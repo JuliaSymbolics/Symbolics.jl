@@ -1,0 +1,10 @@
+name = "Symbolics"
+uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+authors = ["Shashi Gowda <gowda@mit.edu>"]
+version = "0.1.0"
+
+[deps]
+AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
+NaNMath = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
+SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
