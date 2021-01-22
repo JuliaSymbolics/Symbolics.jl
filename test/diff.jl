@@ -125,7 +125,7 @@ dxyu = Dx(Dy(u(x,y)))
 dxxu = Dx(Dx(u(x,y)))
 @test isequal(expand_derivatives(dxxu), dxxu)
 
-using Symbolics, StaticArrays, LinearAlgebra, SparseArrays
+using Symbolics, LinearAlgebra, SparseArrays
 using Test
 
 canonequal(a, b) = isequal(simplify(a), simplify(b))
@@ -198,4 +198,3 @@ reference_hes = Symbolics.hessian(rr, X)
 sp_hess = Symbolics.sparsehessian(rr, X)
 @test findnz(sparse(reference_hes))[1:2] == findnz(sp_hess)[1:2]
 @test isequal(map(spoly, findnz(sparse(reference_hes))[3]), map(spoly, findnz(sp_hess)[3]))
-
