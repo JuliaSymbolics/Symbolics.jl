@@ -79,7 +79,7 @@ end
     tosymbolic(a::T) -> T
 """
 tosymbolic(a::Num) = tosymbolic(value(a))
-tosymbolic(a::Sym) = tovar(a)
+tosymbolic(a::Sym) = Sym{symtype(a)}(nameof(a)) # unwrap stuff like Parameter{<:Number}
 tosymbolic(a) = a
 
 @num_method Base.isless isless(tosymbolic(a), tosymbolic(b)) (Real,)
