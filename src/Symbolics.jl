@@ -10,15 +10,16 @@ import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype, to_symbolic,
                       FnType, @rule, Rewriters, substitute, similarterm,
                       promote_symtype, istree, operation, arguments
 
+import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 # re-export
 
 export simplify, substitute
 
-include("utils.jl")
-
 export Num
 include("num.jl")
+
+include("utils.jl")
 
 using TreeViews
 export @variables

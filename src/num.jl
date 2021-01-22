@@ -102,3 +102,10 @@ Base.convert(::Type{Sym}, x::Num) = value(x) isa Sym ? value(x) : error("cannot 
 
 LinearAlgebra.lu(x::Array{Num}; check=true, kw...) = sym_lu(x; check=check)
 
+_iszero(x::Number) = iszero(x)
+_isone(x::Number) = isone(x)
+_iszero(::Symbolic) = false
+_isone(::Symbolic) = false
+_iszero(x::Num) = _iszero(value(x))
+_isone(x::Num) = _isone(value(x))
+
