@@ -1,5 +1,3 @@
-using SymbolicUtils: Term, symtype, Sym, simplify
-
 """
 
 Represents a differential operator.

@@ -124,3 +124,78 @@ dxyu = Dx(Dy(u(x,y)))
 @test isequal(expand_derivatives(dxyu), dxyu)
 dxxu = Dx(Dx(u(x,y)))
 @test isequal(expand_derivatives(dxxu), dxxu)
+
+using Symbolics, StaticArrays, LinearAlgebra, SparseArrays
+using Test
+
+canonequal(a, b) = isequal(simplify(a), simplify(b))
+
+# Calculus
+@variables t σ ρ β
+@variables x y z
+@test isequal(
+    (Differential(z) * Differential(y) * Differential(x))(t),
+    Differential(z)(Differential(y)(Differential(x)(t)))
+)
+
+@test canonequal(
+                 Symbolics.derivative(sin(cos(x)), x),
+                 -sin(x) * cos(cos(x))
+                )
+
+Symbolics.@register no_der(x)
+@test canonequal(
+                 Symbolics.derivative([sin(cos(x)), hypot(x, no_der(x))], x),
+                 [
+                  -sin(x) * cos(cos(x)),
+                  x/hypot(x, no_der(x)) + no_der(x)*Differential(x)(no_der(x))/hypot(x, no_der(x))
+                 ]
+                )
+
+Symbolics.@register intfun(x)::Int
+@test Symbolics.symtype(intfun(x)) === Int
+
+eqs = [σ*(y-x),
+       x*(ρ-z)-y,
+       x*y - β*z]
+
+∂ = Symbolics.jacobian(eqs,[x,y,z])
+for i in 1:3
+    ∇ = Symbolics.gradient(eqs[i],[x,y,z])
+    @test canonequal(∂[i,:],∇)
+end
+
+@test all(canonequal.(Symbolics.gradient(eqs[1],[x,y,z]),[σ * -1,σ,0]))
+@test all(canonequal.(Symbolics.hessian(eqs[1],[x,y,z]),0))
+
+du = [x^2, y^3, x^4, sin(y), x+y, x+z^2, z+x, x+y^2+sin(z)]
+reference_jac = sparse(Symbolics.jacobian(du, [x,y,z]))
+
+@test findnz(Symbolics.jacobian_sparsity(du, [x,y,z]))[[1,2]] == findnz(reference_jac)[[1,2]]
+
+let
+    @variables t x(t) y(t) z(t)
+    @test Symbolics.exprs_occur_in([x,y,z], x^2*y) == [true, true, false]
+end
+
+@test isequal(Symbolics.sparsejacobian(du, [x,y,z]), reference_jac)
+
+using Symbolics
+
+rosenbrock(X) = sum(1:length(X)-1) do i
+    100 * (X[i+1] - X[i]^2)^2 + (1 - X[i])^2
+end
+
+@variables a,b
+X = [a,b]
+
+spoly(x) = simplify(x, polynorm=true)
+rr = rosenbrock(X)
+
+reference_hes = Symbolics.hessian(rr, X)
+@test findnz(sparse(reference_hes))[1:2] == findnz(Symbolics.hessian_sparsity(rr, X))[1:2]
+
+sp_hess = Symbolics.sparsehessian(rr, X)
+@test findnz(sparse(reference_hes))[1:2] == findnz(sp_hess)[1:2]
+@test isequal(map(spoly, findnz(sparse(reference_hes))[3]), map(spoly, findnz(sp_hess)[3]))
+

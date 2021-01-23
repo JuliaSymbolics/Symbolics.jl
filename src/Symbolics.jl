@@ -21,6 +21,9 @@ include("num.jl")
 
 include("utils.jl")
 
+using MacroTools
+include("register.jl")
+
 using TreeViews
 export @variables
 include("variable.jl")
@@ -28,6 +31,9 @@ include("variable.jl")
 include("linearity.jl")
 
 using DiffRules, SpecialFunctions, NaNMath
+
+using SparseArrays
+
 export Differential, expand_derivatives, gradient,
        jacobian, jacobian_sparsity, sparsejacobian,
        hessian, sparsehessian, hessian_sparsity
