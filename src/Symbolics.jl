@@ -34,4 +34,6 @@ export Differential, expand_derivatives, gradient,
 
 include("diff.jl")
 
+include("linear_algebra.jl")
+
 end # module
