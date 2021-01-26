@@ -14,7 +14,7 @@ const IndexMap = Dict{Char,Char}(
 
 # TODO: move this to Symutils
 function Sym{T}(name, i, indices...) where T
-    var_name = Symbol("$(name)$(join(map_subscripts.((i, indices...,)), "ˏ"))")
+    var_name = Symbol("$(name)$(join(map_subscripts.((i, indices...,)), ","))")
     Sym{T}(var_name)
 end
 
