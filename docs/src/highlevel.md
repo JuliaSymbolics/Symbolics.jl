@@ -12,7 +12,6 @@ methods.
 @variables
 Differential
 Base.:~(::Num, ::Num)
-modelingtoolkitize
 ```
 
 ## Differentiation Functions
