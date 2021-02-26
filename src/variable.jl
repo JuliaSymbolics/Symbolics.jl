@@ -162,4 +162,3 @@ function TreeViews.treelabel(io::IO,x::Sym,
                              mime::MIME"text/plain" = MIME"text/plain"())
   show(io,mime,Text(x.name))
 end
-
