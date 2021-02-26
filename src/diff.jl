@@ -1,4 +1,5 @@
 """
+$(TYPEDEF)
 
 Represents a differential operator.
 
@@ -34,16 +35,12 @@ end
 (D::Differential)(x::Num) = Num(D(value(x)))
 SymbolicUtils.promote_symtype(::Differential, x) = x
 
-is_derivative(O::Term) = isa(operation(O), Differential)
-is_derivative(::Any) = false
-
-
 Base.:*(D1, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
 Base.:*(D1::Differential, D2::Differential) = D1 ∘ D2
 Base.:^(D::Differential, n::Integer) = _repeat_apply(D, n)
 
-Base.show(io::IO, D::Differential) = print(io, "(D'~", D.x, ")")
+Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ")")
 
 Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
 
