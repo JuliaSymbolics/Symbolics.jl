@@ -13,12 +13,12 @@ makedocs(
         "Tutorials" => Any[
             "tutorials/symbolic_functions.md",
             "tutorials/auto_parallel.md",
-            "tutorials/converting_to_C.md"
+            "tutorials/converting_to_C.md",
         ],
         "Comparison Against SymPy" => "comparison.md",
         "highlevel.md",
         "build_function.md",
-        "IR.md"
+        "IR.md",
     ]
 )
 
