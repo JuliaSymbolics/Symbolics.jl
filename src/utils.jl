@@ -174,3 +174,7 @@ x⦗t⦘
 """
 makesym(t::Symbolic; kwargs...) = Sym{symtype(t)}(tosymbol(t; kwargs...))
 makesym(t::Num; kwargs...) = makesym(value(t); kwargs...)
+
+var_from_nested_derivative(x, i=0) = (missing, missing)
+var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1],i+1) : (x,i)
+var_from_nested_derivative(x::Sym,i=0) = (x,i)
