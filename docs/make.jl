@@ -6,7 +6,7 @@ makedocs(
     modules=[Symbolics],
     clean=true,doctest=false,
     format = Documenter.HTML(#analytics = "UA-90474609-3",
-                             assets = ["assets/favicon.ico"],
+                             assets = ["assets/favicon.ico"])
                              #canonical="https://mtk.sciml.ai/stable/"),
     pages=[
         "Home" => "index.md",
