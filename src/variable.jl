@@ -12,6 +12,7 @@ const IndexMap = Dict{Char,Char}(
             '8' => '₈',
             '9' => '₉')
 
+const Variable = Sym # for backward compat
 # TODO: move this to Symutils
 function Sym{T}(name, i, indices...) where T
     var_name = Symbol("$(name)$(join(map_subscripts.((i, indices...,)), "ˏ"))")
@@ -24,7 +25,7 @@ function map_subscripts(indices)
 end
 
 rename(x::Sym{T},name) where T = Sym{T}(name)
-function rename(x::Term, name) where T
+function rename(x::Symbolic, name)
     if operation(x) isa Sym
         rename(operation(x), name)(arguments(x)...)
     else

@@ -73,25 +73,32 @@ function A_b(eq, var)
 end
 
 """
-    solve_for(eqs::Vector, vars::Vector)
+    solve_for(eqs::Vector, vars::Vector; simplify=true, check=true)
 
 Solve the vector of equations `eqs` for a set of variables `vars`.
 
 Assumes `length(eqs) == length(vars)`
 
-Currently only works if all equations are linear.
+Currently only works if all equations are linear. `check` if the expr is linear
+w.r.t `vars`.
 """
-function solve_for(eqs, vars)
-    A, b = A_b(eqs, vars)
-    _solve(A, b)
+function solve_for(eqs, vars; simplify=true, check=true)
+    A, b = A_b(eqs, vars, check)
+    #TODO: we need to make sure that `solve_for(eqs, vars)` contains no `vars`
+    _solve(A, b, simplify)
 end
 
-function _solve(A::AbstractMatrix, b::AbstractArray)
+function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     A = SymbolicUtils.simplify.(Num.(A), polynorm=true)
     b = SymbolicUtils.simplify.(Num.(b), polynorm=true)
-    value.(SymbolicUtils.simplify.(sym_lu(A) \ b))
+    sol = value.(sym_lu(A) \ b)
+    do_simplify ? SymbolicUtils.simplify.(sol, polynorm=true) : sol
 end
-_solve(a, b) = value(SymbolicUtils.simplify(b/a, polynorm=true))
+
+function _solve(a, b, do_simplify)
+    sol = value(b/a)
+    do_simplify ? SymbolicUtils.simplify(sol, polynorm=true) : sol
+end
 
 # ldiv below
 
