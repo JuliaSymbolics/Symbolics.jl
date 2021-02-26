@@ -349,7 +349,7 @@ x + 2 * (t + y)  y ^ 2
 We can then use `substitute` to change values of an expression around:
 
 ```julia
-simplify.(substitute.(B,[x=>y^2]))
+simplify.(substitute.(B, (Dict(x=>y^2),)))
 
 2×2 Array{Num,2}:
        2 * t ^ 2 + t     6t
@@ -360,7 +360,7 @@ and we can use this to interactively evaluate expressions without
 generating and compiling Julia functions:
 
 ```julia
-substitute.(B,([x=>2.0,y=>3.0,t=>4.0],))
+substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
 
 2×2 Array{Symbolics.Constant,2}:
  Constant(36.0)  Constant(24.0)

@@ -8,7 +8,7 @@ using Reexport
 
 @reexport using SymbolicUtils
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype, to_symbolic,
+import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
                       FnType, @rule, Rewriters, substitute, similarterm,
                       promote_symtype, istree, operation, arguments, toexpr
 
