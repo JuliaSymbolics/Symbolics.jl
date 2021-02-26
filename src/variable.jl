@@ -12,6 +12,52 @@ const IndexMap = Dict{Char,Char}(
             '8' => '₈',
             '9' => '₉')
 
+"""
+$(TYPEDEF)
+
+A named variable which represents a numerical value. The variable is uniquely
+identified by its `name`, and all variables with the same `name` are treated
+as equal.
+
+# Fields
+$(FIELDS)
+
+For example, the following code defines an independent variable `t`, a parameter
+`α`, a function parameter `σ`, a variable `x`, which depends on `t`, a variable
+`y` with no dependents, a variable `z`, which depends on `t`, `α`, and `x(t)`
+and parameters `β₁` and `β₂`.
+
+
+```julia
+t = Num(Variable{ModelingToolkit.Parameter{Real}}(:t))  # independent variables are treated as known
+α = Num(Variable{ModelingToolkit.Parameter{Real}}(:α))  # parameters are known
+σ = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
+w = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
+x = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
+y = Num(Variable(:y))   # unknown, no dependents
+z = Num(Variable{ModelingToolkit.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
+β₁ = Num(Variable(:β, 1)) # with index 1
+β₂ = Num(Variable(:β, 2)) # with index 2
+
+expr = β₁ * x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
+```
+"""
+struct Variable{T} <: Function # backward compat
+    """The variable's unique name."""
+    name::Symbol
+    Variable(name) = Sym{Real}(name)
+    Variable{T}(name) where T = Sym{T}(name)
+    function Variable{T}(name, indices...) where T
+        var_name = Symbol("$(name)$(join(map_subscripts.(indices), "ˏ"))")
+        Sym{T}(var_name)
+    end
+end
+
+function Variable(name, indices...)
+    var_name = Symbol("$(name)$(join(map_subscripts.(indices), "ˏ"))")
+    Variable(var_name)
+end
+
 # TODO: move this to Symutils
 function Sym{T}(name, i, indices...) where T
     var_name = Symbol("$(name)$(join(map_subscripts.((i, indices...,)), "ˏ"))")
@@ -24,7 +70,7 @@ function map_subscripts(indices)
 end
 
 rename(x::Sym{T},name) where T = Sym{T}(name)
-function rename(x::Term, name) where T
+function rename(x::Symbolic, name)
     if operation(x) isa Sym
         rename(operation(x), name)(arguments(x)...)
     else
@@ -162,4 +208,3 @@ function TreeViews.treelabel(io::IO,x::Sym,
                              mime::MIME"text/plain" = MIME"text/plain"())
   show(io,mime,Text(x.name))
 end
-

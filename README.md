@@ -45,13 +45,13 @@ B = simplify.([t^2+t+t^2  2t+4t
 #  2 * t ^ 2 + t     6t
 #  x + 2 * (t + y)  y ^ 2
 
-simplify.(substitute.(B,[x=>y^2]))
+simplify.(substitute.(B,Dict(x=>y^2)))
 
 #2×2 Array{Num,2}:
 #       2 * t ^ 2 + t     6t
 # y ^ 2 + 2 * (t + y)  y ^ 2
 
-substitute.(B,([x=>2.0,y=>3.0,t=>4.0],))
+substitute.(B,(Dict(x=>2.0,y=>3.0,t=>4.0),))
 
 #2×2 Array{ModelingToolkit.Constant,2}:
 # Constant(36.0)  Constant(24.0)

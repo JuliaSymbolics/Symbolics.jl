@@ -14,12 +14,43 @@ Num(x::Num) = x # ideally this should never be called
 value(x) = x
 value(x::Num) = x.val
 
+SciMLBase.issymbollike(::Num) = true
+SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
 
-using SymbolicUtils: to_symbolic
-SymbolicUtils.to_symbolic(n::Num) = value(n)
 SymbolicUtils.@number_methods(Num,
                               Num(f(value(a))),
                               Num(f(value(a), value(b))))
+for C in [Complex, Complex{Bool}]
+    @eval begin
+        Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
+        Base.:*(z::$C, x::Num) = Complex(real(z) * x, imag(z) * x)
+    end
+end
+
+Base.:+(x::Num, z::Complex) = Complex(x + real(z), imag(z))
+Base.:+(z::Complex, x::Num) = Complex(real(z) + x, imag(z))
+Base.:-(x::Num, z::Complex) = Complex(x - real(z), -imag(z))
+Base.:-(z::Complex, x::Num) = Complex(real(z) - x, imag(z))
+function Base.inv(z::Complex{Num})
+    a, b = reim(z)
+    den = a^2 + b^2
+    Complex(a/den, -b/den)
+end
+function Base.:/(x::Complex{Num}, y::Complex{Num})
+    a, b = reim(x)
+    c, d = reim(y)
+    den = c^2 + d^2
+    Complex((a*c + b*d)/den, (b*c - a*d)/den)
+end
+
+function Base.show(io::IO, z::Complex{<:Num})
+    r, i = reim(z)
+    compact = get(io, :compact, false)
+    show(io, r)
+    print(io, (compact ? "+" : " + ") * "(")
+    show(io, i)
+    print(io, ")*im")
+end
 
 SymbolicUtils.simplify(n::Num; kw...) = Num(SymbolicUtils.simplify(value(n); kw...))
 
@@ -82,13 +113,13 @@ tosymbolic(a::Num) = tosymbolic(value(a))
 tosymbolic(a::Sym) = Sym{symtype(a)}(nameof(a)) # unwrap stuff like Parameter{<:Number}
 tosymbolic(a) = a
 
-@num_method Base.isless isless(tosymbolic(a), tosymbolic(b)) (Real,)
-@num_method Base.:(<) (tosymbolic(a) < tosymbolic(b)) (Real,)
-@num_method Base.:(<=) (tosymbolic(a) <= tosymbolic(b)) (Real,)
-@num_method Base.:(>) (tosymbolic(a) > tosymbolic(b)) (Real,)
-@num_method Base.:(>=) (tosymbolic(a) >= tosymbolic(b)) (Real,)
+@num_method Base.isless  (val = isless(tosymbolic(a), tosymbolic(b)); val isa Bool ? val : Num(val)) (Real,)
+@num_method Base.:(<)    (val = tosymbolic(a) < tosymbolic(b)       ; val isa Bool ? val : Num(val)) (Real,)
+@num_method Base.:(<=)   (val = tosymbolic(a) <= tosymbolic(b)      ; val isa Bool ? val : Num(val)) (Real,)
+@num_method Base.:(>)    (val = tosymbolic(a) > tosymbolic(b)       ; val isa Bool ? val : Num(val)) (Real,)
+@num_method Base.:(>=)   (val = tosymbolic(a) >= tosymbolic(b)      ; val isa Bool ? val : Num(val)) (Real,)
+@num_method Base.:(==)   (val = tosymbolic(a) == tosymbolic(b)      ; val isa Bool ? val : Num(val)) (AbstractFloat,Number)
 @num_method Base.isequal isequal(tosymbolic(a), tosymbolic(b)) (AbstractFloat, Number, Symbolic)
-@num_method Base.:(==) tosymbolic(a) == tosymbolic(b) (AbstractFloat,Number)
 
 Base.hash(x::Num, h::UInt) = hash(value(x), h)
 
@@ -109,3 +140,4 @@ _isone(::Symbolic) = false
 _iszero(x::Num) = _iszero(value(x))
 _isone(x::Num) = _isone(value(x))
 
+SymbolicUtils.Code.toexpr(x::Num) = SymbolicUtils.Code.toexpr(value(x))
