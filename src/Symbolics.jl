@@ -22,12 +22,13 @@ using SciMLBase
 export Num
 include("num.jl")
 
-export Equation, CongtrainedEquation
+export Equation, ConstrainedEquation
 include("equations.jl")
 
 include("utils.jl")
 
 using MacroTools
+import MacroTools: splitdef, combinedef, postwalk, striplines
 export @register
 include("register.jl")
 
@@ -51,5 +52,8 @@ include("linear_algebra.jl")
 
 using IfElse, Distributions
 include("extra_functions.jl")
+
+using Latexify
+include("latexify_recipes.jl")
 
 end # module
