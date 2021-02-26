@@ -1,6 +1,6 @@
-# ModelingToolkit IR
+# Symbolics IR
 
-ModelingToolkit IR mirrors the Julia AST but allows for easy mathematical
+Symbolics IR mirrors the Julia AST but allows for easy mathematical
 manipulation by itself following mathematical semantics. The base of the IR is
 the `Sym` type, which defines a symbolic variable. Registered (mathematical)
 functions on `Sym`s (or `istree` objects) return an expression that `istree`.
@@ -10,7 +10,7 @@ written as `op1 ~ op2`, defines the symbolic equality between two operations.
 
 ### Types
 `Sym`, `Term`, and `FnType` are from [SymbolicUtils.jl](https://juliasymbolics.github.io/SymbolicUtils.jl/api/). Note that in
-ModelingToolkit, we always use `Sym{Real}`, `Term{Real}`, and
+Symbolics, we always use `Sym{Real}`, `Term{Real}`, and
 `FnType{Tuple{Any}, Real}`. To get the arguments of a `istree` object use
 `arguments(t::Term)`, and to get the operation, use `operation(t::Term)`.
 However, note that one should never dispatch on `Term` or test `isa Term`.
@@ -23,11 +23,11 @@ Equation
 
 ### A note about functions restricted to `Number`s
 
-`Sym` and `Term` objects are NOT subtypes of `Number`. ModelingToolkit provides
+`Sym` and `Term` objects are NOT subtypes of `Number`. Symbolics provides
 a simple wrapper type called `Num` which is a subtype of `Real`. `Num` wraps
 either a Sym or a Term or any other object, defines the same set of operations
 as symbolic expressions and forwards those to the values it wraps. You can use
-`ModelingToolkit.value` function to unwrap a `Num`.
+`Symbolics.value` function to unwrap a `Num`.
 
 By default, the `@variables` and `@parameters` functions return Num-wrapped
 objects so as to allow calling functions which are restricted to `Number` or
@@ -36,13 +36,13 @@ objects so as to allow calling functions which are restricted to `Number` or
 ```julia
 julia> @parameters t; @variables x y z(t);
 
-julia> ModelingToolkit.operation(ModelingToolkit.value(x + y))
+julia> Symbolics.operation(Symbolics.value(x + y))
 + (generic function with 377 methods)
 
-julia> ModelingToolkit.operation(ModelingToolkit.value(z))
+julia> Symbolics.operation(Symbolics.value(z))
 z(::Any)::Real
 
-julia> ModelingToolkit.arguments(ModelingToolkit.value(x + y))
+julia> Symbolics.arguments(Symbolics.value(x + y))
 2-element Vector{Sym{Real}}:
  x
  y
@@ -50,9 +50,9 @@ julia> ModelingToolkit.arguments(ModelingToolkit.value(x + y))
 
 ### Function Registration
 
-The ModelingToolkit graph only allowed for registered Julia functions for the
+The Symbolics graph only allowed for registered Julia functions for the
 operations. All other functions are automatically traced down to registered
-functions. By default, ModelingToolkit.jl pre-registers the common functions
+functions. By default, Symbolics.jl pre-registers the common functions
 utilized in [SymbolicUtils.jl](https://github.com/JuliaSymbolics/SymbolicUtils.jl)
 and pre-defines their derivatives. However, the user can utilize the `@register`
 macro to add their function to allowed functions of the computation graph.
@@ -74,12 +74,12 @@ out all of the differentials, the `expand_derivatives` function eliminates all
 of the differentials down to basic one-variable expressions.
 
 ```@docs
-ModelingToolkit.derivative
+Symbolics.derivative
 Differential
 expand_derivatives
-ModelingToolkit.jacobian
-ModelingToolkit.gradient
-ModelingToolkit.hessian
+Symbolics.jacobian
+Symbolics.gradient
+Symbolics.hessian
 ```
 
 For jacobians which are sparse, use the `sparsejacobian` function.
@@ -106,7 +106,7 @@ function via the dispatch:
 
 ```julia
 # `N` arguments are accepted by the relevant method of `my_function`
-ModelingToolkit.derivative(::typeof(my_function), args::NTuple{N,Any}, ::Val{i})
+Symbolics.derivative(::typeof(my_function), args::NTuple{N,Any}, ::Val{i})
 ```
 
 where `i` means that it's the derivative with respect to the `i`th argument. `args` is the
@@ -116,12 +116,12 @@ You should return an `Term` for the derivative of your function.
 For example, `sin(t)`'s derivative (by `t`) is given by the following:
 
 ```julia
-ModelingToolkit.derivative(::typeof(sin), args::NTuple{1,Any}, ::Val{1}) = cos(args[1])
+Symbolics.derivative(::typeof(sin), args::NTuple{1,Any}, ::Val{1}) = cos(args[1])
 ```
 
 ### IR Manipulation
 
-ModelingToolkit.jl provides functionality for easily manipulating expressions.
+Symbolics.jl provides functionality for easily manipulating expressions.
 Most of the functionality comes by the expression objects obeying the standard
 mathematical semantics. For example, if one has `A` a matrix of symbolic
 expressions wrapped in `Num`, then `A^2` calculates the expressions for the

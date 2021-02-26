@@ -17,31 +17,31 @@ Base.:~(::Num, ::Num)
 ## Differentiation Functions
 
 ```@docs
-ModelingToolkit.derivative
-ModelingToolkit.gradient
-ModelingToolkit.jacobian
-ModelingToolkit.sparsejacobian
-ModelingToolkit.hessian
-ModelingToolkit.sparsehessian
+Symbolics.derivative
+Symbolics.gradient
+Symbolics.jacobian
+Symbolics.sparsejacobian
+Symbolics.hessian
+Symbolics.sparsehessian
 ```
 
 ## Sparsity Detection
 
 ```@docs
-ModelingToolkit.jacobian_sparsity
-ModelingToolkit.hessian_sparsity
+Symbolics.jacobian_sparsity
+Symbolics.hessian_sparsity
 ```
 
 ## Latexification
 
-ModelingToolkit.jl's expressions support Latexify.jl, and thus
+Symbolics.jl's expressions support Latexify.jl, and thus
 
 ```julia
 using Latexify
 latexify(ex)
 ```
 
-will produce LaTeX output from ModelingToolkit models and expressions.
+will produce LaTeX output from Symbolics models and expressions.
 This works on basics like `Term` all the way to higher primitives
 like `ODESystem` and `ReactionSystem`.
 
@@ -59,8 +59,8 @@ NonlinearSystem(eqs)
 
 ## Direct Tracing
 
-Because ModelingToolkit expressions respect Julia semantics, one way
-to generate symbolic expressions is to simply place ModelingToolkit
+Because Symbolics expressions respect Julia semantics, one way
+to generate symbolic expressions is to simply place Symbolics
 variables as inputs into existing Julia code. For example, the following
 uses the standard Julia function for the Lorenz equations to generate
 the symbolic expression for the Lorenz equations:
@@ -140,12 +140,12 @@ to appropriately handle them.
 ## I/O and Saving
 
 Note that Julia's standard I/O functionality can be used to save
-ModelingToolkit expressions out to files. For example, here we will
+Symbolics expressions out to files. For example, here we will
 generate an in-place version of `f` and save the anonymous function to
 a `.jl` file:
 
 ```julia
-using ModelingToolkit
+using Symbolics
 @variables u[1:3]
 function f(u)
   [u[1]-u[3],u[1]^2-u[2],u[3]+u[2]]
@@ -161,5 +161,5 @@ f = include("function.jl")
 ```
 
 and that will load the function back in. Note that this can be done
-to save the transformation results of ModelingToolkit.jl so that
+to save the transformation results of Symbolics.jl so that
 they can be stored and used in a precompiled Julia package.
