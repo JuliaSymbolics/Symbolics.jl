@@ -10,7 +10,7 @@ using Reexport
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype, to_symbolic,
                       FnType, @rule, Rewriters, substitute, similarterm,
-                      promote_symtype, istree, operation, arguments
+                      promote_symtype, istree, operation, arguments, toexpr
 
 import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
