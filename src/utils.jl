@@ -26,6 +26,7 @@ tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
+
 ```julia
 julia> ModelingToolkit.diff2term(ModelingToolkit.value(D(D(x))))
 xˍtt(t)
@@ -56,6 +57,7 @@ means if the target has escapes like `val"y⦗t⦘"`. If `escape` then it will o
 output `y` instead of `y⦗t⦘`.
 
 # Examples
+
 ```julia
 julia> @parameters t; @variables z(t)
 (z(t),)

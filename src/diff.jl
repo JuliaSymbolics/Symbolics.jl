@@ -288,9 +288,7 @@ end
 ### Jacobians & Hessians
 
 """
-```julia
-derivative(O, v; simplify=false)
-```
+$(SIGNATURES)
 
 A helper function for computing the derivative of an expression with respect to
 `var`.
@@ -304,9 +302,7 @@ function derivative(O, v; simplify=false)
 end
 
 """
-```julia
-gradient(O, vars::AbstractVector; simplify=false)
-```
+$(SIGNATURES)
 
 A helper function for computing the gradient of an expression with respect to
 an array of variable expressions.
@@ -316,9 +312,7 @@ function gradient(O, vars::AbstractVector; simplify=false)
 end
 
 """
-```julia
-jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
-```
+$(SIGNATURES)
 
 A helper function for computing the Jacobian of an array of expressions with respect to
 an array of variable expressions.
@@ -328,9 +322,7 @@ function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
 end
 
 """
-```julia
-sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
-```
+$(SIGNATURES)
 
 A helper function for computing the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions.
@@ -395,9 +387,7 @@ function exprs_occur_in(exprs, expr)
 end
 
 """
-```julia
-hessian(O, vars::AbstractVector; simplify=false)
-```
+$(SIGNATURES)
 
 A helper function for computing the Hessian of an expression with respect to
 an array of variable expressions.
@@ -419,9 +409,7 @@ end
 isidx(x) = x isa TermCombination
 
 """
-```julia
-hessian_sparsity(ops::AbstractVector, vars::AbstractVector)
-```
+    hessian_sparsity(ops::AbstractVector, vars::AbstractVector)
 
 Return the sparsity pattern of the Hessian of an array of expressions with respect to
 an array of variable expressions.
@@ -457,14 +445,6 @@ let
 
     global hessian_sparsity
 
-    """
-    ```julia
-    hessian_sparsity(ops::AbstractVector, vars::AbstractVector)
-    ```
-
-    Return the sparsity pattern of the Hessian of an array of expressions with respect to
-    an array of variable expressions.
-    """
     function hessian_sparsity(f, u)
         @assert !(f isa AbstractArray)
         f = value(f)
@@ -478,9 +458,8 @@ let
 end
 
 """
-```julia
-islinear(ex, u)
-```
+$(SIGNATURES)
+
 Check if an expression is linear with respect to a list of variable expressions.
 """
 function islinear(ex, u)
@@ -488,9 +467,7 @@ function islinear(ex, u)
 end
 
 """
-```julia
-sparsehessian(O, vars::AbstractVector; simplify=false)
-```
+$(SIGNATURES)
 
 A helper function for computing the sparse Hessian of an expression with respect to
 an array of variable expressions.

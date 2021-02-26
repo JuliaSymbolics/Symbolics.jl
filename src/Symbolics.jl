@@ -4,7 +4,9 @@ using DocStringExtensions
 
 using LinearAlgebra
 
-import SymbolicUtils
+using Reexport
+
+@reexport using SymbolicUtils
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype, to_symbolic,
                       FnType, @rule, Rewriters, substitute, similarterm,
