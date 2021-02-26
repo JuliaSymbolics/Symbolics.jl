@@ -45,4 +45,7 @@ include("diff.jl")
 
 include("linear_algebra.jl")
 
+using IfElse, Distributions
+include("extra_functions.jl")
+
 end # module
