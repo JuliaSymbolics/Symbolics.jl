@@ -10,7 +10,7 @@ using Reexport
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
                       FnType, @rule, Rewriters, substitute, similarterm,
-                      promote_symtype, istree, operation, arguments, toexpr
+                      promote_symtype, istree, operation, arguments
 
 import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
@@ -18,6 +18,7 @@ import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 export simplify, substitute
 
+using SciMLBase
 export Num
 include("num.jl")
 

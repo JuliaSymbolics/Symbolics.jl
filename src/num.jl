@@ -140,4 +140,4 @@ _isone(::Symbolic) = false
 _iszero(x::Num) = _iszero(value(x))
 _isone(x::Num) = _isone(value(x))
 
-SymbolicUtils.toexpr(x::Num) = toexpr(value(x))
+SymbolicUtils.Code.toexpr(x::Num) = SymbolicUtils.Code.toexpr(value(x))
