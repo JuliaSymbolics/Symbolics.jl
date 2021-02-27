@@ -53,6 +53,7 @@ function Base.show(io::IO, z::Complex{<:Num})
 end
 
 SymbolicUtils.simplify(n::Num; kw...) = Num(SymbolicUtils.simplify(value(n); kw...))
+substitute(x::Num, rule; kw...) = substitute(value(x), rule; kw...)
 
 SymbolicUtils.symtype(n::Num) = symtype(n.val)
 
