@@ -317,9 +317,9 @@ like:
 ```julia
 Symbolics.jacobian([x+x*y,x^2+y],[x,y])
 
-2×2 Array{Num,2}:
- 1 + y            x
-    2x  Constant(1)
+2×2 Matrix{Num}:
+ 1 + y  x
+    2x  1
 ```
 
 and similarly we can do Hessians, gradients, and define whatever other
@@ -360,17 +360,11 @@ and we can use this to interactively evaluate expressions without
 generating and compiling Julia functions:
 
 ```julia
-substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
+V = substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
 
-2×2 Array{Symbolics.Constant,2}:
- Constant(36.0)  Constant(24.0)
- Constant(16.0)   Constant(9.0)
-```
-
-Where we can reference the values via:
-
-```julia
-Symbolics.Constant(2.0).value # 2.0
+2×2 Matrix{Float64}:
+ 36.0  24.0
+ 16.0   9.0
 ```
 
 ## Non-Interactive Development (No Macro Version)
