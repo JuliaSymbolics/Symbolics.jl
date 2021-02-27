@@ -166,7 +166,7 @@ expr = β₁* x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
 `(..)` signifies that the value should be left uncalled.
 
 Sometimes it is convenient to define arrays of variables to model things like `x₁,…,x₃`.
-The `@variables` and `@parameters` macros support this with the following syntax:
+The `@variables` macro supports this with the following syntax:
 
 ```julia
 @variables x[1:3];
@@ -186,7 +186,7 @@ y
  y₃ˏ₁  y₃ˏ₆
 
 # also works for dependent variables
-@parameters t; @variables z[1:3](t);
+@variables t z[1:3](t);
 z
 
 3-element Array{Num,1}:
