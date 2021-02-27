@@ -50,6 +50,14 @@ julia> Symbolics.arguments(Symbolics.value(x + y))
  y
 ```
 
+### Symbolic Control Flow
+
+Control flow can be expressed in Symbolics.jl in the following ways:
+
+- `IfElse.ifelse(cond,x,y)`: this is a dispatch-able version of the `ifelse`
+  function provided by `IfElse.jl` which allows for encoding conditionals in
+  the symbolic branches.
+
 ### Inspection Functions
 
 ```@docs
