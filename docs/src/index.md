@@ -42,6 +42,19 @@ and much more.
 
 ## Extension Packages
 
-- [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl): Symbolic
-  representations of models, like ODEs, SDEs, PDEs, optimization, optimal control,
-  nonlinear solves, and more.
+Below is a list of known extension packages. If you would like your package
+to be listed here, feel free to open a pull request!
+
+- [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl): Symbolic representations of common numerical systems
+    - Ordinary differential equations
+    - Stocahstic differential equations
+    - Partial differential equations
+    - Nonlinear systems
+    - Optimization problems
+    - Optimal Control
+    - Causal and acausal modeling (Simulink/Modelica)
+    - Automated model transformation, simplification, and composition
+- [Catalyst.jl](https://github.com/SciML/Catalyst.jl): Symbolic representations of chemical reactions
+    - Symbolically build and represent large systems of chemical reactions
+    - Generate code for ODEs, SDEs, continuous-time Markov Chains, and more
+    - Simulate the models using the SciML ecosystem with O(1) Gillespie methods
