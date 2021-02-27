@@ -1,4 +1,3 @@
-using ModelingToolkit
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
@@ -25,7 +24,7 @@ F = lu(X)
 R = simplify.(F.L * F.U - X[F.p, :], polynorm=true)
 @test iszero(R)
 @test simplify.(F \ X) == I
-@test ModelingToolkit._solve(X, X, true) == I
+@test Symbolics._solve(X, X, true) == I
 inv(X)
 qr(X)
 
@@ -74,7 +73,6 @@ J = expand_derivatives.(J)
 using LinearAlgebra
 luJ = lu(J,Val(false))
 
-using ModelingToolkit
 @variables M[1:2,1:2]
 inv(M)
 
