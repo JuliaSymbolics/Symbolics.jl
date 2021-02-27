@@ -29,12 +29,11 @@ either a Sym or a Term or any other object, defines the same set of operations
 as symbolic expressions and forwards those to the values it wraps. You can use
 `Symbolics.value` function to unwrap a `Num`.
 
-By default, the `@variables` and `@parameters` functions return Num-wrapped
-objects so as to allow calling functions which are restricted to `Number` or
-`Real`.
+By default, the `@variables` macros return Num-wrapped objects so as to allow
+calling functions which are restricted to `Number` or `Real`.
 
 ```julia
-julia> @parameters t; @variables x y z(t);
+julia> @variables t x y z(t);
 
 julia> Symbolics.operation(Symbolics.value(x + y))
 + (generic function with 377 methods)
