@@ -47,7 +47,7 @@ to be listed here, feel free to open a pull request!
 
 - [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl): Symbolic representations of common numerical systems
     - Ordinary differential equations
-    - Stocahstic differential equations
+    - Stochastic differential equations
     - Partial differential equations
     - Nonlinear systems
     - Optimization problems
