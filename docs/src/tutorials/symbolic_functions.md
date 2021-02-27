@@ -362,6 +362,16 @@ generating and compiling Julia functions:
 ```julia
 V = substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
 
+2×2 Matrix{Num}:
+ 36.0  24.0
+ 16.0   9.0
+```
+
+Where we can reference the values via:
+
+```julia
+Symbolics.value.(V)
+
 2×2 Matrix{Float64}:
  36.0  24.0
  16.0   9.0
