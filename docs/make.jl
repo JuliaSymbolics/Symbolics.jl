@@ -1,9 +1,9 @@
-using Documenter, Symbolics
+using Documenter, Symbolics, SymbolicUtils
 
 makedocs(
     sitename="Symbolics.jl",
     authors="Chris Rackauckas",
-    modules=[Symbolics],
+    modules=[Symbolics,SymbolicUtils],
     clean=true,doctest=false,
     format = Documenter.HTML(#analytics = "UA-90474609-3",
                              assets = ["assets/favicon.ico"]),

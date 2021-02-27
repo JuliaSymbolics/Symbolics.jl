@@ -49,3 +49,11 @@ julia> Symbolics.arguments(Symbolics.value(x + y))
  x
  y
 ```
+
+### Inspection Functions
+
+```@docs
+SymbolicUtils.istree
+SymbolicUtils.operation
+Symbolicutils.arguments
+```

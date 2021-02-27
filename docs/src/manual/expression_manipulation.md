@@ -9,13 +9,19 @@ for performing a lot of the manipulation on the IR, as, for example,
 calculating the sparse form of the matrix via `sparse(A)` is valid, legible,
 and easily understandable to all Julia programmers.
 
+## Functionality Inherited From SymbolicUtils.jl
+
+```@docs
+SymbolicUtils.substitute
+SymbolicUtils.simplify
+```
+
+## Additional Manipulation Functions
+
 Other additional manipulation functions are given below.
 
 ```@docs
 Symbolics.get_variables
-Symbolics.substitute
-Symbolics.tovar
-Symbolics.toparam
 Symbolics.tosymbol
 Symbolics.makesym
 Symbolics.diff2term
