@@ -29,13 +29,11 @@ and parameters `β₁` and `β₂`.
 
 
 ```julia
-t = Num(Variable{ModelingToolkit.Parameter{Real}}(:t))  # independent variables are treated as known
-α = Num(Variable{ModelingToolkit.Parameter{Real}}(:α))  # parameters are known
-σ = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
-w = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
-x = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
+σ = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
+w = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
+x = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
 y = Num(Variable(:y))   # unknown, no dependents
-z = Num(Variable{ModelingToolkit.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
+z = Num(Variable{Symbolics.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
 β₁ = Num(Variable(:β, 1)) # with index 1
 β₂ = Num(Variable(:β, 2)) # with index 2
 

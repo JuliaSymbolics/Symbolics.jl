@@ -9,7 +9,7 @@ $(FIELDS)
 # Examples
 
 ```jldoctest
-julia> using ModelingToolkit
+julia> using Symbolics
 
 julia> @variables x y;
 
