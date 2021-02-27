@@ -49,3 +49,5 @@ excels in many areas due to purposeful design decisions:
   The list keeps going. All told, by design Symbolics.jl's development
   moves fast because it's effectively using the work of hundreds of
   Julia developers, allowing it to grow fast.
+- While Symbolics.jl has many features missing from SymPy, it does not superset
+  SymPy's functionality. For a list of missing features, see [this issue](https://github.com/JuliaSymbolics/Symbolics.jl/issues/59).
