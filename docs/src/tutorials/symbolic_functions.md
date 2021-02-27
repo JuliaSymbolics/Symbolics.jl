@@ -165,7 +165,7 @@ issues, one could do `expression = Val{false}`:
 build_function(to_compute,[x,y],expression=Val{false})
 ```
 
-which will use [GeneralizedGenerated.jl](https://github.com/thautwarm/GeneralizedGenerated.jl)
+which will use [RuntimeGeneratedFunctions.jl](https://github.com/SciML/RuntimeGeneratedFunctions.jl)
 to build Julia functions which avoid world-age issues.
 
 ## Building Non-Allocating Parallel Functions for Sparse Matrices
