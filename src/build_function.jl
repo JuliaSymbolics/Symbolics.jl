@@ -147,8 +147,8 @@ Generates a Julia function which can then be utilized for further evaluations.
 If expression=Val{false}, the return is a Julia function which utilizes
 RuntimeGeneratedFunctions.jl in order to be free of world-age issues.
 
-If the `Num` is an `Operation`, the generated function is a function
-with a scalar output, otherwise if it's an `AbstractArray{Operation}`, the output
+If the `rhss` is a scalar, the generated function is a function
+with a scalar output, otherwise if it's an `AbstractArray`, the output
 is two functions, one for out-of-place AbstractArray output and a second which
 is a mutating function. The outputted functions match the given argument order,
 i.e., f(u,p,args...) for the out-of-place and scalar functions and
@@ -163,7 +163,7 @@ Special Keyword Argumnets:
   - `SerialForm()`: Serial execution.
   - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
     splitting the number of expressions per thread.
-- `conv`: The conversion function of the Operation to Expr. By default this uses
+- `conv`: The conversion function of symbolic types to Expr. By default this uses
   the `toexpr` function.
 - `checkbounds`: For whether to enable bounds checking inside of the generated
   function. Defaults to false, meaning that `@inbounds` is applied.

@@ -28,15 +28,15 @@ Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
 # Examples
 
 ```jldoctest
-julia> using ModelingToolkit
+julia> using Symbolics
 
 julia> @variables x y;
 
 julia> x ~ y
-Equation(x(), y())
+x ~ y
 
 julia> x - y ~ 0
-Equation(x() - y(), 0)
+x - y ~ 0
 ```
 """
 Base.:~(lhs::Num, rhs::Num) = Equation(value(lhs), value(rhs))
