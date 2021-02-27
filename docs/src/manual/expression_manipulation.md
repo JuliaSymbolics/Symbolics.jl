@@ -12,12 +12,12 @@ and easily understandable to all Julia programmers.
 Other additional manipulation functions are given below.
 
 ```@docs
-get_variables
-substitute
-tovar
-toparam
-tosymbol
-makesym
-diff2term
-solve_for
+Symbolics.get_variables
+Symbolics.substitute
+Symbolics.tovar
+Symbolics.toparam
+Symbolics.tosymbol
+Symbolics.makesym
+Symbolics.diff2term
+Symbolics.solve_for
 ```
