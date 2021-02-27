@@ -19,4 +19,5 @@ toparam
 tosymbol
 makesym
 diff2term
+solve_for
 ```

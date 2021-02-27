@@ -16,13 +16,13 @@ makedocs(
             "tutorials/converting_to_C.md"
         ],
         "Manual" => Any[
-            "variables.md",
-            "expression_manipulation.md",
-            "derivatives.md",
-            "build_function.md",
-            "functions.md",
-            "io.md",
-            "sparsity_detection.md"
+            "manual/variables.md",
+            "manual/expression_manipulation.md",
+            "manual/derivatives.md",
+            "manual/build_function.md",
+            "manual/functions.md",
+            "manual/io.md",
+            "manual/sparsity_detection.md"
         ],
         "Comparison Against SymPy" => "comparison.md",
     ]
