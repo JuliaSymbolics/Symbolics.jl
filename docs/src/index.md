@@ -22,10 +22,18 @@ just work. Take the LU-factorization. Etc. Thus see
 [the Julia Documentation](https://docs.julialang.org/en/v1/) for a large list
 of functionality available in Symbolics.jl.
 
-In addition, Symbolics.jl adds specific functions for:
+A general list of the features is:
 
-- Simplification and substitution
+- Symbolic arithmetic
+- Symbolic polynomials and trigonometric functions
+- Pattern matching, simplification and substitution
 - Differentiation
+- Symbolic linear algebra (factorizations, inversion, determinants, eigencomputations, etc.)
+- Discrete math (representations of summations, products, binomial coefficients, etc.)
+- Logical and Boolean expressions
+- Symbolic equation solving and conversion to arbitrary precision
+- Support for non-standard algebras (non-commutative symbols and customizable rulesets)
+- Special functions (list provided by [SpecialFunctions.jl](https://github.com/JuliaMath/SpecialFunctions.jl))
 - Automatic conversion of Julia code to symbolic code
 - Generation of (high performance and parallel) functions from symbolic expressions
 - Automated sparsity detection of Julia code
