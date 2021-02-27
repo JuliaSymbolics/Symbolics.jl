@@ -13,7 +13,7 @@ aa = a; # old a
 @test isequal(a, aa)
 @test hash(a) == hash(aa)
 
-@test isequal(get_variables(a+aa+1), [a])
+@test isequal(Symbolics.get_variables(a+aa+1), [a])
 
 @test hash(a+b ~ c+d) == hash(a+b ~ c+d)
 
@@ -56,7 +56,7 @@ D = sparse([1, 2], [2, 1], [d, d])
 
 @test isequal(C * D, sparse([1,2], [1,2], [c * d, c * d]))
 
-@parameters t σ ρ β
+@variables t σ ρ β
 @variables x(t) y(t) z(t)
 D = Differential(t)
 Dx = Differential(x)

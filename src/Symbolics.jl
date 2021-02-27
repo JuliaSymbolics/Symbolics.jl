@@ -14,6 +14,9 @@ import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
 
 import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
+using RuntimeGeneratedFunctions
+RuntimeGeneratedFunctions.init(@__MODULE__)
+
 # re-export
 
 export simplify, substitute
@@ -49,6 +52,9 @@ export Differential, expand_derivatives, derivative, gradient,
 include("diff.jl")
 
 include("linear_algebra.jl")
+
+include("build_function.jl")
+export build_function
 
 using IfElse, Distributions
 include("extra_functions.jl")
