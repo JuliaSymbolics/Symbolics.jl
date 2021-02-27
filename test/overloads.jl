@@ -1,3 +1,4 @@
+using Symbolics
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
