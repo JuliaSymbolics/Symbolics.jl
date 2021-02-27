@@ -42,6 +42,7 @@ function Base.:/(x::Complex{Num}, y::Complex{Num})
     den = c^2 + d^2
     Complex((a*c + b*d)/den, (b*c - a*d)/den)
 end
+Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
 
 function Base.show(io::IO, z::Complex{<:Num})
     r, i = reim(z)

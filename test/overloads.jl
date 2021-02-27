@@ -125,3 +125,4 @@ z2 = c + d * im
 @test isequal(2 + z1, Complex(2 + a, b))
 @test isequal(z1 - 2, Complex(a - 2, b))
 @test isequal(2 - z1, Complex(2 - a, -b))
+@test isequal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
