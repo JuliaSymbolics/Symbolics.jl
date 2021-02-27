@@ -15,10 +15,16 @@ makedocs(
             "tutorials/auto_parallel.md",
             "tutorials/converting_to_C.md"
         ],
+        "Manual" => Any[
+            "variables.md",
+            "expression_manipulation.md",
+            "derivatives.md",
+            "build_function.md",
+            "functions.md",
+            "io.md",
+            "sparsity_detection.md"
+        ],
         "Comparison Against SymPy" => "comparison.md",
-        "highlevel.md",
-        "build_function.md",
-        "IR.md"
     ]
 )
 

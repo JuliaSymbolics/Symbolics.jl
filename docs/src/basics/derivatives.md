@@ -1,0 +1,56 @@
+# Derivatives and Differentials
+
+A `Differential(op)` is a partial derivative with respect to `op`,
+which can then be applied to some other operations. For example, `D=Differential(t)`
+is what would commonly be referred to as `d/dt`, which can then be applied to
+other operations using its function call, so `D(x+y)` is `d(x+y)/dt`.
+
+By default, the derivatives are left unexpanded to capture the symbolic
+representation of the differential equation. If the user would like to expand
+out all of the differentials, the `expand_derivatives` function eliminates all
+of the differentials down to basic one-variable expressions.
+
+```@docs
+Differential
+Symbolics.derivative
+expand_derivatives
+Symbolics.jacobian
+Symbolics.sparsejacobian
+Symbolics.gradient
+Symbolics.hessian
+Symbolics.sparsehessian
+```
+
+### Adding Analytical Derivatives
+
+There is a large amount of derivatives pre-defined by
+[DiffRules.jl](https://github.com/JuliaDiff/DiffRules.jl).
+
+```julia
+f(x,y,z) = x^2 + sin(x+y) - z
+```
+
+automatically has the derivatives defined via the tracing mechanism. It will do
+this by directly building the operation the internals of your function and
+differentiating that.
+
+However, in many cases you may want to define your own derivatives so that way
+automatic Jacobian etc. calculations can utilize this information. This can
+allow for more succinct versions of the derivatives to be calculated in order
+to better scale to larger systems. You can define derivatives for your own
+function via the dispatch:
+
+```julia
+# `N` arguments are accepted by the relevant method of `my_function`
+Symbolics.derivative(::typeof(my_function), args::NTuple{N,Any}, ::Val{i})
+```
+
+where `i` means that it's the derivative with respect to the `i`th argument. `args` is the
+array of arguments, so, for example, if your function is `f(x,t)`, then `args = [x,t]`.
+You should return an `Term` for the derivative of your function.
+
+For example, `sin(t)`'s derivative (by `t`) is given by the following:
+
+```julia
+Symbolics.derivative(::typeof(sin), args::NTuple{1,Any}, ::Val{1}) = cos(args[1])
+```
