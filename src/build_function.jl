@@ -129,7 +129,7 @@ function fill_array_with_zero!(x::AbstractArray)
 end
 
 """
-Build function target: JuliaTarget
+Build function target: `JuliaTarget`
 
 ```julia
 function _build_function(target::JuliaTarget, rhss, args...;
@@ -352,7 +352,7 @@ numbered_expr(c,args...;kwargs...) = c
 numbered_expr(c::Num,args...;kwargs...) = error("Num found")
 
 """
-Build function target: CTarget
+Build function target: `CTarget`
 
 ```julia
 function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
@@ -401,7 +401,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
 end
 
 """
-Build function target: StanTarget
+Build function target: `StanTarget`
 
 ```julia
 function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
@@ -432,7 +432,7 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
 end
 
 """
-Build function target: MATLABTarget
+Build function target: `MATLABTarget`
 
 ```julia
 function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;

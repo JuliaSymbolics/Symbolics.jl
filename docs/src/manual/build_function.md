@@ -27,6 +27,6 @@ build_function
 ```@docs
 Symbolics._build_function(target::Symbolics.JuliaTarget,rhss::AbstractArray,args...;kwargs...)
 Symbolics._build_function(target::Symbolics.CTarget,eqs::Array{<:Equation},args...;kwargs...)
-Symbolics._build_function(target::Symbolics.StanTarget,eqs::Array{<:Equation},args...;kwargs...)
+Symbolics._build_function(target::Symbolics.StanTarget,eqs::Array{<:Equation}, vs, ps, iv;kwargs...)
 Symbolics._build_function(target::Symbolics.MATLABTarget,eqs::Array{<:Equation},args...;kwargs...)
 ```

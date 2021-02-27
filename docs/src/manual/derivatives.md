@@ -12,8 +12,13 @@ of the differentials down to basic one-variable expressions.
 
 ```@docs
 Differential
-Symbolics.derivative
 expand_derivatives
+```
+
+## High Level Differentiation Functions
+
+```@docs
+Symbolics.derivative
 Symbolics.jacobian
 Symbolics.sparsejacobian
 Symbolics.gradient
@@ -21,7 +26,7 @@ Symbolics.hessian
 Symbolics.sparsehessian
 ```
 
-### Adding Analytical Derivatives
+## Adding Analytical Derivatives
 
 There is a large amount of derivatives pre-defined by
 [DiffRules.jl](https://github.com/JuliaDiff/DiffRules.jl).

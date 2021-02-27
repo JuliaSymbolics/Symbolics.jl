@@ -8,7 +8,7 @@ For example, `op1 = x+y` is one symbolic object and `op2 = 2z` is another, and
 so `op1*op2` is another tree object. Then, at the top, an `Equation`, normally
 written as `op1 ~ op2`, defines the symbolic equality between two operations.
 
-### Types
+## Types
 
 `Sym`, `Term`, and `FnType` are from [SymbolicUtils.jl](https://juliasymbolics.github.io/SymbolicUtils.jl/api/). Note that in
 Symbolics, we always use `Sym{Real}`, `Term{Real}`, and
@@ -19,12 +19,12 @@ Instead, one needs to use `SymbolicUtils.istree` to check if `arguments` and
 `operation` is defined.
 
 ```@docs
-Equation
 @variables
+Equation
 Base.:~(::Num, ::Num)
 ```
 
-### A note about functions restricted to `Number`s
+## A note about functions restricted to `Number`s
 
 `Sym` and `Term` objects are NOT subtypes of `Number`. Symbolics provides
 a simple wrapper type called `Num` which is a subtype of `Real`. `Num` wraps
@@ -50,7 +50,7 @@ julia> Symbolics.arguments(Symbolics.value(x + y))
  y
 ```
 
-### Symbolic Control Flow
+## Symbolic Control Flow
 
 Control flow can be expressed in Symbolics.jl in the following ways:
 
@@ -58,7 +58,7 @@ Control flow can be expressed in Symbolics.jl in the following ways:
   function provided by `IfElse.jl` which allows for encoding conditionals in
   the symbolic branches.
 
-### Inspection Functions
+## Inspection Functions
 
 ```@docs
 SymbolicUtils.istree
