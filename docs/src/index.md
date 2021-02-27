@@ -24,7 +24,7 @@ of functionality available in Symbolics.jl.
 
 A general list of the features is:
 
-- Symbolic arithmetic
+- Symbolic arithmetic with type information and multiple dispatch
 - Symbolic polynomials and trigonometric functions
 - Pattern matching, simplification and substitution
 - Differentiation
@@ -36,7 +36,7 @@ A general list of the features is:
 - Special functions (list provided by [SpecialFunctions.jl](https://github.com/JuliaMath/SpecialFunctions.jl))
 - Automatic conversion of Julia code to symbolic code
 - Generation of (high performance and parallel) functions from symbolic expressions
-- Automated sparsity detection of Julia code
+- Fast automated sparsity detection and generation of sparse Jacobian and Hessians
 
 and much more.
 
