@@ -1,4 +1,4 @@
-# Automated Sparse Parallelism of ODEs via Tracing
+# Automated Sparse Parallelism of Julia Functions via Tracing
 
 Because the Symbolics.jl expressions obey Julia semantics, one can
 directly transform existing Julia functions into Symbolics.jl symbolic
