@@ -14,6 +14,8 @@ import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
 
 import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
+import SymbolicUtils.Code: toexpr
+
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
