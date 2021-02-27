@@ -25,13 +25,11 @@ excels in many areas due to purposeful design decisions:
   symbolic simplification via [SymbolicUtils.jl](https://github.com/JuliaSymbolics/SymbolicUtils.jl)
   has built-in parallelism, Symbolics.jl builds functions that
   parallelizes across threads. Symbolics.jl is compatible with GPU libraries like CUDA.jl.
-- Primitives for high-performance numerics. Features like `ODESystem`
-  can be used to easily generate automatically parallelized ODE solver
-  code with sparse Jacobians and all of the pieces required to get
-  the most optimal solves. Support for differential-algebraic equations,
-  chemical reaction networks, and generation of code for nonlinear
-  optimization tools makes Symbolics.jl a tool for, well,
-  building, generating, and analyzing models.
+- Extendability: All of Symbolics.jl and its underlying tools are written in
+  pure Julia. Want to add new or better simplification rules? Add some Julia code!
+  Need to add new derivatives? Add some Julia code! You get the picture. Breaking
+  down these barriers makes it easier for the user to tailor the program to their
+  needs and accelerates the development of the library.
 - Deep integration with the Julia ecosystem: Symbolics.jl's integration
   with neural networks is not the only thing that's deep. Symbolics.jl
   is built with the same philosophy as other SciML packages, eschewing
