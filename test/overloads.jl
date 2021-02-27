@@ -1,4 +1,4 @@
-using ModelingToolkit
+using Symbolics
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
@@ -13,7 +13,7 @@ aa = a; # old a
 @test isequal(a, aa)
 @test hash(a) == hash(aa)
 
-@test isequal(get_variables(a+aa+1), [a])
+@test isequal(Symbolics.get_variables(a+aa+1), [a])
 
 @test hash(a+b ~ c+d) == hash(a+b ~ c+d)
 
@@ -25,7 +25,7 @@ F = lu(X)
 R = simplify.(F.L * F.U - X[F.p, :], polynorm=true)
 @test iszero(R)
 @test simplify.(F \ X) == I
-@test ModelingToolkit._solve(X, X, true) == I
+@test Symbolics._solve(X, X, true) == I
 inv(X)
 qr(X)
 
@@ -56,7 +56,7 @@ D = sparse([1, 2], [2, 1], [d, d])
 
 @test isequal(C * D, sparse([1,2], [1,2], [c * d, c * d]))
 
-@parameters t σ ρ β
+@variables t σ ρ β
 @variables x(t) y(t) z(t)
 D = Differential(t)
 Dx = Differential(x)
@@ -74,7 +74,6 @@ J = expand_derivatives.(J)
 using LinearAlgebra
 luJ = lu(J,Val(false))
 
-using ModelingToolkit
 @variables M[1:2,1:2]
 inv(M)
 
