@@ -25,8 +25,8 @@ build_function
 ## Target-Specific Definitions
 
 ```@docs
-_build_function(target::JuliaTarget,args...;kwargs...)
-_build_function(target::CTarget,args...;kwargs...)
-_build_function(target::StanTarget,args...;kwargs...)
-_build_function(target::MATLABTarget,args...;kwargs...)
+SymbolicUtils._build_function(target::JuliaTarget,args...;kwargs...)
+SymbolicUtils._build_function(target::CTarget,args...;kwargs...)
+SymbolicUtils._build_function(target::StanTarget,args...;kwargs...)
+SymbolicUtils._build_function(target::MATLABTarget,args...;kwargs...)
 ```

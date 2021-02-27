@@ -55,5 +55,5 @@ julia> Symbolics.arguments(Symbolics.value(x + y))
 ```@docs
 SymbolicUtils.istree
 SymbolicUtils.operation
-Symbolicutils.arguments
+SymbolicUtils.arguments
 ```
