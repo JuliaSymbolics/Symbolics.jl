@@ -17,9 +17,13 @@ value(x::Num) = x.val
 SciMLBase.issymbollike(::Num) = true
 SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
 
-SymbolicUtils.@number_methods(Num,
+SymbolicUtils.@number_methods(
+                              Num,
                               Num(f(value(a))),
-                              Num(f(value(a), value(b))))
+                              Num(f(value(a), value(b))),
+                              [conj, real]
+                             )
+Base.conj(x::Num) = x
 for C in [Complex, Complex{Bool}]
     @eval begin
         Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
