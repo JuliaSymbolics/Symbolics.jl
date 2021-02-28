@@ -127,6 +127,7 @@ z2 = c + d * im
 @test isequal(2 - z1, Complex(2 - a, -b))
 @test isequal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
 
+@test x + im === Complex(x, Num(true))
 @test real(a) === a
 @test conj(a) === a
 @test imag(a) === 0
