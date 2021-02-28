@@ -129,3 +129,4 @@ z2 = c + d * im
 
 @test real(a) === a
 @test conj(a) === a
+@test imag(a) === 0
