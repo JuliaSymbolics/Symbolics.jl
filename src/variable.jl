@@ -29,13 +29,11 @@ and parameters `β₁` and `β₂`.
 
 
 ```julia
-t = Num(Variable{ModelingToolkit.Parameter{Real}}(:t))  # independent variables are treated as known
-α = Num(Variable{ModelingToolkit.Parameter{Real}}(:α))  # parameters are known
-σ = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
-w = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
-x = Num(Variable{ModelingToolkit.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
+σ = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
+w = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
+x = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
 y = Num(Variable(:y))   # unknown, no dependents
-z = Num(Variable{ModelingToolkit.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
+z = Num(Variable{Symbolics.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
 β₁ = Num(Variable(:β, 1)) # with index 1
 β₂ = Num(Variable(:β, 2)) # with index 2
 
@@ -158,44 +156,41 @@ Define one or more unknown variables.
 
 ```julia
 @parameters t α σ(..) β[1:2]
-@variables w(..) x(t) y() z(t, α, x)
+@variables w(..) x(t) y z(t, α, x)
 
 expr = β₁* x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
 ```
 
-Note that `@parameters` and `@variables` implicitly add `()` to values that
-are not given a call. The former specifies the values as known, while the
-latter specifies it as unknown. `(..)` signifies that the value should be
-left uncalled.
+`(..)` signifies that the value should be left uncalled.
 
 Sometimes it is convenient to define arrays of variables to model things like `x₁,…,x₃`.
-The `@variables` and `@parameters` macros support this with the following syntax:
+The `@variables` macro supports this with the following syntax:
 
 ```julia
 @variables x[1:3];
 x
 
-3-element Array{Operation,1}:
- x₁()
- x₂()
- x₃()
+3-element Vector{Num}:
+ x₁
+ x₂
+ x₃
 
 # support for arbitrary ranges and tensors
 @variables y[2:3,1:5:6];
 y
 
-2×2 Array{Operation,2}:
-    y₂̒₁() y₂̒₆()
-    y₃̒₁() y₃̒₆()
+2×2 Matrix{Num}:
+ y₂ˏ₁  y₂ˏ₆
+ y₃ˏ₁  y₃ˏ₆
 
 # also works for dependent variables
-@parameters t; @variables z[1:3](t);
+@variables t z[1:3](t);
 z
 
-3-element Array{Operation,1}:
- z₁(t())
- z₂(t())
- z₃(t())
+3-element Array{Num,1}:
+ z₁(t)
+ z₂(t)
+ z₃(t)
 ```
 """
 macro variables(xs...)

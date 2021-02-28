@@ -78,7 +78,7 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
-julia> ModelingToolkit.diff2term(ModelingToolkit.value(D(D(x))))
+julia> Symbolics.diff2term(Symbolics.value(D(D(x))))
 xˍtt(t)
 ```
 """
@@ -112,7 +112,7 @@ output `y` instead of `y⦗t⦘`.
 julia> @parameters t; @variables z(t)
 (z(t),)
 
-julia> ModelingToolkit.tosymbol(z)
+julia> Symbolics.tosymbol(z)
 Symbol("z⦗t⦘")
 ```
 """
@@ -168,7 +168,7 @@ lower_varname(t::Sym, iv) = t
 julia> @parameters t; @variables x(t)
 (x(t),)
 
-julia> ModelingToolkit.makesym(x)
+julia> Symbolics.makesym(x)
 x⦗t⦘
 ```
 """

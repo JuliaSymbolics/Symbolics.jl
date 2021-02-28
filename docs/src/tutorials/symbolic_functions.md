@@ -22,10 +22,10 @@ A = [x^2+y 0 2x
      0     0 2y
      y^2+x 0 0]
 
-3×3 Array{Num,2}:
-  x ^ 2 + y  0  2x
-  0  0  2y
-  y ^ 2 + x  0  0
+3×3 Matrix{Num}:
+ y + x^2  0  2x
+       0  0  2y
+ x + y^2  0   0
 ```
 
 Note that by default, `@variables` returns `Sym` or `istree` objects wrapped in
@@ -42,15 +42,11 @@ latexify(A)
 ```
 
 ```math
-\begin{equation}
-\left[
 \begin{array}{ccc}
 (x ^ 2) + y & 0 & 2 * x \\
 0 & 0 & 2 * y \\
 (y ^ 2) + x & 0 & 0 \\
 \end{array}
-\right]
-\end{equation}
 ```
 
 Normal Julia functions work on Symbolics expressions, so if we
@@ -60,11 +56,10 @@ want to create the sparse version of `A` we would just call `sparse`:
 using SparseArrays
 spA = sparse(A)
 
-3×3 SparseMatrixCSC{Num,Int64} with 4 stored entries:
-  [1, 1]  =  (x ^ 2) + y
-  [3, 1]  =  (y ^ 2) + x
-  [1, 3]  =  2 * x
-  [2, 3]  =  2 * y
+3×3 SparseMatrixCSC{Num, Int64} with 4 stored entries:
+ y + x^2  ⋅  2x
+       ⋅  ⋅  2y
+ x + y^2  ⋅   ⋅
 ```
 
 We can thus use normal Julia functions as generators for sparse
@@ -76,10 +71,10 @@ function f(u)
 end
 f([x,y,z]) # Recall that z = x^2 + y
 
-3-element Array{Num,1}:
- x - (x ^ 2 + y)
-       x ^ 2 - y
- (x ^ 2 + y) + y
+3-element Vector{Num}:
+ x - y - (x^2)
+       x^2 - y
+      x^2 + 2y
 ```
 
 Or we can build array variables and use these to trace:
@@ -89,9 +84,9 @@ Or we can build array variables and use these to trace:
 f(u)
 
 3-element Array{Num,1}:
-     u₁ - u₃
- u₁ ^ 2 - u₂
-     u₃ + u₂
+   u₁ - u₃
+ u₁^2 - u₂
+   u₂ + u₃
 ```
 
 ## Building Functions
@@ -113,6 +108,7 @@ is specialized to Julia and supports features like StaticArrays. For
 example:
 
 ```julia
+using StaticArrays
 myf = eval(f_expr[1])
 myf(SA[2.0,3.0])
 
@@ -125,17 +121,17 @@ The second function is an in-place non-allocating mutating function
 which mutates its first value:
 
 ```julia
-f_expr[2]
+Base.remove_linenums!(f_expr[2])
 
-:((var"##MTIIPVar#292", var"##MTKArg#290")->begin
+:(function (var"##out#259", var"##arg#258")
+      let x = var"##arg#258"[1], y = var"##arg#258"[2]
           @inbounds begin
-                  let (x, y) = (var"##MTKArg#290"[1], var"##MTKArg#290"[2])
-                      var"##MTIIPVar#292"[1] = (getproperty(Base, :+))(x ^ 2, y)
-                      var"##MTIIPVar#292"[2] = (getproperty(Base, :+))(y ^ 2, x)
-                  end
-              end
-          nothing
-      end)
+                  var"##out#259"[1] = (+)(y, (^)(x, 2))
+                  var"##out#259"[2] = (+)(x, (^)(y, 2))
+                  nothing
+          end
+      end
+  end)
 ```
 
 Thus we'd use it like the following:
@@ -178,30 +174,19 @@ this, we just have to represent the operation that we're turning into
 a function via a sparse matrix. For example:
 
 ```julia
+using LinearAlgebra
 N = 8
 A = sparse(Tridiagonal([x^i for i in 1:N-1],[x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
 
-8×8 SparseMatrixCSC{Num,Int64} with 22 stored entries:
-  [1, 1]  =  x ^ 1 * y ^ 7
-  [2, 1]  =  x ^ 1
-  [1, 2]  =  y ^ 1
-  [2, 2]  =  x ^ 2 * y ^ 6
-  [3, 2]  =  x ^ 2
-  [2, 3]  =  y ^ 2
-  [3, 3]  =  x ^ 3 * y ^ 5
-  [4, 3]  =  x ^ 3
-  [3, 4]  =  y ^ 3
-  ⋮
-  [5, 5]  =  x ^ 5 * y ^ 3
-  [6, 5]  =  x ^ 5
-  [5, 6]  =  y ^ 5
-  [6, 6]  =  x ^ 6 * y ^ 2
-  [7, 6]  =  x ^ 6
-  [6, 7]  =  y ^ 6
-  [7, 7]  =  x ^ 7 * y ^ 1
-  [8, 7]  =  x ^ 7
-  [7, 8]  =  y ^ 7
-  [8, 8]  =  x ^ 8 * y ^ 0
+8×8 SparseMatrixCSC{Num, Int64} with 22 stored entries:
+ x*(y^7)            y            ⋅  …            ⋅            ⋅        ⋅    ⋅
+       x  (x^2)*(y^6)          y^2               ⋅            ⋅        ⋅    ⋅
+       ⋅          x^2  (x^3)*(y^5)               ⋅            ⋅        ⋅    ⋅
+       ⋅            ⋅          x^3             y^4            ⋅        ⋅    ⋅
+       ⋅            ⋅            ⋅     (x^5)*(y^3)          y^5        ⋅    ⋅
+       ⋅            ⋅            ⋅  …          x^5  (x^6)*(y^2)      y^6    ⋅
+       ⋅            ⋅            ⋅               ⋅          x^6  y*(x^7)  y^7
+       ⋅            ⋅            ⋅               ⋅            ⋅      x^7  x^8
 ```
 
 Now we call `build_function`:
@@ -290,10 +275,10 @@ just like any other function. To build a differential operator, use
 D = Differential(t)
 ```
 
-This is the differential operator ``D = \frac{\partial}{\partial t}``: the number of
-`'` is the order of the derivative and the second variable is the
-variable we're differentiating by. Now let's write down the derivative
-of some expression:
+This is the differential operator ``D = \frac{\partial}{\partial t}``. We can
+compose the differential operator by `*`, e.g.
+`Differential(t) * Differential(x)` or `Differential(t)^2`.
+Now let's write down the derivative of some expression:
 
 ```julia
 z = t + t^2
@@ -317,9 +302,9 @@ like:
 ```julia
 Symbolics.jacobian([x+x*y,x^2+y],[x,y])
 
-2×2 Array{Num,2}:
- 1 + y            x
-    2x  Constant(1)
+2×2 Matrix{Num}:
+ 1 + y  x
+    2x  1
 ```
 
 and similarly we can do Hessians, gradients, and define whatever other
@@ -341,9 +326,9 @@ This can be applied to arrays by using Julia's broadcast mechanism:
 B = simplify.([t^2+t+t^2  2t+4t
            x+y+y+2t   x^2 - x^2 + y^2])
 
-2×2 Array{Num,2}:
-  2 * t ^ 2 + t     6t
-x + 2 * (t + y)  y ^ 2
+2×2 Matrix{Num}:
+   t + 2(t^2)   6t
+ x + 2(t + y)  y^2
 ```
 
 We can then use `substitute` to change values of an expression around:
@@ -351,26 +336,30 @@ We can then use `substitute` to change values of an expression around:
 ```julia
 simplify.(substitute.(B, (Dict(x=>y^2),)))
 
-2×2 Array{Num,2}:
-       2 * t ^ 2 + t     6t
- y ^ 2 + 2 * (t + y)  y ^ 2
+2×2 Matrix{Num}:
+     t + 2(t^2)   6t
+ y^2 + 2(t + y)  y^2
 ```
 
 and we can use this to interactively evaluate expressions without
 generating and compiling Julia functions:
 
 ```julia
-substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
+V = substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
 
-2×2 Array{Symbolics.Constant,2}:
- Constant(36.0)  Constant(24.0)
- Constant(16.0)   Constant(9.0)
+2×2 Matrix{Num}:
+ 36.0  24.0
+ 16.0   9.0
 ```
 
 Where we can reference the values via:
 
 ```julia
-Symbolics.Constant(2.0).value # 2.0
+Symbolics.value.(V)
+
+2×2 Matrix{Float64}:
+ 36.0  24.0
+ 16.0   9.0
 ```
 
 ## Non-Interactive Development (No Macro Version)
@@ -387,8 +376,6 @@ x = Num(Sym{Float64}(:x))
 y = Num(Sym{Float64}(:y))
 x+y^2.0 # isa Num
 
-t = Num(Variable{Symbolics.Parameter{Real}}(:t))  # independent variables are treated as known
-α = Num(Variable{Symbolics.Parameter{Real}}(:α))  # parameters are known
 σ = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
 w = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
 x = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
@@ -409,7 +396,7 @@ If we need to use this to generate new Julia code, we can simply
 convert the output to an `Expr`:
 
 ```julia
-toexpr(x+y^2)
+Symbolics.toexpr(x+y^2)
 ```
 
 ## `Sym`s and callable `Sym`s
@@ -464,7 +451,8 @@ h(x,y) = x^2 + y
 Now when we use `h(x,y)`, it is a symbolic expression and doesn't expand:
 
 ```julia
-h(x,y) + y^2
+julia> h(x,y) + y^2
+h(x(t), y(t)) + (y(t))^2
 ```
 
 In order to use it with the differentiation system, we need to register
@@ -480,8 +468,6 @@ Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1
 and now it works with the rest of the system:
 
 ```julia
-Dx = Differential(x)
-Dy = Differential(y)
-expand_derivatives(Dx(h(x,y) + y^2)) # 2x
-expand_derivatives(Dy(h(x,y) + y^2)) # 1 + 2y
+derivative(h(x,y) + y^2, x) # 2x
+derivative(h(x,y) + y^2, y) # 1 + 2y
 ```

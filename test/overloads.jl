@@ -34,23 +34,20 @@ X2 = [0 b c; 0 0 0; 0 h 0]
 F2 = lu(X2, check=false)
 @test F2.info == 1
 
-# test operations with sparse arrays and Operations
-# note `isequal` instead of `==` because `==` would give another Operation
+# test operations with sparse arrays
+# note `isequal` instead of `==` because `==` would give another symbolic type
 
-# test that we can create a sparse array of Operation
+# test that we can create a symbolic sparse array
 Oarray = zeros(Num, 2,2)
 Oarray[2,2] = a
 @test isequal(sparse(Oarray), sparse([2], [2], [a]))
 
-# test Operation * sparse
 @test isequal(a * sparse([2], [2], [1]), sparse([2], [2], [a * 1]))
 
-# test sparse{Operation} + sparse{Operation}
 A = sparse([2], [2], [a])
 B = sparse([2], [2], [b])
 @test isequal(A + B, sparse([2], [2], [a+b]))
 
-# test sparse{Operation} * sparse{Operation}
 C = sparse([1, 2], [2, 1], [c, c])
 D = sparse([1, 2], [2, 1], [d, d])
 
@@ -128,3 +125,9 @@ z2 = c + d * im
 @test isequal(2 + z1, Complex(2 + a, b))
 @test isequal(z1 - 2, Complex(a - 2, b))
 @test isequal(2 - z1, Complex(2 - a, -b))
+@test isequal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
+
+@test a + im === Complex(a, Num(true))
+@test real(a) === a
+@test conj(a) === a
+@test imag(a) === Num(0)

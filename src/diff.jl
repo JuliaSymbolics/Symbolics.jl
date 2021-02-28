@@ -9,7 +9,7 @@ $(FIELDS)
 # Examples
 
 ```jldoctest
-julia> using ModelingToolkit
+julia> using Symbolics
 
 julia> @variables x y;
 
@@ -174,29 +174,29 @@ Calculate the derivative of the op `O` with respect to its argument with index
 # Examples
 
 ```jldoctest label1
-julia> using ModelingToolkit
+julia> using Symbolics
 
 julia> @variables x y;
 
-julia> ModelingToolkit.derivative_idx(sin(x), 1)
-cos(x())
+julia> Symbolics.derivative_idx(Symbolics.value(sin(x)), 1)
+cos(x)
 ```
 
 Note that the function does not recurse into the operation's arguments, i.e., the
 chain rule is not applied:
 
 ```jldoctest label1
-julia> myop = sin(x) * y^2
-sin(x()) * y() ^ 2
+julia> myop = Symbolics.value(sin(x) * y^2)
+sin(x)*(y^2)
 
-julia> typeof(operation(myop))  # Op is multiplication function
+julia> typeof(Symbolics.operation(myop))  # Op is multiplication function
 typeof(*)
 
-julia> ModelingToolkit.derivative_idx(myop, 1)  # wrt. sin(x)
-y() ^ 2
+julia> Symbolics.derivative_idx(myop, 1)  # wrt. sin(x)
+y^2
 
-julia> ModelingToolkit.derivative_idx(myop, 2)  # wrt. y^2
-sin(x())
+julia> Symbolics.derivative_idx(myop, 2)  # wrt. y^2
+sin(x)
 ```
 """
 derivative_idx(O::Any, ::Any) = 0
@@ -266,18 +266,17 @@ Define one or more differentials.
 # Examples
 
 ```jldoctest
-julia> using ModelingToolkit
+julia> using Symbolics
 
 julia> @variables x y z;
 
-julia> @derivatives Dx'~x Dy'~y  # Create differentials wrt. x and y
-((D'~x()), (D'~y()))
+julia> Dx = Differential(x); Dy = Differential(y);  # Create differentials wrt. x and y
 
 julia> Dx(z)  # Differentiate z wrt. x
-(D'~x())(z())
+Differential(x)(z)
 
 julia> Dy(z)  # Differentiate z wrt. y
-(D'~y())(z())
+Differential(y)(z)
 ```
 """
 macro derivatives(x...)

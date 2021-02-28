@@ -40,7 +40,7 @@ for the version of the documentation which contains the unreleased features.
 ## Example
 
 ```julia
-using Symbolics 
+using Symbolics
 
 @variables t x y
 D = Differential(t)
@@ -51,26 +51,26 @@ expand_derivatives(D(z)) # 1 + 2t
 
 Symbolics.jacobian([x+x*y,x^2+y],[x,y])
 
-#2×2 Array{Num,2}:
-# 1 + y            x
-#    2x  Constant(1)
+#2×2 Matrix{Num}:
+# 1 + y  x
+#    2x  1
 
 B = simplify.([t^2+t+t^2  2t+4t
            x+y+y+2t   x^2 - x^2 + y^2])
 
-#2×2 Array{Num,2}:
-#  2 * t ^ 2 + t     6t
-#  x + 2 * (t + y)  y ^ 2
+#2×2 Matrix{Num}:
+#   t + 2(t^2)   6t
+# x + 2(t + y)  y^2
 
-simplify.(substitute.(B,Dict(x=>y^2)))
+simplify.(substitute.(B,(Dict(x=>y^2),)))
 
-#2×2 Array{Num,2}:
-#       2 * t ^ 2 + t     6t
-# y ^ 2 + 2 * (t + y)  y ^ 2
+#2×2 Matrix{Num}:
+#     t + 2(t^2)   6t
+# y^2 + 2(t + y)  y^2
 
 substitute.(B,(Dict(x=>2.0,y=>3.0,t=>4.0),))
 
-#2×2 Array{Symbolics.Constant,2}:
-# Constant(36.0)  Constant(24.0)
-# Constant(16.0)   Constant(9.0)
+#2×2 Matrix{Num}:
+# 36.0  24.0
+# 16.0   9.0
 ```
