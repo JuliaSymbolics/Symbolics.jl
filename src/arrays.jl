@@ -1,5 +1,7 @@
 const SymArray = Symbolic{<:AbstractArray}
 
+struct ArrayShapeCtx end
+
 # AbstractArray deosn't work
 # indexing Matrix should give Array not AbstractArray
 # length does not work
@@ -37,18 +39,20 @@ macro maybe(args...)
     end |> esc
 end
 
+slicetype(::Type{<:Array}) = Array
+slicetype(::Type) = AbstractArray
 function promote_symtype(::typeof(getindex),
                          A::Type{<:AbstractArray},
                          idx...)
     D = count(x->x <: Number, idx)
     @maybe T=elt(A) begin
-        @maybe N=nd(A) return N-D == 0 ? T : AbstractArray{T,N-D}
-        return AbstractArray{T}
+        @maybe N=nd(A) return N-D == 0 ? T : slicetype(A){T,N-D}
+        return slicetype(A){T}
     end
 
-    @maybe N=nd(A) return N-D == 0 ? T : AbstractArray{T, N-D} where T
+    @maybe N=nd(A) return N-D == 0 ? T : slicetype(A){T, N-D} where T
 
-    return AbstractArray
+    return slicetype(A)
 end
 
 function Base.getindex(x::SymArray, idx...)

@@ -1,22 +1,22 @@
 using SymbolicUtils, Test
-using SymbolicUtils: metadata, symtype, ArrayShape, ArrayCtx
+using SymbolicUtils: getmetadata, symtype, ArrayShape, ArrayShapeCtx
 using Base: Slice
 
 @testset "arrays" begin
     @syms X[1:5, 2:6] (Y::Real)[1:5, 1:5] Z::Matrix{Float64} i::Int j::Int
-    @test symtype(X) == AbstractArray{Number, 2}
-    @test symtype(Y) == AbstractArray{Real, 2}
-    @test metadata(X, ArrayCtx) == ArrayShape(Slice.((1:5, 2:6)))
-    @test metadata(Y, ArrayCtx) == ArrayShape(Slice.((1:5, 1:5)))
+    @test symtype(X) == Array{Number, 2}
+    @test symtype(Y) == Array{Real, 2}
+    @test getmetadata(X, ArrayShapeCtx) == ArrayShape(Slice.((1:5, 2:6)))
+    @test getmetadata(Y, ArrayShapeCtx) == ArrayShape(Slice.((1:5, 1:5)))
 
     A = Y[2, :]
-    @test symtype(A) == AbstractArray{Real, 1}
-    @test axes(metadata(A, ArrayCtx)) == (1:5,)
+    @test symtype(A) == Array{Real, 1}
+    @test axes(getmetadata(A, ArrayShapeCtx)) == (1:5,)
 
     B = A[3:5]
-    @test axes(metadata(B, ArrayCtx)) == (Slice(1:3),)
+    @test axes(getmetadata(B, ArrayShapeCtx)) == (Slice(1:3),)
 
-    @test metadata(Z[1:2, 3:4], ArrayCtx) == nothing
+    @test_throws ArgumentError getmetadata(Z[1:2, 3:4], ArrayShapeCtx)
 
     X[i,j]
     X[1,j]
