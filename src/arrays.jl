@@ -22,7 +22,7 @@ nd(s::SymArray) = nd(symtype(s))
 nd(::Type{<:AbstractArray{<:Any, N}}) where {N} = N
 nd(::Type{<:AbstractArray}) = nothing
 
-shape(s::SymArray) = metadata(s, ArrayCtx)
+shape(s::SymArray) = getmetadata(s, ArrayShapeCtx)
 
 macro maybe(args...)
     f = args[end]
@@ -56,12 +56,14 @@ function Base.getindex(x::SymArray, idx...)
         Term(getindex, [x, idx...])
     else
         shp = @maybe s=shape(x) s[idx...]
-        Term(getindex, [x, idx...], Dict{Type, Any}(ArrayCtx => shp))
+        setmetadata(Term(getindex, [x, idx...]),
+                    ArrayShapeCtx,
+                    shp)
     end
 end
 
 function Base.getindex(x::Symbolic{T}, idx::Int...) where {T<:AbstractArray}
-    Term{eltype(T)}(getindex, idx...)
+    Term{eltype(T)}(getindex, x, [idx...])
 end
 
 # basic
