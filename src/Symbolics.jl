@@ -55,6 +55,7 @@ include("diff.jl")
 
 include("linear_algebra.jl")
 
+import Libdl
 include("build_function.jl")
 export build_function
 

@@ -55,18 +55,20 @@ end
 # return the coefficient matrix `A` and a
 # vector of constants (possibly symbolic) `b` such that
 # A \ b will solve the equations for the vars
-function A_b(eqs::AbstractArray, vars::AbstractArray)
+function A_b(eqs::AbstractArray, vars::AbstractArray, check)
     exprs = rhss(eqs) .- lhss(eqs)
-    for ex in exprs
-        @assert islinear(ex, vars)
+    if check
+        for ex in exprs
+            @assert islinear(ex, vars)
+        end
     end
     A = jacobian(exprs, vars)
     b = A * vars - exprs
     A, b
 end
-function A_b(eq, var)
+function A_b(eq, var, check)
     ex = eq.rhs - eq.lhs
-    @assert islinear(ex, [var])
+    check && @assert islinear(ex, [var])
     a = expand_derivatives(Differential(var)(ex))
     b = a * var - ex
     a, b
