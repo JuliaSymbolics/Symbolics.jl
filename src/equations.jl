@@ -19,6 +19,9 @@ Base.show(io::IO, eq::Equation) = print(io, eq.lhs, " ~ ", eq.rhs)
 
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
 
+lhss(xs) = map(x->x.lhs, xs)
+rhss(xs) = map(x->x.rhs, xs)
+
 """
 $(TYPEDSIGNATURES)
 
