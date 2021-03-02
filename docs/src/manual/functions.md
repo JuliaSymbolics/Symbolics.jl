@@ -14,8 +14,7 @@ function lorenz(du,u,p,t)
  du[2] = u[1]*(28.0-u[3]) - u[2]
  du[3] = u[1]*u[2] - (8/3)*u[3]
 end
-@variables t u[1:3](t) du[1:3](t)
-@parameters p[1:3]
+@variables t p[1:3] u[1:3](t) du[1:3](t)
 lorenz(du,u,p,t)
 du
 ```
