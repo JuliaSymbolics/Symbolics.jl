@@ -14,8 +14,7 @@ function lorenz(du,u,p,t)
  du[2] = u[1]*(28.0-u[3]) - u[2]
  du[3] = u[1]*u[2] - (8/3)*u[3]
 end
-@variables t u[1:3](t) du[1:3](t)
-@parameters p[1:3]
+@variables t p[1:3] u[1:3](t) du[1:3](t)
 lorenz(du,u,p,t)
 du
 ```
@@ -30,8 +29,7 @@ u₁(t) * u₂(t) - 2.6666666666666665 * u₃(t)
 Or similarly:
 
 ```julia
-@variables t x(t) y(t) z(t) dx(t) dy(t) dz(t)
-@parameters σ ρ β
+@variables t x(t) y(t) z(t) dx(t) dy(t) dz(t) σ ρ β
 du = [dx,dy,dz]
 u = [x,y,z]
 p = [σ,ρ,β]
