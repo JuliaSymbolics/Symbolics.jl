@@ -87,7 +87,8 @@ w.r.t `vars`.
 function solve_for(eqs, vars; simplify=true, check=true)
     A, b = A_b(eqs, vars, check)
     #TODO: we need to make sure that `solve_for(eqs, vars)` contains no `vars`
-    _solve(A, b, simplify)
+    sol = _solve(A, b, simplify)
+    sol isa AbstractArray ? map(Num, sol) : Num(sol)
 end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
