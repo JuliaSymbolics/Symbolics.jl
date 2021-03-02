@@ -29,8 +29,7 @@ u₁(t) * u₂(t) - 2.6666666666666665 * u₃(t)
 Or similarly:
 
 ```julia
-@variables t x(t) y(t) z(t) dx(t) dy(t) dz(t)
-@parameters σ ρ β
+@variables t x(t) y(t) z(t) dx(t) dy(t) dz(t) σ ρ β
 du = [dx,dy,dz]
 u = [x,y,z]
 p = [σ,ρ,β]
