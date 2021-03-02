@@ -65,4 +65,6 @@ include("extra_functions.jl")
 using Latexify
 include("latexify_recipes.jl")
 
+using RecipesBase
+include("plot_recipes.jl")
 end # module
