@@ -48,6 +48,13 @@ Base.:~(lhs::Number    , rhs::Num) = Equation(value(lhs), value(rhs))
 Base.:~(lhs::Symbolic, rhs::Symbolic) = Equation(value(lhs), value(rhs))
 Base.:~(lhs::Symbolic, rhs::Any    ) = Equation(value(lhs), value(rhs))
 Base.:~(lhs::Any, rhs::Symbolic    ) = Equation(value(lhs), value(rhs))
+for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
+    (T != :Complex && S != :Complex) && continue
+    @eval Base.:~(a::$T, b::$S) = [
+      (isa(value(real(a)), Number) && isa(value(real(b)), Number)) ? [] : value(real(a)) ~ value(real(b));
+      (isa(value(imag(a)), Number) && isa(value(imag(b)), Number)) ? [] : value(imag(a)) ~ value(imag(b))
+    ]
+end
 
 struct ConstrainedEquation
   constraints
