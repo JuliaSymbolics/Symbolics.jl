@@ -400,6 +400,59 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
     end
 end
 
+
+function _build_function(target::CTarget, ex::Array{<:Num}, args...;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf,
+                         lhsname     = :du, 
+                         rhsnames    = [Symbol("RHS$i") for i in 1:length(args)],
+                         libpath     = tempname(), 
+                         compiler    = :gcc)
+
+    if !columnmajor
+        return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...; 
+                               columnmajor = true, 
+                               conv        = conv,
+                               fname       = fname, 
+                               lhsname     = lhsname,
+                               rhsnames    = rhsnames,
+                               libpath     = libpath,
+                               compiler    = compiler)
+    end
+
+    equations = Vector{String}()
+    for col ∈ 1:size(ex,2)
+        for row ∈ 1:size(ex,1)
+            lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
+            rhs = numbered_expr(value(ex[row, col]), args...;
+                                lhsname  = lhsname,
+                                rhsnames = rhsnames,
+                                offset   = -1) |> string
+            push!(equations, string(lhs, " = ", rhs, ";"))
+        end
+    end
+
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
+
+    ccode = """
+    void $fname($(argstrs...)) { $([string("\n  ", eqn) for eqn ∈ equations]...) \n}
+    """
+
+    if expression == Val{true}
+        return ccode
+    else
+        @assert compiler == :gcc
+        open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
+            print(f, ccode)
+        end
+        @RuntimeGeneratedFunction(:((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)))
+    end
+
+end
+
+
 """
 Build function target: `StanTarget`
 
