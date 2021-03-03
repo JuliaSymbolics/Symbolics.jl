@@ -42,6 +42,11 @@ derivative(::typeof(IfElse.ifelse), args::NTuple{3,Any}, ::Val{3}) = IfElse.ifel
 @register ∈(x::Num, y::AbstractArray)
 @register ∪(x, y)
 @register ∩(x, y)
+
+function ∨ end
+function ∧ end
+function ⊆ end
+
 @register ∨(x, y)
 @register ∧(x, y)
 @register ⊆(x, y)
