@@ -377,6 +377,8 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                          lhsname=:du,rhsnames=[Symbol("RHS$i") for i in 1:length(args)],
                          libpath=tempname(),compiler=:gcc)
 
+    @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::Array{Num}...) instead."
+
     differential_equation = string(join([numbered_expr(eq,args...,lhsname=lhsname,
                                   rhsnames=rhsnames,offset=-1) for
                                   (i, eq) ∈ enumerate(eqs)],";\n  "),";")
@@ -401,6 +403,30 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
 end
 
 
+"""
+Build function target: `CTarget`
+
+```julia
+function _build_function(target::CTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf,
+                         lhsname     = :du, 
+                         rhsnames    = [Symbol("RHS$i") for i in 1:length(args)],
+                         libpath     = tempname(), 
+                         compiler    = :gcc)
+```
+
+This builds an in-place C function. Only works on expressions. If
+`expression == Val{false}`, then this builds a function in C, compiles it,
+and returns a lambda to that compiled function. These special keyword arguments
+control the compilation:
+
+- libpath: the path to store the binary. Defaults to a temporary path.
+- compiler: which C compiler to use. Defaults to :gcc, which is currently the
+  only available option.
+"""
 function _build_function(target::CTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
                          columnmajor = true,
                          conv        = toexpr, 
@@ -472,7 +498,10 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
                          conv = toexpr, expression = Val{true},
                          fname = :diffeqf, lhsname=:internal_var___du,
                          rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
+    
+    @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::Array{Num}...) instead."
     @assert expression == Val{true}
+
     differential_equation = string(join([numbered_expr(eq,vs,ps,lhsname=lhsname,
                                    rhsnames=rhsnames) for
                                    (i, eq) ∈ enumerate(eqs)],";\n  "),";")
@@ -485,6 +514,22 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
     """
 end
 
+"""
+Build function target: `StanTarget`
+
+```julia
+function _build_function(target::StanTarget, ex::Array{<:Num}, vs, ps, iv;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf, lhsname=:internal_var___du,
+                         rhsnames    =  [:internal_var___u,:internal_var___p,:internal_var___t])
+```
+
+This builds an in-place Stan function compatible with the Stan differential equation solvers.
+Unlike other build targets, this one requestions (vs, ps, iv) as the function arguments.
+Only allowed on expressions, and arrays of expressions.
+"""
 function _build_function(target::StanTarget, ex::Array{<:Num}, vs, ps, iv;
                          columnmajor = true,
                          conv        = toexpr, 
@@ -537,14 +582,17 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
 ```
 
 This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
-Compatible with the MATLAB differential equation solvers. Only allowed on arrays
-of equations.
+Compatible with the MATLAB differential equation solvers. Only allowed on expressions, 
+and arrays of equations.
 """
 function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
                          conv = toexpr, expression = Val{true},
                          fname = :diffeqf, lhsname=:internal_var___du,
                          rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
+
+    @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::Array{Num}...) instead."
     @assert expression == Val{true}
+
     matstr = join([numbered_expr(eq.rhs,args...,lhsname=lhsname,
                                   rhsnames=rhsnames) for
                                   (i, eq) ∈ enumerate(eqs)],"; ")
@@ -555,6 +603,23 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
     matstr
 end
 
+"""
+Build function target: `MATLABTarget`
+
+```julia
+function _build_function(target::MATLABTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf, 
+                         lhsname     = :internal_var___du,
+                         rhsnames    = [:internal_var___u,:internal_var___p,:internal_var___t])
+```
+
+This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
+Compatible with the MATLAB differential equation solvers. Only allowed on expressions,
+and arrays of expressions.
+"""
 function _build_function(target::MATLABTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
                          columnmajor = true,
                          conv        = toexpr, 
