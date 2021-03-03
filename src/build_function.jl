@@ -235,12 +235,11 @@ end
 
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     spawns = map(p.exprs) do thunk
-        ex = :(()->$(toexpr(thunk, st)))
-        closure = @RuntimeGeneratedFunction(ex)
+        ex = toexpr(thunk, st)
         var = esc(Base.sync_varname)
         quote
             let
-                task = Base.Threads.Task($closure)
+                task = Base.Threads.Task($ex)
                 Base.Threads.schedule(task)
                 task
             end
