@@ -233,10 +233,17 @@ function make_array(s::MultithreadedForm, arr, similarto)
     SpawnFetch{MultithreadedForm}(arrays, vcat)
 end
 
+struct Funcall{F, T}
+    f::F
+    args::T
+end
+
+(f::Funcall)() = f.f(f.args...)
+
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
-    spawns = map(p.exprs) do thunk
-        ex = toexpr(thunk, st)
-        var = esc(Base.sync_varname)
+    spawns = map(zip(p.exprs, p.args)) do thunk, args
+        ex = Funcall(@RuntimeGeneratedFunction(toexpr(thunk, st)),
+                     (toexpr.(args, (st,))...,))
         quote
             let
                 task = Base.Threads.Task($ex)
