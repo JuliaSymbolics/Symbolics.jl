@@ -407,7 +407,7 @@ end
 Build function target: `CTarget`
 
 ```julia
-function _build_function(target::CTarget, ex::Array{Num}, args::Vector{Num}...;
+function _build_function(target::CTarget, ex::Array{Num}, args...;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -427,7 +427,7 @@ control the compilation:
 - compiler: which C compiler to use. Defaults to :gcc, which is currently the
   only available option.
 """
-function _build_function(target::CTarget, ex::Array{Num}, args::Vector{Num}...;
+function _build_function(target::CTarget, ex::Array{Num}, args...;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -463,7 +463,7 @@ function _build_function(target::CTarget, ex::Array{Num}, args::Vector{Num}...;
     argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
 
     ccode = """
-    void $fname($(argstrs...)) { $([string("\n  ", eqn) for eqn ∈ equations]...) \n}
+    void $fname($(argstrs...)) {$([string("\n  ", eqn) for eqn ∈ equations]...)\n}
     """
 
     if expression == Val{true}
@@ -552,11 +552,11 @@ function _build_function(target::StanTarget, ex::Array{Num}, vs, ps, iv;
     equations = Vector{String}()
     for col ∈ 1:size(ex,2)
         for row ∈ 1:size(ex,1)
-            lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
+            lhs = string(lhsname, "[", (col-1) * size(ex,1) + row, "]")
             rhs = numbered_expr(value(ex[row, col]), vs, ps, iv;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
-                                offset   = -1) |> string
+                                offset   = 0) |> string
             push!(equations, string(lhs, " = ", rhs, ";"))
         end
     end
@@ -564,7 +564,7 @@ function _build_function(target::StanTarget, ex::Array{Num}, vs, ps, iv;
     """
     real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
       real $lhsname[$(length(equations))];
-    $([string("\n  ", eqn) for eqn ∈ equations]...) \n
+    $([eqn == equations[end] ? string("  ", eqn) : string("  ", eqn, "\n") for eqn ∈ equations]...)
       return $lhsname;
     }
     """
@@ -607,7 +607,7 @@ end
 Build function target: `MATLABTarget`
 
 ```julia
-function _build_function(target::MATLABTarget, ex::Array{Num}, args::Vector{Num}...;
+function _build_function(target::MATLABTarget, ex::Array{Num}, args...;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -620,7 +620,7 @@ This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MA
 Compatible with the MATLAB differential equation solvers. Only allowed on expressions,
 and arrays of expressions.
 """
-function _build_function(target::MATLABTarget, ex::Array{Num}, args::Vector{Num}...;
+function _build_function(target::MATLABTarget, ex::Array{Num}, args...;
                          columnmajor = true,
                          allowscalar = true,
                          conv        = toexpr, 
@@ -661,7 +661,7 @@ function _build_function(target::MATLABTarget, ex::Array{Num}, args::Vector{Num}
     if length(ex) == 1 && allowscalar
         matstr = "$fname = @(t,$(rhsnames[1]))" * matstr * ";"
     else
-        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];"
+        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];\n"
     end
     
     return matstr
