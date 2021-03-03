@@ -413,7 +413,7 @@ function _build_function(target::CTarget, ex::Array{<:Num}, args::Vector{<:Num}.
                          expression  = Val{true},
                          fname       = :diffeqf,
                          lhsname     = :du, 
-                         rhsnames    = [Symbol("RHS$i") for i in 1:length(args)],
+                         rhsnames    = [Symbol("RHS\$i") for i in 1:length(args)],
                          libpath     = tempname(), 
                          compiler    = :gcc)
 ```
@@ -660,4 +660,4 @@ function _build_function(target::MATLABTarget, ex::Array{<:Num}, args::Vector{<:
     matstr
 
 end
-_build_function(target::MATLABTarget, ex::Num, args..., kwargs...) = _build_function(target, [ex], args...; kwargs...)
+_build_function(target::MATLABTarget, ex::Num, args...; kwargs...) = _build_function(target, [ex], args...; kwargs...)
