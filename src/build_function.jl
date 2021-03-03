@@ -401,7 +401,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
 end
 
 
-function _build_function(target::CTarget, ex::Array{<:Num}, args...;
+function _build_function(target::CTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -451,6 +451,7 @@ function _build_function(target::CTarget, ex::Array{<:Num}, args...;
     end
 
 end
+_build_function(target::CTarget, ex::Num, args...; kwargs...) = _build_function(target, [ex], args...; kwargs...)
 
 
 """
@@ -484,6 +485,47 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
     """
 end
 
+function _build_function(target::StanTarget, ex::Array{<:Num}, vs, ps, iv;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf, lhsname=:internal_var___du,
+                         rhsnames    =  [:internal_var___u,:internal_var___p,:internal_var___t])
+
+    @assert expression == Val{true}
+
+    if !columnmajor
+        return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), vs::Vector{<:Num}, ps::Vector{<:Num}, iv::Vector{<:Num}; 
+                            columnmajor = true, 
+                            conv        = conv,
+                            expression  = expression,
+                            fname       = fname, 
+                            lhsname     = lhsname,
+                            rhsnames    = rhsnames)
+    end
+
+    equations = Vector{String}()
+    for col ∈ 1:size(ex,2)
+        for row ∈ 1:size(ex,1)
+            lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
+            rhs = numbered_expr(value(ex[row, col]), vs, ps, iv;
+                                lhsname  = lhsname,
+                                rhsnames = rhsnames,
+                                offset   = -1) |> string
+            push!(equations, string(lhs, " = ", rhs, ";"))
+        end
+    end
+
+    """
+    real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
+      real $lhsname[$(length(equations))];
+    $([string("\n  ", eqn) for eqn ∈ equations]...) \n
+      return $lhsname;
+    }
+    """
+end
+_build_function(target::StanTarget, ex::Num, vs, ps, iv; kwargs...) = _build_function(target, [ex], vs, ps, iv; kwargs...)
+
 """
 Build function target: `MATLABTarget`
 
@@ -512,3 +554,45 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
     matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
     matstr
 end
+
+function _build_function(target::MATLABTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf, 
+                         lhsname     = :internal_var___du,
+                         rhsnames    = [:internal_var___u,:internal_var___p,:internal_var___t])
+
+    @assert expression == Val{true}
+
+    if !columnmajor
+        return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...; 
+                               columnmajor = true, 
+                               conv        = conv,
+                               expression  = expression,
+                               fname       = fname, 
+                               lhsname     = lhsname,
+                               rhsnames    = rhsnames)
+    end
+
+    expressions = Vector{String}()
+    for col ∈ 1:size(ex,2)
+        for row ∈ 1:size(ex,1)
+            lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
+            rhs = numbered_expr(value(ex[row, col]), args...;
+                                lhsname  = lhsname,
+                                rhsnames = rhsnames,
+                                offset   = 0) |> string
+            push!(expressions, string(rhs))
+        end
+    end
+
+    matstr = join(expressions, "; ")
+
+    matstr = replace(matstr,"["=>"(")
+    matstr = replace(matstr,"]"=>")")
+    matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
+    matstr
+
+end
+_build_function(target::MATLABTarget, ex::Num, args..., kwargs...) = _build_function(target, [ex], args...; kwargs...)
