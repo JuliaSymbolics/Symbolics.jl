@@ -583,7 +583,7 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
 
 This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
 Compatible with the MATLAB differential equation solvers. Only allowed on expressions, 
-and arrays of equations.
+and arrays of expressions.
 """
 function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
                          conv = toexpr, expression = Val{true},
