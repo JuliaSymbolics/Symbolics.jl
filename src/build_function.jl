@@ -407,7 +407,7 @@ end
 Build function target: `CTarget`
 
 ```julia
-function _build_function(target::CTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
+function _build_function(target::CTarget, ex::Array{Num}, args::Vector{Num}...;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -427,7 +427,7 @@ control the compilation:
 - compiler: which C compiler to use. Defaults to :gcc, which is currently the
   only available option.
 """
-function _build_function(target::CTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
+function _build_function(target::CTarget, ex::Array{Num}, args::Vector{Num}...;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -518,7 +518,7 @@ end
 Build function target: `StanTarget`
 
 ```julia
-function _build_function(target::StanTarget, ex::Array{<:Num}, vs, ps, iv;
+function _build_function(target::StanTarget, ex::Array{Num}, vs, ps, iv;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -530,7 +530,7 @@ This builds an in-place Stan function compatible with the Stan differential equa
 Unlike other build targets, this one requestions (vs, ps, iv) as the function arguments.
 Only allowed on expressions, and arrays of expressions.
 """
-function _build_function(target::StanTarget, ex::Array{<:Num}, vs, ps, iv;
+function _build_function(target::StanTarget, ex::Array{Num}, vs, ps, iv;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -540,7 +540,7 @@ function _build_function(target::StanTarget, ex::Array{<:Num}, vs, ps, iv;
     @assert expression == Val{true}
 
     if !columnmajor
-        return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), vs::Vector{<:Num}, ps::Vector{<:Num}, iv::Vector{<:Num}; 
+        return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), vs, ps, iv; 
                             columnmajor = true, 
                             conv        = conv,
                             expression  = expression,
@@ -607,7 +607,7 @@ end
 Build function target: `MATLABTarget`
 
 ```julia
-function _build_function(target::MATLABTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
+function _build_function(target::MATLABTarget, ex::Array{Num}, args::Vector{Num}...;
                          columnmajor = true,
                          conv        = toexpr, 
                          expression  = Val{true},
@@ -620,8 +620,9 @@ This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MA
 Compatible with the MATLAB differential equation solvers. Only allowed on expressions,
 and arrays of expressions.
 """
-function _build_function(target::MATLABTarget, ex::Array{<:Num}, args::Vector{<:Num}...;
+function _build_function(target::MATLABTarget, ex::Array{Num}, args::Vector{Num}...;
                          columnmajor = true,
+                         allowscalar = true,
                          conv        = toexpr, 
                          expression  = Val{true},
                          fname       = :diffeqf, 
@@ -633,6 +634,7 @@ function _build_function(target::MATLABTarget, ex::Array{<:Num}, args::Vector{<:
     if !columnmajor
         return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...; 
                                columnmajor = true, 
+                               allowscalar = allowscalar,
                                conv        = conv,
                                expression  = expression,
                                fname       = fname, 
@@ -640,24 +642,29 @@ function _build_function(target::MATLABTarget, ex::Array{<:Num}, args::Vector{<:
                                rhsnames    = rhsnames)
     end
 
-    expressions = Vector{String}()
-    for col ∈ 1:size(ex,2)
-        for row ∈ 1:size(ex,1)
+    matstr = ""
+    for row ∈ 1:size(ex,1)
+        row_strings = Vector{String}()
+        for col ∈ 1:size(ex,2)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
             rhs = numbered_expr(value(ex[row, col]), args...;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = 0) |> string
-            push!(expressions, string(rhs))
+            push!(row_strings, rhs)
         end
+        matstr = matstr * "  " * join(row_strings, ", ") * ";\n"
     end
-
-    matstr = join(expressions, "; ")
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-    matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
-    matstr
+    if length(ex) == 1 && allowscalar
+        matstr = "$fname = @(t,$(rhsnames[1]))" * matstr * ";"
+    else
+        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];"
+    end
+    
+    return matstr
 
 end
 _build_function(target::MATLABTarget, ex::Num, args...; kwargs...) = _build_function(target, [ex], args...; kwargs...)
