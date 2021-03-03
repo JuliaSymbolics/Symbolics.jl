@@ -230,7 +230,27 @@ function make_array(s::MultithreadedForm, arr, similarto)
     arrays = map(slices) do slice
         _make_array(slice, similarto)
     end
-    SpawnFetch{Multithreaded}(arrays, vcat)
+    SpawnFetch{MultithreadedForm}(arrays, vcat)
+end
+
+function toexpr(p::SpawnFetch{MultithreadedForm}, st)
+    spawns = map(p.exprs) do thunk
+        closure = @RuntimeGeneratedFunction(:(()->$(toexpr(thunk, st))))
+        var = esc(Base.sync_varname)
+        quote
+            let
+                task = Base.Threads.Task($closure)
+                if $(Expr(:islocal, var))
+                    put!($var, task)
+                end
+                Base.Threads.schedule(task)
+                task
+            end
+        end
+    end
+    quote
+        $(toexpr(p.combine, st))(map(fetch, ($(spawns...),))...)
+    end
 end
 
 function _make_array(rhss::AbstractSparseArray, similarto)
@@ -283,7 +303,7 @@ function set_array(s::MultithreadedForm, out, outputidxs, rhss, checkbounds, ski
         idxs, vals = first.(slice), last.(slice)
         _set_array(out, idxs, vals, checkbounds, skipzeros)
     end
-    SpawnFetch{Multithreaded}(arrays, @inline noop(args...) = nothing)
+    SpawnFetch{MultithreadedForm}(arrays, @inline noop(args...) = nothing)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
