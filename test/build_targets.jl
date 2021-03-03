@@ -137,9 +137,9 @@ end
 let 
     @variables x y z
     expression = x + y + z
-    mfunc = build_function(expression, vcat(x,y,z); target = Symbolics.MATLABTarget(), expression = Val{true}, allowscalar = true)
+    mfunc = build_function(expression, vcat(x,y,z); target = Symbolics.MATLABTarget(), expression = Val{true})
 
     # Generated function should be out[0] = v[0] + p[0] + t[0]
-    @test mfunc == "diffeqf = @(t,internal_var___u)  internal_var___u(1) + internal_var___u(2) + internal_var___u(3);\n;"
+    @test mfunc == "diffeqf = @(t,internal_var___u) [\n  internal_var___u(1) + internal_var___u(2) + internal_var___u(3);\n];\n"
 end
 

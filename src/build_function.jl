@@ -622,7 +622,6 @@ and arrays of expressions.
 """
 function _build_function(target::MATLABTarget, ex::Array{Num}, args...;
                          columnmajor = true,
-                         allowscalar = true,
                          conv        = toexpr, 
                          expression  = Val{true},
                          fname       = :diffeqf, 
@@ -634,7 +633,6 @@ function _build_function(target::MATLABTarget, ex::Array{Num}, args...;
     if !columnmajor
         return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...; 
                                columnmajor = true, 
-                               allowscalar = allowscalar,
                                conv        = conv,
                                expression  = expression,
                                fname       = fname, 
@@ -658,11 +656,7 @@ function _build_function(target::MATLABTarget, ex::Array{Num}, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-    if length(ex) == 1 && allowscalar
-        matstr = "$fname = @(t,$(rhsnames[1]))" * matstr * ";"
-    else
         matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];\n"
-    end
     
     return matstr
 
