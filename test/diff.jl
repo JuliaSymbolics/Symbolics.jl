@@ -44,7 +44,7 @@ d2 = D(sin(t)*cos(t))
 eqs = [σ*(y-x),
        x*(ρ-z)-y,
        x*y - β*z]
-jac = jacobian(eqs, [x, y, z])
+jac = Symbolics.jacobian(eqs, [x, y, z])
 test_equal(jac[1,1], -1σ)
 test_equal(jac[1,2], σ)
 test_equal(jac[1,3], 0)
