@@ -18,5 +18,5 @@ end
 
 if GROUP == "Downstream"
     activate_downstream_env()
-    @time @safetestset "Unitful" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
+    @time @safetestset "ParameterizedFunctions MATLABDiffEq Regression Test" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
 end
