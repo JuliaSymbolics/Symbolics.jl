@@ -401,6 +401,8 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                          lhsname=:du,rhsnames=[Symbol("RHS$i") for i in 1:length(args)],
                          libpath=tempname(),compiler=:gcc)
 
+    @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::Array{Num}...) instead."
+
     differential_equation = string(join([numbered_expr(eq,args...,lhsname=lhsname,
                                   rhsnames=rhsnames,offset=-1) for
                                   (i, eq) ∈ enumerate(eqs)],";\n  "),";")
@@ -424,6 +426,84 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
     end
 end
 
+
+"""
+Build function target: `CTarget`
+
+```julia
+function _build_function(target::CTarget, ex::Array{Num}, args...;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf,
+                         lhsname     = :du, 
+                         rhsnames    = [Symbol("RHS\$i") for i in 1:length(args)],
+                         libpath     = tempname(), 
+                         compiler    = :gcc)
+```
+
+This builds an in-place C function. Only works on expressions. If
+`expression == Val{false}`, then this builds a function in C, compiles it,
+and returns a lambda to that compiled function. These special keyword arguments
+control the compilation:
+
+- libpath: the path to store the binary. Defaults to a temporary path.
+- compiler: which C compiler to use. Defaults to :gcc, which is currently the
+  only available option.
+"""
+function _build_function(target::CTarget, ex::Array{Num}, args...;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf,
+                         lhsname     = :du, 
+                         rhsnames    = [Symbol("RHS$i") for i in 1:length(args)],
+                         libpath     = tempname(), 
+                         compiler    = :gcc)
+
+    if !columnmajor
+        return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...; 
+                               columnmajor = true, 
+                               conv        = conv,
+                               fname       = fname, 
+                               lhsname     = lhsname,
+                               rhsnames    = rhsnames,
+                               libpath     = libpath,
+                               compiler    = compiler)
+    end
+
+    equations = Vector{String}()
+    for col ∈ 1:size(ex,2)
+        for row ∈ 1:size(ex,1)
+            lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
+            rhs = numbered_expr(value(ex[row, col]), args...;
+                                lhsname  = lhsname,
+                                rhsnames = rhsnames,
+                                offset   = -1) |> string
+            push!(equations, string(lhs, " = ", rhs, ";"))
+        end
+    end
+
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
+
+    ccode = """
+    void $fname($(argstrs...)) {$([string("\n  ", eqn) for eqn ∈ equations]...)\n}
+    """
+
+    if expression == Val{true}
+        return ccode
+    else
+        @assert compiler == :gcc
+        open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
+            print(f, ccode)
+        end
+        @RuntimeGeneratedFunction(:((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)))
+    end
+
+end
+_build_function(target::CTarget, ex::Num, args...; kwargs...) = _build_function(target, [ex], args...; kwargs...)
+
+
 """
 Build function target: `StanTarget`
 
@@ -442,7 +522,10 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
                          conv = toexpr, expression = Val{true},
                          fname = :diffeqf, lhsname=:internal_var___du,
                          rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
+    
+    @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::Array{Num}...) instead."
     @assert expression == Val{true}
+
     differential_equation = string(join([numbered_expr(eq,vs,ps,lhsname=lhsname,
                                    rhsnames=rhsnames) for
                                    (i, eq) ∈ enumerate(eqs)],";\n  "),";")
@@ -456,6 +539,63 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
 end
 
 """
+Build function target: `StanTarget`
+
+```julia
+function _build_function(target::StanTarget, ex::Array{Num}, vs, ps, iv;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf, lhsname=:internal_var___du,
+                         rhsnames    =  [:internal_var___u,:internal_var___p,:internal_var___t])
+```
+
+This builds an in-place Stan function compatible with the Stan differential equation solvers.
+Unlike other build targets, this one requestions (vs, ps, iv) as the function arguments.
+Only allowed on expressions, and arrays of expressions.
+"""
+function _build_function(target::StanTarget, ex::Array{Num}, vs, ps, iv;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf, lhsname=:internal_var___du,
+                         rhsnames    =  [:internal_var___u,:internal_var___p,:internal_var___t])
+
+    @assert expression == Val{true}
+
+    if !columnmajor
+        return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), vs, ps, iv; 
+                            columnmajor = true, 
+                            conv        = conv,
+                            expression  = expression,
+                            fname       = fname, 
+                            lhsname     = lhsname,
+                            rhsnames    = rhsnames)
+    end
+
+    equations = Vector{String}()
+    for col ∈ 1:size(ex,2)
+        for row ∈ 1:size(ex,1)
+            lhs = string(lhsname, "[", (col-1) * size(ex,1) + row, "]")
+            rhs = numbered_expr(value(ex[row, col]), vs, ps, iv;
+                                lhsname  = lhsname,
+                                rhsnames = rhsnames,
+                                offset   = 0) |> string
+            push!(equations, string(lhs, " = ", rhs, ";"))
+        end
+    end
+
+    """
+    real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
+      real $lhsname[$(length(equations))];
+    $([eqn == equations[end] ? string("  ", eqn) : string("  ", eqn, "\n") for eqn ∈ equations]...)
+      return $lhsname;
+    }
+    """
+end
+_build_function(target::StanTarget, ex::Num, vs, ps, iv; kwargs...) = _build_function(target, [ex], vs, ps, iv; kwargs...)
+
+"""
 Build function target: `MATLABTarget`
 
 ```julia
@@ -466,14 +606,17 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
 ```
 
 This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
-Compatible with the MATLAB differential equation solvers. Only allowed on arrays
-of equations.
+Compatible with the MATLAB differential equation solvers. Only allowed on expressions, 
+and arrays of expressions.
 """
 function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
                          conv = toexpr, expression = Val{true},
                          fname = :diffeqf, lhsname=:internal_var___du,
                          rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
+
+    @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::Array{Num}...) instead."
     @assert expression == Val{true}
+
     matstr = join([numbered_expr(eq.rhs,args...,lhsname=lhsname,
                                   rhsnames=rhsnames) for
                                   (i, eq) ∈ enumerate(eqs)],"; ")
@@ -483,3 +626,63 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
     matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
     matstr
 end
+
+"""
+Build function target: `MATLABTarget`
+
+```julia
+function _build_function(target::MATLABTarget, ex::Array{Num}, args...;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf, 
+                         lhsname     = :internal_var___du,
+                         rhsnames    = [:internal_var___u,:internal_var___p,:internal_var___t])
+```
+
+This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
+Compatible with the MATLAB differential equation solvers. Only allowed on expressions,
+and arrays of expressions.
+"""
+function _build_function(target::MATLABTarget, ex::Array{Num}, args...;
+                         columnmajor = true,
+                         conv        = toexpr, 
+                         expression  = Val{true},
+                         fname       = :diffeqf, 
+                         lhsname     = :internal_var___du,
+                         rhsnames    = [:internal_var___u,:internal_var___p,:internal_var___t])
+
+    @assert expression == Val{true}
+
+    if !columnmajor
+        return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...; 
+                               columnmajor = true, 
+                               conv        = conv,
+                               expression  = expression,
+                               fname       = fname, 
+                               lhsname     = lhsname,
+                               rhsnames    = rhsnames)
+    end
+
+    matstr = ""
+    for row ∈ 1:size(ex,1)
+        row_strings = Vector{String}()
+        for col ∈ 1:size(ex,2)
+            lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
+            rhs = numbered_expr(value(ex[row, col]), args...;
+                                lhsname  = lhsname,
+                                rhsnames = rhsnames,
+                                offset   = 0) |> string
+            push!(row_strings, rhs)
+        end
+        matstr = matstr * "  " * join(row_strings, ", ") * ";\n"
+    end
+
+    matstr = replace(matstr,"["=>"(")
+    matstr = replace(matstr,"]"=>")")
+        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];\n"
+    
+    return matstr
+
+end
+_build_function(target::MATLABTarget, ex::Num, args...; kwargs...) = _build_function(target, [ex], args...; kwargs...)
