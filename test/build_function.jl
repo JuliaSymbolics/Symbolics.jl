@@ -14,18 +14,33 @@ end
 
 h_str = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g])
 h_oop = eval(h_str[1])
+h_str_par = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm())
+h_oop_par = eval(h_str_par[1])
+h_par_rgf = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm(), expression=false)
 h_ip! = eval(h_str[2])
 h_ip_skip! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true, fillzeros=false)[2])
+h_ip_skip_par! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true, parallel=Symbolics.MultithreadedForm(), fillzeros=false)[2])
 inputs = ([1], [2], [3, 4, 5], [6], [7], [8])
 
 @test h_oop(inputs...) == h_julia(inputs...)
+@test h_oop_par(inputs...) == h_julia(inputs...)
+@test h_par_rgf[1](inputs...) == h_julia(inputs...)
 out_1 = similar(h, Int)
 out_2 = similar(out_1)
 h_ip!(out_1, inputs...)
 h_julia!(out_2, inputs...)
 @test out_1 == out_2
+out_1 = similar(h, Int)
+h_par_rgf[2](out_1, inputs...)
+@test out_1 == out_2
 fill!(out_1, 10)
 h_ip_skip!(out_1, inputs...)
+@test out_1[3] == 10
+out_1[3] = 0
+@test out_1 == out_2
+
+fill!(out_1, 10)
+h_ip_skip_par!(out_1, inputs...)
 @test out_1[3] == 10
 out_1[3] = 0
 @test out_1 == out_2

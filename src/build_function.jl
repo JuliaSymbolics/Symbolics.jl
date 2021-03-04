@@ -195,13 +195,13 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     dargs = map(destructure_arg, [args...])
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
-    oop_expr = Func(dargs, [], make_array(parallel, rhss, similarto))
+    oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto))
     if !isnothing(wrap_code[1])
         oop_expr = wrap_code[1](oop_expr)
     end
 
     out = Sym{Any}(gensym("out"))
-    ip_expr = Func([out, dargs...], [], set_array(parallel, out, outputidxs, rhss, checkbounds, skipzeros))
+    ip_expr = Func([out, dargs...], [], set_array(parallel, dargs, out, outputidxs, rhss, checkbounds, skipzeros))
 
     if !isnothing(wrap_code[2])
         ip_expr = wrap_code[2](ip_expr)
@@ -215,22 +215,22 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 end
 
-function make_array(s, arr, similarto)
+function make_array(s, dargs, arr, similarto)
     Base.@warn("Parallel form of $(typeof(s)) not implemented")
     _make_array(arr, similarto)
 end
 
-function make_array(s::SerialForm, arr, similarto)
+function make_array(s::SerialForm, dargs, arr, similarto)
     _make_array(arr, similarto)
 end
 
-function make_array(s::MultithreadedForm, arr, similarto)
+function make_array(s::MultithreadedForm, closed_args, arr, similarto)
     per_task = ceil(Int, length(arr) / s.ntasks)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
-        _make_array(slice, similarto)
+        Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
-    SpawnFetch{MultithreadedForm}(arrays, vcat)
+    SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), vcat)
 end
 
 struct Funcall{F, T}
@@ -241,9 +241,11 @@ end
 (f::Funcall)() = f.f(f.args...)
 
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
-    spawns = map(zip(p.exprs, p.args)) do thunk, args
-        ex = Funcall(@RuntimeGeneratedFunction(toexpr(thunk, st)),
-                     (toexpr.(args, (st,))...,))
+    args = isnothing(p.args) ?
+              Iterators.repeated((), length(p.exprs)) : p.args
+    spawns = map(p.exprs, args) do thunk, a
+        ex = :($Funcall($(@RuntimeGeneratedFunction(toexpr(thunk, st))),
+                       ($(toexpr.(a, (st,))...),)))
         quote
             let
                 task = Base.Threads.Task($ex)
@@ -280,16 +282,16 @@ _make_array(x, similarto) = unflatten_long_ops(x)
 
 ## In-place version
 
-function set_array(p, args...)
+function set_array(p, closed_vars, args...)
     Base.@warn("Parallel form of $(typeof(p)) not implemented")
     _set_array(args...)
 end
 
-function set_array(s::SerialForm, args...)
+function set_array(s::SerialForm, closed_vars, args...)
     _set_array(args...)
 end
 
-function set_array(s::MultithreadedForm, out, outputidxs, rhss, checkbounds, skipzeros)
+function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
         return set_array(LiteralExpr(:($out.nzval)),
                          nothing,
@@ -305,9 +307,10 @@ function set_array(s::MultithreadedForm, out, outputidxs, rhss, checkbounds, ski
     slices = collect(Iterators.partition(zip(outputidxs, rhss), per_task))
     arrays = map(slices) do slice
         idxs, vals = first.(slice), last.(slice)
-        _set_array(out, idxs, vals, checkbounds, skipzeros)
+        Func([out, closed_args...], [],
+             _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
     end
-    SpawnFetch{MultithreadedForm}(arrays, @inline noop(args...) = nothing)
+    SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
