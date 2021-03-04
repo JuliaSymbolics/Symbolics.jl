@@ -47,9 +47,7 @@ using DiffRules, SpecialFunctions, NaNMath
 
 using SparseArrays
 
-export Differential, expand_derivatives, derivative, gradient,
-       jacobian, jacobian_sparsity, sparsejacobian,
-       hessian, sparsehessian, hessian_sparsity
+export Differential, expand_derivatives
 
 include("diff.jl")
 

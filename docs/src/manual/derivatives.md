@@ -17,6 +17,9 @@ expand_derivatives
 
 ## High Level Differentiation Functions
 
+The following functions are not exported and thus must be accessed in a namespaced
+way, i.e. `Symbolics.jacobian`.
+
 ```@docs
 Symbolics.derivative
 Symbolics.jacobian
