@@ -142,20 +142,3 @@ let
     # Generated function should be out[0] = v[0] + p[0] + t[0]
     @test mfunc == "diffeqf = @(t,internal_var___u) [\n  internal_var___u(1) + internal_var___u(2) + internal_var___u(3);\n];\n"
 end
-
-### Capture MATLABDiffEq.jl type issues
-@parameters t a b c d
-@variables x(t) y(t)
-D = Differential(t)
-eqs = [D(x) ~ a*x - b*x*y
-       D(y) ~ -c*y + d*x*y]
-sys = ODESystem(eqs)
-equations(sys)
-matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),states(sys),
-                                        parameters(sys),independent_variable(sys),
-                                        target = ModelingToolkit.MATLABTarget())
-@test matstr == "diffeqf = @(t,internal_var___u) [
-  internal_var___p(1) * internal_var___u(1) + -1 * internal_var___p(2) * internal_var___u(1) * internal_var___u(2);
-  -1 * internal_var___p(3) * internal_var___u(2) + internal_var___p(4) * internal_var___u(1) * internal_var___u(2);
-];
-"
