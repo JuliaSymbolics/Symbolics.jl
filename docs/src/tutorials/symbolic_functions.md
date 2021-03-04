@@ -409,8 +409,8 @@ In the definition
 
 `t` is of type `Sym{Real}` but the name `x` refers to an object that represents the `Term` `x(t)`. The operation of this expression is itself the object `Sym{FnType{Tuple{Real}, Real}}(:x)`. The type `Sym{FnType{...}}` represents a callable object. In this case specifically it's a function that takes 1 Real argument (noted by `Tuple{Real}`) and returns a `Real` result. You can call such a callable `Sym` with either a number or a symbolic expression of a permissible type.
 
-this expression also defines `t` as a dependent variable while `x(t)` and `y(t)` are
-independent variables. This is accounted for in differentiation:
+This expression also defines `t` as a independent variable while `x(t)` and `y(t)` are
+dependent variables. This is accounted for in differentiation:
 
 ```julia
 z = x + y*t
