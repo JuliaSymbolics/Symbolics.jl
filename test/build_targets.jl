@@ -58,7 +58,7 @@ expr = [a*x - x*y,-3y + x*y]
 
 
 # Matrix CTarget test
-let 
+let
     @variables x[1:4] y[1:4] z[1:4]
     expression = hcat(x,y,z) # Results in [x1 y1 z1; x2 y2 z2; ...]
     variables  = vcat(x,y,z) # Results in [x1, x2, x3, x4, y1, ...]
@@ -69,7 +69,7 @@ let
 end
 
 # Scalar CTarget test
-let 
+let
     @variables x y z
     expression = x + y + z
     cfunc = build_function(expression, [x], [y], [z]; target = Symbolics.CTarget(), expression = Val{true})
@@ -79,7 +79,7 @@ let
 end
 
 # Matrix StanTarget test
-let 
+let
     @variables x[1:4] y[1:4] z[1:4]
     expression = hcat(x,y,z) # Results in [x1 y1 z1; x2 y2 z2; ...]
     variables  = vcat(x,y,z) # Results in [x1, x2, x3, x4, y1, ...]
@@ -107,7 +107,7 @@ let
 end
 
 # Scalar StanTarget test
-let 
+let
     @variables t x(t) y(t) z(t)
     expression = x + y + z
     sfunc = build_function(expression, vcat(x,y), [z], t; target = Symbolics.StanTarget(), expression = Val{true})
@@ -123,7 +123,7 @@ let
 end
 
 # Matrix MATLABTarget test
-let 
+let
     @variables x[1:4] y[1:4] z[1:4]
     expression = hcat(x,y,z) # Results in [x1 y1 z1; x2 y2 z2; ...]
     variables  = vcat(x,y,z) # Results in [x1, x2, x3, x4, y1, ...]
@@ -134,7 +134,7 @@ let
 end
 
 # Scalar MATLABTarget test
-let 
+let
     @variables x y z
     expression = x + y + z
     mfunc = build_function(expression, vcat(x,y,z); target = Symbolics.MATLABTarget(), expression = Val{true})
@@ -142,4 +142,3 @@ let
     # Generated function should be out[0] = v[0] + p[0] + t[0]
     @test mfunc == "diffeqf = @(t,internal_var___u) [\n  internal_var___u(1) + internal_var___u(2) + internal_var___u(3);\n];\n"
 end
-
