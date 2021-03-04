@@ -1,12 +1,14 @@
 using SafeTestsets, Test
 
+const GROUP = get(ENV, "GROUP", "All")
+
 function activate_downstream_env()
     Pkg.activate("downstream")
     Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
     Pkg.instantiate()
 end
 
-if !is_APPVEYOR && GROUP == "Core"
+if GROUP == "All" || GROUP == "Core"
     @safetestset "Differentiation Test" begin include("diff.jl") end
     @safetestset "Overloading Test" begin include("overloads.jl") end
     @safetestset "Build Function Test" begin include("build_function.jl") end
@@ -14,7 +16,7 @@ if !is_APPVEYOR && GROUP == "Core"
     @safetestset "Build Targets Test" begin include("build_targets.jl") end
 end
 
-if !is_APPVEYOR && GROUP == "Downstream"
+if GROUP == "Downstream"
     activate_downstream_env()
     @time @safetestset "Unitful" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
 end
