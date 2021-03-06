@@ -1,5 +1,6 @@
 using SymbolicUtils.Code
 using Base.Threads
+using ThreadingUtilities
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
