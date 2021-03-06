@@ -10,6 +10,7 @@ struct MATLABTarget <: BuildTargets end
 
 abstract type ParallelForm end
 struct SerialForm <: ParallelForm end
+struct BatchedForm <: ParallelForm end
 struct MultithreadedForm <: ParallelForm
     ntasks::Int
 end
@@ -234,29 +235,29 @@ function make_array(s::MultithreadedForm, closed_args, arr, similarto)
     SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), vcat)
 end
 
-struct Funcall{F, T}
-    f::F
-    args::T
+struct ClosureExpr
+    f
+    args
+    rt
 end
 
-(f::Funcall)() = f.f(f.args...)
+ClosureExpr(f,args) = ClosureExpr(f, args, Any)
+
+function toexpr(c::ClosureExpr, st)
+    :($Funcall($(@RuntimeGeneratedFunction(toexpr(c.f, st))),
+               ($(toexpr.(c.args, (st,))...),),
+               $(toexpr(c.rt, st))))
+end
 
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
-    args = isnothing(p.args) ?
-              Iterators.repeated((), length(p.exprs)) : p.args
-    spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(@RuntimeGeneratedFunction(toexpr(thunk, st))),
-                       ($(toexpr.(a, (st,))...),)))
-        quote
-            let
-                task = Base.Threads.Task($ex)
-                Base.Threads.schedule(task)
-                task
-            end
-        end
+    ex = map(p.exprs) do thunk
+        toexpr(thunk, st)
     end
+
     quote
-        $(toexpr(p.combine, st))(map(fetch, ($(spawns...),))...)
+        $spawn_fetch(($(ex...),),
+                     Val{$(Threads.nthreads())}(),
+                     $(toexpr(p.combine, st)))
     end
 end
 
@@ -311,7 +312,7 @@ function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, che
         Func([out, closed_args...], [],
              _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
     end
-    SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
+    SpawnFetch{MultithreadedForm}(ClosureExpr.(first.(arrays), last.(arrays)), @inline noop(args...) = nothing)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
