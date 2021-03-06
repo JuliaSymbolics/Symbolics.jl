@@ -60,7 +60,14 @@ function Base.show(io::IO, z::Complex{<:Num})
 end
 
 SymbolicUtils.simplify(n::Num; kw...) = Num(SymbolicUtils.simplify(value(n); kw...))
-substitute(x::Num, rule; kw...) = Num(substitute(value(x), rule; kw...))
+function substitute(x::Num, rule::Dict; kw...)
+    rule′ = if any(v -> v isa Num, values(rule))
+        Dict((k => v isa Num ? value(v) : v for (k, v) in rule))
+    else
+        rule
+    end
+    Num(substitute(value(x), rule′; kw...))
+end
 
 SymbolicUtils.symtype(n::Num) = symtype(n.val)
 
