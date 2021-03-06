@@ -155,7 +155,7 @@ end
 Define one or more unknown variables.
 
 ```julia
-@parameters t α σ(..) β[1:2]
+@variables t α σ(..) β[1:2]
 @variables w(..) x(t) y z(t, α, x)
 
 expr = β₁* x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
