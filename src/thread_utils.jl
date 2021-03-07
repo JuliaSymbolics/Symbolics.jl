@@ -55,24 +55,46 @@ end
 end
 @generated function spawn_fetch(fs::NTuple{N,Any}, ::Val{nt}, g=tuple) where {nt, N}
 
-    ts = 1:nt-1
-    batches = map(Iterators.partition(1:N, nt-1)) do batch
+    ts = 1:nt
+    batches = map(Iterators.partition(1:N, nt)) do batch
          # one batch of spawns
+         launches = map(ts) do t
+             if t > length(batch)
+                 return
+             end
+             i = batch[t]
+             if t == nt
+                 :(rs[$i][] = fs[$i]())
+             else
+                 :(launch_call!($(ts[t]),
+                                fs[$i].f,
+                                argrefs[$i],
+                                rs[$i]))
+             end
+         end
+
+         waits = map(ts) do t
+             if t > length(batch)
+                 return
+             end
+             i = batch[t]
+             if t == nt
+                 :(rs[$i][] = fs[$i]())
+             else
+                 :(ThreadingUtilities.__wait($(ts[t])))
+             end
+         end
+
          quote
-             $([:(launch_call!($(ts[t]),
-                               fs[$i].f,
-                               argrefs[$i],
-                               rs[$i]))
-                for (t, i) in enumerate(batch)]...)
-             $([:(ThreadingUtilities.__wait($(ts[t])))
-                for (t, i) in enumerate(batch)]...)
+             $(launches...)
+             $(waits...)
          end
      end
 
     quote
         rs = Base.@ntuple $N i->Ref{output_type(fs[i])}()
         argrefs = Base.@ntuple $N i->Ref(fs[i].args)
-        GC.@preserve rs argrefs begin
+        GC.@preserve fs rs argrefs begin
             $(batches...)
         end
         return Base.@ntuple $N i->rs[i][]
@@ -85,7 +107,7 @@ function spawn_fetch_nonstatic(fs, g=tuple)
 
     nt = Threads.nthreads()
     ts = 1:nt-1
-    GC.@preserve rs argrefs begin
+    GC.@preserve fs rs argrefs begin
         for batch in Iterators.partition(1:length(fs),
                                          length(ts))
             for (t, i) in enumerate(batch)
