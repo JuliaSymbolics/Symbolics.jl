@@ -252,7 +252,7 @@ end
 ClosureExpr(f,args) = ClosureExpr(f, args, Any)
 
 function toexpr(c::ClosureExpr, st)
-    :($(toexpr(c.f, st))(toexpr.(c.args, (st,))...))
+    :($(toexpr(c.f, st))($(toexpr.(c.args, (st,))...)))
    #:($Funcall($(@RuntimeGeneratedFunction(toexpr(c.f, st))),
    #           ($(toexpr.(c.args, (st,))...),),
    #           $(toexpr(c.rt, st))))
@@ -260,11 +260,11 @@ end
 
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     ex = map(p.exprs) do thunk
-        LiteralExpr(:(Threads.@spawn $(toexpr(thunk, st))))
+        :(Threads.@spawn $(toexpr(thunk, st)))
     end
 
     quote
-        $(toexpr(p.combine, st))(map(fetch, ($(ex...,)))...)
+        $(toexpr(p.combine, st))(map(fetch, ($(ex...),))...)
     end
 end
 
