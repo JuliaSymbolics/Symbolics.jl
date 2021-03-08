@@ -203,7 +203,15 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 
     out = Sym{Any}(gensym("out"))
-    ip_expr = Func([out, dargs...], [], set_array(parallel, dargs, out, outputidxs, rhss, checkbounds, skipzeros))
+    ip_expr = Func([out, dargs...],
+                   [],
+                   set_array(parallel,
+                             dargs,
+                             out,
+                             outputidxs,
+                             rhss,
+                             checkbounds,
+                             skipzeros))
 
     if !isnothing(wrap_code[2])
         ip_expr = wrap_code[2](ip_expr)
@@ -255,7 +263,7 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
 
     quote
-        $spawn_fetch_serial(($(ex...),),
+        $spawn_fetch(($(ex...),),
                             Val{$(Threads.nthreads())}(),
                             $(toexpr(p.combine, st)))
     end
@@ -297,7 +305,9 @@ end
 
 function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
-        return set_array(LiteralExpr(:($out.nzval)),
+        return set_array(s,
+                         [],
+                         LiteralExpr(:($out.nzval)),
                          nothing,
                          rhss.nzval,
                          checkbounds,
@@ -311,10 +321,14 @@ function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, che
     slices = collect(Iterators.partition(zip(outputidxs, rhss), per_task))
     arrays = map(slices) do slice
         idxs, vals = first.(slice), last.(slice)
-        Func([out, closed_args...], [],
-             _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
+        outvar = gensym("out")
+        Func([outvar, closed_args...], [],
+             _set_array(outvar, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
     end
-    SpawnFetch{MultithreadedForm}(ClosureExpr.(first.(arrays), last.(arrays), Nothing), noop)
+
+    SpawnFetch{MultithreadedForm}(ClosureExpr.(first.(arrays),
+                                               last.(arrays),
+                                               Nothing), noop)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)

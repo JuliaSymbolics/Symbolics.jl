@@ -13,8 +13,21 @@ function (f::RGFWrap{F, Args, T})(p::Ptr{UInt}) where {Args, F, T}
     nothing
 end
 
-@inline function fptr(f::RGFWrap)
-    @cfunction($f, Cvoid, (Ptr{UInt},))
+const Cf = @cfunction($sin, Float64, (Float64,))
+
+@generated function fptr(f::RGFWrap{F}) where {F}
+    if F <: RuntimeGeneratedFunction
+        instance = f(F(Expr(:block))) # HACK
+        cf = @cfunction($instance, Cvoid, (Ptr{UInt},))
+        quote
+            $(Expr(:meta, :inline))
+            $Cf
+        end
+    else
+        instance = f(F.instance)
+        #@cfunction($instance, Cvoid, (Ptr{UInt},))
+        Cf
+    end
 end
 
 struct Funcall{F, Args, outT}
@@ -27,13 +40,13 @@ end
 
 output_type(f::Funcall{F, Args, outT}) where {F, Args, outT} = outT
 
-@inline function Funcall(f::F, args::Args, outT=Base.return_types(f, Args)[1]) where {F,Args}
+@inline function Funcall(f::F, args::Args, outT) where {F,Args}
     g = RGFWrap{F, Args, outT}(f)
     Funcall{F, Args, outT}(g, args, fptr(g))
 end
 
-function setup_call!(p, f, cfunc, args, resref)
-    fp = Base.unsafe_convert(Ptr{Cvoid}, cfunc)
+@inline function setup_call!(p, f, cfunc, args, resref)
+    fp = Base.unsafe_convert(Ptr{Nothing}, cfunc)
     resptr = Base.unsafe_convert(Ptr{eltype(resref)}, resref)
     argptr = Base.unsafe_convert(Ptr{args_type(f)}, args)
     offset = ThreadingUtilities.store!(p, fp, sizeof(UInt))
@@ -113,7 +126,7 @@ end
 end
 
 function spawn_fetch_serial(fs::NTuple{N,Any}, ::Val, g=tuple) where {N}
-    ntuple(i->fs[i](), Val{N}())
+    ntuple(i->fs[i].f.f(fs[i].args...), Val{N}())
 end
 
 function spawn_fetch_nonstatic(fs, g=tuple)
@@ -154,6 +167,7 @@ const DEBUGBUF = zeros(UInt, 64)
                  quote
                     setup_call!(p,
                                 fs[$i].f,
+                                fs[$i].cfunc,
                                 argrefs[$i],
                                 rs[$i])
                     fs[$i].f(p)
