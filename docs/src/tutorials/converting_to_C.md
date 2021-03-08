@@ -1,6 +1,6 @@
 # Automatic Conversion of Julia Code to C Functions
 
-Since Symbolics.jl can trace Julia code into MTK IR that can be built and
+Since Symbolics.jl can trace Julia code into Symbolics IR that can be built and
 compiled via `build_function` to C, this gives us a nifty way to automatically
 generate C functions from Julia code! To see this in action, let's start with
 the Lotka-Volterra equations:
