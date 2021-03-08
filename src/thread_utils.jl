@@ -58,6 +58,7 @@ end
         end
     end
 end
+
 @inline @generated function spawn_fetch(fs::NTuple{N,Any}, ::Val{nt}, g=tuple) where {nt, N}
 
     ts = 1:nt
@@ -109,6 +110,10 @@ end
         end
         return Base.@ntuple $N i->res_i[]
     end
+end
+
+function spawn_fetch_serial(fs::NTuple{N,Any}, ::Val, g=tuple) where {N}
+    ntuple(i->fs[i](), Val{N}())
 end
 
 function spawn_fetch_nonstatic(fs, g=tuple)

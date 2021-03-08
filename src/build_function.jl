@@ -255,9 +255,9 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
 
     quote
-        $spawn_fetch(($(ex...),),
-                     Val{$(Threads.nthreads())}(),
-                     $(toexpr(p.combine, st)))
+        $spawn_fetch_serial(($(ex...),),
+                            Val{$(Threads.nthreads())}(),
+                            $(toexpr(p.combine, st)))
     end
 end
 
