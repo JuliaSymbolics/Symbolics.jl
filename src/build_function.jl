@@ -293,6 +293,8 @@ function set_array(s::SerialForm, closed_vars, args...)
     _set_array(args...)
 end
 
+@inline noop(args...) = nothing
+
 function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
         return set_array(LiteralExpr(:($out.nzval)),
@@ -312,10 +314,8 @@ function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, che
         Func([out, closed_args...], [],
              _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
     end
-    SpawnFetch{MultithreadedForm}(ClosureExpr.(first.(arrays), last.(arrays), (Nothing,)), noop)
+    SpawnFetch{MultithreadedForm}(ClosureExpr.(first.(arrays), last.(arrays), Nothing), noop)
 end
-
-@inline noop(args...) = nothing
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
     if outputidxs === nothing

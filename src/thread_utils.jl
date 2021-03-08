@@ -3,6 +3,7 @@ using ThreadingUtilities
 struct RGFWrap{F, Args, T}
     f::F
 end
+
 @inline args_type(f::RGFWrap{F,Args}) where {F, Args} = Args
 
 function (f::RGFWrap{F, Args, T})(p::Ptr{UInt}) where {Args, F, T}
@@ -19,6 +20,7 @@ end
 struct Funcall{F, Args, outT}
     f::RGFWrap{F, Args, outT}
     args::Args
+    cfunc::Base.CFunction
 end
 
 (f::Funcall)() = f.f.f(f.args...)
@@ -26,36 +28,42 @@ end
 output_type(f::Funcall{F, Args, outT}) where {F, Args, outT} = outT
 
 @inline function Funcall(f::F, args::Args, outT=Base.return_types(f, Args)[1]) where {F,Args}
-    Funcall{F, Args, outT}(RGFWrap{F, Args, outT}(f), args)
+    g = RGFWrap{F, Args, outT}(f)
+    Funcall{F, Args, outT}(g, args, fptr(g))
 end
 
-function setup_call!(p, f, args, resref)
-    fp = Base.unsafe_convert(Ptr{Cvoid}, fptr(f))
+function setup_call!(p, f, cfunc, args, resref)
+    fp = Base.unsafe_convert(Ptr{Cvoid}, cfunc)
     resptr = Base.unsafe_convert(Ptr{eltype(resref)}, resref)
     argptr = Base.unsafe_convert(Ptr{args_type(f)}, args)
     offset = ThreadingUtilities.store!(p, fp, sizeof(UInt))
     ThreadingUtilities.store!(p, (argptr, resptr), offset)
 end
 
-@inline function launch_call!(tid, f::RGFWrap, args, resref)
+@inline function launch_call!(tid, f::RGFWrap, cfunc, args, resref)
     p = ThreadingUtilities.taskpointer(tid)
-    while true
-        if ThreadingUtilities._atomic_cas_cmp!(p, ThreadingUtilities.SPIN, ThreadingUtilities.STUP)
-            setup_call!(p, f, args, resref)
-            @assert ThreadingUtilities._atomic_cas_cmp!(p, ThreadingUtilities.STUP, ThreadingUtilities.TASK)
-            return
-        elseif ThreadingUtilities._atomic_cas_cmp!(p, ThreadingUtilities.WAIT, ThreadingUtilities.STUP)
-            setup_call!(p, f, args, resref)
-            @assert ThreadingUtilities._atomic_cas_cmp!(p, ThreadingUtilities.STUP, ThreadingUtilities.LOCK)
-            ThreadingUtilities.wake_thread!(tid % UInt)
-            return
+    GC.@preserve cfunc begin
+        while true
+            if ThreadingUtilities._atomic_cas_cmp!(p, ThreadingUtilities.SPIN, ThreadingUtilities.STUP)
+                setup_call!(p, f, cfunc, args, resref)
+                @assert ThreadingUtilities._atomic_cas_cmp!(p, ThreadingUtilities.STUP, ThreadingUtilities.TASK)
+                return
+            elseif ThreadingUtilities._atomic_cas_cmp!(p, ThreadingUtilities.WAIT, ThreadingUtilities.STUP)
+                setup_call!(p, f, cfunc, args, resref)
+                @assert ThreadingUtilities._atomic_cas_cmp!(p, ThreadingUtilities.STUP, ThreadingUtilities.LOCK)
+                ThreadingUtilities.wake_thread!(tid % UInt)
+                return
+            end
+            ThreadingUtilities.pause()
         end
-        ThreadingUtilities.pause()
     end
 end
-@generated function spawn_fetch(fs::NTuple{N,Any}, ::Val{nt}, g=tuple) where {nt, N}
+@inline @generated function spawn_fetch(fs::NTuple{N,Any}, ::Val{nt}, g=tuple) where {nt, N}
 
     ts = 1:nt
+    rs = [Symbol("res_$i") for i=1:N]
+    argrefs = [Symbol("argref_$i") for i=1:N]
+    cfuncs = [Symbol("cfunc_$i") for i=1:N]
     batches = map(Iterators.partition(1:N, nt)) do batch
          # one batch of spawns
          launches = map(ts) do t
@@ -64,12 +72,13 @@ end
              end
              i = batch[t]
              if t == nt
-                 :(rs[$i][] = fs[$i]())
+                 :($(rs[i])[] = fs[$i]())
              else
                  :(launch_call!($(ts[t]),
                                 fs[$i].f,
-                                argrefs[$i],
-                                rs[$i]))
+                                $(cfuncs[i]),
+                                $(argrefs[i]),
+                                $(rs[i])))
              end
          end
 
@@ -79,7 +88,7 @@ end
              end
              i = batch[t]
              if t == nt
-                 :(rs[$i][] = fs[$i]())
+                 :($(rs[i])[] = fs[$i]())
              else
                  :(ThreadingUtilities.__wait($(ts[t])))
              end
@@ -92,12 +101,13 @@ end
      end
 
     quote
-        rs = Base.@ntuple $N i->Ref{output_type(fs[i])}()
-        argrefs = Base.@ntuple $N i->Ref(fs[i].args)
-        GC.@preserve rs argrefs begin
+        Base.@nexprs $N i->res_i = Ref{output_type(fs[i])}()
+        Base.@nexprs $N i->argref_i = Ref(fs[i].args)
+        Base.@nexprs $N i->cfunc_i = fs[i].cfunc
+        GC.@preserve $(rs...) $(argrefs...) $(cfuncs...) begin
             $(batches...)
         end
-        return Base.@ntuple $N i->rs[i][]
+        return Base.@ntuple $N i->res_i[]
     end
 end
 
@@ -123,7 +133,7 @@ end
 
 
 const DEBUGBUF = zeros(UInt, 64)
-@generated function spawn_fetch_debug(fs::NTuple{N,Any}, ::Val{nt}, g=tuple) where {nt, N}
+@inline @generated function spawn_fetch_debug(fs::NTuple{N,Any}, ::Val{nt}, g=tuple) where {nt, N}
 
     ts = 1:nt
     batches = map(Iterators.partition(1:N, nt)) do batch
