@@ -50,10 +50,19 @@ Base.:~(lhs::Symbolic, rhs::Any    ) = Equation(value(lhs), value(rhs))
 Base.:~(lhs::Any, rhs::Symbolic    ) = Equation(value(lhs), value(rhs))
 for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
     (T != :Complex && S != :Complex) && continue
-    @eval Base.:~(a::$T, b::$S) = [
-      (isa(value(real(a)), Number) && isa(value(real(b)), Number)) ? [] : value(real(a)) ~ value(real(b));
-      (isa(value(imag(a)), Number) && isa(value(imag(b)), Number)) ? [] : value(imag(a)) ~ value(imag(b))
-    ]
+    @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
+                                      ai = value(imag(a)), bi = value(imag(b))
+        if ar isa Number && br isa Number && ai isa number && bi isa Number
+          error("Equation $a ~ $b does not contain any symbols")
+        elseif ar isa Number && br isa Number
+            ai ~ bi
+        elseif ai isa Number && bi isa Number
+            ar ~ br
+        else
+            [ar ~ br
+            ai ~ bi]
+        end
+    end
 end
 
 struct ConstrainedEquation
