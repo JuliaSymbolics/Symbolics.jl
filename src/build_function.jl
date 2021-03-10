@@ -543,6 +543,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
     argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
 
     ccode = """
+    #include <math.h>
     void $fname($(argstrs...)) {$([string("\n  ", eqn) for eqn ∈ equations]...)\n}
     """
 
