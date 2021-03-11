@@ -45,3 +45,5 @@ derivative(::typeof(IfElse.ifelse), args::NTuple{3,Any}, ::Val{3}) = IfElse.ifel
 @register ∨(x, y)
 @register ∧(x, y)
 @register ⊆(x, y)
+
+LinearAlgebra.norm(x::Num, p::Real) = abs(x)
