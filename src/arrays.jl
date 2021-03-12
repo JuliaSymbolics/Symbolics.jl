@@ -24,7 +24,9 @@ nd(s::SymArray) = nd(symtype(s))
 nd(::Type{<:AbstractArray{<:Any, N}}) where {N} = N
 nd(::Type{<:AbstractArray}) = nothing
 
-shape(s::SymArray) = getmetadata(s, ArrayShapeCtx)
+function shape(s::SymArray)
+    hasmetadata(s, ArrayShapeCtx) ? getmetadata(s, ArrayShapeCtx) : nothing
+end
 
 macro maybe(args...)
     f = args[end]
@@ -150,3 +152,5 @@ function Base.getindex(a::ArrayShape, idx...)
 end
 
 Base.length(a::ArrayShape) = prod(map(length, axes(a)))
+
+
