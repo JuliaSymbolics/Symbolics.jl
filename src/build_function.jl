@@ -352,6 +352,7 @@ function vars_to_pairs(name,vs, symsdict)
 end
 
 get_varnumber(varop, vars::Vector) =  findfirst(x->isequal(x,varop),vars)
+get_varnumber(varop, var) =  isequal(var,varop) ? 0 : nothing
 
 function numbered_expr(O::Symbolic,args...;varordering = args[1],offset = 0,
                        lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)])
@@ -360,7 +361,7 @@ function numbered_expr(O::Symbolic,args...;varordering = args[1],offset = 0,
         for j in 1:length(args)
             i = get_varnumber(O,args[j])
             if i !== nothing
-                return :($(rhsnames[j])[$(i+offset)])
+                return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
             end
         end
     end
@@ -382,6 +383,53 @@ function numbered_expr(de::Equation,args...;varordering = args[1],
 end
 numbered_expr(c,args...;kwargs...) = c
 numbered_expr(c::Num,args...;kwargs...) = error("Num found")
+
+
+# Replace certain multiplication and power expressions so they form valid C code
+# Extra factors of 1 are hopefully eliminated by the C compiler
+function coperators(expr)
+    for e in expr.args
+        if e isa Expr
+            coperators(e)
+        end
+    end
+    # Introduce another factor 1 to prevent contraction of terms like "5 * t" to "5t" (not valid C code)
+    if expr.head==:call && expr.args[1]==:* && length(expr.args)==3 && isa(expr.args[2], Real) && isa(expr.args[3], Symbol)
+        push!(expr.args, 1)
+    # Power operator does not exist in C, replace by multiplication or "pow"
+    elseif expr.head==:call && expr.args[1]==:^
+        @assert length(expr.args)==3 "Don't know how to handle ^ operation with <> 2 arguments"
+        x = expr.args[2]
+        n = expr.args[3]
+        empty!(expr.args)
+        # Replace by multiplication/division if
+        #   x is a symbol and  n is a small integer
+        #   x is a more complex expression and n is ±1
+        #   n is exactly 0
+        if (isa(n,Integer) && ((isa(x, Symbol) && abs(n) <= 3) || abs(n) <= 1)) || n==0
+            if n >= 0
+                append!(expr.args, [:*, fill(x, n)...])
+                # fill up with factor 1 so this expr can still be a multiplication
+                while length(expr.args) < 3
+                    push!(expr.args, 1)
+                end
+            else # inverse of the above
+                if n==-1
+                    term = x
+                else
+                    term = :( ($(x)) ^ ($(-n)))
+                    coperators(term)
+                end
+                append!(expr.args, [:/, 1., term])
+            end
+        #... otherwise use "pow" function
+        else
+            append!(expr.args, [:pow, x, n])
+        end
+    end
+    expr
+end
+
 
 """
 Build function target: `CTarget`
@@ -487,7 +535,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
             rhs = numbered_expr(value(ex[row, col]), args...;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
-                                offset   = -1) |> string
+                                offset   = -1) |> coperators |> string  # Filter through coperators to produce valid C code in more cases
             push!(equations, string(lhs, " = ", rhs, ";"))
         end
     end
@@ -495,6 +543,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
     argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
 
     ccode = """
+    #include <math.h>
     void $fname($(argstrs...)) {$([string("\n  ", eqn) for eqn ∈ equations]...)\n}
     """
 
