@@ -52,8 +52,27 @@ function build_function(args...;target = JuliaTarget(),kwargs...)
   _build_function(target,args...;kwargs...)
 end
 
+function muladd_form(ab,c,rest)
+    length(ab) < 2 && return nothing
+    isequal(ab[1], -1) &&r return nothing
+    a,bs = ab[1], ab[2:end]
+    materm = term(muladd,
+                 a,
+                 length(bs) == 1 ? bs[1] : Term(*, bs),
+                 c)
+    isempty(rest) ? materm : term(+, materm, rest...)
+end
+
+function muladd_pass(expr)
+    rules = [@rule +(~~a, *(~~x), ~y, ~~b) =>
+             muladd_form(~~x, ~y, vcat(~~a, ~~b))
+             @rule +(~~a, ~y, *(~~x), ~~b) =>
+             muladd_form(~~x, ~y, vcat(~~a, ~~b))]
+    Num(Rewriters.Postwalk(Rewriters.Chain(rules))(value(expr)))
+end
+
 function unflatten_args(f, args, N=4)
-    length(args) < N && return Term{Real}(f, args)
+    length(args) <= N && return Term{Real}(f, args)
     unflatten_args(f, [Term{Real}(f, group)
                                        for group in Iterators.partition(args, N)], N)
 end
@@ -61,10 +80,14 @@ end
 function unflatten_long_ops(op, N=4)
     op = value(op)
     !istree(op) && return Num(op)
-    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, 4) : nothing)
-    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, 4) : nothing)
+    rules = [@rule((+)(~~x) =>
+                   length(~~x) > N ?
+                   unflatten_args(+, ~~x, 4) : nothing)
+             @rule((*)(~~x) =>
+                   length(~~x) > N ?
+                   unflatten_args(*, ~~x, 4) : nothing)]
 
-    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]))(op))
+    Num(Rewriters.Postwalk(Rewriters.Chain(rules))(op)) |> muladd_pass
 end
 
 
