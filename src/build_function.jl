@@ -102,21 +102,6 @@ function _build_and_inject_function(mod::Module, ex)
     RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex)
 end
 
-# Detect heterogeneous element types of "arrays of matrices/sparce matrices"
-function is_array_matrix(F)
-    return isa(F, AbstractVector) && all(x->isa(x, AbstractArray), F)
-end
-function is_array_sparse_matrix(F)
-    return isa(F, AbstractVector) && all(x->isa(x, AbstractSparseMatrix), F)
-end
-# Detect heterogeneous element types of "arrays of arrays of matrices/sparce matrices"
-function is_array_array_matrix(F)
-    return isa(F, AbstractVector) && all(x->isa(x, AbstractArray{<:AbstractMatrix}), F)
-end
-function is_array_array_sparse_matrix(F)
-    return isa(F, AbstractVector) && all(x->isa(x, AbstractArray{<:AbstractSparseMatrix}), F)
-end
-
 toexpr(n::Num, st) = toexpr(value(n), st)
 
 function fill_array_with_zero!(x::AbstractArray)
@@ -311,6 +296,10 @@ function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, che
              _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
     end
     SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
+end
+
+function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
+    _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
