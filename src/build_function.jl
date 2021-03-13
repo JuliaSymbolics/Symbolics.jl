@@ -102,21 +102,6 @@ function _build_and_inject_function(mod::Module, ex)
     RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex)
 end
 
-# Detect heterogeneous element types of "arrays of matrices/sparce matrices"
-function is_array_matrix(F)
-    return isa(F, AbstractVector) && all(x->isa(x, AbstractArray), F)
-end
-function is_array_sparse_matrix(F)
-    return isa(F, AbstractVector) && all(x->isa(x, AbstractSparseMatrix), F)
-end
-# Detect heterogeneous element types of "arrays of arrays of matrices/sparce matrices"
-function is_array_array_matrix(F)
-    return isa(F, AbstractVector) && all(x->isa(x, AbstractArray{<:AbstractMatrix}), F)
-end
-function is_array_array_sparse_matrix(F)
-    return isa(F, AbstractVector) && all(x->isa(x, AbstractArray{<:AbstractSparseMatrix}), F)
-end
-
 toexpr(n::Num, st) = toexpr(value(n), st)
 
 function fill_array_with_zero!(x::AbstractArray)
