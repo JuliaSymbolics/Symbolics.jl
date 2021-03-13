@@ -298,6 +298,10 @@ function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, che
     SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
 end
 
+function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
+    _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros)
+end
+
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
