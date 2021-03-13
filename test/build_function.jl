@@ -105,7 +105,7 @@ f = eval(build_function(sparse([1],[1], [(x+y)/k], 10,10), [x,y,k])[1])
 @test f([1.,1.,2])[1,1] == 1.0
 @test sum(f([1.,1.,2])) == 1.0
 
-let #800
+let # ModelingToolkit.jl#800
     @variables x
     y = sparse(1:3,1:3,x)
 
