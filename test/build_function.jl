@@ -104,3 +104,15 @@ f = eval(build_function(sparse([1],[1], [(x+y)/k], 10,10), [x,y,k])[1])
 @test size(f([1.,1.,2])) == (10,10)
 @test f([1.,1.,2])[1,1] == 1.0
 @test sum(f([1.,1.,2])) == 1.0
+
+let #800
+    @variables x
+    y = sparse(1:3,1:3,x)
+
+    f1,f2 = build_function(y,x)
+    sf1, sf2 = string(f1), string(f2)
+    @test !contains(sf1, "CartesianIndex")
+    @test !contains(sf2, "CartesianIndex")
+    @test contains(sf1, "SparseMatrixCSC(")
+    @test contains(sf2, ".nzval")
+end
