@@ -5,6 +5,8 @@ using Test
 
 @variables a,b,c,d,e,f,g,h,i
 
+@test substitute(a ~ b, Dict(a=>1, b=>c)) == (1 ~ c)
+
 # test hashing
 aa = a; # old a
 

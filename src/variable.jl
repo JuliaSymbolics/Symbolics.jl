@@ -1,4 +1,5 @@
 using SymbolicUtils: FnType, Sym
+using Setfield
 
 const IndexMap = Dict{Char,Char}(
             '0' => '₀',
@@ -11,6 +12,8 @@ const IndexMap = Dict{Char,Char}(
             '7' => '₇',
             '8' => '₈',
             '9' => '₉')
+
+struct VariableDefaultValue end
 
 """
 $(TYPEDEF)
@@ -67,10 +70,13 @@ function map_subscripts(indices)
     join(IndexMap[c] for c in str)
 end
 
-rename(x::Sym{T},name) where T = Sym{T}(name)
+rename(x::Sym,name) = @set! x.name = name
 function rename(x::Symbolic, name)
     if operation(x) isa Sym
-        rename(operation(x), name)(arguments(x)...)
+        @assert x isa Term
+        @set! x.f = rename(operation(x), name)
+        @set! x.arguments = arguments(x)
+        @set! x.hash = Ref{UInt}(0)
     else
         error("can't rename $x to $name")
     end
@@ -88,17 +94,43 @@ function _parse_vars(macroname, type, x)
     # end
     x = x isa Tuple && first(x) isa Expr && first(x).head == :tuple ? first(x).args : x # tuple handling
     x = flatten_expr!(x)
-    for _var in x
-        iscall = isa(_var, Expr) && _var.head == :call
-        isarray = isa(_var, Expr) && _var.head == :ref
-        issym  = _var isa Symbol
-        @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x, y, z(t) v[1:3] w[1:2,1:4]`)"
+    cursor = 0
+    isoption(ex) = Meta.isexpr(ex, [:vect, :vcat, :hcat])
+    while cursor < length(x)
+        cursor += 1
+        v = x[cursor]
+
+        # We need lookahead to the next `v` to parse
+        # `@variables x [connect=Flow,unit=u]`
+        nv = cursor < length(x) ? x[cursor+1] : nothing
+        val = unit = connect = options = nothing
+
+        # x = 1, [connect = flow; unit = u"m^3/s"]
+        if Meta.isexpr(v, :(=))
+            v, val = v.args
+            if Meta.isexpr(val, :tuple) && length(val.args) == 2 && isoption(val.args[2])
+                options = val.args[2].args
+                val = val.args[1]
+            end
+        end
+
+        # x [connect = flow; unit = u"m^3/s"]
+        if isoption(nv)
+            options = nv.args
+            cursor += 1
+        end
+
+        iscall = Meta.isexpr(v, :call)
+        isarray = Meta.isexpr(v, :ref)
+        issym  = v isa Symbol
+        @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
 
         if iscall
-            var_name, expr = _construct_vars(_var.args[1], type, _var.args[2:end])
+            var_name, expr = construct_vars(v.args[1], type, v.args[2:end], val, options)
         else
-            var_name, expr = _construct_vars(_var, type, nothing)
+            var_name, expr = construct_vars(v, type, nothing, val, options)
         end
+
         push!(var_names, var_name)
         push!(ex.args, expr)
     end
@@ -107,22 +139,45 @@ function _parse_vars(macroname, type, x)
     return ex
 end
 
-function _construct_vars(_var, type, call_args)
-    issym  = _var isa Symbol
-    isarray = isa(_var, Expr) && _var.head == :ref
+function construct_vars(v, type, call_args, val, prop)
+    issym  = v isa Symbol
+    isarray = isa(v, Expr) && v.head == :ref
     if isarray
-        var_name = _var.args[1]
-        indices = _var.args[2:end]
-        expr = _construct_array_vars(var_name, type, call_args, indices...)
+        var_name = v.args[1]
+        indices = v.args[2:end]
+        expr = _construct_array_vars(var_name, type, call_args, val, prop, indices...)
     else
-        # Implicit 0-args call
-        var_name = _var
-        expr = _construct_var(var_name, type, call_args)
+        var_name = v
+        expr = construct_var(var_name, type, call_args, val, prop)
     end
     var_name, :($var_name = $expr)
 end
 
-function _construct_var(var_name, type, call_args)
+function option_to_metadata_type(::Val{opt}) where {opt}
+    throw(Base.Meta.ParseError("unknown property type $opt"))
+end
+
+function setprops_expr(expr, props)
+    isnothing(props) && return expr
+    for opt in props
+        if !Meta.isexpr(opt, :(=))
+            throw(Base.Meta.ParseError(
+                "Variable properties must be in " *
+                "the form of `a = b`. Got $opt."))
+        end
+
+        lhs, rhs = opt.args
+
+        @assert lhs isa Symbol "the lhs of an option must be a symbol"
+        expr = :($setmetadata($expr,
+                              $(option_to_metadata_type(Val{lhs}())),
+                       $rhs))
+    end
+    expr
+end
+
+
+function construct_var(var_name, type, call_args, val, prop)
     expr = if call_args === nothing
         :($Num($Sym{$type}($(Meta.quot(var_name)))))
     elseif !isempty(call_args) && call_args[end] == :..
@@ -130,22 +185,33 @@ function _construct_var(var_name, type, call_args)
     else
         :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)))($(map(x->:($value($x)), call_args)...))))
     end
+
+    if val !== nothing
+        expr = :($setmetadata($expr, $VariableDefaultValue, $val))
+    end
+
+    return setprops_expr(expr, prop)
 end
 
-function _construct_var(var_name, type, call_args, ind)
+function construct_var(var_name, type, call_args, val, prop, ind)
     # TODO: just use Sym here
-    if call_args === nothing
+    expr = if call_args === nothing
         :($Num($Sym{$type}($(Meta.quot(var_name)), $ind...)))
     elseif !isempty(call_args) && call_args[end] == :..
         :($Num($Sym{$FnType{Tuple{Any}, $type}}($(Meta.quot(var_name)), $ind...))) # XXX: using Num as output
     else
         :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)), $ind...)($(map(x->:($value($x)), call_args)...))))
     end
+    if val !== nothing
+        expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
+    end
+
+    return setprops_expr(expr, prop)
 end
 
-function _construct_array_vars(var_name, type, call_args, indices...)
+function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
     :(map(Iterators.product($(indices...))) do ind
-        $(_construct_var(var_name, type, call_args, :ind))
+        $(construct_var(var_name, type, call_args, val, prop, :ind))
     end)
 end
 

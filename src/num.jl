@@ -176,3 +176,7 @@ _iszero(x::Num) = _iszero(value(x))
 _isone(x::Num) = _isone(value(x))
 
 SymbolicUtils.Code.toexpr(x::Num) = SymbolicUtils.Code.toexpr(value(x))
+
+SymbolicUtils.setmetadata(x::Num, t, v) = Num(SymbolicUtils.setmetadata(value(x), t, v))
+SymbolicUtils.getmetadata(x::Num, t) = SymbolicUtils.getmetadata(value(x), t)
+SymbolicUtils.hasmetadata(x::Num, t) = SymbolicUtils.hasmetadata(value(x), t)

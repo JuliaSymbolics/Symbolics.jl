@@ -18,6 +18,7 @@ Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 Base.show(io::IO, eq::Equation) = print(io, eq.lhs, " ~ ", eq.rhs)
 
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
+SymbolicUtils.substitute(x::Equation, rules; kw...) = substitute(x.lhs, rules; kw...) ~ substitute(x.rhs, rules; kw...)
 
 lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
