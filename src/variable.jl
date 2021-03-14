@@ -161,7 +161,7 @@ option_to_metadata_type(::Val{:unit}) = VariableUnit
 option_to_metadata_type(::Val{:connect}) = VariableConnectType
 
 function setprops_expr(expr, props)
-
+    isnothing(props) && return expr
     for opt in props
         if !Meta.isexpr(opt, :(=))
             throw(Base.Meta.ParseError(
