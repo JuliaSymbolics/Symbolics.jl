@@ -1,4 +1,5 @@
 using SymbolicUtils: FnType, Sym
+using Setfield
 
 const IndexMap = Dict{Char,Char}(
             '0' => '₀',
@@ -71,10 +72,12 @@ function map_subscripts(indices)
     join(IndexMap[c] for c in str)
 end
 
-rename(x::Sym{T},name) where T = Sym{T}(name)
+rename(x::Sym,name) = @set! x.name = name
 function rename(x::Symbolic, name)
     if operation(x) isa Sym
-        rename(operation(x), name)(arguments(x)...)
+        @assert x isa Term
+        @set! x.f = rename(operation(x), name)
+        @set! x.arguments = arguments(x)
     else
         error("can't rename $x to $name")
     end

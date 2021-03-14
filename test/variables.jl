@@ -1,5 +1,6 @@
 using Test
 using Symbolics
+using Symbolics: value
 using Symbolics: VariableDefaultValue, VariableConnectType, VariableUnit
 using Unitful
 
@@ -33,8 +34,18 @@ end
 @test getmetadata(y, Symbolics.VariableDefaultValue) === 2
 @test getmetadata(y, Symbolics.VariableConnectType) == Flow
 
-@variables x [connect=Flow,unit=u]
-
+a = Symbolics.rename(value(x), :a)
 @test !hasmetadata(x, Symbolics.VariableDefaultValue)
 @test getmetadata(x, Symbolics.VariableConnectType) == Flow
 @test getmetadata(x, Symbolics.VariableUnit) == u
+
+@variables t x(t)=1 [connect=Flow,unit=u]
+
+@test getmetadata(x, Symbolics.VariableDefaultValue) == 1
+@test getmetadata(x, Symbolics.VariableConnectType) == Flow
+@test getmetadata(x, Symbolics.VariableUnit) == u
+
+a = Symbolics.rename(value(x), :a)
+@test getmetadata(a, Symbolics.VariableDefaultValue) == 1
+@test getmetadata(a, Symbolics.VariableConnectType) == Flow
+@test getmetadata(a, Symbolics.VariableUnit) == u
