@@ -12,6 +12,8 @@ const IndexMap = Dict{Char,Char}(
             '8' => '₈',
             '9' => '₉')
 
+struct DefaultValue end
+
 """
 $(TYPEDEF)
 
@@ -88,17 +90,23 @@ function _parse_vars(macroname, type, x)
     # end
     x = x isa Tuple && first(x) isa Expr && first(x).head == :tuple ? first(x).args : x # tuple handling
     x = flatten_expr!(x)
-    for _var in x
-        iscall = isa(_var, Expr) && _var.head == :call
-        isarray = isa(_var, Expr) && _var.head == :ref
-        issym  = _var isa Symbol
-        @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x, y, z(t) v[1:3] w[1:2,1:4]`)"
+    for v in x
+        if Meta.isexpr(v, :(=))
+            v, val = v.args
+        else
+            val = nothing
+        end
+        iscall = Meta.isexpr(v, :call)
+        isarray = Meta.isexpr(v, :ref)
+        issym  = v isa Symbol
+        @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
 
         if iscall
-            var_name, expr = _construct_vars(_var.args[1], type, _var.args[2:end])
+            var_name, expr = construct_vars(v.args[1], type, v.args[2:end], val)
         else
-            var_name, expr = _construct_vars(_var, type, nothing)
+            var_name, expr = construct_vars(v, type, nothing, val)
         end
+
         push!(var_names, var_name)
         push!(ex.args, expr)
     end
@@ -107,22 +115,21 @@ function _parse_vars(macroname, type, x)
     return ex
 end
 
-function _construct_vars(_var, type, call_args)
-    issym  = _var isa Symbol
-    isarray = isa(_var, Expr) && _var.head == :ref
+function construct_vars(v, type, call_args, val)
+    issym  = v isa Symbol
+    isarray = isa(v, Expr) && v.head == :ref
     if isarray
-        var_name = _var.args[1]
-        indices = _var.args[2:end]
-        expr = _construct_array_vars(var_name, type, call_args, indices...)
+        var_name = v.args[1]
+        indices = v.args[2:end]
+        expr = _construct_array_vars(var_name, type, call_args, val, indices...)
     else
-        # Implicit 0-args call
-        var_name = _var
-        expr = _construct_var(var_name, type, call_args)
+        var_name = v
+        expr = construct_var(var_name, type, call_args, val)
     end
     var_name, :($var_name = $expr)
 end
 
-function _construct_var(var_name, type, call_args)
+function construct_var(var_name, type, call_args, val)
     expr = if call_args === nothing
         :($Num($Sym{$type}($(Meta.quot(var_name)))))
     elseif !isempty(call_args) && call_args[end] == :..
@@ -130,22 +137,32 @@ function _construct_var(var_name, type, call_args)
     else
         :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)))($(map(x->:($value($x)), call_args)...))))
     end
+    if val === nothing
+        expr
+    else
+        :($setmetadata($expr, $DefaultValue, $val))
+    end
 end
 
-function _construct_var(var_name, type, call_args, ind)
+function construct_var(var_name, type, call_args, val, ind)
     # TODO: just use Sym here
-    if call_args === nothing
+    expr = if call_args === nothing
         :($Num($Sym{$type}($(Meta.quot(var_name)), $ind...)))
     elseif !isempty(call_args) && call_args[end] == :..
         :($Num($Sym{$FnType{Tuple{Any}, $type}}($(Meta.quot(var_name)), $ind...))) # XXX: using Num as output
     else
         :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)), $ind...)($(map(x->:($value($x)), call_args)...))))
     end
+    if val === nothing
+        expr
+    else
+        :($setmetadata($expr, $DefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
+    end
 end
 
-function _construct_array_vars(var_name, type, call_args, indices...)
+function _construct_array_vars(var_name, type, call_args, val, indices...)
     :(map(Iterators.product($(indices...))) do ind
-        $(_construct_var(var_name, type, call_args, :ind))
+        $(construct_var(var_name, type, call_args, val, :ind))
     end)
 end
 
