@@ -78,6 +78,7 @@ function rename(x::Symbolic, name)
         @assert x isa Term
         @set! x.f = rename(operation(x), name)
         @set! x.arguments = arguments(x)
+        @set! x.hash = Ref{UInt}(0)
     else
         error("can't rename $x to $name")
     end
