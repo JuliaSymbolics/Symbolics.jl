@@ -121,27 +121,15 @@ function _parse_vars(macroname, type, x)
             cursor += 1
         end
 
-        if options !== nothing
-            # [connect = flow; unit = u"m^3/s"]
-            for opt in options
-                Meta.isexpr(opt, :(=)) || throw(Base.Meta.ParseError("Variable properties must be in the form of `a = b`. Got $opt."))
-            end
-            idx = findfirst(x->x.args[1] == :unit, options)
-            idx !== nothing && (unit = options[idx].args[2])
-            idx = findfirst(x->x.args[1] == :connect, options)
-            idx !== nothing && (connect = options[idx].args[2])
-        end
-
         iscall = Meta.isexpr(v, :call)
         isarray = Meta.isexpr(v, :ref)
         issym  = v isa Symbol
         @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
 
-        prop = (val, connect, unit)
         if iscall
-            var_name, expr = construct_vars(v.args[1], type, v.args[2:end], prop)
+            var_name, expr = construct_vars(v.args[1], type, v.args[2:end], val, options)
         else
-            var_name, expr = construct_vars(v, type, nothing, prop)
+            var_name, expr = construct_vars(v, type, nothing, val, options)
         end
 
         push!(var_names, var_name)
@@ -152,21 +140,47 @@ function _parse_vars(macroname, type, x)
     return ex
 end
 
-function construct_vars(v, type, call_args, prop)
+function construct_vars(v, type, call_args, val, prop)
     issym  = v isa Symbol
     isarray = isa(v, Expr) && v.head == :ref
     if isarray
         var_name = v.args[1]
         indices = v.args[2:end]
-        expr = _construct_array_vars(var_name, type, call_args, prop, indices...)
+        expr = _construct_array_vars(var_name, type, call_args, val, prop, indices...)
     else
         var_name = v
-        expr = construct_var(var_name, type, call_args, prop)
+        expr = construct_var(var_name, type, call_args, val, prop)
     end
     var_name, :($var_name = $expr)
 end
 
-function construct_var(var_name, type, call_args, (val, connect, unit))
+function option_to_metadata_type(::Val{opt}) where {opt}
+    throw(Base.Meta.ParseError("unknown property type $opt"))
+end
+option_to_metadata_type(::Val{:unit}) = VariableUnit
+option_to_metadata_type(::Val{:connect}) = VariableConnectType
+
+function setprops_expr(expr, props)
+
+    for opt in props
+        if !Meta.isexpr(opt, :(=))
+            throw(Base.Meta.ParseError(
+                "Variable properties must be in " *
+                "the form of `a = b`. Got $opt."))
+        end
+
+        lhs, rhs = opt.args
+
+        @assert lhs isa Symbol "the lhs of an option must be a symbol"
+        expr = :($setmetadata($expr,
+                              $(option_to_metadata_type(Val{lhs}())),
+                       $rhs))
+    end
+    expr
+end
+
+
+function construct_var(var_name, type, call_args, val, prop)
     expr = if call_args === nothing
         :($Num($Sym{$type}($(Meta.quot(var_name)))))
     elseif !isempty(call_args) && call_args[end] == :..
@@ -174,19 +188,15 @@ function construct_var(var_name, type, call_args, (val, connect, unit))
     else
         :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)))($(map(x->:($value($x)), call_args)...))))
     end
+
     if val !== nothing
         expr = :($setmetadata($expr, $VariableDefaultValue, $val))
     end
-    if unit !== nothing
-        expr = :($setmetadata($expr, $VariableUnit, $unit))
-    end
-    if connect !== nothing
-        expr = :($setmetadata($expr, $VariableConnectType, $connect))
-    end
-    return expr
+
+    return setprops_expr(expr, prop)
 end
 
-function construct_var(var_name, type, call_args, (val, connect, unit), ind)
+function construct_var(var_name, type, call_args, val, prop, ind)
     # TODO: just use Sym here
     expr = if call_args === nothing
         :($Num($Sym{$type}($(Meta.quot(var_name)), $ind...)))
@@ -198,18 +208,13 @@ function construct_var(var_name, type, call_args, (val, connect, unit), ind)
     if val !== nothing
         expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
     end
-    if unit !== nothing
-        expr = :($setmetadata($expr, $VariableUnit, $unit))
-    end
-    if connect !== nothing
-        expr = :($setmetadata($expr, $VariableConnectType, $connect))
-    end
-    return expr
+
+    return setprops_expr(expr, prop)
 end
 
-function _construct_array_vars(var_name, type, call_args, val, indices...)
+function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
     :(map(Iterators.product($(indices...))) do ind
-        $(construct_var(var_name, type, call_args, val, :ind))
+        $(construct_var(var_name, type, call_args, val, prop, :ind))
     end)
 end
 
