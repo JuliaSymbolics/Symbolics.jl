@@ -535,7 +535,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         end
     end
 
-    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "const double* $(rhsnames[i])" : "const double $(rhsnames[i])" for i in 1:length(args)]),", ")
 
     ccode = """
     #include <math.h>
