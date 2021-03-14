@@ -14,8 +14,6 @@ const IndexMap = Dict{Char,Char}(
             '9' => '₉')
 
 struct VariableDefaultValue end
-struct VariableUnit end
-struct VariableConnectType end
 
 """
 $(TYPEDEF)
@@ -107,7 +105,7 @@ function _parse_vars(macroname, type, x)
         nv = cursor < length(x) ? x[cursor+1] : nothing
         val = unit = connect = options = nothing
 
-        # x = 1 [connect = flow; unit = u"m^3/s"]
+        # x = 1, [connect = flow; unit = u"m^3/s"]
         if Meta.isexpr(v, :(=))
             v, val = v.args
             if Meta.isexpr(val, :tuple) && length(val.args) == 2 && isoption(val.args[2])
@@ -158,8 +156,6 @@ end
 function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
-option_to_metadata_type(::Val{:unit}) = VariableUnit
-option_to_metadata_type(::Val{:connect}) = VariableConnectType
 
 function setprops_expr(expr, props)
     isnothing(props) && return expr
