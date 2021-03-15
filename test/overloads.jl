@@ -23,6 +23,7 @@ aa = a; # old a
 X = [0 b c; d e f; g h i]
 @test iszero(simplify(det(X) - ((d * ((b * i) - (c * h))) + (g * ((b * f) - (c * e))))))
 F = lu(X)
+@test_nowarn lu(X'), lu(transpose(X))
 @test F.p == [2, 1, 3]
 R = simplify.(F.L * F.U - X[F.p, :], polynorm=true)
 @test iszero(R)
