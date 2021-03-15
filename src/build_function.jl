@@ -354,9 +354,14 @@ function numbered_expr(O::Symbolic,args...;varordering = args[1],offset = 0,
             end
         end
     end
-  return Expr(:call, O isa Sym ? tosymbol(O, escape=false) : Symbol(operation(O)),
-         [numbered_expr(x,args...;offset=offset,lhsname=lhsname,
-                        rhsnames=rhsnames,varordering=varordering) for x in arguments(O)]...)
+    if istree(O)
+        Expr(:call, Symbol(operation(O)), (numbered_expr(x,args...;offset=offset,lhsname=lhsname,
+                                                         rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+    elseif O isa Sym
+        tosymbol(O, escape=false)
+    else
+        O
+    end
 end
 
 function numbered_expr(de::Equation,args...;varordering = args[1],
@@ -377,6 +382,7 @@ numbered_expr(c::Num,args...;kwargs...) = error("Num found")
 # Replace certain multiplication and power expressions so they form valid C code
 # Extra factors of 1 are hopefully eliminated by the C compiler
 function coperators(expr)
+    expr isa Expr || return expr
     for e in expr.args
         if e isa Expr
             coperators(e)

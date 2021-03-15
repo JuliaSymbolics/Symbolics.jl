@@ -21,9 +21,15 @@ SymbolicUtils.@number_methods(
                               Num,
                               Num(f(value(a))),
                               Num(f(value(a), value(b))),
-                              [conj, real]
+                              [conj, real, transpose]
                              )
 Base.conj(x::Num) = x
+Base.transpose(x::Num) = x
+
+Base.eps(::Type{Num}) = Num(0)
+Base.typemin(::Type{Num}) = Num(-Inf)
+Base.typemax(::Type{Num}) = Num(Inf)
+Base.float(x::Num) = x
 
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
 for C in [Complex, Complex{Bool}]
@@ -166,7 +172,7 @@ Base.convert(::Type{<:Array{Num}}, x::AbstractArray) = map(Num, x)
 Base.convert(::Type{<:Array{Num}}, x::AbstractArray{Num}) = x
 Base.convert(::Type{Sym}, x::Num) = value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
 
-LinearAlgebra.lu(x::Array{Num}; check=true, kw...) = sym_lu(x; check=check)
+LinearAlgebra.lu(x::Union{Adjoint{<:Num},Transpose{<:Num},Array{<:Num}}; check=true, kw...) = sym_lu(x; check=check)
 
 _iszero(x::Number) = iszero(x)
 _isone(x::Number) = isone(x)
