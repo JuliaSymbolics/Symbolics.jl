@@ -382,6 +382,7 @@ numbered_expr(c::Num,args...;kwargs...) = error("Num found")
 # Replace certain multiplication and power expressions so they form valid C code
 # Extra factors of 1 are hopefully eliminated by the C compiler
 function coperators(expr)
+    expr isa Expr || return expr
     for e in expr.args
         if e isa Expr
             coperators(e)
