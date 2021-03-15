@@ -146,3 +146,8 @@ eqs = [
       ]
 @test [2 1 -1; -3 1 -1; 0 1 -5] * Symbolics.solve_for(eqs, [x, y, z]) == [2; -2; -2]
 @test isequal(Symbolics.solve_for(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x), 1//7*y - 2//7*z)
+
+using IfElse: ifelse
+@test isequal(Symbolics.derivative(abs(x), x), ifelse(signbit(x), -1, 1))
+@test isequal(Symbolics.derivative(sign(x), x), 0)
+@test isequal(Symbolics.derivative(signbit(x), x), 0)
