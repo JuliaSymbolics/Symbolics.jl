@@ -36,6 +36,10 @@ for C in [Complex, Complex{Bool}]
     @eval begin
         Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
         Base.:*(z::$C, x::Num) = Complex(real(z) * x, imag(z) * x)
+        Base.:/(x::Num, z::$C) = let (a, b) = reim(z), den = a^2 + b^2
+            Complex(x * a / den, x * b / den)
+        end
+        Base.:/(z::$C, x::Num) = Complex(real(z) / x, imag(z) / x)
         Base.:+(x::Num, z::$C) = Complex(x + real(z), imag(z))
         Base.:+(z::$C, x::Num) = Complex(real(z) + x, imag(z))
         Base.:-(x::Num, z::$C) = Complex(x - real(z), -imag(z))
