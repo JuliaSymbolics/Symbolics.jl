@@ -124,6 +124,8 @@ z2 = c + d * im
 @test isequal(z1 / z1, 1)
 @test isequal(z1 / z2, Complex((a*c + b*d)/(c^2 + d^2), (b*c - a*d)/(c^2 + d^2)))
 @test isequal(1 / z2, Complex(c/(c^2 + d^2), -d/(c^2 + d^2)))
+@test isequal(z1 / c, Complex(a/c, b/c))
+@test isequal(a / z2, Complex(a*c/(c^2 + d^2), a*d/(c^2 + d^2)))
 @test isequal(z1 * z2, Complex(a*c - b*d, a*d + b*c))
 @test isequal(z1 - z2, Complex(a - c, b - d))
 @test isequal(z1 + z2, Complex(a + c, b + d))
