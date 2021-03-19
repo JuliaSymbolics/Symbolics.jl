@@ -106,7 +106,6 @@ end
 
 function axes(A::SymArray, i)
     @maybe s=shape(A) begin
-        @show s.axes
         return i <= length(s.axes) ? s.axes[i] : Base.OneTo(1)
     end
     error("axes of $A not known")
