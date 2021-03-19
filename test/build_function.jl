@@ -134,7 +134,7 @@ let # Symbolics.jl#123
     """
 end
 
-using SymbolicUtils.Code: Func
+using SymbolicUtils.Code: Func, toexpr
 @variables t x(t)
 D = Differential(t)
 expr = toexpr(Func([D(x)], [], D(x)))
