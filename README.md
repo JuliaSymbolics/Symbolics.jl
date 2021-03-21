@@ -68,7 +68,7 @@ simplify.(substitute.(B, (Dict(x=>y^2),)))
 #     t + 2(t^2)   6t
 # y^2 + 2(t + y)  y^2
 
-substitute.(B, (Dict(x => 2.0,y => 3.0,t => 4.0),))
+substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
 
 #2×2 Matrix{Num}:
 # 36.0  24.0
