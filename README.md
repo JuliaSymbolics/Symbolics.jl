@@ -62,7 +62,7 @@ B = simplify.([t^2 + t + t^2  2t + 4t
 #   t + 2(t^2)   6t
 # x + 2(t + y)  y^2
 
-simplify.(substitute.(B, (Dict(x=>y^2),)))
+simplify.(substitute.(B, (Dict(x => y^2),)))
 
 #2×2 Matrix{Num}:
 #     t + 2(t^2)   6t
