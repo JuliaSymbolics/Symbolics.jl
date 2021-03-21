@@ -91,7 +91,7 @@ f(u)
 
 ## Building Functions
 
-The function for building functions is the aptly-named `build_function`.
+The function for building functions from symbolic expressions is the aptly-named `build_function`.
 The first argument is the symbolic expression or the array of symbolic
 expressions to compile, and the trailing arguments are the arguments
 for the function. For example:
