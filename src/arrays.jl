@@ -16,17 +16,21 @@ symtype(x::Union{Colon, AbstractRange}) = typeof(x)
 
 
 # Partial information
-elt(s::SymArray) = elt(symtype(s))
-elt(::Type{<:AbstractArray{T}}) where {T} = T
-elt(::Type{<:AbstractArray}) = nothing
+geteltype(s::SymArray) = geteltype(symtype(s))
+geteltype(::Type{<:AbstractArray{T}}) where {T} = T
+geteltype(::Type{<:AbstractArray}) = Unknown()
 
-nd(s::SymArray) = nd(symtype(s))
-nd(x) = ndims(x)
-nd(::Type{<:AbstractArray{<:Any, N}}) where {N} = N
-nd(::Type{<:AbstractArray}) = nothing
+getndims(s::SymArray) = getndims(symtype(s))
+getndims(x) = ndims(x)
+getndims(::Type{<:AbstractArray{<:Any, N}}) where {N} = N
+getndims(::Type{<:AbstractArray}) = Unknown()
 
 function shape(s::SymArray)
-    hasmetadata(s, ArrayShapeCtx) ? getmetadata(s, ArrayShapeCtx) : nothing
+    if hasmetadata(s, ArrayShapeCtx)
+        getmetadata(s, ArrayShapeCtx)
+    else
+        Unknown()
+    end
 end
 function shape(s)
     ArrayShape(axes(s))
@@ -47,42 +51,55 @@ end
 
 slicetype(::Type{<:Array}) = Array
 slicetype(::Type) = AbstractArray
-function promote_symtype(::typeof(getindex),
-                         A::Type{<:AbstractArray},
-                         idx...)
-    D = count(x->x <: Number, idx)
-    @maybe T=elt(A) begin
-        @maybe N=nd(A) return N-D == 0 ? T : slicetype(A){T,N-D}
-        return slicetype(A){T}
-    end
-
-    @maybe N=nd(A) return N-D == 0 ? T : slicetype(A){T, N-D} where T
-
-    return slicetype(A)
-end
 
 struct Unknown end
 
-function similararraytype(A::Type; N=Unknown(), T=Unknown())
-    if N === Unknown()
-        N = nd(A)
-    end
-    if T === Unknown()
-        T = elt(A)
+propagate_atype(f, args...) = AbstractArray
+propagate_eltype(f, args...) = Unknown()
+propagate_ndims(f, args...) = Unknown()
+
+function propagate_shape(f, args...)
+    error("Don't know how to propagate shape for $f$args")
+end
+
+function arrterm(f, args...)
+    atype = propagate_atype(f, args...)
+    etype = propagate_eltype(f, args...)
+    nd    = propagate_ndims(f, args...)
+
+    S = if etype === Unknown() && nd === Unknown()
+        atype
+    elseif etype === Unknown()
+        atype{T, nd} where T
+    elseif nd === Unknown()
+        atype{etype, N} where N
+    else
+        atype{etype, nd}
     end
 
-    slicetype(A){T, N}
+    setmetadata(Term{S}(f, args),
+                ArrayShapeCtx,
+                propagate_shape(f, args...))
+end
+
+maybe(f, x::Unknown) = Unknown()
+maybe(f, x) = f(x)
+
+propagate_atype(::typeof(getindex), x, idx...) = slicetype(symtype(x))
+function propagate_ndims(::typeof(getindex), x, idx...)
+    maybe(getndims(x)) do N
+        N - count(x->symtype(x) <: Integer, idx)
+    end
+end
+
+function propagate_shape(::typeof(getindex), x, idx...)
+    maybe(shape(x)) do s
+        s[idx...]
+    end
 end
 
 function Base.getindex(x::SymArray, idx...)
-    if any(i-> i isa Symbolic, idx)
-        Term(getindex, [x, idx...])
-    else
-        shp = @maybe s=shape(x) s[idx...]
-        setmetadata(Term(getindex, [x, idx...]),
-                    ArrayShapeCtx,
-                    shp)
-    end
+    arrterm(getindex, x, idx...)
 end
 
 function Base.getindex(x::Symbolic{T}, idx::Int...) where {T<:AbstractArray}
@@ -94,24 +111,33 @@ end
 import Base: eltype, length, ndims, size, axes, eachindex
 
 function eltype(A::SymArray)
-    @maybe T=elt(A) return T
-    error("eltype of $A not known")
+    T = geteltype(A)
+    T === Unknown() && error("eltype of $A not known")
+    return T
 end
 
 function length(A::SymArray)
-    @maybe s=shape(A) return length(s)
-    error("length of $A not known")
+    s = shape(A)
+    s === Unknown() && error("length of $A not known")
+    return length(s)
 end
 
 function ndims(A::SymArray)
-    @maybe n=nd(A) return n
-    @maybe s=shape(A) return length(s.axes)
-    error("ndims of $A not known")
+    n = getndims(A)
+    if n === Unknown()
+        s = shape(A)
+        if s === Unknown()
+            error("ndims of $A not known")
+        end
+        return length(s.axes)
+    end
+    return n
 end
 
 function size(A::SymArray)
-    @maybe s=shape(A) return length.(s.axes)
-    error("size of $A not known")
+    s = shape(A)
+    s === Unknown() && error("size of $A not known")
+    return length.(s.axes)
 end
 
 function size(A::SymArray, i::Integer)
@@ -120,21 +146,22 @@ function size(A::SymArray, i::Integer)
 end
 
 function axes(A::SymArray)
-    @maybe s=shape(A) return s.axes
-    error("axes of $A not known")
+    s = shape(A)
+    s === Unknown() && error("axes of $A not known")
+    return s.axes
 end
 
 
 function axes(A::SymArray, i)
-    @maybe s=shape(A) begin
-        return i <= length(s.axes) ? s.axes[i] : Base.OneTo(1)
-    end
-    error("axes of $A not known")
+    s = shape(A)
+    s === Unknown() && error("axes of $A not known")
+    return i <= length(s.axes) ? s.axes[i] : Base.OneTo(1)
 end
 
 function eachindex(A::SymArray)
-    @maybe s=shape(A) return CartesianIndices(s.axes)
-    error("eachindex of $A not known")
+    s = shape(A)
+    s === Unknown() && error("eachindex of $A not known")
+    return CartesianIndices(s.axes)
 end
 
 # todo: stride?
@@ -174,5 +201,3 @@ end
 Base.ndims(a::ArrayShape) = length(a.axes)
 
 Base.length(a::ArrayShape) = prod(map(length, axes(a)))
-
-
