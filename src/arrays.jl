@@ -21,12 +21,15 @@ elt(::Type{<:AbstractArray{T}}) where {T} = T
 elt(::Type{<:AbstractArray}) = nothing
 
 nd(s::SymArray) = nd(symtype(s))
-nd(x::AbstractArray) = nd(typeof(x))
+nd(x) = ndims(x)
 nd(::Type{<:AbstractArray{<:Any, N}}) where {N} = N
 nd(::Type{<:AbstractArray}) = nothing
 
 function shape(s::SymArray)
     hasmetadata(s, ArrayShapeCtx) ? getmetadata(s, ArrayShapeCtx) : nothing
+end
+function shape(s)
+    ArrayShape(axes(s))
 end
 
 macro maybe(args...)
@@ -74,7 +77,6 @@ function Base.getindex(x::Symbolic{T}, idx::Int...) where {T<:AbstractArray}
 end
 
 # basic
-
 # these methods are not symbolic but work if we know this info.
 import Base: eltype, length, ndims, size, axes, eachindex
 

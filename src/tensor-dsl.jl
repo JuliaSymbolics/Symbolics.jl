@@ -10,6 +10,8 @@ struct AxisOf
     dim
 end
 
+Base.get(a::AxisOf) = axes(a.A, a.dim)
+
 function idx_to_axes(expr, dict=Dict{Sym, Vector}())
     if istree(expr)
         if operation(expr) === (getindex)
