@@ -27,29 +27,22 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
         subscripts = [Sym{Int}(Symbol("i_$i")) for i in 1:ndim]
         args = map(bc.args) do x
             if ndims(x) != 0
-                term(getindex, x, subscripts[1:ndims(x)]...)
+                subs = map(i-> isone(size(x, i)) ? 1 : subscripts[i], 1:ndims(x))
+                term(getindex, x, subs...)
             else
                 x
             end
         end
-        shp = shape_propagate(TensorOp((subscripts...,), term(+, args...)))
-        setmetadata(Term{AbstractArray}(broadcast, [bc.f, bc.args...]), ArrayShapeCtx, ArrayShape(map(get, shp)))
+
+        shp = shape_propagate(TensorOp((subscripts...,),
+                                       term(+, args...)))
+
+        setmetadata(Term{AbstractArray}(broadcast,
+                                        [bc.f, bc.args...]),
+                    ArrayShapeCtx,
+                    ArrayShape(map(get, shp)))
     end
 end
-
-function promote_symtype(::typeof(broadcast),
-                         f, args...)
-    D = count(x->x <: Number, idx)
-    @maybe T=elt(A) begin
-        @maybe N=nd(A) return N-D == 0 ? T : slicetype(A){T,N-D}
-        return slicetype(A){T}
-    end
-
-    @maybe N=nd(A) return N-D == 0 ? T : slicetype(A){T, N-D} where T
-
-    return slicetype(A)
-end
-
 
 function maybefoldl(f, g, xs, acc)
     for x in xs
@@ -60,6 +53,26 @@ function maybefoldl(f, g, xs, acc)
         return nothing
     end
     return acc
+end
+
+
+function Base.adjoint(A::SymArray)
+    N = nd(A)
+    if N !== nothing && !(N in (1, 2))
+        error("Can adjoint only a vector or a matrix")
+    end
+
+    shp = shape(A)
+    if shp !== nothing
+        shp = ArrayShape(ndims(shp) == 2 ? reverse(shp.axes) : (Base.OneTo(1), shp.axes...))
+        A_t = similararraytype(symtype(A), N=2)
+        setmetadata(Term{A_t}(adjoint, [A]),
+                    ArrayShapeCtx,
+                    shp
+                    )
+    else
+        Term{symtype(A)}(adjoint, [A])
+    end
 end
 
 #=

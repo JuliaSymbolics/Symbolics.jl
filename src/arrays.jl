@@ -61,6 +61,19 @@ function promote_symtype(::typeof(getindex),
     return slicetype(A)
 end
 
+struct Unknown end
+
+function similararraytype(A::Type; N=Unknown(), T=Unknown())
+    if N === Unknown()
+        N = nd(A)
+    end
+    if T === Unknown()
+        T = elt(A)
+    end
+
+    slicetype(A){T, N}
+end
+
 function Base.getindex(x::SymArray, idx...)
     if any(i-> i isa Symbolic, idx)
         Term(getindex, [x, idx...])
@@ -99,6 +112,11 @@ end
 function size(A::SymArray)
     @maybe s=shape(A) return length.(s.axes)
     error("size of $A not known")
+end
+
+function size(A::SymArray, i::Integer)
+    @assert(i > 0)
+    i > ndims(A) ? 1 : size(A)[i]
 end
 
 function axes(A::SymArray)
@@ -152,6 +170,8 @@ function Base.getindex(a::ArrayShape, idx...)
     newaxes = ([1:length(x) for x in idx1 if !(x isa Number)]...,)
     newshape = ArrayShape(newaxes)
 end
+
+Base.ndims(a::ArrayShape) = length(a.axes)
 
 Base.length(a::ArrayShape) = prod(map(length, axes(a)))
 
