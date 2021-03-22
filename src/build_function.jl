@@ -13,7 +13,7 @@ struct SerialForm <: ParallelForm end
 struct MultithreadedForm <: ParallelForm
     ntasks::Int
 end
-MultithreadedForm() = MultithreadedForm(nthreads())
+MultithreadedForm() = MultithreadedForm(2*nthreads())
 
 """
 `build_function`
@@ -333,26 +333,22 @@ end
 
 function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
-        outputidxs = collect(eachindex(rhss.nzval))
-    else
-        outputidxs = collect(eachindex(rhss))
+        return set_array(LiteralExpr(:($out.nzval)),
+                         nothing,
+                         rhss.nzval,
+                         checkbounds,
+                         skipzeros)
     end
     if outputidxs === nothing
-
+        outputidxs = collect(eachindex(rhss))
     end
     per_task = ceil(Int, length(rhss) / s.ntasks)
     # TODO: do better partitioning when skipzeros is present
     slices = collect(Iterators.partition(zip(outputidxs, rhss), per_task))
     arrays = map(slices) do slice
         idxs, vals = first.(slice), last.(slice)
-
-        if rhss isa AbstractSparseArray
-            Func([out, closed_args...], [],
-                 _set_array(LiteralExpr(:($out.nzval)), idxs, rhss.nzval, checkbounds, skipzeros)), [out, closed_args...]
-        else
-            Func([out, closed_args...], [],
-                 _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
-        end
+        Func([out, closed_args...], [],
+             _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
     end
     SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
 end
