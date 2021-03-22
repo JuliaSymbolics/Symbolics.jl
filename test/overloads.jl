@@ -9,6 +9,7 @@ using Test
 @test isequal(sincos(a), (sin(a), cos(a)))
 
 @test substitute(a ~ b, Dict(a=>1, b=>c)) == (1 ~ c)
+@test substitute(im * a, Dict(a=>1)) == Complex{Num}(Num(false), Num(1))
 
 # test hashing
 aa = a; # old a
