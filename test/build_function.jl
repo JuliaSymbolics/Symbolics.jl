@@ -191,8 +191,10 @@ let # issue#136
     C = copy(B) - 100*I
 
 
-    f = build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2] |> eval
+    f = build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2]
+    g = eval(f)
 
-    f(C, [1,2])
+    g(C, [1,2])
+    @test contains(repr(f), "schedule")
     @test isequal(C, B)
 end
