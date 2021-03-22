@@ -55,7 +55,6 @@ function maybefoldl(f, g, xs, acc)
     return acc
 end
 
-
 function Base.adjoint(A::SymArray)
     N = nd(A)
     if N !== nothing && !(N in (1, 2))
@@ -73,6 +72,22 @@ function Base.adjoint(A::SymArray)
     else
         Term{symtype(A)}(adjoint, [A])
     end
+end
+
+import Base: *, \
+function (*)(A::Symbolic{<:AbstractMatrix},
+             b::Symbolic{<:AbstractVector})
+    @syms i::Int k::Int
+    if istree(A) &&
+        operation(A) === adjoint &&
+        nd(arguments(A)[1]) === 1
+        # do this to fail if dim mismatch
+        shape_propagate(TensorOp((i,), A[i,k] * b[k]))
+        return Term{Real}(*, [A, b])
+    end
+
+    shp = shape_propagate(TensorOp((i,), A[i,k] * b[k]))
+    setmetadata(Term{Vector}(*, [A, b]), ArrayShapeCtx, ArrayShape(map(get, shp)))
 end
 
 #=
