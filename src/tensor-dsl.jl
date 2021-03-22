@@ -38,8 +38,11 @@ function shape_propagate(t::TensorOp)
         reference = axes(first(to_check).A, first(to_check).dim)
         for i in 2:length(ms)
             m = ms[i]
-            @maybe s=shape(m.A) begin
-                @assert isequal(axes(m.A, m.dim), reference)
+            s=shape(m.A)
+            if s !== Unknown()
+                if !isequal(axes(m.A, m.dim), reference)
+                    "expected axes($(m.A), $(m.dim)) = $(reference)" |> DimensionMismatch |> throw
+                end
             end
         end
     end

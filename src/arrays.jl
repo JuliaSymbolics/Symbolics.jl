@@ -36,22 +36,6 @@ function shape(s)
     ArrayShape(axes(s))
 end
 
-macro maybe(args...)
-    f = args[end]
-    vars = args[1:end-1]
-    names = [(@assert v.head == :(=); v.args[1]) for v in vars]
-    quote
-        $(vars...)
-        if !any(isnothing, ($(names...),))
-            $f
-        end
-        # nothing otherwise
-    end |> esc
-end
-
-slicetype(::Type{<:Array}) = Array
-slicetype(::Type) = AbstractArray
-
 struct Unknown end
 
 propagate_atype(f, args...) = AbstractArray
@@ -85,6 +69,8 @@ end
 maybe(f, x::Unknown) = Unknown()
 maybe(f, x) = f(x)
 
+slicetype(::Type{<:Array}) = Array
+slicetype(::Type) = AbstractArray
 propagate_atype(::typeof(getindex), x, idx...) = slicetype(symtype(x))
 function propagate_ndims(::typeof(getindex), x, idx...)
     maybe(getndims(x)) do N

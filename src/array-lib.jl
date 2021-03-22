@@ -6,26 +6,20 @@ Broadcast.BroadcastStyle(::Type{<:Symbolic{<:AbstractArray}}) = SymBroadcast()
 Broadcast.result_style(::SymBroadcast) = SymBroadcast()
 Broadcast.BroadcastStyle(::SymBroadcast, ::Broadcast.BroadcastStyle) = SymBroadcast()
 
-
-function bestarraytype(A)
-    @maybe T=elt(A) begin
-        @maybe N=nd(A) slicetype(A){T,N}
-        return slicetype(A){T}
-    end
-
-    @maybe N=nd(A) return slicetype(A){N}
-
-    return slicetype(A)
-end
-
 function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
     # Do the thing here
-    ndim = maybefoldl(nd, max, bc.args, 0)
-    if ndim === nothing
-        return Term{AbstractArray}(broadcast, [bc.f, bc.args...])
-    else
+    arrterm(broadcast, bc.f, bc.args...)
+end
+
+function propagate_ndims(::typeof(broadcast), f, args...)
+    maybefoldl(getndims, max, args, 0)
+end
+
+function propagate_shape(::typeof(broadcast), f, args...)
+    ndim = propagate_ndims(broadcast, f, args...)
+    maybe(ndim) do ndim
         subscripts = [Sym{Int}(Symbol("i_$i")) for i in 1:ndim]
-        args = map(bc.args) do x
+        args′ = map(args) do x
             if ndims(x) != 0
                 subs = map(i-> isone(size(x, i)) ? 1 : subscripts[i], 1:ndims(x))
                 term(getindex, x, subs...)
@@ -35,22 +29,17 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
         end
 
         shp = shape_propagate(TensorOp((subscripts...,),
-                                       term(+, args...)))
+                                       term(+, args′...)))
 
-        setmetadata(Term{AbstractArray}(broadcast,
-                                        [bc.f, bc.args...]),
-                    ArrayShapeCtx,
-                    ArrayShape(map(get, shp)))
+        ArrayShape(map(get, shp))
     end
 end
 
 function maybefoldl(f, g, xs, acc)
     for x in xs
-        @maybe y=f(x) begin
-            acc = g(acc, y)
-            continue
-        end
-        return nothing
+        y = f(x)
+        y === Unknown() && return Unknown()
+        acc = g(acc, y)
     end
     return acc
 end
@@ -60,6 +49,8 @@ function Base.adjoint(A::SymArray)
     if N !== nothing && !(N in (1, 2))
         error("Can adjoint only a vector or a matrix")
     end
+
+    arrterm(adjoint, A)
 
     shp = shape(A)
     if shp !== nothing
