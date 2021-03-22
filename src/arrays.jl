@@ -21,6 +21,7 @@ elt(::Type{<:AbstractArray{T}}) where {T} = T
 elt(::Type{<:AbstractArray}) = nothing
 
 nd(s::SymArray) = nd(symtype(s))
+nd(x::AbstractArray) = nd(typeof(x))
 nd(::Type{<:AbstractArray{<:Any, N}}) where {N} = N
 nd(::Type{<:AbstractArray}) = nothing
 
