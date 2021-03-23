@@ -1,3 +1,5 @@
+#################### BROADCAST ################
+#
 using Base.Broadcast
 
 Base.broadcastable(s::Symbolic{<:AbstractArray}) = s
@@ -31,19 +33,12 @@ function propagate_shape(::typeof(broadcast), f, args...)
         shp = shape_propagate(TensorOp((subscripts...,),
                                        term(+, args′...)))
 
-        ArrayShape(map(get, shp))
+        map(get, shp)
     end
 end
-
-function maybefoldl(f, g, xs, acc)
-    for x in xs
-        y = f(x)
-        y === Unknown() && return Unknown()
-        acc = g(acc, y)
-    end
-    return acc
-end
-
+# propagate_atype, propagate_eltype
+#################### TRANSPOSE ################
+#
 function Base.adjoint(A::SymArray)
     N = nd(A)
     if N !== nothing && !(N in (1, 2))
@@ -51,34 +46,40 @@ function Base.adjoint(A::SymArray)
     end
 
     arrterm(adjoint, A)
-
-    shp = shape(A)
-    if shp !== nothing
-        shp = ArrayShape(ndims(shp) == 2 ? reverse(shp.axes) : (Base.OneTo(1), shp.axes...))
-        A_t = similararraytype(symtype(A), N=2)
-        setmetadata(Term{A_t}(adjoint, [A]),
-                    ArrayShapeCtx,
-                    shp
-                    )
-    else
-        Term{symtype(A)}(adjoint, [A])
-    end
 end
 
+propagate_ndims(::typeof(adjoint), A) = 2
+function propagate_shape(::typeof(adjoint), A)
+    shp = shape(A)
+    shp === Unknown() && return Unknown()
+    ndims(shp) == 2 ? reverse(shp) : (Base.OneTo(1), shp...)
+end
+
+#################### MATVEC ################
+#
 import Base: *, \
 function (*)(A::Symbolic{<:AbstractMatrix},
              b::Symbolic{<:AbstractVector})
+    arrterm(*, A, b)
+end
+
+propagate_ndims(::typeof(*), A, B) = getndims(B)
+function propagate_shape(::typeof(*), A, B::Symbolic{<:AbstractVector})
     @syms i::Int k::Int
     if istree(A) &&
         operation(A) === adjoint &&
         nd(arguments(A)[1]) === 1
         # do this to fail if dim mismatch
-        shape_propagate(TensorOp((i,), A[i,k] * b[k]))
-        return Term{Real}(*, [A, b])
+        map(get, shape_propagate(TensorOp((i,), A[i,k] * b[k])))
+    else
+        shp = shape_propagate(TensorOp((i,), A[i,k] * b[k]))
+        map(get, shp)
     end
+end
 
-    shp = shape_propagate(TensorOp((i,), A[i,k] * b[k]))
-    setmetadata(Term{Vector}(*, [A, b]), ArrayShapeCtx, ArrayShape(map(get, shp)))
+function (*)(A::Symbolic{<:AbstractMatrix},
+             B::Symbolic{<:AbstractMatrix})
+    @syms i::Int j::Int k::Int
 end
 
 #=
