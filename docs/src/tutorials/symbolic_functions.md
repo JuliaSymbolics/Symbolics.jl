@@ -300,7 +300,7 @@ For example, we can compute the Jacobian of an array of expressions
 like:
 
 ```julia
-Symbolics.jacobian([x+x*y,x^2+y],[x,y])
+Symbolics.jacobian([x + x*y, x^2 + y], [x, y])
 
 2×2 Matrix{Num}:
  1 + y  x
