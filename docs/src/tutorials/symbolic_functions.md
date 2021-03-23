@@ -101,7 +101,7 @@ to_compute = [x^2 + y, y^2 + x]
 f_expr = build_function(to_compute, [x, y])
 ```
 
-gives back two codes. The first is a function `f([x,y])` that computes
+gives back two codes. The first is a function `f([x, y])` that computes
 and builds an output vector `[x^2 + y, y^2 + x]`. Because this tool
 was made to be used by all the cool kids writing fast Julia codes, it
 is specialized to Julia and supports features like StaticArrays. For
@@ -176,7 +176,7 @@ a function via a sparse matrix. For example:
 ```julia
 using LinearAlgebra
 N = 8
-A = sparse(Tridiagonal([x^i for i in 1:N-1],[x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
+A = sparse(Tridiagonal([x^i for i in 1:N-1], [x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
 
 8×8 SparseMatrixCSC{Num, Int64} with 22 stored entries:
  x*(y^7)            y            ⋅  …            ⋅            ⋅        ⋅    ⋅
@@ -282,12 +282,12 @@ Now let's write down the derivative of some expression:
 
 ```julia
 z = t + t^2
-D(z) # derivative(t + t ^ 2, t)
+D(z) # derivative(t + t^2, t)
 ```
 
 Notice that this hasn't computed anything yet: `D` is a lazy operator
-because it lets us symbolically represent "The derivative of z with
-respect to t", which is useful for example when representing our
+because it lets us symbolically represent "The derivative of ``z`` with
+respect to ``t``", which is useful for example when representing our
 favorite thing in the world, differential equations. However, if we
 want to expand the derivative operators, we'd use `expand_derivatives`:
 
