@@ -110,15 +110,15 @@ function propagate_shape(::typeof(getindex), x, idx...)
     axes === Unknown() && return Unknown()
 
     idx1 = to_indices(CartesianIndices(axes), axes, idx)
-    ([1:length(x) for x in idx1 if !(x isa Number)]...,)
+    ([1:length(x) for x in idx1 if !(symtype(x) <: Number)]...,)
 end
 
 function Base.getindex(x::SymArray, idx...)
-    arrterm(getindex, x, idx...)
-end
-
-function Base.getindex(x::Symbolic{T}, idx::Int...) where {T<:AbstractArray}
-    Term{eltype(T)}(getindex, [x, idx...])
+    if all(i->symtype(i) <: Integer, idx)
+        Term{eltype(symtype(x))}(getindex, [x, idx...])
+    else
+        arrterm(getindex, x, idx...)
+    end
 end
 
 # basic

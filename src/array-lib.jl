@@ -40,8 +40,8 @@ end
 #################### TRANSPOSE ################
 #
 function Base.adjoint(A::SymArray)
-    N = nd(A)
-    if N !== nothing && !(N in (1, 2))
+    N = getndims(A)
+    if N !== Unknown() && !(N in (1, 2))
         error("Can adjoint only a vector or a matrix")
     end
 
@@ -52,19 +52,20 @@ propagate_ndims(::typeof(adjoint), A) = 2
 function propagate_shape(::typeof(adjoint), A)
     shp = shape(A)
     shp === Unknown() && return Unknown()
-    ndims(shp) == 2 ? reverse(shp) : (Base.OneTo(1), shp...)
+    length(shp) == 2 ? reverse(shp) : (Base.OneTo(1), shp...)
 end
 
 #################### MATVEC ################
 #
 import Base: *, \
 function (*)(A::Symbolic{<:AbstractMatrix},
-             b::Symbolic{<:AbstractVector})
+             b::Union{Symbolic{<:AbstractMatrix},
+                      Symbolic{<:AbstractVector}})
     arrterm(*, A, b)
 end
 
 propagate_ndims(::typeof(*), A, B) = getndims(B)
-function propagate_shape(::typeof(*), A, B::Symbolic{<:AbstractVector})
+function propagate_shape(::typeof(*), A, b::Symbolic{<:AbstractVector})
     @syms i::Int k::Int
     if istree(A) &&
         operation(A) === adjoint &&
@@ -77,9 +78,10 @@ function propagate_shape(::typeof(*), A, B::Symbolic{<:AbstractVector})
     end
 end
 
-function (*)(A::Symbolic{<:AbstractMatrix},
-             B::Symbolic{<:AbstractMatrix})
+function propagate_shape(::typeof(*), A, B::Symbolic{<:AbstractMatrix})
     @syms i::Int j::Int k::Int
+    shp = shape_propagate(TensorOp((i,j), A[i,k] * B[k,j]))
+    map(get, shp)
 end
 
 #=
