@@ -83,33 +83,45 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
+julia> @variables t x(t); D = Differential(t);
+
 julia> Symbolics.diff2term(Symbolics.value(D(D(x))))
-xˍtt(t)
+var"Differential(t)∘Differential(t)"(t)
 ```
 """
 function diff2term(O)
     istree(O) || return O
-    if is_derivative(O)
-        (x, t, order) = flatten_differential(O)
-        return lower_varname(x, t, order)
+    ds = []
+    while is_derivative(O)
+        push!(ds, operation(O).x)
+        O = arguments(O)[1]
     end
-    return Term{Real}(operation(O), diff2term.(arguments(O)))
-end
-
-function flatten_differential(O::Term)
-    @assert is_derivative(O) "invalid differential: $O"
-    is_derivative(arguments(O)[1]) || return (arguments(O)[1], operation(O).x, 1)
-    (x, t, order) = flatten_differential(arguments(O)[1])
-    isequal(t, operation(O).x) || throw(ArgumentError("non-matching differentials on lhs: $t, $(operation(O).x)"))
-    return (x, t, order + 1)
+    op = nothing
+    for d in reverse(ds)
+        if op === nothing
+            op = string("(Differential(", nameof(d), ")")
+        else
+            op = string(op, "∘Differential(", nameof(d), ")")
+        end
+    end
+    if op === nothing
+        return Term{Real}(operation(O), map(diff2term, arguments(O)))
+    else
+        oldop = operation(O)
+        if !(oldop isa Sym)
+            throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
+        end
+        op *= ")($(nameof(oldop)))"
+        return Term{Real}(rename(oldop, Symbol(op)), arguments(O))
+    end
 end
 
 """
     tosymbol(x::Union{Num,Symbolic}; states=nothing, escape=true) -> Symbol
 
 Convert `x` to a symbol. `states` are the states of a system, and `escape`
-means if the target has escapes like `val"y⦗t⦘"`. If `escape` then it will only
-output `y` instead of `y⦗t⦘`.
+means if the target has escapes like `val"y(t)"`. If `escape` then it will only
+output `y` instead of `y(t)`.
 
 # Examples
 
@@ -118,7 +130,7 @@ julia> @parameters t; @variables z(t)
 (z(t),)
 
 julia> Symbolics.tosymbol(z)
-Symbol("z⦗t⦘")
+Symbol("z(t)")
 ```
 """
 function tosymbol(t::Term; states=nothing, escape=true)
@@ -136,7 +148,7 @@ function tosymbol(t::Term; states=nothing, escape=true)
         @goto err
     end
 
-    return escape ? Symbol(op, "⦗", join(args, ", "), "⦘") : op
+    return escape ? Symbol(op, "(", join(args, ", "), ")") : op
     @label err
     error("Cannot convert $t to a symbol")
 end
