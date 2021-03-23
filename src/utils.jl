@@ -104,7 +104,7 @@ function diff2term(O)
             op = string(op, "∘Differential(", nameof(d), ")")
         end
     end
-    T = symtype(operation(O))
+    T = symtype(O)
     if op === nothing
         return Term{T}(operation(O), map(diff2term, arguments(O)))
     else
