@@ -104,15 +104,16 @@ function diff2term(O)
             op = string(op, "∘Differential(", nameof(d), ")")
         end
     end
+    T = symtype(operation(O))
     if op === nothing
-        return Term{Real}(operation(O), map(diff2term, arguments(O)))
+        return Term{T}(operation(O), map(diff2term, arguments(O)))
     else
         oldop = operation(O)
         if !(oldop isa Sym)
             throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
         end
         op *= ")($(nameof(oldop)))"
-        return Term{Real}(rename(oldop, Symbol(op)), arguments(O))
+        return Term{T}(rename(oldop, Symbol(op)), arguments(O))
     end
 end
 
@@ -155,24 +156,12 @@ end
 
 function lower_varname(var::Symbolic, idv, order)
     order == 0 && return var
-    name = string(nameof(operation(var)))
-    underscore = 'ˍ'
-    idx = findlast(underscore, name)
-    append = string(idv)^order
-    if idx === nothing
-        newname = Symbol(name, underscore, append)
-    else
-        nidx = nextind(name, idx)
-        newname = Symbol(name[1:idx], name[nidx:end], append)
+    D = Differential(idv)
+    for _ in 1:order
+        var = D(var)
     end
-    return Sym{symtype(operation(var))}(newname)(arguments(var)[1])
+    return diff2term(var)
 end
-
-function lower_varname(t::Symbolic, iv)
-    var, order = var_from_nested_derivative(t)
-    lower_varname(var, iv, order)
-end
-lower_varname(t::Sym, iv) = t
 
 """
     makesym(x::Union{Num,Symbolic}, kwargs...) -> Sym
