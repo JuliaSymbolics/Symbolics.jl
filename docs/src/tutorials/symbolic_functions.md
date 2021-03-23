@@ -286,7 +286,7 @@ D(z) # derivative(t + t ^ 2, t)
 ```
 
 Notice that this hasn't computed anything yet: `D` is a lazy operator
-because it lets us symbolically represent "The derivative of $z$ with
+because it lets us symbolically represent "The derivative of z with
 respect to t", which is useful for example when representing our
 favorite thing in the world, differential equations. However, if we
 want to expand the derivative operators, we'd use `expand_derivatives`:
