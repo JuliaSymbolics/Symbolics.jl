@@ -153,7 +153,7 @@ function lower_varname(var::Symbolic, idv, order)
         nidx = nextind(name, idx)
         newname = Symbol(name[1:idx], name[nidx:end], append)
     end
-    return Sym{symtype(operation(var))}(newname)(arguments(var)[1])
+    return Sym{symtype(operation(var))}(newname)(arguments(var)...)
 end
 
 function lower_varname(t::Symbolic, iv)
