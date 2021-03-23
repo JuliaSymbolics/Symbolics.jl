@@ -18,9 +18,9 @@ Here, `z` is an expression tree for "square `x` and add `y`". To make an array
 of symbolic expressions, simply make an array of symbolic expressions:
 
 ```julia
-A = [x^2+y 0 2x
-     0     0 2y
-     y^2+x 0 0]
+A = [x^2 + y 0 2x
+     0       0 2y
+     y^2 + x 0 0]
 
 3×3 Matrix{Num}:
  y + x^2  0  2x
@@ -67,9 +67,9 @@ expressions. For example, here we will define
 
 ```julia
 function f(u)
-  [u[1]-u[3],u[1]^2-u[2],u[3]+u[2]]
+  [u[1] - u[3], u[1]^2 - u[2], u[3] + u[2]]
 end
-f([x,y,z]) # Recall that z = x^2 + y
+f([x, y, z]) # Recall that z = x^2 + y
 
 3-element Vector{Num}:
  x - y - (x^2)
@@ -98,7 +98,7 @@ for the function. For example:
 
 ```julia
 to_compute = [x^2 + y, y^2 + x]
-f_expr = build_function(to_compute,[x,y])
+f_expr = build_function(to_compute, [x, y])
 ```
 
 gives back two codes. The first is a function `f([x,y])` that computes
@@ -110,7 +110,7 @@ example:
 ```julia
 using StaticArrays
 myf = eval(f_expr[1])
-myf(SA[2.0,3.0])
+myf(SA[2.0, 3.0])
 
 2-element SArray{Tuple{2},Float64,1,2} with indices SOneTo(2):
   7.0
@@ -139,7 +139,7 @@ Thus we'd use it like the following:
 ```julia
 myf! = eval(f_expr[2])
 out = zeros(2)
-myf!(out,[2.0,3.0])
+myf!(out, [2.0, 3.0])
 out
 
 2-element Array{Float64,1}:
@@ -158,7 +158,7 @@ Note that if we need to avoid `eval`, for example to avoid world-age
 issues, one could do `expression = Val{false}`:
 
 ```julia
-build_function(to_compute,[x,y],expression=Val{false})
+build_function(to_compute, [x, y], expression=Val{false})
 ```
 
 which will use [RuntimeGeneratedFunctions.jl](https://github.com/SciML/RuntimeGeneratedFunctions.jl)
