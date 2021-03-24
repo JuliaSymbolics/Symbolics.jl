@@ -323,21 +323,21 @@ simplify(2x + 2y) # 2(x + y)
 This can be applied to arrays by using Julia's broadcast mechanism:
 
 ```julia
-B = simplify.([t^2+t+t^2  2t+4t
-           x+y+y+2t   x^2 - x^2 + y^2])
+B = simplify.([t + t^2 + t + t^2  2t + 4t
+               x + y + y + 2t     x^2 - x^2 + y^2])
 
 2×2 Matrix{Num}:
-   t + 2(t^2)   6t
+   2(t + t^2)   6t
  x + 2(t + y)  y^2
 ```
 
 We can then use `substitute` to change values of an expression around:
 
 ```julia
-simplify.(substitute.(B, (Dict(x=>y^2),)))
+simplify.(substitute.(B, (Dict(x => y^2),)))
 
 2×2 Matrix{Num}:
-     t + 2(t^2)   6t
+     2(t + t^2)   6t
  y^2 + 2(t + y)  y^2
 ```
 
@@ -345,10 +345,10 @@ and we can use this to interactively evaluate expressions without
 generating and compiling Julia functions:
 
 ```julia
-V = substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
+V = substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
 
 2×2 Matrix{Num}:
- 36.0  24.0
+ 40.0  24.0
  16.0   9.0
 ```
 
@@ -358,7 +358,7 @@ Where we can reference the values via:
 Symbolics.value.(V)
 
 2×2 Matrix{Float64}:
- 36.0  24.0
+ 40.0  24.0
  16.0   9.0
 ```
 
