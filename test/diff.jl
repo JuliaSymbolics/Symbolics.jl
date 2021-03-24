@@ -9,8 +9,8 @@ D = Differential(t)
 D2 = Differential(t)^2
 Dx = Differential(x)
 
-@test Symbol(D(D(uu))) === Symbol("(Differential(t)∘Differential(t))(uu)(t)")
-@test Symbol(D(uuˍt)) === Symbol("(Differential(t))(uuˍt)(t)")
+@test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
+@test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
 
@@ -102,7 +102,7 @@ t1 = Symbolics.gradient(tmp, [x1, x2])
 @variables t k
 @variables x(t)
 D = Differential(k)
-@test Symbolics.tosymbol(Symbolics.value(D(x))) === Symbol("(Differential(k))(x)(t)")
+@test Symbolics.tosymbol(D(x).val) === Symbol("xˍk(t)")
 
 using Symbolics
 @variables t x(t)
@@ -204,11 +204,3 @@ sp_hess = Symbolics.sparsehessian(rr, X)
 expression = sin(x[1] + x[2] + x[3] + x[4]) |> Differential(t) |> expand_derivatives
 expression2 = substitute(expression, Dict(Differential(t).(x) .=> ẋ))
 @test isequal(expression2, (ẋ[1] + ẋ[2] + ẋ[3] + ẋ[4])*cos(x[1] + x[2] + x[3] + x[4]))
-
-@variables t x y u(x, y, t) z(t)
-dd = Differential(t)(Differential(y)(Differential(x)(u)))
-dd_ref, = @variables var"(Differential(x)∘Differential(y)∘Differential(t))(u)"(x, y, t)
-@test isequal(Symbolics.diff2term(Symbolics.value(dd)), dd_ref)
-ddd_ref, = @variables var"(Differential(t)∘Differential(t)∘Differential(t))(z)"(t)
-ddd = Symbolics.lower_varname(Symbolics.value(z), t, 3)
-@test isequal(Symbolics.diff2term(Symbolics.value(ddd)), ddd_ref)

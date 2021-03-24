@@ -83,37 +83,35 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
-julia> @variables t x(t); D = Differential(t);
+julia> @variables x t u(x, t); Dt = Differential(t); Dx = Differential(x);
 
-julia> Symbolics.diff2term(Symbolics.value(D(D(x))))
-var"Differential(t)∘Differential(t)"(t)
+julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
+uˍtx(x, t)
 ```
 """
 function diff2term(O)
     istree(O) || return O
-    ds = []
-    while is_derivative(O)
-        push!(ds, operation(O).x)
-        O = arguments(O)[1]
-    end
-    op = nothing
-    for d in reverse(ds)
-        if op === nothing
-            op = string("(Differential(", nameof(d), ")")
-        else
-            op = string(op, "∘Differential(", nameof(d), ")")
+    if is_derivative(O)
+        ds = ""
+        while is_derivative(O)
+            ds = string(operation(O).x) * ds
+            O = arguments(O)[1]
         end
+    else
+        ds = nothing
     end
     T = symtype(O)
-    if op === nothing
+    if ds === nothing
         return Term{T}(operation(O), map(diff2term, arguments(O)))
     else
         oldop = operation(O)
         if !(oldop isa Sym)
             throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
         end
-        op *= ")($(nameof(oldop)))"
-        return Term{T}(rename(oldop, Symbol(op)), arguments(O))
+        d_separator = 'ˍ'
+        opname = string(nameof(oldop))
+        newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
+        return Term{T}(rename(oldop, newname), arguments(O))
     end
 end
 
