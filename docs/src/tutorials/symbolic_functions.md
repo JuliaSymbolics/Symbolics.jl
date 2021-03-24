@@ -447,14 +447,14 @@ primitives. However, we can expand the allowed primitives by registering
 new functions. For example, let's register a new function `h`:
 
 ```julia
-h(x,y) = x^2 + y
-@register h(x,y)
+h(x, y) = x^2 + y
+@register h(x, y)
 ```
 
-Now when we use `h(x,y)`, it is a symbolic expression and doesn't expand:
+Now when we use `h(x, y)`, it is a symbolic expression and doesn't expand:
 
 ```julia
-julia> h(x,y) + y^2
+julia> h(x, y) + y^2
 h(x(t), y(t)) + (y(t))^2
 ```
 
@@ -471,6 +471,6 @@ Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1
 and now it works with the rest of the system:
 
 ```julia
-derivative(h(x,y) + y^2, x) # 2x
-derivative(h(x,y) + y^2, y) # 1 + 2y
+derivative(h(x, y) + y^2, x) # 2x
+derivative(h(x, y) + y^2, y) # 1 + 2y
 ```
