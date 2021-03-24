@@ -372,15 +372,18 @@ the user's code. For these cases, Symbolics.jl allows for fully
 macro-free usage. For example:
 
 ```julia
+using Symbolics: Sym
+
 x = Num(Sym{Float64}(:x))
 y = Num(Sym{Float64}(:y))
-x+y^2.0 # isa Num
+x + y^2.0 # isa Num
 
-σ = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
-w = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
-x = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
+σ = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:σ)) # left uncalled, since it is used as a function
+w = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:w)) # unknown, left uncalled
+x = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:x))(t)  # unknown, depends on `t`
 y = Num(Variable(:y))   # unknown, no dependents
-z = Num(Variable{Symbolics.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
+# Line below throw an error since \alpha is not defined
+z = Num(Variable{Symbolics.FnType{NTuple{3, Any}, Real}}(:z))(t, α, x)  # unknown, multiple arguments
 β₁ = Num(Variable(:β, 1)) # with index 1
 β₂ = Num(Variable(:β, 2)) # with index 2
 
@@ -396,7 +399,7 @@ If we need to use this to generate new Julia code, we can simply
 convert the output to an `Expr`:
 
 ```julia
-Symbolics.toexpr(x+y^2)
+Symbolics.toexpr(x + y^2)
 ```
 
 ## `Sym`s and callable `Sym`s
