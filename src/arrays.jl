@@ -54,7 +54,7 @@ end
 
 function propagate_eltype(f, args...)
     As = [eltype(symtype(T))
-          for T in Iterators.filter(x->x <: Symbolic{<:AbstractArray}, typeof.(args))]
+          for T in Iterators.filter(x->symtype(x) <: AbstractArray, args)]
     promote_type(As...)
 end
 

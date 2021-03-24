@@ -55,27 +55,29 @@ function propagate_shape(::typeof(adjoint), A)
     length(shp) == 2 ? reverse(shp) : (Base.OneTo(1), shp...)
 end
 
-#################### MATVEC ################
+#################### MATMUL ################
 #
 import Base: *, \
 function (*)(A::Symbolic{<:AbstractMatrix},
              b::Union{Symbolic{<:AbstractMatrix},
                       Symbolic{<:AbstractVector}})
-    arrterm(*, A, b)
+    if istree(A) &&
+        operation(A) === adjoint &&
+        getndims(arguments(A)[1]) === 1
+        # do this to fail if dim mismatch
+        T = Base.promote_op(*, eltype(A), eltype(b))
+        T = T == Any ? Number : T
+        Term{T}(*, [A, b])
+    else
+        arrterm(*, A, b)
+    end
 end
 
 propagate_ndims(::typeof(*), A, B) = getndims(B)
 function propagate_shape(::typeof(*), A, b::Symbolic{<:AbstractVector})
     @syms i::Int k::Int
-    if istree(A) &&
-        operation(A) === adjoint &&
-        nd(arguments(A)[1]) === 1
-        # do this to fail if dim mismatch
-        map(get, shape_propagate(TensorOp((i,), A[i,k] * b[k])))
-    else
-        shp = shape_propagate(TensorOp((i,), A[i,k] * b[k]))
-        map(get, shp)
-    end
+    shp = shape_propagate(TensorOp((i,), A[i,k] * b[k]))
+    map(get, shp)
 end
 
 function propagate_shape(::typeof(*), A, B::Symbolic{<:AbstractMatrix})
@@ -83,6 +85,7 @@ function propagate_shape(::typeof(*), A, B::Symbolic{<:AbstractMatrix})
     shp = shape_propagate(TensorOp((i,j), A[i,k] * B[k,j]))
     map(get, shp)
 end
+
 
 #=
 # a .+ 1
