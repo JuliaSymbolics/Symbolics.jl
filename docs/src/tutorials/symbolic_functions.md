@@ -317,7 +317,7 @@ to allow for simplifying symbolic expressions. This is done simply
 through the `simplify` command:
 
 ```julia
-simplify(t+t) # 2t
+simplify(2x + 2y) # 2(x + y)
 ```
 
 This can be applied to arrays by using Julia's broadcast mechanism:
