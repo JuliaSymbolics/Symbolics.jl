@@ -495,5 +495,3 @@ function sparsehessian(O, vars::AbstractVector; simplify=false)
     end
     return H
 end
-
-SymbolicUtils.Code.function_to_expr(::Differential, o, st) = toexpr(diff2term(o), st)
