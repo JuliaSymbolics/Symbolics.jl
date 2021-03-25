@@ -103,3 +103,44 @@ end
 # TODO: find one that has a shape, not just the first one.
 propagate_shape(::typeof(map), f, x, xs...) = shape(x)
 
+
+@inline _reduce(f, x, dims, kw) = reduce(f, x; dims=dims, kw...)
+
+function Base.reduce(f, x::SymArray; dims=:, kw...)
+    if dims === (:)
+        return Term{Number}(_reduce, f, x, dims, kw)
+    end
+
+    arrterm(_reduce, f, x, dims, kw)
+end
+
+macro oops(ex)
+    quote
+        tmp = $(esc(ex))
+        if tmp === Unknown()
+            return Unknown()
+        else
+            tmp
+        end
+    end
+end
+
+function propagate_shape(::typeof(_reduce), f, x, dims, kw)
+    @oops shp = shape(x)
+
+    map(enumerate(shp)) do (i, dim)
+        i in dims ? Base.OneTo(1) : dim
+    end
+end
+
+
+#=
+#
+#Bounds check
+#
+julia> @syms x[1:10]
+(x,)
+
+julia> x[1:11]
+getindex(x, 1:11)
+=#
