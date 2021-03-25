@@ -378,6 +378,7 @@ x = Num(Sym{Float64}(:x))
 y = Num(Sym{Float64}(:y))
 x + y^2.0 # isa Num
 
+α = Num(Variable(:α))
 σ = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:σ)) # left uncalled, since it is used as a function
 w = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:w)) # unknown, left uncalled
 x = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:x))(t)  # unknown, depends on `t`
