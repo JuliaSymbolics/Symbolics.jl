@@ -14,6 +14,19 @@ struct ArrayShapeCtx end
 symtype(x::Union{Colon, AbstractRange}) = typeof(x)
 
 
+struct Unknown end
+
+macro oops(ex)
+    quote
+        tmp = $(esc(ex))
+        if tmp === Unknown()
+            return Unknown()
+        else
+            tmp
+        end
+    end
+end
+
 # Partial information
 geteltype(s::SymArray) = geteltype(symtype(s))
 geteltype(::Type{<:AbstractArray{T}}) where {T} = T
@@ -33,7 +46,6 @@ function shape(s::SymArray)
 end
 shape(s) = axes(s)
 
-struct Unknown end
 
 _propagate_atype(::Type{T}, ::Type{T}) where {T} = T
 _propagate_atype(::Type{<:Array}, ::Type{<:SArray}) = Array
@@ -84,13 +96,11 @@ function arrterm(f, args...)
                 propagate_shape(f, args...))
 end
 
-maybe(f, x::Unknown) = Unknown()
-maybe(f, x) = f(x)
+maybe(f, x) = f(@oops x)
 
 function maybefoldl(f, g, xs, acc)
     for x in xs
-        y = f(x)
-        y === Unknown() && return Unknown()
+        @oops y = f(x)
         acc = g(acc, y)
     end
     return acc
@@ -106,8 +116,7 @@ function propagate_ndims(::typeof(getindex), x, idx...)
 end
 
 function propagate_shape(::typeof(getindex), x, idx...)
-    axes = shape(x)
-    axes === Unknown() && return Unknown()
+    @oops axes = shape(x)
 
     idx1 = to_indices(CartesianIndices(axes), axes, idx)
     ([1:length(x) for x in idx1 if !(symtype(x) <: Number)]...,)

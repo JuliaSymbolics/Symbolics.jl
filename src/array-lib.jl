@@ -50,8 +50,7 @@ end
 
 propagate_ndims(::typeof(adjoint), A) = 2
 function propagate_shape(::typeof(adjoint), A)
-    shp = shape(A)
-    shp === Unknown() && return Unknown()
+    @oops shp = shape(A)
     length(shp) == 2 ? reverse(shp) : (Base.OneTo(1), shp...)
 end
 
@@ -114,16 +113,6 @@ function Base.reduce(f, x::SymArray; dims=:, kw...)
     arrterm(_reduce, f, x, dims, kw)
 end
 
-macro oops(ex)
-    quote
-        tmp = $(esc(ex))
-        if tmp === Unknown()
-            return Unknown()
-        else
-            tmp
-        end
-    end
-end
 
 function propagate_shape(::typeof(_reduce), f, x, dims, kw)
     @oops shp = shape(x)
