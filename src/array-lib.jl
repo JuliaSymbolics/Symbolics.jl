@@ -103,22 +103,45 @@ end
 propagate_shape(::typeof(map), f, x, xs...) = shape(x)
 
 
-@inline _reduce(f, x, dims, kw) = reduce(f, x; dims=dims, kw...)
+@inline _mapreduce(f, x, dims, kw) = mapreduce(f, x; dims=dims, kw...)
 
-function Base.reduce(f, x::SymArray; dims=:, kw...)
+function Base.mapreduce(f, g, x::SymArray; dims=:, kw...)
     if dims === (:)
-        return Term{Number}(_reduce, f, x, dims, kw)
+        return Term{Number}(_mapreduce, [f, g, x, dims, (kw...,)])
     end
 
-    arrterm(_reduce, f, x, dims, kw)
+    arrterm(_mapreduce, f, g, x, dims, kw)
 end
 
-
-function propagate_shape(::typeof(_reduce), f, x, dims, kw)
+function propagate_shape(::typeof(_mapreduce), f, g, x, dims, kw)
     @oops shp = shape(x)
 
     map(enumerate(shp)) do (i, dim)
         i in dims ? Base.OneTo(1) : dim
+    end
+end
+
+for f in [sum, prod]
+    _f = Symbol("_", nameof(f))
+
+    @eval function $_f(x, dims, kw)
+        $f(x; dims=dims, kw...)
+    end
+
+    @eval function (::$(typeof(f)))(x::SymArray; dims=:, kw...)
+        if dims === (:)
+            return Term{Number}($f, [x, dims, (kw...,)])
+        end
+
+        arrterm($_f, x, dims, (kw...,))
+    end
+
+    @eval function propagate_shape(::typeof($_f), x, dims, kw)
+        @oops shp = shape(x)
+
+        (map(enumerate(shp)) do (i, dim)
+            i in dims ? Base.OneTo(1) : dim
+        end...,)
     end
 end
 

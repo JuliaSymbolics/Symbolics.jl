@@ -100,8 +100,7 @@ maybe(f, x) = f(@oops x)
 
 function maybefoldl(f, g, xs, acc)
     for x in xs
-        @oops y = f(x)
-        acc = g(acc, y)
+        acc = g(acc, @oops f(x))
     end
     return acc
 end
