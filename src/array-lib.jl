@@ -86,12 +86,20 @@ function propagate_shape(::typeof(*), A, B::Symbolic{<:AbstractMatrix})
     map(get, shp)
 end
 
-
-#=
-# a .+ 1
+#################### MAP-REDUCE ################
 #
-# a --> Symarray with known size
-#     a --> Symarray with size (m, n) (n, m)
-# a --> Symarray with known dimension but no size
-# a --> Sym{AbstractArray} without any shape info
-=#
+
+Base.map(f, x::SymArray) = arrterm(map, f, x)
+Base.map(f, x::SymArray, xs...) = arrterm(map, f, x, xs...)
+Base.map(f, x, y::SymArray, z...) = arrterm(map, f, x, y, z...)
+Base.map(f, x, y, z::SymArray, w...) = arrterm(map, f, x, y, z, w...)
+function propagate_eltype(::typeof(map), f, xs...)
+    if any(x->x isa Unknown, geteltype.(xs))
+        return Unknown()
+    end
+    Base.return_types(f, eltype.(xs))[1]
+end
+
+# TODO: find one that has a shape, not just the first one.
+propagate_shape(::typeof(map), f, x, xs...) = shape(x)
+
