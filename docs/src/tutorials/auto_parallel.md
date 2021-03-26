@@ -34,7 +34,7 @@ My[1, 2] = 2.0
 My[end,end-1] = 2.0
 
 # Define the discretized PDE as an ODE function
-function f(u,p,t)
+function f(u, p, t)
     A = u[:,:,1]
     B = u[:,:,2]
     C = u[:,:,3]
@@ -69,7 +69,7 @@ fastf = eval(Symbolics.build_function(du,u,
 Now let's compute the sparse Jacobian function and compile a fast multithreaded version:
 
 ```julia
-jac = Symbolics.sparsejacobian(vec(du),vec(u))
+jac = Symbolics.sparsejacobian(vec(du), vec(u))
 fjac = eval(Symbolics.build_function(jac,u,
             parallel=Symbolics.MultithreadedForm())[2])
 ```
@@ -81,15 +81,15 @@ version:
 
 ```julia
 using OrdinaryDiffEq
-u0 = zeros(N,N,3)
-MyA = zeros(N,N);
-AMx = zeros(N,N);
-DA = zeros(N,N);
-prob = ODEProblem(f,u0,(0.0,10.0))
-fastprob = ODEProblem(ODEFunction((du,u,p,t)->fastf(du,u),
-                                   jac = (du,u,p,t) -> fjac(du,u),
-                                   jac_prototype = similar(jac,Float64)),
-                                   u0,(0.0,10.0))
+u0 = zeros(N, N, 3)
+MyA = zeros(N, N);
+AMx = zeros(N, N);
+DA = zeros(N, N);
+prob = ODEProblem(f, u0, (0.0, 10.0))
+fastprob = ODEProblem(ODEFunction((du, u, p, t) -> fastf(du, u),
+                                   jac = (du, u, p, t) -> fjac(du, u),
+                                   jac_prototype = similar(jac, Float64)),
+                                   u0, (0.0, 10.0))
 ```
 
 Let's see the timing difference:
