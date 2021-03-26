@@ -134,9 +134,10 @@ let # Symbolics.jl#123
     """
 end
 
+using Symbolics: value
 using SymbolicUtils.Code: Func, toexpr
 @variables t x(t)
 D = Differential(t)
-expr = toexpr(Func([D(x)], [], D(x)))
+expr = toexpr(Func([value(D(x))], [], value(D(x))))
 @test expr.args[2].args[end] == expr.args[1].args[1] # check function body and function arg
-@test expr.args[2].args[end] == :(xˍt(t))
+@test expr.args[2].args[end] == :(var"Differential(t)(x(t))")

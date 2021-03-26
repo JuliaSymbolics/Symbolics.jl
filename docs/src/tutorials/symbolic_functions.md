@@ -295,6 +295,12 @@ want to expand the derivative operators, we'd use `expand_derivatives`:
 expand_derivatives(D(z)) # 1 + 2t
 ```
 
+To get the variable that you are taking the derivative with respect to is accessed with:
+
+```julia
+D.x # t
+```
+
 We can also have simplified functions for multivariable calculus.
 For example, we can compute the Jacobian of an array of expressions
 like:

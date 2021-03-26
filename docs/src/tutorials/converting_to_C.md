@@ -3,7 +3,7 @@
 Since Symbolics.jl can trace Julia code into Symbolics IR that can be built and
 compiled via `build_function` to C, this gives us a nifty way to automatically
 generate C functions from Julia code! To see this in action, let's start with
-the Lotka-Volterra equations:
+[the Lotka-Volterra equations](https://en.wikipedia.org/wiki/Lotka%E2%80%93Volterra_equations):
 
 ```julia
 using Symbolics
@@ -26,6 +26,12 @@ which gives:
 
 ```julia
 du = Num[p₁ * u₁ - (p₂ * u₁) * u₂, -p₃ * u₂ + (p₄ * u₁) * u₂]
+```
+
+Since Lotka-Volterra equations are differential equations with respect of to time `t`, we define derivative `D` with respect to this variable.
+
+```julia
+D = Differential(t)
 ```
 
 Now we build the equations we want to solve:
@@ -52,7 +58,7 @@ void diffeqf(double* du, double* RHS1, double* RHS2, double RHS3) {
 If we want to compile this, we do `expression=Val{false}`:
 
 ```julia
-f = build_function(eqs, u, p, t, target=Symbolics.CTarget(),expression=Val{false})
+f = build_function(eqs, u, p, t, target=Symbolics.CTarget(), expression=Val{false})
 ```
 
 now we check it computes the same thing:
@@ -62,7 +68,7 @@ du = rand(2); du2 = rand(2)
 u = rand(2)
 p = rand(4)
 t = rand()
-f(du,u,p,t)
+f(du, u, p, t)
 lotka_volterra!(du2, u, p, t)
 du == du2 # true!
 ```

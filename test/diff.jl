@@ -9,7 +9,7 @@ D = Differential(t)
 D2 = Differential(t)^2
 Dx = Differential(x)
 
-@test Symbol(D(D(uu))) === Symbol("uuˍtt⦗t⦘")
+@test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
 @test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
@@ -102,7 +102,7 @@ t1 = Symbolics.gradient(tmp, [x1, x2])
 @variables t k
 @variables x(t)
 D = Differential(k)
-@test Symbolics.tosymbol(D(x).val) === Symbol("xˍk⦗t⦘")
+@test Symbolics.tosymbol(D(x).val) === Symbol("xˍk(t)")
 
 using Symbolics
 @variables t x(t)

@@ -102,7 +102,9 @@ end
 SymbolicUtils.symtype(n::Num) = symtype(n.val)
 
 function Base.iszero(x::Num)
-    _x = SymbolicUtils.to_mpoly(value(x))[1]
+    x = value(x)
+    x isa Number && iszero(x) && return true
+    _x = SymbolicUtils.to_mpoly(x)[1]
     return (_x isa Number || _x isa SymbolicUtils.MPoly) && iszero(_x)
 end
 
