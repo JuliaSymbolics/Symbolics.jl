@@ -30,6 +30,10 @@ Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num}) = print(io, latexify(x))
 
+@latexrecipe function f(n::Num)
+    return _toexpr(n, canonicalize=false)
+end
+
 # `_toexpr` is only used for latexify
 function _toexpr(O; canonicalize=true)
     if canonicalize
@@ -49,7 +53,7 @@ function _toexpr(O; canonicalize=true)
         isempty(args) && return nameof(op)
         return Expr(:call, _toexpr(op; canonicalize=canonicalize), _toexpr(args; canonicalize=canonicalize)...)
     end
-    return Expr(:call, op, _toexpr(args; canonicalize=canonicalize)...)
+    return Expr(:call, Symbol(op), _toexpr(args; canonicalize=canonicalize)...)
 end
 _toexpr(s::Sym; kw...) = nameof(s)
 
@@ -61,9 +65,9 @@ function canonicalexpr(O)
         if length(args) == 2 && args[2] isa Number && args[2] < 0
             ex = _toexpr(args[1])
             if args[2] == -1
-                expr = Expr(:call, inv, ex)
+                expr = Expr(:call, :inv, ex)
             else
-                expr = Expr(:call, ^, Expr(:call, inv, ex), -args[2])
+                expr = Expr(:call, :^, Expr(:call, inv, ex), -args[2])
             end
             return true, expr
         end
