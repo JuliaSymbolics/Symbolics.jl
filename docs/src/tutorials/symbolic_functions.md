@@ -323,27 +323,27 @@ to allow for simplifying symbolic expressions. This is done simply
 through the `simplify` command:
 
 ```julia
-simplify(t+t) # 2t
+simplify(2x + 2y) # 2(x + y)
 ```
 
 This can be applied to arrays by using Julia's broadcast mechanism:
 
 ```julia
-B = simplify.([t^2+t+t^2  2t+4t
-           x+y+y+2t   x^2 - x^2 + y^2])
+B = simplify.([t + t^2 + t + t^2  2t + 4t
+               x + y + y + 2t     x^2 - x^2 + y^2])
 
 2×2 Matrix{Num}:
-   t + 2(t^2)   6t
+   2(t + t^2)   6t
  x + 2(t + y)  y^2
 ```
 
 We can then use `substitute` to change values of an expression around:
 
 ```julia
-simplify.(substitute.(B, (Dict(x=>y^2),)))
+simplify.(substitute.(B, (Dict(x => y^2),)))
 
 2×2 Matrix{Num}:
-     t + 2(t^2)   6t
+     2(t + t^2)   6t
  y^2 + 2(t + y)  y^2
 ```
 
@@ -351,10 +351,10 @@ and we can use this to interactively evaluate expressions without
 generating and compiling Julia functions:
 
 ```julia
-V = substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
+V = substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
 
 2×2 Matrix{Num}:
- 36.0  24.0
+ 40.0  24.0
  16.0   9.0
 ```
 
@@ -364,7 +364,7 @@ Where we can reference the values via:
 Symbolics.value.(V)
 
 2×2 Matrix{Float64}:
- 36.0  24.0
+ 40.0  24.0
  16.0   9.0
 ```
 
@@ -378,15 +378,19 @@ the user's code. For these cases, Symbolics.jl allows for fully
 macro-free usage. For example:
 
 ```julia
+using Symbolics: Sym
+
 x = Num(Sym{Float64}(:x))
 y = Num(Sym{Float64}(:y))
-x+y^2.0 # isa Num
+x + y^2.0 # isa Num
 
-σ = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
-w = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
-x = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
+α = Num(Variable(:α))
+σ = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:σ)) # left uncalled, since it is used as a function
+w = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:w)) # unknown, left uncalled
+x = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:x))(t)  # unknown, depends on `t`
 y = Num(Variable(:y))   # unknown, no dependents
-z = Num(Variable{Symbolics.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
+# Line below throw an error since \alpha is not defined
+z = Num(Variable{Symbolics.FnType{NTuple{3, Any}, Real}}(:z))(t, α, x)  # unknown, multiple arguments
 β₁ = Num(Variable(:β, 1)) # with index 1
 β₂ = Num(Variable(:β, 2)) # with index 2
 
@@ -402,7 +406,7 @@ If we need to use this to generate new Julia code, we can simply
 convert the output to an `Expr`:
 
 ```julia
-Symbolics.toexpr(x+y^2)
+Symbolics.toexpr(x + y^2)
 ```
 
 ## `Sym`s and callable `Sym`s
@@ -450,14 +454,14 @@ primitives. However, we can expand the allowed primitives by registering
 new functions. For example, let's register a new function `h`:
 
 ```julia
-h(x,y) = x^2 + y
-@register h(x,y)
+h(x, y) = x^2 + y
+@register h(x, y)
 ```
 
-Now when we use `h(x,y)`, it is a symbolic expression and doesn't expand:
+Now when we use `h(x, y)`, it is a symbolic expression and doesn't expand:
 
 ```julia
-julia> h(x,y) + y^2
+julia> h(x, y) + y^2
 h(x(t), y(t)) + (y(t))^2
 ```
 
@@ -474,6 +478,6 @@ Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1
 and now it works with the rest of the system:
 
 ```julia
-derivative(h(x,y) + y^2, x) # 2x
-derivative(h(x,y) + y^2, y) # 1 + 2y
+derivative(h(x, y) + y^2, x) # 2x
+derivative(h(x, y) + y^2, y) # 1 + 2y
 ```

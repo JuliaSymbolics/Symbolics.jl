@@ -22,15 +22,15 @@ const γ₁ = 0.1
 const γ₂ = 0.1
 const γ₃ = 0.1
 const N = 32
-const X = reshape([i for i in 1:N for j in 1:N],N,N)
-const Y = reshape([j for i in 1:N for j in 1:N],N,N)
+const X = reshape([i for i in 1:N for j in 1:N], N, N)
+const Y = reshape([j for i in 1:N for j in 1:N], N, N)
 const α₁ = 1.0.*(X.>=4*N/5)
 
-const Mx = Array(Tridiagonal([1.0 for i in 1:N-1],[-2.0 for i in 1:N],[1.0 for i in 1:N-1]))
+const Mx = Array(Tridiagonal([1.0 for i in 1:N-1], [-2.0 for i in 1:N], [1.0 for i in 1:N-1]))
 const My = copy(Mx)
-Mx[2,1] = 2.0
+Mx[2, 1] = 2.0
 Mx[end-1,end] = 2.0
-My[1,2] = 2.0
+My[1, 2] = 2.0
 My[end,end-1] = 2.0
 
 # Define the discretized PDE as an ODE function
@@ -44,7 +44,7 @@ function f(u,p,t)
     dA = @. DA + α₁ - β₁*A - r₁*A*B + r₂*C
     dB = @. α₂ - β₂*B - r₁*A*B + r₂*C
     dC = @. α₃ - β₃*C + r₁*A*B - r₂*C
-    cat(dA,dB,dC,dims=3)
+    cat(dA, dB, dC, dims=3)
 end
 ```
 
@@ -54,7 +54,7 @@ model function:
 ```julia
 # Define the initial condition as normal arrays
 @variables u[1:N,1:N,1:3]
-du = simplify.(f(u,nothing,0.0))
+du = simplify.(f(u, nothing, 0.0))
 ```
 
 The output, here the in-place modified `du`, is a symbolic representation of
