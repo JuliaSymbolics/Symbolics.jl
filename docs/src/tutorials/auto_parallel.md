@@ -24,7 +24,7 @@ const γ₃ = 0.1
 const N = 32
 const X = reshape([i for i in 1:N for j in 1:N], N, N)
 const Y = reshape([j for i in 1:N for j in 1:N], N, N)
-const α₁ = 1.0.*(X.>=4*N/5)
+const α₁ = 1.0 .* (X .>= 4*N/5)
 
 const Mx = Array(Tridiagonal([1.0 for i in 1:N-1], [-2.0 for i in 1:N], [1.0 for i in 1:N-1]))
 const My = copy(Mx)
@@ -53,7 +53,7 @@ model function:
 
 ```julia
 # Define the initial condition as normal arrays
-@variables u[1:N,1:N,1:3]
+@variables u[1:N, 1:N, 1:3]
 du = simplify.(f(u, nothing, 0.0))
 ```
 
