@@ -282,7 +282,7 @@ Now let's write down the derivative of some expression:
 
 ```julia
 z = t + t^2
-D(z) # derivative(t + t^2, t)
+D(z) # Symbolics.derivative(t + t^2, t)
 ```
 
 Notice that this hasn't computed anything yet: `D` is a lazy operator
@@ -478,6 +478,6 @@ Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1
 and now it works with the rest of the system:
 
 ```julia
-derivative(h(x, y) + y^2, x) # 2x
-derivative(h(x, y) + y^2, y) # 1 + 2y
+Symbolics.derivative(h(x, y) + y^2, x) # 2x
+Symbolics.derivative(h(x, y) + y^2, y) # 1 + 2y
 ```
