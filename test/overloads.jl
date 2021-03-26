@@ -158,3 +158,5 @@ using IfElse: ifelse
 @test isequal(Symbolics.derivative(abs(x), x), ifelse(signbit(x), -1, 1))
 @test isequal(Symbolics.derivative(sign(x), x), 0)
 @test isequal(Symbolics.derivative(signbit(x), x), 0)
+
+@test iszero(Num(0.0))
