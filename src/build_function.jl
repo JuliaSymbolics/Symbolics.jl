@@ -58,8 +58,16 @@ function unflatten_args(f, args, N=4)
                                        for group in Iterators.partition(args, N)], N)
 end
 
+# Speeds up by avoiding repeated sorting when you call `arguments`
+# after editing children in Postwalk in unflatten_long_ops
+function termify(op)
+    !istree(op) && return op
+    Term{symtype(op)}(operation(op), arguments(op); metadata=op.metadata)
+end
+
 function unflatten_long_ops(op, N=4)
     op = value(op)
+    op = termify(op)
     !istree(op) && return Num(op)
     rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, 4) : nothing)
     rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, 4) : nothing)
