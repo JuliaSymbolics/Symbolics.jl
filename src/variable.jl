@@ -83,7 +83,7 @@ function rename(x::Symbolic, name)
 end
 
 # Build variables more easily
-function _parse_vars(macroname, type, x)
+function _parse_vars(macroname, type, x, transform=identity)
     ex = Expr(:block)
     var_names = Symbol[]
     # if parsing things in the form of
@@ -126,9 +126,9 @@ function _parse_vars(macroname, type, x)
         @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
 
         if iscall
-            var_name, expr = construct_vars(v.args[1], type, v.args[2:end], val, options)
+            var_name, expr = construct_vars(v.args[1], type, v.args[2:end], val, options, transform)
         else
-            var_name, expr = construct_vars(v, type, nothing, val, options)
+            var_name, expr = construct_vars(v, type, nothing, val, options, transform)
         end
 
         push!(var_names, var_name)
@@ -139,7 +139,7 @@ function _parse_vars(macroname, type, x)
     return ex
 end
 
-function construct_vars(v, type, call_args, val, prop)
+function construct_vars(v, type, call_args, val, prop, transform)
     issym  = v isa Symbol
     isarray = isa(v, Expr) && v.head == :ref
     if isarray
@@ -150,7 +150,7 @@ function construct_vars(v, type, call_args, val, prop)
         var_name = v
         expr = construct_var(var_name, type, call_args, val, prop)
     end
-    var_name, :($var_name = $expr)
+    var_name, :($var_name = $transform($expr))
 end
 
 function option_to_metadata_type(::Val{opt}) where {opt}
