@@ -92,6 +92,11 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             return D(arg) # Cannot expand
         elseif isa(operation(arg), Sym)
             return D(arg) # Cannot expand
+        elseif isa(operation(arg), typeof(IfElse.ifelse))
+            args = arguments(arg)
+            op = operation(arg)
+            O = op(args[1], D(args[2]), D(args[3]))
+            return expand_derivatives(O, simplify; occurances)
         elseif isa(operation(arg), Differential)
             # The recursive expand_derivatives was not able to remove
             # a nested Differential. We can attempt to differentiate the
