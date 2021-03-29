@@ -121,8 +121,9 @@ function propagate_shape(::typeof(_mapreduce), f, g, x, dims, kw)
     end
 end
 
-for f in [sum, prod]
+for f in [sum, prod, any, all]
     _f = Symbol("_", nameof(f))
+    T = f in (any, all) ? Bool : Number
 
     @eval function $_f(x, dims, kw)
         $f(x; dims=dims, kw...)
@@ -130,7 +131,7 @@ for f in [sum, prod]
 
     @eval function (::$(typeof(f)))(x::SymArray; dims=:, kw...)
         if dims === (:)
-            return Term{Number}($f, [x, dims, (kw...,)])
+            return Term{$T}($_f, [x, dims, (kw...,)])
         end
 
         arrterm($_f, x, dims, (kw...,))
