@@ -25,9 +25,6 @@ function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{2})
 end
 
 IfElse.ifelse(x::Num,y,z) = Num(Term{Real}(IfElse.ifelse, [value(x), value(y), value(z)]))
-derivative(::typeof(IfElse.ifelse), args::NTuple{3,Any}, ::Val{1}) = 0
-derivative(::typeof(IfElse.ifelse), args::NTuple{3,Any}, ::Val{2}) = IfElse.ifelse(args[1],1,0)
-derivative(::typeof(IfElse.ifelse), args::NTuple{3,Any}, ::Val{3}) = IfElse.ifelse(args[1],0,1)
 
 @register Base.rand(x)
 @register Base.randn(x)

@@ -1,5 +1,6 @@
 using Symbolics
 using Test
+using IfElse
 
 # Derivatives
 @variables t σ ρ β
@@ -204,3 +205,8 @@ sp_hess = Symbolics.sparsehessian(rr, X)
 expression = sin(x[1] + x[2] + x[3] + x[4]) |> Differential(t) |> expand_derivatives
 expression2 = substitute(expression, Dict(Differential(t).(x) .=> ẋ))
 @test isequal(expression2, (ẋ[1] + ẋ[2] + ẋ[3] + ẋ[4])*cos(x[1] + x[2] + x[3] + x[4]))
+
+@test isequal(
+    Symbolics.derivative(IfElse.ifelse(signbit(b), b^2, sqrt(b)), b),
+    IfElse.ifelse(signbit(b), 2b, (1//2)*(sqrt(b)^-1))
+)
