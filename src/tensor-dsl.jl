@@ -53,3 +53,72 @@ function shape_propagate(t::TensorOp)
         first(mi)
     end
 end
+
+
+### @arrayop
+#
+
+
+struct ArrayOp
+    op
+    output_idx
+    expr
+end
+
+# replace _1 with __args__[1]
+function position_args(expr)
+    !(expr isa Expr) && return expr
+    if expr.head == :ref
+        name = expr.args[1]
+        if startswith(string(name), "_")
+            i = parse(Int, replace(string(name), "_" => ""))
+            return Expr(:ref,
+                        :(__args__[$i]),
+                        expr.args[2:end]...)
+        end
+    elseif expr.head == :call &&
+        expr.args[1] == :getindex ||
+        expr.args[1] == getindex
+
+        name = expr.args[2]
+        if startswith(string(name), "_")
+            i = parse(Int, replace(string(name), "_" => ""))
+            return Expr(:call,
+                        expr.args[1],
+                        :(__args__[$i]),
+                        expr.args[3:end]...)
+        end
+    end
+
+    return Expr(expr.head, map(position_args, expr.args)...)
+end
+
+# Find all symbolic indices in expr
+function find_indices(expr, idxs=[])
+    !(expr isa Expr) && return idxs
+    if expr.head == :ref
+        return append!(idxs, expr.args[2:end])
+    elseif expr.head == :call && expr.args[1] == :getindex || expr.args[1] == getindex
+        return append!(idxs, filter(x->x isa Symbol, expr.args[3:end]))
+    else
+        foreach(x->find_indices(x, idxs), expr.args)
+        return idxs
+    end
+end
+
+macro arrayop(name, output_idx, expr, options...)
+    @assert output_idx.head == :tuple
+    idxs = union(output_idx.args, find_indices(expr))
+    expr = position_args(expr)
+    oftype(x,T) = :($x::$T)
+    quote
+        let
+            @syms $(map(x->oftype(x, Int), idxs)...)
+
+            $ArrayOp($(esc(name)),
+                     $output_idx,
+                     (__args__...,) -> $(expr))
+        end
+    end
+end
+
