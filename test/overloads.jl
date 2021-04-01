@@ -163,7 +163,12 @@ using IfElse: ifelse
 
 
 # Tests for both norms
-x = Num.(rand(10))
-
+x = Num.(randn(10))
 @test norm(x) == norm(Symbolics.value.(x))
 @test norm(x, Inf) == norm(Symbolics.value.(x), Inf)
+@test norm(x, 1) == norm(Symbolics.value.(x), 1)
+
+@variables x[1:2]
+@test isequal(norm(x), sqrt(x[1]^2 + x[2]^2))
+@test isequal(norm(x, Inf), max(abs(x[1]), abs(x[2])))
+@test isequal(norm(x, 1), abs(x[1]) + abs(x[2]))

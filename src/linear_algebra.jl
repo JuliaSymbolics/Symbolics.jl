@@ -11,7 +11,11 @@ function LinearAlgebra.norm2(x::AbstractArray{Num})
 end
 
 function LinearAlgebra.normInf(x::AbstractArray{Num})
-    reduce(max, x)
+    reduce(max, abs.(x))
+end
+
+function LinearAlgebra.norm1(x::AbstractArray{Num})
+    sum(abs.(x))
 end
 
 # Soft pivoted
