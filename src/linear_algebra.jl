@@ -6,14 +6,6 @@ function nterms(t)
     end
 end
 
-function LinearAlgebra.normInf(x::AbstractArray{Num})
-    reduce(max, x)
-end
-
-function LinearAlgebra.norm2(x::AbstractArray{Num})
-    sqrt(sum(x.^2))
-end
-
 # Soft pivoted
 # Note: we call this function with a matrix of Union{SymbolicUtils.Symbolic, Any}
 function sym_lu(A; check=true)
