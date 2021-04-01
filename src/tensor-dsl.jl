@@ -1,8 +1,43 @@
-const _ = Sym{AbstractArray}(:_)
+### @arrayop
+#
 
-struct TensorOp
-    output_idx::Tuple
-    expr
+struct ArrayOp
+    op         # High-level operation
+    output_idx # output indices
+    expr       # Used in pattern matching
+    f          # When called with Symbolic arguments, gives the RHS of a tensor expression as a Term
+               # Useful to infer eltype
+end
+
+macro arrayop(name, output_idx, expr, options...)
+    @assert output_idx.head == :tuple
+    oidxs = filter(x->x isa Symbol, output_idx)
+    idxs = union(oidxs, find_indices(expr))
+    fbody = position_args(deepcopy(expr))
+    oftype(x,T) = :($x::$T)
+    quote
+        let
+            @syms $(map(x->oftype(x, Int), idxs)...)
+
+            $ArrayOp($(esc(name)),
+                     $output_idx,
+                     $expr,
+                     (__args__...,) -> $fbody)
+        end
+    end
+end
+
+# Find all symbolic indices in expr
+function find_indices(expr, idxs=[])
+    !(expr isa Expr) && return idxs
+    if expr.head == :ref
+        return append!(idxs, expr.args[2:end])
+    elseif expr.head == :call && expr.args[1] == :getindex || expr.args[1] == getindex
+        return append!(idxs, filter(x->x isa Symbol, expr.args[3:end]))
+    else
+        foreach(x->find_indices(x, idxs), expr.args)
+        return idxs
+    end
 end
 
 struct AxisOf
@@ -28,8 +63,9 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}())
     dict
 end
 
-function shape_propagate(t::TensorOp)
-    matches = idx_to_axes(t.expr)
+
+function shape_propagate(output_idx, expr)
+    matches = idx_to_axes(expr)
     for (sym, ms) in matches
         @assert !isempty(ms) "dimension of $sym is unknown"
         to_check = filter(m->!isnothing(shape(m.A)), ms)
@@ -47,26 +83,15 @@ function shape_propagate(t::TensorOp)
         end
     end
 
-    map(t.output_idx) do i
+    map(output_idx) do i
         mi = matches[i]
         @assert !isempty(mi)
-        first(mi)
+        get(first(mi))
     end
 end
 
-
-### @arrayop
-#
-
-
-struct ArrayOp
-    op
-    output_idx
-    expr
-end
-
 # replace _1 with __args__[1]
-function position_args(expr)
+function position_args(expr, arrs=[])
     !(expr isa Expr) && return expr
     if expr.head == :ref
         name = expr.args[1]
@@ -92,33 +117,3 @@ function position_args(expr)
 
     return Expr(expr.head, map(position_args, expr.args)...)
 end
-
-# Find all symbolic indices in expr
-function find_indices(expr, idxs=[])
-    !(expr isa Expr) && return idxs
-    if expr.head == :ref
-        return append!(idxs, expr.args[2:end])
-    elseif expr.head == :call && expr.args[1] == :getindex || expr.args[1] == getindex
-        return append!(idxs, filter(x->x isa Symbol, expr.args[3:end]))
-    else
-        foreach(x->find_indices(x, idxs), expr.args)
-        return idxs
-    end
-end
-
-macro arrayop(name, output_idx, expr, options...)
-    @assert output_idx.head == :tuple
-    idxs = union(output_idx.args, find_indices(expr))
-    expr = position_args(expr)
-    oftype(x,T) = :($x::$T)
-    quote
-        let
-            @syms $(map(x->oftype(x, Int), idxs)...)
-
-            $ArrayOp($(esc(name)),
-                     $output_idx,
-                     (__args__...,) -> $(expr))
-        end
-    end
-end
-

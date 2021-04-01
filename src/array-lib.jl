@@ -30,10 +30,7 @@ function propagate_shape(::typeof(broadcast), f, args...)
             end
         end
 
-        shp = shape_propagate(TensorOp((subscripts...,),
-                                       term(+, args′...)))
-
-        map(get, shp)
+        shape_propagate((subscripts...,), term(+, args′...))
     end
 end
 # propagate_atype, propagate_eltype
@@ -75,14 +72,12 @@ end
 propagate_ndims(::typeof(*), A, B) = getndims(B)
 function propagate_shape(::typeof(*), A, b::Symbolic{<:AbstractVector})
     @syms i::Int k::Int
-    shp = shape_propagate(TensorOp((i,), A[i,k] * b[k]))
-    map(get, shp)
+    shape_propagate((i,), A[i,k] * b[k])
 end
 
 function propagate_shape(::typeof(*), A, B::Symbolic{<:AbstractMatrix})
     @syms i::Int j::Int k::Int
-    shp = shape_propagate(TensorOp((i,j), A[i,k] * B[k,j]))
-    map(get, shp)
+    shape_propagate((i,j), A[i,k] * B[k,j])
 end
 
 #################### MAP-REDUCE ################
