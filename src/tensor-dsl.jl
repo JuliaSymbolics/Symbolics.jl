@@ -5,40 +5,61 @@ struct ArrayOp
     op         # High-level operation
     output_idx # output indices
     expr       # Used in pattern matching
-    f          # When called with Symbolic arguments, gives the RHS of a tensor expression as a Term
                # Useful to infer eltype
+    arity
 end
 
+positional(i) = Term{Array}(positional, [i])
 macro arrayop(name, output_idx, expr, options...)
     @assert output_idx.head == :tuple
-    oidxs = filter(x->x isa Symbol, output_idx)
-    idxs = union(oidxs, find_indices(expr))
-    fbody = position_args(deepcopy(expr))
+    oidxs = filter(x->x isa Symbol, output_idx.args)
+    iidxs, arity = find_indices(expr)
+    idxs = union(oidxs, iidxs)
+    fbody = call2term(deepcopy(expr))
     oftype(x,T) = :($x::$T)
+    positionals = [:($(Symbol("_$i")) = $(Sym{Array}(Symbol("_$i"))))
+                   for i in 1:arity]
     quote
         let
             @syms $(map(x->oftype(x, Int), idxs)...)
+            $(positionals...)
 
             $ArrayOp($(esc(name)),
                      $output_idx,
-                     $expr,
-                     (__args__...,) -> $fbody)
+                     $fbody,
+                     $arity)
         end
     end
 end
 
+get_pos(x::Symbol) = startswith(string(x), "_") ? parse(Int, replace(string(x), "_"=>"")) : 0
 # Find all symbolic indices in expr
-function find_indices(expr, idxs=[])
-    !(expr isa Expr) && return idxs
+function find_indices(expr, idxs=[], arity=Ref{Int}(0))
+    !(expr isa Expr) && return idxs, arity[]
     if expr.head == :ref
-        return append!(idxs, expr.args[2:end])
+        arity[] = max(arity[], get_pos(expr.args[1]))
+        return append!(idxs, filter(x->x isa Symbol, expr.args[2:end])), arity[]
     elseif expr.head == :call && expr.args[1] == :getindex || expr.args[1] == getindex
-        return append!(idxs, filter(x->x isa Symbol, expr.args[3:end]))
+        arity[] = max(arity[], get_pos(expr.args[2]))
+        return append!(idxs, filter(x->x isa Symbol, expr.args[3:end])), max(arity, get_pos(expr.args[1])), arity[]
     else
-        foreach(x->find_indices(x, idxs), expr.args)
-        return idxs
+        foreach(x->find_indices(x, idxs, arity), expr.args)
+        return idxs, arity[]
     end
 end
+
+# replace _1 with __args__[1]
+function call2term(expr, arrs=[])
+    !(expr isa Expr) && return expr
+    if expr.head == :call
+        return Expr(:call, term, map(call2term, expr.args)...)
+    end
+
+    return Expr(expr.head, map(call2term, expr.args)...)
+end
+
+
+### Shape propagate
 
 struct AxisOf
     A
@@ -62,7 +83,6 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}())
     end
     dict
 end
-
 
 function shape_propagate(output_idx, expr)
     matches = idx_to_axes(expr)
@@ -88,32 +108,4 @@ function shape_propagate(output_idx, expr)
         @assert !isempty(mi)
         get(first(mi))
     end
-end
-
-# replace _1 with __args__[1]
-function position_args(expr, arrs=[])
-    !(expr isa Expr) && return expr
-    if expr.head == :ref
-        name = expr.args[1]
-        if startswith(string(name), "_")
-            i = parse(Int, replace(string(name), "_" => ""))
-            return Expr(:ref,
-                        :(__args__[$i]),
-                        expr.args[2:end]...)
-        end
-    elseif expr.head == :call &&
-        expr.args[1] == :getindex ||
-        expr.args[1] == getindex
-
-        name = expr.args[2]
-        if startswith(string(name), "_")
-            i = parse(Int, replace(string(name), "_" => ""))
-            return Expr(:call,
-                        expr.args[1],
-                        :(__args__[$i]),
-                        expr.args[3:end]...)
-        end
-    end
-
-    return Expr(expr.head, map(position_args, expr.args)...)
 end
