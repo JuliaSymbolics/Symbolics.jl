@@ -351,19 +351,20 @@ end
 get_varnumber(varop, vars::Vector) =  findfirst(x->isequal(x,varop),vars)
 get_varnumber(varop, var) =  isequal(var,varop) ? 0 : nothing
 
-function numbered_expr(O::Symbolic,args...;varordering = args[1],offset = 0,
+buildvarnumbercache(args...) = Dict([isa(arg,AbstractArray) ? el=>(argi,eli) : arg=>(argi,0)
+                                    for (argi,arg) in enumerate(args) for (eli,el) in enumerate(arg)])
+
+function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)])
     O = value(O)
     if O isa Sym || isa(operation(O), Sym)
-        for j in 1:length(args)
-            i = get_varnumber(O,args[j])
-            if i !== nothing
-                return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
-            end
+        if haskey(varnumbercache,O)
+            (j,i) = varnumbercache[O]
+            return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
     if istree(O)
-        Expr(:call, Symbol(operation(O)), (numbered_expr(x,args...;offset=offset,lhsname=lhsname,
+        Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
                                                          rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
     elseif O isa Sym
         tosymbol(O, escape=false)
@@ -372,13 +373,13 @@ function numbered_expr(O::Symbolic,args...;varordering = args[1],offset = 0,
     end
 end
 
-function numbered_expr(de::Equation,args...;varordering = args[1],
+function numbered_expr(de::Equation,varnumbercache,args...;varordering = args[1],
                        lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)],offset=0)
 
     varordering = value.(args[1])
     var = var_from_nested_derivative(de.lhs)[1]
     i = findfirst(x->isequal(tosymbol(x isa Sym ? x : operation(x), escape=false), tosymbol(var, escape=false)),varordering)
-    :($lhsname[$(i+offset)] = $(numbered_expr(de.rhs,args...;offset=offset,
+    :($lhsname[$(i+offset)] = $(numbered_expr(de.rhs,varnumbercache,args...;offset=offset,
                                               varordering = varordering,
                                               lhsname = lhsname,
                                               rhsnames = rhsnames)))
@@ -462,7 +463,8 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
 
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
 
-    differential_equation = string(join([numbered_expr(eq,args...,lhsname=lhsname,
+    buildvarnumbercache(args...)
+    differential_equation = string(join([numbered_expr(eq,varnumbercache,args...,lhsname=lhsname,
                                   rhsnames=rhsnames,offset=-1) for
                                   (i, eq) ∈ enumerate(eqs)],";\n  "),";")
 
@@ -531,11 +533,13 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
                                compiler    = compiler)
     end
 
+    
+    varnumbercache = buildvarnumbercache(args...)
     equations = Vector{String}()
     for col ∈ 1:size(ex,2)
         for row ∈ 1:size(ex,1)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
-            rhs = numbered_expr(value(ex[row, col]), args...;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, args...;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = -1) |> coperators |> string  # Filter through coperators to produce valid C code in more cases
@@ -586,7 +590,8 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    differential_equation = string(join([numbered_expr(eq,vs,ps,lhsname=lhsname,
+    varnumbercache = buildvarnumbercache(vs,ps)
+    differential_equation = string(join([numbered_expr(eq,varnumbercache,vs,ps,lhsname=lhsname,
                                    rhsnames=rhsnames) for
                                    (i, eq) ∈ enumerate(eqs)],";\n  "),";")
     """
@@ -633,11 +638,12 @@ function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
                             rhsnames    = rhsnames)
     end
 
+    varnumbercache = buildvarnumbercache(vs,ps,iv)
     equations = Vector{String}()
     for col ∈ 1:size(ex,2)
         for row ∈ 1:size(ex,1)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row, "]")
-            rhs = numbered_expr(value(ex[row, col]), vs, ps, iv;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, vs, ps, iv;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = 0) |> string
@@ -677,7 +683,8 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    matstr = join([numbered_expr(eq.rhs,args...,lhsname=lhsname,
+    varnumbercache = buildvarnumbercache(args...)
+    matstr = join([numbered_expr(eq.rhs,varnumbercache,args...,lhsname=lhsname,
                                   rhsnames=rhsnames) for
                                   (i, eq) ∈ enumerate(eqs)],"; ")
 
@@ -724,12 +731,13 @@ function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
                                rhsnames    = rhsnames)
     end
 
+    varnumbercache = buildvarnumbercache(args...)
     matstr = ""
     for row ∈ 1:size(ex,1)
         row_strings = Vector{String}()
         for col ∈ 1:size(ex,2)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
-            rhs = numbered_expr(value(ex[row, col]), args...;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, args...;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = 0) |> string
