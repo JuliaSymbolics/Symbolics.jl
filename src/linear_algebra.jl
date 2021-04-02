@@ -173,3 +173,17 @@ function LinearAlgebra.det(A::AbstractMatrix{<:Num}; laplace=true)
         return det(lu(A; check = false))
     end
 end
+
+function LinearAlgebra.norm(x::AbstractArray{Num}, p::Real=2)
+    p = value(p)
+    issym = p isa Symbolic
+    if !issym && p == 2
+        sqrt(sum(x->abs2(x), x))
+    elseif !issym && isone(p)
+        sum(abs, x)
+    elseif !issym && isinf(p)
+        mapreduce(abs, max, x)
+    else
+        sum(x->abs(x)^p, x)^inv(p)
+    end
+end
