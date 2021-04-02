@@ -160,3 +160,14 @@ using IfElse: ifelse
 @test isequal(Symbolics.derivative(signbit(x), x), 0)
 
 @test iszero(Num(0.0))
+x = Num.(randn(10))
+@test norm(x) == norm(Symbolics.value.(x))
+@test norm(x, Inf) == norm(Symbolics.value.(x), Inf)
+@test norm(x, 1) == norm(Symbolics.value.(x), 1)
+@test norm(x, 1.2) == norm(Symbolics.value.(x), 1.2)
+
+@variables x[1:2]
+@test isequal(norm(x), sqrt(abs2(x[1]) + abs2(x[2])))
+@test isequal(norm(x, Inf), max(abs(x[1]), abs(x[2])))
+@test isequal(norm(x, 1), abs(x[1]) + abs(x[2]))
+@test isequal(norm(x, 1.2), (abs(x[1])^1.2 + abs(x[2])^1.2)^(1/1.2))
