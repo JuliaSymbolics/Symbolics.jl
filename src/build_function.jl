@@ -463,7 +463,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
 
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
 
-    buildvarnumbercache(args...)
+    varnumbercache = buildvarnumbercache(args...)
     differential_equation = string(join([numbered_expr(eq,varnumbercache,args...,lhsname=lhsname,
                                   rhsnames=rhsnames,offset=-1) for
                                   (i, eq) ∈ enumerate(eqs)],";\n  "),";")
