@@ -76,7 +76,7 @@ tosymbol(x::Sym; kwargs...) = nameof(x)
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x::Term) -> Term
+    diff2term(x::Term) -> Symbolic
     diff2term(x) -> x
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
@@ -102,7 +102,7 @@ function diff2term(O)
     end
     T = symtype(O)
     if ds === nothing
-        return Term{T}(operation(O), map(diff2term, arguments(O)))
+        return similarterm(O, operation(O), map(diff2term, arguments(O)))
     else
         oldop = operation(O)
         if !(oldop isa Sym)
@@ -111,7 +111,7 @@ function diff2term(O)
         d_separator = 'ˍ'
         opname = string(nameof(oldop))
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return Term{T}(rename(oldop, newname), arguments(O))
+        return similarterm(O, rename(oldop, newname), arguments(O))
     end
 end
 
