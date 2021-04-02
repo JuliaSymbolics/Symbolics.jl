@@ -24,8 +24,6 @@ function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{2})
     IfElse.ifelse(x > y, zero(y), one(y))
 end
 
-IfElse.ifelse(x::Num,y,z) = Num(Term{Real}(IfElse.ifelse, [value(x), value(y), value(z)]))
-
 @register Base.rand(x)
 @register Base.randn(x)
 

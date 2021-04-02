@@ -23,7 +23,7 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 
 export simplify, substitute
 
-using SciMLBase
+using SciMLBase, IfElse
 export Num
 include("num.jl")
 
@@ -57,7 +57,7 @@ import Libdl
 include("build_function.jl")
 export build_function
 
-using IfElse, Distributions
+using Distributions
 include("extra_functions.jl")
 
 using Latexify
