@@ -46,8 +46,6 @@ function _toexpr(O; canonicalize=true)
     args = arguments(O)
     
     if (op===(*)) && (args[1] === -1)
-        println("here")
-	println(args)
     	arg_mul = Expr(:call, :(*), _toexpr(args[2:end]; canonicalize=canonicalize)...)
         return Expr(:call, :(-), arg_mul)
     end
