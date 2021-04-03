@@ -42,9 +42,13 @@ function _toexpr(O; canonicalize=true)
     else
         !istree(O) && return O
     end
-
     op = operation(O)
     args = arguments(O)
+    
+    if (op===(*)) && (args[1] == -1)
+	return Symbol("-$(args[2])")
+    end
+    
     if op isa Differential
         ex = _toexpr(args[1]; canonicalize=canonicalize)
         wrt = _toexpr(op.x; canonicalize=canonicalize)
