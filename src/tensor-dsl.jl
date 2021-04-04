@@ -7,10 +7,12 @@ struct ArrayOp
     expr       # Used in pattern matching
                # Useful to infer eltype
     arity
+    reduce
 end
 
 positional(i) = Term{Array}(positional, [i])
-macro arrayop(name, output_idx, expr, options...)
+
+macro arrayop(name, output_idx, expr, reduce=+)
     @assert output_idx.head == :tuple
     oidxs = filter(x->x isa Symbol, output_idx.args)
     iidxs, arity = find_indices(expr)
@@ -27,7 +29,8 @@ macro arrayop(name, output_idx, expr, options...)
             $ArrayOp($(esc(name)),
                      $output_idx,
                      $fbody,
-                     $arity)
+                     $arity,
+                     $reduce)
         end
     end
 end
