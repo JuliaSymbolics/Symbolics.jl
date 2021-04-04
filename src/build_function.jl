@@ -358,8 +358,8 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
                        lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)])
     O = value(O)
     if O isa Sym || isa(operation(O), Sym)
-        if haskey(varnumbercache,O)
-            (j,i) = varnumbercache[O]
+        (j,i) = get(varnumbercache, O, (nothing, nothing))
+        if !isnothing(j)
             return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
