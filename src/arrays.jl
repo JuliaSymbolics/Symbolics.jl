@@ -14,19 +14,6 @@ struct ArrayShapeCtx end
 symtype(x::Union{Colon, AbstractRange}) = typeof(x)
 
 
-struct Unknown end
-
-macro oops(ex)
-    quote
-        tmp = $(esc(ex))
-        if tmp === Unknown()
-            return Unknown()
-        else
-            tmp
-        end
-    end
-end
-
 # Partial information
 geteltype(s::SymArray) = geteltype(symtype(s))
 geteltype(::Type{<:AbstractArray{T}}) where {T} = T
@@ -96,14 +83,6 @@ function arrterm(f, args...)
                 propagate_shape(f, args...))
 end
 
-maybe(f, x) = f(@oops x)
-
-function maybefoldl(f, g, xs, acc)
-    for x in xs
-        acc = g(acc, @oops f(x))
-    end
-    return acc
-end
 atype(::Type{<:Array}) = Array
 atype(::Type{<:SArray}) = SArray
 atype(::Type) = AbstractArray

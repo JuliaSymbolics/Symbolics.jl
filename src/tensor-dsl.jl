@@ -87,7 +87,11 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}())
     dict
 end
 
-function shape_propagate(output_idx, expr)
+makeposvars(n) = [Sym{Array}(Symbol("_$i")) for i in 1:n]
+function shape_propagate(aop::ArrayOp, args...)
+    expr = substitute(aop.expr, Dict(makeposvars(aop.arity) .=> args))
+    output_idx = aop.output_idx
+
     matches = idx_to_axes(expr)
     for (sym, ms) in matches
         @assert !isempty(ms) "dimension of $sym is unknown"
