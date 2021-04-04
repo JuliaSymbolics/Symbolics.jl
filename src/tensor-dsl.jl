@@ -88,9 +88,14 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}())
 end
 
 makeposvars(n) = [Sym{Array}(Symbol("_$i")) for i in 1:n]
-function shape_propagate(aop::ArrayOp, args...)
-    expr = substitute(aop.expr, Dict(makeposvars(aop.arity) .=> args))
+
+function instantiate_rhs(aop::ArrayOp, args...)
+    substitute(aop.expr, Dict(makeposvars(aop.arity) .=> args))
+end
+
+function propagate_shape(aop::ArrayOp, args...)
     output_idx = aop.output_idx
+    expr = instantiate_rhs(aop, args...)
 
     matches = idx_to_axes(expr)
     for (sym, ms) in matches
@@ -115,4 +120,13 @@ function shape_propagate(aop::ArrayOp, args...)
         @assert !isempty(mi)
         get(first(mi))
     end
+end
+
+# TODO: have fallback
+function propagate_eltype(aop::ArrayOp, args...)
+    eltype(symtype(instantiate_rhs(aop, args...)))
+end
+
+function propagate_ndims(aop::ArrayOp, args...)
+    length(aop.output_idx)
 end
