@@ -100,6 +100,8 @@ function propagate_shape(::typeof(getindex), x, idx...)
     ([1:length(x) for x in idx1 if !(symtype(x) <: Number)]...,)
 end
 
+propagate_eltype(::typeof(getindex), x, idx...) = geteltype(x)
+
 function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)
         Term{eltype(symtype(x))}(getindex, [x, idx...])
