@@ -78,8 +78,8 @@ end
 
 # Scalar output
 
-destructure_arg(arg::Union{AbstractArray, Tuple}) = DestructuredArgs(map(value, arg))
-destructure_arg(arg) = arg
+destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds) = DestructuredArgs(map(value, arg), inbounds=inbounds)
+destructure_arg(arg, _) = arg
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
@@ -88,7 +88,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          checkbounds = false,
                          linenumbers = true)
 
-    dargs = map(destructure_arg, [args...])
+    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
     expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
 
     if expression == Val{true}
@@ -185,7 +185,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
                        parallel=SerialForm(), kwargs...)
 
-    dargs = map(destructure_arg, [args...])
+    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto))
