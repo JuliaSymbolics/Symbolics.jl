@@ -42,9 +42,14 @@ function _toexpr(O; canonicalize=true)
     else
         !istree(O) && return O
     end
-
     op = operation(O)
     args = arguments(O)
+    
+    if (op===(*)) && (args[1] === -1)
+    	arg_mul = Expr(:call, :(*), _toexpr(args[2:end]; canonicalize=canonicalize)...)
+        return Expr(:call, :(-), arg_mul)
+    end
+    
     if op isa Differential
         ex = _toexpr(args[1]; canonicalize=canonicalize)
         wrt = _toexpr(op.x; canonicalize=canonicalize)

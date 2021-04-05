@@ -14,6 +14,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Build Function Test" begin include("build_function.jl") end
     @safetestset "Build Function Array Test" begin include("build_function_arrayofarray.jl") end
     @safetestset "Build Targets Test" begin include("build_targets.jl") end
+    @safetestset "Latexify Test" begin include("latexify.jl") end
 end
 
 if GROUP == "Downstream"
