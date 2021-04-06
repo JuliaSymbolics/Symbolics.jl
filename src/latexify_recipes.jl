@@ -61,6 +61,15 @@ function _toexpr(O; canonicalize=true)
     return Expr(:call, Symbol(op), _toexpr(args; canonicalize=canonicalize)...)
 end
 _toexpr(s::Sym; kw...) = nameof(s)
+_toexpr(x::Integer; kw...) = x
+_toexpr(x::AbstractFloat; kw...) = x
+
+function _toexpr(eq::Equation; kw...)
+    Expr(:(=), _toexpr(eq.lhs; kw...), _toexpr(eq.rhs; kw...))
+end
+
+_toexpr(eqs::AbstractArray; kw...) = map(eq->_toexpr(eq; kw...), eqs)
+_toexpr(x::Num; kw...) = _toexpr(value(x); kw...)
 
 function canonicalexpr(O)
     !istree(O) && return true, O
@@ -79,15 +88,3 @@ function canonicalexpr(O)
     end
     return false, O
 end
-for fun in [:_toexpr]
-    @eval begin
-        function $fun(eq::Equation; kw...)
-            Expr(:(=), $fun(eq.lhs; kw...), $fun(eq.rhs; kw...))
-        end
-
-        $fun(eqs::AbstractArray; kw...) = map(eq->$fun(eq; kw...), eqs)
-        $fun(x::Integer; kw...) = x
-        $fun(x::AbstractFloat; kw...) = x
-    end
-end
-_toexpr(x::Num; kw...) = _toexpr(value(x); kw...)
