@@ -8,31 +8,47 @@ Broadcast.BroadcastStyle(::Type{<:Symbolic{<:AbstractArray}}) = SymBroadcast()
 Broadcast.result_style(::SymBroadcast) = SymBroadcast()
 Broadcast.BroadcastStyle(::SymBroadcast, ::Broadcast.BroadcastStyle) = SymBroadcast()
 
+struct BCast{F}
+    f::F
+end
+(b::BCast)(args...) = b.f.(args...)
+function Base.show(io::IO, b::BCast)
+    n = Base.nameof(b.f)
+    if Base.isbinaryoperator(n)
+        print(io, "(.$(b.f))")
+    else
+        print(io, "($(b.f).)")
+    end
+end
+Base.nameof(b::BCast) = Symbol(sprint(io->show(io, b)))
+
 function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
     # Do the thing here
-    arrterm(broadcast, bc.f, bc.args...)
-end
-
-function propagate_ndims(::typeof(broadcast), f, args...)
-    maybefoldl(getndims, max, args, 0)
-end
-
-function propagate_shape(::typeof(broadcast), f, args...)
-    ndim = propagate_ndims(broadcast, f, args...)
-    maybe(ndim) do ndim
+    if !any(x->x isa Unknown, getndims.(bc.args))
+        ndim = maybefoldl(getndims, max, bc.args, 0)
         subscripts = [Sym{Int}(Symbol("i_$i")) for i in 1:ndim]
-        args′ = map(args) do x
+
+        expr_args′ = map(enumerate(bc.args)) do (i, x)
+            place = Sym{Array}(Symbol("_$i"))
             if ndims(x) != 0
-                subs = map(i-> isone(size(x, i)) ? 1 : subscripts[i], 1:ndims(x))
-                term(getindex, x, subs...)
+                subs = map(i-> isone(size(x, i)) ?
+                           1 : subscripts[i], 1:ndims(x))
+                term(getindex, place, subs...)
             else
                 x
             end
         end
 
-        shape_propagate((subscripts...,), term(+, args′...))
+        op = ArrayOp(BCast(bc.f),
+                     (subscripts...,),
+                     term(bc.f, expr_args′...),
+                     length(bc.args),
+                     +)
+        return arrterm(op, bc.args...)
     end
+    return term(broadcast, bc.f, bc.args...)
 end
+
 # propagate_atype, propagate_eltype
 #################### TRANSPOSE ################
 #

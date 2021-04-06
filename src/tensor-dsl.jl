@@ -10,6 +10,8 @@ struct ArrayOp
     reduce
 end
 
+Base.nameof(aop::ArrayOp) = nameof(aop.op)
+
 positional(i) = Term{Array}(positional, [i])
 
 macro arrayop(name, output_idx, expr, reduce=+)
