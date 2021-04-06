@@ -56,6 +56,45 @@ function _toexpr(O)
     end
     return Expr(:call, Symbol(op), _toexpr(args)...)
 end
+function _toexpr(m::Mul{<:Number})
+    numer = Any[]
+    denom = Any[]
+
+    for (base, pow) in m.dict
+        if pow > 0
+            if isone(pow)
+                pushfirst!(numer, _toexpr(base))
+            else
+                pushfirst!(numer, Expr(:call, :^, _toexpr(base), pow))
+            end
+        else
+            if isone(-1*pow)
+                pushfirst!(denom, _toexpr(base))
+            else
+                pushfirst!(denom, Expr(:call, :^, _toexpr(base), -1*pow))
+            end
+        end
+    end
+
+    if isempty(numer) || !isone(abs(m.coeff))
+        numer_expr = Expr(:call, :*, abs(m.coeff), numer...)
+    else
+        numer_expr = Expr(:call, :*, numer...)
+    end
+
+    if isempty(denom)
+        frac_expr = numer_expr
+    else
+        denom_expr = Expr(:call, :*, denom...)
+        frac_expr = Expr(:call, :/, numer_expr, denom_expr)
+    end
+
+    if m.coeff < 0
+        return Expr(:call, :-, frac_expr)
+    else
+        return frac_expr
+    end
+end
 _toexpr(s::Sym) = nameof(s)
 _toexpr(x::Integer) = x
 _toexpr(x::AbstractFloat) = x
