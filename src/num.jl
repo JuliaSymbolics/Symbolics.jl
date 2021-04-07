@@ -72,6 +72,7 @@ function Base.show(io::IO, z::Complex{<:Num})
 end
 
 SymbolicUtils.simplify(n::Num; kw...) = Num(SymbolicUtils.simplify(value(n); kw...))
+SymbolicUtils.expand(n::Num) = Num(SymbolicUtils.expand(value(n)))
 """
     substitute(expr, s::Dict)
 
