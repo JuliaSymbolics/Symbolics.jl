@@ -10,6 +10,10 @@ struct ArrayOp
     reduce
 end
 
+function Base.show(io::IO, a::ArrayOp)
+    print(io, "$(a.op) aka @arrayop $(a.output_idx) ($(a.expr)) $(a.reduce)")
+end
+
 Base.nameof(aop::ArrayOp) = nameof(aop.op)
 
 positional(i) = Term{Array}(positional, [i])
