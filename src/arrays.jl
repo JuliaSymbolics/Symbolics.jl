@@ -61,13 +61,15 @@ macro arrayop(call, output_idx, expr, reduce=+)
         let
             @syms $(map(x->oftype(x, Int), idxs)...)
 
-            $aop = $ArrayOp($output_idx,
-                     $fbody,
-                     $reduce,
-                     $(call2term(call)))
+            expr = $fbody
+            #TODO: proper Atype
+            $ArrayOp{Array{symtype(expr),
+                           $(length(output_idx.args))}}(
+              $output_idx,
+              $reduce,
+              expr,
+              $(call2term(call)))
 
-            $aop.term[] = adjust_metadata($(call2term(call)))
-            $aop
         end
     end |> esc
 end
