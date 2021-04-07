@@ -171,3 +171,6 @@ x = Num.(randn(10))
 @test isequal(norm(x, Inf), max(abs(x[1]), abs(x[2])))
 @test isequal(norm(x, 1), abs(x[1]) + abs(x[2]))
 @test isequal(norm(x, 1.2), (abs(x[1])^1.2 + abs(x[2])^1.2)^(1/1.2))
+
+@variables x y
+@test isequal(expand((x+y)^2), x^2 + y^2 + 2x*y)
