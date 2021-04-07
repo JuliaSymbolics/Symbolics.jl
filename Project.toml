@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 authors = ["Shashi Gowda <gowda@mit.edu>"]
-version = "0.1.15"
+version = "0.1.17"
 
 [deps]
 AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
@@ -40,7 +40,7 @@ SafeTestsets = "0"
 SciMLBase = "1.8"
 Setfield = "0.7"
 SpecialFunctions = "0.7, 0.8, 0.9, 0.10, 1.0"
-SymbolicUtils = "0.9.0, 0.10"
+SymbolicUtils = "0.10.1"
 TreeViews = "0.3"
 julia = "1.5"
 
