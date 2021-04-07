@@ -93,12 +93,6 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}())
     dict
 end
 
-makeposvars(n) = [Sym{Array}(Symbol("_$i")) for i in 1:n]
-
-function instantiate_rhs(aop::ArrayOp, args...)
-    substitute(aop.expr, Dict(makeposvars(aop.arity) .=> args))
-end
-
 function propagate_shape(aop::ArrayOp, args...)
     output_idx = aop.output_idx
     expr = instantiate_rhs(aop, args...)

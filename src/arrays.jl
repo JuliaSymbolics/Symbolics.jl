@@ -127,6 +127,8 @@ function call2term(expr, arrs=[])
     !(expr isa Expr) && return expr
     if expr.head == :call
         return Expr(:call, term, map(call2term, expr.args)...)
+    elseif expr.head == Symbol("'")
+        return Expr(:call, term, adjoint, map(call2term, expr.args)...)
     end
 
     return Expr(expr.head, map(call2term, expr.args)...)
@@ -134,13 +136,13 @@ end
 
 # Find all symbolic indices in expr
 function find_indices(expr, idxs=[])
-    !(expr isa Expr) && return idxs, arity[]
+    !(expr isa Expr) && return idxs
     if expr.head == :ref
-        return append!(idxs, filter(x->x isa Symbol, expr.args[2:end])), arity[]
+        return append!(idxs, filter(x->x isa Symbol, expr.args[2:end]))
     elseif expr.head == :call && expr.args[1] == :getindex || expr.args[1] == getindex
         return append!(idxs, filter(x->x isa Symbol, expr.args[3:end]))
     else
-        foreach(x->find_indices(x, idxs, arity), expr.args)
+        foreach(x->find_indices(x, idxs), expr.args)
         return idxs
     end
 end
