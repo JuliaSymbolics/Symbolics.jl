@@ -75,6 +75,7 @@ tosymbol(x; kwargs...) = x
 tosymbol(x::Sym; kwargs...) = nameof(x)
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
+# TODO: print vector calculus operators properly e.g. ∇u(t,x,y) for Gradient
 """
     diff2term(x::Term) -> Symbolic
     diff2term(x) -> x
@@ -94,7 +95,12 @@ function diff2term(O)
     if is_derivative(O)
         ds = ""
         while is_derivative(O)
-            ds = string(operation(O).x) * ds
+            if operation(O) isa Differential
+                ds = string(operation(O).x) * ds
+            else
+                # AbstractVecDiffOperator
+                ds = "(" * join(operation(O).xs, ",") * ")" * ds
+            end
             O = arguments(O)[1]
         end
     else
@@ -139,7 +145,7 @@ function tosymbol(t::Term; states=nothing, escape=true)
         end
         op = nameof(operation(t))
         args = arguments(t)
-    elseif operation(t) isa Differential
+    elseif operation(t) isa AbstractDifferentialOperator
         term = diff2term(t)
         op = Symbol(operation(term))
         args = arguments(term)
