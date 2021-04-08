@@ -70,7 +70,8 @@ struct Divergence <: AbstractVecDiffOperator
     Divergence(xs...) = new(map(x->value(x), xs))
 end
 struct Curl <: AbstractVecDiffOperator
-    xs
+    # Curl is 3-dimensional
+    xs::NTuple{3}
     Curl(xs...) = new(map(x->value(x), xs))
 end
 struct Laplacian <: AbstractVecDiffOperator
