@@ -39,8 +39,16 @@ struct ArrayOp{T<:AbstractArray}
     expr       # Used in pattern matching
                # Useful to infer eltype
     reduce
-    term::Ref{Any} # may or may not exist
+    term
+    shape
 end
+
+function ArrayOp(T::Type, output_idx, expr, reduce, term)
+    sh = make_shape(output_idx, expr)
+    ArrayOp{T}(output_idx, expr, reduce, term, sh)
+end
+
+shape(aop::ArrayOp) = aop.shape
 
 function Base.show(io::IO, aop::ArrayOp)
     print(io, "@arrayop")
@@ -66,12 +74,12 @@ macro arrayop(call, output_idx, expr, reduce=+)
 
             expr = $fbody
             #TODO: proper Atype
-            $ArrayOp{Array{symtype(expr),
-                           $(length(output_idx.args))}}(
-              $output_idx,
-              $reduce,
-              expr,
-              $(call2term(call)))
+            $ArrayOp(Array{symtype(expr),
+                           $(length(output_idx.args))},
+                     $output_idx,
+                     expr,
+                     $reduce,
+                     $(call2term(call)))
 
         end
     end |> esc
@@ -85,10 +93,7 @@ const SymVec = Union{ArrayOp{<:AbstractVector}, Symbolic{<:AbstractVector}}
 #
 ## Shape ##
 
-function shape(aop::ArrayOp)
-    output_idx = aop.output_idx
-    expr = aop.expr
-
+function make_shape(output_idx, expr)
     matches = idx_to_axes(expr)
     for (sym, ms) in matches
         @assert !isempty(ms) "dimension of $sym is unknown"
@@ -101,7 +106,7 @@ function shape(aop::ArrayOp)
             s=shape(m.A)
             if s !== Unknown()
                 if !isequal(axes(m.A, m.dim), reference)
-                    "expected axes($(m.A), $(m.dim)) = $(reference)" |> DimensionMismatch |> throw
+                    throw(DimensionMismatch("expected axes($(m.A), $(m.dim)) = $(reference)"))
                 end
             end
         end

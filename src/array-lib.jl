@@ -61,11 +61,11 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
 
     expr = term(bc.f, expr_args′...)
     Atype = propagate_atype(broadcast, bc.f, bc.args...)
-    ArrayOp{Atype{symtype(expr), ndim}}(
-        (subscripts...,),
-        expr,
-        +,
-        Term{Any}(broadcast, [bc.f, bc.args...]))
+    ArrayOp(Atype{symtype(expr), ndim},
+            (subscripts...,),
+            expr,
+            +,
+            Term{Any}(broadcast, [bc.f, bc.args...]))
 end
 
 #################### TRANSPOSE ################
@@ -82,14 +82,23 @@ end
 
 import Base: *, \
 
+function isdot(A::Term, ::SymVec)
+    operation(A) === (adjoint) && symtype(arguments(A)[1]) <: AbstractVector
+end
+isdot(A::ArrayOp, b::SymVec) = isdot(A.term, b)
+isdot(A, b) = false
+
 function (*)(A::SymMat, B::SymMat)
     @syms i::Int j::Int k::Int
-    @arrayop (*) (i, j) A[i, k] * B[k, j]
+    @arrayop (A*B) (i, j) A[i, k] * B[k, j]
 end
 
 function (*)(A::SymMat, b::SymVec)
+    if isdot(A, b)
+        return Term{Number}(*, [A, b])
+    end
     @syms i::Int k::Int
-    @arrayop (*) (i,) A[i, k] * b[k]
+    @arrayop (A*b) (i,) A[i, k] * b[k]
 end
 
 #################### MAP-REDUCE ################
@@ -107,11 +116,11 @@ function _map(f, x, xs...)
     expr = f(map(a->a[idx...], [x, xs...])...)
 
     Atype = propagate_atype(map, f, x, xs...)
-    ArrayOp{Atype{symtype(expr), N}}(
-        (idx...,),
-        f(expr),
-        +,
-        Term{Any}(map, [f, x, xs...]))
+    ArrayOp(Atype{symtype(expr), N},
+            (idx...,),
+            f(expr),
+            +,
+            Term{Any}(map, [f, x, xs...]))
 end
 
 @inline _mapreduce(f, x, dims, kw) = mapreduce(f, x; dims=dims, kw...)
@@ -126,11 +135,11 @@ function Base.mapreduce(f, g, x::SymArray; dims=:, kw...)
     expr = f(x[idx...])
 
     Atype = propagate_atype(_mapreduce, f, g, x, dims, (kw...,))
-    ArrayOp{Atype{symtype(expr), ndims(x)}}(
-        (out_idx...,),
-        expr,
-        g,
-        Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)]))
+    ArrayOp(Atype{symtype(expr), ndims(x)},
+            (out_idx...,),
+            expr,
+            g,
+            Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)]))
 end
 
 for (ff, opts) in [sum => (identity, +, false),
