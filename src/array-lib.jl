@@ -110,8 +110,8 @@ function _matmul(A,B)
     @arrayop (A*B) (i, j) A[i, k] * B[k, j]
 end
 
-(*)(A::SymMat, B::Union{SymMat, AbstractMatrix}) = _matmul(A, B)
-(*)(A::AbstractMatrix, B::SymMat) = _matmul(A, B)
+(*)(A::Union{SymMat,SymVec}, B::Union{SymMat, AbstractMatrix}) = _matmul(A, B)
+(*)(A::Union{AbstractVector, AbstractMatrix}, B::SymMat) = _matmul(A, B)
 
 function _matvec(A,b)
     @syms i::Int k::Int
@@ -122,7 +122,7 @@ function _matvec(A,b)
     @arrayop (A*b) (i,) A[i, k] * b[k]
 end
 (*)(A::SymMat, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
-(*)(A::AbstractMatrix, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
+(*)(A::AbstractArray, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
 
 #################### MAP-REDUCE ################
 #
