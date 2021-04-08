@@ -96,8 +96,7 @@ const SymVec = Union{ArrayOp{<:AbstractVector}, Symbolic{<:AbstractVector}}
 function make_shape(output_idx, expr)
     matches = idx_to_axes(expr)
     for (sym, ms) in matches
-        @assert !isempty(ms) "dimension of $sym is unknown"
-        to_check = filter(m->!isnothing(shape(m.A)), ms)
+        to_check = filter(m->!(shape(m.A) isa Unknown), ms)
         # Only check known dimensions. It may be "known symbolically"
         isempty(to_check) && continue
         reference = axes(first(to_check).A, first(to_check).dim)
@@ -112,7 +111,7 @@ function make_shape(output_idx, expr)
         end
     end
 
-    map(output_idx) do i
+    sz = map(output_idx) do i
         if i isa Sym
             mi = matches[i]
             @assert !isempty(mi)
@@ -120,6 +119,12 @@ function make_shape(output_idx, expr)
         elseif i isa Integer
             return Base.OneTo(1)
         end
+    end
+    # TODO: maybe we can remove this restriction?
+    if any(x->x isa Unknown, sz)
+        Unknown()
+    else
+        sz
     end
 end
 
@@ -170,7 +175,10 @@ struct AxisOf
     dim
 end
 
-Base.get(a::AxisOf) = axes(a.A, a.dim)
+function Base.get(a::AxisOf)
+    @oops shape(a.A)
+    axes(a.A, a.dim)
+end
 
 function idx_to_axes(expr, dict=Dict{Sym, Vector}())
     if istree(expr)

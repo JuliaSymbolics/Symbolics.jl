@@ -82,24 +82,47 @@ end
 
 import Base: *, \
 
+using LinearAlgebra
+
+isdot(A::Adjoint, ::SymVec) = true
+
+# TODO: add more such methods
+function getindex(A::AbstractArray, i::Symbolic{<:Integer}...)
+    Term{eltype(A)}(getindex, [A, i...])
+end
+
+function getindex(A::AbstractArray, i::Int, j::Symbolic{<:Integer})
+    Term{eltype(A)}(getindex, [A, i, j])
+end
+
+function getindex(A::AbstractArray, j::Symbolic{<:Integer}, i::Int)
+    Term{eltype(A)}(getindex, [A, j, i])
+end
+
 function isdot(A::Term, ::SymVec)
     operation(A) === (adjoint) && symtype(arguments(A)[1]) <: AbstractVector
 end
-isdot(A::ArrayOp, b::SymVec) = isdot(A.term, b)
+isdot(A::ArrayOp, b::Union{SymVec, Vector}) = isdot(A.term, b)
 isdot(A, b) = false
 
-function (*)(A::SymMat, B::SymMat)
+function _matmul(A,B)
     @syms i::Int j::Int k::Int
     @arrayop (A*B) (i, j) A[i, k] * B[k, j]
 end
 
-function (*)(A::SymMat, b::SymVec)
+(*)(A::SymMat, B::Union{SymMat, AbstractMatrix}) = _matmul(A, B)
+(*)(A::AbstractMatrix, B::SymMat) = _matmul(A, B)
+
+function _matvec(A,b)
+    @syms i::Int k::Int
     if isdot(A, b)
+        make_shape((i,), A[i, k] * b[k]) # This is a dimension check
         return Term{Number}(*, [A, b])
     end
-    @syms i::Int k::Int
     @arrayop (A*b) (i,) A[i, k] * b[k]
 end
+(*)(A::SymMat, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
+(*)(A::AbstractMatrix, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
 
 #################### MAP-REDUCE ################
 #
