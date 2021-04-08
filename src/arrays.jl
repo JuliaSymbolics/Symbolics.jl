@@ -2,8 +2,6 @@ using SymbolicUtils
 using StaticArrays
 import Base: eltype, ndims, size
 
-const SymArray = Symbolic{<:AbstractArray}
-
 ### Store Shape as a metadata in Term{<:AbstractArray} objects
 struct ArrayShapeCtx end
 
@@ -73,6 +71,10 @@ macro arrayop(call, output_idx, expr, reduce=+)
         end
     end |> esc
 end
+
+const SymArray = Union{ArrayOp, Symbolic{<:AbstractArray}}
+const SymMat = Union{ArrayOp{<:AbstractMatrix}, Symbolic{<:AbstractMatrix}}
+const SymVec = Union{ArrayOp{<:AbstractVector}, Symbolic{<:AbstractVector}}
 
 ### Propagate ###
 #
@@ -229,7 +231,7 @@ shape(s) = axes(s)
 Extract the shape metadata from a SymArray.
 If not known, returns `Unknown()`
 """
-function shape(s::SymArray)
+function shape(s::Symbolic{<:AbstractArray})
     if hasmetadata(s, ArrayShapeCtx)
         getmetadata(s, ArrayShapeCtx)
     else
@@ -278,56 +280,54 @@ end
 ################# Base array functions
 #
 
-const ArrayLike = Union{ArrayOp, SymArray}
-
 # basic
 # these methods are not symbolic but work if we know this info.
 import Base: eltype, length, ndims, size, axes, eachindex
 
-geteltype(s::ArrayLike) = geteltype(symtype(s))
+geteltype(s::SymArray) = geteltype(symtype(s))
 geteltype(::Type{<:AbstractArray{T}}) where {T} = T
 geteltype(::Type{<:AbstractArray}) = Unknown()
 
-ndims(s::ArrayLike) = ndims(symtype(s))
+ndims(s::SymArray) = ndims(symtype(s))
 ndims(T::Type{<:AbstractArray}) = ndims(T)
 
-function eltype(A::ArrayLike)
+function eltype(A::SymArray)
     T = geteltype(A)
     T === Unknown() && error("eltype of $A not known")
     return T
 end
 
-function length(A::ArrayLike)
+function length(A::SymArray)
     s = shape(A)
     s === Unknown() && error("length of $A not known")
     return prod(length, s)
 end
 
-function size(A::ArrayLike)
+function size(A::SymArray)
     s = shape(A)
     s === Unknown() && error("size of $A not known")
     return length.(s)
 end
 
-function size(A::ArrayLike, i::Integer)
+function size(A::SymArray, i::Integer)
     @assert(i > 0)
     i > ndims(A) ? 1 : size(A)[i]
 end
 
-function axes(A::ArrayLike)
+function axes(A::SymArray)
     s = shape(A)
     s === Unknown() && error("axes of $A not known")
     return s
 end
 
 
-function axes(A::ArrayLike, i)
+function axes(A::SymArray, i)
     s = shape(A)
     s === Unknown() && error("axes of $A not known")
     return i <= length(s) ? s[i] : Base.OneTo(1)
 end
 
-function eachindex(A::ArrayLike)
+function eachindex(A::SymArray)
     s = shape(A)
     s === Unknown() && error("eachindex of $A not known")
     return CartesianIndices(s)

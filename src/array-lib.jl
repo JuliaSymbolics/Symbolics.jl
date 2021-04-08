@@ -1,5 +1,5 @@
 ##### getindex #####
-function Base.getindex(x::ArrayLike, idx...)
+function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)
         Term{eltype(symtype(x))}(getindex, [x, idx...])
     else
@@ -28,9 +28,9 @@ makesubscripts(n) = [Sym{Int}(Symbol("i_$i")) for i in 1:n]
 
 using Base.Broadcast
 
-Base.broadcastable(s::ArrayLike) = s
+Base.broadcastable(s::SymArray) = s
 struct SymBroadcast <: Broadcast.BroadcastStyle end
-Broadcast.BroadcastStyle(::Type{<:ArrayLike}) = SymBroadcast()
+Broadcast.BroadcastStyle(::Type{<:SymArray}) = SymBroadcast()
 Broadcast.result_style(::SymBroadcast) = SymBroadcast()
 Broadcast.BroadcastStyle(::SymBroadcast, ::Broadcast.BroadcastStyle) = SymBroadcast()
 
@@ -41,7 +41,7 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
     ndim = mapfoldl(ndims, max, bc.args, init=0)
     subscripts = makesubscripts(ndim)
 
-    expr_args′ = map(enumerate(bc.args)) do (i, x)
+    expr_args′ = map(bc.args) do x
         if ndims(x) != 0
             subs = map(i-> isonedim(x, i) ?
                        1 : subscripts[i], 1:ndims(x))
@@ -62,15 +62,77 @@ end
 
 #################### TRANSPOSE ################
 #
-function Base.adjoint(A::ArrayLike)
+function Base.adjoint(A::SymMat)
     @syms i::Int j::Int
+    @arrayop A' (i, j) A[j, i]
+end
 
-    N = ndims(A)
-    if N == 1
-        @arrayop A' (1, j) A[j]
-    elseif N == 2
-        @arrayop A' (i, j) A[j, i]
-    else
-        error("Can adjoint only a vector or a matrix")
+function Base.adjoint(b::SymVec)
+    @syms i::Int
+    @arrayop b' (1, i) b[i]
+end
+
+import Base: *, \
+
+function (*)(A::SymMat, B::SymMat)
+    @syms i::Int j::Int k::Int
+    @arrayop (*) (i, j) A[i, k] * B[k, j]
+end
+
+function (*)(A::SymMat, b::SymVec)
+    @syms i::Int k::Int
+    @arrayop (*) (i,) A[i, k] * b[k]
+end
+
+#################### MAP-REDUCE ################
+#
+
+Base.map(f, x::SymArray) = _map(f, x)
+Base.map(f, x::SymArray, xs...) = _map(f, x, xs...)
+Base.map(f, x, y::SymArray, z...) = _map(f, x, y, z...)
+Base.map(f, x, y, z::SymArray, w...) = _map(f, x, y, z, w...)
+
+function _map(f, x, xs...)
+    N = ndims(x)
+    idx = makesubscripts(N)
+
+    expr = f(map(a->a[idx...], [x, xs...])...)
+
+    Atype = propagate_atype(map, f, x, xs...)
+    ArrayOp{Atype{symtype(expr), N}}(
+        (idx...,),
+        f(expr),
+        +,
+        Term{Any}(map, [f, x, xs...]))
+end
+
+@inline _mapreduce(f, x, dims, kw) = mapreduce(f, x; dims=dims, kw...)
+
+function Base.mapreduce(f, g, x::SymArray; dims=:, kw...)
+    if dims === (:)
+        return Term{Number}(_mapreduce, [f, g, x, dims, (kw...,)])
+    end
+
+    idx = makesubscripts(ndims(x))
+    out_idx = [i in dims ? 1 : idx[i] for i = 1:ndims(x)]
+    expr = f(x[idx...])
+
+    Atype = propagate_atype(_mapreduce, f, g, x, dims, (kw...,))
+    ArrayOp{Atype{symtype(expr), ndims(x)}}(
+        (out_idx...,),
+        expr,
+        g,
+        Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)]))
+end
+
+for (ff, opts) in [sum => (identity, +, false),
+                  prod => (identity, *, true),
+                  any => (identity, (|), false),
+                  all => (identity, (&), true)]
+
+    f, g, init = opts
+    @eval function (::$(typeof(ff)))(x::SymArray;
+                                     dims=:, init=$init)
+        mapreduce($f, $g, x, dims=dims, init=init)
     end
 end
