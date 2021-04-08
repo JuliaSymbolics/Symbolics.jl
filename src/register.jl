@@ -1,12 +1,14 @@
 """
-    @register(expr, define_promotion, Ts = [Num, Symbolic, Real])
+    @register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
 
-Overload approperate methods such that ModelingToolkit can stop tracing into the
-registered function.
+Overload appropriate methods such that ModelingToolkit can stop tracing into the
+registered function. If `define_promotion` is true, then a promotion method is
+defined for the register function.
 
 # Examples
 ```julia
 @register foo(x, y)
+@register foo(x, y::Bool) false # do not overload a duplicate promotion rule
 @register goo(x, y::Int) # `y` is not overloaded to take symbolic objects
 @register hoo(x, y)::Int # `hoo` returns `Int`
 ```
