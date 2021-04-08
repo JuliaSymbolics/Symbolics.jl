@@ -24,7 +24,15 @@ propagate_eltype(::typeof(getindex), x, idx...) = geteltype(x)
 #### Broadcast ####
 #
 
-makesubscripts(n) = [Sym{Int}(Symbol("i_$i")) for i in 1:n]
+function makesubscripts(n)
+    set = 'i':'z'
+    m = length(set)
+    map(1:n) do i
+        repeats = ceil(Int, i / m)
+        c = set[(i-1) % m + 1]
+        Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
+    end
+end
 
 using Base.Broadcast
 

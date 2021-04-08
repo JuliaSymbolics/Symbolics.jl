@@ -42,6 +42,11 @@ struct ArrayOp{T<:AbstractArray}
     term::Ref{Any} # may or may not exist
 end
 
+function Base.show(io::IO, aop::ArrayOp)
+    print(io, "@arrayop")
+    print(io, "(_[$(join(string.(aop.output_idx), ","))] := $(aop.expr))")
+end
+
 symtype(a::ArrayOp{T}) where {T} = T
 istree(a::ArrayOp) = true
 operation(a::ArrayOp) = typeof(a)
@@ -103,9 +108,13 @@ function shape(aop::ArrayOp)
     end
 
     map(output_idx) do i
-        mi = matches[i]
-        @assert !isempty(mi)
-        get(first(mi))
+        if i isa Sym
+            mi = matches[i]
+            @assert !isempty(mi)
+            get(first(mi))
+        elseif i isa Integer
+            return Base.OneTo(1)
+        end
     end
 end
 
