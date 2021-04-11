@@ -182,3 +182,27 @@ makesym(t::Num; kwargs...) = makesym(value(t); kwargs...)
 var_from_nested_derivative(x, i=0) = (missing, missing)
 var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1],i+1) : (x,i)
 var_from_nested_derivative(x::Sym,i=0) = (x,i)
+
+### OOPS
+
+struct Unknown end
+
+macro oops(ex)
+    quote
+        tmp = $(esc(ex))
+        if tmp === Unknown()
+            return Unknown()
+        else
+            tmp
+        end
+    end
+end
+
+maybe(f, x) = f(@oops x)
+
+function maybefoldl(f, g, xs, acc)
+    for x in xs
+        acc = g(acc, @oops f(x))
+    end
+    return acc
+end
