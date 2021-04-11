@@ -1,3 +1,4 @@
+import Base: getindex
 ##### getindex #####
 function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)

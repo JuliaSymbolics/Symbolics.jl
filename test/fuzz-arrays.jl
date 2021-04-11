@@ -8,14 +8,15 @@ using LinearAlgebra
 
 AA = rand(2,3); BB = rand(3,2); xx = rand(2); yy = rand(3)
 
-leaf_nodes = [A, B, C, x, y, z, AA, BB, xx, yy]
+adjmul_leaf_nodes = [A, B, C, x, y, z, AA, BB, xx, yy]
 
-function rand_leaf()
-    a = rand(leaf_nodes)
+function adjmul_rand_leaf()
+    a = rand(adjmul_leaf_nodes)
     rand(Bool) ?  a' : a
 end
 
-function rand_mul_expr(a=rand_leaf(), b=rand_leaf())
+function rand_mul_expr(a=adjmul_rand_leaf(),
+                       b=adjmul_rand_leaf())
 
     try
         a * b
@@ -71,9 +72,32 @@ end
     end
 end
 
-## Getindex fuzz
+## Mapreduce
 #
 
-function rand_getindex_expr(x=rand_leaf())
+AA = rand(2,3); BB = rand(3,2); xx = rand(2); yy = rand(3)
+CC = rand(2,3,4)
+
+mapreduce_leaf_nodes = [A, B, C, x, y, z, AA, BB, CC, xx, yy]
+
+function mapreduce_rand_leaf()
+    a = rand(adjmul_leaf_nodes)
+    rand(Bool) ?  a' : a
+end
+
+function rand_map_reduce(x=mapreduce_rand_leaf())
     n = ndims(x)
+
+    reducedims = rand(1:n+1, rand(0:n))
+
+    init=rand([nothing, 3])
+    function test_run(x)
+        if init==nothing
+            sum(rand(size(x)...), dims=reducedims)
+        else
+            sum(rand(size(x)...), dims=reducedims, init=init)
+        end
+    end
+
+    @test size(test_run(rand(size(x)...))) == size(test_run(x))
 end
