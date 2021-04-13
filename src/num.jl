@@ -111,6 +111,13 @@ function Base.iszero(x::Num)
     return (_x isa Number || _x isa SymbolicUtils.MPoly) && iszero(_x)
 end
 
+function Base.isone(x::Num)
+    x = value(x)
+    x isa Number && isone(x) && return true
+    _x = SymbolicUtils.to_mpoly(x)[1]
+    return (_x isa Number || _x isa SymbolicUtils.MPoly) && isone(_x)
+end
+
 import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
 
 Base.show(io::IO, n::Num) = show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
