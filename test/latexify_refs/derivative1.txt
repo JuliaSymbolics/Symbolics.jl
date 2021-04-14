@@ -1,0 +1,1 @@
+$\mathrm{\_derivative}\left( y, x \right)$
