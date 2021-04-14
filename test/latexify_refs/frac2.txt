@@ -1,1 +1,3 @@
-$\frac{\left( z - z^{2} \right) \cdot \left( 3 \cdot x - 7 \cdot z^{23} \cdot y \right)}{x}$
+\begin{equation}
+\frac{\left( z - z^{2} \right) \left( 3 x - 7 z^{23} y \right)}{x}
+\end{equation}

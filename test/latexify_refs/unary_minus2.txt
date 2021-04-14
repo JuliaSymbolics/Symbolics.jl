@@ -1,1 +1,3 @@
-$ - y \cdot z$
+\begin{equation}
+ - y z
+\end{equation}

@@ -12,7 +12,7 @@ function latexify_derivatives(ex)
             if x.args[2] isa Expr && length(x.args[2].args) == 2
                 return :($(Symbol(:d, x.args[2]))/$(Symbol(:d, x.args[2].args[2])))
             else
-                return Expr(:call, Expr(:call, :/, :d, Expr(:call, :*, x.args[3])), x.args[2])
+                return Expr(:call, Expr(:call, :/, :d, Expr(:call, :*, :d, x.args[3])), x.args[2])
             end
         else
             return x
@@ -20,31 +20,29 @@ function latexify_derivatives(ex)
     end
 end
 
-@latexrecipe function f(eqs::Vector{Equation})
-    # Set default option values.
-    env --> :align
+@latexrecipe function f(n::Num)
+    env --> :equation
     cdot --> false
 
-    # Convert both the left- and right-hand sides to expressions of basic types
-    # that latexify can deal with
+    return latexify_derivatives(cleanup_exprs(_toexpr(n)))
+end
 
-    rhs = getfield.(eqs, :rhs)
-    rhs = latexify_derivatives.(cleanup_exprs.(prettify_expr.(_toexpr(rhs))))
+@latexrecipe function f(eqs::Vector{Equation})
+    env --> :align
 
-    lhs = getfield.(eqs, :lhs)
-    lhs = latexify_derivatives.(cleanup_exprs.(prettify_expr.(_toexpr(lhs))))
+    return Num.(getfield.(eqs, :lhs)), Num.(getfield.(eqs, :rhs))
+end
 
-    return lhs, rhs
+@latexrecipe function f(eq::Equation)
+    env --> :equation
+
+    return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
 end
 
 Base.show(io::IO, ::MIME"text/latex", x::Num) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num}) = print(io, latexify(x))
-
-@latexrecipe function f(n::Num)
-    return _toexpr(n)
-end
 
 # `_toexpr` is only used for latexify
 function _toexpr(O)

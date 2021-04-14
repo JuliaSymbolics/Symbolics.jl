@@ -1,3 +1,3 @@
 \begin{equation}
-x y
+x = y + z
 \end{equation}
