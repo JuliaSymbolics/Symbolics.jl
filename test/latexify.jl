@@ -33,8 +33,7 @@ Dx = Differential(x)
     y ~   x - 3z
     z ~ -5x + 4y
 ])
-# Dx(y) is broken
-# @test_reference "latexify_refs/equation_vec2.txt" latexify([
-#     Dx(u) ~   z
-#     Dx(y) ~   y*x
-# ])
+@test_reference "latexify_refs/equation_vec2.txt" latexify([
+    Dx(u) ~   z
+    Dx(y) ~   y*x
+])

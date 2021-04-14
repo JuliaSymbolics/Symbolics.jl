@@ -2,6 +2,24 @@ prettify_expr(expr) = expr
 prettify_expr(f::Function) = nameof(f)
 prettify_expr(expr::Expr) = Expr(expr.head, prettify_expr.(expr.args)...)
 
+function cleanup_exprs(ex)
+    return postwalk(x -> x isa Expr && length(x.args) == 1 ? x.args[1] : x, ex)
+end
+
+function latexify_derivatives(ex)
+    return postwalk(ex) do x
+        if x isa Expr && x.args[1] == :_derivative
+            if x.args[2] isa Expr && length(x.args[2].args) == 2
+                return :($(Symbol(:d, x.args[2]))/$(Symbol(:d, x.args[2].args[2])))
+            else
+                return Expr(:call, Expr(:call, :/, :d, Expr(:call, :*, x.args[3])), x.args[2])
+            end
+        else
+            return x
+        end
+    end
+end
+
 @latexrecipe function f(eqs::Vector{Equation})
     # Set default option values.
     env --> :align
@@ -11,16 +29,10 @@ prettify_expr(expr::Expr) = Expr(expr.head, prettify_expr.(expr.args)...)
     # that latexify can deal with
 
     rhs = getfield.(eqs, :rhs)
-    rhs = prettify_expr.(_toexpr(rhs))
-    rhs = [postwalk(x -> x isa Expr && length(x.args) == 1 ? x.args[1] : x, eq) for eq in rhs]
-    rhs = [postwalk(x -> x isa Expr && x.args[1] == :_derivative && length(x.args[2].args) == 2 ? :($(Symbol(:d, x.args[2]))/($(Symbol(:d, x.args[2].args[2])))) : x, eq) for eq in rhs]
-    rhs = [postwalk(x -> x isa Expr && x.args[1] == :_derivative ? "\\frac{d\\left($(Latexify.latexraw(x.args[2]))\\right)}{d$(Latexify.latexraw(x.args[3]))}" : x, eq) for eq in rhs]
+    rhs = latexify_derivatives.(cleanup_exprs.(prettify_expr.(_toexpr(rhs))))
 
     lhs = getfield.(eqs, :lhs)
-    lhs = prettify_expr.(_toexpr(lhs))
-    lhs = [postwalk(x -> x isa Expr && length(x.args) == 1 ? x.args[1] : x, eq) for eq in lhs]
-    lhs = [postwalk(x -> x isa Expr && x.args[1] == :_derivative && length(x.args[2].args) == 2 ? :($(Symbol(:d, x.args[2]))/($(Symbol(:d, x.args[2].args[2])))) : x, eq) for eq in lhs]
-    lhs = [postwalk(x -> x isa Expr && x.args[1] == :_derivative ? "\\frac{d\\left($(Latexify.latexraw(x.args[2]))\\right)}{d$(Latexify.latexraw(x.args[3]))}" : x, eq) for eq in lhs]
+    lhs = latexify_derivatives.(cleanup_exprs.(prettify_expr.(_toexpr(lhs))))
 
     return lhs, rhs
 end
