@@ -3,7 +3,7 @@
 @register Base.binomial(n,k)
 
 Base.sign(x::Symbolic) = Term{Int}(sign, [x])
-Base.sign(x::Num) = Num(sign(x.val))
+Base.sign(x::Num) = Num(sign(value(x)))
 derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
 @register Base.signbit(x)::Bool
 derivative(::typeof(signbit), args::NTuple{1,Any}, ::Val{1}) = 0
