@@ -1,0 +1,1 @@
+$\mathrm{\_derivative}\left( u\left( x \right), x \right)$
