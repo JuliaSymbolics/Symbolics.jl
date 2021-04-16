@@ -1,18 +1,18 @@
+@symbolic_wrap Num <: Real
+
 """
     Num(val)
 
 Wrap anything in a type that is a subtype of Real
 """
-struct Num <: Real
-    val
-end
+Num
 
 const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value,args)...))
 value(x) = x
-value(x::Num) = x.val
+value(x::Num) = SymbolicUtils.unwrap(x)
 
 SciMLBase.issymbollike(::Num) = true
 SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
@@ -102,7 +102,7 @@ function substituter(pairs)
     (expr; kw...) -> SymbolicUtils.substitute(expr, dict; kw...)
 end
 
-SymbolicUtils.symtype(n::Num) = symtype(n.val)
+SymbolicUtils.symtype(n::Num) = symtype(value(n))
 
 function Base.iszero(x::Num)
     x = value(x)

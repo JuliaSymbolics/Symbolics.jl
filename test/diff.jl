@@ -1,6 +1,7 @@
 using Symbolics
 using Test
 using IfElse
+using Symbolics: value
 
 # Derivatives
 @variables t σ ρ β
@@ -103,7 +104,7 @@ t1 = Symbolics.gradient(tmp, [x1, x2])
 @variables t k
 @variables x(t)
 D = Differential(k)
-@test Symbolics.tosymbol(D(x).val) === Symbol("xˍk(t)")
+@test Symbolics.tosymbol(value(D(x))) === Symbol("xˍk(t)")
 
 using Symbolics
 @variables t x(t)
