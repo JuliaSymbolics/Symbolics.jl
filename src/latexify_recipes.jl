@@ -60,7 +60,16 @@ function _toexpr(m::Mul{<:Number})
     numer = Any[]
     denom = Any[]
 
-    for (base, pow) in m.dict
+    # We need to iterate over each term in m, ignoring the numeric coefficient.
+    # This iteration needs to be stable, so we can't iterate over m.dict.
+    for term in Iterators.drop(arguments(m), isone(m.coeff) ? 0 : 1)
+        if !(term isa Pow)
+            push!(numer, _toexpr(term))
+            continue
+        end
+
+        base = term.base
+        pow  = term.exp
         if pow > 0
             if isone(pow)
                 pushfirst!(numer, _toexpr(base))
