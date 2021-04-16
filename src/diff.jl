@@ -473,7 +473,7 @@ end
 """
 $(SIGNATURES)
 
-Check if an expression is affine with respect to a list of variable expressions.
+Check if an expression is linear with respect to a list of variable expressions.
 """
 function islinear(ex, u)
     isaffine(ex, u) && isequal(simplify(substitute(ex, Dict(u .=> 0))),0)
