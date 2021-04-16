@@ -1,0 +1,1 @@
+$\frac{\left( z - z^{2} \right) \cdot \left( 3 \cdot x - 7 \cdot y \cdot z^{23} \right)}{x}$

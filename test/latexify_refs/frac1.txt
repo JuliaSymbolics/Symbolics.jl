@@ -1,0 +1,1 @@
+$\frac{\left( z + \frac{x}{y} \right)}{\sin\left( z \right)}$
