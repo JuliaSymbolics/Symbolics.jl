@@ -430,6 +430,7 @@ let
           @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
           @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
           @rule (~f)(~x::(!isidx)) => _scalar
+
           @rule (~f)(~x::isidx) => if haslinearity_1(~f)
               combine_terms_1(linearity_1(~f), ~x)
           else
@@ -444,7 +445,8 @@ let
               else
                   error("Function of unknown linearity used: ", ~f)
               end
-          end]
+          end
+          @rule ~x::(x->x isa Sym) => 0]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=simterm))
 
     global hessian_sparsity
@@ -476,7 +478,7 @@ $(SIGNATURES)
 Check if an expression is linear with respect to a list of variable expressions.
 """
 function islinear(ex, u)
-    isaffine(ex, u) && isequal(simplify(substitute(ex, Dict(u .=> 0))),0)
+    isaffine(ex, u) && iszero(substitute(ex, Dict(u .=> 0)))
 end
 
 """
