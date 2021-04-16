@@ -14,5 +14,5 @@ using Symbolics, Test
 @test Symbolics.isaffine(x + z * y,[x,y])
 @test Symbolics.islinear(x + z * y,[x,y])
 @test Symbolics.islinear(z * x + z * y,[x,y])
-@test_broken Symbolics.islinear(z * (x + y),[x,y])
+@test Symbolics.islinear(z * (x + y),[x,y])
 @test Symbolics.isaffine(z * (x + y),[x,y])
