@@ -464,10 +464,19 @@ end
 """
 $(SIGNATURES)
 
-Check if an expression is linear with respect to a list of variable expressions.
+Check if an expression is affine with respect to a list of variable expressions.
+"""
+function isaffine(ex, u)
+    isempty(hessian_sparsity(ex, u).nzval)
+end
+
+"""
+$(SIGNATURES)
+
+Check if an expression is affine with respect to a list of variable expressions.
 """
 function islinear(ex, u)
-    isempty(hessian_sparsity(ex, u).nzval)
+    isaffine(ex, u) && isequal(substitute(ex, Dict(u .=> 0)),0)
 end
 
 """

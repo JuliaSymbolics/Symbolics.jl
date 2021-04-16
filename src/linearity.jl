@@ -167,6 +167,8 @@ function _sparse(t::TermCombination, n)
     s1 .| s1'
 end
 
+_sparse(::Sym, ::Int) = sparse([])
+
 # 1-arg functions
 combine_terms_1(lin, term) = lin ? term : term * term
 
