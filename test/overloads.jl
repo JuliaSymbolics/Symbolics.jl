@@ -160,6 +160,10 @@ using IfElse: ifelse
 @test isequal(Symbolics.derivative(signbit(x), x), 0)
 
 @test iszero(Num(0.0))
+@test isone(Num(1.0))
+@test isone(complex(Num(1), Num(0)))
+@test iszero(complex(Num(0), Num(0)))
+
 x = Num.(randn(10))
 @test norm(x) == norm(Symbolics.value.(x))
 @test norm(x, Inf) == norm(Symbolics.value.(x), Inf)
