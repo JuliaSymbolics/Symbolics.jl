@@ -182,3 +182,6 @@ x = Num.(randn(10))
 
 @variables x y
 @test isequal(expand((x+y)^2), x^2 + y^2 + 2x*y)
+
+@variables t p x(t) y(t) z(t)
+@test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)
