@@ -102,7 +102,6 @@ function _parse_vars(macroname, type, x, transform=identity)
     x = flatten_expr!(x)
     cursor = 0
     isoption(ex) = Meta.isexpr(ex, [:vect, :vcat, :hcat])
-    runtime_vals = Dict()
     while cursor < length(x)
         cursor += 1
         v = x[cursor]
@@ -136,9 +135,9 @@ function _parse_vars(macroname, type, x, transform=identity)
         if iscall
             isruntime, fname = unwrap_runtime_var(v.args[1])
             call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
-            var_name, expr = construct_vars!(runtime_vals, fname, type, call_args, val, options, transform, isruntime)
+            var_name, expr = construct_vars(fname, type, call_args, val, options, transform, isruntime)
         else
-            var_name, expr = construct_vars!(runtime_vals, v, type, nothing, val, options, transform, isruntime)
+            var_name, expr = construct_vars(v, type, nothing, val, options, transform, isruntime)
         end
 
         push!(var_names, var_name)
@@ -149,7 +148,7 @@ function _parse_vars(macroname, type, x, transform=identity)
     return ex
 end
 
-function construct_vars!(runtime_vals, v, type, call_args, val, prop, transform, isruntime)
+function construct_vars(v, type, call_args, val, prop, transform, isruntime)
     issym  = v isa Symbol
     isarray = isa(v, Expr) && v.head == :ref
     if isarray
@@ -163,7 +162,6 @@ function construct_vars!(runtime_vals, v, type, call_args, val, prop, transform,
     end
     rhs = transform(expr)
     lhs = isruntime ? gensym(var_name) : var_name
-    runtime_vals[var_name] = lhs
     lhs, :($lhs = $rhs)
 end
 
