@@ -3,7 +3,8 @@ using LinearAlgebra
 using SparseArrays: sparse
 using Test
 
-@variables a,b,c,d,e,f,g,h,i
+vars = @variables a,b,c,d,e,f,g,h,i
+@test isequal(vars, [a,b,c,d,e,f,g,h,i])
 @test isequal(transpose(a), a)
 @test isequal(a', a)
 @test isequal(sincos(a), (sin(a), cos(a)))

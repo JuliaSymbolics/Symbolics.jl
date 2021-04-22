@@ -134,8 +134,8 @@ function _parse_vars(macroname, type, x, transform=identity)
         push!(var_names, var_name)
         push!(ex.args, expr)
     end
-    rhs = build_expr(:tuple, var_names)
-    push!(ex.args, :(($(var_names...),) = $rhs))
+    rhs = build_expr(:vect, var_names)
+    push!(ex.args, rhs)
     return ex
 end
 
@@ -224,7 +224,7 @@ Define one or more unknown variables.
 @variables t α σ(..) β[1:2]
 @variables w(..) x(t) y z(t, α, x)
 
-expr = β₁* x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
+expr = β[1]* x + y^α + σ(3) * (z - t) - β[2] * w(t - 1)
 ```
 
 `(..)` signifies that the value should be left uncalled.
@@ -233,31 +233,21 @@ Sometimes it is convenient to define arrays of variables to model things like `x
 The `@variables` macro supports this with the following syntax:
 
 ```julia
-@variables x[1:3];
-x
+julia> @variables x[1:3]
+1-element Vector{Vector{Num}}:
+ [x₁, x₂, x₃]
 
-3-element Vector{Num}:
- x₁
- x₂
- x₃
+julia> @variables y[2:3, 1:5:6] # support for arbitrary ranges and tensors
+1-element Vector{Matrix{Num}}:
+ [y₂ˏ₁ y₂ˏ₆; y₃ˏ₁ y₃ˏ₆]
 
-# support for arbitrary ranges and tensors
-@variables y[2:3,1:5:6];
-y
-
-2×2 Matrix{Num}:
- y₂ˏ₁  y₂ˏ₆
- y₃ˏ₁  y₃ˏ₆
-
-# also works for dependent variables
-@variables t z[1:3](t);
-z
-
-3-element Array{Num,1}:
- z₁(t)
- z₂(t)
- z₃(t)
+julia> @variables t z[1:3](t) # also works for dependent variables
+2-element Vector{Any}:
+ t
+  Num[z₁(t), z₂(t), z₃(t)]
 ```
+
+Note that `@variables` returns a vector of all the defined variables.
 """
 macro variables(xs...)
     esc(_parse_vars(:variables, Real, xs))
