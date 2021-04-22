@@ -262,6 +262,26 @@ julia> @variables t z[1:3](t) # also works for dependent variables
 ```
 
 Note that `@variables` returns a vector of all the defined variables.
+
+`@variables` can also take runtime symbol values by the `\$` interpolation
+operator, and in this case, `@variables` doesn't automatically assign the value,
+instead, it only returns a vector of symbolic variables. All the rest of the
+syntax also applies here.
+
+```julia
+julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
+:runtime_symbol_value
+
+julia> vars = @variables t \$a \$b(t) \$c[1:3](t)
+3-element Vector{Num}:
+      t
+ runtime_symbol_value
+   value_b(t)
+       Num[value_c₁(t), value_c₂(t), value_c₃(t)]
+
+julia> (t, a, b, c)
+(t, :runtime_symbol_value, :value_b, :value_c)
+```
 """
 macro variables(xs...)
     esc(_parse_vars(:variables, Real, xs))
