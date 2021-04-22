@@ -82,6 +82,12 @@ function rename(x::Symbolic, name)
     end
 end
 
+function unwrap_runtime_var(v)
+    isruntime = Meta.isexpr(v, :$) && length(v.args) == 1
+    isruntime && (v = v.args[1])
+    return isruntime, v
+end
+
 # Build variables more easily
 function _parse_vars(macroname, type, x, transform=identity)
     ex = Expr(:block)
@@ -96,6 +102,7 @@ function _parse_vars(macroname, type, x, transform=identity)
     x = flatten_expr!(x)
     cursor = 0
     isoption(ex) = Meta.isexpr(ex, [:vect, :vcat, :hcat])
+    runtime_vals = Dict()
     while cursor < length(x)
         cursor += 1
         v = x[cursor]
@@ -120,15 +127,18 @@ function _parse_vars(macroname, type, x, transform=identity)
             cursor += 1
         end
 
+        isruntime, v = unwrap_runtime_var(v)
         iscall = Meta.isexpr(v, :call)
         isarray = Meta.isexpr(v, :ref)
         issym  = v isa Symbol
         @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
 
         if iscall
-            var_name, expr = construct_vars(v.args[1], type, v.args[2:end], val, options, transform)
+            isruntime, fname = unwrap_runtime_var(v.args[1])
+            call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
+            var_name, expr = construct_vars!(runtime_vals, fname, type, call_args, val, options, transform, isruntime)
         else
-            var_name, expr = construct_vars(v, type, nothing, val, options, transform)
+            var_name, expr = construct_vars!(runtime_vals, v, type, nothing, val, options, transform, isruntime)
         end
 
         push!(var_names, var_name)
@@ -139,18 +149,22 @@ function _parse_vars(macroname, type, x, transform=identity)
     return ex
 end
 
-function construct_vars(v, type, call_args, val, prop, transform)
+function construct_vars!(runtime_vals, v, type, call_args, val, prop, transform, isruntime)
     issym  = v isa Symbol
     isarray = isa(v, Expr) && v.head == :ref
     if isarray
         var_name = v.args[1]
+        isruntime, var_name = unwrap_runtime_var(var_name)
         indices = v.args[2:end]
-        expr = _construct_array_vars(var_name, type, call_args, val, prop, indices...)
+        expr = _construct_array_vars(isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, indices...)
     else
         var_name = v
-        expr = construct_var(var_name, type, call_args, val, prop)
+        expr = construct_var(isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop)
     end
-    var_name, :($var_name = $transform($expr))
+    rhs = transform(expr)
+    lhs = isruntime ? gensym(var_name) : var_name
+    runtime_vals[var_name] = lhs
+    lhs, :($lhs = $rhs)
 end
 
 function option_to_metadata_type(::Val{opt}) where {opt}
@@ -179,11 +193,11 @@ end
 
 function construct_var(var_name, type, call_args, val, prop)
     expr = if call_args === nothing
-        :($Num($Sym{$type}($(Meta.quot(var_name)))))
+        :($Num($Sym{$type}($var_name)))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($Num($Sym{$FnType{Tuple, $type}}($(Meta.quot(var_name))))) # XXX: using Num as output
+        :($Num($Sym{$FnType{Tuple, $type}}($var_name))) # XXX: using Num as output
     else
-        :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)))($(map(x->:($value($x)), call_args)...))))
+        :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...))))
     end
 
     if val !== nothing
@@ -196,11 +210,11 @@ end
 function construct_var(var_name, type, call_args, val, prop, ind)
     # TODO: just use Sym here
     expr = if call_args === nothing
-        :($Num($Sym{$type}($(Meta.quot(var_name)), $ind...)))
+        :($Num($Sym{$type}($var_name, $ind...)))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($Num($Sym{$FnType{Tuple{Any}, $type}}($(Meta.quot(var_name)), $ind...))) # XXX: using Num as output
+        :($Num($Sym{$FnType{Tuple{Any}, $type}}($var_name, $ind...))) # XXX: using Num as output
     else
-        :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)), $ind...)($(map(x->:($value($x)), call_args)...))))
+        :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name, $ind...)($(map(x->:($value($x)), call_args)...))))
     end
     if val !== nothing
         expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
