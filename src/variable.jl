@@ -176,14 +176,19 @@ function setprops_expr(expr, props)
     expr
 end
 
+function _wrap(x)
+    T = SymbolicUtils.symtype(x)
+    SymbolicUtils.has_symwrapper(T) ?
+        SymbolicUtils.wrapper_type(T)(x) : x
+end
 
 function construct_var(var_name, type, call_args, val, prop)
     expr = if call_args === nothing
-        :($Num($Sym{$type}($(Meta.quot(var_name)))))
+        :($_wrap($Sym{$type}($(Meta.quot(var_name)))))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($Num($Sym{$FnType{Tuple, $type}}($(Meta.quot(var_name))))) # XXX: using Num as output
+        :($_wrap($Sym{$FnType{Tuple, $type}}($(Meta.quot(var_name))))) # XXX: using _wrap as output
     else
-        :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)))($(map(x->:($value($x)), call_args)...))))
+        :($_wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)))($(map(x->:($value($x)), call_args)...))))
     end
 
     if val !== nothing
@@ -196,11 +201,11 @@ end
 function construct_var(var_name, type, call_args, val, prop, ind)
     # TODO: just use Sym here
     expr = if call_args === nothing
-        :($Num($Sym{$type}($(Meta.quot(var_name)), $ind...)))
+        :($_wrap($Sym{$type}($(Meta.quot(var_name)), $ind...)))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($Num($Sym{$FnType{Tuple{Any}, $type}}($(Meta.quot(var_name)), $ind...))) # XXX: using Num as output
+        :($_wrap($Sym{$FnType{Tuple{Any}, $type}}($(Meta.quot(var_name)), $ind...))) # XXX: using _wrap as output
     else
-        :($Num($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)), $ind...)($(map(x->:($value($x)), call_args)...))))
+        :($_wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)), $ind...)($(map(x->:($value($x)), call_args)...))))
     end
     if val !== nothing
         expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))

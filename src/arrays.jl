@@ -354,3 +354,20 @@ function eachindex(A::SymArray)
     s === Unknown() && error("eachindex of $A not known")
     return CartesianIndices(s)
 end
+
+### Wrap
+#
+
+import SymbolicUtils: unwrap
+@symbolic_wrap Arr{T,N} <: AbstractArray{T, N}
+function Arr(x)
+    T = symtype(x)
+    @assert T <: AbstractArray
+    Arr{eltype(T), ndims(T)}(x)
+end
+
+for f in [eachindex, size, axes, adjoint]
+    @inline (::$(typeof(f)))(x::Arr) = Arr($f(unwrap(x)))
+end
+
+@inline Base.getindex(x::Arr, idx...) = unwrap(x)[idx...]
