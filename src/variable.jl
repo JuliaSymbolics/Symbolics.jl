@@ -160,8 +160,8 @@ function construct_vars(v, type, call_args, val, prop, transform, isruntime)
         var_name = v
         expr = construct_var(isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop)
     end
-    rhs = transform(expr)
     lhs = isruntime ? gensym(var_name) : var_name
+    rhs = :($transform($expr))
     lhs, :($lhs = $rhs)
 end
 
