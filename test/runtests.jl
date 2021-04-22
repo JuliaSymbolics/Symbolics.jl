@@ -9,6 +9,7 @@ function activate_downstream_env()
 end
 
 if GROUP == "All" || GROUP == "Core"
+    @safetestset "Macro Test" begin include("macro.jl") end
     @safetestset "Differentiation Test" begin include("diff.jl") end
     @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
     @safetestset "Overloading Test" begin include("overloads.jl") end
