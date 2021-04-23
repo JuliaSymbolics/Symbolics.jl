@@ -1,15 +1,15 @@
 """
     @register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
 
-Overload approperate methods such that Symbolics can stop tracing into the
+Overload appropriate methods so that Symbolics can stop tracing into the
 registered function. If `define_promotion` is true, then a promotion method in
 the form of
 ```julia
 SymbolicUtils.promote_symtype(::typeof(f_registered), args...) = Real # or the annotated return type
 ```
-isdefined for the register function. Note that when defining multiple register
+is defined for the register function. Note that when defining multiple register
 overloads for one function, all the rest of the registers must set
-`define_promotion` to `false` except for the first one to avoid method
+`define_promotion` to `false` except for the first one, to avoid method
 overwritting.
 
 # Examples
