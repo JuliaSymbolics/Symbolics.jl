@@ -32,6 +32,8 @@ include("equations.jl")
 
 include("utils.jl")
 
+include("arrays.jl")
+
 using MacroTools
 import MacroTools: splitdef, combinedef, postwalk, striplines
 export @register
@@ -50,6 +52,8 @@ using SparseArrays
 export Differential, expand_derivatives
 
 include("diff.jl")
+
+include("array-lib.jl")
 
 include("linear_algebra.jl")
 

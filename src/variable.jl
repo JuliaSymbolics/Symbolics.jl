@@ -227,9 +227,28 @@ function construct_var(var_name, type, call_args, val, prop, ind)
 end
 
 function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
-    :(map(Iterators.product($(indices...))) do ind
-        $(construct_var(var_name, type, call_args, val, prop, :ind))
-    end)
+    # TODO: just use Sym here
+    ndim = length(indices)
+
+    expr = if call_args === nothing
+        ex = :($Sym{Array{$type, $ndim}}($var_name))
+        :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+    elseif !isempty(call_args) && call_args[end] == :..
+        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name)) # XXX: using Num as output
+        :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+    else
+        # [(R -> R)(R) ....]
+        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        :($map(x->x($(map(y->:($value($y)), call_args)...)), $ex)) # XXX: using Num as output
+    end
+    if val !== nothing
+        expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
+    end
+
+    expr = :($_wrap($expr))
+
+    return setprops_expr(expr, prop)
 end
 
 

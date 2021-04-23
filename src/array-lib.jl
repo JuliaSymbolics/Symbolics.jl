@@ -142,7 +142,7 @@ function _map(f, x, xs...)
     Atype = propagate_atype(map, f, x, xs...)
     ArrayOp(Atype{symtype(expr), N},
             (idx...,),
-            f(expr),
+            expr,
             +,
             Term{Any}(map, [f, x, xs...]))
 end

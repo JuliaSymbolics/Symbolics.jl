@@ -187,9 +187,10 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}())
             for (axis, sym) in enumerate(@views args[2:end])
                 !(sym isa Sym) && continue
                 axesvec = Base.get!(() -> [], dict, sym)
-                push!(axesvec, AxisOf(car(args), axis))
+                push!(axesvec, AxisOf(first(args), axis))
             end
         else
+            idx_to_axes(operation(expr), dict)
             foreach(ex->idx_to_axes(ex, dict), arguments(expr))
         end
     end
@@ -367,7 +368,7 @@ function Arr(x)
 end
 
 for f in [eachindex, size, axes, adjoint]
-    @inline (::$(typeof(f)))(x::Arr) = Arr($f(unwrap(x)))
+    @eval @inline (::$(typeof(f)))(x::Arr) = Arr($f(unwrap(x)))
 end
 
 @inline Base.getindex(x::Arr, idx...) = unwrap(x)[idx...]
