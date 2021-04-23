@@ -59,7 +59,7 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
     exprs = rhss(eqs) .- lhss(eqs)
     if check
         for ex in exprs
-            @assert islinear(ex, vars)
+            @assert isaffine(ex, vars)
         end
     end
     A = jacobian(exprs, vars)
@@ -68,7 +68,7 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
 end
 function A_b(eq, var, check)
     ex = eq.rhs - eq.lhs
-    check && @assert islinear(ex, [var])
+    check && @assert isaffine(ex, [var])
     a = expand_derivatives(Differential(var)(ex))
     b = a * var - ex
     a, b

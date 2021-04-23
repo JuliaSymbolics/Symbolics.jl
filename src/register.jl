@@ -1,12 +1,21 @@
 """
-    @register(expr, define_promotion, Ts = [Num, Symbolic, Real])
+    @register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
 
-Overload approperate methods such that ModelingToolkit can stop tracing into the
-registered function.
+Overload appropriate methods so that Symbolics can stop tracing into the
+registered function. If `define_promotion` is true, then a promotion method in
+the form of
+```julia
+SymbolicUtils.promote_symtype(::typeof(f_registered), args...) = Real # or the annotated return type
+```
+is defined for the register function. Note that when defining multiple register
+overloads for one function, all the rest of the registers must set
+`define_promotion` to `false` except for the first one, to avoid method
+overwritting.
 
 # Examples
 ```julia
 @register foo(x, y)
+@register foo(x, y::Bool) false # do not overload a duplicate promotion rule
 @register goo(x, y::Int) # `y` is not overloaded to take symbolic objects
 @register hoo(x, y)::Int # `hoo` returns `Int`
 ```
@@ -40,7 +49,7 @@ macro register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
     for ts in types
         push!(ex.args, quote
             function $f($(setinds(args, symbolic_args, ts)...))
-                wrap =  any(x->typeof(x) <: Num, tuple($(setinds(args, symbolic_args, ts)...),)) ? Num : identity
+                wrap =  any(x->typeof(x) <: $Num, tuple($(setinds(args, symbolic_args, ts)...),)) ? $Num : $identity
                 wrap($Term{$ret_type}($f, [$(map(name, args)...)]))
             end
         end)

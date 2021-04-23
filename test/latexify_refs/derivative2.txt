@@ -1,1 +1,3 @@
-$\mathrm{\_derivative}\left( u\left( x \right), x \right)$
+\begin{equation}
+\frac{du(x)}{dx}
+\end{equation}

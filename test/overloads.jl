@@ -1,9 +1,23 @@
 using Symbolics
+using Symbolics: Sym, FnType, Term, value
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
 
-@variables a,b,c,d,e,f,g,h,i
+a, b, c = :runtime_symbol_value, :value_b, :value_c
+vars = @variables t $a $b(t) $c[1:3](t)
+@test t isa Num
+@test a === :runtime_symbol_value
+@test b === :value_b
+@test c === :value_c
+@test isequal(vars[1], t)
+@test isequal(vars[2], Num(Sym{Real}(a)))
+@test isequal(vars[3], Num(Sym{FnType{Tuple{Any},Real}}(b)(value(t))))
+genc(n) = Num(Sym{FnType{Tuple{Any},Real}}(Symbol(c, n))(value(t)))
+@test isequal(vars[4], [genc('₁'), genc('₂'), genc('₃')])
+
+vars = @variables a,b,c,d,e,f,g,h,i
+@test isequal(vars, [a,b,c,d,e,f,g,h,i])
 @test isequal(transpose(a), a)
 @test isequal(a', a)
 @test isequal(sincos(a), (sin(a), cos(a)))
@@ -164,6 +178,10 @@ using IfElse: ifelse
 @test isequal(Symbolics.derivative(signbit(x), x), 0)
 
 @test iszero(Num(0.0))
+@test isone(Num(1.0))
+@test isone(complex(Num(1), Num(0)))
+@test iszero(complex(Num(0), Num(0)))
+
 x = Num.(randn(10))
 @test norm(x) == norm(Symbolics.value.(x))
 @test norm(x, Inf) == norm(Symbolics.value.(x), Inf)
@@ -178,3 +196,6 @@ x = Num.(randn(10))
 
 @variables x y
 @test isequal(expand((x+y)^2), x^2 + y^2 + 2x*y)
+
+@variables t p x(t) y(t) z(t)
+@test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)

@@ -82,6 +82,12 @@ function rename(x::Symbolic, name)
     end
 end
 
+function unwrap_runtime_var(v)
+    isruntime = Meta.isexpr(v, :$) && length(v.args) == 1
+    isruntime && (v = v.args[1])
+    return isruntime, v
+end
+
 # Build variables more easily
 function _parse_vars(macroname, type, x, transform=identity)
     ex = Expr(:block)
@@ -120,37 +126,43 @@ function _parse_vars(macroname, type, x, transform=identity)
             cursor += 1
         end
 
+        isruntime, v = unwrap_runtime_var(v)
         iscall = Meta.isexpr(v, :call)
         isarray = Meta.isexpr(v, :ref)
         issym  = v isa Symbol
         @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
 
         if iscall
-            var_name, expr = construct_vars(v.args[1], type, v.args[2:end], val, options, transform)
+            isruntime, fname = unwrap_runtime_var(v.args[1])
+            call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
+            var_name, expr = construct_vars(fname, type, call_args, val, options, transform, isruntime)
         else
-            var_name, expr = construct_vars(v, type, nothing, val, options, transform)
+            var_name, expr = construct_vars(v, type, nothing, val, options, transform, isruntime)
         end
 
         push!(var_names, var_name)
         push!(ex.args, expr)
     end
-    rhs = build_expr(:tuple, var_names)
-    push!(ex.args, :(($(var_names...),) = $rhs))
+    rhs = build_expr(:vect, var_names)
+    push!(ex.args, rhs)
     return ex
 end
 
-function construct_vars(v, type, call_args, val, prop, transform)
+function construct_vars(v, type, call_args, val, prop, transform, isruntime)
     issym  = v isa Symbol
     isarray = isa(v, Expr) && v.head == :ref
     if isarray
         var_name = v.args[1]
+        isruntime, var_name = unwrap_runtime_var(var_name)
         indices = v.args[2:end]
-        expr = _construct_array_vars(var_name, type, call_args, val, prop, indices...)
+        expr = _construct_array_vars(isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, indices...)
     else
         var_name = v
-        expr = construct_var(var_name, type, call_args, val, prop)
+        expr = construct_var(isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop)
     end
-    var_name, :($var_name = $transform($expr))
+    lhs = isruntime ? gensym(var_name) : var_name
+    rhs = :($transform($expr))
+    lhs, :($lhs = $rhs)
 end
 
 function option_to_metadata_type(::Val{opt}) where {opt}
@@ -184,11 +196,11 @@ end
 
 function construct_var(var_name, type, call_args, val, prop)
     expr = if call_args === nothing
-        :($_wrap($Sym{$type}($(Meta.quot(var_name)))))
+        :($_wrap($Sym{$type}($var_name)))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($_wrap($Sym{$FnType{Tuple, $type}}($(Meta.quot(var_name))))) # XXX: using _wrap as output
+        :($_wrap($Sym{$FnType{Tuple, $type}}($var_name))) # XXX: using Num as output
     else
-        :($_wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)))($(map(x->:($value($x)), call_args)...))))
+        :($_wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...))))
     end
 
     if val !== nothing
@@ -201,11 +213,11 @@ end
 function construct_var(var_name, type, call_args, val, prop, ind)
     # TODO: just use Sym here
     expr = if call_args === nothing
-        :($_wrap($Sym{$type}($(Meta.quot(var_name)), $ind...)))
+        :($_wrap($Sym{$type}($var_name, $ind...)))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($_wrap($Sym{$FnType{Tuple{Any}, $type}}($(Meta.quot(var_name)), $ind...))) # XXX: using _wrap as output
+        :($_wrap($Sym{$FnType{Tuple{Any}, $type}}($var_name, $ind...))) # XXX: using Num as output
     else
-        :($_wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($(Meta.quot(var_name)), $ind...)($(map(x->:($value($x)), call_args)...))))
+        :($_wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name, $ind...)($(map(x->:($value($x)), call_args)...))))
     end
     if val !== nothing
         expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
@@ -229,7 +241,7 @@ Define one or more unknown variables.
 @variables t α σ(..) β[1:2]
 @variables w(..) x(t) y z(t, α, x)
 
-expr = β₁* x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
+expr = β[1]* x + y^α + σ(3) * (z - t) - β[2] * w(t - 1)
 ```
 
 `(..)` signifies that the value should be left uncalled.
@@ -238,30 +250,40 @@ Sometimes it is convenient to define arrays of variables to model things like `x
 The `@variables` macro supports this with the following syntax:
 
 ```julia
-@variables x[1:3];
-x
+julia> @variables x[1:3]
+1-element Vector{Vector{Num}}:
+ [x₁, x₂, x₃]
 
+julia> @variables y[2:3, 1:5:6] # support for arbitrary ranges and tensors
+1-element Vector{Matrix{Num}}:
+ [y₂ˏ₁ y₂ˏ₆; y₃ˏ₁ y₃ˏ₆]
+
+julia> @variables t z[1:3](t) # also works for dependent variables
+2-element Vector{Any}:
+ t
+  Num[z₁(t), z₂(t), z₃(t)]
+```
+
+Note that `@variables` returns a vector of all the defined variables.
+
+`@variables` can also take runtime symbol values by the `\$` interpolation
+operator, and in this case, `@variables` doesn't automatically assign the value,
+instead, it only returns a vector of symbolic variables. All the rest of the
+syntax also applies here.
+
+```julia
+julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
+:runtime_symbol_value
+
+julia> vars = @variables t \$a \$b(t) \$c[1:3](t)
 3-element Vector{Num}:
- x₁
- x₂
- x₃
+      t
+ runtime_symbol_value
+   value_b(t)
+       Num[value_c₁(t), value_c₂(t), value_c₃(t)]
 
-# support for arbitrary ranges and tensors
-@variables y[2:3,1:5:6];
-y
-
-2×2 Matrix{Num}:
- y₂ˏ₁  y₂ˏ₆
- y₃ˏ₁  y₃ˏ₆
-
-# also works for dependent variables
-@variables t z[1:3](t);
-z
-
-3-element Array{Num,1}:
- z₁(t)
- z₂(t)
- z₃(t)
+julia> (t, a, b, c)
+(t, :runtime_symbol_value, :value_b, :value_c)
 ```
 """
 macro variables(xs...)

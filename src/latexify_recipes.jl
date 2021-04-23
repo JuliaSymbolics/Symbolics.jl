@@ -2,37 +2,47 @@ prettify_expr(expr) = expr
 prettify_expr(f::Function) = nameof(f)
 prettify_expr(expr::Expr) = Expr(expr.head, prettify_expr.(expr.args)...)
 
-@latexrecipe function f(eqs::Vector{Equation})
-    # Set default option values.
-    env --> :align
+function cleanup_exprs(ex)
+    return postwalk(x -> x isa Expr && length(x.args) == 1 ? x.args[1] : x, ex)
+end
+
+function latexify_derivatives(ex)
+    return postwalk(ex) do x
+        if x isa Expr && x.args[1] == :_derivative
+            if x.args[2] isa Expr && length(x.args[2].args) == 2
+                return :($(Symbol(:d, x.args[2]))/$(Symbol(:d, x.args[2].args[2])))
+            else
+                return Expr(:call, Expr(:call, :/, :d, Expr(:call, :*, :d, x.args[3])), x.args[2])
+            end
+        else
+            return x
+        end
+    end
+end
+
+@latexrecipe function f(n::Num)
+    env --> :equation
     cdot --> false
 
-    # Convert both the left- and right-hand sides to expressions of basic types
-    # that latexify can deal with
+    return latexify_derivatives(cleanup_exprs(_toexpr(n)))
+end
 
-    rhs = getfield.(eqs, :rhs)
-    rhs = prettify_expr.(_toexpr(rhs))
-    rhs = [postwalk(x -> x isa Expr && length(x.args) == 1 ? x.args[1] : x, eq) for eq in rhs]
-    rhs = [postwalk(x -> x isa Expr && x.args[1] == :_derivative && length(x.args[2].args) == 2 ? :($(Symbol(:d, x.args[2]))/($(Symbol(:d, x.args[2].args[2])))) : x, eq) for eq in rhs]
-    rhs = [postwalk(x -> x isa Expr && x.args[1] == :_derivative ? "\\frac{d\\left($(Latexify.latexraw(x.args[2]))\\right)}{d$(Latexify.latexraw(x.args[3]))}" : x, eq) for eq in rhs]
+@latexrecipe function f(eqs::Vector{Equation})
+    env --> :align
 
-    lhs = getfield.(eqs, :lhs)
-    lhs = prettify_expr.(_toexpr(lhs))
-    lhs = [postwalk(x -> x isa Expr && length(x.args) == 1 ? x.args[1] : x, eq) for eq in lhs]
-    lhs = [postwalk(x -> x isa Expr && x.args[1] == :_derivative && length(x.args[2].args) == 2 ? :($(Symbol(:d, x.args[2]))/($(Symbol(:d, x.args[2].args[2])))) : x, eq) for eq in lhs]
-    lhs = [postwalk(x -> x isa Expr && x.args[1] == :_derivative ? "\\frac{d\\left($(Latexify.latexraw(x.args[2]))\\right)}{d$(Latexify.latexraw(x.args[3]))}" : x, eq) for eq in lhs]
+    return Num.(getfield.(eqs, :lhs)), Num.(getfield.(eqs, :rhs))
+end
 
-    return lhs, rhs
+@latexrecipe function f(eq::Equation)
+    env --> :equation
+
+    return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
 end
 
 Base.show(io::IO, ::MIME"text/latex", x::Num) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num}) = print(io, latexify(x))
-
-@latexrecipe function f(n::Num)
-    return _toexpr(n)
-end
 
 # `_toexpr` is only used for latexify
 function _toexpr(O)
@@ -60,7 +70,16 @@ function _toexpr(m::Mul{<:Number})
     numer = Any[]
     denom = Any[]
 
-    for (base, pow) in m.dict
+    # We need to iterate over each term in m, ignoring the numeric coefficient.
+    # This iteration needs to be stable, so we can't iterate over m.dict.
+    for term in Iterators.drop(arguments(m), isone(m.coeff) ? 0 : 1)
+        if !(term isa Pow)
+            push!(numer, _toexpr(term))
+            continue
+        end
+
+        base = term.base
+        pow  = term.exp
         if pow > 0
             if isone(pow)
                 pushfirst!(numer, _toexpr(base))

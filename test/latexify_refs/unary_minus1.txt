@@ -1,1 +1,3 @@
-$ - y$
+\begin{equation}
+ - y
+\end{equation}

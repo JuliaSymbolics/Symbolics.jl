@@ -1,0 +1,4 @@
+\begin{align}
+\frac{du(x)}{dx} =& z \\
+\mathrm{\frac{d}{d x}}\left( y \right) =& x y
+\end{align}
