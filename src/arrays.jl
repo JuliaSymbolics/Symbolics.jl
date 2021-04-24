@@ -360,15 +360,24 @@ end
 #
 
 import SymbolicUtils: unwrap
-@symbolic_wrap Arr{T,N} <: AbstractArray{T, N}
-function Arr(x)
-    T = symtype(x)
-    @assert T <: AbstractArray
-    Arr{eltype(T), ndims(T)}(x)
-end
 
+@symbolic_wrap struct Arr{T,N} <: AbstractArray{T, N}
+    value
+    function Arr(x)
+        T = symtype(x)
+        @assert T <: AbstractArray
+        new{eltype(T), ndims(T)}(x)
+    end
+end
+SymbolicUtils.unwrap(x::Arr) = x.value
+
+function Base.show(io::IO, arr::Arr)
+    print(io, summary(arr))
+end
 for f in [eachindex, size, axes, adjoint]
-    @eval @inline (::$(typeof(f)))(x::Arr) = Arr($f(unwrap(x)))
+    @eval @inline (::$(typeof(f)))(x::Arr) = _wrap($f(unwrap(x)))
 end
 
-@inline Base.getindex(x::Arr, idx...) = unwrap(x)[idx...]
+function Base.getindex(x::Arr, idx...)
+    _wrap(unwrap(x)[idx...])
+end

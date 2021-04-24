@@ -1,4 +1,8 @@
-@symbolic_wrap Num <: Real
+@symbolic_wrap struct Num <: Real
+    value
+end
+
+SymbolicUtils.unwrap(x::Num) = x.value
 
 """
     Num(val)
