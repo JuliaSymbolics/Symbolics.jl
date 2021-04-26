@@ -35,10 +35,10 @@ macro symbolic_wrap(expr)
     quote
         $expr
 
-        SymbolicUtils.has_symwrapper(::Type{<:$supertype}) = true
-        SymbolicUtils.wrapper_type(::Type{<:$supertype}) = $T
-        SymbolicUtils.wraps_type(::Type{$T}) = $supertype
-        SymbolicUtils.iswrapped(::$T) = true
+        Symbolics.has_symwrapper(::Type{<:$supertype}) = true
+        Symbolics.wrapper_type(::Type{<:$supertype}) = $T
+        Symbolics.wraps_type(::Type{$T}) = $supertype
+        Symbolics.iswrapped(::$T) = true
     end |> esc
 end
 
@@ -47,8 +47,8 @@ unwrap(x) = x
 
 function wrap(x)
     T = SymbolicUtils.symtype(x)
-    SymbolicUtils.has_symwrapper(T) ?
-        SymbolicUtils.wrapper_type(T)(x) : x
+    Symbolics.has_symwrapper(T) ?
+        Symbolics.wrapper_type(T)(x) : x
 end
 
 function wrapper_type end

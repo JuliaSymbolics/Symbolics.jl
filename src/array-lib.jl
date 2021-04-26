@@ -1,4 +1,3 @@
-import SymbolicUtils: @wrapped
 import Base: getindex
 
 ##### getindex #####

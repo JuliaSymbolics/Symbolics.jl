@@ -1,4 +1,4 @@
-using SymbolicUtils: FnType, Sym, wrap
+using SymbolicUtils: FnType, Sym
 using Setfield
 
 const IndexMap = Dict{Char,Char}(

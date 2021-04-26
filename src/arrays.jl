@@ -1,6 +1,6 @@
 using SymbolicUtils
 using StaticArrays
-import Base: eltype, ndims, size
+import Base: eltype, length, ndims, size, axes, eachindex
 
 ### Store Shape as a metadata in Term{<:AbstractArray} objects
 struct ArrayShapeCtx end
@@ -307,8 +307,6 @@ end
 
 ### Wrapper type for dispatch
 
-import SymbolicUtils: unwrap
-
 @symbolic_wrap struct Arr{T,N} <: AbstractArray{T, N}
     value
 end
@@ -319,15 +317,15 @@ function Arr(x)
     Arr{eltype(T), ndims(T)}(x)
 end
 
-SymbolicUtils.unwrap(x::Arr) = x.value
+unwrap(x::Arr) = x.value
 
 # These methods allow @wrapped methods to be more specific and not overwrite
 # each other when defined both for matrix and vector
-SymbolicUtils.wrapper_type(::Type{<:AbstractMatrix}) = Arr{<:Any, 2}
-SymbolicUtils.wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{T, 2}
+wrapper_type(::Type{<:AbstractMatrix}) = Arr{<:Any, 2}
+wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{T, 2}
 
-SymbolicUtils.wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
-SymbolicUtils.wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{T, 1}
+wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
+wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{T, 1}
 
 function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
     print(io, unwrap(arr))
@@ -339,7 +337,6 @@ end
 
 # basic
 # these methods are not symbolic but work if we know this info.
-import Base: eltype, length, ndims, size, axes, eachindex
 
 geteltype(s::SymArray) = geteltype(symtype(s))
 geteltype(::Type{<:AbstractArray{T}}) where {T} = T

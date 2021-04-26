@@ -25,6 +25,8 @@ export simplify, substitute
 
 using SciMLBase, IfElse
 export Num
+include("wrapper-types.jl")
+
 include("num.jl")
 
 export Equation, ConstrainedEquation

@@ -2,7 +2,7 @@
     value
 end
 
-SymbolicUtils.unwrap(x::Num) = x.value
+unwrap(x::Num) = x.value
 
 """
     Num(val)
@@ -16,7 +16,7 @@ const show_numwrap = Ref(false)
 Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value,args)...))
 value(x) = x
-value(x::Num) = SymbolicUtils.unwrap(x)
+value(x::Num) = unwrap(x)
 
 SciMLBase.issymbollike(::Num) = true
 SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
