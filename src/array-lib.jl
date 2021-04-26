@@ -86,7 +86,17 @@ import Base: *, \
 
 using LinearAlgebra
 
-isdot(A::Adjoint, ::SymVec) = true
+isdot(A, b) = isadjointvec(A) && ndims(b) == 1
+
+isadjointvec(A::Adjoint) = ndims(parent(A)) == 1
+isadjointvec(A::Transpose) = ndims(parent(A)) == 1
+
+function isadjointvec(A::Term)
+    (operation(A) === (adjoint) ||
+     operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
+end
+
+isadjointvec(A::ArrayOp) = isadjointvec(A.term)
 
 # TODO: add more such methods
 function getindex(A::AbstractArray, i::Symbolic{<:Integer}...)
@@ -101,15 +111,13 @@ function getindex(A::AbstractArray, j::Symbolic{<:Integer}, i::Int)
     Term{eltype(A)}(getindex, [A, j, i])
 end
 
-function isdot(A::Term, ::SymVec)
-    operation(A) === (adjoint) && symtype(arguments(A)[1]) <: AbstractVector
-end
-isdot(A::ArrayOp, b::Union{SymVec, Vector}) = isdot(A.term, b)
-isdot(A, b) = false
-
 function _matmul(A,B)
     @syms i::Int j::Int k::Int
-    @arrayop (A*B) (i, j) A[i, k] * B[k, j]
+    if isadjointvec(A)
+        op = operation(A.term)
+        return op(op(B) * first(arguments(A.term)))
+    end
+    return @arrayop (A*B) (i, j) A[i, k] * B[k, j]
 end
 
 @wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B)
