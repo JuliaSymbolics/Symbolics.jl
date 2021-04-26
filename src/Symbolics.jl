@@ -63,7 +63,7 @@ import Libdl
 include("build_function.jl")
 export build_function
 
-using Distributions
+import Distributions
 include("extra_functions.jl")
 
 using Latexify

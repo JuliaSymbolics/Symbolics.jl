@@ -1,6 +1,5 @@
 export @symbolic_wrap, @wrapped
 
-using ExprTools
 # Turn A{X} <: B{Int, X} into
 #
 # B{Int, X} where X
