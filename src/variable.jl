@@ -1,4 +1,4 @@
-using SymbolicUtils: FnType, Sym
+using SymbolicUtils: FnType, Sym, wrap
 using Setfield
 
 const IndexMap = Dict{Char,Char}(
@@ -188,19 +188,14 @@ function setprops_expr(expr, props)
     expr
 end
 
-function _wrap(x)
-    T = SymbolicUtils.symtype(x)
-    SymbolicUtils.has_symwrapper(T) ?
-        SymbolicUtils.wrapper_type(T)(x) : x
-end
 
 function construct_var(var_name, type, call_args, val, prop)
     expr = if call_args === nothing
-        :($_wrap($Sym{$type}($var_name)))
+        :($wrap($Sym{$type}($var_name)))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($_wrap($Sym{$FnType{Tuple, $type}}($var_name))) # XXX: using Num as output
+        :($wrap($Sym{$FnType{Tuple, $type}}($var_name))) # XXX: using Num as output
     else
-        :($_wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...))))
+        :($wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...))))
     end
 
     if val !== nothing
@@ -213,11 +208,11 @@ end
 function construct_var(var_name, type, call_args, val, prop, ind)
     # TODO: just use Sym here
     expr = if call_args === nothing
-        :($_wrap($Sym{$type}($var_name, $ind...)))
+        :($wrap($Sym{$type}($var_name, $ind...)))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($_wrap($Sym{$FnType{Tuple{Any}, $type}}($var_name, $ind...))) # XXX: using Num as output
+        :($wrap($Sym{$FnType{Tuple{Any}, $type}}($var_name, $ind...))) # XXX: using Num as output
     else
-        :($_wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name, $ind...)($(map(x->:($value($x)), call_args)...))))
+        :($wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name, $ind...)($(map(x->:($value($x)), call_args)...))))
     end
     if val !== nothing
         expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
@@ -246,7 +241,7 @@ function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
         expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
     end
 
-    expr = :($_wrap($expr))
+    expr = :($wrap($expr))
 
     return setprops_expr(expr, prop)
 end

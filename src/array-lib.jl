@@ -1,4 +1,6 @@
+import SymbolicUtils: @wrapped
 import Base: getindex
+
 ##### getindex #####
 function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)
@@ -71,12 +73,12 @@ end
 
 #################### TRANSPOSE ################
 #
-function Base.adjoint(A::SymMat)
+@wrapped function Base.adjoint(A::AbstractMatrix)
     @syms i::Int j::Int
     @arrayop A' (i, j) A[j, i]
 end
 
-function Base.adjoint(b::SymVec)
+@wrapped function Base.adjoint(b::AbstractVector)
     @syms i::Int
     @arrayop b' (1, i) b[i]
 end
@@ -111,27 +113,29 @@ function _matmul(A,B)
     @arrayop (A*B) (i, j) A[i, k] * B[k, j]
 end
 
-(*)(A::Union{SymMat,SymVec}, B::Union{SymMat, AbstractMatrix}) = _matmul(A, B)
-(*)(A::Union{AbstractVector, AbstractMatrix}, B::SymMat) = _matmul(A, B)
+@wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B)
+@wrapped (*)(A::AbstractVector, B::AbstractMatrix) = _matmul(A, B)
 
 function _matvec(A,b)
     @syms i::Int k::Int
     if isdot(A, b)
         make_shape((i,), A[i, k] * b[k]) # This is a dimension check
-        return Term{Number}(*, [A, b])
+        T = SymbolicUtils.promote_symtype(*, eltype(A), eltype(b))
+        S = SymbolicUtils.promote_symtype(+, T,T)
+        return Term{S}(*, [A, b])
     end
     @arrayop (A*b) (i,) A[i, k] * b[k]
 end
-(*)(A::SymMat, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
+@wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
 (*)(A::AbstractArray, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
 
 #################### MAP-REDUCE ################
 #
 
-Base.map(f, x::SymArray) = _map(f, x)
-Base.map(f, x::SymArray, xs...) = _map(f, x, xs...)
-Base.map(f, x, y::SymArray, z...) = _map(f, x, y, z...)
-Base.map(f, x, y, z::SymArray, w...) = _map(f, x, y, z, w...)
+@wrapped Base.map(f, x::AbstractArray) = _map(f, x)
+@wrapped Base.map(f, x::AbstractArray, xs...) = _map(f, x, xs...)
+@wrapped Base.map(f, x, y::AbstractArray, z...) = _map(f, x, y, z...)
+@wrapped Base.map(f, x, y, z::AbstractArray, w...) = _map(f, x, y, z, w...)
 
 function _map(f, x, xs...)
     N = ndims(x)
@@ -149,9 +153,11 @@ end
 
 @inline _mapreduce(f, x, dims, kw) = mapreduce(f, x; dims=dims, kw...)
 
-function Base.mapreduce(f, g, x::SymArray; dims=:, kw...)
+@wrapped function Base.mapreduce(f, g, x::AbstractArray; dims=:, kw...)
     if dims === (:)
-        return Term{Number}(_mapreduce, [f, g, x, dims, (kw...,)])
+        T = SymbolicUtils.promote_symtype(f, eltype(x))
+        S = SymbolicUtils.promote_symtype(g, T, T)
+        return Term{S}(_mapreduce, [f, g, x, dims, (kw...,)])
     end
 
     idx = makesubscripts(ndims(x))
@@ -172,8 +178,33 @@ for (ff, opts) in [sum => (identity, +, false),
                   all => (identity, (&), true)]
 
     f, g, init = opts
-    @eval function (::$(typeof(ff)))(x::SymArray;
+    @eval @wrapped function (::$(typeof(ff)))(x::AbstractArray;
                                      dims=:, init=$init)
         mapreduce($f, $g, x, dims=dims, init=init)
     end
 end
+
+
+# Wrapped array should wrap the elements too
+function Base.getindex(x::Arr, idx...)
+    wrap(unwrap(x)[idx...])
+end
+function Base.getindex(x::Arr, idx::Symbolic{<:Integer}...)
+    wrap(unwrap(x)[idx...])
+end
+
+struct SymWrapBroadcast <: Broadcast.BroadcastStyle end
+
+Base.broadcastable(s::Arr) = s
+
+Broadcast.BroadcastStyle(::Type{<:Arr}) = SymWrapBroadcast()
+
+Broadcast.result_style(::SymWrapBroadcast) = SymWrapBroadcast()
+
+Broadcast.BroadcastStyle(::SymWrapBroadcast,
+                         ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
+
+function Broadcast.materialize(bc::Broadcast.Broadcasted{SymWrapBroadcast})
+    wrap(broadcast(bc.f, unwrap.(bc.args)...))
+end
+

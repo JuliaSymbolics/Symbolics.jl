@@ -34,7 +34,7 @@ A tensor expression where `output_idx` are the output indices
 `expr`, is the tensor expression and `reduce` is the function
 used to reduce over contracted dimensions.
 """
-struct ArrayOp{T<:AbstractArray}
+struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
     output_idx # output indices
     expr       # Used in pattern matching
                # Useful to infer eltype
@@ -50,9 +50,14 @@ end
 
 shape(aop::ArrayOp) = aop.shape
 
+const show_arrayop = Ref{Bool}(false)
 function Base.show(io::IO, aop::ArrayOp)
-    print(io, "@arrayop")
-    print(io, "(_[$(join(string.(aop.output_idx), ","))] := $(aop.expr))")
+    if istree(aop.term) && !show_arrayop[]
+        show(io, aop.term)
+    else
+        print(io, "@arrayop")
+        print(io, "(_[$(join(string.(aop.output_idx), ","))] := $(aop.expr))")
+    end
 end
 
 symtype(a::ArrayOp{T}) where {T} = T
@@ -300,6 +305,35 @@ function propagate_shape(f, args...)
     error("Don't know how to propagate shape for $f$args")
 end
 
+### Wrapper type for dispatch
+
+import SymbolicUtils: unwrap
+
+@symbolic_wrap struct Arr{T,N} <: AbstractArray{T, N}
+    value
+end
+
+function Arr(x)
+    T = symtype(x)
+    @assert T <: AbstractArray
+    Arr{eltype(T), ndims(T)}(x)
+end
+
+SymbolicUtils.unwrap(x::Arr) = x.value
+
+# These methods allow @wrapped methods to be more specific and not overwrite
+# each other when defined both for matrix and vector
+SymbolicUtils.wrapper_type(::Type{<:AbstractMatrix}) = Arr{<:Any, 2}
+SymbolicUtils.wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{T, 2}
+
+SymbolicUtils.wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
+SymbolicUtils.wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{T, 1}
+
+function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
+    print(io, unwrap(arr))
+    print(io, "[", join(string.(axes(arr)), ","), "]")
+end
+
 ################# Base array functions
 #
 
@@ -314,19 +348,19 @@ geteltype(::Type{<:AbstractArray}) = Unknown()
 ndims(s::SymArray) = ndims(symtype(s))
 ndims(T::Type{<:AbstractArray}) = ndims(T)
 
-function eltype(A::SymArray)
+@wrapped function eltype(A::AbstractArray)
     T = geteltype(A)
     T === Unknown() && error("eltype of $A not known")
     return T
 end
 
-function length(A::SymArray)
+@wrapped function length(A::AbstractArray)
     s = shape(A)
     s === Unknown() && error("length of $A not known")
     return prod(length, s)
 end
 
-function size(A::SymArray)
+@wrapped function size(A::AbstractArray)
     s = shape(A)
     s === Unknown() && error("size of $A not known")
     return length.(s)
@@ -337,7 +371,7 @@ function size(A::SymArray, i::Integer)
     i > ndims(A) ? 1 : size(A)[i]
 end
 
-function axes(A::SymArray)
+@wrapped function axes(A::AbstractArray)
     s = shape(A)
     s === Unknown() && error("axes of $A not known")
     return s
@@ -350,34 +384,8 @@ function axes(A::SymArray, i)
     return i <= length(s) ? s[i] : Base.OneTo(1)
 end
 
-function eachindex(A::SymArray)
+@wrapped function eachindex(A::AbstractArray)
     s = shape(A)
     s === Unknown() && error("eachindex of $A not known")
     return CartesianIndices(s)
-end
-
-### Wrap
-#
-
-import SymbolicUtils: unwrap
-
-@symbolic_wrap struct Arr{T,N} <: AbstractArray{T, N}
-    value
-    function Arr(x)
-        T = symtype(x)
-        @assert T <: AbstractArray
-        new{eltype(T), ndims(T)}(x)
-    end
-end
-SymbolicUtils.unwrap(x::Arr) = x.value
-
-function Base.show(io::IO, arr::Arr)
-    print(io, summary(arr))
-end
-for f in [eachindex, size, axes, adjoint]
-    @eval @inline (::$(typeof(f)))(x::Arr) = _wrap($f(unwrap(x)))
-end
-
-function Base.getindex(x::Arr, idx...)
-    _wrap(unwrap(x)[idx...])
 end
