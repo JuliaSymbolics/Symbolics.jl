@@ -345,7 +345,10 @@ wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
 wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{T, 1}
 
 function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
+    x = unwrap(arr)
+    istree(x) && print(io, "(")
     print(io, unwrap(arr))
+    istree(x) && print(io, ")")
     print(io, "[", join(string.(axes(arr)), ","), "]")
 end
 
