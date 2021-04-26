@@ -25,6 +25,8 @@ export simplify, substitute
 
 using SciMLBase, IfElse
 export Num
+using MacroTools
+import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
 
 include("num.jl")
@@ -36,8 +38,6 @@ include("utils.jl")
 
 include("arrays.jl")
 
-using MacroTools
-import MacroTools: splitdef, combinedef, postwalk, striplines
 export @register
 include("register.jl")
 
