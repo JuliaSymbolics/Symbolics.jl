@@ -15,6 +15,17 @@ const IndexMap = Dict{Char,Char}(
 
 struct VariableDefaultValue end
 
+function setdefaultval(x, val)
+    if symtype(x) <: AbstractArray
+        getindex_posthook(x,
+                          (r,x,i...)->setdefaultval(r, val[i...]))
+    else
+        setmetadata(x,
+                    VariableDefaultValue,
+                    val)
+    end
+end
+
 """
 $(TYPEDEF)
 
@@ -191,34 +202,35 @@ end
 
 function construct_var(var_name, type, call_args, val, prop)
     expr = if call_args === nothing
-        :($wrap($Sym{$type}($var_name)))
+        :($Sym{$type}($var_name))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($wrap($Sym{$FnType{Tuple, $type}}($var_name))) # XXX: using Num as output
+        :($Sym{$FnType{Tuple, $type}}($var_name)) # XXX: using Num as output
     else
-        :($wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...))))
+        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
     end
 
     if val !== nothing
-        expr = :($setmetadata($expr, $VariableDefaultValue, $val))
+        expr = :($setdefaultval($expr, $val))
     end
 
-    return setprops_expr(expr, prop)
+    :($wrap($(setprops_expr(expr, prop))))
 end
 
 function construct_var(var_name, type, call_args, val, prop, ind)
     # TODO: just use Sym here
     expr = if call_args === nothing
-        :($wrap($Sym{$type}($var_name, $ind...)))
+        :($Sym{$type}($var_name, $ind...))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($wrap($Sym{$FnType{Tuple{Any}, $type}}($var_name, $ind...))) # XXX: using Num as output
+        :($Sym{$FnType{Tuple{Any}, $type}}($var_name, $ind...)) # XXX: using Num as output
     else
-        :($wrap($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name, $ind...)($(map(x->:($value($x)), call_args)...))))
-    end
-    if val !== nothing
-        expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
+        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name, $ind...)($(map(x->:($value($x)), call_args)...)))
     end
 
-    return setprops_expr(expr, prop)
+    if val !== nothing
+        expr = :($setdefaultval($expr, $val))
+    end
+
+    :($wrap($(setprops_expr(expr, prop))))
 end
 
 function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
@@ -237,13 +249,14 @@ function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map(x->x($(map(y->:($value($y)), call_args)...)), $ex)) # XXX: using Num as output
     end
+
     if val !== nothing
-        expr = :($setmetadata($expr, $VariableDefaultValue, $val isa AbstractArray ? $val[$ind...] : $val))
+        expr = :($setdefaultval($expr, $val))
     end
 
-    expr = :($wrap($expr))
+    expr = setprops_expr(expr, prop)
 
-    return setprops_expr(expr, prop)
+    return :($wrap($expr))
 end
 
 

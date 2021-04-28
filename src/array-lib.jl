@@ -4,7 +4,14 @@ import Base: getindex
 struct GetindexPosthookCtx end
 
 @wrapped function getindex_posthook(x::AbstractArray, f)
-    setmetadata(x, GetindexPosthookCtx, f)
+    if hasmetadata(x, GetindexPosthookCtx)
+        g = getmetadata(x, GetindexPosthookCtx)
+        setmetadata(x,
+                    GetindexPosthookCtx,
+                    (res, args...) -> f(g(res, args...), args...))
+    else
+        setmetadata(x, GetindexPosthookCtx, f)
+    end
 end
 
 function Base.getindex(x::SymArray, idx...)
