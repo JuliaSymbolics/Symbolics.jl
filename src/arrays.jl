@@ -41,11 +41,12 @@ struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
     reduce
     term
     shape
+    metadata
 end
 
-function ArrayOp(T::Type, output_idx, expr, reduce, term)
+function ArrayOp(T::Type, output_idx, expr, reduce, term; metadata=nothing)
     sh = make_shape(output_idx, expr)
-    ArrayOp{T}(output_idx, expr, reduce, term, sh)
+    ArrayOp{T}(output_idx, expr, reduce, term, sh, metadata)
 end
 
 shape(aop::ArrayOp) = aop.shape

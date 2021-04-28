@@ -1,12 +1,33 @@
 import Base: getindex
 
 ##### getindex #####
+struct GetindexPosthookCtx end
+
+@wrapped function getindex_posthook(x::AbstractArray, f)
+    setmetadata(x, GetindexPosthookCtx, f)
+end
+
 function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)
-        Term{eltype(symtype(x))}(getindex, [x, idx...])
+        res = Term{eltype(symtype(x))}(getindex, [x, idx...])
     else
-        arrterm(getindex, x, idx...)
+        res = arrterm(getindex, x, idx...)
     end
+
+    if hasmetadata(x, GetindexPosthookCtx)
+        f = getmetadata(x, GetindexPosthookCtx, identity)
+        f(res, x, idx...)
+    else
+        res
+    end
+end
+
+# Wrapped array should wrap the elements too
+function Base.getindex(x::Arr, idx...)
+    wrap(unwrap(x)[idx...])
+end
+function Base.getindex(x::Arr, idx::Symbolic{<:Integer}...)
+    wrap(unwrap(x)[idx...])
 end
 
 function propagate_ndims(::typeof(getindex), x, idx...)
@@ -69,6 +90,23 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
             +,
             Term{Any}(broadcast, [bc.f, bc.args...]))
 end
+
+# On wrapper:
+struct SymWrapBroadcast <: Broadcast.BroadcastStyle end
+
+Base.broadcastable(s::Arr) = s
+
+Broadcast.BroadcastStyle(::Type{<:Arr}) = SymWrapBroadcast()
+
+Broadcast.result_style(::SymWrapBroadcast) = SymWrapBroadcast()
+
+Broadcast.BroadcastStyle(::SymWrapBroadcast,
+                         ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
+
+function Broadcast.materialize(bc::Broadcast.Broadcasted{SymWrapBroadcast})
+    wrap(broadcast(bc.f, unwrap.(bc.args)...))
+end
+
 
 #################### TRANSPOSE ################
 #
@@ -191,27 +229,4 @@ for (ff, opts) in [sum => (identity, +, false),
     end
 end
 
-
-# Wrapped array should wrap the elements too
-function Base.getindex(x::Arr, idx...)
-    wrap(unwrap(x)[idx...])
-end
-function Base.getindex(x::Arr, idx::Symbolic{<:Integer}...)
-    wrap(unwrap(x)[idx...])
-end
-
-struct SymWrapBroadcast <: Broadcast.BroadcastStyle end
-
-Base.broadcastable(s::Arr) = s
-
-Broadcast.BroadcastStyle(::Type{<:Arr}) = SymWrapBroadcast()
-
-Broadcast.result_style(::SymWrapBroadcast) = SymWrapBroadcast()
-
-Broadcast.BroadcastStyle(::SymWrapBroadcast,
-                         ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
-
-function Broadcast.materialize(bc::Broadcast.Broadcasted{SymWrapBroadcast})
-    wrap(broadcast(bc.f, unwrap.(bc.args)...))
-end
 
