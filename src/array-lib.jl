@@ -227,6 +227,10 @@ for (ff, opts) in [sum => (identity, +, false),
                                      dims=:, init=$init)
         mapreduce($f, $g, x, dims=dims, init=init)
     end
+    @eval @wrapped function (::$(typeof(ff)))(f::Function, x::AbstractArray;
+                                     dims=:, init=$init)
+        mapreduce(f, $g, x, dims=dims, init=init)
+    end
 end
 
 
