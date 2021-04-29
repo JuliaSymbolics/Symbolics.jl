@@ -17,8 +17,13 @@ struct VariableDefaultValue end
 
 function setdefaultval(x, val)
     if symtype(x) <: AbstractArray
-        getindex_posthook(x,
-                          (r,x,i...)->setdefaultval(r, val[i...]))
+        if val isa AbstractArray
+            getindex_posthook(x,
+                              (r,x,i...)->setdefaultval(r, val[i...]))
+        else
+            getindex_posthook(x,
+                              (r,x,i...)->setdefaultval(r, val))
+        end
     else
         setmetadata(x,
                     VariableDefaultValue,
