@@ -407,3 +407,17 @@ end
     s === Unknown() && error("eachindex of $A not known")
     return CartesianIndices(s)
 end
+
+
+function SymbolicUtils.Code.toexpr(x::ArrayOp)
+    if istree(x.term)
+        toexpr(x.term)
+    else
+        throw(ArgumentError("""Don't know how to turn $x
+                               into code yet"""))
+    end
+end
+
+function SymbolicUtils.Code.toexpr(x::Arr)
+    toexpr(uwrwap(x))
+end
