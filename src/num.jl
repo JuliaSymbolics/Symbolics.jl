@@ -170,7 +170,7 @@ tosymbolic(a::Num) = tosymbolic(value(a))
 tosymbolic(a::Sym) = Sym{symtype(a)}(nameof(a)) # unwrap stuff like Parameter{<:Number}
 tosymbolic(a) = a
 
-# binary ops that return Bool
+# Boolean operations
 for (f, Domain) in [:(==) => :((AbstractFloat, Number)), :(!=) => :((AbstractFloat, Number)),
                     :(<=) => :((Real,)),   :(>=) => :((Real,)),
                     :(isless) => :((Real,)),
