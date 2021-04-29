@@ -170,12 +170,19 @@ tosymbolic(a::Num) = tosymbolic(value(a))
 tosymbolic(a::Sym) = Sym{symtype(a)}(nameof(a)) # unwrap stuff like Parameter{<:Number}
 tosymbolic(a) = a
 
-@num_method Base.isless  (val = isless(tosymbolic(a), tosymbolic(b)); val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(<)    (val = tosymbolic(a) < tosymbolic(b)       ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(<=)   (val = tosymbolic(a) <= tosymbolic(b)      ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(>)    (val = tosymbolic(a) > tosymbolic(b)       ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(>=)   (val = tosymbolic(a) >= tosymbolic(b)      ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(==)   (val = tosymbolic(a) == tosymbolic(b)      ; val isa Bool ? val : Num(val)) (AbstractFloat,Number)
+# binary ops that return Bool
+for (f, Domain) in [:(==) => :((AbstractFloat, Number)), :(!=) => :((AbstractFloat, Number)),
+                    :(<=) => :((Real,)),   :(>=) => :((Real,)),
+                    :(isless) => :((Real,)),
+                    :(<) => :((Real,)),   :(> ) => :((Real,)),
+                    :(& )=> :((Bool,)),  :(| ) => :((Bool,)),
+                    :xor => :((Bool,))]
+    @eval @num_method Base.$f (val = $f(tosymbolic(a), tosymbolic(b)); val isa Bool ? val : Num(val)) $Domain
+end
+
+for f in [:!, :~]
+    @eval Base.$f(x::Num) = (val = $f(tosymbolic(x)); val isa Bool ? val : Num(val))
+end
 @num_method Base.isequal isequal(tosymbolic(a), tosymbolic(b)) (AbstractFloat, Number, Symbolic)
 
 Base.hash(x::Num, h::UInt) = hash(value(x), h)
