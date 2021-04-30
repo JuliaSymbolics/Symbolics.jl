@@ -15,14 +15,26 @@ const IndexMap = Dict{Char,Char}(
 
 struct VariableDefaultValue end
 
+function recurse_and_apply(f, x)
+    if symtype(x) <: AbstractArray
+        getindex_posthook(x) do r,x,i...
+            recurse_and_apply(f, r)
+        end
+    else
+        f(x)
+    end
+end
+
 function setdefaultval(x, val)
     if symtype(x) <: AbstractArray
         if val isa AbstractArray
-            getindex_posthook(x,
-                              (r,x,i...)->setdefaultval(r, val[i...]))
+            getindex_posthook(x) do r,x,i...
+                setdefaultval(r, val[i...])
+            end
         else
-            getindex_posthook(x,
-                              (r,x,i...)->setdefaultval(r, val))
+            getindex_posthook(x) do r,x,i...
+                setdefaultval(r, val)
+            end
         end
     else
         setmetadata(x,
@@ -252,7 +264,8 @@ function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
         # [(R -> R)(R) ....]
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map(x->x($(map(y->:($value($y)), call_args)...)), $ex)) # XXX: using Num as output
+        apply_with(x...) = f -> wrap(f(unwrap.(x)...))
+        :($recurse_and_apply($apply_with($(call_args...)), $ex))
     end
 
     if val !== nothing

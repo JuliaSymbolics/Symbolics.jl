@@ -3,7 +3,7 @@ import Base: getindex
 ##### getindex #####
 struct GetindexPosthookCtx end
 
-@wrapped function getindex_posthook(x::AbstractArray, f)
+@wrapped function getindex_posthook(f, x::AbstractArray)
     if hasmetadata(x, GetindexPosthookCtx)
         g = getmetadata(x, GetindexPosthookCtx)
         setmetadata(x,
