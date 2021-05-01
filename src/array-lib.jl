@@ -141,6 +141,8 @@ function isadjointvec(A::Term)
      operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
 end
 
+isadjointvec(A::Sym) = false
+
 isadjointvec(A::ArrayOp) = isadjointvec(A.term)
 
 # TODO: add more such methods

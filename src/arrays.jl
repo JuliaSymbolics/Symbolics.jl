@@ -64,7 +64,7 @@ end
 symtype(a::ArrayOp{T}) where {T} = T
 istree(a::ArrayOp) = true
 operation(a::ArrayOp) = typeof(a)
-arguments(a::ArrayOp) = [a.output_idx, a.expr, a.term, a.reduce]
+arguments(a::ArrayOp) = [a.output_idx, a.expr, a.reduce, a.term, a.shape, a.metadata]
 
 macro arrayop(call, output_idx, expr, reduce=+)
     @assert output_idx.head == :tuple
@@ -423,6 +423,13 @@ function SymbolicUtils.Code.toexpr(x::Arr)
 end
 
 
+scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
+function replace_by_scalarizing(ex, dict)
+    rs = [@rule(getindex(~x, ~~i) =>
+                scalarize(~x, (map(a->substitute(a, dict), ~~i)...,)))]
+    Postwalk(Chain(rs))(ex)
+end
+
 function scalarize(arr::ArrayOp, idx)
     @assert length(arr.output_idx) == length(idx)
 
@@ -431,17 +438,29 @@ function scalarize(arr::ArrayOp, idx)
     iidx = collect(keys(axs))
     contracted = setdiff(iidx, arr.output_idx)
 
-    ## TODO: only do this on the indices and not the arrays
-    partial = substitute(arr.expr, Dict(arr.output_idx .=> idx))
+    ## TODO: only do substitute indices and not the arrays
+    dict = Dict(arr.output_idx .=> idx)
+    partial = replace_by_scalarizing(arr.expr, dict)
 
     axes = [get(first(axs[c])) for c in contracted]
     mapreduce(arr.reduce, Iterators.product(axes...)) do idx
-        substitute(partial, Dict(contracted .=> idx))
+        replace_by_scalarizing(partial, Dict(contracted .=> idx))
     end
 end
 
-function scalarize(arr::ArrayOp)
-    map(Iterators.product(shape(arr)...)) do i
-        scalarize(arr, i)
+scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
+                                          unwrap.(idx)))
+
+function scalarize(arr)
+    arr = unwrap(arr)
+    if symtype(arr) <: AbstractArray
+        map(Iterators.product(shape(arr)...)) do i
+            scalarize(arr, i)
+        end
+    elseif istree(arr) && operation(arr) == getindex
+        args = arguments(arr)
+        scalarize(args[1], (args[2:end]...,))
+    else
+        error("Cannot scalarize $arr")
     end
 end
