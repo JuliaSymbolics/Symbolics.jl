@@ -421,3 +421,27 @@ end
 function SymbolicUtils.Code.toexpr(x::Arr)
     toexpr(uwrwap(x))
 end
+
+
+function scalarize(arr::ArrayOp, idx)
+    @assert length(arr.output_idx) == length(idx)
+
+    axs = idx_to_axes(arr.expr)
+
+    iidx = collect(keys(axs))
+    contracted = setdiff(iidx, arr.output_idx)
+
+    ## TODO: only do this on the indices and not the arrays
+    partial = substitute(arr.expr, Dict(arr.output_idx .=> idx))
+
+    axes = [get(first(axs[c])) for c in contracted]
+    mapreduce(arr.reduce, Iterators.product(axes...)) do idx
+        substitute(partial, Dict(contracted .=> idx))
+    end
+end
+
+function scalarize(arr::ArrayOp)
+    map(Iterators.product(shape(arr)...)) do i
+        scalarize(arr, i)
+    end
+end
