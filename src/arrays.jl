@@ -453,7 +453,6 @@ end
 
 scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
 function replace_by_scalarizing(ex, dict)
-    # FIXME: this needs to be fixed up not to recurse into nested ArrayOps
     r = @rule(getindex(~x, ~~i) =>
               scalarize(~x, (map(a->haskey(dict,a) ? dict[a] : a, ~~i)...,)))
     # This must be a Prewalk to avoid descending into ArrayOp (madness)
