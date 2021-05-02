@@ -182,27 +182,7 @@ end
 
 ## Eltype ##
 
-function get_worst_type(expr, T=Union{})
-    if symtype(expr) <: AbstractArray
-        T = promote_type(T, eltype(expr))
-    end
-
-    if istree(expr)
-        mapreduce(x -> get_worst_type(x, T), promote_type, arguments(expr), init=T)
-    else
-        return T
-    end
-end
-# TODO: have fallback
-function approx_eltype(expr)
-    if symtype(expr) == Any
-        get_worst_type(expr)
-    else
-        symtype(expr)
-    end
-end
-
-eltype(aop::ArrayOp) = approx_eltype(aop.expr)
+eltype(aop::ArrayOp) = symtype(aop.expr)
 
 ## Ndims ##
 function ndims(aop::ArrayOp)
