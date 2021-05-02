@@ -68,8 +68,18 @@ istree(a::ArrayOp) = true
 operation(a::ArrayOp) = typeof(a)
 arguments(a::ArrayOp) = [a.output_idx, a.expr, a.reduce, a.term, a.shape, a.ranges, a.metadata]
 
-macro arrayop(call, output_idx, expr, reduce=+)
+macro arrayop(call, output_idx, expr, options...)
     @assert output_idx.head == :tuple
+    rs = []
+    reduce = +
+    for o in options
+        if isexpr(o, :call) && o.args[1] == :in
+            push!(rs, :($(o.args[2]) => $(o.args[3])))
+        elseif isexpr(o, :(=)) && o.args[1] == :reduce
+            reduce = o.args[2]
+        end
+    end
+
     oidxs = filter(x->x isa Symbol, output_idx.args)
     iidxs = find_indices(expr)
     idxs  = union(oidxs, iidxs)
@@ -82,12 +92,13 @@ macro arrayop(call, output_idx, expr, reduce=+)
 
             expr = $fbody
             #TODO: proper Atype
-            $ArrayOp(Array{approx_eltype(expr),
+            $ArrayOp(Array{$symtype(expr),
                            $(length(output_idx.args))},
                      $output_idx,
                      expr,
                      $reduce,
-                     $(call2term(call)))
+                     $(call2term(call)),
+                     Dict($(rs...)))
 
         end
     end |> esc
@@ -477,7 +488,6 @@ function scalarize(arr::ArrayOp, idx)
     iidx = collect(keys(axs))
     contracted = setdiff(iidx, arr.output_idx)
 
-    ## TODO: only do substitute indices and not the arrays
     dict = Dict(oi => axs[oi][i] for (oi, i) in zip(arr.output_idx, idx))
     partial = replace_by_scalarizing(arr.expr, dict)
 
