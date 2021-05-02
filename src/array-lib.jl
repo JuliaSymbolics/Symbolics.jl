@@ -18,7 +18,29 @@ function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)
         res = Term{eltype(symtype(x))}(getindex, [x, idx...])
     else
-        res = arrterm(getindex, x, idx...)
+        output_idx = []
+        ranges = Dict{Sym, AbstractRange}()
+        subscripts = makesubscripts(length(idx))
+        for (j, i) in enumerate(idx)
+            if i isa Integer
+            elseif i isa Colon
+                push!(output_idx, subscripts[j])
+            elseif i isa AbstractVector
+                isym = subscripts[j]
+                push!(output_idx, isym)
+                ranges[isym] = i
+            else
+                error("Don't know how to index by $i")
+            end
+        end
+
+        term = Term{Any}(getindex, [x, idx...])
+        res = ArrayOp(symtype(x),
+                      (output_idx...,),
+                      x[output_idx...],
+                      +,
+                      term,
+                      ranges)
     end
 
     if hasmetadata(x, GetindexPosthookCtx)

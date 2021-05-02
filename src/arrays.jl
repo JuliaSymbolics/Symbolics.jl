@@ -41,12 +41,14 @@ struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
     reduce
     term
     shape
+    ranges::Dict{Sym, AbstractRange} # index range each index symbol can take,
+                                     # optional for each symbol
     metadata
 end
 
-function ArrayOp(T::Type, output_idx, expr, reduce, term; metadata=nothing)
-    sh = make_shape(output_idx, expr)
-    ArrayOp{T}(output_idx, expr, reduce, term, sh, metadata)
+function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(); metadata=nothing)
+    sh = make_shape(output_idx, expr, ranges)
+    ArrayOp{T}(output_idx, expr, reduce, term, sh, ranges, metadata)
 end
 
 shape(aop::ArrayOp) = aop.shape
@@ -64,7 +66,7 @@ end
 symtype(a::ArrayOp{T}) where {T} = T
 istree(a::ArrayOp) = true
 operation(a::ArrayOp) = typeof(a)
-arguments(a::ArrayOp) = [a.output_idx, a.expr, a.reduce, a.term, a.shape, a.metadata]
+arguments(a::ArrayOp) = [a.output_idx, a.expr, a.reduce, a.term, a.shape, a.ranges, a.metadata]
 
 macro arrayop(call, output_idx, expr, reduce=+)
     @assert output_idx.head == :tuple
@@ -99,18 +101,34 @@ const SymVec = Union{ArrayOp{<:AbstractVector}, Symbolic{<:AbstractVector}}
 #
 ## Shape ##
 
-function make_shape(output_idx, expr)
+
+function axis_in(a, b)
+    first(a) >= first(b) && last(a) <= last(b)
+end
+
+function make_shape(output_idx, expr, ranges=Dict())
     matches = idx_to_axes(expr)
     for (sym, ms) in matches
         to_check = filter(m->!(shape(m.A) isa Unknown), ms)
         # Only check known dimensions. It may be "known symbolically"
         isempty(to_check) && continue
-        reference = axes(first(to_check).A, first(to_check).dim)
-        for i in 2:length(ms)
+        restricted = false
+        if haskey(ranges, sym)
+            ref_axis = axes(ranges[sym], 1)
+            restricted = true
+        else
+            ref_axis = axes(first(to_check).A, first(to_check).dim)
+        end
+        reference = axes(ref_axis, 1) # Reset to 1
+        for i in (restricted ? 1 : 2):length(ms)
             m = ms[i]
             s=shape(m.A)
             if s !== Unknown()
-                if !isequal(axes(m.A, m.dim), reference)
+                if restricted
+                    if !axis_in(ref_axis, axes(m.A, m.dim))
+                        throw(DimensionMismatch("expected $(ref_axis) to be within axes($(m.A), $(m.dim))"))
+                    end
+                elseif !isequal(axes(m.A, m.dim), reference)
                     throw(DimensionMismatch("expected axes($(m.A), $(m.dim)) = $(reference)"))
                 end
             end
@@ -119,6 +137,9 @@ function make_shape(output_idx, expr)
 
     sz = map(output_idx) do i
         if i isa Sym
+            if haskey(ranges, i)
+                return axes(ranges[i], 1)
+            end
             mi = matches[i]
             @assert !isempty(mi)
             get(first(mi))
@@ -132,6 +153,20 @@ function make_shape(output_idx, expr)
     else
         sz
     end
+end
+
+
+function ranges(a::ArrayOp)
+    rs = Dict{Sym, Any}()
+    ax = idx_to_axes(a.expr)
+    for i in a.output_idx
+        if haskey(a.ranges, i)
+            rs[i] = a.ranges[i]
+        else
+            rs[i] = get(first(ax[i]))
+        end
+    end
+    return rs
 end
 
 ## Eltype ##
@@ -203,7 +238,7 @@ function Base.get(a::AxisOf)
     axes(a.A, a.dim)
 end
 
-function idx_to_axes(expr, dict=Dict{Sym, Vector}())
+function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
     if istree(expr)
         if operation(expr) === (getindex)
             args = arguments(expr)
@@ -423,26 +458,29 @@ function SymbolicUtils.Code.toexpr(x::Arr)
 end
 
 
+### Scalarize
+
 scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
 function replace_by_scalarizing(ex, dict)
-    rs = [@rule(getindex(~x, ~~i) =>
-                scalarize(~x, (map(a->substitute(a, dict), ~~i)...,)))]
-    Postwalk(Chain(rs))(ex)
+    # FIXME: this needs to be fixed up not to recurse into nested ArrayOps
+    r = @rule(getindex(~x, ~~i) =>
+              scalarize(~x, (map(a->substitute(a, dict), ~~i)...,)))
+    Postwalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), r)))(ex)
 end
 
 function scalarize(arr::ArrayOp, idx)
     @assert length(arr.output_idx) == length(idx)
 
-    axs = idx_to_axes(arr.expr)
+    axs = ranges(arr)
 
     iidx = collect(keys(axs))
     contracted = setdiff(iidx, arr.output_idx)
 
     ## TODO: only do substitute indices and not the arrays
-    dict = Dict(arr.output_idx .=> idx)
+    dict = Dict(oi => axs[oi][i] for (oi, i) in zip(arr.output_idx, idx))
     partial = replace_by_scalarizing(arr.expr, dict)
 
-    axes = [get(first(axs[c])) for c in contracted]
+    axes = [axs[c] for c in contracted]
     mapreduce(arr.reduce, Iterators.product(axes...)) do idx
         replace_by_scalarizing(partial, Dict(contracted .=> idx))
     end
