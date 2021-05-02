@@ -464,8 +464,9 @@ scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
 function replace_by_scalarizing(ex, dict)
     # FIXME: this needs to be fixed up not to recurse into nested ArrayOps
     r = @rule(getindex(~x, ~~i) =>
-              scalarize(~x, (map(a->substitute(a, dict), ~~i)...,)))
-    Postwalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), r)))(ex)
+              scalarize(~x, (map(a->haskey(dict,a) ? dict[a] : a, ~~i)...,)))
+    # This must be a Prewalk to avoid descending into ArrayOp (madness)
+    Prewalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), r)))(ex)
 end
 
 function scalarize(arr::ArrayOp, idx)
@@ -492,7 +493,7 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 function scalarize(arr)
     arr = unwrap(arr)
     if symtype(arr) <: AbstractArray
-        map(Iterators.product(shape(arr)...)) do i
+        map(Iterators.product(ranges(arr)...)) do i
             scalarize(arr, i)
         end
     elseif istree(arr) && operation(arr) == getindex

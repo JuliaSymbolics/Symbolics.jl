@@ -263,5 +263,3 @@ for (ff, opts) in [sum => (identity, +, false),
         mapreduce(f, $g, x, dims=dims, init=init)
     end
 end
-
-
