@@ -452,12 +452,23 @@ end
 ### Scalarize
 
 scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
+
 function replace_by_scalarizing(ex, dict)
-    r = @rule(getindex(~x, ~~i) =>
+    rule = @rule(getindex(~x, ~~i) =>
               scalarize(~x, (map(a->haskey(dict,a) ? dict[a] : a, ~~i)...,)))
     # This must be a Prewalk to avoid descending into ArrayOp (madness)
-    Prewalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), r)))(ex)
+
+    function rewrite_operation(x)
+        if istree(x) && istree(operation(x))
+            replace_by_scalarizing(operation(x), dict)(arguments(x)...)
+        else
+            nothing
+        end
+    end
+
+    Prewalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), Chain([rule, rewrite_operation]))))(ex)
 end
+
 
 function scalarize(arr::ArrayOp, idx)
     @assert length(arr.output_idx) == length(idx)
