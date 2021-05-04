@@ -264,6 +264,8 @@ function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
         # [(R -> R)(R) ....]
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        :($map(f->f($(call_args...)), $ex))
+
     end
 
     if val !== nothing

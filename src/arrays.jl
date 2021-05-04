@@ -455,18 +455,20 @@ scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
 
 function replace_by_scalarizing(ex, dict)
     rule = @rule(getindex(~x, ~~i) =>
-              scalarize(~x, (map(a->haskey(dict,a) ? dict[a] : a, ~~i)...,)))
-    # This must be a Prewalk to avoid descending into ArrayOp (madness)
+              scalarize(~x, (map(j->haskey(dict,j) ? dict[j] : j, ~~i)...,)))
 
+    simterm = (x, f, args) -> f(args...)
     function rewrite_operation(x)
         if istree(x) && istree(operation(x))
-            replace_by_scalarizing(operation(x), dict)(arguments(x)...)
+            f = operation(x)
+            replace_by_scalarizing(f, dict)(arguments(x)...)
         else
             nothing
         end
     end
 
-    Prewalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), Chain([rule, rewrite_operation]))))(ex)
+    # This must be a Prewalk to avoid descending into ArrayOp (madness)
+    Prewalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), Chain([rewrite_operation, rule]))), similarterm=simterm)(ex)
 end
 
 
@@ -482,8 +484,12 @@ function scalarize(arr::ArrayOp, idx)
     partial = replace_by_scalarizing(arr.expr, dict)
 
     axes = [axs[c] for c in contracted]
-    mapreduce(arr.reduce, Iterators.product(axes...)) do idx
-        replace_by_scalarizing(partial, Dict(contracted .=> idx))
+    if isempty(contracted)
+        partial
+    else
+        mapreduce(arr.reduce, Iterators.product(axes...)) do idx
+            replace_by_scalarizing(partial, Dict(contracted .=> idx))
+        end
     end
 end
 
