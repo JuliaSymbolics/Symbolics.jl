@@ -51,6 +51,14 @@ function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(); metadat
     ArrayOp{T}(output_idx, expr, reduce, term, sh, ranges, metadata)
 end
 
+function ArrayOp(a::AbstractArray)
+    i = makesubscripts(ndims(a))
+    # TODO: formalize symtype(::Type) then!
+    ArrayOp(symtype(eltype(a)), (i...,), a[i...], +, a)
+end
+
+ConstructionBase.constructorof(s::Type{<:ArrayOp{T}}) where {T} = ArrayOp{T}
+
 shape(aop::ArrayOp) = aop.shape
 
 const show_arrayop = Ref{Bool}(false)
@@ -355,6 +363,8 @@ end
     value
 end
 
+ArrayOp(x::Arr) = unwrap(x)
+
 function Arr(x)
     T = symtype(x)
     @assert T <: AbstractArray
@@ -506,6 +516,6 @@ function scalarize(arr)
         args = arguments(arr)
         scalarize(args[1], (args[2:end]...,))
     else
-        error("Cannot scalarize $arr")
+        arr
     end
 end

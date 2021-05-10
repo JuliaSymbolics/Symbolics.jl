@@ -36,6 +36,7 @@ include("equations.jl")
 
 include("utils.jl")
 
+using ConstructionBase
 include("arrays.jl")
 
 export @register

@@ -76,16 +76,6 @@ propagate_eltype(::typeof(getindex), x, idx...) = geteltype(x)
 #### Broadcast ####
 #
 
-function makesubscripts(n)
-    set = 'i':'z'
-    m = length(set)
-    map(1:n) do i
-        repeats = ceil(Int, i / m)
-        c = set[(i-1) % m + 1]
-        Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
-    end
-end
-
 using Base.Broadcast
 
 Base.broadcastable(s::SymArray) = s
