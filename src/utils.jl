@@ -144,12 +144,11 @@ function tosymbol(t::Term; states=nothing, escape=true)
         op = Symbol(operation(term))
         args = arguments(term)
     else
-        @goto err
+        op = Symbol(repr(operation(t)))
+        args = arguments(t)
     end
 
     return escape ? Symbol(op, "(", join(args, ", "), ")") : op
-    @label err
-    error("Cannot convert $t to a symbol")
 end
 
 function lower_varname(var::Symbolic, idv, order)
