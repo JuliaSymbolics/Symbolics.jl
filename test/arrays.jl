@@ -1,9 +1,9 @@
 using SymbolicUtils, Test
-using SymbolicUtils: symtype, shape, Unknown
+using Symbolics: symtype, shape, Unknown
 using Base: Slice
 
 @testset "arrays" begin
-    @syms X[1:5, 2:6] (Y::Real)[1:5, 1:5] Z::Matrix{Float64} i::Int j::Int
+    @variables X[1:5, 2:6] (Y::Real)[1:5, 1:5] Z::Matrix{Float64} i::Int j::Int
     @test symtype(X) == Array{Number, 2}
     @test symtype(Y) == Array{Real, 2}
     @test shape(X) == Slice.((1:5, 2:6))

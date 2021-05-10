@@ -509,7 +509,7 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 function scalarize(arr)
     arr = unwrap(arr)
     if symtype(arr) <: AbstractArray
-        map(Iterators.product(ranges(arr)...)) do i
+        map(Iterators.product(axes(arr)...)) do i
             scalarize(arr, i)
         end
     elseif istree(arr) && operation(arr) == getindex
