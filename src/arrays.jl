@@ -508,7 +508,7 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 
 function scalarize(arr)
     arr = unwrap(arr)
-    if symtype(arr) <: AbstractArray
+    if arr isa Arr || arr isa Symbolic{<:AbstractArray}
         map(Iterators.product(axes(arr)...)) do i
             scalarize(arr, i)
         end
@@ -516,6 +516,6 @@ function scalarize(arr)
         args = arguments(arr)
         scalarize(args[1], (args[2:end]...,))
     else
-        arr
+        return arr
     end
 end
