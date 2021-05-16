@@ -68,11 +68,12 @@ end
 function unflatten_long_ops(op, N=4)
     op = value(op)
     op = termify(op)
-    !istree(op) && return Num(op)
-    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, 4) : nothing)
-    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, 4) : nothing)
+    !istree(op) && return wrap(op)
+    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, N) : nothing)
+    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, N) : nothing)
 
-    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]))(op))
+    simterm(x,f,args; metadata=nothing) = Term{symtype(x)}(f, args, metadata=metadata)
+    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]), similarterm=simterm)(op))
 end
 
 
