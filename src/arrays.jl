@@ -402,20 +402,20 @@ geteltype(::Type{<:AbstractArray}) = Unknown()
 ndims(s::SymArray) = ndims(symtype(s))
 ndims(T::Type{<:AbstractArray}) = ndims(T)
 
-@wrapped function eltype(A::AbstractArray)
-    T = geteltype(A)
+function eltype(A::Union{Arr, SymArray})
+    T = geteltype(unwrap(A))
     T === Unknown() && error("eltype of $A not known")
     return T
 end
 
-@wrapped function length(A::AbstractArray)
-    s = shape(A)
+function length(A::Union{Arr, SymArray})
+    s = shape(unwrap(A))
     s === Unknown() && error("length of $A not known")
     return prod(length, s)
 end
 
-@wrapped function size(A::AbstractArray)
-    s = shape(A)
+function size(A::Union{Arr, SymArray})
+    s = shape(unwrap(A))
     s === Unknown() && error("size of $A not known")
     return length.(s)
 end
@@ -425,8 +425,8 @@ function size(A::SymArray, i::Integer)
     i > ndims(A) ? 1 : size(A)[i]
 end
 
-@wrapped function axes(A::AbstractArray)
-    s = shape(A)
+function axes(A::Union{Arr, SymArray})
+    s = shape(unwrap(A))
     s === Unknown() && error("axes of $A not known")
     return s
 end
@@ -438,8 +438,8 @@ function axes(A::SymArray, i)
     return i <= length(s) ? s[i] : Base.OneTo(1)
 end
 
-@wrapped function eachindex(A::AbstractArray)
-    s = shape(A)
+function eachindex(A::Union{Arr, SymArray})
+    s = shape(unwrap(A))
     s === Unknown() && error("eachindex of $A not known")
     return CartesianIndices(s)
 end
@@ -519,3 +519,5 @@ function scalarize(arr)
         return arr
     end
 end
+
+Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalarize(arr)
