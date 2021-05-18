@@ -58,8 +58,16 @@ function unflatten_args(f, args, N=4)
                                        for group in Iterators.partition(args, N)], N)
 end
 
+# Speeds up by avoiding repeated sorting when you call `arguments`
+# after editing children in Postwalk in unflatten_long_ops
+function termify(op)
+    !istree(op) && return op
+    Term{symtype(op)}(operation(op), arguments(op); metadata=op.metadata)
+end
+
 function unflatten_long_ops(op, N=4)
     op = value(op)
+    op = termify(op)
     !istree(op) && return Num(op)
     rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, 4) : nothing)
     rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, 4) : nothing)
@@ -70,8 +78,8 @@ end
 
 # Scalar output
 
-destructure_arg(arg::Union{AbstractArray, Tuple}) = DestructuredArgs(map(value, arg))
-destructure_arg(arg) = arg
+destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds) = DestructuredArgs(map(value, arg), inbounds=inbounds)
+destructure_arg(arg, _) = arg
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
@@ -80,7 +88,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          checkbounds = false,
                          linenumbers = true)
 
-    dargs = map(destructure_arg, [args...])
+    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
     expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
 
     if expression == Val{true}
@@ -177,7 +185,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
                        parallel=SerialForm(), kwargs...)
 
-    dargs = map(destructure_arg, [args...])
+    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto))
@@ -343,29 +351,35 @@ end
 get_varnumber(varop, vars::Vector) =  findfirst(x->isequal(x,varop),vars)
 get_varnumber(varop, var) =  isequal(var,varop) ? 0 : nothing
 
-function numbered_expr(O::Symbolic,args...;varordering = args[1],offset = 0,
+buildvarnumbercache(args...) = Dict([isa(arg,AbstractArray) ? el=>(argi,eli) : arg=>(argi,0)
+                                    for (argi,arg) in enumerate(args) for (eli,el) in enumerate(arg)])
+
+function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)])
     O = value(O)
     if O isa Sym || isa(operation(O), Sym)
-        for j in 1:length(args)
-            i = get_varnumber(O,args[j])
-            if i !== nothing
-                return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
-            end
+        (j,i) = get(varnumbercache, O, (nothing, nothing))
+        if !isnothing(j)
+            return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
-  return Expr(:call, O isa Sym ? tosymbol(O, escape=false) : Symbol(operation(O)),
-         [numbered_expr(x,args...;offset=offset,lhsname=lhsname,
-                        rhsnames=rhsnames,varordering=varordering) for x in arguments(O)]...)
+    if istree(O)
+        Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
+                                                         rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+    elseif O isa Sym
+        tosymbol(O, escape=false)
+    else
+        O
+    end
 end
 
-function numbered_expr(de::Equation,args...;varordering = args[1],
+function numbered_expr(de::Equation,varnumbercache,args...;varordering = args[1],
                        lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)],offset=0)
 
     varordering = value.(args[1])
     var = var_from_nested_derivative(de.lhs)[1]
     i = findfirst(x->isequal(tosymbol(x isa Sym ? x : operation(x), escape=false), tosymbol(var, escape=false)),varordering)
-    :($lhsname[$(i+offset)] = $(numbered_expr(de.rhs,args...;offset=offset,
+    :($lhsname[$(i+offset)] = $(numbered_expr(de.rhs,varnumbercache,args...;offset=offset,
                                               varordering = varordering,
                                               lhsname = lhsname,
                                               rhsnames = rhsnames)))
@@ -377,6 +391,7 @@ numbered_expr(c::Num,args...;kwargs...) = error("Num found")
 # Replace certain multiplication and power expressions so they form valid C code
 # Extra factors of 1 are hopefully eliminated by the C compiler
 function coperators(expr)
+    expr isa Expr || return expr
     for e in expr.args
         if e isa Expr
             coperators(e)
@@ -448,7 +463,8 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
 
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
 
-    differential_equation = string(join([numbered_expr(eq,args...,lhsname=lhsname,
+    varnumbercache = buildvarnumbercache(args...)
+    differential_equation = string(join([numbered_expr(eq,varnumbercache,args...,lhsname=lhsname,
                                   rhsnames=rhsnames,offset=-1) for
                                   (i, eq) ∈ enumerate(eqs)],";\n  "),";")
 
@@ -517,11 +533,13 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
                                compiler    = compiler)
     end
 
+    
+    varnumbercache = buildvarnumbercache(args...)
     equations = Vector{String}()
     for col ∈ 1:size(ex,2)
         for row ∈ 1:size(ex,1)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
-            rhs = numbered_expr(value(ex[row, col]), args...;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, args...;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = -1) |> coperators |> string  # Filter through coperators to produce valid C code in more cases
@@ -529,7 +547,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         end
     end
 
-    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "const double* $(rhsnames[i])" : "const double $(rhsnames[i])" for i in 1:length(args)]),", ")
 
     ccode = """
     #include <math.h>
@@ -572,7 +590,8 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    differential_equation = string(join([numbered_expr(eq,vs,ps,lhsname=lhsname,
+    varnumbercache = buildvarnumbercache(vs,ps)
+    differential_equation = string(join([numbered_expr(eq,varnumbercache,vs,ps,lhsname=lhsname,
                                    rhsnames=rhsnames) for
                                    (i, eq) ∈ enumerate(eqs)],";\n  "),";")
     """
@@ -619,11 +638,12 @@ function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
                             rhsnames    = rhsnames)
     end
 
+    varnumbercache = buildvarnumbercache(vs,ps,iv)
     equations = Vector{String}()
     for col ∈ 1:size(ex,2)
         for row ∈ 1:size(ex,1)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row, "]")
-            rhs = numbered_expr(value(ex[row, col]), vs, ps, iv;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, vs, ps, iv;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = 0) |> string
@@ -663,7 +683,8 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    matstr = join([numbered_expr(eq.rhs,args...,lhsname=lhsname,
+    varnumbercache = buildvarnumbercache(args...)
+    matstr = join([numbered_expr(eq.rhs,varnumbercache,args...,lhsname=lhsname,
                                   rhsnames=rhsnames) for
                                   (i, eq) ∈ enumerate(eqs)],"; ")
 
@@ -710,12 +731,13 @@ function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
                                rhsnames    = rhsnames)
     end
 
+    varnumbercache = buildvarnumbercache(args...)
     matstr = ""
     for row ∈ 1:size(ex,1)
         row_strings = Vector{String}()
         for col ∈ 1:size(ex,2)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
-            rhs = numbered_expr(value(ex[row, col]), args...;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, args...;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = 0) |> string

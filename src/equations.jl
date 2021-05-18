@@ -18,6 +18,10 @@ Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 Base.show(io::IO, eq::Equation) = print(io, eq.lhs, " ~ ", eq.rhs)
 
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
+function SymbolicUtils.substitute(x::Equation, rules; kw...)
+    sub = substituter(rules)
+    sub(x.lhs; kw...) ~ sub(x.rhs; kw...)
+end
 
 lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
@@ -62,6 +66,22 @@ Base.:~(lhs::Number    , rhs::Num) = Equation(value(lhs), value(rhs))
 Base.:~(lhs::Symbolic, rhs::Symbolic) = Equation(value(lhs), value(rhs))
 Base.:~(lhs::Symbolic, rhs::Any    ) = Equation(value(lhs), value(rhs))
 Base.:~(lhs::Any, rhs::Symbolic    ) = Equation(value(lhs), value(rhs))
+for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
+    (T != :Complex && S != :Complex) && continue
+    @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
+                                      ai = value(imag(a)), bi = value(imag(b))
+        if ar isa Number && br isa Number && ai isa number && bi isa Number
+            error("Equation $a ~ $b does not contain any symbols")
+        elseif ar isa Number && br isa Number
+            ai ~ bi
+        elseif ai isa Number && bi isa Number
+            ar ~ br
+        else
+            [ar ~ br
+            ai ~ bi]
+        end
+    end
+end
 
 struct ConstrainedEquation
   constraints

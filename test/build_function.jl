@@ -116,3 +116,28 @@ let # ModelingToolkit.jl#800
     @test contains(sf1, "SparseMatrixCSC(")
     @test contains(sf2, ".nzval")
 end
+
+let # Symbolics.jl#123
+    ns = 6
+    @variables x[1:ns]
+    @variables u
+    @variables M[1:36]
+    @variables qd[1:6]
+    output_eq = u*(qd[1]*(M[1]*qd[1] + M[1]*qd[3] + M[1]*qd[4] + M[25]*qd[5] + M[31]*qd[6] + M[7]*qd[2]))
+
+    str = build_function(output_eq, x, target=Symbolics.CTarget())
+    @test str == """
+    #include <math.h>
+    void diffeqf(double* du, const double* RHS1) {
+      du[0] = qd₁ * u * (M₁ * qd₁ + M₁ * qd₃ + M₁ * qd₄ + M₂₅ * qd₅ + M₃₁ * qd₆ + M₇ * qd₂);
+    }
+    """
+end
+
+using Symbolics: value
+using SymbolicUtils.Code: Func, toexpr
+@variables t x(t)
+D = Differential(t)
+expr = toexpr(Func([value(D(x))], [], value(D(x))))
+@test expr.args[2].args[end] == expr.args[1].args[1] # check function body and function arg
+@test expr.args[2].args[end] == :(var"Differential(t)(x(t))")

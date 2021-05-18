@@ -59,7 +59,7 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
     exprs = rhss(eqs) .- lhss(eqs)
     if check
         for ex in exprs
-            @assert islinear(ex, vars)
+            @assert isaffine(ex, vars)
         end
     end
     A = jacobian(exprs, vars)
@@ -68,7 +68,7 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
 end
 function A_b(eq, var, check)
     ex = eq.rhs - eq.lhs
-    check && @assert islinear(ex, [var])
+    check && @assert isaffine(ex, [var])
     a = expand_derivatives(Differential(var)(ex))
     b = a * var - ex
     a, b
@@ -171,5 +171,19 @@ function LinearAlgebra.det(A::AbstractMatrix{<:Num}; laplace=true)
             return det(UpperTriangular(A))
         end
         return det(lu(A; check = false))
+    end
+end
+
+function LinearAlgebra.norm(x::AbstractArray{Num}, p::Real=2)
+    p = value(p)
+    issym = p isa Symbolic
+    if !issym && p == 2
+        sqrt(sum(x->abs2(x), x))
+    elseif !issym && isone(p)
+        sum(abs, x)
+    elseif !issym && isinf(p)
+        mapreduce(abs, max, x)
+    else
+        sum(x->abs(x)^p, x)^inv(p)
     end
 end

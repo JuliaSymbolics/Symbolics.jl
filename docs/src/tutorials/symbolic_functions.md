@@ -18,9 +18,9 @@ Here, `z` is an expression tree for "square `x` and add `y`". To make an array
 of symbolic expressions, simply make an array of symbolic expressions:
 
 ```julia
-A = [x^2+y 0 2x
-     0     0 2y
-     y^2+x 0 0]
+A = [x^2 + y 0 2x
+     0       0 2y
+     y^2 + x 0 0]
 
 3×3 Matrix{Num}:
  y + x^2  0  2x
@@ -67,9 +67,9 @@ expressions. For example, here we will define
 
 ```julia
 function f(u)
-  [u[1]-u[3],u[1]^2-u[2],u[3]+u[2]]
+  [u[1] - u[3], u[1]^2 - u[2], u[3] + u[2]]
 end
-f([x,y,z]) # Recall that z = x^2 + y
+f([x, y, z]) # Recall that z = x^2 + y
 
 3-element Vector{Num}:
  x - y - (x^2)
@@ -91,17 +91,17 @@ f(u)
 
 ## Building Functions
 
-The function for building functions is the aptly-named `build_function`.
+The function for building functions from symbolic expressions is the aptly-named `build_function`.
 The first argument is the symbolic expression or the array of symbolic
 expressions to compile, and the trailing arguments are the arguments
 for the function. For example:
 
 ```julia
 to_compute = [x^2 + y, y^2 + x]
-f_expr = build_function(to_compute,[x,y])
+f_expr = build_function(to_compute, [x, y])
 ```
 
-gives back two codes. The first is a function `f([x,y])` that computes
+gives back two codes. The first is a function `f([x, y])` that computes
 and builds an output vector `[x^2 + y, y^2 + x]`. Because this tool
 was made to be used by all the cool kids writing fast Julia codes, it
 is specialized to Julia and supports features like StaticArrays. For
@@ -110,7 +110,7 @@ example:
 ```julia
 using StaticArrays
 myf = eval(f_expr[1])
-myf(SA[2.0,3.0])
+myf(SA[2.0, 3.0])
 
 2-element SArray{Tuple{2},Float64,1,2} with indices SOneTo(2):
   7.0
@@ -139,7 +139,7 @@ Thus we'd use it like the following:
 ```julia
 myf! = eval(f_expr[2])
 out = zeros(2)
-myf!(out,[2.0,3.0])
+myf!(out, [2.0, 3.0])
 out
 
 2-element Array{Float64,1}:
@@ -158,7 +158,7 @@ Note that if we need to avoid `eval`, for example to avoid world-age
 issues, one could do `expression = Val{false}`:
 
 ```julia
-build_function(to_compute,[x,y],expression=Val{false})
+build_function(to_compute, [x, y], expression=Val{false})
 ```
 
 which will use [RuntimeGeneratedFunctions.jl](https://github.com/SciML/RuntimeGeneratedFunctions.jl)
@@ -176,7 +176,7 @@ a function via a sparse matrix. For example:
 ```julia
 using LinearAlgebra
 N = 8
-A = sparse(Tridiagonal([x^i for i in 1:N-1],[x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
+A = sparse(Tridiagonal([x^i for i in 1:N-1], [x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
 
 8×8 SparseMatrixCSC{Num, Int64} with 22 stored entries:
  x*(y^7)            y            ⋅  …            ⋅            ⋅        ⋅    ⋅
@@ -282,12 +282,12 @@ Now let's write down the derivative of some expression:
 
 ```julia
 z = t + t^2
-D(z) # derivative(t + t ^ 2, t)
+D(z) # Symbolics.derivative(t + t^2, t)
 ```
 
 Notice that this hasn't computed anything yet: `D` is a lazy operator
-because it lets us symbolically represent "The derivative of z with
-respect to t", which is useful for example when representing our
+because it lets us symbolically represent "The derivative of ``z`` with
+respect to ``t``", which is useful for example when representing our
 favorite thing in the world, differential equations. However, if we
 want to expand the derivative operators, we'd use `expand_derivatives`:
 
@@ -295,12 +295,18 @@ want to expand the derivative operators, we'd use `expand_derivatives`:
 expand_derivatives(D(z)) # 1 + 2t
 ```
 
+To get the variable that you are taking the derivative with respect to is accessed with:
+
+```julia
+D.x # t
+```
+
 We can also have simplified functions for multivariable calculus.
 For example, we can compute the Jacobian of an array of expressions
 like:
 
 ```julia
-Symbolics.jacobian([x+x*y,x^2+y],[x,y])
+Symbolics.jacobian([x + x*y, x^2 + y], [x, y])
 
 2×2 Matrix{Num}:
  1 + y  x
@@ -317,27 +323,27 @@ to allow for simplifying symbolic expressions. This is done simply
 through the `simplify` command:
 
 ```julia
-simplify(t+t) # 2t
+simplify(2x + 2y) # 2(x + y)
 ```
 
 This can be applied to arrays by using Julia's broadcast mechanism:
 
 ```julia
-B = simplify.([t^2+t+t^2  2t+4t
-           x+y+y+2t   x^2 - x^2 + y^2])
+B = simplify.([t + t^2 + t + t^2  2t + 4t
+               x + y + y + 2t     x^2 - x^2 + y^2])
 
 2×2 Matrix{Num}:
-   t + 2(t^2)   6t
+   2(t + t^2)   6t
  x + 2(t + y)  y^2
 ```
 
 We can then use `substitute` to change values of an expression around:
 
 ```julia
-simplify.(substitute.(B, (Dict(x=>y^2),)))
+simplify.(substitute.(B, (Dict(x => y^2),)))
 
 2×2 Matrix{Num}:
-     t + 2(t^2)   6t
+     2(t + t^2)   6t
  y^2 + 2(t + y)  y^2
 ```
 
@@ -345,10 +351,10 @@ and we can use this to interactively evaluate expressions without
 generating and compiling Julia functions:
 
 ```julia
-V = substitute.(B,((Dict(x=>2.0,y=>3.0,t=>4.0),)))
+V = substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
 
 2×2 Matrix{Num}:
- 36.0  24.0
+ 40.0  24.0
  16.0   9.0
 ```
 
@@ -358,7 +364,7 @@ Where we can reference the values via:
 Symbolics.value.(V)
 
 2×2 Matrix{Float64}:
- 36.0  24.0
+ 40.0  24.0
  16.0   9.0
 ```
 
@@ -372,15 +378,19 @@ the user's code. For these cases, Symbolics.jl allows for fully
 macro-free usage. For example:
 
 ```julia
+using Symbolics: Sym
+
 x = Num(Sym{Float64}(:x))
 y = Num(Sym{Float64}(:y))
-x+y^2.0 # isa Num
+x + y^2.0 # isa Num
 
-σ = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
-w = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
-x = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
+α = Num(Variable(:α))
+σ = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:σ)) # left uncalled, since it is used as a function
+w = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:w)) # unknown, left uncalled
+x = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:x))(t)  # unknown, depends on `t`
 y = Num(Variable(:y))   # unknown, no dependents
-z = Num(Variable{Symbolics.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
+# Line below throw an error since \alpha is not defined
+z = Num(Variable{Symbolics.FnType{NTuple{3, Any}, Real}}(:z))(t, α, x)  # unknown, multiple arguments
 β₁ = Num(Variable(:β, 1)) # with index 1
 β₂ = Num(Variable(:β, 2)) # with index 2
 
@@ -396,7 +406,7 @@ If we need to use this to generate new Julia code, we can simply
 convert the output to an `Expr`:
 
 ```julia
-Symbolics.toexpr(x+y^2)
+Symbolics.toexpr(x + y^2)
 ```
 
 ## `Sym`s and callable `Sym`s
@@ -444,14 +454,14 @@ primitives. However, we can expand the allowed primitives by registering
 new functions. For example, let's register a new function `h`:
 
 ```julia
-h(x,y) = x^2 + y
-@register h(x,y)
+h(x, y) = x^2 + y
+@register h(x, y)
 ```
 
-Now when we use `h(x,y)`, it is a symbolic expression and doesn't expand:
+Now when we use `h(x, y)`, it is a symbolic expression and doesn't expand:
 
 ```julia
-julia> h(x,y) + y^2
+julia> h(x, y) + y^2
 h(x(t), y(t)) + (y(t))^2
 ```
 
@@ -468,6 +478,6 @@ Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1
 and now it works with the rest of the system:
 
 ```julia
-derivative(h(x,y) + y^2, x) # 2x
-derivative(h(x,y) + y^2, y) # 1 + 2y
+Symbolics.derivative(h(x, y) + y^2, x) # 2x
+Symbolics.derivative(h(x, y) + y^2, y) # 1 + 2y
 ```

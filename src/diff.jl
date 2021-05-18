@@ -92,6 +92,11 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             return D(arg) # Cannot expand
         elseif isa(operation(arg), Sym)
             return D(arg) # Cannot expand
+        elseif isa(operation(arg), typeof(IfElse.ifelse))
+            args = arguments(arg)
+            op = operation(arg)
+            O = op(args[1], D(args[2]), D(args[3]))
+            return expand_derivatives(O, simplify; occurances)
         elseif isa(operation(arg), Differential)
             # The recursive expand_derivatives was not able to remove
             # a nested Differential. We can attempt to differentiate the
@@ -425,6 +430,7 @@ let
           @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
           @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
           @rule (~f)(~x::(!isidx)) => _scalar
+
           @rule (~f)(~x::isidx) => if haslinearity_1(~f)
               combine_terms_1(linearity_1(~f), ~x)
           else
@@ -439,7 +445,8 @@ let
               else
                   error("Function of unknown linearity used: ", ~f)
               end
-          end]
+          end
+          @rule ~x::(x->x isa Sym) => 0]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=simterm))
 
     global hessian_sparsity
@@ -459,10 +466,19 @@ end
 """
 $(SIGNATURES)
 
+Check if an expression is affine with respect to a list of variable expressions.
+"""
+function isaffine(ex, u)
+    isempty(hessian_sparsity(ex, u).nzval)
+end
+
+"""
+$(SIGNATURES)
+
 Check if an expression is linear with respect to a list of variable expressions.
 """
 function islinear(ex, u)
-    isempty(hessian_sparsity(ex, u).nzval)
+    isaffine(ex, u) && iszero(Num(substitute(ex, Dict(u .=> 0))))
 end
 
 """

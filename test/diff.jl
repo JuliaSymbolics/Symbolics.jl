@@ -1,5 +1,6 @@
 using Symbolics
 using Test
+using IfElse
 
 # Derivatives
 @variables t σ ρ β
@@ -9,7 +10,7 @@ D = Differential(t)
 D2 = Differential(t)^2
 Dx = Differential(x)
 
-@test Symbol(D(D(uu))) === Symbol("uuˍtt⦗t⦘")
+@test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
 @test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
@@ -102,7 +103,7 @@ t1 = Symbolics.gradient(tmp, [x1, x2])
 @variables t k
 @variables x(t)
 D = Differential(k)
-@test Symbolics.tosymbol(D(x).val) === Symbol("xˍk⦗t⦘")
+@test Symbolics.tosymbol(D(x).val) === Symbol("xˍk(t)")
 
 using Symbolics
 @variables t x(t)
@@ -204,3 +205,8 @@ sp_hess = Symbolics.sparsehessian(rr, X)
 expression = sin(x[1] + x[2] + x[3] + x[4]) |> Differential(t) |> expand_derivatives
 expression2 = substitute(expression, Dict(Differential(t).(x) .=> ẋ))
 @test isequal(expression2, (ẋ[1] + ẋ[2] + ẋ[3] + ẋ[4])*cos(x[1] + x[2] + x[3] + x[4]))
+
+@test isequal(
+    Symbolics.derivative(IfElse.ifelse(signbit(b), b^2, sqrt(b)), b),
+    IfElse.ifelse(signbit(b), 2b, (1//2)*(sqrt(b)^-1))
+)

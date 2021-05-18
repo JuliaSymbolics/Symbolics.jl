@@ -21,15 +21,27 @@ SymbolicUtils.@number_methods(
                               Num,
                               Num(f(value(a))),
                               Num(f(value(a), value(b))),
-                              [conj, real]
+                              [conj, real, transpose]
                              )
 Base.conj(x::Num) = x
+Base.transpose(x::Num) = x
+
+Base.eps(::Type{Num}) = Num(0)
+Base.typemin(::Type{Num}) = Num(-Inf)
+Base.typemax(::Type{Num}) = Num(Inf)
+Base.float(x::Num) = x
+
+IfElse.ifelse(x::Num,y,z) = Num(IfElse.ifelse(value(x), value(y), value(z)))
 
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
 for C in [Complex, Complex{Bool}]
     @eval begin
         Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
         Base.:*(z::$C, x::Num) = Complex(real(z) * x, imag(z) * x)
+        Base.:/(x::Num, z::$C) = let (a, b) = reim(z), den = a^2 + b^2
+            Complex(x * a / den, x * b / den)
+        end
+        Base.:/(z::$C, x::Num) = Complex(real(z) / x, imag(z) / x)
         Base.:+(x::Num, z::$C) = Complex(x + real(z), imag(z))
         Base.:+(z::$C, x::Num) = Complex(real(z) + x, imag(z))
         Base.:-(x::Num, z::$C) = Complex(x - real(z), -imag(z))
@@ -60,6 +72,7 @@ function Base.show(io::IO, z::Complex{<:Num})
 end
 
 SymbolicUtils.simplify(n::Num; kw...) = Num(SymbolicUtils.simplify(value(n); kw...))
+SymbolicUtils.expand(n::Num) = Num(SymbolicUtils.expand(value(n)))
 """
     substitute(expr, s::Dict)
 
@@ -92,8 +105,17 @@ end
 SymbolicUtils.symtype(n::Num) = symtype(n.val)
 
 function Base.iszero(x::Num)
-    _x = SymbolicUtils.to_mpoly(value(x))[1]
+    x = value(x)
+    x isa Number && iszero(x) && return true
+    _x = SymbolicUtils.to_mpoly(x)[1]
     return (_x isa Number || _x isa SymbolicUtils.MPoly) && iszero(_x)
+end
+
+function Base.isone(x::Num)
+    x = value(x)
+    x isa Number && isone(x) && return true
+    _x = SymbolicUtils.to_mpoly(x)[1]
+    return (_x isa Number || _x isa SymbolicUtils.MPoly) && isone(_x)
 end
 
 import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
@@ -140,21 +162,20 @@ macro num_method(f, expr, Ts=nothing)
     end |> esc
 end
 
-"""
-    tosymbolic(a::Union{Sym,Num}) -> Sym{Real}
-    tosymbolic(a::T) -> T
-"""
-tosymbolic(a::Num) = tosymbolic(value(a))
-tosymbolic(a::Sym) = Sym{symtype(a)}(nameof(a)) # unwrap stuff like Parameter{<:Number}
-tosymbolic(a) = a
+# Boolean operations
+for (f, Domain) in [:(==) => :((AbstractFloat, Number)), :(!=) => :((AbstractFloat, Number)),
+                    :(<=) => :((Real,)),   :(>=) => :((Real,)),
+                    :(isless) => :((Real,)),
+                    :(<) => :((Real,)),   :(> ) => :((Real,)),
+                    :(& )=> :((Bool,)),  :(| ) => :((Bool,)),
+                    :xor => :((Bool,))]
+    @eval @num_method Base.$f (val = $f(value(a), value(b)); val isa Bool ? val : Num(val)) $Domain
+end
 
-@num_method Base.isless  (val = isless(tosymbolic(a), tosymbolic(b)); val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(<)    (val = tosymbolic(a) < tosymbolic(b)       ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(<=)   (val = tosymbolic(a) <= tosymbolic(b)      ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(>)    (val = tosymbolic(a) > tosymbolic(b)       ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(>=)   (val = tosymbolic(a) >= tosymbolic(b)      ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(==)   (val = tosymbolic(a) == tosymbolic(b)      ; val isa Bool ? val : Num(val)) (AbstractFloat,Number)
-@num_method Base.isequal isequal(tosymbolic(a), tosymbolic(b)) (AbstractFloat, Number, Symbolic)
+for f in [:!, :~]
+    @eval Base.$f(x::Num) = (val = $f(value(x)); val isa Bool ? val : Num(val))
+end
+@num_method Base.isequal isequal(value(a), value(b)) (AbstractFloat, Number, Symbolic)
 
 Base.hash(x::Num, h::UInt) = hash(value(x), h)
 
@@ -166,7 +187,7 @@ Base.convert(::Type{<:Array{Num}}, x::AbstractArray) = map(Num, x)
 Base.convert(::Type{<:Array{Num}}, x::AbstractArray{Num}) = x
 Base.convert(::Type{Sym}, x::Num) = value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
 
-LinearAlgebra.lu(x::Array{Num}; check=true, kw...) = sym_lu(x; check=check)
+LinearAlgebra.lu(x::Union{Adjoint{<:Num},Transpose{<:Num},Array{<:Num}}; check=true, kw...) = sym_lu(x; check=check)
 
 _iszero(x::Number) = iszero(x)
 _isone(x::Number) = isone(x)
@@ -176,3 +197,7 @@ _iszero(x::Num) = _iszero(value(x))
 _isone(x::Num) = _isone(value(x))
 
 SymbolicUtils.Code.toexpr(x::Num) = SymbolicUtils.Code.toexpr(value(x))
+
+SymbolicUtils.setmetadata(x::Num, t, v) = Num(SymbolicUtils.setmetadata(value(x), t, v))
+SymbolicUtils.getmetadata(x::Num, t) = SymbolicUtils.getmetadata(value(x), t)
+SymbolicUtils.hasmetadata(x::Num, t) = SymbolicUtils.hasmetadata(value(x), t)
