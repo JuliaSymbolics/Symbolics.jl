@@ -3,7 +3,7 @@ function flatten_expr!(x)
     isb = isblock(x)
     if isb
         x = MacroTools.striplines(x[1])
-        filter!(z->z isa Symbol || z.head != :line, x.args)
+        filter!(z -> z isa Symbol || z.head != :line, x.args)
         x = (x.args...,)
     end
     x
@@ -176,5 +176,26 @@ makesym(t::Symbolic; kwargs...) = Sym{symtype(t)}(tosymbol(t; kwargs...))
 makesym(t::Num; kwargs...) = makesym(value(t); kwargs...)
 
 var_from_nested_derivative(x, i=0) = (missing, missing)
-var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1],i+1) : (x,i)
-var_from_nested_derivative(x::Sym,i=0) = (x,i)
+var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
+var_from_nested_derivative(x::Sym,i=0) = (x, i)
+
+function degree(p)
+    if typeof(p) <: Integer || typeof(p) in [Float16, Float32, Float64]
+        return 0
+    end
+    if typeof(p) <: Num
+        p = expand(p)
+        if !hasproperty(p.val, :sorted_args_cache)
+            return hasproperty(p.val, :exp) ? p.val.exp : 1
+        else 
+            highest_deg_monomial = last(p.val.sorted_args_cache.x)
+            if hasproperty(highest_deg_monomial, :exp) 
+                return 1
+            elseif hasproperty(highest_deg_monomial, :val)
+                return sum(map(U -> hasproperty(U, :exp) ? U.exp : 1, highest_deg_monomial.sorted_args_cache.x))
+            end
+        end
+    else
+        error("Error")
+    end
+end
