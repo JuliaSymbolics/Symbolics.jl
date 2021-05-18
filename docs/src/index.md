@@ -17,12 +17,14 @@ Pkg.add("Symbolics")
 
 If you use Symbolics.jl, please [cite this paper](https://arxiv.org/abs/2105.03949)
 
+```
 @article{gowda2021high,
   title={High-performance symbolic-numerics via multiple dispatch},
   author={Gowda, Shashi and Ma, Yingbo and Cheli, Alessandro and Gwozdz, Maja and Shah, Viral B and Edelman, Alan and Rackauckas, Christopher},
   journal={arXiv preprint arXiv:2105.03949},
   year={2021}
 }
+```
 
 ## Feature Summary
 
