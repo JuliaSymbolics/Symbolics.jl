@@ -183,23 +183,49 @@ var_from_nested_derivative(x, i=0) = (missing, missing)
 var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
 var_from_nested_derivative(x::Sym,i=0) = (x, i)
 
-function degree(p)
+function degree(p::Sym, sym::Union{Sym,Nothing}=nothing)
+    if sym === nothing
+        return 1
+    else
+        return p.name == sym.name ? 1 : 0
+    end
+end
+
+function degree(p::Pow, sym::Union{Sym,Nothing}=nothing)
+    if sym === nothing
+        return p.exp
+    else
+        return p.base.name == sym.name ? p.exp : 0
+    end
+end
+
+function degree(p::Add, sym::Union{Sym,Nothing}=nothing)
+    dict = p.dict
+    ks = collect(keys(dict))
+    degrees = map(t -> degree(t, sym), ks)
+    return maximum(degrees)
+end
+        
+function degree(p::Mul, sym::Union{Sym,Nothing}=nothing)
+    if (sym === nothing)
+        dict = p.dict
+        vals = collect(values(dict))
+        total_degree = sum(vals)
+        return total_degree
+    else
+        dict = p.dict
+        return dict[sym]
+    end
+end
+ 
+function degree(p::Union{Num,Real,Int}, sym::Union{Num,Nothing}=nothing)
     if typeof(p) <: Integer || typeof(p) in [Float16, Float32, Float64]
         return 0
     end
-    if typeof(p) <: Num
-        p = expand(p)
-        if !hasproperty(p.val, :sorted_args_cache)
-            return hasproperty(p.val, :exp) ? p.val.exp : 1
-        else 
-            highest_deg_monomial = last(p.val.sorted_args_cache.x)
-            if hasproperty(highest_deg_monomial, :exp) 
-                return 1
-            elseif hasproperty(highest_deg_monomial, :val)
-                return sum(map(U -> hasproperty(U, :exp) ? U.exp : 1, highest_deg_monomial.sorted_args_cache.x))
-            end
-        end
+    p = expand(p)
+    if (sym === nothing)
+        return degree(p.val)
     else
-        error("Error")
+        return degree(p.val, sym.val)
     end
 end
