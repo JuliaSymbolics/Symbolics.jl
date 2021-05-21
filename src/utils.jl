@@ -214,7 +214,11 @@ function degree(p::Mul, sym::Union{Sym,Nothing}=nothing)
         return total_degree
     else
         dict = p.dict
-        return dict[sym]
+        if sym in keys(dict)
+            return dict[sym]
+        else
+            return 0
+        end
     end
 end
  
