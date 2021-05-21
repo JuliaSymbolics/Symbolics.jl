@@ -51,6 +51,9 @@ export Differential, expand_derivatives
 
 include("diff.jl")
 
+export Integral
+include("integral.jl")
+
 include("linear_algebra.jl")
 
 import Libdl
