@@ -11,7 +11,7 @@ end
 SymbolicUtils.promote_symtype(::Integral, x) = x
 
 function Base.show(io::IO, I::Integral)
-    print(io, "Differential(", I.x, ")")
+    print(io, "Integral(", I.x, ")")
     print(io,"upper_bound: ")
     show(io,I.ub)
     println(io , "lower_bound")
