@@ -11,8 +11,8 @@ SymbolicUtils.promote_symtype(::Integral, x) = x
 
 function Base.show(io::IO, I::Integral)
     print(io, "Integral(", I.x, ")")
-    print(io,"domain: ")
-    show(io,I.domain)
+    print(io, "domain: ")
+    show(io, I.domain)
 end
 
-Base.:(==)(I1::Integral, I2::Integral) = isequal(I1.x, I2.x) && isequal(I1.domain,I2.domain)
+Base.:(==)(I1::Integral, I2::Integral) = (isequal(I1.x, I2.x) && isequal(I1.domain, I2.domain))
