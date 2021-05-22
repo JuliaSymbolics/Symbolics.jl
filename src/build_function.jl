@@ -89,7 +89,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          linenumbers = true)
 
     dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
-    expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
+    expr = conv(Func(dargs, [], unflatten_long_ops(op)))
 
     if expression == Val{true}
         expr
