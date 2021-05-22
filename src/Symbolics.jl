@@ -6,6 +6,9 @@ using LinearAlgebra
 
 using Reexport
 
+using DomainSets
+
+import DomainSets: Domain
 @reexport using SymbolicUtils
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
