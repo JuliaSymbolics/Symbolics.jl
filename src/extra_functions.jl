@@ -2,9 +2,9 @@
 @register Base.getindex(x,i) # define one and only one promotion rule
 @register Base.binomial(n,k)
 
-Base.sign(x::Symbolic) = Term{Int}(sign, [x])
-Base.sign(x::Num) = Num(sign(value(x)))
+@register Base.sign(x)::Int
 derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
+
 @register Base.signbit(x)::Bool
 derivative(::typeof(signbit), args::NTuple{1,Any}, ::Val{1}) = 0
 derivative(::typeof(abs), args::NTuple{1,Any}, ::Val{1}) = IfElse.ifelse(signbit(args[1]),-one(args[1]),one(args[1]))
