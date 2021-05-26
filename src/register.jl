@@ -53,7 +53,7 @@ macro register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
                 wrap =  any(x->typeof(x) <: $Num, tuple($(setinds(args, symbolic_args, ts)...),)) ? $Num : $identity
                 args = ($(map(name, args)...),)
                 if all(arg -> !(arg isa $Symbolic), args)
-                    $f(args...,)
+                    wrap($f(args...,))
                 else
                     wrap($Term{$ret_type}($f, collect(args)))
                 end
