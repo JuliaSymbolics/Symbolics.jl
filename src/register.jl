@@ -1,3 +1,4 @@
+using SymbolicUtils: Symbolic
 """
     @register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
 
@@ -50,7 +51,12 @@ macro register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
         push!(ex.args, quote
             function $f($(setinds(args, symbolic_args, ts)...))
                 wrap =  any(x->typeof(x) <: $Num, tuple($(setinds(args, symbolic_args, ts)...),)) ? $Num : $identity
-                wrap($Term{$ret_type}($f, [$(map(name, args)...)]))
+                args = ($(map(name, args)...),)
+                if all(arg -> !(arg isa $Symbolic), args)
+                    $f(args...,)
+                else
+                    wrap($Term{$ret_type}($f, collect(args)))
+                end
             end
         end)
     end
