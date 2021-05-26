@@ -79,7 +79,13 @@ end
 
 # Scalar output
 
-destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds) = DestructuredArgs(map(value, arg), inbounds=inbounds)
+function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds)
+    if !(arg isa Arr)
+        DestructuredArgs(map(value, arg), inbounds=inbounds)
+    else
+        arg
+    end
+end
 destructure_arg(arg, _) = arg
 
 function _build_function(target::JuliaTarget, op, args...;
