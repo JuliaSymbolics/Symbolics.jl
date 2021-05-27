@@ -142,7 +142,7 @@ function tosymbol(t::Term; states=nothing, escape=true)
     elseif operation(t) isa Differential
         term = diff2term(t)
         op = Symbol(operation(term))
-        args = arguments(term)
+    args = arguments(term)
     else
         @goto err
     end
@@ -183,7 +183,7 @@ var_from_nested_derivative(x, i=0) = (missing, missing)
 var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
 var_from_nested_derivative(x::Sym,i=0) = (x, i)
 
-function degree(p::Sym, sym::Union{Sym,Nothing}=nothing)
+function degree(p::Sym, sym=nothing)
     if sym === nothing
         return 1
     else
@@ -191,22 +191,36 @@ function degree(p::Sym, sym::Union{Sym,Nothing}=nothing)
     end
 end
 
-function degree(p::Pow, sym::Union{Sym,Nothing}=nothing)
+function degree(p::Pow, sym=nothing)
     if sym === nothing
         return p.exp
     else
-        return p.base.name == sym.name ? p.exp : 0
+        if hasproperty(p.base, :name)
+            p_name = p.base.name
+        elseif hasproperty(p.base, :f)
+            p_name = p.base.f
+        else
+            p_name = nothing
+        end
+        if hasproperty(sym, :name)
+            sym_name = sym.name
+        elseif hasproperty(sym, :f)
+            sym_name = sym.f
+        else
+            sym_name = nothing
+        end
+        return p_name == sym_name && (p_name != nothing) && (sym_name != nothing) ? p.exp : 0
     end
 end
 
-function degree(p::Add, sym::Union{Sym,Nothing}=nothing)
+function degree(p::Add, sym=nothing)
     dict = p.dict
     ks = collect(keys(dict))
     degrees = map(t -> degree(t, sym), ks)
     return maximum(degrees)
 end
         
-function degree(p::Mul, sym::Union{Sym,Nothing}=nothing)
+function degree(p::Mul, sym=nothing)
     if (sym === nothing)
         dict = p.dict
         vals = collect(values(dict))
@@ -221,8 +235,23 @@ function degree(p::Mul, sym::Union{Sym,Nothing}=nothing)
         end
     end
 end
+
+function degree(p::Term, sym=nothing)
+    if sym === nothing
+        return 1
+    else
+        if hasproperty(sym, :name)
+            sym_name = sym.name
+        elseif hasproperty(sym, :f)
+            sym_name = sym.f
+        else
+            sym_name = nothing
+        end
+        return p.f == sym_name ? 1 : 0
+    end
+end
  
-function degree(p::Union{Num,Real,Int}, sym::Union{Num,Nothing}=nothing)
+function degree(p::Union{Num,Real,Int}, sym=nothing)
     if typeof(p) <: Integer || typeof(p) in [Float16, Float32, Float64]
         return 0
     end
