@@ -252,7 +252,7 @@ function degree(p::Term, sym=nothing)
 end
  
 function degree(p::Union{Num,Real,Int}, sym=nothing)
-    if typeof(p) <: Integer || typeof(p) in [Float16, Float32, Float64]
+    if p isa Integer || p isa Union{Float16, Float32, Float64}
         return 0
     end
     p = expand(p)
