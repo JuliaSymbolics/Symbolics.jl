@@ -142,7 +142,7 @@ function tosymbol(t::Term; states=nothing, escape=true)
     elseif operation(t) isa Differential
         term = diff2term(t)
         op = Symbol(operation(term))
-    args = arguments(term)
+        args = arguments(term)
     else
         @goto err
     end
