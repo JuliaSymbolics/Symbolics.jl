@@ -168,7 +168,8 @@ eqs = [
 @test [2 1 -1; -3 1 -1; 0 1 -5] * Symbolics.solve_for(eqs, [x, y, z]) == [2; -2; -2]
 @test isequal(Symbolics.solve_for(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x), 1//7*y - 2//7*z)
 
-@test isequal(sign(x), Num(SymbolicUtils.Term{Int}(sign, [x])))
+@test isequal(sign(x), Num(SymbolicUtils.Term{Int}(sign, [Symbolics.value(x)])))
+@test sign(Num(1)) isa Num
 @test isequal(sign(Num(1)), Num(1))
 @test isequal(sign(Num(-1)), Num(-1))
 
@@ -199,3 +200,4 @@ x = Num.(randn(10))
 
 @variables t p x(t) y(t) z(t)
 @test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)
+@test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num

@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 authors = ["Shashi Gowda <gowda@mit.edu>"]
-version = "0.1.24"
+version = "0.1.26"
 
 [deps]
 AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
@@ -27,9 +27,9 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
-AbstractAlgebra = "0.13, 0.14, 0.15, 0.16"
+AbstractAlgebra = "0.13, 0.14, 0.15, 0.16, 0.17"
 DiffRules = "0.1, 1.0"
-Distributions = "0.23, 0.24"
+Distributions = "0.23, 0.24, 0.25"
 DocStringExtensions = "0.7, 0.8"
 IfElse = "0.1"
 Latexify = "0.11, 0.12, 0.13, 0.14, 0.15"
