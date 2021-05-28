@@ -184,55 +184,26 @@ var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_fr
 var_from_nested_derivative(x::Sym,i=0) = (x, i)
 
 function degree(p::Sym, sym=nothing)
-    if sym === nothing
+    if isequal(sym, nothing)
         return 1
     else
-        return p.name == sym.name ? 1 : 0
+        return isequal(nameof(p), nameof(sym)) ? 1 : 0
     end
 end
 
 function degree(p::Pow, sym=nothing)
-    if sym === nothing
-        return p.exp
-    else
-        if hasproperty(p.base, :name)
-            p_name = p.base.name
-        elseif hasproperty(p.base, :f)
-            p_name = p.base.f
-        else
-            p_name = nothing
-        end
-        if hasproperty(sym, :name)
-            sym_name = sym.name
-        elseif hasproperty(sym, :f)
-            sym_name = sym.f
-        else
-            sym_name = nothing
-        end
-        return p_name == sym_name && (p_name != nothing) && (sym_name != nothing) ? p.exp : 0
-    end
+    return p.exp * degree(p.base, sym)
 end
 
 function degree(p::Add, sym=nothing)
-    dict = p.dict
-    ks = collect(keys(dict))
-    degrees = map(t -> degree(t, sym), ks)
-    return maximum(degrees)
+    return maximum([degree(key, sym) for key in keys(p.dict)])
 end
         
 function degree(p::Mul, sym=nothing)
-    if (sym === nothing)
-        dict = p.dict
-        vals = collect(values(dict))
-        total_degree = sum(vals)
-        return total_degree
+    if isequal(sym, nothing)
+        return sum(values(p.dict))
     else
-        dict = p.dict
-        if sym in keys(dict)
-            return dict[sym]
-        else
-            return 0
-        end
+        return get(p.dict, sym, 0)
     end
 end
 
@@ -241,7 +212,7 @@ function degree(p::Term, sym=nothing)
         return 1
     else
         if hasproperty(sym, :name)
-            sym_name = sym.name
+            sym_name = nameof(sym)
         elseif hasproperty(sym, :f)
             sym_name = sym.f
         else
@@ -251,14 +222,9 @@ function degree(p::Term, sym=nothing)
     end
 end
  
-function degree(p::Union{Num,Real,Int}, sym=nothing)
-    if typeof(p) <: Integer || typeof(p) in [Float16, Float32, Float64]
+function degree(p, sym=nothing)
+    if value(p) isa Number
         return 0
     end
-    p = expand(p)
-    if (sym === nothing)
-        return degree(p.val)
-    else
-        return degree(p.val, sym.val)
-    end
+    return degree(value(p), value(sym))
 end
