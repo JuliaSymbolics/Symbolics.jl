@@ -187,7 +187,7 @@ function degree(p::Sym, sym=nothing)
     if isequal(sym, nothing)
         return 1
     else
-        return isequal(nameof(p), nameof(sym)) ? 1 : 0
+        return isequal(p, sym) ? 1 : 0
     end
 end
 
@@ -225,6 +225,9 @@ end
 function degree(p, sym=nothing)
     if value(p) isa Number
         return 0
+    end
+    if isequal(value(p), value(sym))
+        return 1
     end
     return degree(value(p), value(sym))
 end
