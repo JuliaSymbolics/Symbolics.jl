@@ -161,8 +161,8 @@ isadjointvec(A::ArrayOp) = isadjointvec(A.term)
 isadjointvec(A) = false
 
 # TODO: add more such methods
-function getindex(A::AbstractArray, i::Symbolic{<:Integer}...)
-    Term{eltype(A)}(getindex, [A, i...])
+function getindex(A::AbstractArray, i::Symbolic{<:Integer}, ii::Symbolic{<:Integer}...)
+    Term{eltype(A)}(getindex, [A, i, ii...])
 end
 
 function getindex(A::AbstractArray, i::Int, j::Symbolic{<:Integer})
