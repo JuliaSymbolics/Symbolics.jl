@@ -17,11 +17,20 @@ ball = Ball(2.5, [1,2])
 t in domain
 domains = [t ∈ Interval(0.0,1.0),
            x ∈ Interval(0.0,1.0)]
+@test domains[1] isa VarDomainPairing
+@test domains[2] isa VarDomainPairing
+
+@syms y z
+@test ((x,y) ∈ Ball(2.0, [0,0])) isa VarDomainPairing
+@test ((x,y,z) ∈ Ball(1.5, [1,2,3])) isa VarDomainPairing
 
 # Test tuple gets converted to Interval
 var_domain_pair = t ∈ (0,1)
+@test var_domain_pair isa VarDomainPairing
 @test var_domain_pair.domain isa Interval
 
-@syms y z
-(x,y) ∈ Ball(2.0, [0,0])
-(x,y,z) ∈ Ball(1.5, [1,2,3])
+# Other types
+t = Symbolics.Num(:t)
+@assert (t ∈ domain) isa VarDomainPairing
+t = Symbolics.Variable(:t)
+@assert (t ∈ domain) isa VarDomainPairing
