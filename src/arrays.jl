@@ -54,7 +54,7 @@ end
 function ArrayOp(a::AbstractArray)
     i = makesubscripts(ndims(a))
     # TODO: formalize symtype(::Type) then!
-    ArrayOp(symtype(eltype(a)), (i...,), a[i...], +, a)
+    ArrayOp(symtype(a), (i...,), a[i...], +, a)
 end
 
 ConstructionBase.constructorof(s::Type{<:ArrayOp{T}}) where {T} = ArrayOp{T}
@@ -178,7 +178,7 @@ end
 function ranges(a::ArrayOp)
     rs = Dict{Sym, Any}()
     ax = idx_to_axes(a.expr)
-    for i in a.output_idx
+    for i in keys(ax)
         if haskey(a.ranges, i)
             rs[i] = a.ranges[i]
         else
@@ -481,6 +481,9 @@ function replace_by_scalarizing(ex, dict)
     Prewalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), Chain([rewrite_operation, rule]))), similarterm=simterm)(ex)
 end
 
+function scalarize(arr::AbstractArray, idx)
+    arr[idx...]
+end
 
 function scalarize(arr::ArrayOp, idx)
     @assert length(arr.output_idx) == length(idx)
@@ -507,7 +510,6 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
                                           unwrap.(idx)))
 
 function scalarize(arr)
-    arr = unwrap(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
         map(Iterators.product(axes(arr)...)) do i
             scalarize(arr, i)

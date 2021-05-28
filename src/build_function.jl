@@ -325,11 +325,11 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
     ii = findall(i->!(rhss[i] isa AbstractArray) && !(skipzeros && _iszero(rhss[i])), eachindex(outputidxs))
     jj = findall(i->rhss[i] isa AbstractArray, eachindex(outputidxs))
     exprs = []
-    rhss_scalar = unflatten_long_ops.(vec(rhss[ii]))
     setterexpr = SetArray(!checkbounds,
                           out,
-                          AtIndex.(vec(collect(outputidxs[ii])),
-                                   rhss_scalar))
+                          [AtIndex(outputidxs[ii[i]],
+                                   unflatten_long_ops(rhss[i]))
+                           for i in 1:length(ii)])
     push!(exprs, setterexpr)
     for j in jj
         push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros))

@@ -1,8 +1,8 @@
 @symbolic_wrap struct Num <: Real
-    value
+    val
 end
 
-unwrap(x::Num) = x.value
+unwrap(x::Num) = x.val
 
 """
     Num(val)
