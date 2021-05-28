@@ -173,6 +173,14 @@ function getindex(A::AbstractArray, j::Symbolic{<:Integer}, i::Int)
     Term{eltype(A)}(getindex, [A, j, i])
 end
 
+function getindex(A::Arr, i::Int, j::Symbolic{<:Integer})
+    wrap(unwrap(A)[i,j])
+end
+
+function getindex(A::Arr, j::Symbolic{<:Integer}, i::Int)
+    wrap(unwrap(A)[j,i])
+end
+
 function _matmul(A,B)
     @syms i::Int j::Int k::Int
     if isadjointvec(A)

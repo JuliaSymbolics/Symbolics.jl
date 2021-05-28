@@ -127,27 +127,10 @@ end
 _toexpr(eqs::AbstractArray) = map(eq->_toexpr(eq), eqs)
 _toexpr(x::Num) = _toexpr(value(x))
 
-const IndexMap = Dict{Char,Char}(
-            '0' => '₀',
-            '1' => '₁',
-            '2' => '₂',
-            '3' => '₃',
-            '4' => '₄',
-            '5' => '₅',
-            '6' => '₆',
-            '7' => '₇',
-            '8' => '₈',
-            '9' => '₉')
-
-function make_subscript(idx)
-    str = string(idx)
-    join(IndexMap[c] for c in str)
-end
-
 function getindex_to_symbol(t)
     @assert istree(t) && operation(t) === getindex && symtype(arguments(t)[1]) <: AbstractArray
     args = arguments(t)
     idxs = args[2:end]
-    sub = join(map(make_subscript, idxs), "ˏ")
+    sub = join(map(map_subscripts, idxs), "ˏ")
     return Symbol(_toexpr(args[1]), sub)
 end
