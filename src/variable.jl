@@ -266,7 +266,7 @@ function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
         # [(R -> R)(R) ....]
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($scalarize_getindex($map(f->f($(call_args...)), $ex)))
+        :($scalarize_getindex($map(f->$unwrap(f($(call_args...))), $ex)))
 
     end
 
