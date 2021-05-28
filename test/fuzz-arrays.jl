@@ -1,4 +1,4 @@
-using SymbolicUtils
+using Symbolics
 using Test
 using LinearAlgebra
 
@@ -43,7 +43,7 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
         end
         @label test_size
 
-        if (a isa Adjoint{<:Any, <:AbstractVector} && ndims(b) == 1) || SymbolicUtils.isdot(a, b)
+        if (a isa Adjoint{<:Any, <:AbstractVector} && ndims(b) == 1) || Symbolics.isdot(a, b)
             if size(a*b) != ()
                 println("a * b is wrong:")
                 @show a b
