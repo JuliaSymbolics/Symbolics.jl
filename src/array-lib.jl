@@ -13,6 +13,9 @@ struct GetindexPosthookCtx end
         setmetadata(x, GetindexPosthookCtx, f)
     end
 end
+function Base.getindex(x::SymArray, idx::CartesianIndex)
+    return x[Tuple(idx)...]
+end
 
 function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)
