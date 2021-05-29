@@ -92,15 +92,15 @@ function solve_for(eqs, vars; simplify=true, check=true)
 end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
-    A = SymbolicUtils.simplify.(Num.(A), polynorm=true)
-    b = SymbolicUtils.simplify.(Num.(b), polynorm=true)
+    A = SymbolicUtils.simplify.(Num.(A), expand=true)
+    b = SymbolicUtils.simplify.(Num.(b), expand=true)
     sol = value.(sym_lu(A) \ b)
-    do_simplify ? SymbolicUtils.simplify.(sol, polynorm=true) : sol
+    do_simplify ? SymbolicUtils.simplify.(sol, expand=true) : sol
 end
 
 function _solve(a, b, do_simplify)
     sol = value(b/a)
-    do_simplify ? SymbolicUtils.simplify(sol, polynorm=true) : sol
+    do_simplify ? SymbolicUtils.simplify(sol, expand=true) : sol
 end
 
 # ldiv below

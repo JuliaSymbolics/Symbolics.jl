@@ -42,7 +42,7 @@ X = [0 b c; d e f; g h i]
 F = lu(X)
 @test_nowarn lu(X'), lu(transpose(X))
 @test F.p == [2, 1, 3]
-R = simplify.(F.L * F.U - X[F.p, :], polynorm=true)
+R = simplify.(F.L * F.U - X[F.p, :])
 @test iszero(R)
 @test simplify.(F \ X) == I
 @test Symbolics._solve(X, X, true) == I
@@ -201,3 +201,6 @@ x = Num.(randn(10))
 @variables t p x(t) y(t) z(t)
 @test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)
 @test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num
+
+@variables p x y
+@test isequal(Symbolics.solve_for(x * p + y * (1 - p) ~ 0, p), y/(y - x))
