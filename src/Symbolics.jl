@@ -65,4 +65,7 @@ include("latexify_recipes.jl")
 
 using RecipesBase
 include("plot_recipes.jl")
+
+include("domains.jl")
+
 end # module
