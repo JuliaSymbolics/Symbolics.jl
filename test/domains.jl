@@ -1,4 +1,5 @@
 using Symbolics, Test
+import Symbolics: VarDomainPairing
 import DomainSets: Interval, Ball, infimum, supremum, radius, center
 
 domain = Interval(0, 1)
