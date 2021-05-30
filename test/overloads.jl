@@ -204,3 +204,10 @@ x = Num.(randn(10))
 
 @variables p x y
 @test isequal(Symbolics.solve_for(x * p + y * (1 - p) ~ 0, p), y/(y - x))
+@test isequal(Symbolics.solve_for(x * p ~ 0, p), 0)
+@test_throws Any Symbolics.solve_for(1/x + p * p/x ~ 0, p)
+@test isequal(Symbolics.solve_for(x * y ~ p, x), p / y)
+@test isequal(Symbolics.solve_for(x * y ~ p, y), p / x)
+@test isequal(Symbolics.solve_for(x * y ~ p, p), x * y)
+@test isequal(Symbolics.solve_for(x^2 * y ~ p, y), p / x^2)
+@test isequal(Symbolics.solve_for(x^2 * y ~ p, p), x^2 * y)
