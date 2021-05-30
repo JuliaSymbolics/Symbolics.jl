@@ -187,3 +187,62 @@ function LinearAlgebra.norm(x::AbstractArray{Num}, p::Real=2)
         sum(x->abs(x)^p, x)^inv(p)
     end
 end
+
+"""
+    (a, b, islinear) = linear_expansion(t, x)
+
+When `islinear`, return `a` and `b` such that `a * x + b == t`.
+"""
+linear_expansion(t::Num, x) = linear_expansion(value(t), value(x))
+_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true) # trival case
+function linear_expansion(t, x)
+    t isa Symbolic || return (0, t, true)
+    x = value(x)
+    istree(t) || return _linear_expansion(t, x)
+
+    op, args = operation(t), arguments(t)
+    op isa Differential && _linear_expansion(t, x)
+
+    if op === (+)
+        a₁ = b₁ = 0
+        islinear = true
+        # (a₁ x + b₁) + (a₂ x + b₂) = (a₁ + a₂) x + (b₁ + b₂)
+        for (i, arg) in enumerate(args)
+            a₂, b₂, islinear = linear_expansion(arg, x)
+            islinear || return (a₁, b₁, false)
+            a₁ += a₂
+            b₁ += b₂
+        end
+        return (a₁, b₁, true)
+    elseif op === (-)
+        @assert length(args) == 1
+        a, b, islinear = linear_expansion(args[1], x)
+        return (-a, -b, islinear)
+    elseif op === (*)
+        # (a₁ x + b₁) (a₂ x + b₂) = a₁ a₂ x² + (a₁ b₂ + a₂ b₁) x + b₁ b₂
+        a₁ = 0
+        b₁ = 1
+        islinear = true
+        for (i, arg) in enumerate(args)
+            a₂, b₂, islinear = linear_expansion(arg, x)
+            (islinear && _iszero(a₁ * a₂)) || return (a₁, b₁, false)
+            a₁ = a₁ * b₂ + a₂ * b₁
+            b₁ *= b₂
+        end
+        return (a₁, b₁, true)
+    elseif op === (^)
+        # (a₁ x + b₁)^(a₂ x + b₂) is linear => a₂ = 0 && (b₂ == 1 || a₁ == 0)
+        a₂, b₂, islinear = linear_expansion(args[2], x)
+        (islinear && _iszero(a₂)) || return (0, 0, false)
+        a₁, b₁, islinear = linear_expansion(args[1], x)
+        _isone(b₂) && (a₁, b₁, islinear)
+        (islinear && _iszero(a₁)) || return (0, 0, false)
+        return (0, b₁^b₂, islinear)
+    else
+        for (i, arg) in enumerate(args)
+            a, b, islinear = linear_expansion(arg, x)
+            (_iszero(b) && islinear) || return (0, 0, false)
+        end
+        return (0, t, true)
+    end
+end
