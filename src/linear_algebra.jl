@@ -249,7 +249,7 @@ function linear_expansion(t, x)
     else
         for (i, arg) in enumerate(args)
             a, b, islinear = linear_expansion(arg, x)
-            (_iszero(b) && islinear) || return (0, 0, false)
+            (_iszero(a) && islinear) || return (0, 0, false)
         end
         return (0, t, true)
     end
