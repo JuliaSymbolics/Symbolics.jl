@@ -89,7 +89,8 @@ function solve_for(eq, var; simplify=true, check=true) # scalar case
     check && @assert islinear
     # a * x + b = 0
     x = a \ -b
-    simplify ? SymbolicUtils.simplify(x, expand=true) : x
+    simplify && (x = SymbolicUtils.simplify(x, expand=true))
+    var isa Num ? Num(x) : x
 end
 
 function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)

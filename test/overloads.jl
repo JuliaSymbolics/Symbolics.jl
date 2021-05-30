@@ -203,7 +203,9 @@ x = Num.(randn(10))
 @test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num
 
 @variables p x y
-@test isequal(Symbolics.solve_for(x * p + y * (1 - p) ~ 0, p), y/(y - x))
+sol = Symbolics.solve_for(x * p + y * (1 - p) ~ 0, p)
+@test sol isa Num
+@test isequal(sol, y/(y - x))
 @test isequal(Symbolics.solve_for(x * p ~ 0, p), 0)
 @test_throws Any Symbolics.solve_for(1/x + p * p/x ~ 0, p)
 @test isequal(Symbolics.solve_for(x * y ~ p, x), p / y)
