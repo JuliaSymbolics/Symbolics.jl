@@ -75,20 +75,28 @@ function A_b(eq, var, check)
 end
 
 """
-    solve_for(eqs::Vector, vars::Vector; simplify=true, check=true)
+    solve_for(eqs, vars; simplify=true, check=true)
 
-Solve the vector of equations `eqs` for a set of variables `vars`.
+Solve equation(s) `eqs` for a set of variables `vars`.
 
 Assumes `length(eqs) == length(vars)`
 
 Currently only works if all equations are linear. `check` if the expr is linear
 w.r.t `vars`.
 """
-function solve_for(eqs, vars; simplify=true, check=true)
+function solve_for(eq, var; simplify=true, check=true) # scalar case
+    a, b, islinear = linear_expansion(eq, var)
+    check && @assert islinear
+    # a * x + b = 0
+    x = a \ -b
+    simplify ? SymbolicUtils.simplify(x, expand=true) : x
+end
+
+function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
     A, b = A_b(eqs, vars, check)
     #TODO: we need to make sure that `solve_for(eqs, vars)` contains no `vars`
     sol = _solve(A, b, simplify)
-    sol isa AbstractArray ? map(Num, sol) : Num(sol)
+    map(Num, sol)
 end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
@@ -97,13 +105,6 @@ function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     sol = value.(sym_lu(A) \ b)
     do_simplify ? SymbolicUtils.simplify.(sol, expand=true) : sol
 end
-
-function _solve(a, b, do_simplify)
-    sol = value(b/a)
-    do_simplify ? SymbolicUtils.simplify(sol, expand=true) : sol
-end
-
-# ldiv below
 
 LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{Symbolic,Num}}, b::AbstractVector{<:Union{Symbolic,Num}}, x::AbstractVector{<:Union{Symbolic,Num}} = b) = symsub!(A, b, x)
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
@@ -194,6 +195,13 @@ end
 When `islinear`, return `a` and `b` such that `a * x + b == t`.
 """
 linear_expansion(t::Num, x) = linear_expansion(value(t), value(x))
+function linear_expansion(t::Equation, x)
+    a₂, b₂, islinear = linear_expansion(t.rhs, x)
+    islinear || return (a₂, b₂, false)
+    a₁, b₁, islinear = linear_expansion(t.lhs, x)
+    # t.rhs - t.lhs = 0
+    return (a₂ - a₁, b₂ - b₁, islinear)
+end
 _linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true) # trival case
 function linear_expansion(t, x)
     t isa Symbolic || return (0, t, true)
