@@ -208,6 +208,7 @@ function linear_expansion(t, x)
     t isa Symbolic || return (0, t, true)
     x = value(x)
     istree(t) || return _linear_expansion(t, x)
+    isequal(t, x) && return (1, 0, true)
 
     op, args = operation(t), arguments(t)
     op isa Differential && _linear_expansion(t, x)

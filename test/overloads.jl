@@ -202,7 +202,7 @@ x = Num.(randn(10))
 @test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)
 @test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num
 
-@variables p x y
+@variables t p(t) x y(t)
 sol = Symbolics.solve_for(x * p + y * (1 - p) ~ 0, p)
 @test sol isa Num
 @test isequal(sol, y/(y - x))
