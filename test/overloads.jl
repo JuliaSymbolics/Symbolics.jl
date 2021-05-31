@@ -203,6 +203,7 @@ x = Num.(randn(10))
 @test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num
 
 @variables t p(t) x y(t)
+D = Differential(t)
 sol = Symbolics.solve_for(x * p + y * (1 - p) ~ 0, p)
 @test sol isa Num
 @test isequal(sol, y/(y - x))
@@ -214,3 +215,6 @@ sol = Symbolics.solve_for(x * p + y * (1 - p) ~ 0, p)
 @test isequal(Symbolics.solve_for(x^2 * y ~ p, y), p / x^2)
 @test isequal(Symbolics.solve_for(x^2 * y ~ p, p), x^2 * y)
 @test_throws Any Symbolics.solve_for(x^2 * y - sin(p) ~ p, p)
+@test_throws Any Symbolics.solve_for(t*D(x) ~ y, t)
+@test isequal(Symbolics.solve_for(t*D(x) ~ y, D(x)), y/t)
+@test isequal(Symbolics.solve_for(t*D(x) ~ y, y), t*D(x))
