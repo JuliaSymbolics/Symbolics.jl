@@ -159,15 +159,6 @@ z2 = c + d * im
 @test conj(a) === a
 @test imag(a) === Num(0)
 
-@variables x y z
-eqs = [
-        2//1 * x + y - z ~ 2//1
-        2//1 + y - z ~ 3//1*x
-        2//1 + y - 2z ~ 3//1*z
-      ]
-@test [2 1 -1; -3 1 -1; 0 1 -5] * Symbolics.solve_for(eqs, [x, y, z]) == [2; -2; -2]
-@test isequal(Symbolics.solve_for(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x), 1//7*y - 2//7*z)
-
 @test isequal(sign(x), Num(SymbolicUtils.Term{Int}(sign, [Symbolics.value(x)])))
 @test sign(Num(1)) isa Num
 @test isequal(sign(Num(1)), Num(1))
@@ -201,21 +192,3 @@ x = Num.(randn(10))
 @variables t p x(t) y(t) z(t)
 @test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)
 @test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num
-
-@variables t p(t) x y(t)
-D = Differential(t)
-sol = Symbolics.solve_for(x * p + y * (1 - p) ~ 0, p)
-@test sol isa Num
-@test isequal(sol, y/(y - x))
-@test isequal(Symbolics.solve_for(x * p ~ 0, p), 0)
-@test_throws Any Symbolics.solve_for(1/x + p * p/x ~ 0, p)
-@test isequal(Symbolics.solve_for(x * y ~ p, x), p / y)
-@test isequal(Symbolics.solve_for(x * y ~ p, y), p / x)
-@test isequal(Symbolics.solve_for(x * y ~ p, p), x * y)
-@test isequal(Symbolics.solve_for(x^2 * y ~ p, y), p / x^2)
-@test isequal(Symbolics.solve_for(x^2 * y ~ p, p), x^2 * y)
-@test_throws Any Symbolics.solve_for(x^2 * y - sin(p) ~ p, p)
-@test_throws Any Symbolics.solve_for(t*D(x) ~ y, t)
-@test isequal(Symbolics.solve_for(t*D(x) ~ y, D(x)), y/t)
-@test isequal(Symbolics.solve_for([t*D(x) ~ y], [D(x)]), [y/t])
-@test isequal(Symbolics.solve_for(t*D(x) ~ y, y), t*D(x))

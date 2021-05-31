@@ -66,13 +66,6 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
     b = A * vars - exprs
     A, b
 end
-function A_b(eq, var, check)
-    ex = eq.rhs - eq.lhs
-    check && @assert isaffine(ex, [var])
-    a = expand_derivatives(Differential(var)(ex))
-    b = a * var - ex
-    a, b
-end
 
 """
 $(TYPEDSIGNATURES)
@@ -91,8 +84,7 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     check && @assert islinear
     # a * x + b = 0
     x = a \ -b
-    simplify && (x = SymbolicUtils.simplify(x, expand=true))
-    var isa Num ? Num(x) : x
+    simplify ? SymbolicUtils.simplify(x, expand=true) : x
 end
 
 function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
@@ -198,23 +190,28 @@ end
 
 When `islinear`, return `a` and `b` such that `a * x + b == t`.
 """
-linear_expansion(t::Num, x) = linear_expansion(value(t), value(x))
-function linear_expansion(t::Equation, x)
+function linear_expansion(t, x)
+    a, b, islinear = _linear_expansion(t, x)
+    x isa Num ? (Num(a), Num(b), islinear) : (a, b, islinear)
+end
+# _linear_expansion always returns `Symbolic`
+function _linear_expansion(t::Equation, x)
     a₂, b₂, islinear = linear_expansion(t.rhs, x)
     islinear || return (a₂, b₂, false)
     a₁, b₁, islinear = linear_expansion(t.lhs, x)
     # t.rhs - t.lhs = 0
     return (a₂ - a₁, b₂ - b₁, islinear)
 end
-_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true) # trival case
-function linear_expansion(t, x)
+trival_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true) # trival case
+function _linear_expansion(t, x)
+    t = value(t)
     t isa Symbolic || return (0, t, true)
     x = value(x)
-    istree(t) || return _linear_expansion(t, x)
+    istree(t) || return trival_linear_expansion(t, x)
     isequal(t, x) && return (1, 0, true)
 
     op, args = operation(t), arguments(t)
-    op isa Differential && _linear_expansion(t, x)
+    op isa Differential && trival_linear_expansion(t, x)
 
     if op === (+)
         a₁ = b₁ = 0
