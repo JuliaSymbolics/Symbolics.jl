@@ -75,7 +75,7 @@ function A_b(eq, var, check)
 end
 
 """
-    solve_for(eqs, vars; simplify=true, check=true)
+$(TYPEDSIGNATURES)
 
 Solve equation(s) `eqs` for a set of variables `vars`.
 
@@ -84,7 +84,9 @@ Assumes `length(eqs) == length(vars)`
 Currently only works if all equations are linear. `check` if the expr is linear
 w.r.t `vars`.
 """
-function solve_for(eq, var; simplify=true, check=true) # scalar case
+function solve_for(eq, var; simplify=false, check=true) # scalar case
+    # simplify defaults for `false` as canonicalization should handle most of
+    # the cases.
     a, b, islinear = linear_expansion(eq, var)
     check && @assert islinear
     # a * x + b = 0
@@ -94,6 +96,7 @@ function solve_for(eq, var; simplify=true, check=true) # scalar case
 end
 
 function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
+    length(eqs) == 1 == length(vars) && return [solve_for(eqs[1], vars[1]; simplify=simplify, check=check)]
     A, b = A_b(eqs, vars, check)
     #TODO: we need to make sure that `solve_for(eqs, vars)` contains no `vars`
     sol = _solve(A, b, simplify)
