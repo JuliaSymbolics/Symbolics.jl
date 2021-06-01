@@ -1,4 +1,4 @@
-if ENV["CI"]
+if get(ENV, "CI", nothing) !== nothing
     # copied and modified from https://github.com/tkf/IPython.jl/blob/master/test/install_dependencies.jl
 
 
