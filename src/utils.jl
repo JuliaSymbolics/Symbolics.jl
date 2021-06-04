@@ -211,14 +211,7 @@ function degree(p::Term, sym=nothing)
     if sym === nothing
         return 1
     else
-        if hasproperty(sym, :name)
-            sym_name = nameof(sym)
-        elseif hasproperty(sym, :f)
-            sym_name = sym.f
-        else
-            sym_name = nothing
-        end
-        return p.f == sym_name ? 1 : 0
+        return isequal(p, sym) ? 1 : 0 
     end
 end
  
