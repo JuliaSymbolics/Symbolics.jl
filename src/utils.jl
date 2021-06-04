@@ -200,11 +200,7 @@ function degree(p::Add, sym=nothing)
 end
         
 function degree(p::Mul, sym=nothing)
-    if sym === nothing
-        return sum(values(p.dict))
-    else
-        return get(p.dict, sym, 0)
-    end
+    return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
 end
 
 function degree(p::Term, sym=nothing)
@@ -216,7 +212,6 @@ function degree(p::Term, sym=nothing)
 end
  
 function degree(p, sym=nothing)
-    @assert !(typeof(p) <: Array) "Input may not be an Array."
     p = value(p)
     sym = value(sym)
     if p isa Number
@@ -225,5 +220,8 @@ function degree(p, sym=nothing)
     if isequal(p, sym)
         return 1
     end
-    return degree(p, sym)
+    if p isa Symbolic
+        return degree(p, sym)
+    end
+    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end
