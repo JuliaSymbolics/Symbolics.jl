@@ -66,44 +66,41 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
     b = A * vars - exprs
     A, b
 end
-function A_b(eq, var, check)
-    ex = eq.rhs - eq.lhs
-    check && @assert isaffine(ex, [var])
-    a = expand_derivatives(Differential(var)(ex))
-    b = a * var - ex
-    a, b
-end
 
 """
-    solve_for(eqs::Vector, vars::Vector; simplify=true, check=true)
+$(TYPEDSIGNATURES)
 
-Solve the vector of equations `eqs` for a set of variables `vars`.
+Solve equation(s) `eqs` for a set of variables `vars`.
 
 Assumes `length(eqs) == length(vars)`
 
 Currently only works if all equations are linear. `check` if the expr is linear
 w.r.t `vars`.
 """
-function solve_for(eqs, vars; simplify=true, check=true)
+function solve_for(eq, var; simplify=false, check=true) # scalar case
+    # simplify defaults for `false` as canonicalization should handle most of
+    # the cases.
+    a, b, islinear = linear_expansion(eq, var)
+    check && @assert islinear
+    # a * x + b = 0
+    x = a \ -b
+    simplify ? SymbolicUtils.simplify(x, expand=true) : x
+end
+
+function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
+    length(eqs) == 1 == length(vars) && return [solve_for(eqs[1], vars[1]; simplify=simplify, check=check)]
     A, b = A_b(eqs, vars, check)
     #TODO: we need to make sure that `solve_for(eqs, vars)` contains no `vars`
     sol = _solve(A, b, simplify)
-    sol isa AbstractArray ? map(Num, sol) : Num(sol)
+    map(Num, sol)
 end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
-    A = SymbolicUtils.simplify.(Num.(A), polynorm=true)
-    b = SymbolicUtils.simplify.(Num.(b), polynorm=true)
+    A = SymbolicUtils.simplify.(Num.(A), expand=true)
+    b = SymbolicUtils.simplify.(Num.(b), expand=true)
     sol = value.(sym_lu(A) \ b)
-    do_simplify ? SymbolicUtils.simplify.(sol, polynorm=true) : sol
+    do_simplify ? SymbolicUtils.simplify.(sol, expand=true) : sol
 end
-
-function _solve(a, b, do_simplify)
-    sol = value(b/a)
-    do_simplify ? SymbolicUtils.simplify(sol, polynorm=true) : sol
-end
-
-# ldiv below
 
 LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{Symbolic,Num}}, b::AbstractVector{<:Union{Symbolic,Num}}, x::AbstractVector{<:Union{Symbolic,Num}} = b) = symsub!(A, b, x)
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
@@ -185,5 +182,77 @@ function LinearAlgebra.norm(x::AbstractArray{Num}, p::Real=2)
         mapreduce(abs, max, x)
     else
         sum(x->abs(x)^p, x)^inv(p)
+    end
+end
+
+"""
+    (a, b, islinear) = linear_expansion(t, x)
+
+When `islinear`, return `a` and `b` such that `a * x + b == t`.
+"""
+function linear_expansion(t, x)
+    a, b, islinear = _linear_expansion(t, x)
+    x isa Num ? (Num(a), Num(b), islinear) : (a, b, islinear)
+end
+# _linear_expansion always returns `Symbolic`
+function _linear_expansion(t::Equation, x)
+    a₂, b₂, islinear = linear_expansion(t.rhs, x)
+    islinear || return (a₂, b₂, false)
+    a₁, b₁, islinear = linear_expansion(t.lhs, x)
+    # t.rhs - t.lhs = 0
+    return (a₂ - a₁, b₂ - b₁, islinear)
+end
+trival_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true) # trival case
+function _linear_expansion(t, x)
+    t = value(t)
+    t isa Symbolic || return (0, t, true)
+    x = value(x)
+    istree(t) || return trival_linear_expansion(t, x)
+    isequal(t, x) && return (1, 0, true)
+
+    op, args = operation(t), arguments(t)
+    op isa Differential && trival_linear_expansion(t, x)
+
+    if op === (+)
+        a₁ = b₁ = 0
+        islinear = true
+        # (a₁ x + b₁) + (a₂ x + b₂) = (a₁ + a₂) x + (b₁ + b₂)
+        for (i, arg) in enumerate(args)
+            a₂, b₂, islinear = linear_expansion(arg, x)
+            islinear || return (a₁, b₁, false)
+            a₁ += a₂
+            b₁ += b₂
+        end
+        return (a₁, b₁, true)
+    elseif op === (-)
+        @assert length(args) == 1
+        a, b, islinear = linear_expansion(args[1], x)
+        return (-a, -b, islinear)
+    elseif op === (*)
+        # (a₁ x + b₁) (a₂ x + b₂) = a₁ a₂ x² + (a₁ b₂ + a₂ b₁) x + b₁ b₂
+        a₁ = 0
+        b₁ = 1
+        islinear = true
+        for (i, arg) in enumerate(args)
+            a₂, b₂, islinear = linear_expansion(arg, x)
+            (islinear && _iszero(a₁ * a₂)) || return (a₁, b₁, false)
+            a₁ = a₁ * b₂ + a₂ * b₁
+            b₁ *= b₂
+        end
+        return (a₁, b₁, true)
+    elseif op === (^)
+        # (a₁ x + b₁)^(a₂ x + b₂) is linear => a₂ = 0 && (b₂ == 1 || a₁ == 0)
+        a₂, b₂, islinear = linear_expansion(args[2], x)
+        (islinear && _iszero(a₂)) || return (0, 0, false)
+        a₁, b₁, islinear = linear_expansion(args[1], x)
+        _isone(b₂) && (a₁, b₁, islinear)
+        (islinear && _iszero(a₁)) || return (0, 0, false)
+        return (0, b₁^b₂, islinear)
+    else
+        for (i, arg) in enumerate(args)
+            a, b, islinear = linear_expansion(arg, x)
+            (_iszero(a) && islinear) || return (0, 0, false)
+        end
+        return (0, t, true)
     end
 end

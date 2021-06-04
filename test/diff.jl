@@ -190,7 +190,7 @@ end
 @variables a,b
 X = [a,b]
 
-spoly(x) = simplify(x, polynorm=true)
+spoly(x) = simplify(x, expand=true)
 rr = rosenbrock(X)
 
 reference_hes = Symbolics.hessian(rr, X)

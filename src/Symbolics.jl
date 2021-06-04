@@ -66,4 +66,12 @@ include("latexify_recipes.jl")
 
 using RecipesBase
 include("plot_recipes.jl")
+
+include("domains.jl")
+
+using Requires
+
+export symbolics_to_sympy
+include("init.jl")
+
 end # module
