@@ -216,6 +216,7 @@ function degree(p::Term, sym=nothing)
 end
  
 function degree(p, sym=nothing)
+    @assert !(typeof(p) <: Array) "Input may not be an Array."
     p = value(p)
     sym = value(sym)
     if p isa Number
