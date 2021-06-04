@@ -184,10 +184,10 @@ var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_fr
 var_from_nested_derivative(x::Sym,i=0) = (x, i)
 
 function degree(p::Sym, sym=nothing)
-    if isequal(sym, nothing)
+    if sym === nothing
         return 1
     else
-        return isequal(p, sym) ? 1 : 0
+        return Int(isequal(p, sym))
     end
 end
 
@@ -196,11 +196,11 @@ function degree(p::Pow, sym=nothing)
 end
 
 function degree(p::Add, sym=nothing)
-    return maximum([degree(key, sym) for key in keys(p.dict)])
+    return maximum(degree(key, sym) for key in keys(p.dict))
 end
         
 function degree(p::Mul, sym=nothing)
-    if isequal(sym, nothing)
+    if sym === nothing
         return sum(values(p.dict))
     else
         return get(p.dict, sym, 0)
@@ -211,16 +211,18 @@ function degree(p::Term, sym=nothing)
     if sym === nothing
         return 1
     else
-        return isequal(p, sym) ? 1 : 0 
+        return Int(isequal(p, sym))
     end
 end
  
 function degree(p, sym=nothing)
-    if value(p) isa Number
+    p = value(p)
+    sym = value(sym)
+    if p isa Number
         return 0
     end
-    if isequal(value(p), value(sym))
+    if isequal(p, sym)
         return 1
     end
-    return degree(value(p), value(sym))
+    return degree(p, sym)
 end
