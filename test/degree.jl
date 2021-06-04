@@ -27,3 +27,6 @@ using Test
 
 @test isequal(degree(x^2*sin(z), x), 2)
 @test isequal(degree(x+exp(z), x), 1)
+
+@test isequal(degree((x - y)^2*((y + x*y)^3)), 8)
+@test isequal(degree((x + z)*((y + x*y)^3), x), 4)
