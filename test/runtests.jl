@@ -11,6 +11,7 @@ end
 if GROUP == "All" || GROUP == "Core"
     @safetestset "Macro Test" begin include("macro.jl") end
     @safetestset "Differentiation Test" begin include("diff.jl") end
+    @safetestset "Degree Test" begin include("degree.jl") end 
     @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
     @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
     @safetestset "Overloading Test" begin include("overloads.jl") end

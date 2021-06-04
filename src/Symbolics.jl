@@ -31,6 +31,7 @@ export Equation, ConstrainedEquation
 include("equations.jl")
 
 include("utils.jl")
+export degree
 
 using MacroTools
 import MacroTools: splitdef, combinedef, postwalk, striplines
