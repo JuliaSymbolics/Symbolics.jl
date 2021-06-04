@@ -590,13 +590,17 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    varnumbercache = buildvarnumbercache(vs,ps)
+    varnumbercache = merge(buildvarnumbercache(vs), buildvarnumbercache(ps))
+    par_str = join(["real $(rhsnames[2])_$i" for i in 1:length(ps)], ", ")
+    rhsnames_mod = [:internal_var___u, [Symbol("$(rhsnames[2])_$i") for i in 1:length(ps)]..., :internal_var___t]
     differential_equation = string(join([numbered_expr(eq,varnumbercache,vs,ps,lhsname=lhsname,
-                                   rhsnames=rhsnames) for
+                                   rhsnames=rhsnames_mod) for
                                    (i, eq) ∈ enumerate(eqs)],";\n  "),";")
+
+
     """
-    real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
-      real $lhsname[$(length(eqs))];
+    vector $fname(real $(conv(iv)),vector $(rhsnames[1]), $par_str) {
+      vector[$(length(eqs))] $lhsname;
       $differential_equation
       return $lhsname;
     }
@@ -652,8 +656,8 @@ function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
     end
 
     """
-    real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
-      real $lhsname[$(length(equations))];
+    vector $fname(real $(conv(iv)),vector $(rhsnames[1]),vector $(rhsnames[2])) {
+      vector[$(length(equations))] $lhsname;
     $([eqn == equations[end] ? string("  ", eqn) : string("  ", eqn, "\n") for eqn ∈ equations]...)
       return $lhsname;
     }
