@@ -24,6 +24,9 @@ function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{2})
     x, y = args
     IfElse.ifelse(x > y, zero(y), one(y))
 end
+            
+@register Base.ceil(x)
+@register Base.floor(x)
 
 @register Base.rand(x)
 @register Base.randn(x)
