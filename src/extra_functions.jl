@@ -27,6 +27,7 @@ end
             
 @register Base.ceil(x)
 @register Base.floor(x)
+@register Base.factorial(x)
 
 @register Base.rand(x)
 @register Base.randn(x)
