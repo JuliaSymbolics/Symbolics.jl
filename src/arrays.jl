@@ -216,6 +216,8 @@ function call2term(expr, arrs=[])
     !(expr isa Expr) && return expr
     if expr.head == :call
         return Expr(:call, term, map(call2term, expr.args)...)
+    elseif expr.head == :ref
+        return Expr(:call, Term{Any}, getindex, Expr(:vect, call2term(expr.args[1]), expr.args[2:end]...))
     elseif expr.head == Symbol("'")
         return Expr(:call, term, adjoint, map(call2term, expr.args)...)
     end

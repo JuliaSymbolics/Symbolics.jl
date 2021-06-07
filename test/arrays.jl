@@ -27,8 +27,9 @@ end
     @variables X[1:5, 1:5] Y[1:5, 1:5]
 
     @test isequal(X[1,1], wrap(term(getindex, unwrap(X), 1,1)))
-    #@test isequal(X[1,:], wrap(Symbolics.arrterm(getindex, unwrap(X), 1,1:5)))
 
     XX = unwrap(X)
     @test isequal(unwrap(X[1, :]), Symbolics.@arrayop(XX[1,:], (j,), XX[1, j]))
+    @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop(XX[:,2], (i,), XX[i, 2]))
+    @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop(XX[:,2:3], (i,j), XX[i, j], (+), (j in 2:3)))
 end
