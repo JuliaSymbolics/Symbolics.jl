@@ -29,6 +29,10 @@ end
 @register Base.floor(x)
 @register Base.factorial(x)
 
+function derivative(::Union{typeof(ceil),typeof(floor),typeof(factorial)}, args::NTuple{1,Any}, ::Val{1})
+    zero(args[1])
+end
+            
 @register Base.rand(x)
 @register Base.randn(x)
 
