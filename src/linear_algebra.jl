@@ -82,6 +82,7 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
     check && @assert islinear
+    islinear || return nothing
     # a * x + b = 0
     x = a \ -b
     simplify ? SymbolicUtils.simplify(x, expand=true) : x

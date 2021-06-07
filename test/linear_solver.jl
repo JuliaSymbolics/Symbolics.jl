@@ -19,6 +19,7 @@ a, b, islinear = Symbolics.linear_expansion(expr, p)
 @test isequal(Symbolics.solve_for(x^2 * y ~ p, y), p / x^2)
 @test isequal(Symbolics.solve_for(x^2 * y ~ p, p), x^2 * y)
 @test_throws Any Symbolics.solve_for(x^2 * y - sin(p) ~ p, p)
+@test Symbolics.solve_for(x^2 * y - sin(p) ~ p, p, check=false) === nothing
 @test_throws Any Symbolics.solve_for(t*D(x) ~ y, t)
 @test isequal(Symbolics.solve_for(t*D(x) ~ y, D(x)), y/t)
 @test isequal(Symbolics.solve_for([t*D(x) ~ y], [D(x)]), [y/t])
