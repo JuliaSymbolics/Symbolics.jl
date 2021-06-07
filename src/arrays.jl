@@ -76,6 +76,15 @@ istree(a::ArrayOp) = true
 operation(a::ArrayOp) = typeof(a)
 arguments(a::ArrayOp) = [a.output_idx, a.expr, a.reduce, a.term, a.shape, a.ranges, a.metadata]
 
+function Base.isequal(a::ArrayOp, b::ArrayOp)
+    a === b && return true
+    isequal(operation(a), operation(b)) &&
+    isequal(a.output_idx, b.output_idx) &&
+    isequal(a.expr, b.expr) &&
+    isequal(a.reduce, b.reduce) &&
+    isequal(a.shape, b.shape)
+end
+
 macro arrayop(call, output_idx, expr, options...)
     @assert output_idx.head == :tuple
     rs = []

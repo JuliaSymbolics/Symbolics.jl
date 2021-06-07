@@ -21,16 +21,20 @@ function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)
         res = Term{eltype(symtype(x))}(getindex, [x, idx...])
     else
+        input_idx = []
         output_idx = []
         ranges = Dict{Sym, AbstractRange}()
         subscripts = makesubscripts(length(idx))
         for (j, i) in enumerate(idx)
-            if i isa Integer
+            if symtype(i) <: Integer
+                push!(input_idx, i)
             elseif i isa Colon
                 push!(output_idx, subscripts[j])
+                push!(input_idx, subscripts[j])
             elseif i isa AbstractVector
                 isym = subscripts[j]
                 push!(output_idx, isym)
+                push!(input_idx, isym)
                 ranges[isym] = i
             else
                 error("Don't know how to index by $i")
@@ -38,9 +42,11 @@ function Base.getindex(x::SymArray, idx...)
         end
 
         term = Term{Any}(getindex, [x, idx...])
-        res = ArrayOp(symtype(x),
+        T = eltype(symtype(x))
+        N = ndims(x) - count(i->symtype(i) <: Integer, idx)
+        res = ArrayOp(atype(symtype(x)){T,N},
                       (output_idx...,),
-                      x[output_idx...],
+                      x[input_idx...],
                       +,
                       term,
                       ranges)
@@ -74,6 +80,12 @@ function propagate_shape(::typeof(getindex), x, idx...)
 end
 
 propagate_eltype(::typeof(getindex), x, idx...) = geteltype(x)
+
+function SymbolicUtils.promote_symtype(::typeof(getindex), X, ii...)
+    @assert all(i-> i <:Integer, ii) "user arrterm to create arr term."
+
+    eltype(X)
+end
 
 
 #### Broadcast ####

@@ -1,8 +1,8 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, Unknown, Arr
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm
 using Base: Slice
-using SymbolicUtils: Sym
+using SymbolicUtils: Sym, term
 
 @testset "arrays" begin
     @variables X[1:5, 1:5] Y[1:5, 1:5]
@@ -10,8 +10,8 @@ using SymbolicUtils: Sym
     @test shape(X) == Slice.((1:5, 1:5))
     @test shape(Y) == Slice.((1:5, 1:5))
 
-    A = Y[2, :] # Maybe it should be Array vv
-    @test typeof(A) <: Arr{Real, 2}
+    A = Y[2, :]
+    @test typeof(A) <: Arr{Real, 1}
     @test axes(A) == (1:5,)
 
     B = A[3:5]
@@ -21,4 +21,14 @@ using SymbolicUtils: Sym
     j = Sym{Int}(:j)
     @test symtype(X[i,j]) == Real
     @test symtype(X[1,j]) == Real
+end
+
+@testset "getindex" begin
+    @variables X[1:5, 1:5] Y[1:5, 1:5]
+
+    @test isequal(X[1,1], wrap(term(getindex, unwrap(X), 1,1)))
+    #@test isequal(X[1,:], wrap(Symbolics.arrterm(getindex, unwrap(X), 1,1:5)))
+
+    XX = unwrap(X)
+    @test isequal(unwrap(X[1, :]), Symbolics.@arrayop(XX[1,:], (j,), XX[1, j]))
 end
