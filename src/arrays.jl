@@ -505,7 +505,8 @@ function scalarize(arr::ArrayOp, idx)
     iidx = collect(keys(axs))
     contracted = setdiff(iidx, arr.output_idx)
 
-    dict = Dict(oi => axs[oi][i] for (oi, i) in zip(arr.output_idx, idx))
+    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : axs[oi][i])
+                for (oi, i) in zip(arr.output_idx, idx))
     partial = replace_by_scalarizing(arr.expr, dict)
 
     axes = [axs[c] for c in contracted]
@@ -535,5 +536,8 @@ function scalarize(arr)
         arr
     end
 end
+
+Base.collect(x::Arr) = scalarize(x)
+Base.collect(x::SymArray) = scalarize(x)
 
 Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalarize(arr)
