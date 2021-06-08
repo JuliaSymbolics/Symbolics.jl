@@ -13,8 +13,6 @@ vars = @variables t $a $b(t) $c[1:3](t)
 @test isequal(vars[1], t)
 @test isequal(vars[2], Num(Sym{Real}(a)))
 @test isequal(vars[3], Num(Sym{FnType{Tuple{Any},Real}}(b)(value(t))))
-genc(n) = Num(Sym{FnType{Tuple{Any},Real}}(Symbol(c, n))(value(t)))
-@test isequal(vars[4], [genc('₁'), genc('₂'), genc('₃')])
 
 vars = @variables a,b,c,d,e,f,g,h,i
 @test isequal(vars, [a,b,c,d,e,f,g,h,i])

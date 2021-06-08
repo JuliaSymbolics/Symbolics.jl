@@ -378,20 +378,21 @@ end
 ArrayOp(x::Arr) = unwrap(x)
 
 function Arr(x)
-    T = symtype(x)
-    @assert T <: AbstractArray
-    Arr{eltype(T), ndims(T)}(x)
+    A = symtype(x)
+    @assert A <: AbstractArray
+    Arr{maybewrap(eltype(A)), ndims(A)}(x)
 end
 
 unwrap(x::Arr) = x.value
 
+maybewrap(T) = has_symwrapper(T) ? wrapper_type(T) : T
 # These methods allow @wrapped methods to be more specific and not overwrite
 # each other when defined both for matrix and vector
 wrapper_type(::Type{<:AbstractMatrix}) = Arr{<:Any, 2}
-wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{T, 2}
+wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{maybewrap(T), 2}
 
 wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
-wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{T, 1}
+wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
 
 function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
     x = unwrap(arr)
@@ -497,6 +498,54 @@ function scalarize(arr::AbstractArray, idx)
     arr[idx...]
 end
 
+function scalarize(arr::Term, idx)
+    scalarize_term_indexing(operation(arr), arr, idx)
+end
+
+struct ScalarizeCache end
+
+function scalarize_term_indexing(f, arr, idx)
+    if hasmetadata(arr, ScalarizeCache) && getmetadata(arr, ScalarizeCache)[] !== nothing
+        wrap(getmetadata(arr, ScalarizeCache)[][idx...])
+    else
+        thing = f(scalarize.(map(wrap, arguments(arr)))...)
+        getmetadata(arr, ScalarizeCache)[] = thing
+        wrap(thing[idx...])
+    end
+end
+
+@wrapped function Base.:(\)(A::AbstractMatrix, b::AbstractVecOrMat)
+    t = arrterm(\, A, b)
+    setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
+end
+
+@wrapped function Base.inv(A::AbstractMatrix)
+    t = arrterm(inv, A)
+    setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
+end
+
+
+# A * x = b
+# A ∈ R^(m x n) x ∈ R^(n, k) = b ∈ R^(m, k)
+propagate_ndims(::typeof(\), A, b) = ndims(b)
+propagate_ndims(::typeof(inv), A) = ndims(A)
+
+# A(m,k) * B(k,n) = C(m,n)
+# A(m,k) \ C(m,n)  = B(k,n)
+function propagate_shape(::typeof(\), A, b)
+    if ndims(b) == 1
+        (axes(A,2),)
+    else
+        (axes(A,2), axes(b, 2))
+    end
+end
+
+function propagate_shape(::typeof(inv), A)
+    @oops shp = shape(A)
+    @assert ndims(A) == 2 && reverse(shp) == shp "Inv called on a non-square matrix"
+    shp
+end
+
 function scalarize(arr::ArrayOp, idx)
     @assert length(arr.output_idx) == length(idx)
 
@@ -531,7 +580,7 @@ function scalarize(arr)
         args = arguments(arr)
         scalarize(args[1], (args[2:end]...,))
     elseif arr isa Num
-        scalarize(unwrap(arr))
+        wrap(scalarize(unwrap(arr)))
     else
         arr
     end
