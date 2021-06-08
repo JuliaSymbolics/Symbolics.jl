@@ -468,7 +468,7 @@ function SymbolicUtils.Code.toexpr(x::ArrayOp)
 end
 
 function SymbolicUtils.Code.toexpr(x::Arr)
-    toexpr(uwrwap(x))
+    toexpr(unwrap(x))
 end
 
 
@@ -502,6 +502,12 @@ function scalarize(arr::Term, idx)
     scalarize_term_indexing(operation(arr), arr, idx)
 end
 
+function scalarize(arr::Term)
+    scalarize_term_indexing(operation(arr), arr)
+end
+
+scalarize_term_indexing(f, arr) = arr
+
 struct ScalarizeCache end
 
 function scalarize_term_indexing(f, arr, idx)
@@ -522,6 +528,16 @@ end
 @wrapped function Base.inv(A::AbstractMatrix)
     t = arrterm(inv, A)
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
+end
+
+_det(x, lp) = det(x, laplace=lp)
+
+function scalarize_term_indexing(f::typeof(_det), arr)
+    det(map(wrap, collect(arguments(arr)[1])), laplace=arguments(arr)[2])
+end
+
+@wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace=true)
+    Term{eltype(x)}(_det, [x, laplace])
 end
 
 

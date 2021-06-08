@@ -108,8 +108,8 @@ M \ [1, 2]
 @variables X[1:4,1:4]
 d1 = det(X, laplace=true)
 d2 = det(X, laplace=false)
-_det1 = eval(build_function(d1, X))
-_det2 = eval(build_function(d2, X))
+_det1 = eval(build_function(d1,X))
+_det2 = eval(build_function(d2,X))
 A = [1 1 1 1
      1 0 1 1
      1 1 0 1

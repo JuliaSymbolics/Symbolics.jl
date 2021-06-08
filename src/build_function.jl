@@ -105,6 +105,26 @@ function _build_function(target::JuliaTarget, op, args...;
     end
 end
 
+SymbolicUtils.get_symbolify(x::Arr) = SymbolicUtils.get_symbolify(unwrap(x))
+
+function _build_function(target::JuliaTarget, op::Arr, args...;
+                         conv = toexpr,
+                         expression = Val{true},
+                         expression_module = @__MODULE__(),
+                         checkbounds = false,
+                         linenumbers = true)
+
+    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
+    @show dargs
+    expr = toexpr(Func(dargs, [], op))
+
+    if expression == Val{true}
+        expr
+    else
+        _build_and_inject_function(expression_module, expr)
+    end
+end
+
 function _build_and_inject_function(mod::Module, ex)
     if ex.head == :function && ex.args[1].head == :tuple
         ex.args[1] = Expr(:call, :($mod.$(gensym())), ex.args[1].args...)
