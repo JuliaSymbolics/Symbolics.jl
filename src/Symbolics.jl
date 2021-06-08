@@ -35,6 +35,7 @@ export Equation, ConstrainedEquation
 include("equations.jl")
 
 include("utils.jl")
+export degree
 
 using ConstructionBase
 include("arrays.jl")
@@ -72,4 +73,12 @@ include("latexify_recipes.jl")
 
 using RecipesBase
 include("plot_recipes.jl")
+
+include("domains.jl")
+
+using Requires
+
+export symbolics_to_sympy
+include("init.jl")
+
 end # module
