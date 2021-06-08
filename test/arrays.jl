@@ -33,3 +33,12 @@ end
     @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop(XX[:,2], (i,), XX[i, 2]))
     @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop(XX[:,2:3], (i,j), XX[i, j], (+), (j in 2:3)))
 end
+
+@testset "broadcast" begin
+    @variables A[1:5,1:3] b[1:3]
+
+    c = A*b
+
+    A .* c
+    sin.(A .* c)
+end

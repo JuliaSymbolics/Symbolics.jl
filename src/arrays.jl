@@ -529,8 +529,10 @@ function scalarize(arr)
     elseif istree(arr) && operation(arr) == getindex
         args = arguments(arr)
         scalarize(args[1], (args[2:end]...,))
+    elseif arr isa Num
+        scalarize(unwrap(arr))
     else
-        return arr
+        arr
     end
 end
 
