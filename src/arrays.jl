@@ -458,17 +458,17 @@ function eachindex(A::Union{Arr, SymArray})
 end
 
 
-function SymbolicUtils.Code.toexpr(x::ArrayOp)
+function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
     if istree(x.term)
-        toexpr(x.term)
+        toexpr(x.term, st)
     else
         throw(ArgumentError("""Don't know how to turn $x
                                into code yet"""))
     end
 end
 
-function SymbolicUtils.Code.toexpr(x::Arr)
-    toexpr(unwrap(x))
+function SymbolicUtils.Code.toexpr(x::Arr, st)
+    toexpr(unwrap(x), st)
 end
 
 
