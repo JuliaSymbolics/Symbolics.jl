@@ -116,7 +116,7 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
         end
     end
 
-    expr = term(bc.f, expr_args′...)
+    expr = bc.f(expr_args′...)
     Atype = propagate_atype(broadcast, bc.f, bc.args...)
     ArrayOp(Atype{symtype(expr), ndim},
             (subscripts...,),

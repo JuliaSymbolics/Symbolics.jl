@@ -511,6 +511,8 @@ function scalarize(arr::Term, idx)
 end
 
 function scalarize(arr::Term)
+    args = arguments(arr)
+    operation(arr) == getindex && return scalarize(args[1], (args[2:end]...,))
     scalarize_term_indexing(operation(arr), arr)
 end
 

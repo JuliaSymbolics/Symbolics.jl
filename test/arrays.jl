@@ -11,7 +11,7 @@ using SymbolicUtils: Sym, term, operation
     @test shape(Y) == Slice.((1:5, 1:5))
 
     A = Y[2, :]
-    @test typeof(A) <: Arr{Real, 1}
+    @test typeof(A) <: Arr{Num, 1}
     @test axes(A) == (1:5,)
 
     B = A[3:5]
