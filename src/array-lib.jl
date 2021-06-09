@@ -116,7 +116,9 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
         end
     end
 
-    expr = bc.f(expr_args′...)
+    expr = term(bc.f, expr_args′...) # Imagine x .=> y -- if you don't have a term
+                                     # then you get pairs, and index matcher cannot
+                                     # recurse into pairs
     Atype = propagate_atype(broadcast, bc.f, bc.args...)
     ArrayOp(Atype{symtype(expr), ndim},
             (subscripts...,),
