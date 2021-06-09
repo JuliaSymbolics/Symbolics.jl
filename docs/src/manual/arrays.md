@@ -119,10 +119,10 @@ A[i, 1]*A[j, 1] + A[i, 2]*A[j, 2] + A[i, 3]*A[j, 3]
 In general any scalar expression which is derived from array expressions can be scalarized.
 
 ```julia
-julia> sum(A[:,1]) + sum(A[:,2])
-Symbolics._mapreduce(identity, +, A[Colon(), 1], Colon(), (:init => false,)) + Symbolics._mapreduce(identity, +, A[Colon(), 2], Colon(), (:init => false,))
+julia> sum(A[:,1]) + sum(A[2,:])
+Symbolics._mapreduce(identity, +, A[Colon(), 1], Colon(), (:init => false,)) + Symbolics._mapreduce(identity, +, A[2, Colon()], Colon(), (:init => false,))
 
-julia> Symbolics.scalarize(sum(A[:,1]) + sum(A[:,2]))
-A[1, 1] + A[1, 2] + A[2, 1] + A[2, 2] + A[3, 1] + A[3, 2] + A[4, 1] + A[4, 2] + A[5, 1] + A[5, 2]
+julia> Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
+A[1, 1] + A[2, 2] + A[2, 3] + A[4, 1] + A[5, 1] + 2A[2, 1] + A[3, 1]
 
 ```
