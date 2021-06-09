@@ -1,6 +1,6 @@
 # basic integral struct with upper bound and lower bound.
-struct Integral{X , T <: Domain} <: Function
-    x::X
+struct Integral{X, T <: Domain} <: Function
+    x
     domain::T
     Integral(x,domain) = new{typeof(x),typeof(domain)}(Symbolics.value(x), domain)
 end
@@ -15,3 +15,20 @@ end
 
 Base.:(==)(I1::Integral, I2::Integral) = (isequal(I1.x, I2.x) && isequal(I1.domain, I2.domain))
 (D::Differential)(I::Integral{X,T}) where{X,T} = I∘D
+
+function replaceSym(a::Sym, b, O)
+    if isa(O , Sym)
+        if isequal(O , a)
+            return b
+        else
+            return O
+        end
+    else
+        args_replace = Vector{Symbolic{Real}}()
+        args_ = arguments(O)
+        for i in 1:length(args_)
+            push!(args_replace, replaceSym(a , b , args_[i]))
+        end
+        return operation(O)(args_replace...)
+    end
+end
