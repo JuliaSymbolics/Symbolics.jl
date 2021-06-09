@@ -85,6 +85,10 @@ function Base.isequal(a::ArrayOp, b::ArrayOp)
     isequal(a.shape, b.shape)
 end
 
+function Base.hash(a::ArrayOp, u::UInt)
+    hash(a.shape, hash(a.expr, hash(a.expr, hash(a.output_idx, hash(operation(a), u)))))
+end
+
 macro arrayop(call, output_idx, expr, options...)
     @assert output_idx.head == :tuple
     rs = []
@@ -375,6 +379,8 @@ end
     value
 end
 
+Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
+
 ArrayOp(x::Arr) = unwrap(x)
 
 function Arr(x)
@@ -459,6 +465,8 @@ end
 
 
 function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
+    haskey(st.symbolify, x) && return st.symbolify[x]
+
     if istree(x.term)
         toexpr(x.term, st)
     else
