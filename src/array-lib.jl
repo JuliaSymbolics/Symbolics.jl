@@ -250,18 +250,16 @@ end
 @inline _mapreduce(f, x, dims, kw) = mapreduce(f, x; dims=dims, kw...)
 
 @wrapped function Base.mapreduce(f, g, x::AbstractArray; dims=:, kw...)
+    idx = makesubscripts(ndims(x))
+    out_idx = [dims == (:) || i in dims ? 1 : idx[i] for i = 1:ndims(x)]
+    expr = f(x[idx...])
+    T = symtype(g(expr, expr))
     if dims === (:)
-        T = SymbolicUtils.promote_symtype(f, eltype(x))
-        S = SymbolicUtils.promote_symtype(g, T, T)
-        return Term{S}(_mapreduce, [f, g, x, dims, (kw...,)])
+        return Term{T}(_mapreduce, [f, g, x, dims, (kw...,)])
     end
 
-    idx = makesubscripts(ndims(x))
-    out_idx = [i in dims ? 1 : idx[i] for i = 1:ndims(x)]
-    expr = f(x[idx...])
-
     Atype = propagate_atype(_mapreduce, f, g, x, dims, (kw...,))
-    ArrayOp(Atype{symtype(expr), ndims(x)},
+    ArrayOp(Atype{T, ndims(x)},
             (out_idx...,),
             expr,
             g,

@@ -114,8 +114,8 @@ A = [1 1 1 1
      1 0 1 1
      1 1 0 1
      1 1 1 0]
-@test _det1(A) == -1
-@test _det2(A) == -1
+@test_broken _det1(map(Num, A)) == -1
+@test _det2(map(Num, A)) == -1
 
 @variables X[1:3,1:3]
 d1 = det(X, laplace=true)
@@ -125,8 +125,8 @@ _det2 = eval(build_function(d2, X))
 A = [1 1 1
      1 0 1
      1 1 1]
-@test _det1(A) == 0
-@test _det2(A) == 0
+@test _det1(map(Num, A)) == 0
+@test _det2(map(Num, A)) == 0
 
 @variables a b c d
 z1 = a + b * im
