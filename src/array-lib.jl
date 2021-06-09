@@ -247,7 +247,14 @@ function _map(f, x, xs...)
             Term{Any}(map, [f, x, xs...]))
 end
 
-@inline _mapreduce(f, x, dims, kw) = mapreduce(f, x; dims=dims, kw...)
+@inline _mapreduce(f, g, x, dims, kw) = mapreduce(f, g, x; dims=dims, kw...)
+
+function scalarize_op(::typeof(_mapreduce), t)
+    f,g,x,dims,kw = arguments(t)
+    # we wrap and unwrap to make things work smoothly.
+    # we need the result unwrapped to allow recursive scalarize to work.
+    unwrap(_mapreduce(f, g, collect(wrap(x)), dims, kw))
+end
 
 @wrapped function Base.mapreduce(f, g, x::AbstractArray; dims=:, kw...)
     idx = makesubscripts(ndims(x))

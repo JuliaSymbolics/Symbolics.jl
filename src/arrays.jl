@@ -507,20 +507,14 @@ function scalarize(arr::AbstractArray, idx)
 end
 
 function scalarize(arr::Term, idx)
-    scalarize_term_indexing(operation(arr), arr, idx)
+    scalarize_op(operation(arr), arr, idx)
 end
 
-function scalarize(arr::Term)
-    args = arguments(arr)
-    operation(arr) == getindex && return scalarize(args[1], (args[2:end]...,))
-    scalarize_term_indexing(operation(arr), arr)
-end
-
-scalarize_term_indexing(f, arr) = arr
+scalarize_op(f, arr) = arr
 
 struct ScalarizeCache end
 
-function scalarize_term_indexing(f, arr, idx)
+function scalarize_op(f, arr, idx)
     if hasmetadata(arr, ScalarizeCache) && getmetadata(arr, ScalarizeCache)[] !== nothing
         wrap(getmetadata(arr, ScalarizeCache)[][idx...])
     else
@@ -542,7 +536,7 @@ end
 
 _det(x, lp) = det(x, laplace=lp)
 
-function scalarize_term_indexing(f::typeof(_det), arr)
+function scalarize_op(f::typeof(_det), arr)
     det(map(wrap, collect(arguments(arr)[1])), laplace=arguments(arr)[2])
 end
 
@@ -607,6 +601,9 @@ function scalarize(arr)
         scalarize(args[1], (args[2:end]...,))
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
+    elseif istree(arr) && symtype(arr) <: Number
+        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr))
+        scalarize_op(operation(t), t)
     else
         arr
     end
