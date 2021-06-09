@@ -126,7 +126,7 @@ let # Symbolics.jl#123
     output_eq = u*(qd[1]*(M[1]*qd[1] + M[1]*qd[3] + M[1]*qd[4] + M[25]*qd[5] + M[31]*qd[6] + M[7]*qd[2]))
 
     str = build_function(output_eq, x, target=Symbolics.CTarget())
-    @test str == """
+    @test_broken str == """
     #include <math.h>
     void diffeqf(double* du, const double* RHS1) {
       du[0] = qd₁ * u * (M₁ * qd₁ + M₁ * qd₃ + M₁ * qd₄ + M₂₅ * qd₅ + M₃₁ * qd₆ + M₇ * qd₂);
