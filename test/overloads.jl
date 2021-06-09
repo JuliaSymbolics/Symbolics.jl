@@ -1,5 +1,5 @@
 using Symbolics
-using Symbolics: Sym, FnType, Term, value
+using Symbolics: Sym, FnType, Term, value, scalarize
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
@@ -179,10 +179,10 @@ x = Num.(randn(10))
 @test norm(x, 1.2) == norm(Symbolics.value.(x), 1.2)
 
 @variables x[1:2]
-@test isequal(norm(x), sqrt(abs2(x[1]) + abs2(x[2])))
-@test isequal(norm(x, Inf), max(abs(x[1]), abs(x[2])))
-@test isequal(norm(x, 1), abs(x[1]) + abs(x[2]))
-@test isequal(norm(x, 1.2), (abs(x[1])^1.2 + abs(x[2])^1.2)^(1/1.2))
+@test isequal(scalarize(norm(x)), sqrt(abs2(x[1]) + abs2(x[2])))
+@test isequal(scalarize(norm(x, Inf)), max(abs(x[1]), abs(x[2])))
+@test isequal(scalarize(norm(x, 1)), abs(x[1]) + abs(x[2]))
+@test isequal(scalarize(norm(x, 1.2)), (abs(x[1])^1.2 + abs(x[2])^1.2)^(1/1.2))
 
 @variables x y
 @test isequal(expand((x+y)^2), x^2 + y^2 + 2x*y)
