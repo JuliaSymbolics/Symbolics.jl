@@ -2,7 +2,7 @@
 
 ## Limits of Symbolic Computation
 
-#### Transforming my function to a symbolic equation has failed. What do I do?
+### Transforming my function to a symbolic equation has failed. What do I do?
 
 If you see the error:
 
@@ -48,3 +48,12 @@ Loops are allowed, but the amount of loop iterations should not require that you
 know the value of the symbol `x`. If the algorithm is quasi-static, then Symbolics.jl
 tracing will produce the static form of the code, unrolling the operations, and
 generating a flat representation of the algorithm.
+
+#### What can be done?
+
+If you need to represent this function `f` symbolically, then you'll need to make
+sure it's not traced and instead is directly represented in the underlying
+computational graph. Just like how `sqrt(x)` symbolically does not try to
+represent the underlying algorithm, this needs to be done to your `f`. This is
+done by doing `@register f(x)`. If you need to define things like derivatives to
+`f`, then [the function registration documentation](@ref function_registration).
