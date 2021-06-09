@@ -114,7 +114,7 @@ A = [1 1 1 1
      1 0 1 1
      1 1 0 1
      1 1 1 0]
-@test_broken _det1(map(Num, A)) == -1
+@test _det1(map(Num, A)) == -1
 @test _det2(map(Num, A)) == -1
 
 @variables X[1:3,1:3]
