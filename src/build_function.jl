@@ -384,15 +384,20 @@ buildvarnumbercache(args...) = Dict([isa(arg,AbstractArray) ? el=>(argi,eli) : a
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)])
     O = value(O)
-    if O isa Sym || isa(operation(O), Sym)
+    if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
         if !isnothing(j)
             return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
     if istree(O)
-        Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
-                                                         rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+        if operation(O) === getindex
+            args = arguments(O)
+            Expr(:ref, toexpr(args[1]), toexpr.(args[2:end] .+ offset)...)
+        else
+            Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
+                                                             rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+        end
     elseif O isa Sym
         tosymbol(O, escape=false)
     else
@@ -495,7 +500,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                                   rhsnames=rhsnames,offset=-1) for
                                   (i, eq) ∈ enumerate(eqs)],";\n  "),";")
 
-    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:AbstractArray ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
     ex = """
     void $fname($(argstrs...)) {
       $differential_equation
@@ -574,7 +579,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         end
     end
 
-    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "const double* $(rhsnames[i])" : "const double $(rhsnames[i])" for i in 1:length(args)]),", ")
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:AbstractArray ? "const double* $(rhsnames[i])" : "const double $(rhsnames[i])" for i in 1:length(args)]),", ")
 
     ccode = """
     #include <math.h>
