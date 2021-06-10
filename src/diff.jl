@@ -120,11 +120,11 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                 c = 0
                 inner_function = expand_derivatives_(arguments(arg)[1])
                 if isa(value(a), Term)
-                    t1 = replaceSym(operation(arg).x ,a , inner )
+                    t1 = replaceSym(operation(arg).x ,value(a) , inner_function )
                     t2 = D(a)
-                    c += t1*t2
+                    c -= t1*t2
                 elseif isa(value(b) , Term)
-                    t1 = replaceSym(operation(arg).x ,b , inner )
+                    t1 = replaceSym(operation(arg).x ,value(b) , inner_function )
                     t2 = D(b)
                     c += t1*t2
                 end
@@ -170,10 +170,10 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             x = +((!_iszero(c) ? vcat(c, exprs) : exprs)...)
             return simplify ? SymbolicUtils.simplify(x) : x
         end
+    elseif isa(operation(O) , Integral )
+        return operation(O)(expand_derivatives_(arguments(O)[1]))  
     elseif !hasderiv(O)
         return O
-    elseif isa(operation(O) , Integral )
-        return operation(O)(expand_derivatives_(arguments(O)[1]))        
     else
         args = map(a->expand_derivatives(a, false), arguments(O))
         O1 = operation(O)(args...)
