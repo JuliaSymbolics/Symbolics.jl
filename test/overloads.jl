@@ -35,8 +35,13 @@ aa = a; # old a
 @test hash(a+b ~ c+d) == hash(a+b ~ c+d)
 
 # test some matrix operations don't throw errors
-X = [0 b c; d e f; g h i]
-@test iszero(simplify(det(X) - ((d * ((b * i) - (c * h))) + (g * ((b * f) - (c * e))))))
+X = [0 b c;
+     d e f;
+     g h i]
+
+@test iszero(expand(det(X) - (-b * (d*i-f*g) + c * (d*h - e*g))))
+
+
 F = lu(X)
 @test_nowarn lu(X'), lu(transpose(X))
 @test F.p == [2, 1, 3]
