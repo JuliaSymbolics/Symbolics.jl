@@ -42,7 +42,7 @@ X = [0 b c; d e f; g h i]
 F = lu(X)
 @test_nowarn lu(X'), lu(transpose(X))
 @test F.p == [2, 1, 3]
-R = simplify.(F.L * F.U - X[F.p, :], polynorm=true)
+R = simplify.(F.L * F.U - X[F.p, :])
 @test iszero(R)
 @test simplify.(F \ X) == I
 @test Symbolics._solve(X, X, true) == I
@@ -159,16 +159,8 @@ z2 = c + d * im
 @test conj(a) === a
 @test imag(a) === Num(0)
 
-@variables x y z
-eqs = [
-        2//1 * x + y - z ~ 2//1
-        2//1 + y - z ~ 3//1*x
-        2//1 + y - 2z ~ 3//1*z
-      ]
-@test [2 1 -1; -3 1 -1; 0 1 -5] * Symbolics.solve_for(eqs, [x, y, z]) == [2; -2; -2]
-@test isequal(Symbolics.solve_for(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x), 1//7*y - 2//7*z)
-
-@test isequal(sign(x), Num(SymbolicUtils.Term{Int}(sign, [x])))
+@test isequal(sign(x), Num(SymbolicUtils.Term{Int}(sign, [Symbolics.value(x)])))
+@test sign(Num(1)) isa Num
 @test isequal(sign(Num(1)), Num(1))
 @test isequal(sign(Num(-1)), Num(-1))
 

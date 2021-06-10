@@ -2,7 +2,7 @@ isblock(x) = length(x) == 1 && x[1] isa Expr && x[1].head == :block
 function flatten_expr!(x)
     isblock(x) || return x
     x = MacroTools.striplines(x[1])
-    filter!(z->z isa Symbol || z.head != :line, x.args)
+    filter!(z -> z isa Symbol || z.head != :line, x.args)
     xs = []
     for ex in x.args
         if Meta.isexpr(ex, :tuple)
@@ -180,5 +180,48 @@ makesym(t::Symbolic; kwargs...) = Sym{symtype(t)}(tosymbol(t; kwargs...))
 makesym(t::Num; kwargs...) = makesym(value(t); kwargs...)
 
 var_from_nested_derivative(x, i=0) = (missing, missing)
-var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1],i+1) : (x,i)
-var_from_nested_derivative(x::Sym,i=0) = (x,i)
+var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
+var_from_nested_derivative(x::Sym,i=0) = (x, i)
+
+function degree(p::Sym, sym=nothing)
+    if sym === nothing
+        return 1
+    else
+        return Int(isequal(p, sym))
+    end
+end
+
+function degree(p::Pow, sym=nothing)
+    return p.exp * degree(p.base, sym)
+end
+
+function degree(p::Add, sym=nothing)
+    return maximum(degree(key, sym) for key in keys(p.dict))
+end
+        
+function degree(p::Mul, sym=nothing)
+    return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
+end
+
+function degree(p::Term, sym=nothing)
+    if sym === nothing
+        return 1
+    else
+        return Int(isequal(p, sym))
+    end
+end
+ 
+function degree(p, sym=nothing)
+    p = value(p)
+    sym = value(sym)
+    if p isa Number
+        return 0
+    end
+    if isequal(p, sym)
+        return 1
+    end
+    if p isa Symbolic
+        return degree(p, sym)
+    end
+    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
+end
