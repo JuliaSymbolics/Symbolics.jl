@@ -1,4 +1,4 @@
-# Function Registration and Tracing
+# [Function Registration and Tracing](@id function_registration)
 
 ## Direct Tracing
 
