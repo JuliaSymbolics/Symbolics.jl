@@ -160,24 +160,6 @@ function lower_varname(var::Symbolic, idv, order)
     return diff2term(var)
 end
 
-"""
-    makesym(x::Union{Num,Symbolic}, kwargs...) -> Sym
-
-`makesym` takes the same arguments as [`tosymbol`](@ref), but it converts a
-`Term` in the form of `x(t)` to a `Sym` in the form of `x⦗t⦘`.
-
-# Examples
-```julia
-julia> @parameters t; @variables x(t)
-(x(t),)
-
-julia> Symbolics.makesym(x)
-x⦗t⦘
-```
-"""
-makesym(t::Symbolic; kwargs...) = Sym{symtype(t)}(tosymbol(t; kwargs...))
-makesym(t::Num; kwargs...) = makesym(value(t); kwargs...)
-
 var_from_nested_derivative(x, i=0) = (missing, missing)
 
 ### OOPS
@@ -193,15 +175,6 @@ macro oops(ex)
             tmp
         end
     end
-end
-
-maybe(f, x) = f(@oops x)
-
-function maybefoldl(f, g, xs, acc)
-    for x in xs
-        acc = g(acc, @oops f(x))
-    end
-    return acc
 end
 
 function makesubscripts(n)
