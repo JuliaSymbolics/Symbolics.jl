@@ -16,6 +16,17 @@ const IndexMap = Dict{Char,Char}(
 
 struct VariableDefaultValue end
 
+const _fail = Dict()
+function getdefaultval(x, val=_fail)
+    x = unwrap(x)
+    if hasmetadata(x, VariableDefaultValue)
+        return getmetadata(x, VariableDefaultValue)
+    else
+        val === _fail && error("$x has no default value")
+        return val
+    end
+end
+
 function recurse_and_apply(f, x)
     if symtype(x) <: AbstractArray
         getindex_posthook(x) do r,x,i...
