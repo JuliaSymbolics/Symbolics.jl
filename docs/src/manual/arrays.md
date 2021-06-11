@@ -78,7 +78,7 @@ julia> map(asin, (A*b))
 (map(asin, A*b))[1:5]
 ```
 
-``julia
+```julia
 julia> sum(A)
 ...
 
@@ -126,5 +126,3 @@ julia> Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
 A[1, 1] + A[2, 2] + A[2, 3] + A[4, 1] + A[5, 1] + 2A[2, 1] + A[3, 1]
 
 ```
-
-## How arrays work
