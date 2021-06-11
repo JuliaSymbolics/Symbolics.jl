@@ -1,9 +1,8 @@
-import Symbolics
+using Symbolics
 import Symbolics: getdefaultval, wrap, unwrap
 import SymbolicUtils: Term, symtype, FnType
 using Test
 
-@test !(@isdefined Num)
 @variables t
 Symbolics.@register fff(t)
 @test isequal(fff(t), Symbolics.Num(Symbolics.Term{Real}(fff, [Symbolics.value(t)])))
@@ -23,7 +22,7 @@ Symbolics.@register fff(t)
 
 @test p[1] isa Term
 @test symtype(p[1]) <: FnType{Tuple, Real}
-@test p[1](t) isa Num
+@test p[1](t) isa Symbolics.Num
 
 
 ## Wrapper types
