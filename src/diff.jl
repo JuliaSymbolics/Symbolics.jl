@@ -364,13 +364,19 @@ function jacobian_sparsity(du, u)
     I = Int[]
     J = Int[]
 
+
+    simterm(x, f, args; kw...) = similarterm(x, f, args, symtype(x); kw...)
+
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
-    r = [@rule ~x::(x->haskey(dict, x)) => begin
+
+    r = @rule ~x::(x->haskey(dict, x)) => begin
         push!(I, i[])
         push!(J, dict[~x])
         nothing
-    end] |> Rewriters.Chain |> Rewriters.Postwalk
+    end
+
+    r =  Rewriters.Postwalk(r, similarterm=simterm)
 
     for ii = 1:length(du)
         i[] = ii

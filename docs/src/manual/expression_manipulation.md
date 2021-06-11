@@ -23,7 +23,6 @@ Other additional manipulation functions are given below.
 ```@docs
 Symbolics.get_variables
 Symbolics.tosymbol
-Symbolics.makesym
 Symbolics.diff2term
 Symbolics.solve_for
 ```

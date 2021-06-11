@@ -1,6 +1,7 @@
 using Symbolics
 using Test
 using IfElse
+using Symbolics: value
 
 # Derivatives
 @variables t σ ρ β
@@ -103,7 +104,7 @@ t1 = Symbolics.gradient(tmp, [x1, x2])
 @variables t k
 @variables x(t)
 D = Differential(k)
-@test Symbolics.tosymbol(D(x).val) === Symbol("xˍk(t)")
+@test Symbolics.tosymbol(value(D(x))) === Symbol("xˍk(t)")
 
 using Symbolics
 @variables t x(t)
@@ -203,7 +204,7 @@ sp_hess = Symbolics.sparsehessian(rr, X)
 #96
 @variables t x[1:4](t) ẋ[1:4](t)
 expression = sin(x[1] + x[2] + x[3] + x[4]) |> Differential(t) |> expand_derivatives
-expression2 = substitute(expression, Dict(Differential(t).(x) .=> ẋ))
+expression2 = substitute(expression, Dict(collect(Differential(t).(x) .=> ẋ)))
 @test isequal(expression2, (ẋ[1] + ẋ[2] + ẋ[3] + ẋ[4])*cos(x[1] + x[2] + x[3] + x[4]))
 
 @test isequal(

@@ -1,4 +1,5 @@
 using Symbolics, SparseArrays, Test
+using ReferenceTests
 @variables a b c1 c2 c3 d e g
 
 # Multiple argument matrix
@@ -125,13 +126,7 @@ let # Symbolics.jl#123
     @variables qd[1:6]
     output_eq = u*(qd[1]*(M[1]*qd[1] + M[1]*qd[3] + M[1]*qd[4] + M[25]*qd[5] + M[31]*qd[6] + M[7]*qd[2]))
 
-    str = build_function(output_eq, x, target=Symbolics.CTarget())
-    @test str == """
-    #include <math.h>
-    void diffeqf(double* du, const double* RHS1) {
-      du[0] = qd₁ * u * (M₁ * qd₁ + M₁ * qd₃ + M₁ * qd₄ + M₂₅ * qd₅ + M₃₁ * qd₆ + M₇ * qd₂);
-    }
-    """
+    @test_reference "ctarget_functions/issue123.c" build_function(output_eq, x, target=Symbolics.CTarget())
 end
 
 using Symbolics: value
@@ -141,3 +136,10 @@ D = Differential(t)
 expr = toexpr(Func([value(D(x))], [], value(D(x))))
 @test expr.args[2].args[end] == expr.args[1].args[1] # check function body and function arg
 @test expr.args[2].args[end] == :(var"Differential(t)(x(t))")
+
+## Oop Arr case:
+#
+
+a = rand(4)
+@variables x[1:4]
+@test eval(build_function(sin.(cos.(x)), cos.(x)))(a) == sin.(a)

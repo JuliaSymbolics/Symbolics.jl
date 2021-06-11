@@ -68,17 +68,24 @@ end
 function unflatten_long_ops(op, N=4)
     op = value(op)
     op = termify(op)
-    !istree(op) && return Num(op)
-    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, 4) : nothing)
-    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, 4) : nothing)
+    !istree(op) && return wrap(op)
+    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, N) : nothing)
+    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, N) : nothing)
 
-    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]))(op))
+    simterm(x,f,args; metadata=nothing) = Term{symtype(x)}(f, args, metadata=metadata)
+    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]), similarterm=simterm)(op))
 end
 
 
 # Scalar output
 
-destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds) = DestructuredArgs(map(value, arg), inbounds=inbounds)
+function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds)
+    if !(arg isa Arr)
+        DestructuredArgs(map(value, arg), inbounds=inbounds)
+    else
+        arg
+    end
+end
 destructure_arg(arg, _) = arg
 
 function _build_function(target::JuliaTarget, op, args...;
@@ -90,6 +97,26 @@ function _build_function(target::JuliaTarget, op, args...;
 
     dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
     expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
+
+    if expression == Val{true}
+        expr
+    else
+        _build_and_inject_function(expression_module, expr)
+    end
+end
+
+SymbolicUtils.Code.get_symbolify(x::Arr) = SymbolicUtils.Code.get_symbolify(unwrap(x))
+
+function _build_function(target::JuliaTarget, op::Arr, args...;
+                         conv = toexpr,
+                         expression = Val{true},
+                         expression_module = @__MODULE__(),
+                         checkbounds = false,
+                         linenumbers = true)
+
+    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
+    @show dargs
+    expr = toexpr(Func(dargs, [], op))
 
     if expression == Val{true}
         expr
@@ -318,11 +345,11 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
     ii = findall(i->!(rhss[i] isa AbstractArray) && !(skipzeros && _iszero(rhss[i])), eachindex(outputidxs))
     jj = findall(i->rhss[i] isa AbstractArray, eachindex(outputidxs))
     exprs = []
-    rhss_scalar = unflatten_long_ops.(vec(rhss[ii]))
     setterexpr = SetArray(!checkbounds,
                           out,
-                          AtIndex.(vec(collect(outputidxs[ii])),
-                                   rhss_scalar))
+                          [AtIndex(outputidxs[ii[i]],
+                                   unflatten_long_ops(rhss[i]))
+                           for i in 1:length(ii)])
     push!(exprs, setterexpr)
     for j in jj
         push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros))
@@ -357,15 +384,20 @@ buildvarnumbercache(args...) = Dict([isa(arg,AbstractArray) ? el=>(argi,eli) : a
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)])
     O = value(O)
-    if O isa Sym || isa(operation(O), Sym)
+    if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
         if !isnothing(j)
             return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
     if istree(O)
-        Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
-                                                         rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+        if operation(O) === getindex
+            args = arguments(O)
+            Expr(:ref, toexpr(args[1]), toexpr.(args[2:end] .+ offset)...)
+        else
+            Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
+                                                             rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+        end
     elseif O isa Sym
         tosymbol(O, escape=false)
     else
@@ -468,7 +500,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                                   rhsnames=rhsnames,offset=-1) for
                                   (i, eq) ∈ enumerate(eqs)],";\n  "),";")
 
-    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:AbstractArray ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
     ex = """
     void $fname($(argstrs...)) {
       $differential_equation
@@ -547,7 +579,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         end
     end
 
-    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "const double* $(rhsnames[i])" : "const double $(rhsnames[i])" for i in 1:length(args)]),", ")
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:AbstractArray ? "const double* $(rhsnames[i])" : "const double $(rhsnames[i])" for i in 1:length(args)]),", ")
 
     ccode = """
     #include <math.h>

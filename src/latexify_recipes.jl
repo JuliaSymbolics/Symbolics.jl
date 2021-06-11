@@ -60,9 +60,11 @@ function _toexpr(O)
         ex = _toexpr(args[1])
         wrt = _toexpr(op.x)
         return :(_derivative($ex, $wrt))
-    elseif op isa Sym
+    elseif symtype(op) <: FnType
         isempty(args) && return nameof(op)
         return Expr(:call, _toexpr(op), _toexpr(args)...)
+    elseif op === getindex && symtype(args[1]) <: AbstractArray
+        return getindex_to_symbol(O)
     end
     return Expr(:call, Symbol(op), _toexpr(args)...)
 end
@@ -124,3 +126,11 @@ end
 
 _toexpr(eqs::AbstractArray) = map(eq->_toexpr(eq), eqs)
 _toexpr(x::Num) = _toexpr(value(x))
+
+function getindex_to_symbol(t)
+    @assert istree(t) && operation(t) === getindex && symtype(arguments(t)[1]) <: AbstractArray
+    args = arguments(t)
+    idxs = args[2:end]
+    sub = join(map(map_subscripts, idxs), "ˏ")
+    return Symbol(_toexpr(args[1]), sub)
+end

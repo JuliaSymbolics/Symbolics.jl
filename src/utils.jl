@@ -144,12 +144,11 @@ function tosymbol(t::Term; states=nothing, escape=true)
         op = Symbol(operation(term))
         args = arguments(term)
     else
-        @goto err
+        op = Symbol(repr(operation(t)))
+        args = arguments(t)
     end
 
     return escape ? Symbol(op, "(", join(args, ", "), ")") : op
-    @label err
-    error("Cannot convert $t to a symbol")
 end
 
 function lower_varname(var::Symbolic, idv, order)
@@ -161,25 +160,33 @@ function lower_varname(var::Symbolic, idv, order)
     return diff2term(var)
 end
 
-"""
-    makesym(x::Union{Num,Symbolic}, kwargs...) -> Sym
-
-`makesym` takes the same arguments as [`tosymbol`](@ref), but it converts a
-`Term` in the form of `x(t)` to a `Sym` in the form of `x⦗t⦘`.
-
-# Examples
-```julia
-julia> @parameters t; @variables x(t)
-(x(t),)
-
-julia> Symbolics.makesym(x)
-x⦗t⦘
-```
-"""
-makesym(t::Symbolic; kwargs...) = Sym{symtype(t)}(tosymbol(t; kwargs...))
-makesym(t::Num; kwargs...) = makesym(value(t); kwargs...)
-
 var_from_nested_derivative(x, i=0) = (missing, missing)
+
+### OOPS
+
+struct Unknown end
+
+macro oops(ex)
+    quote
+        tmp = $(esc(ex))
+        if tmp === Unknown()
+            return Unknown()
+        else
+            tmp
+        end
+    end
+end
+
+function makesubscripts(n)
+    set = 'i':'z'
+    m = length(set)
+    map(1:n) do i
+        repeats = ceil(Int, i / m)
+        c = set[(i-1) % m + 1]
+        Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
+    end
+end
+
 var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
 var_from_nested_derivative(x::Sym,i=0) = (x, i)
 

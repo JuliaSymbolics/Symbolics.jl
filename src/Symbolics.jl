@@ -25,6 +25,10 @@ export simplify, substitute
 
 using SciMLBase, IfElse
 export Num
+using MacroTools
+import MacroTools: splitdef, combinedef, postwalk, striplines
+include("wrapper-types.jl")
+
 include("num.jl")
 
 export Equation, ConstrainedEquation
@@ -33,8 +37,9 @@ include("equations.jl")
 include("utils.jl")
 export degree
 
-using MacroTools
-import MacroTools: splitdef, combinedef, postwalk, striplines
+using ConstructionBase
+include("arrays.jl")
+
 export @register
 include("register.jl")
 
@@ -52,13 +57,15 @@ export Differential, expand_derivatives
 
 include("diff.jl")
 
+include("array-lib.jl")
+
 include("linear_algebra.jl")
 
 import Libdl
 include("build_function.jl")
 export build_function
 
-using Distributions
+import Distributions
 include("extra_functions.jl")
 
 using Latexify
