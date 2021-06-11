@@ -136,3 +136,9 @@ D = Differential(t)
 expr = toexpr(Func([value(D(x))], [], value(D(x))))
 @test expr.args[2].args[end] == expr.args[1].args[1] # check function body and function arg
 @test expr.args[2].args[end] == :(var"Differential(t)(x(t))")
+
+## Oop Arr case:
+#
+
+a = rand(4)
+@test eval(build_function(sin.(cos.(x)), cos.(x)))(a) == sin.(a)
