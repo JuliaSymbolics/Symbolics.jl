@@ -141,4 +141,5 @@ expr = toexpr(Func([value(D(x))], [], value(D(x))))
 #
 
 a = rand(4)
+@variables x[1:4]
 @test eval(build_function(sin.(cos.(x)), cos.(x)))(a) == sin.(a)
