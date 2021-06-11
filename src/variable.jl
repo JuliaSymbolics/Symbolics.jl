@@ -247,23 +247,6 @@ function construct_var(var_name, type, call_args, val, prop)
     :($wrap($(setprops_expr(expr, prop))))
 end
 
-function construct_var(var_name, type, call_args, val, prop, ind)
-    # TODO: just use Sym here
-    expr = if call_args === nothing
-        :($Sym{$type}($var_name, $ind...))
-    elseif !isempty(call_args) && call_args[end] == :..
-        :($Sym{$FnType{Tuple{Any}, $type}}($var_name, $ind...)) # XXX: using Num as output
-    else
-        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name, $ind...)($(map(x->:($value($x)), call_args)...)))
-    end
-
-    if val !== nothing
-        expr = :($setdefaultval($expr, $val))
-    end
-
-    :($wrap($(setprops_expr(expr, prop))))
-end
-
 function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
     # TODO: just use Sym here
     ndim = length(indices)
