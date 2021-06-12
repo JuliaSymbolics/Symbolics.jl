@@ -118,17 +118,18 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                 domain = operation(arg).domain
                 a , b = DomainSets.endpoints(domain)
                 c = 0
-                inner_function = expand_derivatives_(arguments(arg)[1])
+                inner_function = expand_derivatives(arguments(arg)[1])
                 if isa(value(a), Term)
-                    t1 = replaceSym(operation(arg).x ,value(a) , inner_function )
+                    t1 = SymbolicUtils.substitute(eqp.lhs, Dict(operation(arg).x => value(a)))
                     t2 = D(a)
                     c -= t1*t2
-                elseif isa(value(b) , Term)
-                    t1 = replaceSym(operation(arg).x ,value(b) , inner_function )
+                end
+                if isa(value(b) , Term)
+                    t1 = SymbolicUtils.substitute(eqp.lhs, Dict(operation(arg).x ==> value(b)))
                     t2 = D(b)
                     c += t1*t2
                 end
-                inner = expand_derivatives_(D(arguments(arg)[1]))
+                inner = expand_derivatives(D(arguments(arg)[1]))
                 c += operation(arg)(inner)
                 return c
             end
@@ -171,7 +172,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             return simplify ? SymbolicUtils.simplify(x) : x
         end
     elseif isa(operation(O) , Integral )
-        return operation(O)(expand_derivatives_(arguments(O)[1]))  
+        return operation(O)(expand_derivatives(arguments(O)[1]))
     elseif !hasderiv(O)
         return O
     else
