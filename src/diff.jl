@@ -125,7 +125,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                     c -= t1*t2
                 end
                 if isa(value(b) , Term)
-                    t1 = SymbolicUtils.substitute(eqp.lhs, Dict(operation(arg).x ==> value(b)))
+                    t1 = SymbolicUtils.substitute(eqp.lhs, Dict(operation(arg).x => value(b)))
                     t2 = D(b)
                     c += t1*t2
                 end
