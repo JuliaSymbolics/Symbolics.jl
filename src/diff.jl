@@ -120,18 +120,18 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                 c = 0
                 inner_function = expand_derivatives(arguments(arg)[1])
                 if isa(value(a), Term)
-                    t1 = SymbolicUtils.substitute(eqp.lhs, Dict(operation(arg).x => value(a)))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).x => value(a)))
                     t2 = D(a)
                     c -= t1*t2
                 end
                 if isa(value(b) , Term)
-                    t1 = SymbolicUtils.substitute(eqp.lhs, Dict(operation(arg).x => value(b)))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).x => value(b)))
                     t2 = D(b)
                     c += t1*t2
                 end
                 inner = expand_derivatives(D(arguments(arg)[1]))
                 c += operation(arg)(inner)
-                return c
+                return value(c)
             end
         end
 
