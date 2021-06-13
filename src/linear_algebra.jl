@@ -142,6 +142,7 @@ function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = 
     x
 end
 
+minor(B, j) = B[2:end, 1:size(B,2) .!= j]
 function LinearAlgebra.det(A::AbstractMatrix{<:Num}; laplace=true)
     if laplace
         n = LinearAlgebra.checksquare(A)
@@ -150,20 +151,9 @@ function LinearAlgebra.det(A::AbstractMatrix{<:Num}; laplace=true)
         elseif n == 2
             return A[1, 1] * A[2, 2] - A[1, 2] * A[2, 1]
         else
-            temp = 0
-            # Laplace expansion along the first column
-            M′ = A[:, 2:end]
-            for i in axes(A, 1)
-                M = M′[(1:n) .!= i, :]
-                d′ = A[i, 1] * det(M)
-                if iseven(i)
-                    temp = iszero(temp) ? d′ : temp - d′
-                else
-                    temp = iszero(temp) ? d′ : temp + d′
-                end
-            end
+            return sum((-1)^(1+j) * A[1,j] * det(minor(A,j), laplace=true)
+                       for j in axes(A,2))
         end
-        return temp
     else
         if istriu(A) || istril(A)
             return det(UpperTriangular(A))

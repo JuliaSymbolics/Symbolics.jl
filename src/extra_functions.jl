@@ -1,5 +1,3 @@
-@register Base.getindex(x,i::Integer) false
-@register Base.getindex(x,i) # define one and only one promotion rule
 @register Base.binomial(n,k)
 
 @register Base.sign(x)::Int

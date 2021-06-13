@@ -10,6 +10,8 @@ end
 
 if GROUP == "All" || GROUP == "Core"
     @safetestset "Macro Test" begin include("macro.jl") end
+    @safetestset "Arrays" begin include("arrays.jl") end
+    @safetestset "Fuzz Arrays" begin include("fuzz-arrays.jl") end
     @safetestset "Differentiation Test" begin include("diff.jl") end
     @safetestset "Degree Test" begin include("degree.jl") end 
     @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end

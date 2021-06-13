@@ -1,5 +1,5 @@
 using Symbolics
-using Symbolics: Sym, FnType, Term, value
+using Symbolics: Sym, FnType, Term, value, scalarize
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
@@ -13,8 +13,6 @@ vars = @variables t $a $b(t) $c[1:3](t)
 @test isequal(vars[1], t)
 @test isequal(vars[2], Num(Sym{Real}(a)))
 @test isequal(vars[3], Num(Sym{FnType{Tuple{Any},Real}}(b)(value(t))))
-genc(n) = Num(Sym{FnType{Tuple{Any},Real}}(Symbol(c, n))(value(t)))
-@test isequal(vars[4], [genc('₁'), genc('₂'), genc('₃')])
 
 vars = @variables a,b,c,d,e,f,g,h,i
 @test isequal(vars, [a,b,c,d,e,f,g,h,i])
@@ -37,8 +35,13 @@ aa = a; # old a
 @test hash(a+b ~ c+d) == hash(a+b ~ c+d)
 
 # test some matrix operations don't throw errors
-X = [0 b c; d e f; g h i]
-@test iszero(simplify(det(X) - ((d * ((b * i) - (c * h))) + (g * ((b * f) - (c * e))))))
+X = [0 b c;
+     d e f;
+     g h i]
+
+@test iszero(expand(det(X) - (-b * (d*i-f*g) + c * (d*h - e*g))))
+
+
 F = lu(X)
 @test_nowarn lu(X'), lu(transpose(X))
 @test F.p == [2, 1, 3]
@@ -110,14 +113,14 @@ M \ [1, 2]
 @variables X[1:4,1:4]
 d1 = det(X, laplace=true)
 d2 = det(X, laplace=false)
-_det1 = eval(build_function(d1, X))
-_det2 = eval(build_function(d2, X))
+_det1 = eval(build_function(d1,X))
+_det2 = eval(build_function(d2,X))
 A = [1 1 1 1
      1 0 1 1
      1 1 0 1
      1 1 1 0]
-@test _det1(A) == -1
-@test _det2(A) == -1
+@test _det1(map(Num, A)) == -1
+@test _det2(map(Num, A)) == -1
 
 @variables X[1:3,1:3]
 d1 = det(X, laplace=true)
@@ -127,8 +130,8 @@ _det2 = eval(build_function(d2, X))
 A = [1 1 1
      1 0 1
      1 1 1]
-@test _det1(A) == 0
-@test _det2(A) == 0
+@test _det1(map(Num, A)) == 0
+@test _det2(map(Num, A)) == 0
 
 @variables a b c d
 z1 = a + b * im
@@ -181,10 +184,10 @@ x = Num.(randn(10))
 @test norm(x, 1.2) == norm(Symbolics.value.(x), 1.2)
 
 @variables x[1:2]
-@test isequal(norm(x), sqrt(abs2(x[1]) + abs2(x[2])))
-@test isequal(norm(x, Inf), max(abs(x[1]), abs(x[2])))
-@test isequal(norm(x, 1), abs(x[1]) + abs(x[2]))
-@test isequal(norm(x, 1.2), (abs(x[1])^1.2 + abs(x[2])^1.2)^(1/1.2))
+@test isequal(scalarize(norm(x)), sqrt(abs2(x[1]) + abs2(x[2])))
+@test isequal(scalarize(norm(x, Inf)), max(abs(x[1]), abs(x[2])))
+@test isequal(scalarize(norm(x, 1)), abs(x[1]) + abs(x[2]))
+@test isequal(scalarize(norm(x, 1.2)), (abs(x[1])^1.2 + abs(x[2])^1.2)^(1/1.2))
 
 @variables x y
 @test isequal(expand((x+y)^2), x^2 + y^2 + 2x*y)
