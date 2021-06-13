@@ -13,5 +13,4 @@ function Base.show(io::IO, I::Integral)
     print(io, "Integral(", I.x, ", ", I.domain, ")")
 end
 
-Base.:(==)(I1::Integral, I2::Integral) = (isequal(I1.x, I2.x) && isequal(I1.domain, I2.domain))
-(D::Differential)(I::Integral{X,T}) where{X,T} = I∘D
+Base.:(==)(I1::Integral, I2::Integral) = convert(Bool, simplify(isequal(I1.x, I2.x) && isequal(I1.domain, I2.domain)))
