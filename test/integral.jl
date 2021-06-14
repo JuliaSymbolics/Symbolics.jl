@@ -31,4 +31,5 @@ eq_test_ = I(D(D(u(x,y)))) + D(D(v(x)))*u(x, v(x)) + 2D(u(x,v(x)))*D(v(x))
 @test isequal(expand_derivatives(eq.lhs), expand_derivatives(eq_test))
 
 eq = D((I(u(x,y)^2))) ~ 0
-expand_derivatives(eq.lhs)
+eq_test = I(2D(u(x,y))*u(x,y)) + D(v(x))*u(x, v(x))^2
+@test isequal(expand_derivatives(eq.lhs), Symbolics.value(eq_test))
