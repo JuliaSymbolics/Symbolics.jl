@@ -102,7 +102,7 @@ function _toexpr(m::Mul{<:Number})
     if isempty(numer) || !isone(abs(m.coeff))
         numer_expr = Expr(:call, :*, abs(m.coeff), numer...)
     else
-        numer_expr = length(numer) > 1 ? Expr(:call, :*, numer...) : number[1]
+        numer_expr = length(numer) > 1 ? Expr(:call, :*, numer...) : numer[1]
     end
 
     if isempty(denom)
