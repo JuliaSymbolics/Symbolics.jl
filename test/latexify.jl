@@ -6,6 +6,10 @@ using ReferenceTests
 @variables x y z u(x)
 Dx = Differential(x)
 
+# issue 260
+@test Symbolics._toexpr(3*x/y) == :((3x) / y)
+@test Symbolics._toexpr(3*x^y) == :(3x^y)
+
 @test_reference "latexify_refs/inverse.txt" latexify(x^-1)
 
 @test_reference "latexify_refs/frac1.txt" latexify((z + x*y^-1) / sin(z))

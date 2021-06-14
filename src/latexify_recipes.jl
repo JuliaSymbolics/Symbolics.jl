@@ -82,17 +82,19 @@ function _toexpr(m::Mul{<:Number})
 
         base = term.base
         pow  = term.exp
-        if pow > 0
-            if isone(pow)
+        isneg = (pow isa Number && pow < 0) || (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
+        if !isneg
+            if _isone(pow)
                 pushfirst!(numer, _toexpr(base))
             else
-                pushfirst!(numer, Expr(:call, :^, _toexpr(base), pow))
+                pushfirst!(numer, Expr(:call, :^, _toexpr(base), _toexpr(pow)))
             end
         else
-            if isone(-1*pow)
+            newpow = -1*pow
+            if _isone(newpow)
                 pushfirst!(denom, _toexpr(base))
             else
-                pushfirst!(denom, Expr(:call, :^, _toexpr(base), -1*pow))
+                pushfirst!(denom, Expr(:call, :^, _toexpr(base), _toexpr(newpow)))
             end
         end
     end
@@ -100,13 +102,13 @@ function _toexpr(m::Mul{<:Number})
     if isempty(numer) || !isone(abs(m.coeff))
         numer_expr = Expr(:call, :*, abs(m.coeff), numer...)
     else
-        numer_expr = Expr(:call, :*, numer...)
+        numer_expr = length(numer) > 1 ? Expr(:call, :*, numer...) : number[1]
     end
 
     if isempty(denom)
         frac_expr = numer_expr
     else
-        denom_expr = Expr(:call, :*, denom...)
+        denom_expr = length(denom) > 1 ? Expr(:call, :*, denom...) : denom[1]
         frac_expr = Expr(:call, :/, numer_expr, denom_expr)
     end
 
