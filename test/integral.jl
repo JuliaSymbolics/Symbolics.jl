@@ -10,7 +10,7 @@ I2 = Integral(x, ClosedInterval(1, 5))
 D = Differential(x)
 Dxx = Differential(x)^2
 I = Integral(y, ClosedInterval(1, 5))
-eq = D((I(u(x,y)))) ~ 0
+eq = D(I(u(x,y))) ~ 0
 eq_test = I(D(u(x,y)))
 @test isequal(expand_derivatives(eq.lhs), Symbolics.value(eq_test))
 
@@ -29,3 +29,6 @@ eq_test = D(I(D(u(x,y))) + D(v(x))*u(x, v(x)))
 eq_test_ = I(D(D(u(x,y)))) + D(D(v(x)))*u(x, v(x)) + 2D(u(x,v(x)))*D(v(x))
 @test isequal(expand_derivatives(eq.lhs), Symbolics.value(eq_test_))
 @test isequal(expand_derivatives(eq.lhs), expand_derivatives(eq_test))
+
+eq = D((I(u(x,y)^2))) ~ 0
+expand_derivatives(eq.lhs)
