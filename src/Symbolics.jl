@@ -6,6 +6,9 @@ using LinearAlgebra
 
 using Reexport
 
+using DomainSets
+
+import DomainSets: Domain
 @reexport using SymbolicUtils
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
@@ -56,6 +59,9 @@ using SparseArrays
 export Differential, expand_derivatives
 
 include("diff.jl")
+
+export Integral
+include("integral.jl")
 
 include("array-lib.jl")
 
