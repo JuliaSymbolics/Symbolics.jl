@@ -171,7 +171,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             x = +((!_iszero(c) ? vcat(c, exprs) : exprs)...)
             return simplify ? SymbolicUtils.simplify(x) : x
         end
-    elseif istree(O) && isa(operation(O), Integral )
+    elseif istree(O) && isa(operation(O), Integral)
         return operation(O)(expand_derivatives(arguments(O)[1]))
     elseif !hasderiv(O)
         return O
