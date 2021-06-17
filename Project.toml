@@ -29,7 +29,7 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
-AbstractAlgebra = "0.13, 0.14, 0.15, 0.16, 0.17"
+AbstractAlgebra = "0.13, 0.14, 0.15, 0.16, 0.17, 0.18"
 ConstructionBase = "1.2"
 DiffRules = "0.1, 1.0"
 Distributions = "0.23, 0.24, 0.25"
