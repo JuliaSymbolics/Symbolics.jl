@@ -56,7 +56,8 @@ using DiffRules, SpecialFunctions, NaNMath
 
 using SparseArrays
 
-export Differential, expand_derivatives
+export Differential, Gradient, Divergence, Curl, Laplacian
+export expand_derivatives
 
 include("diff.jl")
 

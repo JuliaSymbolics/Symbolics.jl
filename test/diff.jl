@@ -34,6 +34,35 @@ dcsch = D(csch(t))
 @test isequal(expand_derivatives(D2(t)), 0)
 @test isequal(expand_derivatives(D2(5)), 0)
 
+# Vector calculus operators
+@variables vv(t,x,y)
+∇z = Gradient(z)
+∇xy = Gradient(x,y)
+Δxy = Laplacian(x,y)
+curl = Curl(x,y,z)
+divxy = Divergence(x,y)
+
+# TODO: better printing
+@test Symbol(∇z(vv)) === Symbol("vvˍ(z)(t, x, y)")
+@test Symbol(∇xy(vv)) === Symbol("vvˍ(x,y)(t, x, y)")
+@test Symbol(Δxy(vv)) === Symbol("vvˍ(x,y)(t, x, y)")
+@test Symbol(divxy(vv)) === Symbol("vvˍ(x,y)(t, x, y)")
+@test Symbol(D(divxy(vv))) === Symbol("vvˍ(x,y)t(t, x, y)")
+@test Symbol(divxy(D(vv))) === Symbol("vvˍt(x,y)(t, x, y)")
+
+@test isequal(∇z.xs,(z,))
+@test isequal(∇xy.xs,(x,y))
+@test isequal(Δxy.xs,(x,y))
+
+@test ~isequal(D,∇z)
+@test isequal(∇z,∇z)
+@test ~isequal(∇z,∇xy)
+@test ~isequal(Δxy,∇xy)
+
+@test isequal(expand_derivatives(∇z(uu)),0)
+@test isequal(expand_derivatives(∇z(vv)),0)
+@test isequal(expand_derivatives(∇xy(vv)),∇xy(vv))
+
 # Chain rule
 dsinsin = D(sin(sin(t)))
 test_equal(expand_derivatives(dsinsin), cos(sin(t))*cos(t))

@@ -1,3 +1,6 @@
+abstract type AbstractDifferentialOperator <: Function end
+abstract type AbstractVecDiffOperator <: AbstractDifferentialOperator end
+
 """
 $(TYPEDEF)
 
@@ -26,31 +29,60 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 (D'~x(t)) ∘ (D'~x(t)) ∘ (D'~x(t))
 ```
 """
-struct Differential <: Function
+struct Differential <: AbstractDifferentialOperator
     """The variable or expression to differentiate with respect to."""
     x
     Differential(x) = new(value(x))
 end
-(D::Differential)(x) = Term{symtype(x)}(D, [x])
-(D::Differential)(x::Num) = Num(D(value(x)))
-SymbolicUtils.promote_symtype(::Differential, x) = x
 
-is_derivative(x::Term) = operation(x) isa Differential
+(D::AbstractDifferentialOperator)(x) = Term{symtype(x)}(D, [x])
+(D::AbstractDifferentialOperator)(x::Num) = Num(D(value(x)))
+SymbolicUtils.promote_symtype(::AbstractDifferentialOperator, x) = x
+
+is_derivative(x::Term) = operation(x) isa AbstractDifferentialOperator
 is_derivative(x) = false
 
+# composition rules only apply to Differential
 Base.:*(D1, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
 Base.:*(D1::Differential, D2::Differential) = D1 ∘ D2
 Base.:^(D::Differential, n::Integer) = _repeat_apply(D, n)
 
 Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ")")
+Base.show(io::IO, D::AbstractVecDiffOperator) = print(io, nameof(D), "(", join(D.xs, ", "), ")")
 
 Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
+Base.:(==)(D1::AbstractVecDiffOperator, D2::AbstractVecDiffOperator) = isequal(typeof(D1),typeof(D2)) && isequal(D1.xs, D2.xs)
+
+"""
+$(SIGNATURES)
+
+Represents a symbolic Gradient operator, to be used when defining a PDE model.
+Not to be confused with the helper function 'gradient'.
+"""
+struct Gradient <: AbstractVecDiffOperator
+    # Use 'xs' instead of 'x' to make it clear that this is a Tuple of variables, not a variable
+    xs
+    Gradient(xs...) = new(map(x->value(x), xs))
+end
+struct Divergence <: AbstractVecDiffOperator
+    xs
+    Divergence(xs...) = new(map(x->value(x), xs))
+end
+struct Curl <: AbstractVecDiffOperator
+    # Curl is 3-dimensional
+    xs::NTuple{3}
+    Curl(xs...) = new(map(x->value(x), xs))
+end
+struct Laplacian <: AbstractVecDiffOperator
+    xs
+    Laplacian(xs...) = new(map(x->value(x), xs))
+end
 
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
 
-function occursin_info(x, expr)
+function occursin_info(x::SymbolicUtils.Symbolic, expr)
     !istree(expr) && return false
     if isequal(x, expr)
         true
@@ -62,12 +94,18 @@ function occursin_info(x, expr)
         Term{Real}(true, args)
     end
 end
-function occursin_info(x, expr::Sym)
+function occursin_info(x::SymbolicUtils.Symbolic, expr::Sym)
     isequal(x, expr)
 end
-
+function occursin_info(xs::Tuple, expr)
+    args = map(x->occursin_info(x,expr),xs)
+    if all(_isfalse, args)
+        return false
+    end
+    Term{Real}(true, args)
+end
 function hasderiv(O)
-    istree(O) ? operation(O) isa Differential || any(hasderiv, arguments(O)) : false
+    istree(O) ? operation(O) isa AbstractDifferentialOperator || any(hasderiv, arguments(O)) : false
 end
 """
 $(SIGNATURES)
@@ -75,12 +113,16 @@ $(SIGNATURES)
 TODO
 """
 function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
-    if istree(O) && isa(operation(O), Differential)
+    if istree(O) && isa(operation(O), AbstractDifferentialOperator)
         @assert length(arguments(O)) == 1
         arg = expand_derivatives(arguments(O)[1], false)
 
-        if occurances == nothing
-            occurances = occursin_info(operation(O).x, arg)
+        if occurances === nothing
+            if isa(operation(O), Differential)
+                occurances = occursin_info(operation(O).x, arg)
+            else
+                occurances = occursin_info(operation(O).xs, arg)
+            end
         end
 
         _isfalse(occurances) && return 0
@@ -97,17 +139,19 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             op = operation(arg)
             O = op(args[1], D(args[2]), D(args[3]))
             return expand_derivatives(O, simplify; occurances)
-        elseif isa(operation(arg), Differential)
+        elseif isa(operation(arg), AbstractDifferentialOperator)
             # The recursive expand_derivatives was not able to remove
-            # a nested Differential. We can attempt to differentiate the
+            # a nested AbstractDifferentialOperator. We can attempt to differentiate the
             # inner expression wrt to the outer iv. And leave the
-            # unexpandable Differential outside.
-            if isequal(operation(arg).x, D.x)
+            # unexpandable AbstractDifferentialOperator outside.
+            if isa(operation(arg), Differential) && isequal(operation(arg).x, D.x)
+                return D(arg)
+            elseif isa(operation(arg), AbstractVecDiffOperator) && isequal(operation(arg).xs, D.xs)
                 return D(arg)
             else
                 inner = expand_derivatives(D(arguments(arg)[1]), false)
                 # if the inner expression is not expandable either, return
-                if istree(inner) && operation(inner) isa Differential
+                if istree(inner) && operation(inner) isa AbstractDifferentialOperator
                     return D(arg)
                 else
                     return expand_derivatives(operation(arg)(inner), simplify)
