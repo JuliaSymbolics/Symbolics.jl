@@ -79,14 +79,14 @@ end
 
 # Scalar output
 
-function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds)
+function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
     if !(arg isa Arr)
-        DestructuredArgs(map(value, arg), inbounds=inbounds)
+        DestructuredArgs(map(value, arg), name, inbounds=inbounds)
     else
         arg
     end
 end
-destructure_arg(arg, _) = arg
+destructure_arg(arg, _, _) = arg
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
@@ -95,7 +95,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          checkbounds = false,
                          linenumbers = true)
 
-    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
 
     if expression == Val{true}
@@ -114,8 +114,8 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          checkbounds = false,
                          linenumbers = true)
 
-    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
-    @show dargs
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds,
+                                  Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = toexpr(Func(dargs, [], op))
 
     if expression == Val{true}
@@ -212,15 +212,17 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
                        parallel=SerialForm(), kwargs...)
 
-    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds,
+                                  Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto))
+
     if !isnothing(wrap_code[1])
         oop_expr = wrap_code[1](oop_expr)
     end
 
-    out = Sym{Any}(gensym("out"))
+    out = Sym{Any}(:ˍ₋out)
     ip_expr = Func([out, dargs...], [], set_array(parallel, dargs, out, outputidxs, rhss, checkbounds, skipzeros))
 
     if !isnothing(wrap_code[2])
@@ -382,7 +384,7 @@ buildvarnumbercache(args...) = Dict([isa(arg,AbstractArray) ? el=>(argi,eli) : a
                                     for (argi,arg) in enumerate(args) for (eli,el) in enumerate(arg)])
 
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
-                       lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)])
+                       lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
     if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
@@ -406,7 +408,7 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
 end
 
 function numbered_expr(de::Equation,varnumbercache,args...;varordering = args[1],
-                       lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)],offset=0)
+                       lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)],offset=0)
 
     varordering = value.(args[1])
     var = var_from_nested_derivative(de.lhs)[1]
@@ -565,7 +567,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
                                compiler    = compiler)
     end
 
-    
+
     varnumbercache = buildvarnumbercache(args...)
     equations = Vector{String}()
     for col ∈ 1:size(ex,2)
