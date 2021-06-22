@@ -46,6 +46,8 @@ Base.:^(D::Differential, n::Integer) = _repeat_apply(D, n)
 Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ")")
 
 Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
+Base.isequal(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
+Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
@@ -91,7 +93,19 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
         if !istree(arg)
             return D(arg) # Cannot expand
         elseif isa(operation(arg), Sym)
-            return D(arg) # Cannot expand
+            inner_args = arguments(arg)
+            if length(inner_args) == 1 && isequal(inner_args[1], D.x)
+                return D(arg)
+            else
+                if any(isequal(D.x), arguments(arg))
+                    return D(arg)
+                else
+                    return sum(arguments(arg), init=0) do a
+                        return expand_derivatives(Differential(a)(arg)) * expand_derivatives(D(a))
+
+                    end
+                end
+            end
         elseif isa(operation(arg), typeof(IfElse.ifelse))
             args = arguments(arg)
             op = operation(arg)
