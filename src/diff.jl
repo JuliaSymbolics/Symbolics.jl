@@ -113,6 +113,26 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                     return expand_derivatives(operation(arg)(inner), simplify)
                 end
             end
+        elseif isa(operation(arg), Integral)
+            if isa(operation(arg).domain, AbstractInterval)
+                domain = operation(arg).domain
+                a, b = DomainSets.endpoints(domain)
+                c = 0
+                inner_function = expand_derivatives(arguments(arg)[1])
+                if istree(value(a))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).x => value(a)))
+                    t2 = D(a)
+                    c -= t1*t2
+                end
+                if istree(value(b))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).x => value(b)))
+                    t2 = D(b)
+                    c += t1*t2
+                end
+                inner = expand_derivatives(D(arguments(arg)[1]))
+                c += operation(arg)(inner)
+                return value(c)
+            end
         end
 
         l = length(arguments(arg))
@@ -151,6 +171,8 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             x = +((!_iszero(c) ? vcat(c, exprs) : exprs)...)
             return simplify ? SymbolicUtils.simplify(x) : x
         end
+    elseif istree(O) && isa(operation(O), Integral)
+        return operation(O)(expand_derivatives(arguments(O)[1]))
     elseif !hasderiv(O)
         return O
     else
