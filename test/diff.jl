@@ -211,3 +211,16 @@ expression2 = substitute(expression, Dict(collect(Differential(t).(x) .=> ẋ)))
     Symbolics.derivative(IfElse.ifelse(signbit(b), b^2, sqrt(b)), b),
     IfElse.ifelse(signbit(b), 2b, (1//2)*(sqrt(b)^-1))
 )
+
+# Chain rule
+#
+let
+    @variables t x(..) y(..) z(..)
+    Dt = Differential(t)
+
+    @test isequal(expand_derivatives(Dt(x(y(t)))),
+                  Dt(y(t))*Differential(y(t))(x(y(t))))
+
+    @test isequal(expand_derivatives(Dt(x(y(t), z(t)))),
+                  Dt(y(t))*Differential(y(t))(x(y(t), z(t))) + Dt(z(t))*Differential(z(t))(x(y(t), z(t))))
+end
