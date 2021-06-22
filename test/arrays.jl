@@ -40,6 +40,9 @@ end
 
 @testset "broadcast & scalarize" begin
     @variables A[1:5,1:3] b[1:3] t x[1:4](t)
+    bb = Symbolics.scalarize(b)
+    @test isequal(Symbolics.scalarize([b.*1; b.*1]), [bb; bb])
+    @test isequal(Symbolics.scalarize(b.^1), bb)
     c = A*b
 
     @test isequal(collect(sin.(x)),
