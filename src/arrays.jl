@@ -172,6 +172,9 @@ function make_shape(output_idx, expr, ranges=Dict())
             if haskey(ranges, i)
                 return axes(ranges[i], 1)
             end
+            if !haskey(matches, i)
+                error("index $i not found in RHS")
+            end
             mi = matches[i]
             @assert !isempty(mi)
             get(first(mi))
@@ -246,6 +249,7 @@ end
 struct AxisOf
     A
     dim
+    boundary
 end
 
 function Base.get(a::AxisOf)
@@ -257,10 +261,12 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
     if istree(expr)
         if operation(expr) === (getindex)
             args = arguments(expr)
-            for (axis, sym) in enumerate(@views args[2:end])
-                !(sym isa Sym) && continue
-                axesvec = Base.get!(() -> [], dict, sym)
-                push!(axesvec, AxisOf(first(args), axis))
+            for (axis, idx_expr) in enumerate(@views args[2:end])
+                if idx_expr isa Sym || istree(idx_expr)
+                    sym = only(get_variables(idx_expr))
+                    axesvec = Base.get!(() -> [], dict, sym)
+                    push!(axesvec, AxisOf(first(args), axis, idx_expr - sym))
+                end
             end
         else
             idx_to_axes(operation(expr), dict)
