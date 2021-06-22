@@ -94,16 +94,12 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             return D(arg) # Cannot expand
         elseif isa(operation(arg), Sym)
             inner_args = arguments(arg)
-            if length(inner_args) == 1 && isequal(inner_args[1], D.x)
-                return D(arg)
+            if any(isequal(D.x), inner_args)
+                return D(arg) # base case if any argument is directly equal to the i.v.
             else
-                if any(isequal(D.x), arguments(arg))
-                    return D(arg)
-                else
-                    return sum(arguments(arg), init=0) do a
-                        return expand_derivatives(Differential(a)(arg)) * expand_derivatives(D(a))
-
-                    end
+                return sum(inner_args, init=0) do a
+                    return expand_derivatives(Differential(a)(arg)) *
+                           expand_derivatives(D(a))
                 end
             end
         elseif isa(operation(arg), typeof(IfElse.ifelse))
