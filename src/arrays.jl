@@ -482,6 +482,7 @@ end
 
 ### Scalarize
 
+scalarize(a::Array) = map(scalarize, a)
 scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
 val2num(::Val{n}) where n = n
 
