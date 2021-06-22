@@ -4,7 +4,6 @@ authors = ["Shashi Gowda <gowda@mit.edu>"]
 version = "1.1.0"
 
 [deps]
-AbstractAlgebra = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
 ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -29,7 +28,6 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
-AbstractAlgebra = "0.13, 0.14, 0.15, 0.16, 0.17"
 ConstructionBase = "1.2"
 DiffRules = "0.1, 1.0"
 Distributions = "0.23, 0.24, 0.25"
