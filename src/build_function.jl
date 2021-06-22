@@ -114,8 +114,8 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          checkbounds = false,
                          linenumbers = true)
 
-    dargs = map(arg -> destructure_arg(arg, !checkbounds), [args...])
-    @show dargs
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds,
+                                  Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = toexpr(Func(dargs, [], op))
 
     if expression == Val{true}
@@ -127,7 +127,6 @@ end
 
 function _build_and_inject_function(mod::Module, ex)
     if ex.head == :function && ex.args[1].head == :tuple
-        @show Expr(:call, :($mod.$(gensym())), ex.args[1].args...)
         ex.args[1] = Expr(:call, :($mod.$(gensym())), ex.args[1].args...)
     elseif ex.head == :(->)
         return _build_and_inject_function(mod, Expr(:function, ex.args...))
@@ -213,7 +212,8 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
                        parallel=SerialForm(), kwargs...)
 
-    dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds,
+                                  Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto))
