@@ -14,6 +14,10 @@ function h_julia!(out, a, b, c, d, e, g)
 end
 
 h_str = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g])
+h_str2 = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g])
+@test h_str[1] == h_str2[1]
+@test h_str[2] == h_str2[2]
+
 h_oop = eval(h_str[1])
 h_str_par = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm())
 h_oop_par = eval(h_str_par[1])
@@ -78,6 +82,9 @@ h_julia_skip!(out_2_skip_2, inputs_skip_2...)
 h_scalar = a + b + c1 + c2 + c3 + d + e + g
 h_julia_scalar(a, b, c, d, e, g) = a[1] + b[1] + c[1] + c[2] + c[3] + d[1] + e[1] + g[1]
 h_str_scalar = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], [e], [g])
+h_str_scalar2 = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], [e], [g])
+@test h_str_scalar == h_str_scalar2
+
 h_oop_scalar = eval(h_str_scalar)
 @test h_oop_scalar(inputs...) == h_julia_scalar(inputs...)
 
