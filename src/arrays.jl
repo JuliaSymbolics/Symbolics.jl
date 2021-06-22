@@ -483,12 +483,30 @@ end
 ### Scalarize
 
 scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
+val2num(::Val{n}) where n = n
 
 function replace_by_scalarizing(ex, dict)
     rule = @rule(getindex(~x, ~~i) =>
               scalarize(~x, (map(j->haskey(dict,j) ? dict[j] : j, ~~i)...,)))
 
-    simterm = (x, f, args) -> f(args...)
+    simterm = (x, f, args) -> begin
+        if f === Base.literal_pow && length(args) == 3
+            #=
+            julia> @variables u[1:3]
+            1-element Vector{Symbolics.Arr{Num, 1}}:
+             u[1:3]
+
+            julia> u.^1
+            (broadcast(literal_pow, Base.RefValue{typeof(^)}(^), u, Base.RefValue{Val{1}}(Val{1}())))[1:3]
+            =#
+            base = args[2]
+            exp = val2num(only(args[3]))
+            f = only(args[1])
+            f(base, exp)
+        else
+            f(args...)
+        end
+    end
     function rewrite_operation(x)
         if istree(x) && istree(operation(x))
             f = operation(x)
