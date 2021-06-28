@@ -14,8 +14,8 @@ symbolic algebra system that is directly extendable in the same language as the 
 To install Symbolics.jl, use the Julia package manager:
 
 ```julia
-using Pkg
-Pkg.add("Symbolics")
+julia> using Pkg
+julia> Pkg.add("Symbolics")
 ```
 
 ## Documentation
@@ -79,7 +79,7 @@ substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
 
 If you use Symbolics.jl, please [cite this paper](https://arxiv.org/abs/2105.03949)
 
-```
+```bib
 @article{gowda2021high,
   title={High-performance symbolic-numerics via multiple dispatch},
   author={Gowda, Shashi and Ma, Yingbo and Cheli, Alessandro and Gwozdz, Maja and Shah, Viral B and Edelman, Alan and Rackauckas, Christopher},
