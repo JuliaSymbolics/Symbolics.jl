@@ -288,22 +288,32 @@ expr = β[1]* x + y^α + σ(3) * (z - t) - β[2] * w(t - 1)
 
 `(..)` signifies that the value should be left uncalled.
 
-Sometimes it is convenient to define arrays of variables to model things like `x₁,…,x₃`.
-The `@variables` macro supports this with the following syntax:
+Symbolics supports creating variables that denote an array of some size.
 
 ```julia
 julia> @variables x[1:3]
-1-element Vector{Vector{Num}}:
- [x₁, x₂, x₃]
+1-element Vector{Symbolics.Arr{Num, 1}}:
+ x[1:3]
 
-julia> @variables y[2:3, 1:5:6] # support for arbitrary ranges and tensors
-1-element Vector{Matrix{Num}}:
- [y₂ˏ₁ y₂ˏ₆; y₃ˏ₁ y₃ˏ₆]
+julia> @variables y[1:3, 1:6] # support for  tensors
+1-element Vector{Symbolics.Arr{Num, 2}}:
+ y[1:3,1:6]
 
 julia> @variables t z[1:3](t) # also works for dependent variables
 2-element Vector{Any}:
  t
-  Num[z₁(t), z₂(t), z₃(t)]
+  (map(#5, z))[1:3]
+```
+
+A symbol or expression that represents an array can be turned into an array of
+symbols or expressions using the `scalarize` function.
+
+```julia
+julia> Symbolics.scalarize(z)
+3-element Vector{Num}:
+ z[1](t)
+ z[2](t)
+ z[3](t)
 ```
 
 Note that `@variables` returns a vector of all the defined variables.
@@ -317,12 +327,12 @@ syntax also applies here.
 julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
 :runtime_symbol_value
 
-julia> vars = @variables t \$a \$b(t) \$c[1:3](t)
-3-element Vector{Num}:
+julia> vars = @variables t $a $b(t) $c[1:3](t)
+4-element Vector{Any}:
       t
  runtime_symbol_value
    value_b(t)
-       Num[value_c₁(t), value_c₂(t), value_c₃(t)]
+       (map(#9, value_c))[1:3]
 
 julia> (t, a, b, c)
 (t, :runtime_symbol_value, :value_b, :value_c)
