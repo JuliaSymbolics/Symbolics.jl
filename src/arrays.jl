@@ -41,14 +41,21 @@ struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
     reduce
     term
     shape
+    boundary_style
     ranges::Dict{Sym, AbstractRange} # index range each index symbol can take,
                                      # optional for each symbol
     metadata
 end
 
-function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(); metadata=nothing)
+
+struct ZeroBoundary end
+struct ClipBoundary end
+
+function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(); boundary_style=ZeroBoundary(), metadata=nothing)
     sh = make_shape(output_idx, expr, ranges)
-    ArrayOp{T}(output_idx, expr, reduce, term, sh, ranges, metadata)
+    ArrayOp{T}(output_idx, expr, reduce,
+               term, sh, boundary_style,
+               ranges, metadata)
 end
 
 function ArrayOp(a::AbstractArray)
@@ -146,12 +153,12 @@ function make_shape(output_idx, expr, ranges=Dict())
         isempty(to_check) && continue
         restricted = false
         if haskey(ranges, sym)
-            ref_axis = axes(ranges[sym], 1)
+            ref_axis = ranges[sym]
             restricted = true
         else
             ref_axis = axes(first(to_check).A, first(to_check).dim)
         end
-        reference = axes(ref_axis, 1) # Reset to 1
+        reference = ref_axis
         for i in (restricted ? 1 : 2):length(ms)
             m = ms[i]
             s=shape(m.A)
