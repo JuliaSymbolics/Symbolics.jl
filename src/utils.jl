@@ -47,7 +47,7 @@ get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
 function is_singleton(e::Term)
-    typeof(operation(e)) == typeof(getindex) && return true
+    operation(e) === getindex && return true
     operation(e) isa Sym
 end
 
