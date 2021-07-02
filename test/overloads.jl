@@ -195,3 +195,10 @@ x = Num.(randn(10))
 @variables t p x(t) y(t) z(t)
 @test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)
 @test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num
+
+
+# Maybe move me
+
+@variables x[1:3]
+ex = x[1]+x[2]
+@test isequal(Symbolics.get_variables(ex), Symbolics.scalarize(x[1:2]))

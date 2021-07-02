@@ -46,7 +46,11 @@ julia> Symbolics.get_variables(ex)
 get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
-is_singleton(e::Term) = operation(e) isa Sym
+function is_singleton(e::Term)
+    operation(e) === getindex && return true
+    operation(e) isa Sym
+end
+
 is_singleton(e::Sym) = true
 is_singleton(e) = false
 
@@ -205,7 +209,7 @@ end
 function degree(p::Add, sym=nothing)
     return maximum(degree(key, sym) for key in keys(p.dict))
 end
-        
+
 function degree(p::Mul, sym=nothing)
     return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
 end
@@ -217,7 +221,7 @@ function degree(p::Term, sym=nothing)
         return Int(isequal(p, sym))
     end
 end
- 
+
 function degree(p, sym=nothing)
     p = value(p)
     sym = value(sym)
