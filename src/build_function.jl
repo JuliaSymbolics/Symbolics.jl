@@ -94,7 +94,6 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          linenumbers = true)
-
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
 
