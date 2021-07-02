@@ -38,9 +38,13 @@ end
     @test isequal(x[i], operation(unwrap(x[i]))(t))
 end
 
+getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
-    @variables A[1:5,1:3] b[1:3] t x[1:4](t)
+    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x[1:4](t)
+    AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)
+    @test all(isequal(42), getdef.(AA))
+    @test getdef.(bb) == [2, 3, 5]
     @test isequal(Symbolics.scalarize([b.*1; b.*1]), [bb; bb])
     @test isequal(Symbolics.scalarize(b.^1), bb)
     c = A*b
