@@ -14,6 +14,9 @@ function latexify_derivatives(ex)
             else
                 return Expr(:call, Expr(:call, :/, :d, Expr(:call, :*, :d, x.args[3])), x.args[2])
             end
+        elseif x isa Expr && x.args[1] === :_textbf
+            ls = latexify(latexify_derivatives(x.args[2])).s
+            return "\\textbf{" * strip(ls, '\$') * "}"
         else
             return x
         end
@@ -25,6 +28,33 @@ end
     cdot --> false
 
     return latexify_derivatives(cleanup_exprs(_toexpr(n)))
+end
+
+@latexrecipe function f(n::ArrayOp)
+    env --> :equation
+    cdot --> false
+    return latexify_derivatives(cleanup_exprs(_toexpr(n.term)))
+end
+
+@latexrecipe function f(n::Arr)
+    env --> :equation
+    cdot --> false
+
+    return latexify_derivatives(cleanup_exprs(_toexpr(unwrap(n))))
+end
+
+@latexrecipe function f(n::Symbolic)
+    env --> :equation
+    cdot --> false
+
+    return latexify_derivatives(cleanup_exprs(_toexpr(n)))
+end
+
+@latexrecipe function f(n::Sym{<:AbstractArray})
+    env --> :equation
+    cdot --> false
+
+    ls = latexify(latexify_derivatives(cleanup_exprs(_toexpr(n)))).s
 end
 
 @latexrecipe function f(eqs::Vector{Equation})
@@ -62,11 +92,15 @@ function _toexpr(O)
         return :(_derivative($ex, $wrt))
     elseif symtype(op) <: FnType
         isempty(args) && return nameof(op)
-        return Expr(:call, _toexpr(op), _toexpr(args)...)
+        return Expr(:call, _toexpr(op), _toexpr.(args)...)
     elseif op === getindex && symtype(args[1]) <: AbstractArray
         return getindex_to_symbol(O)
+    elseif op isa Sym && symtype(op) <: AbstractArray
+        @show "hi"
+
+        return :(_textbf($(nameof(op))))
     end
-    return Expr(:call, Symbol(op), _toexpr(args)...)
+    return Expr(:call, Symbol(op), _toexpr.(args)...)
 end
 function _toexpr(m::Mul{<:Number})
     numer = Any[]
