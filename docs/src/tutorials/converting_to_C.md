@@ -28,26 +28,10 @@ which gives:
 du = Num[p₁ * u₁ - (p₂ * u₁) * u₂, -p₃ * u₂ + (p₄ * u₁) * u₂]
 ```
 
-Since Lotka-Volterra equations are differential equations with respect of to time `t`, we define derivative `D` with respect to this variable.
-
-```julia
-D = Differential(t)
-```
-
-Now we build the equations we want to solve:
-
-```julia
-eqs = @. D(u) ~ du
-
-2-element Array{Equation,1}:
- Equation(derivative(u₁, t), p₁ * u₁ - (p₂ * u₁) * u₂)
- Equation(derivative(u₂, t), -p₃ * u₂ + (p₄ * u₁) * u₂)
-```
-
 and then we build the function:
 
 ```julia
-build_function(eqs, u, p, t, target=Symbolics.CTarget())
+build_function(du, u, p, t, target=Symbolics.CTarget())
 
 void diffeqf(double* du, double* RHS1, double* RHS2, double RHS3) {
   du[0] = RHS2[0] * RHS1[0] - (RHS2[1] * RHS1[0]) * RHS1[1];
@@ -58,7 +42,7 @@ void diffeqf(double* du, double* RHS1, double* RHS2, double RHS3) {
 If we want to compile this, we do `expression=Val{false}`:
 
 ```julia
-f = build_function(eqs, u, p, t, target=Symbolics.CTarget(), expression=Val{false})
+f = build_function(du, u, p, t, target=Symbolics.CTarget(), expression=Val{false})
 ```
 
 now we check it computes the same thing:
