@@ -60,6 +60,10 @@ export Differential, expand_derivatives
 
 include("diff.jl")
 
+export Difference
+
+include("difference.jl")
+
 export Integral
 include("integral.jl")
 
