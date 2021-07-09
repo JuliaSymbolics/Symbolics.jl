@@ -27,11 +27,12 @@ not wrapped in the `Num` type.
 
 # Examples
 ```julia
-julia> @parameters t
-(t,)
-
-julia> @variables x y z(t)
-(x, y, z(t))
+julia> @variables t x y z(t)
+4-element Vector{Num}:
+    t
+    x
+    y
+ z(t)
 
 julia> ex = x + y + sin(z)
 (x + y) + sin(z(t))
@@ -129,8 +130,10 @@ output `y` instead of `y(t)`.
 # Examples
 
 ```julia
-julia> @parameters t; @variables z(t)
-(z(t),)
+julia> @variables t z(t)
+2-element Vector{Num}:
+    t
+ z(t)
 
 julia> Symbolics.tosymbol(z)
 Symbol("z(t)")
