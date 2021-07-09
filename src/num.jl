@@ -6,7 +6,7 @@ unwrap(x::Num) = x.val
 
 # Hacks to make wrappers "nicer"
 (::Type{T})(x::Num) where {T<:Union{Number,AbstractArray}} = T(Symbolics.value(x))::T
-(::Type{T})(x::Symbolics.Symbolic) where {T<:Union{AbstractFloat,Integer,Complex,AbstractArray}} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic values."))
+(::Type{T})(x::SymbolicUtils.Symbolic) where {T<:Union{AbstractFloat,Integer,Complex,AbstractArray}} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic values."))
 
 """
     Num(val)
