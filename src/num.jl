@@ -83,10 +83,12 @@ SymbolicUtils.expand(n::Num) = Num(SymbolicUtils.expand(value(n)))
 Performs the substitution on `expr` according to rule(s) `s`.
 # Examples
 ```julia
-julia> @parameters t
-(t,)
-julia> @variables x y z(t)
-(x, y, z(t))
+julia> @variables t x y z(t)
+4-element Vector{Num}:
+    t
+    x
+    y
+ z(t)
 julia> ex = x + y + sin(z)
 (x + y) + sin(z(t))
 julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
