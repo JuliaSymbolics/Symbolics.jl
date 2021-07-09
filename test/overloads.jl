@@ -196,9 +196,17 @@ x = Num.(randn(10))
 @test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)
 @test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num
 
-
 # Maybe move me
 
 @variables x[1:3]
 ex = x[1]+x[2]
 @test isequal(Symbolics.get_variables(ex), Symbolics.scalarize(x[1:2]))
+
+@variables x
+A = [x[1] 2
+     2    0.0]
+B = [x[1] 1.0
+    2.0 0.0]
+@test_throws ArgumentError Matrix{Float64}(A)
+@test Matrix{Float64}(A-B) isa Matrix{Float64}
+@test Matrix{Float64}(A-B) == [0.0 1.0;0.0 0.0]
