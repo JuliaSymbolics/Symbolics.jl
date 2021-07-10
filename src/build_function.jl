@@ -379,8 +379,19 @@ end
 get_varnumber(varop, vars::Vector) =  findfirst(x->isequal(x,varop),vars)
 get_varnumber(varop, var) =  isequal(var,varop) ? 0 : nothing
 
-buildvarnumbercache(args...) = Dict([isa(arg,AbstractArray) ? el=>(argi,eli) : arg=>(argi,0)
-                                    for (argi,arg) in enumerate(args) for (eli,el) in enumerate(arg)])
+function buildvarnumbercache(args...)
+    varnumsdict = Pair[]
+    for (argi,arg) in enumerate(args)
+        if isa(arg,AbstractArray)
+            for (eli,el) in enumerate(arg)
+                push!(varnumsdict, el=>(argi,eli))
+            end
+        else
+            push!(varnumsdict ,arg=>(argi,0))
+        end
+    end
+    return Dict(varnumsdict)
+end
 
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
@@ -623,7 +634,7 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    varnumbercache = merge(buildvarnumbercache(vs), buildvarnumbercache(ps))
+    varnumbercache = buildvarnumbercache(vs,ps...)
     par_str = join(["real $(rhsnames[2])_$i" for i in 1:length(ps)], ", ")
     rhsnames_mod = [:internal_var___u, [Symbol("$(rhsnames[2])_$i") for i in 1:length(ps)]..., :internal_var___t]
     differential_equation = string(join([numbered_expr(eq,varnumbercache,vs,ps,lhsname=lhsname,
