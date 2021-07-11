@@ -630,6 +630,6 @@ end
 
 Base.collect(x::Arr) = scalarize(x)
 Base.collect(x::SymArray) = scalarize(x)
-isarraysymbolic(x) = x isa Arr || SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
+isarraysymbolic(x) = SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
 
 Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalarize(arr)
