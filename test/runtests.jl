@@ -13,6 +13,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Arrays" begin include("arrays.jl") end
     @safetestset "Fuzz Arrays" begin include("fuzz-arrays.jl") end
     @safetestset "Differentiation Test" begin include("diff.jl") end
+    @safetestset "Difference Test" begin include("difference.jl") end
     @safetestset "Degree Test" begin include("degree.jl") end 
     @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
     @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
