@@ -1,7 +1,7 @@
 using Symbolics
 using Test
 
-@variables t, x
+@variables t x
 D1 = Difference(t; dt=0.01)
 D2 = Difference(t; dt=0.01)
 
