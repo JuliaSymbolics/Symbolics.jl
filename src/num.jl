@@ -213,3 +213,4 @@ SymbolicUtils.getmetadata(x::Num, t) = SymbolicUtils.getmetadata(value(x), t)
 SymbolicUtils.hasmetadata(x::Num, t) = SymbolicUtils.hasmetadata(value(x), t)
 
 (f::Symbolic{<:FnType})(x::Num, y...) = Num(f(unwrap(x), unwrap.(y)...))
+Broadcast.broadcastable(x::Num) = x
