@@ -7,8 +7,15 @@ Represents a difference operator.
 $(FIELDS)
 
 # Examples
-TODO:
 
+```jldoctest
+julia> using Symbolics
+
+julia> @variables t;
+
+julia> D = Difference(t; dt=0.01)
+Difference(t; dt=0.01)
+```
 """
 struct Difference <: Function
     """Fixed Difference"""
