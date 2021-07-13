@@ -6,6 +6,9 @@ struct ComplexTerm{T} <: AbstractComplexTerm{T}
     im
 end
 
+Base.imag(c::Symbolic{Complex{T}}) where {T} = term(imag, c)
+SymbolicUtils.promote_type(::typeof(imag), ::Type{Complex{T}}) where {T} = T
+
 symtype(a::ComplexTerm{T}) where T = Complex{T}
 istree(a::ComplexTerm) = true
 operation(a::ComplexTerm{T}) where T = Complex{T}
@@ -31,6 +34,7 @@ function unwrap(a::Complex{<:Num})
     ComplexTerm{T}(re, im)
 end
 wrap(a::ComplexTerm) = Complex(wrap.(arguments(a))...)
+wrap(a::Sym{Complex{Real}}) = Complex(wrap(real(a)), wrap(imag(a)))
 
 SymbolicUtils.@number_methods(
                               ComplexTerm,
