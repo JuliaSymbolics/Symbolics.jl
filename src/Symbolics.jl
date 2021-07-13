@@ -36,10 +36,11 @@ include("num.jl")
 include("complex.jl")
 
 # Hacks to make wrappers "nicer"
-(::Type{T})(x::SymbolicUtils.Symbolic) where {T<:Union{AbstractFloat,Integer,Complex}} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
+const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
+(::Type{T})(x::SymbolicUtils.Symbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
 for T in [Num, Complex{Num}]
     @eval begin
-        (::Type{S})(x::$T) where {S<:Union{Number,AbstractArray}} = S(Symbolics.unwrap(x))::S
+        (::Type{S})(x::$T) where {S<:Union{NumberTypes,AbstractArray}} = S(Symbolics.unwrap(x))::S
 
         SymbolicUtils.simplify(n::$T; kw...) = wrap(SymbolicUtils.simplify(unwrap(n); kw...))
         SymbolicUtils.expand(n::$T) = wrap(SymbolicUtils.expand(unwrap(n)))
