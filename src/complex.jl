@@ -34,7 +34,7 @@ function unwrap(a::Complex{<:Num})
     ComplexTerm{T}(re, im)
 end
 wrap(a::ComplexTerm) = Complex(wrap.(arguments(a))...)
-wrap(a::Sym{Complex{Real}}) = Complex(wrap(real(a)), wrap(imag(a)))
+wrap(a::Symbolic{<:Complex}) = Complex(wrap(real(a)), wrap(imag(a)))
 
 SymbolicUtils.@number_methods(
                               ComplexTerm,
