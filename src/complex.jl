@@ -9,6 +9,13 @@ end
 Base.imag(c::Symbolic{Complex{T}}) where {T} = term(imag, c)
 SymbolicUtils.promote_type(::typeof(imag), ::Type{Complex{T}}) where {T} = T
 
+has_symwrapper(::Type{<:Complex{T}}) where {T<:Real} = true
+wraps_type(::Type{Complex{Num}}) = Complex{Real}
+iswrapped(::Complex{Num}) = true
+function wrapper_type(::Type{Complex{T}}) where T
+    Symbolics.has_symwrapper(T) ? Complex{wrapper_type(T)} : Complex{T}
+end
+
 symtype(a::ComplexTerm{T}) where T = Complex{T}
 istree(a::ComplexTerm) = true
 operation(a::ComplexTerm{T}) where T = Complex{T}
