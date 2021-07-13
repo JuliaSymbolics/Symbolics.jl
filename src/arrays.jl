@@ -68,6 +68,13 @@ function Base.show(io::IO, aop::ArrayOp)
     else
         print(io, "@arrayop")
         print(io, "(_[$(join(string.(aop.output_idx), ","))] := $(aop.expr))")
+        if aop.reduce != +
+            print(io, " ($(aop.reduce))")
+        end
+
+        if !isempty(aop.ranges)
+            print(io, " ", join(["$k in $v" for (k, v) in aop.ranges], ", "))
+        end
     end
 end
 
