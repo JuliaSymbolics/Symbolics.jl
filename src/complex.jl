@@ -36,6 +36,21 @@ function Base.show(io::IO, mime::MIME"text/plain", a::ComplexTerm)
     print(io, ")")
 end
 
+function Base.show(io::IO, a::Complex{Num})
+    rr = unwrap(real(a))
+    ii = unwrap(imag(a))
+
+    if istree(rr) && (operation(rr) === real) &&
+        istree(ii) && (operation(ii) === imag) &&
+        isequal(arguments(rr)[1], arguments(ii)[1])
+
+        return print(io, arguments(rr)[1])
+    end
+
+    i = Sym{Real}(:im)
+    show(io, real(a) + i * imag(a))
+end
+
 function unwrap(a::Complex{<:Num})
     re, im = unwrap(real(a)), unwrap(imag(a))
     T = promote_type(symtype(re), symtype(im))
