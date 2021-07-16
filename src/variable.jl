@@ -163,10 +163,10 @@ function _parse_vars(macroname, type, x, transform=identity)
         end
 
 
-      # if Meta.isexpr(v, :(::))
-      #     v, type′ = v.args
-      #     type = type′ === :Complex ? Complex{type} : type′
-      # end
+        if Meta.isexpr(v, :(::))
+            v, type′ = v.args
+            type = type′ === :Complex ? Complex{type} : type′
+        end
 
 
         # x [connect = flow; unit = u"m^3/s"]
