@@ -82,7 +82,7 @@ include("plot_recipes.jl")
 
 using Metatheory
 using Metatheory.EGraphs
-using TermInterface 
+import TermInterface 
 include("mt_optimize.jl")
 
 include("domains.jl")

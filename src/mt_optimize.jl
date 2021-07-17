@@ -28,6 +28,25 @@ function EGraphs.preprocess(t::Symbolic)
     return t
 end
 
+function EGraphs.preprocess(t::Mul{T}) where T
+    args = []
+    push!(args, t.coeff)
+    for (k,v) in t.dict
+        for i in 1:v 
+            push!(args, k)
+        end
+    end
+    EGraphs.preprocess(Term{T}(*, args))
+end
+
+function EGraphs.preprocess(t::Add{T}) where T
+    args = []
+    for (k,v) in t.dict
+        push!(args, v*k)
+    end
+    EGraphs.preprocess(Term{T}(+, args))
+end
+
 """
 Equational rewrite rules for optimizing expressions
 """
@@ -35,18 +54,38 @@ opt_theory = @methodtheory begin
     a * x == x * a
     a * x + a * y == a*(x+y)
     -1 * a == -a
+    # fraction rules 
+    # (a/b) + (c/b) => (a+c)*(1/b)
 end
 
 """
 Approximation of costs of operators in number 
 of CPU cycles required for the numerical computation
+
+See 
+ * https://latkin.org/blog/2014/11/09/a-simple-benchmark-of-various-math-operations/
+ * https://streamhpc.com/blog/2012-07-16/how-expensive-is-an-operation-on-a-cpu/
+ * https://github.com/triscale-innov/GFlops.jl
 """
 const op_costs = Dict(
-    (+) => 1,
-    (-) => 1,
-    (*) => 3,
-    (/) => 24
+    (+)     => 1,
+    (-)     => 1,
+    abs     => 2,
+    (*)     => 3,
+    exp     => 18,
+    (/)     => 24,
+    log1p   => 24,
+    deg2rad => 25,
+    rad2deg => 25,
+    acos    => 27,
+    asind   => 28,
+    acsch   => 33,
+    sin     => 34,
+    cos     => 34,
+    atan    => 35,
+    tan     => 56,
 )
+# TODO some operator costs are in FLOP and not in cycles!!
 
 function costfun(n::ENode, g::EGraph, an)
     arity(n) == 0 && return get(op_costs, n.head, 1)
@@ -68,10 +107,12 @@ function optimize(ex; params=SaturationParams())
     # ex = SymbolicUtils.Code.toexpr(ex)
     g = EGraph()
 
+    
     settermtype!(g, Term{symtype(ex), Any})
-
+    
     ec, _ = addexpr!(g, ex)
     g.root = ec.id
+    display(g.classes); println()
     saturate!(g, opt_theory, params)
 
     extract!(g, costfun) # --> "term" head args

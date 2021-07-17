@@ -1,3 +1,4 @@
+using LinearAlgebra: length
 using SafeTestsets, Test, Pkg
 
 const GROUP = get(ENV, "GROUP", "All")
