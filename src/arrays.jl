@@ -613,7 +613,7 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
         map(Iterators.product(axes(arr)...)) do i
-            scalarize(arr, i)
+            scalarize(arr[i...])
         end
     elseif istree(arr) && operation(arr) == getindex
         args = arguments(arr)

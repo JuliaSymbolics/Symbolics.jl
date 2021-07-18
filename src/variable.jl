@@ -55,7 +55,17 @@ function setdefaultval(x, val)
     end
 end
 
-scalarize_getindex(x) = recurse_and_apply(scalarize, x)
+struct GetindexParent end
+
+function scalarize_getindex(x, parent=x)
+    if symtype(x) <: AbstractArray
+        getindex_posthook(x) do r,x,i...
+            scalarize_getindex(r, parent)
+        end
+    else
+        setmetadata(scalarize(x), GetindexParent, parent)
+    end
+end
 
 """
 $(TYPEDEF)
