@@ -380,6 +380,7 @@ end
 end
 
 Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
+Base.isequal(a::Arr, b::Arr) = isequal(unwrap(a), unwrap(b))
 
 ArrayOp(x::Arr) = unwrap(x)
 
