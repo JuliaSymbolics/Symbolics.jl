@@ -52,9 +52,16 @@ function Base.show(io::IO, a::Complex{Num})
 end
 
 function unwrap(a::Complex{<:Num})
+
     re, im = unwrap(real(a)), unwrap(imag(a))
-    T = promote_type(symtype(re), symtype(im))
-    ComplexTerm{T}(re, im)
+    if istree(re) && (operation(re) === real) &&
+        istree(im) && (operation(im) === imag) &&
+        isequal(arguments(re)[1], arguments(im)[1])
+        return arguments(re)[1]
+    else
+        T = promote_type(symtype(re), symtype(im))
+        ComplexTerm{T}(re, im)
+    end
 end
 wrap(a::ComplexTerm) = Complex(wrap.(arguments(a))...)
 wrap(a::Symbolic{<:Complex}) = Complex(wrap(real(a)), wrap(imag(a)))
@@ -63,6 +70,14 @@ SymbolicUtils.@number_methods(
                               ComplexTerm,
                               unwrap(f(wrap(a))),
                               unwrap(f(wrap(a), wrap(b))),
+                              skipbasics
+                             )
+
+SymbolicUtils.@number_methods(
+                              Complex{Num},
+                              wrap(term(f, unwrap(a))),
+                              wrap(term(f, unwrap(a), unwrap(b))),
+                              skipbasics
                              )
 
 function Base.isequal(a::ComplexTerm{T}, b::ComplexTerm{S}) where {T,S}
