@@ -24,6 +24,7 @@ makedocs(
             "manual/functions.md",
             "manual/io.md",
             "manual/sparsity_detection.md",
+            "manual/types.md",
             "manual/faq.md"
         ],
         "Comparison Against SymPy" => "comparison.md",
