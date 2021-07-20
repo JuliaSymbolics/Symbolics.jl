@@ -80,6 +80,13 @@ SymbolicUtils.@number_methods(
                               skipbasics
                              )
 
+function Base.:(/)(a::Complex{Num}, b::Complex)
+    aa = unwrap(a)
+    bb = unwrap(b)
+    isequal(aa, bb) && return Complex{Num}(1, 0)
+    term(/, aa, bb)
+end
+
 function Base.isequal(a::ComplexTerm{T}, b::ComplexTerm{S}) where {T,S}
     T === S && isequal(a.re, b.re) && isequal(a.im, b.im)
 end
