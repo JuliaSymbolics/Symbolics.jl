@@ -31,8 +31,8 @@ struct Differential <: Function
     x
     Differential(x) = new(value(x))
 end
-(D::Differential)(x) = isarraysymbolic(x) ? D.(x) : Term{symtype(x)}(D, [x])
-(D::Differential)(x::Num) = Num(D(value(x)))
+(D::Differential)(x) = isarraysymbolic(x) ? D.(x) : wrap(Term{symtype(x)}(D, [unwrap(x)]))
+(D::Differential)(x::Complex{Num}) =  D(real(x)) + im*D(imag(x))
 SymbolicUtils.promote_symtype(::Differential, x) = x
 
 is_derivative(x::Term) = operation(x) isa Differential
@@ -195,6 +195,10 @@ end
 function expand_derivatives(n::Num, simplify=false; occurances=nothing)
     Num(expand_derivatives(value(n), simplify; occurances=occurances))
 end
+function expand_derivatives(n::Complex, simplify=false; occurances=nothing)
+    expand_derivatives(real(n), simplify; occurances=nothing) +
+    im * expand_derivatives(imag(n), simplify; occurances=nothing)
+end
 
 _iszero(x) = false
 _isone(x) = false
@@ -331,9 +335,9 @@ A helper function for computing the derivative of an expression with respect to
 """
 function derivative(O, v; simplify=false)
     if O isa AbstractArray
-        Num[Num(expand_derivatives(Differential(v)(value(o)), simplify)) for o in O]
+        [expand_derivatives(Differential(v)(o), simplify) for o in O]
     else
-        Num(expand_derivatives(Differential(v)(value(O)), simplify))
+        expand_derivatives(Differential(v)(O), simplify)
     end
 end
 

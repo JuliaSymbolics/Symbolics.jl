@@ -21,3 +21,8 @@ end
 end
 
 
+@testset "derivatives" begin
+    @variables x
+    #issue 232
+    @test isequal(Symbolics.derivative(exp(im*x),x), -sin(x)+im*cos(x))
+end
