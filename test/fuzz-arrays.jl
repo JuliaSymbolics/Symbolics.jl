@@ -4,16 +4,21 @@ using LinearAlgebra
 
 # Transpose and multiply
 
-@syms A[1:2, 1:3] B[1:3, 1:1] C::Matrix{Number} x[1:2] y[1:3] z::Vector{Number}
+@variables A[1:2, 1:3] B[1:3, 1:1] x[1:2] y[1:3] C::(Matrix{Real}) z::(Vector{Complex})
+
+stype(T::Type{<:Number}) = Float64
+stype(T::Type{<:Complex}) = Complex{Float64}
 
 AA = rand(2,3); BB = rand(3,2); xx = rand(2); yy = rand(3)
 
-adjmul_leaf_nodes = [A, B, C, x, y, z, AA, BB, xx, yy]
+adjmul_leaf_nodes = (A, B, C, x, y, z, AA, BB, xx, yy)
 
 function adjmul_rand_leaf()
     a = rand(adjmul_leaf_nodes)
     rand(Bool) ?  a' : a
 end
+isadjvec(x::Symbolics.ArrayOp) = x.term.f == adjoint && ndims(Symbolics.arguments(x.term)[1]) == 1
+isadjvec(x) = false
 
 function rand_mul_expr(a=adjmul_rand_leaf(),
                        b=adjmul_rand_leaf())
@@ -22,7 +27,7 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
         a * b
     catch err1
         try
-            rand(size(a)...) * rand(size(b)...)
+            rand(stype(eltype(a)), size(a)...) * rand(stype(eltype(b)), size(b)...)
         catch err2
             if typeof(err1) == typeof(err2)
                 @test typeof(err1) == typeof(err2)
@@ -43,7 +48,7 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
         end
         @label test_size
 
-        if (a isa Adjoint{<:Any, <:AbstractVector} && ndims(b) == 1) || Symbolics.isdot(a, b)
+        if (isadjvec(Symbolics.unwrap(a)) && ndims(b) == 1) || Symbolics.isdot(a, b)
             if size(a*b) != ()
                 println("a * b is wrong:")
                 @show a b
@@ -54,8 +59,10 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
             end
         end
 
-        if size(a * b) == size(rand(size(a)...) * rand(size(b)...))
+        ab_sample = rand(stype(eltype(a)), size(a)...) * rand(stype(eltype(b)), size(b)...)
+        if size(a * b) == size(ab_sample)
             @test true
+            @test (eltype(a*b) <: Real && eltype(ab_sample) <: Real) || (eltype(ab_sample) <: Complex && eltype(a*b) <: Complex)
         else
             println("a * b is wrong:")
             @show a b
@@ -78,7 +85,7 @@ end
 AA = rand(2,3); BB = rand(3,2); xx = rand(2); yy = rand(3)
 CC = rand(2,3,4)
 
-mapreduce_leaf_nodes = [A, B, C, x, y, z, AA, BB, CC, xx, yy]
+mapreduce_leaf_nodes = [A, B, x, y, AA, BB, CC, xx, yy]
 
 function mapreduce_rand_leaf()
     a = rand(adjmul_leaf_nodes)
@@ -90,14 +97,14 @@ function rand_map_reduce(x=mapreduce_rand_leaf())
 
     reducedims = rand(1:n+1, rand(0:n))
 
-    init=rand([nothing, 3])
+    init=rand([nothing, rand(stype(eltype(x)))])
     function test_run(x)
         if init==nothing
-            sum(rand(size(x)...), dims=reducedims)
+            sum(x, dims=reducedims)
         else
-            sum(rand(size(x)...), dims=reducedims, init=init)
+            sum(x, dims=reducedims, init=init)
         end
     end
 
-    @test size(test_run(rand(size(x)...))) == size(test_run(x))
+    @test size(test_run(rand(stype(eltype(x)), size(x)...))) == size(test_run(x))
 end

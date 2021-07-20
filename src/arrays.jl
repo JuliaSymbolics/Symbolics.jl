@@ -405,7 +405,9 @@ function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
     istree(x) && print(io, "(")
     print(io, unwrap(arr))
     istree(x) && print(io, ")")
-    print(io, "[", join(string.(axes(arr)), ","), "]")
+    if !(shape(x) isa Unknown)
+        print(io, "[", join(string.(axes(arr)), ","), "]")
+    end
 end
 
 ################# Base array functions
