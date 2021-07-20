@@ -257,6 +257,12 @@ function construct_var(var_name, type, call_args, val, prop)
     :($wrap($(setprops_expr(expr, prop))))
 end
 
+struct CallWith
+    args
+end
+
+(c::CallWith)(f) = unwrap(f(c.args...))
+
 function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
     # TODO: just use Sym here
     ndim = length(indices)
@@ -271,7 +277,7 @@ function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
         # [(R -> R)(R) ....]
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($scalarize_getindex($map(f->$unwrap(f($(call_args...))), $ex)))
+        :($scalarize_getindex($map($CallWith(($(call_args...),)), $ex)))
 
     end
 
