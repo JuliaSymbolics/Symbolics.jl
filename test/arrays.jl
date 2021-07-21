@@ -58,6 +58,6 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
                                b[3]*A[1, 3])))
 
     D = Differential(t)
-    @test isequal(collect(D(x) ~ x), map(i->D(x[i]) ~ x[i], eachindex(x)))
+    @test isequal(collect(D.(x) ~ x), map(i->D(x[i]) ~ x[i], eachindex(x)))
     @test_throws ArgumentError A ~ t
 end
