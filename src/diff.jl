@@ -31,7 +31,7 @@ struct Differential <: Function
     x
     Differential(x) = new(value(x))
 end
-(D::Differential)(x) = isarraysymbolic(x) ? D.(x) : Term{symtype(x)}(D, [x])
+(D::Differential)(x) = Term{symtype(x)}(D, [x])
 (D::Differential)(x::Num) = Num(D(value(x)))
 SymbolicUtils.promote_symtype(::Differential, x) = x
 
