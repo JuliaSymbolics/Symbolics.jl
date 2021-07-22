@@ -15,6 +15,9 @@ const IndexMap = Dict{Char,Char}(
             '9' => '₉')
 
 struct VariableDefaultValue end
+struct VariableSource end
+
+getsource(x, val=nothing) = getmetadata(unwrap(x), VariableSource, val)
 
 const _fail = Dict()
 function getdefaultval(x, val=_fail)
@@ -194,9 +197,9 @@ function _parse_vars(macroname, type, x, transform=identity)
         if iscall
             isruntime, fname = unwrap_runtime_var(v.args[1])
             call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
-            var_name, expr = construct_vars(fname, type, call_args, val, options, transform, isruntime)
+            var_name, expr = construct_vars(macroname, fname, type, call_args, val, options, transform, isruntime)
         else
-            var_name, expr = construct_vars(v, type, nothing, val, options, transform, isruntime)
+            var_name, expr = construct_vars(macroname, v, type, nothing, val, options, transform, isruntime)
         end
 
         push!(var_names, var_name)
@@ -207,7 +210,7 @@ function _parse_vars(macroname, type, x, transform=identity)
     return ex
 end
 
-function construct_vars(v, type, call_args, val, prop, transform, isruntime)
+function construct_vars(macroname, v, type, call_args, val, prop, transform, isruntime)
     issym  = v isa Symbol
     isarray = isa(v, Expr) && v.head == :ref
     if isarray
@@ -218,14 +221,14 @@ function construct_vars(v, type, call_args, val, prop, transform, isruntime)
         end
         isruntime, var_name = unwrap_runtime_var(var_name)
         indices = v.args[2:end]
-        expr = _construct_array_vars(isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, indices...)
+        expr = _construct_array_vars(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, indices...)
     else
         var_name = v
         if Meta.isexpr(v, :(::))
             var_name, type′ = v.args
             type = type′ === :Complex ? Complex{type} : type′
         end
-        expr = construct_var(isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop)
+        expr = construct_var(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop)
     end
     lhs = isruntime ? gensym(var_name) : var_name
     rhs = :($transform($expr))
@@ -236,7 +239,8 @@ function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
 
-function setprops_expr(expr, props)
+function setprops_expr(expr, props, macroname)
+    expr = :($setmetadata($expr, $VariableSource, $(Meta.quot(macroname))))
     isnothing(props) && return expr
     for opt in props
         if !Meta.isexpr(opt, :(=))
@@ -252,11 +256,9 @@ function setprops_expr(expr, props)
                               $(option_to_metadata_type(Val{lhs}())),
                        $rhs))
     end
-    expr
 end
 
-
-function construct_var(var_name, type, call_args, val, prop)
+function construct_var(macroname, var_name, type, call_args, val, prop)
     expr = if call_args === nothing
         :($Sym{$type}($var_name))
     elseif !isempty(call_args) && call_args[end] == :..
@@ -269,7 +271,7 @@ function construct_var(var_name, type, call_args, val, prop)
         expr = :($setdefaultval($expr, $val))
     end
 
-    :($wrap($(setprops_expr(expr, prop))))
+    :($wrap($(setprops_expr(expr, prop, macroname))))
 end
 
 struct CallWith
@@ -278,7 +280,7 @@ end
 
 (c::CallWith)(f) = unwrap(f(c.args...))
 
-function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
+function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
     # TODO: just use Sym here
     ndim = length(indices)
 
@@ -300,7 +302,7 @@ function _construct_array_vars(var_name, type, call_args, val, prop, indices...)
         expr = :($setdefaultval($expr, $val))
     end
 
-    expr = setprops_expr(expr, prop)
+    expr = setprops_expr(expr, prop, macroname)
 
     return :($wrap($expr))
 end
