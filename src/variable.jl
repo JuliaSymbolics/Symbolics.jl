@@ -239,8 +239,8 @@ function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
 
-function setprops_expr(expr, props, macroname)
-    expr = :($setmetadata($expr, $VariableSource, $(Meta.quot(macroname))))
+function setprops_expr(expr, props, macroname, varname)
+    expr = :($setmetadata($expr, $VariableSource, ($(Meta.quot(macroname)), $varname,)))
     isnothing(props) && return expr
     for opt in props
         if !Meta.isexpr(opt, :(=))
@@ -271,7 +271,7 @@ function construct_var(macroname, var_name, type, call_args, val, prop)
         expr = :($setdefaultval($expr, $val))
     end
 
-    :($wrap($(setprops_expr(expr, prop, macroname))))
+    :($wrap($(setprops_expr(expr, prop, macroname, var_name))))
 end
 
 struct CallWith
@@ -302,7 +302,7 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         expr = :($setdefaultval($expr, $val))
     end
 
-    expr = setprops_expr(expr, prop, macroname)
+    expr = setprops_expr(expr, prop, macroname, var_name)
 
     return :($wrap($expr))
 end
@@ -381,3 +381,19 @@ function TreeViews.treelabel(io::IO,x::Sym,
                              mime::MIME"text/plain" = MIME"text/plain"())
   show(io,mime,Text(x.name))
 end
+
+function getname end
+
+struct Namespace{T} <: Symbolic{T}
+    parent::Any
+    named::Symbolic{T}
+end
+
+SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
+getname(x) = _getname(unwrap(x))
+_getname(x) = nameof(x)
+_getname(x::Symbol) = x
+_getname(x::Symbolic) = getsource(x)[2]
+getname(x::Namespace) = Symbol(getname(x.parent), :(.), getname(x.named))
+Base.show(io::IO, x::Namespace) = print(io, getname(x))
+Base.isequal(x::Namespace, y::Namespace) = isequal(x.parent, y.parent) && isequal(x.named, y.named)
