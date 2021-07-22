@@ -12,7 +12,7 @@ using Symbolics, Test
         @test real(x) isa Num
         @test imag(x) isa Num
         @test conj(x) isa Complex{Num}
-        @test sin(x) isa Copmlex{Num}
+        @test sin(x) isa Complex{Num}
         @test sqrt(x) isa Complex{Num}
     end
 end

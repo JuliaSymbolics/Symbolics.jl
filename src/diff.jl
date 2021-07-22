@@ -193,7 +193,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
 end
 
 function expand_derivatives(n::Num, simplify=false; occurances=nothing)
-    Num(expand_derivatives(value(n), simplify; occurances=occurances))
+    wrap(expand_derivatives(value(n), simplify; occurances=occurances))
 end
 function expand_derivatives(n::Complex, simplify=false; occurances=nothing)
     expand_derivatives(real(n), simplify; occurances=nothing) +
@@ -348,7 +348,7 @@ A helper function for computing the gradient of an expression with respect to
 an array of variable expressions.
 """
 function gradient(O, vars::AbstractVector; simplify=false)
-    Num[Num(expand_derivatives(Differential(v)(value(O)),simplify)) for v in vars]
+    [wrap(expand_derivatives(Differential(v)(value(O)),simplify)) for v in vars]
 end
 
 """
@@ -358,7 +358,7 @@ A helper function for computing the Jacobian of an array of expressions with res
 an array of variable expressions.
 """
 function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
-    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
+    [wrap(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 
 """
@@ -378,7 +378,7 @@ function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=fals
     exprs = Num[]
 
     for (i,j) in zip(I, J)
-        push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify)))
+        push!(exprs, wrap(expand_derivatives(Differential(vars[j])(ops[i]), simplify)))
     end
     sparse(I,J, exprs, length(ops), length(vars))
 end
@@ -520,7 +520,7 @@ $(SIGNATURES)
 Check if an expression is linear with respect to a list of variable expressions.
 """
 function islinear(ex, u)
-    isaffine(ex, u) && iszero(Num(substitute(ex, Dict(u .=> 0))))
+    isaffine(ex, u) && iszero(wrap(substitute(ex, Dict(u .=> 0))))
 end
 
 """
