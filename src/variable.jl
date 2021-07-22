@@ -70,55 +70,6 @@ function scalarize_getindex(x, parent=x)
     end
 end
 
-"""
-$(TYPEDEF)
-
-A named variable which represents a numerical value. The variable is uniquely
-identified by its `name`, and all variables with the same `name` are treated
-as equal.
-
-# Fields
-$(FIELDS)
-
-For example, the following code defines an independent variable `t`, a parameter
-`α`, a function parameter `σ`, a variable `x`, which depends on `t`, a variable
-`y` with no dependents, a variable `z`, which depends on `t`, `α`, and `x(t)`
-and parameters `β₁` and `β₂`.
-
-
-```julia
-σ = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:σ)) # left uncalled, since it is used as a function
-w = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:w)) # unknown, left uncalled
-x = Num(Variable{Symbolics.FnType{Tuple{Any},Real}}(:x))(t)  # unknown, depends on `t`
-y = Num(Variable(:y))   # unknown, no dependents
-z = Num(Variable{Symbolics.FnType{NTuple{3,Any},Real}}(:z))(t, α, x)  # unknown, multiple arguments
-β₁ = Num(Variable(:β, 1)) # with index 1
-β₂ = Num(Variable(:β, 2)) # with index 2
-
-expr = β₁ * x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
-```
-"""
-struct Variable{T} <: Function # backward compat
-    """The variable's unique name."""
-    name::Symbol
-    Variable(name) = Sym{Real}(name)
-    Variable{T}(name) where T = Sym{T}(name)
-    function Variable{T}(name, indices...) where T
-        var_name = Symbol("$(name)$(join(map_subscripts.(indices), "ˏ"))")
-        Sym{T}(var_name)
-    end
-end
-
-function Variable(name, indices...)
-    var_name = Symbol("$(name)$(join(map_subscripts.(indices), "ˏ"))")
-    Variable(var_name)
-end
-
-# TODO: move this to Symutils
-function Sym{T}(name, i, indices...) where T
-    var_name = Symbol("$(name)$(join(map_subscripts.((i, indices...,)), "ˏ"))")
-    Sym{T}(var_name)
-end
 
 function map_subscripts(indices)
     str = string(indices)
@@ -397,3 +348,59 @@ _getname(x::Symbolic) = getsource(x)[2]
 getname(x::Namespace) = Symbol(getname(x.parent), :(.), getname(x.named))
 Base.show(io::IO, x::Namespace) = print(io, getname(x))
 Base.isequal(x::Namespace, y::Namespace) = isequal(x.parent, y.parent) && isequal(x.named, y.named)
+
+"""
+    variables(name::Symbol, indices...)
+
+Create a multi-dimensional array of individual variables named with subscript
+notation. Use `@variables` instead to create symbolic array variables (as
+opposed to array of variables). See `variable` to create one variable with
+subscripts.
+
+```julia-repl
+julia> Symbolics.variables(:x, 1:3, 3:6)
+3×4 Matrix{Num}:
+ x₁ˏ₃  x₁ˏ₄  x₁ˏ₅  x₁ˏ₆
+ x₂ˏ₃  x₂ˏ₄  x₂ˏ₅  x₂ˏ₆
+ x₃ˏ₃  x₃ˏ₄  x₃ˏ₅  x₃ˏ₆
+```
+"""
+function variables(name, indices...; T=Real)
+    [variable(name, ij...; T=T) for ij in Iterators.product(indices...)]
+end
+
+"""
+    variable(name::Symbol, idx::Integer...)
+
+Create a variable with the given name along with subscripted indices.
+
+```julia-repl
+julia> Symbolics.variable(:x, 5,2,0)
+x₄ˏ₂ˏ₀
+```
+
+Also see `variables`.
+"""
+function variable(name, idx...; T=Real)
+    name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
+    first(@variables $name_ij::T)
+end
+
+
+# BS deprecation below
+
+struct Variable{T} end
+
+function (::Type{Variable{T}})(s, i...) where {T}
+    Base.depwarn("Variable{T}(name, idx...) is deprecated, use variable(name, idx...; T=T)", :Variable, force=true)
+    variable(s, i...; T=T)
+end
+
+(::Type{Variable})(s, i...) = Variable{Real}(s, i...)
+(::Type{Variable})(s, i...) = Variable{Real}(s, i...)
+
+function (::Type{Sym{T}})(s, x, i...) where {T}
+    Base.depwarn("Sym{T}(name, x, idx...) is deprecated, use variable(name, x, idx...; T=T)", :Variable, force=true)
+    variable(s, x, i...; T=T)
+end
+(::Type{Sym})(s, x, i...) = Sym{Real}(s, x, i...)
