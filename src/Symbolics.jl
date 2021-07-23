@@ -27,7 +27,7 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 export simplify, substitute
 
 using SciMLBase, IfElse
-export Num
+export Num, Namespace
 using MacroTools
 import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
