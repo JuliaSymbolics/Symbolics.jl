@@ -1,5 +1,7 @@
 @metatheory_init ()
 
+using SymbolicUtils.Rewriters
+
 TermInterface.isterm(t::Type{<:Sym}) = false
 TermInterface.isterm(t::Type{<:Symbolic}) = true
 
@@ -8,43 +10,56 @@ TermInterface.gethead(t::Sym) = t
 TermInterface.getargs(t::Symbolic) = [operation(t), arguments(t)...]
 TermInterface.arity(t::Symbolic) = length(arguments(t))
 
-
 function TermInterface.similarterm(x::Type{<:Symbolic{T}}, head, args; metadata=nothing) where T
     @assert head == :call
     Term{T}(args[1], args[2:end])
 end
 
-function EGraphs.preprocess(t::Symbolic)
+"""
+Converts `Mul` and `Add` to `Term`.
+"""
+function toterm(t::Mul{T}) where T
+    args = []
+    push!(args, t.coeff)
+    for (k, deg) in t.dict
+        push!(args, deg == 1 ? k : Term{T}(^, [k, deg]))
+    end
+    Term{T}(*, args)
+end
+
+function toterm(t::Add{T}) where T
+    args = []
+    for (k, coeff) in t.dict
+        push!(args, coeff == 1 ? k : Term{T}(*, [coeff, k]))
+    end
+    Term{T}(+, args)
+end
+
+function toterm(t::Pow{T}) where T
+    Term{T}(^, t.base, t.exp)
+end
+
+toterm(t) = t
+
+"""
+Binarizes `Term`s with n-ary operations
+"""
+function unflatten(t::Symbolic{T}) where{T}
     # TODO change to isterm after PR
     if SymbolicUtils.istree(t)
         f = operation(t)
-        if f == (+) || f == (*) || f == (-) # check out for other binary ops TODO
+        if f == (+) || f == (*) || f == (-)  # check out for other binary ops TODO
             a = arguments(t)
-            if length(a) > 2
-                return unflatten_args(f, a, 2)
-            end
+            return foldl((x,y) -> Term{T}(f, [x, y]), a)
         end
     end
     return t
 end
 
-function EGraphs.preprocess(t::Mul{T}) where T
-    args = []
-    push!(args, t.coeff)
-    for (k,v) in t.dict
-        for i in 1:v 
-            push!(args, k)
-        end
-    end
-    EGraphs.preprocess(Term{T}(*, args))
-end
+unflatten(t) = t
 
-function EGraphs.preprocess(t::Add{T}) where T
-    args = []
-    for (k,v) in t.dict
-        push!(args, v*k)
-    end
-    EGraphs.preprocess(Term{T}(+, args))
+function preprocess(t)
+    Chain([Postwalk(toterm), Postwalk(unflatten)])(t) 
 end
 
 """
@@ -54,6 +69,7 @@ opt_theory = @methodtheory begin
     a * x == x * a
     a * x + a * y == a*(x+y)
     -1 * a == -a
+    a + (-1 * b) == a - b
     # fraction rules 
     # (a/b) + (c/b) => (a+c)*(1/b)
 end
@@ -74,16 +90,16 @@ const op_costs = Dict(
     (*)     => 3,
     exp     => 18,
     (/)     => 24,
-    log1p   => 24,
-    deg2rad => 25,
-    rad2deg => 25,
-    acos    => 27,
-    asind   => 28,
-    acsch   => 33,
-    sin     => 34,
-    cos     => 34,
-    atan    => 35,
-    tan     => 56,
+    log1p   => 124,
+    deg2rad => 125,
+    rad2deg => 125,
+    acos    => 127,
+    asind   => 128,
+    acsch   => 133,
+    sin     => 134,
+    cos     => 134,
+    atan    => 135,
+    tan     => 156,
 )
 # TODO some operator costs are in FLOP and not in cycles!!
 
@@ -104,16 +120,12 @@ function costfun(n::ENode, g::EGraph, an)
 end
 
 function optimize(ex; params=SaturationParams())
-    # ex = SymbolicUtils.Code.toexpr(ex)
+    prex = preprocess(ex)
     g = EGraph()
-
-    
     settermtype!(g, Term{symtype(ex), Any})
-    
-    ec, _ = addexpr!(g, ex)
+    ec, _ = addexpr!(g, prex)
     g.root = ec.id
-    display(g.classes); println()
+    # display(g.classes); println()
     saturate!(g, opt_theory, params)
-
     extract!(g, costfun) # --> "term" head args
 end
