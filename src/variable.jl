@@ -397,7 +397,6 @@ function (::Type{Variable{T}})(s, i...) where {T}
 end
 
 (::Type{Variable})(s, i...) = Variable{Real}(s, i...)
-(::Type{Variable})(s, i...) = Variable{Real}(s, i...)
 
 function (::Type{Sym{T}})(s, x, i...) where {T}
     Base.depwarn("Sym{T}(name, x, idx...) is deprecated, use variable(name, x, idx...; T=T)", :Variable, force=true)
