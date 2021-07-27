@@ -1,6 +1,6 @@
 using Symbolics, Test
 
-@variables a b::Real z::Complex{Real} (Z::Complex{Real})[1:10]
+@variables a b::Real z::Complex (Z::Complex)[1:10]
 
 @testset "types" begin
     @test a isa Num
