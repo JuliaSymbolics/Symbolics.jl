@@ -207,6 +207,7 @@ function setprops_expr(expr, props, macroname, varname)
                               $(option_to_metadata_type(Val{lhs}())),
                        $rhs))
     end
+    expr
 end
 
 function construct_var(macroname, var_name, type, call_args, val, prop)
@@ -235,6 +236,7 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
     # TODO: just use Sym here
     ndim = length(indices)
 
+    need_scalarize = false
     expr = if call_args === nothing
         ex = :($Sym{Array{$type, $ndim}}($var_name))
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
@@ -243,19 +245,23 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
     else
         # [(R -> R)(R) ....]
+        need_scalarize = true
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($scalarize_getindex($map($CallWith(($(call_args...),)), $ex)))
-
+        :($map($CallWith(($(call_args...),)), $ex))
     end
 
     if val !== nothing
         expr = :($setdefaultval($expr, $val))
     end
-
     expr = setprops_expr(expr, prop, macroname, var_name)
+    if need_scalarize
+        expr = :($scalarize_getindex($expr))
+    end
 
-    return :($wrap($expr))
+    expr = :($wrap($expr))
+
+    return expr
 end
 
 
