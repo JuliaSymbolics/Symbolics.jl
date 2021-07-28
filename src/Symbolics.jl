@@ -1,3 +1,6 @@
+"""
+$(DocStringExtensions.README)
+"""
 module Symbolics
 
 using DocStringExtensions
