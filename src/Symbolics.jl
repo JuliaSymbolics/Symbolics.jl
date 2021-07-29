@@ -140,6 +140,5 @@ export symbolics_to_sympy
 include("init.jl")
 
 AbstractSymbolic = Union{Variable, Sym, Num, Term, SymbolicUtils.Symbolic}
-issymbollike(::AbstractSymbolic) = true
 
 end # module
