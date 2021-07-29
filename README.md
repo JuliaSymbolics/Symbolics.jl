@@ -40,39 +40,38 @@ for the version of the documentation which contains the unreleased features.
 ## Example
 
 ```julia
-using Symbolics
+julia> using Symbolics
 
-@variables t x y
-D = Differential(t)
+julia> @variables t x y
+julia> D = Differential(t)
 
-z = t + t^2
-D(z) # symbolic representation of derivative(t + t^2, t)
-expand_derivatives(D(z)) # 1 + 2t
+julia> z = t + t^2
+julia> D(z) # symbolic representation of derivative(t + t^2, t)
+Differential(t)(t + t^2)
 
-Symbolics.jacobian([x + x*y, x^2 + y],[x, y])
+julia> expand_derivatives(D(z))
+1 + 2t
 
-#2×2 Matrix{Num}:
-# 1 + y  x
-#    2x  1
+julia> Symbolics.jacobian([x + x*y, x^2 + y],[x, y])
+2×2 Matrix{Num}:
+ 1 + y  x
+    2x  1
 
-B = simplify.([t^2 + t + t^2  2t + 4t
-              x + y + y + 2t  x^2 - x^2 + y^2])
+julia> B = simplify.([t^2 + t + t^2  2t + 4t
+                  x + y + y + 2t  x^2 - x^2 + y^2])
+2×2 Matrix{Num}:
+  t + 2(t^2)   6t
+ x + 2t + 2y  y^2
 
-#2×2 Matrix{Num}:
-#   t + 2(t^2)   6t
-# x + 2(t + y)  y^2
+julia> simplify.(substitute.(B, (Dict(x => y^2),)))
+2×2 Matrix{Num}:
+    t + 2(t^2)   6t
+ 2t + y^2 + 2y  y^2
 
-simplify.(substitute.(B, (Dict(x => y^2),)))
-
-#2×2 Matrix{Num}:
-#     t + 2(t^2)   6t
-# y^2 + 2(t + y)  y^2
-
-substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
-
-#2×2 Matrix{Num}:
-# 36.0  24.0
-# 16.0   9.0
+julia> substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
+2×2 Matrix{Num}:
+ 36.0  24.0
+ 16.0   9.0
 ```
 
 ## Citation

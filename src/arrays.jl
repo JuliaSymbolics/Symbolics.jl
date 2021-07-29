@@ -380,6 +380,7 @@ end
 end
 
 Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
+Base.isequal(a::Arr, b::Arr) = isequal(unwrap(a), unwrap(b))
 
 ArrayOp(x::Arr) = unwrap(x)
 
@@ -405,7 +406,9 @@ function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
     istree(x) && print(io, "(")
     print(io, unwrap(arr))
     istree(x) && print(io, ")")
-    print(io, "[", join(string.(axes(arr)), ","), "]")
+    if !(shape(x) isa Unknown)
+        print(io, "[", join(string.(axes(arr)), ","), "]")
+    end
 end
 
 ################# Base array functions
@@ -613,7 +616,7 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
         map(Iterators.product(axes(arr)...)) do i
-            scalarize(arr, i)
+            scalarize(arr[i...])
         end
     elseif istree(arr) && operation(arr) == getindex
         args = arguments(arr)
@@ -630,6 +633,6 @@ end
 
 Base.collect(x::Arr) = scalarize(x)
 Base.collect(x::SymArray) = scalarize(x)
-isarraysymbolic(x) = SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
+isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
 
 Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalarize(arr)
