@@ -26,7 +26,7 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 
 export simplify, substitute
 
-using SciMLBase, IfElse
+using IfElse
 export Num
 using MacroTools
 import MacroTools: splitdef, combinedef, postwalk, striplines
@@ -90,5 +90,8 @@ using Requires
 
 export symbolics_to_sympy
 include("init.jl")
+
+AbstractSymbolic = Union{Variable, Sym, Num, Term, SymbolicUtils.Symbolic}
+issymbollike(::AbstractSymbolic) = true
 
 end # module
