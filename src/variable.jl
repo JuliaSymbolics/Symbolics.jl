@@ -347,12 +347,16 @@ struct Namespace{T} <: Symbolic{T}
     named::Symbolic{T}
 end
 
+Base.hash(ns::Namespace, salt::UInt) = hash(ns.named, hash(ns.parent, salt ⊻ 0x906e89687f904e4a))
 SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
+SymbolicUtils.setmetadata(ns::Namespace, typ::DataType, data) = @set ns.named = SymbolicUtils.setmetadata(ns.named, typ, data)
+# TODO: this isn't correct
+SymbolicUtils.Code.toexpr(ns::Namespace, st) = getname(ns)
 getname(x) = _getname(unwrap(x))
 _getname(x) = nameof(x)
 _getname(x::Symbol) = x
 _getname(x::Symbolic) = getsource(x)[2]
-getname(x::Namespace) = Symbol(getname(x.parent), :(.), getname(x.named))
+_getname(x::Namespace) = Symbol(getname(x.parent), :(.), getname(x.named))
 Base.show(io::IO, x::Namespace) = print(io, getname(x))
 Base.isequal(x::Namespace, y::Namespace) = isequal(x.parent, y.parent) && isequal(x.named, y.named)
 
