@@ -398,7 +398,7 @@ function variable(name, idx...; T=Real)
 end
 
 
-# BS deprecation below
+# Deprecation below
 
 struct Variable{T} end
 

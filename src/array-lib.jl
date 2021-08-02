@@ -19,6 +19,11 @@ end
 
 function Base.getindex(x::SymArray, idx...)
     if all(i->symtype(i) <: Integer, idx)
+        @boundscheck begin
+            if !checkbounds(Bool, CartesianIndices(axes(x)), idx...)
+                throw(BoundsError(x, idx))
+            end
+        end
         res = Term{eltype(symtype(x))}(getindex, [x, idx...])
     else
         input_idx = []

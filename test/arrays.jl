@@ -6,6 +6,7 @@ using SymbolicUtils: Sym, term, operation
 
 @testset "arrays" begin
     @variables X[1:5, 1:5] Y[1:5, 1:5]
+    @test_throws BoundsError X[1000]
     @test typeof(X) <: Arr
     @test shape(X) == Slice.((1:5, 1:5))
     @test shape(Y) == Slice.((1:5, 1:5))
