@@ -1,8 +1,8 @@
 # basic integral struct with upper bound and lower bound.
-struct Integral{X, T <: Domain} <: Function
+struct Integral{X, T <: Symbolics.VarDomainPairing} <: Function
     x
     domain::T
-    Integral(x,domain) = new{typeof(x),typeof(domain)}(Symbolics.value(x), domain)
+    Integral(x,domain) = new{typeof(x),typeof(domain)}(Symbolics.value.(x), domain)
 end
 
 (I::Integral)(x) = Term{SymbolicUtils.symtype(x)}(I, [x])

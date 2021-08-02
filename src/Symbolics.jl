@@ -112,6 +112,8 @@ export Difference
 
 include("difference.jl")
 
+include("domains.jl")
+
 export Integral
 include("integral.jl")
 
@@ -131,8 +133,6 @@ include("latexify_recipes.jl")
 
 using RecipesBase
 include("plot_recipes.jl")
-
-include("domains.jl")
 
 using Requires
 
