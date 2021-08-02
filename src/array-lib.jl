@@ -23,7 +23,7 @@ function Base.getindex(x::SymArray, idx...)
         @boundscheck begin
             if length(idx) > 1
                 for (a, i) in zip(axes(x), idx)
-                    if i <: Integer && !(i in a)
+                    if i isa Integer && !(i in a)
                         throw(BoundsError(x, idx))
                     end
                 end

@@ -506,11 +506,16 @@ function replace_by_scalarizing(ex, dict)
             base = args[2]
             exp = val2num(only(args[3]))
             f = only(args[1])
-            f(base, exp)
+            args = [base,exp]
+        end
+
+        if metadata(x) !== nothing
+            similarterm(x, f, args; metadata=metadata(x))
         else
             f(args...)
         end
     end
+
     function rewrite_operation(x)
         if istree(x) && istree(operation(x))
             f = operation(x)

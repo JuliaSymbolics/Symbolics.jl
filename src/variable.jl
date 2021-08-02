@@ -216,6 +216,10 @@ struct CallWithMetadata{T,M} <: Symbolic{T}
     metadata::M
 end
 
+for f in [:istree, :operation, :arguments]
+    @eval SymbolicUtils.$f(x::CallWithMetadata) = $f(x.f)
+end
+
 SymbolicUtils.Code.toexpr(x::CallWithMetadata, st) = SymbolicUtils.Code.toexpr(x.f, st)
 
 CallWithMetadata(f) = CallWithMetadata(f, nothing)
