@@ -1,4 +1,4 @@
-using SymbolicUtils: FnType, Sym
+using SymbolicUtils: FnType, Sym, metadata
 using Setfield
 
 const IndexMap = Dict{Char,Char}(
@@ -211,11 +211,29 @@ function setprops_expr(expr, props, macroname, varname)
     expr
 end
 
+struct CallWithMetadata{T,M} <: Symbolic{T}
+    f::Symbolic{T}
+    metadata::M
+end
+
+SymbolicUtils.Code.toexpr(x::CallWithMetadata, st) = SymbolicUtils.Code.toexpr(x.f, st)
+
+CallWithMetadata(f) = CallWithMetadata(f, nothing)
+
+function Base.show(io::IO, c::CallWithMetadata)
+    show(io, c.f)
+    print(io, "⋆")
+end
+
+function (f::CallWithMetadata)(args...)
+    wrap(metadata(f.f(args...), metadata(f)))
+end
+
 function construct_var(macroname, var_name, type, call_args, val, prop)
     expr = if call_args === nothing
         :($Sym{$type}($var_name))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($Sym{$FnType{Tuple, $type}}($var_name)) # XXX: using Num as output
+        :($CallWithMetadata($Sym{$FnType{Tuple, $type}}($var_name)))
     else
         :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
     end
@@ -242,8 +260,10 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         ex = :($Sym{Array{$type, $ndim}}($var_name))
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
     elseif !isempty(call_args) && call_args[end] == :..
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name)) # XXX: using Num as output
-        :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        return ex
+        :($map(f->$CallWithMetadata(f), $ex))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
@@ -340,8 +360,6 @@ function TreeViews.treelabel(io::IO,x::Sym,
   show(io,mime,Text(x.name))
 end
 
-function getname end
-
 struct Namespace{T} <: Symbolic{T}
     parent::Any
     named::Symbolic{T}
@@ -350,8 +368,9 @@ end
 Base.hash(ns::Namespace, salt::UInt) = hash(ns.named, hash(ns.parent, salt ⊻ 0x906e89687f904e4a))
 SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
 SymbolicUtils.setmetadata(ns::Namespace, typ::DataType, data) = @set ns.named = SymbolicUtils.setmetadata(ns.named, typ, data)
+Base.nameof(x::Namespace) = getname(x)
 # TODO: this isn't correct
-SymbolicUtils.Code.toexpr(ns::Namespace, st) = getname(ns)
+#SymbolicUtils.Code.toexpr(ns::Namespace, st) = getname(ns)
 getname(x) = _getname(unwrap(x))
 _getname(x) = nameof(x)
 _getname(x::Symbol) = x
@@ -386,7 +405,7 @@ end
 Create a variable with the given name along with subscripted indices.
 
 ```julia-repl
-julia> Symbolics.variable(:x, 5,2,0)
+julia> Symbolics.variable(:x, 4, 2, 0)
 x₄ˏ₂ˏ₀
 ```
 
@@ -394,7 +413,11 @@ Also see `variables`.
 """
 function variable(name, idx...; T=Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
-    first(@variables $name_ij::T)
+    if T <: FnType
+        first(@variables $name_ij(..))
+    else
+        first(@variables $name_ij::T)
+    end
 end
 
 

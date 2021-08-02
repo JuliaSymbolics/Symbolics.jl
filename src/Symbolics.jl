@@ -54,7 +54,6 @@ for T in [Num, Complex{Num}]
         SymbolicUtils.getmetadata(x::$T, t) = SymbolicUtils.getmetadata(unwrap(x), t)
         SymbolicUtils.hasmetadata(x::$T, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
 
-        (f::Symbolic{<:FnType})(x::$T, y...) = wrap(f(unwrap(x), unwrap.(y)...))
         Broadcast.broadcastable(x::$T) = x
     end
 end

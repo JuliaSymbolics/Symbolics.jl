@@ -18,10 +18,15 @@ function Base.getindex(x::SymArray, idx::CartesianIndex)
 end
 
 function Base.getindex(x::SymArray, idx...)
+    idx = unwrap.(idx)
     if all(i->symtype(i) <: Integer, idx)
         @boundscheck begin
-            if !checkbounds(Bool, CartesianIndices(axes(x)), idx...)
-                throw(BoundsError(x, idx))
+            if length(idx) > 1
+                for (a, i) in zip(axes(x), idx)
+                    if i <: Integer && !(i in a)
+                        throw(BoundsError(x, idx))
+                    end
+                end
             end
         end
         res = Term{eltype(symtype(x))}(getindex, [x, idx...])
