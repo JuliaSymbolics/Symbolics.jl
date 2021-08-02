@@ -25,13 +25,13 @@ f([x, y, z]) # Recall that z = x^2 + y
 3-element Vector{Num}:
  x - y - (x^2)
        x^2 - y
-      x^2 + 2y</code></pre><p>Or we can build array variables and use these to trace:</p><pre><code class="language-julia">@variables u[1:3]
+      x^2 + 2y</code></pre><p>Or we can build an array variable and use it to trace the function:</p><pre><code class="language-julia">@variables u[1:4]
 f(u)
 
-3-element Array{Num,1}:
-   u₁ - u₃
- u₁^2 - u₂
-   u₂ + u₃</code></pre><h2 id="Building-Functions-1"><a class="docs-heading-anchor" href="#Building-Functions-1">Building Functions</a><a class="docs-heading-anchor-permalink" href="#Building-Functions-1" title="Permalink"></a></h2><p>The function for building functions from symbolic expressions is the aptly-named <code>build_function</code>. The first argument is the symbolic expression or the array of symbolic expressions to compile, and the trailing arguments are the arguments for the function. For example:</p><pre><code class="language-julia">to_compute = [x^2 + y, y^2 + x]
+3-element Vector{Num}:
+  u[4] - u[3]
+ u[1]^2 - u[2]
+  u[2] + u[3]</code></pre><h2 id="Building-Functions-1"><a class="docs-heading-anchor" href="#Building-Functions-1">Building Functions</a><a class="docs-heading-anchor-permalink" href="#Building-Functions-1" title="Permalink"></a></h2><p>The function for building functions from symbolic expressions is the aptly-named <code>build_function</code>. The first argument is the symbolic expression or the array of symbolic expressions to compile, and the trailing arguments are the arguments for the function. For example:</p><pre><code class="language-julia">to_compute = [x^2 + y, y^2 + x]
 f_expr = build_function(to_compute, [x, y])</code></pre><p>gives back two codes. The first is a function <code>f([x, y])</code> that computes and builds an output vector <code>[x^2 + y, y^2 + x]</code>. Because this tool was made to be used by all the cool kids writing fast Julia codes, it is specialized to Julia and supports features like StaticArrays. For example:</p><pre><code class="language-julia">using StaticArrays
 myf = eval(f_expr[1])
 myf(SA[2.0, 3.0])
@@ -159,4 +159,4 @@ h(x(t), y(t)) + (y(t))^2</code></pre><p>In order to use it with the differentiat
 Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{1}) = 2args[1]
 # Derivative w.r.t. the second argument
 Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1</code></pre><p>and now it works with the rest of the system:</p><pre><code class="language-julia">Symbolics.derivative(h(x, y) + y^2, x) # 2x
-Symbolics.derivative(h(x, y) + y^2, y) # 1 + 2y</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 2 August 2021 17:09">Monday 2 August 2021</span>. Using Julia version 1.6.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Symbolics.derivative(h(x, y) + y^2, y) # 1 + 2y</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 2 August 2021 18:51">Monday 2 August 2021</span>. Using Julia version 1.6.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
