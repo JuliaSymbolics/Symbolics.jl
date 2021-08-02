@@ -77,16 +77,16 @@ f([x, y, z]) # Recall that z = x^2 + y
       x^2 + 2y
 ```
 
-Or we can build array variables and use these to trace:
+Or we can build an array variable and use it to trace the function:
 
 ```julia
-@variables u[1:3]
+@variables u[1:4]
 f(u)
 
-3-element Array{Num,1}:
-   u₁ - u₃
- u₁^2 - u₂
-   u₂ + u₃
+3-element Vector{Num}:
+  u[4] - u[3]
+ u[1]^2 - u[2]
+  u[2] + u[3]
 ```
 
 ## Building Functions
