@@ -376,10 +376,19 @@ end
 
 Base.hash(ns::Namespace, salt::UInt) = hash(ns.named, hash(ns.parent, salt ⊻ 0x906e89687f904e4a))
 SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
+SymbolicUtils.metadata(ns::Namespace, meta) = SymbolicUtils.metadata(ns.named, meta)
 SymbolicUtils.setmetadata(ns::Namespace, typ::DataType, data) = @set ns.named = SymbolicUtils.setmetadata(ns.named, typ, data)
 Base.nameof(x::Namespace) = getname(x)
 # TODO: this isn't correct
-SymbolicUtils.Code.toexpr(ns::Namespace, st) = :($(getname(ns.parent)).$(SymbolicUtils.Code.toexpr(ns.named, st)))
+function SymbolicUtils.Code.toexpr(ns::Namespace, st)
+    if haskey(st.symbolify, ns)
+        st.symbolify[ns]
+    else
+        :($(getname(ns.parent)).$(SymbolicUtils.Code.toexpr(ns.named, st)))
+    end
+end
+# Namespace must be treated as a variable
+SymbolicUtils.Code.get_symbolify(ns::Namespace) = (ns,)
 getname(x) = _getname(unwrap(x))
 _getname(x) = nameof(x)
 _getname(x::Symbol) = x
