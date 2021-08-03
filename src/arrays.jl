@@ -519,7 +519,12 @@ function replace_by_scalarizing(ex, dict)
     function rewrite_operation(x)
         if istree(x) && istree(operation(x))
             f = operation(x)
-            replace_by_scalarizing(f, dict)(arguments(x)...)
+            ff = replace_by_scalarizing(f, dict)
+            if metadata(x) !== nothing
+                similarterm(x, ff, arguments(x); metadata=metadata(x))
+            else
+                ff(arguments(x)...)
+            end
         else
             nothing
         end

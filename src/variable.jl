@@ -66,7 +66,12 @@ function scalarize_getindex(x, parent=x)
             scalarize_getindex(r, parent)
         end
     else
-        setmetadata(scalarize(x), GetindexParent, parent)
+        xx = scalarize(x)
+        if symtype(xx) <: FnType
+            setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent)
+        else
+            setmetadata(xx, GetindexParent, parent)
+        end
     end
 end
 
@@ -264,9 +269,9 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         ex = :($Sym{Array{$type, $ndim}}($var_name))
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
     elseif !isempty(call_args) && call_args[end] == :..
+        need_scalarize = true
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        return ex
         :($map(f->$CallWithMetadata(f), $ex))
     else
         # [(R -> R)(R) ....]
@@ -374,7 +379,7 @@ SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
 SymbolicUtils.setmetadata(ns::Namespace, typ::DataType, data) = @set ns.named = SymbolicUtils.setmetadata(ns.named, typ, data)
 Base.nameof(x::Namespace) = getname(x)
 # TODO: this isn't correct
-#SymbolicUtils.Code.toexpr(ns::Namespace, st) = getname(ns)
+SymbolicUtils.Code.toexpr(ns::Namespace, st) = :($(getname(ns.parent)).$(SymbolicUtils.Code.toexpr(ns.named, st)))
 getname(x) = _getname(unwrap(x))
 _getname(x) = nameof(x)
 _getname(x::Symbol) = x
