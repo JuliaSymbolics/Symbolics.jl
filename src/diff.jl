@@ -124,8 +124,8 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                 end
             end
         elseif isa(operation(arg), Integral)
-            if isa(operation(arg).domain, AbstractInterval)
-                domain = operation(arg).domain
+            if isa(operation(arg).domain.domain, AbstractInterval)
+                domain = operation(arg).domain.domain
                 a, b = DomainSets.endpoints(domain)
                 c = 0
                 inner_function = expand_derivatives(arguments(arg)[1])
