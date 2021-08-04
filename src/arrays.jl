@@ -401,7 +401,7 @@ wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{maybewrap(T), 2}
 wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
 wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
 
-function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
+function Base.show(io::IO, arr::Arr)
     x = unwrap(arr)
     istree(x) && print(io, "(")
     print(io, unwrap(arr))
@@ -410,6 +410,7 @@ function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
         print(io, "[", join(string.(axes(arr)), ","), "]")
     end
 end
+Base.show(io::IO, ::MIME"text/plain", arr::Arr) = show(io, arr)
 
 ################# Base array functions
 #
@@ -641,6 +642,7 @@ function scalarize(arr)
     end
 end
 
+@wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x))
 Base.collect(x::Arr) = scalarize(x)
 Base.collect(x::SymArray) = scalarize(x)
 isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray

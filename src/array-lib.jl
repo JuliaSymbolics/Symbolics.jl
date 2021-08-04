@@ -19,7 +19,7 @@ end
 
 function Base.getindex(x::SymArray, idx...)
     idx = unwrap.(idx)
-    if all(i->i isa Integer, idx)
+    if shape(x) !== Unknown() && all(i->i isa Integer, idx)
         II = CartesianIndices(axes(x))
         @boundscheck begin
             if !checkbounds(Bool, II, idx...)
@@ -29,7 +29,7 @@ function Base.getindex(x::SymArray, idx...)
         ii = II[idx...]
         res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...])
     elseif all(i->symtype(i) <: Integer, idx)
-        @boundscheck begin
+        shape(x) !== Unknown() && @boundscheck begin
             if length(idx) > 1
                 for (a, i) in zip(axes(x), idx)
                     if i isa Integer && !(i in a)
