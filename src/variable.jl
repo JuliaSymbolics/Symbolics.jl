@@ -378,12 +378,11 @@ struct Namespace{T} <: Symbolic{T}
     end
 end
 
-Base.hash(ns::Namespace, salt::UInt) = hash(ns.named, hash(ns.parent, salt ⊻ 0x906e89687f904e4a))
+Base.hash(ns::Namespace, salt::UInt) = hash(ns.named, hash(getname(ns.parent), salt ⊻ 0x906e89687f904e4a))
 SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
 SymbolicUtils.metadata(ns::Namespace, meta) = @set ns.named = SymbolicUtils.metadata(ns.named, meta)
 SymbolicUtils.setmetadata(ns::Namespace, typ::DataType, data) = @set ns.named = SymbolicUtils.setmetadata(ns.named, typ, data)
 Base.nameof(x::Namespace) = getname(x)
-# TODO: this isn't correct
 function SymbolicUtils.Code.toexpr(ns::Namespace, st)
     if haskey(st.symbolify, ns)
         st.symbolify[ns]
@@ -404,7 +403,9 @@ function _getname(x::Symbolic)
 end
 _getname(x::Namespace) = Symbol(getname(x.parent), :(.), getname(x.named))
 Base.show(io::IO, x::Namespace) = print(io, getname(x))
-Base.isequal(x::Namespace, y::Namespace) = isequal(x.parent, y.parent) && isequal(x.named, y.named)
+function Base.isequal(x::Namespace, y::Namespace)
+    isequal(x.named, y.named) && (x.parent === y.parent || isequal(x.parent, y.parent))
+end
 
 """
     variables(name::Symbol, indices...)
