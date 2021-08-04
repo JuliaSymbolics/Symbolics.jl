@@ -19,6 +19,7 @@ Now we trace this into Symbolics:
 
 ```julia
 @variables t du[1:2] u[1:2] p[1:4]
+du = collect(du)
 lotka_volterra!(du, u, p, t)
 ```
 
