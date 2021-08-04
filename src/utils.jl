@@ -137,7 +137,7 @@ julia> @variables t z(t)
 
 julia> Symbolics.tosymbol(z)
 Symbol("z(t)")
-            
+
 julia>  Symbolics.tosymbol(z; escape=false)
 :z
 ```
