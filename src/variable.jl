@@ -17,19 +17,6 @@ const IndexMap = Dict{Char,Char}(
 struct VariableDefaultValue end
 struct VariableSource end
 
-getsource(x, val=nothing) = getmetadata(unwrap(x), VariableSource, val)
-
-const _fail = Dict()
-function getdefaultval(x, val=_fail)
-    x = unwrap(x)
-    if hasmetadata(x, VariableDefaultValue)
-        return getmetadata(x, VariableDefaultValue)
-    else
-        val === _fail && error("$x has no default value")
-        return val
-    end
-end
-
 function recurse_and_apply(f, x)
     if symtype(x) <: AbstractArray
         getindex_posthook(x) do r,x,i...
@@ -67,6 +54,7 @@ function scalarize_getindex(x, parent=x)
         end
     else
         xx = scalarize(x)
+        xx = metadata(xx, metadata(x))
         if symtype(xx) <: FnType
             setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent)
         else
@@ -390,21 +378,52 @@ function SymbolicUtils.Code.toexpr(ns::Namespace, st)
         :($(getname(ns.parent)).$(SymbolicUtils.Code.toexpr(ns.named, st)))
     end
 end
-# Namespace must be treated as a variable
-SymbolicUtils.Code.get_symbolify(ns::Namespace) = (ns,)
-getname(x) = _getname(unwrap(x))
-_getname(x) = nameof(x)
-_getname(x::Symbol) = x
-function _getname(x::Symbolic)
-    if istree(x) && (op = operation(x)) isa Namespace
-        return getname(op)
-    end
-    getsource(x)[2]
-end
-_getname(x::Namespace) = Symbol(getname(x.parent), :(.), getname(x.named))
 Base.show(io::IO, x::Namespace) = print(io, getname(x))
 function Base.isequal(x::Namespace, y::Namespace)
     isequal(x.named, y.named) && (x.parent === y.parent || isequal(x.parent, y.parent))
+end
+# Namespace must be treated as a variable
+SymbolicUtils.Code.get_symbolify(ns::Namespace) = (ns,)
+
+const _fail = Dict()
+
+_getname(x, _) = nameof(x)
+_getname(x::Symbol, _) = x
+function _getname(x::Symbolic, val)
+    if istree(x) && (op = operation(x)) isa Namespace
+        return getname(op)
+    end
+    ss = getsource(x, val)
+    ss === _fail && throw(ArgumentError("Variable $x doesn't have a source defined."))
+    ss[2]
+end
+_getname(x::Namespace, val) = Symbol(getname(x.parent), :(.), getname(x.named, val))
+
+getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
+
+getname(x, val=_fail) = _getname(unwrap(x), val)
+
+function getparent(x, val=_fail)
+    maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
+    if maybe_parent !== nothing
+        return maybe_parent
+    else
+        if istree(x) && operation(x) === getindex
+            return arguments(x)[1]
+        end
+    end
+    val === _fail && throw(ArgumentError("Cannot find the parent of $x."))
+    return val
+end
+
+function getdefaultval(x, val=_fail)
+    x = unwrap(x)
+    val = getmetadata(x, VariableDefaultValue, val)
+    if val !== _fail
+        return val
+    else
+        error("$x has no default value")
+    end
 end
 
 """
