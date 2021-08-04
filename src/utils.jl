@@ -107,7 +107,7 @@ function diff2term(O)
     end
     T = symtype(O)
     if ds === nothing
-        return similarterm(O, operation(O), map(diff2term, arguments(O)))
+        return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
     else
         oldop = operation(O)
         if !(oldop isa Sym)
@@ -116,9 +116,11 @@ function diff2term(O)
         d_separator = 'ˍ'
         opname = string(nameof(oldop))
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return similarterm(O, rename(oldop, newname), arguments(O))
+        return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
     end
 end
+
+setname(v, name) = setmetadata(v, Symbolics.VariableSource, (:variables, name))
 
 """
     tosymbol(x::Union{Num,Symbolic}; states=nothing, escape=true) -> Symbol
