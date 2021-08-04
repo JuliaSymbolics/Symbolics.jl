@@ -372,11 +372,15 @@ end
 struct Namespace{T} <: Symbolic{T}
     parent::Any
     named::Symbolic{T}
+    function Namespace(p, n)
+        n isa Namespace && error("Ill-formed namespacing. $n shouldn't be a namespace.")
+        new{symtype(n)}(p, n)
+    end
 end
 
 Base.hash(ns::Namespace, salt::UInt) = hash(ns.named, hash(ns.parent, salt ⊻ 0x906e89687f904e4a))
 SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
-SymbolicUtils.metadata(ns::Namespace, meta) = SymbolicUtils.metadata(ns.named, meta)
+SymbolicUtils.metadata(ns::Namespace, meta) = @set ns.named = SymbolicUtils.metadata(ns.named, meta)
 SymbolicUtils.setmetadata(ns::Namespace, typ::DataType, data) = @set ns.named = SymbolicUtils.setmetadata(ns.named, typ, data)
 Base.nameof(x::Namespace) = getname(x)
 # TODO: this isn't correct
@@ -392,7 +396,12 @@ SymbolicUtils.Code.get_symbolify(ns::Namespace) = (ns,)
 getname(x) = _getname(unwrap(x))
 _getname(x) = nameof(x)
 _getname(x::Symbol) = x
-_getname(x::Symbolic) = getsource(x)[2]
+function _getname(x::Symbolic)
+    if istree(x) && (op = operation(x)) isa Namespace
+        return getname(op)
+    end
+    getsource(x)[2]
+end
 _getname(x::Namespace) = Symbol(getname(x.parent), :(.), getname(x.named))
 Base.show(io::IO, x::Namespace) = print(io, getname(x))
 Base.isequal(x::Namespace, y::Namespace) = isequal(x.parent, y.parent) && isequal(x.named, y.named)
