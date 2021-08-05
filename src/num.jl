@@ -86,6 +86,7 @@ function substituter(pairs)
 end
 
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
+Base.nameof(n::Num) = nameof(value(n))
 
 function Base.iszero(x::Num)
     x = value(x)

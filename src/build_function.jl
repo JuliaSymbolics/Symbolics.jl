@@ -81,12 +81,12 @@ end
 
 function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
     if !(arg isa Arr)
-        DestructuredArgs(map(value, arg), name, inbounds=inbounds)
+        DestructuredArgs(map(unwrap, arg), name, inbounds=inbounds)
     else
-        arg
+        unwrap(arg)
     end
 end
-destructure_arg(arg, _, _) = arg
+destructure_arg(arg, _, _) = unwrap(arg)
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,

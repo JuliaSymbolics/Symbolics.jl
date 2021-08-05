@@ -26,7 +26,7 @@ nxt_1 = Namespace(nxt, unwrap(x))
 @test getname(nxt) == Symbol(:x, :(.), :t)
 @test getname(nxt_1) == Symbol(:x, :(.), :t, :(.), :x)
 
-@test p[1] isa Term
+@test p[1] isa Symbolics.CallWithMetadata
 @test symtype(p[1]) <: FnType{Tuple, Real}
 @test p[1](t) isa Symbolics.Num
 

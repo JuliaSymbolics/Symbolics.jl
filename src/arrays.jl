@@ -408,7 +408,7 @@ wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{maybewrap(T), 2}
 wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
 wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
 
-function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
+function Base.show(io::IO, arr::Arr)
     x = unwrap(arr)
     istree(x) && print(io, "(")
     print(io, unwrap(arr))
@@ -417,6 +417,7 @@ function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
         print(io, "[", join(string.(axes(arr)), ","), "]")
     end
 end
+Base.show(io::IO, ::MIME"text/plain", arr::Arr) = show(io, arr)
 
 ################# Base array functions
 #
@@ -513,15 +514,25 @@ function replace_by_scalarizing(ex, dict)
             base = args[2]
             exp = val2num(only(args[3]))
             f = only(args[1])
-            f(base, exp)
+            args = [base,exp]
+        end
+
+        if metadata(x) !== nothing
+            similarterm(x, f, args; metadata=metadata(x))
         else
             f(args...)
         end
     end
+
     function rewrite_operation(x)
         if istree(x) && istree(operation(x))
             f = operation(x)
-            replace_by_scalarizing(f, dict)(arguments(x)...)
+            ff = replace_by_scalarizing(f, dict)
+            if metadata(x) !== nothing
+                similarterm(x, ff, arguments(x); metadata=metadata(x))
+            else
+                ff(arguments(x)...)
+            end
         else
             nothing
         end
@@ -638,6 +649,7 @@ function scalarize(arr)
     end
 end
 
+@wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x))
 Base.collect(x::Arr) = scalarize(x)
 Base.collect(x::SymArray) = scalarize(x)
 isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
