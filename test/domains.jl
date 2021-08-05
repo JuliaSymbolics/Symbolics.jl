@@ -33,5 +33,5 @@ var_domain_pair = t ∈ (0,1)
 # Other types
 t = Symbolics.Num(:t)
 @assert (t ∈ domain) isa VarDomainPairing
-t = Symbolics.Variable(:t)
+t = Symbolics.variable(:t)
 @assert (t ∈ domain) isa VarDomainPairing
