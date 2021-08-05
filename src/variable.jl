@@ -447,13 +447,17 @@ function variables(name, indices...; T=Real)
 end
 
 """
-    variable(name::Symbol, idx::Integer...)
+    variable(name::Symbol, idx::Integer...; T=Real)
 
-Create a variable with the given name along with subscripted indices.
+Create a variable with the given name along with subscripted indices with the
+`symtype=T`. When `T=FnType`, it creates a symbolic function.
 
 ```julia-repl
 julia> Symbolics.variable(:x, 4, 2, 0)
 x₄ˏ₂ˏ₀
+
+julia> Symbolics.variable(:x, 4, 2, 0, T=Symbolics.FnType)
+x₄ˏ₂ˏ₀⋆
 ```
 
 Also see `variables`.

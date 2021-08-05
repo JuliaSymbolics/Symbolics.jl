@@ -368,39 +368,32 @@ Symbolics.value.(V)
  16.0   9.0
 ```
 
-## Non-Interactive Development (No Macro Version)
+## Non-Interactive Development
 
-Note that the macros are for the high-level case where you're doing
-symbolic computation on your own code. If you want to do symbolic
-computation on someone else's code, like in a macro, you may not want
-to do `@variables x` because you might want the name "x" to come from
-the user's code. For these cases, Symbolics.jl allows for fully
-macro-free usage. For example:
+Note that the macros are for the high-level case where you're doing symbolic
+computation on your own code. If you want to do symbolic computation on someone
+else's code, like in a macro, you may not want to do `@variables x` because you
+might want the name "x" to come from the user's code. For these cases, you can
+use the interpolation operator to interpolate the runtime value of `x`, i.e.
+`@variables $x`. Check the documentation of `@variables` for more details.
 
-```julia
-using Symbolics: Sym
+```julia-repl
+julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
+(:runtime_symbol_value, :value_b, :value_c)
 
-x = Num(Sym{Float64}(:x))
-y = Num(Sym{Float64}(:y))
-x + y^2.0 # isa Num
+julia> vars = @variables t $a $b(t) $c[1:3](t)
+4-element Vector{Any}:
+      t
+ runtime_symbol_value
+   value_b(t)
+       (map(Symbolics.CallWith((t,)), value_c))[1:3]
 
-α = Num(Variable(:α))
-σ = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:σ)) # left uncalled, since it is used as a function
-w = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:w)) # unknown, left uncalled
-x = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:x))(t)  # unknown, depends on `t`
-y = Num(Variable(:y))   # unknown, no dependents
-# Line below throw an error since \alpha is not defined
-z = Num(Variable{Symbolics.FnType{NTuple{3, Any}, Real}}(:z))(t, α, x)  # unknown, multiple arguments
-β₁ = Num(Variable(:β, 1)) # with index 1
-β₂ = Num(Variable(:β, 2)) # with index 2
-
-expr = β₁ * x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
+julia> (t, a, b, c)
+(t, :runtime_symbol_value, :value_b, :value_c)
 ```
 
-Does what you'd expect. Note that `Variable` is simply a convenient function for
-making variables with indices that always returns `Sym`. The reference
-documentation shows how to define any of the quantities in such a way that the
-names can come from runtime values.
+One could also use `variable` and `variables`. Read their documentation for more
+details.
 
 If we need to use this to generate new Julia code, we can simply
 convert the output to an `Expr`:
