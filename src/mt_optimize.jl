@@ -36,7 +36,7 @@ function toterm(t::Add{T}) where T
 end
 
 function toterm(t::Pow{T}) where T
-    Term{T}(^, t.base, t.exp)
+    Term{T}(^, [t.base, t.exp])
 end
 
 toterm(t) = t
@@ -62,16 +62,33 @@ function preprocess(t)
     Chain([Postwalk(toterm), Postwalk(unflatten)])(t) 
 end
 
+# TODO turn back a tree of `Term` into `Mul`, `Add` and `Pow` types
+function rebuild(x::Term{T})
+    if operation(T) == * 
+        nothing
+    end
+end 
+
+rebuild(x) = x
+
 """
 Equational rewrite rules for optimizing expressions
 """
 opt_theory = @methodtheory begin
-    a * x == x * a
+    a + b == b + a
+    a * b == b * a
     a * x + a * y == a*(x+y)
     -1 * a == -a
     a + (-1 * b) == a - b
+    x^-1 == 1/x 
+    1/x * a == a/x
     # fraction rules 
     # (a/b) + (c/b) => (a+c)*(1/b)
+    # trig functions
+    sin(x)/cos(x) == tan(x)
+    cos(x)/sin(x) == cot(x)
+    sin(x)^2 + cos(x)^2 => 1
+    sin(2a) == 2sin(a)cos(a)
 end
 
 """
@@ -90,6 +107,7 @@ const op_costs = Dict(
     (*)     => 3,
     exp     => 18,
     (/)     => 24,
+    (^)     => 100,
     log1p   => 124,
     deg2rad => 125,
     rad2deg => 125,
@@ -119,13 +137,13 @@ function costfun(n::ENode, g::EGraph, an)
     cost
 end
 
-function optimize(ex; params=SaturationParams())
+function optimize(ex; params=SaturationParams(timeout=20))
     prex = preprocess(ex)
     g = EGraph()
     settermtype!(g, Term{symtype(ex), Any})
     ec, _ = addexpr!(g, prex)
     g.root = ec.id
-    # display(g.classes); println()
+    display(g.classes); println()
     saturate!(g, opt_theory, params)
     extract!(g, costfun) # --> "term" head args
 end
