@@ -393,7 +393,10 @@ function _getname(x::Symbolic, val)
     if istree(x) && (op = operation(x)) isa Namespace
         return getname(op)
     end
-    ss = getsource(x, val)
+    ss = getsource(x, nothing)
+    if ss === nothing
+        ss = getsource(getparent(x), val)
+    end
     ss === _fail && throw(ArgumentError("Variable $x doesn't have a source defined."))
     ss[2]
 end
