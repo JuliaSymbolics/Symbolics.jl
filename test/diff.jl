@@ -224,3 +224,8 @@ let
     @test isequal(expand_derivatives(Dt(x(y(t), z(t)))),
                   Dt(y(t))*Differential(y(t))(x(y(t), z(t))) + Dt(z(t))*Differential(z(t))(x(y(t), z(t))))
 end
+
+@variables x y
+@register foo(x, y, z::Array)
+D = Differential(x)
+@test isequal(expand_derivatives(D(foo(x, y, [1.2]) * x^2)), Differential(x)(foo(x, y, [1.2]))*(x^2) + 2x*foo(x, y, [1.2]))

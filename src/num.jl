@@ -75,27 +75,6 @@ function Base.show(io::IO, z::Complex{<:Num})
     print(io, ")*im")
 end
 
-SymbolicUtils.simplify(n::Num; kw...) = Num(SymbolicUtils.simplify(value(n); kw...))
-SymbolicUtils.expand(n::Num) = Num(SymbolicUtils.expand(value(n)))
-"""
-    substitute(expr, s::Dict)
-
-Performs the substitution on `expr` according to rule(s) `s`.
-# Examples
-```julia
-julia> @parameters t
-(t,)
-julia> @variables x y z(t)
-(x, y, z(t))
-julia> ex = x + y + sin(z)
-(x + y) + sin(z(t))
-julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
-(z(t) + y) + (z(t) ^ 2)
-```
-"""
-substitute(expr::Num, s::Pair; kw...) = Num(substituter(s)(value(expr); kw...)) # backward compat
-substitute(expr::Num, s::Vector; kw...) = Num(substituter(s)(value(expr); kw...))
-substitute(expr::Num, s::Dict; kw...) = Num(substituter(s)(value(expr); kw...))
 # TODO: move this to SymbolicUtils
 substitute(expr, s::Pair; kw...) = substituter([s[1] => s[2]])(expr; kw...)
 substitute(expr, s::Vector; kw...) = substituter(s)(expr; kw...)
@@ -107,6 +86,7 @@ function substituter(pairs)
 end
 
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
+Base.nameof(n::Num) = nameof(value(n))
 
 function Base.iszero(x::Num)
     x = value(x)
@@ -199,11 +179,3 @@ _iszero(::Symbolic) = false
 _isone(::Symbolic) = false
 _iszero(x::Num) = _iszero(value(x))
 _isone(x::Num) = _isone(value(x))
-
-SymbolicUtils.Code.toexpr(x::Num) = SymbolicUtils.Code.toexpr(value(x))
-
-SymbolicUtils.setmetadata(x::Num, t, v) = Num(SymbolicUtils.setmetadata(value(x), t, v))
-SymbolicUtils.getmetadata(x::Num, t) = SymbolicUtils.getmetadata(value(x), t)
-SymbolicUtils.hasmetadata(x::Num, t) = SymbolicUtils.hasmetadata(value(x), t)
-
-(f::Symbolic{<:FnType})(x::Num, y...) = Num(f(unwrap(x), unwrap.(y)...))

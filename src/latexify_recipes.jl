@@ -14,6 +14,9 @@ function latexify_derivatives(ex)
             else
                 return Expr(:call, Expr(:call, :/, :d, Expr(:call, :*, :d, x.args[3])), x.args[2])
             end
+        elseif x isa Expr && x.args[1] === :_textbf
+            ls = latexify(latexify_derivatives(x.args[2])).s
+            return "\\textbf{" * strip(ls, '\$') * "}"
         else
             return x
         end
@@ -21,6 +24,34 @@ function latexify_derivatives(ex)
 end
 
 @latexrecipe function f(n::Num)
+    env --> :equation
+    cdot --> false
+
+    return latexify_derivatives(cleanup_exprs(_toexpr(n)))
+end
+
+@latexrecipe function f(n::ArrayOp)
+    env --> :equation
+    cdot --> false
+    return latexify_derivatives(cleanup_exprs(_toexpr(n.term)))
+end
+
+@latexrecipe function f(n::Function)
+    env --> :equation
+    cdot --> false
+
+    return nameof(n)
+end
+
+
+@latexrecipe function f(n::Arr)
+    env --> :equation
+    cdot --> false
+
+    return unwrap(n)
+end
+
+@latexrecipe function f(n::Symbolic)
     env --> :equation
     cdot --> false
 
@@ -44,6 +75,8 @@ Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num}) = print(io, latexify(x))
 
+_toexpr(O::ArrayOp) = _toexpr(O.term)
+
 # `_toexpr` is only used for latexify
 function _toexpr(O)
     !istree(O) && return O
@@ -65,6 +98,10 @@ function _toexpr(O)
         return Expr(:call, _toexpr(op), _toexpr(args)...)
     elseif op === getindex && symtype(args[1]) <: AbstractArray
         return getindex_to_symbol(O)
+    elseif op === (\)
+        return :(solve($(_toexpr(args[1])), $(_toexpr(args[2]))))
+    elseif op isa Sym && symtype(op) <: AbstractArray
+        return :(_textbf($(nameof(op))))
     end
     return Expr(:call, Symbol(op), _toexpr(args)...)
 end
@@ -133,6 +170,10 @@ function getindex_to_symbol(t)
     @assert istree(t) && operation(t) === getindex && symtype(arguments(t)[1]) <: AbstractArray
     args = arguments(t)
     idxs = args[2:end]
-    sub = join(map(map_subscripts, idxs), "ˏ")
-    return Symbol(_toexpr(args[1]), sub)
+    try
+        sub = join(map(map_subscripts, idxs), "ˏ")
+        return Symbol(_toexpr(args[1]), sub)
+    catch
+        return :($(_toexpr(args[1]))[$(idxs...)])
+    end
 end

@@ -4,8 +4,8 @@ using Symbolics, Test
 expr = [a*x - x*y,-3y + x*y]
 @test Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.StanTarget()) ==
     """
-    real[] diffeqf(real t,real[] internal_var___u,real[] internal_var___p,real[] x_r,int[] x_i) {
-      real internal_var___du[2];
+    vector diffeqf(real t,vector internal_var___u,vector internal_var___p) {
+      vector[2] internal_var___du;
       internal_var___du[1] = internal_var___p[1] * internal_var___u[1] + -1 * internal_var___u[1] * internal_var___u[2];
       internal_var___du[2] = internal_var___u[1] * internal_var___u[2] + -3 * internal_var___u[2];
       return internal_var___du;
@@ -99,8 +99,8 @@ let
 
     # Generated function should be out[1] = v[1], out[2] = v[2], ..., out[9] = p[9], etc.
     @test sfunc == """
-    real[] diffeqf(real Any[],real[] internal_var___u,real[] internal_var___p,real[] x_r,int[] x_i) {
-      real internal_var___du[12];
+    vector diffeqf(real Any[],vector internal_var___u,vector internal_var___p) {
+      vector[12] internal_var___du;
       internal_var___du[1] = internal_var___u[1];
       internal_var___du[2] = internal_var___u[2];
       internal_var___du[3] = internal_var___u[3];
@@ -126,8 +126,8 @@ let
 
     # Generated function should be out[0] = v[0] + p[0] + t[0]
     @test sfunc == """
-    real[] diffeqf(real t,real[] internal_var___u,real[] internal_var___p,real[] x_r,int[] x_i) {
-      real internal_var___du[1];
+    vector diffeqf(real t,vector internal_var___u,vector internal_var___p) {
+      vector[1] internal_var___du;
       internal_var___du[1] = internal_var___u[1] + internal_var___u[2] + internal_var___p[1];
       return internal_var___du;
     }

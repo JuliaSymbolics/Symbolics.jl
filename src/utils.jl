@@ -27,11 +27,12 @@ not wrapped in the `Num` type.
 
 # Examples
 ```julia
-julia> @parameters t
-(t,)
-
-julia> @variables x y z(t)
-(x, y, z(t))
+julia> @variables t x y z(t)
+4-element Vector{Num}:
+    t
+    x
+    y
+ z(t)
 
 julia> ex = x + y + sin(z)
 (x + y) + sin(z(t))
@@ -46,7 +47,11 @@ julia> Symbolics.get_variables(ex)
 get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
-is_singleton(e::Term) = operation(e) isa Sym
+function is_singleton(e::Term)
+    operation(e) === getindex && return true
+    operation(e) isa Sym
+end
+
 is_singleton(e::Sym) = true
 is_singleton(e) = false
 
@@ -102,7 +107,7 @@ function diff2term(O)
     end
     T = symtype(O)
     if ds === nothing
-        return similarterm(O, operation(O), map(diff2term, arguments(O)))
+        return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
     else
         oldop = operation(O)
         if !(oldop isa Sym)
@@ -111,25 +116,32 @@ function diff2term(O)
         d_separator = 'ˍ'
         opname = string(nameof(oldop))
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return similarterm(O, rename(oldop, newname), arguments(O))
+        return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
     end
 end
+
+setname(v, name) = setmetadata(v, Symbolics.VariableSource, (:variables, name))
 
 """
     tosymbol(x::Union{Num,Symbolic}; states=nothing, escape=true) -> Symbol
 
 Convert `x` to a symbol. `states` are the states of a system, and `escape`
-means if the target has escapes like `val"y(t)"`. If `escape` then it will only
-output `y` instead of `y(t)`.
+means if the target has escapes like `val"y(t)"`. If `escape` is false then
+it will only output `y` instead of `y(t)`.
 
 # Examples
 
 ```julia
-julia> @parameters t; @variables z(t)
-(z(t),)
+julia> @variables t z(t)
+2-element Vector{Num}:
+    t
+ z(t)
 
 julia> Symbolics.tosymbol(z)
 Symbol("z(t)")
+
+julia>  Symbolics.tosymbol(z; escape=false)
+:z
 ```
 """
 function tosymbol(t::Term; states=nothing, escape=true)
@@ -205,7 +217,7 @@ end
 function degree(p::Add, sym=nothing)
     return maximum(degree(key, sym) for key in keys(p.dict))
 end
-        
+
 function degree(p::Mul, sym=nothing)
     return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
 end
@@ -217,7 +229,7 @@ function degree(p::Term, sym=nothing)
         return Int(isequal(p, sym))
     end
 end
- 
+
 function degree(p, sym=nothing)
     p = value(p)
     sym = value(sym)

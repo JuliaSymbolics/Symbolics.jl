@@ -1,5 +1,5 @@
 using Symbolics
-import Symbolics: getdefaultval, wrap, unwrap
+import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
 import SymbolicUtils: Term, symtype, FnType
 using Test
 
@@ -9,8 +9,9 @@ Symbolics.@register fff(t)
 
 ## @variables
 
-@variables t=0 a=1 x[1:4]=2 y[1:4](t)=3 w[1:4] = 1:4 z[1:4](t) = 2:5 p[1:4](..)
+many_vars = @variables t=0 a=1 x[1:4]=2 y[1:4](t)=3 w[1:4] = 1:4 z[1:4](t) = 2:5 p[1:4](..)
 
+@test all(t->getsource(t)[1] === :variables, many_vars)
 @test getdefaultval(t) == 0
 @test getdefaultval(a) == 1
 @test_throws ErrorException getdefaultval(x)
@@ -20,7 +21,12 @@ Symbolics.@register fff(t)
 @test getdefaultval(w[4]) == 4
 @test getdefaultval(z[3]) == 4
 
-@test p[1] isa Term
+nxt = Namespace(unwrap(x), unwrap(t))
+nxt_1 = Namespace(nxt, unwrap(x))
+@test getname(nxt) == Symbol(:x, :(.), :t)
+@test getname(nxt_1) == Symbol(:x, :(.), :t, :(.), :x)
+
+@test p[1] isa Symbolics.CallWithMetadata
 @test symtype(p[1]) <: FnType{Tuple, Real}
 @test p[1](t) isa Symbolics.Num
 

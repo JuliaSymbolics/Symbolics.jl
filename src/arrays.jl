@@ -68,6 +68,13 @@ function Base.show(io::IO, aop::ArrayOp)
     else
         print(io, "@arrayop")
         print(io, "(_[$(join(string.(aop.output_idx), ","))] := $(aop.expr))")
+        if aop.reduce != +
+            print(io, " ($(aop.reduce))")
+        end
+
+        if !isempty(aop.ranges)
+            print(io, " ", join(["$k in $v" for (k, v) in aop.ranges], ", "))
+        end
     end
 end
 
@@ -380,6 +387,7 @@ end
 end
 
 Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
+Base.isequal(a::Arr, b::Arr) = isequal(unwrap(a), unwrap(b))
 
 ArrayOp(x::Arr) = unwrap(x)
 
@@ -400,13 +408,16 @@ wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{maybewrap(T), 2}
 wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
 wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
 
-function Base.show(io::IO, ::MIME"text/plain", arr::Arr)
+function Base.show(io::IO, arr::Arr)
     x = unwrap(arr)
     istree(x) && print(io, "(")
     print(io, unwrap(arr))
     istree(x) && print(io, ")")
-    print(io, "[", join(string.(axes(arr)), ","), "]")
+    if !(shape(x) isa Unknown)
+        print(io, "[", join(string.(axes(arr)), ","), "]")
+    end
 end
+Base.show(io::IO, ::MIME"text/plain", arr::Arr) = show(io, arr)
 
 ################# Base array functions
 #
@@ -503,15 +514,25 @@ function replace_by_scalarizing(ex, dict)
             base = args[2]
             exp = val2num(only(args[3]))
             f = only(args[1])
-            f(base, exp)
+            args = [base,exp]
+        end
+
+        if metadata(x) !== nothing
+            similarterm(x, f, args; metadata=metadata(x))
         else
             f(args...)
         end
     end
+
     function rewrite_operation(x)
         if istree(x) && istree(operation(x))
             f = operation(x)
-            replace_by_scalarizing(f, dict)(arguments(x)...)
+            ff = replace_by_scalarizing(f, dict)
+            if metadata(x) !== nothing
+                similarterm(x, ff, arguments(x); metadata=metadata(x))
+            else
+                ff(arguments(x)...)
+            end
         else
             nothing
         end
@@ -613,7 +634,7 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
         map(Iterators.product(axes(arr)...)) do i
-            scalarize(arr, i)
+            scalarize(arr[i...])
         end
     elseif istree(arr) && operation(arr) == getindex
         args = arguments(arr)
@@ -621,14 +642,16 @@ function scalarize(arr)
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
     elseif istree(arr) && symtype(arr) <: Number
-        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr))
+        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=arr.metadata)
         scalarize_op(operation(t), t)
     else
         arr
     end
 end
 
+@wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x))
 Base.collect(x::Arr) = scalarize(x)
 Base.collect(x::SymArray) = scalarize(x)
+isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
 
 Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalarize(arr)

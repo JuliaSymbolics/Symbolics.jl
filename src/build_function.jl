@@ -81,12 +81,12 @@ end
 
 function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
     if !(arg isa Arr)
-        DestructuredArgs(map(value, arg), name, inbounds=inbounds)
+        DestructuredArgs(map(unwrap, arg), name, inbounds=inbounds)
     else
-        arg
+        unwrap(arg)
     end
 end
-destructure_arg(arg, _, _) = arg
+destructure_arg(arg, _, _) = unwrap(arg)
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
@@ -94,7 +94,6 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          linenumbers = true)
-
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
 
@@ -270,8 +269,9 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
                        ($(toexpr.(a, (st,))...),)))
         quote
             let
-                task = Base.Threads.Task($ex)
-                Base.Threads.schedule(task)
+                task = Base.Task($ex)
+                task.sticky = false
+                Base.schedule(task)
                 task
             end
         end
@@ -380,8 +380,19 @@ end
 get_varnumber(varop, vars::Vector) =  findfirst(x->isequal(x,varop),vars)
 get_varnumber(varop, var) =  isequal(var,varop) ? 0 : nothing
 
-buildvarnumbercache(args...) = Dict([isa(arg,AbstractArray) ? el=>(argi,eli) : arg=>(argi,0)
-                                    for (argi,arg) in enumerate(args) for (eli,el) in enumerate(arg)])
+function buildvarnumbercache(args...)
+    varnumsdict = Pair[]
+    for (argi,arg) in enumerate(args)
+        if isa(arg,AbstractArray)
+            for (eli,el) in enumerate(arg)
+                push!(varnumsdict, el=>(argi,eli))
+            end
+        else
+            push!(varnumsdict ,arg=>(argi,0))
+        end
+    end
+    return Dict(varnumsdict)
+end
 
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
@@ -624,13 +635,17 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    varnumbercache = buildvarnumbercache(vs,ps)
+    varnumbercache = buildvarnumbercache(vs,ps...)
+    par_str = join(["real $(rhsnames[2])_$i" for i in 1:length(ps)], ", ")
+    rhsnames_mod = [:internal_var___u, [Symbol("$(rhsnames[2])_$i") for i in 1:length(ps)]..., :internal_var___t]
     differential_equation = string(join([numbered_expr(eq,varnumbercache,vs,ps,lhsname=lhsname,
-                                   rhsnames=rhsnames) for
+                                   rhsnames=rhsnames_mod) for
                                    (i, eq) ∈ enumerate(eqs)],";\n  "),";")
+
+
     """
-    real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
-      real $lhsname[$(length(eqs))];
+    vector $fname(real $(conv(iv)),vector $(rhsnames[1]), $par_str) {
+      vector[$(length(eqs))] $lhsname;
       $differential_equation
       return $lhsname;
     }
@@ -686,8 +701,8 @@ function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
     end
 
     """
-    real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
-      real $lhsname[$(length(equations))];
+    vector $fname(real $(conv(iv)),vector $(rhsnames[1]),vector $(rhsnames[2])) {
+      vector[$(length(equations))] $lhsname;
     $([eqn == equations[end] ? string("  ", eqn) : string("  ", eqn, "\n") for eqn ∈ equations]...)
       return $lhsname;
     }
