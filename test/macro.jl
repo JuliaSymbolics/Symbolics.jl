@@ -21,11 +21,6 @@ many_vars = @variables t=0 a=1 x[1:4]=2 y[1:4](t)=3 w[1:4] = 1:4 z[1:4](t) = 2:5
 @test getdefaultval(w[4]) == 4
 @test getdefaultval(z[3]) == 4
 
-nxt = Namespace(unwrap(x), unwrap(t))
-nxt_1 = Namespace(nxt, unwrap(x))
-@test getname(nxt) == Symbol(:x, :(.), :t)
-@test getname(nxt_1) == Symbol(:x, :(.), :t, :(.), :x)
-
 @test p[1] isa Symbolics.CallWithMetadata
 @test symtype(p[1]) <: FnType{Tuple, Real}
 @test p[1](t) isa Symbolics.Num
@@ -78,4 +73,6 @@ let
 
     @test Symbolics.getname(getmetadata(z[2](t), Symbolics.GetindexParent)) === :z
     @test Symbolics.getname(getmetadata(vars2[end][2](t), Symbolics.GetindexParent)) === :z_2
+
+    @test Symbolics.getname(Symbolics.rename(y[2], :u)) === :u
 end

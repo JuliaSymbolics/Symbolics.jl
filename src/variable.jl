@@ -346,42 +346,11 @@ function TreeViews.treelabel(io::IO,x::Sym,
   show(io,mime,Text(x.name))
 end
 
-struct Namespace{T} <: Symbolic{T}
-    parent::Any
-    named::Symbolic{T}
-    function Namespace(p, n)
-        n isa Namespace && error("Ill-formed namespacing. $n shouldn't be a namespace.")
-        new{symtype(n)}(p, n)
-    end
-end
-
-Base.hash(ns::Namespace, salt::UInt) = hash(ns.named, hash(getname(ns.parent), salt ⊻ 0x906e89687f904e4a))
-SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
-SymbolicUtils.metadata(ns::Namespace, meta) = @set ns.named = SymbolicUtils.metadata(ns.named, meta)
-SymbolicUtils.setmetadata(ns::Namespace, typ::DataType, data) = @set ns.named = SymbolicUtils.setmetadata(ns.named, typ, data)
-Base.nameof(x::Namespace) = getname(x)
-function SymbolicUtils.Code.toexpr(ns::Namespace, st)
-    if haskey(st.symbolify, ns)
-        st.symbolify[ns]
-    else
-        :($(getname(ns.parent)).$(SymbolicUtils.Code.toexpr(ns.named, st)))
-    end
-end
-Base.show(io::IO, x::Namespace) = print(io, getname(x))
-function Base.isequal(x::Namespace, y::Namespace)
-    isequal(x.named, y.named) && (x.parent === y.parent || isequal(x.parent, y.parent))
-end
-# Namespace must be treated as a variable
-SymbolicUtils.Code.get_symbolify(ns::Namespace) = (ns,)
-
 const _fail = Dict()
 
 _getname(x, _) = nameof(x)
 _getname(x::Symbol, _) = x
 function _getname(x::Symbolic, val)
-    if istree(x) && (op = operation(x)) isa Namespace
-        return getname(op)
-    end
     ss = getsource(x, nothing)
     if ss === nothing
         ss = getsource(getparent(x), val)
@@ -389,7 +358,6 @@ function _getname(x::Symbolic, val)
     ss === _fail && throw(ArgumentError("Variable $x doesn't have a source defined."))
     ss[2]
 end
-_getname(x::Namespace, val) = Symbol(getname(x.parent), :(.), getname(x.named, val))
 
 getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
@@ -479,18 +447,22 @@ function rename_getindex_source(x, parent=x)
     end
 end
 
-function rename_source(from, to, name)
+function rename_metadata(from, to, name)
     if hasmetadata(from, VariableSource)
         s = getmetadata(from, VariableSource)
-        setmetadata(to, VariableSource, (s[1], name))
-    else
-        to
+        to = setmetadata(to, VariableSource, (s[1], name))
     end
+    if hasmetadata(from, GetindexParent)
+        s = getmetadata(from, GetindexParent)
+        to = setmetadata(to, GetindexParent, rename(s, name))
+    end
+    return to
 end
 
 function rename(x::Sym, name)
     xx = @set! x.name = name
-    rename_source(x, xx, name)
+    xx = rename_metadata(x, xx, name)
+    symtype(xx) <: AbstractArray ? rename_getindex_source(xx) : xx
 end
 
 rename(x::Union{Num, Arr}, name) = wrap(rename(unwrap(x), name))
@@ -498,24 +470,25 @@ function rename(x::ArrayOp, name)
     t = x.term
     args = arguments(t)
     # Hack:
-    #@assert operation(t) === (map) && (args[1] isa CallWith || args[1] == CallWithMetadata)
+    @assert operation(t) === (map) && (args[1] isa CallWith || args[1] == CallWithMetadata)
     rn = rename(args[2], name)
 
-    xx = metadata(operation(t)(args[1], rn),
-                  metadata(x))
-    rename_getindex_source(rename_source(x, xx, name))
+    xx = metadata(operation(t)(args[1], rn), metadata(x))
+    rename_getindex_source(rename_metadata(x, xx, name))
 end
 
 function rename(x::CallWithMetadata, name)
-    rename_source(x, CallWithMetadata(rename(x.f, name), x.metadata), name)
+    rename_metadata(x, CallWithMetadata(rename(x.f, name), x.metadata), name)
 end
 
 function rename(x::Symbolic, name)
-    if operation(x) isa Sym
+    if istree(x) && operation(x) === getindex
+        rename(arguments(x)[1], name)[arguments(x)[2:end]...]
+    elseif istree(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
         @assert x isa Term
         xx = @set x.f = rename(operation(x), name)
         @set! xx.hash = Ref{UInt}(0)
-        return rename_source(x, xx, name)
+        return rename_metadata(x, xx, name)
     else
         error("can't rename $x to $name")
     end
