@@ -479,10 +479,10 @@ function rename_getindex_source(x, parent=x)
     end
 end
 
-function rename_source(from, to)
+function rename_source(from, to, name)
     if hasmetadata(from, VariableSource)
         s = getmetadata(from, VariableSource)
-        setmetadata(to, VariableSource, (s[1], getname(to)))
+        setmetadata(to, VariableSource, (s[1], name))
     else
         to
     end
@@ -490,33 +490,32 @@ end
 
 function rename(x::Sym, name)
     xx = @set! x.name = name
-    xx = rename_source(x, xx)
+    rename_source(x, xx, name)
 end
 
 rename(x::Union{Num, Arr}, name) = wrap(rename(unwrap(x), name))
 function rename(x::ArrayOp, name)
     t = x.term
     args = arguments(t)
-    @show x
     # Hack:
     #@assert operation(t) === (map) && (args[1] isa CallWith || args[1] == CallWithMetadata)
     rn = rename(args[2], name)
 
     xx = metadata(operation(t)(args[1], rn),
                   metadata(x))
-    rename_getindex_source(rename_source(x, xx))
+    rename_getindex_source(rename_source(x, xx, name))
 end
 
 function rename(x::CallWithMetadata, name)
-    rename_source(x, CallWithMetadata(rename(x.f, name), x.metadata))
+    rename_source(x, CallWithMetadata(rename(x.f, name), x.metadata), name)
 end
 
 function rename(x::Symbolic, name)
     if operation(x) isa Sym
         @assert x isa Term
-        @set! x.f = rename(operation(x), name)
-        @set! x.hash = Ref{UInt}(0)
-        return x
+        xx = @set x.f = rename(operation(x), name)
+        @set! xx.hash = Ref{UInt}(0)
+        return rename_source(x, xx, name)
     else
         error("can't rename $x to $name")
     end
