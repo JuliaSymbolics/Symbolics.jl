@@ -69,17 +69,6 @@ function map_subscripts(indices)
     join(IndexMap[c] for c in str)
 end
 
-rename(x::Sym,name) = @set! x.name = name
-function rename(x::Symbolic, name)
-    if operation(x) isa Sym
-        @assert x isa Term
-        @set! x.f = rename(operation(x), name)
-        @set! x.hash = Ref{UInt}(0)
-        return x
-    else
-        error("can't rename $x to $name")
-    end
-end
 
 function unwrap_runtime_var(v)
     isruntime = Meta.isexpr(v, :$) && length(v.args) == 1
@@ -260,7 +249,7 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         need_scalarize = true
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map(f->$CallWithMetadata(f), $ex))
+        :($map($CallWithMetadata, $ex))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
@@ -474,6 +463,64 @@ function variable(name, idx...; T=Real)
     end
 end
 
+##### Renaming #####
+# getname
+# rename
+# getindex parent
+# calls
+# symbolic function x[1:3](..)
+#
+# x_t
+# sys.x
+
+function rename_getindex_source(x, parent=x)
+    getindex_posthook(x) do r,x,i...
+        hasmetadata(r, GetindexParent) ? setmetadata(r, GetindexParent, parent) : r
+    end
+end
+
+function rename_source(from, to)
+    if hasmetadata(from, VariableSource)
+        s = getmetadata(from, VariableSource)
+        setmetadata(to, VariableSource, (s[1], getname(to)))
+    else
+        to
+    end
+end
+
+function rename(x::Sym, name)
+    xx = @set! x.name = name
+    xx = rename_source(x, xx)
+end
+
+rename(x::Union{Num, Arr}, name) = wrap(rename(unwrap(x), name))
+function rename(x::ArrayOp, name)
+    t = x.term
+    args = arguments(t)
+    @show x
+    # Hack:
+    #@assert operation(t) === (map) && (args[1] isa CallWith || args[1] == CallWithMetadata)
+    rn = rename(args[2], name)
+
+    xx = metadata(operation(t)(args[1], rn),
+                  metadata(x))
+    rename_getindex_source(rename_source(x, xx))
+end
+
+function rename(x::CallWithMetadata, name)
+    rename_source(x, CallWithMetadata(rename(x.f, name), x.metadata))
+end
+
+function rename(x::Symbolic, name)
+    if operation(x) isa Sym
+        @assert x isa Term
+        @set! x.f = rename(operation(x), name)
+        @set! x.hash = Ref{UInt}(0)
+        return x
+    else
+        error("can't rename $x to $name")
+    end
+end
 
 # Deprecation below
 
