@@ -115,8 +115,6 @@ using Metatheory.EGraphs
 import TermInterface 
 include("mt_optimize.jl")
 
-include("domains.jl")
-
 using Requires
 
 export symbolics_to_sympy

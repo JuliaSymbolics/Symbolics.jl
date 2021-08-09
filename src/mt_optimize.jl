@@ -63,11 +63,11 @@ function preprocess(t)
 end
 
 # TODO turn back a tree of `Term` into `Mul`, `Add` and `Pow` types
-function rebuild(x::Term{T})
-    if operation(T) == * 
-        nothing
-    end
-end 
+#function rebuild(x::Term{T})
+#    if operation(T) == * 
+#        nothing
+#    end
+#end 
 
 rebuild(x) = x
 
@@ -138,7 +138,7 @@ function costfun(n::ENode, g::EGraph, an)
 end
 
 function optimize(ex; params=SaturationParams(timeout=20))
-    prex = preprocess(ex)
+    prex = preprocess(unwrap(ex))
     g = EGraph()
     settermtype!(g, Term{symtype(ex), Any})
     ec, _ = addexpr!(g, prex)

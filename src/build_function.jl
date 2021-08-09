@@ -203,6 +203,7 @@ Special Keyword Argumnets:
 function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        expression = Val{true},
                        expression_module = @__MODULE__(),
+                       cpu_cycle_optimize = true,
                        checkbounds = false,
                        linenumbers = false,
                        outputidxs=nothing,
@@ -215,6 +216,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
+
+    if cpu_cycle_optimize
+        rhss = map(optimize∘unwrap, rhss)
+    end
     oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto))
 
     if !isnothing(wrap_code[1])
