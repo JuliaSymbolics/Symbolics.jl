@@ -143,7 +143,16 @@ function optimize(ex; params=SaturationParams(timeout=20))
     settermtype!(g, Term{symtype(ex), Any})
     ec, _ = addexpr!(g, prex)
     g.root = ec.id
-    display(g.classes); println()
+    # display(g.classes); println()
     saturate!(g, opt_theory, params)
     extract!(g, costfun) # --> "term" head args
+end
+
+function optimize(exs::Array; params=SaturationParams(timeout=20))
+    prexs = preprocess.(unwrap.(exs))
+    g = EGraph()
+    settermtype!(g, Term{Number})
+    ids = map(ex -> first(addexpr!(g, ex)).id, prexs)
+    saturate!(g, opt_theory, params)
+    map(id -> extract!(g, costfun; root=id), ids)
 end
