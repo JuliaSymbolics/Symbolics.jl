@@ -10,7 +10,7 @@ function latexify_derivatives(ex)
     return postwalk(ex) do x
         if x isa Expr && x.args[1] == :_derivative
             if x.args[2] isa Expr && length(x.args[2].args) == 2
-                return :($(Symbol(:d, x.args[2]))/$(Symbol(:d, x.args[2].args[2])))
+                return :($(Symbol(:d, x.args[2]))/$(Symbol(:d, x.args[3])))
             else
                 return Expr(:call, Expr(:call, :/, :d, Expr(:call, :*, :d, x.args[3])), x.args[2])
             end
