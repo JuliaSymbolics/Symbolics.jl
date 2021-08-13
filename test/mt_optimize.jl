@@ -11,8 +11,8 @@ ex = 2a + 2b - (a*(a + b))
 prex = Symbolics.preprocess(ex)
 res = Symbolics.optimize(ex)
 
-@test isequal(res, tn(*, tn(+,a,b), tn(-, 2, a)))
+@test isequal(res, tn(*, tn(+,b,a), tn(-, 2, a)))
 
 
 res = Symbolics.optimize(sin(a^2)/cos(a^2))
-@test isequal(res, tan(tn(^, a, 2)))
+@test isequal(res, tan(a^2))
