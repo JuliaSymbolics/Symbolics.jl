@@ -3,14 +3,14 @@ function __init__()
 
         using Symbolics
         using Symbolics: value
-        using SymbolicUtils: istree, operation, arguments, symtype,
+        using SymbolicUtils: isterm, gethead, getargs, symtype,
                              FnType, Symbolic
         function symbolics_to_sympy(expr)
             expr = value(expr)
             expr isa Symbolic || return expr
-            if istree(expr)
-                sop = symbolics_to_sympy(operation(expr))
-                sargs = map(symbolics_to_sympy, arguments(expr))
+            if isterm(expr)
+                sop = symbolics_to_sympy(gethead(expr))
+                sargs = map(symbolics_to_sympy, getargs(expr))
                 if sop === (^) && length(sargs) == 2 && sargs[2] isa Number
                     return Base.literal_pow(^, sargs[1], Val(sargs[2]))
                 else

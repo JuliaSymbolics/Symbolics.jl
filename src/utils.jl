@@ -48,8 +48,8 @@ get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
 function is_singleton(e::Term)
-    operation(e) === getindex && return true
-    operation(e) isa Sym
+    gethead(e) === getindex && return true
+    gethead(e) isa Sym
 end
 
 is_singleton(e::Sym) = true
@@ -63,7 +63,7 @@ function get_variables!(vars, e::Symbolic, varlist=nothing)
             push!(vars, e)
         end
     else
-        foreach(x -> get_variables!(vars, x, varlist), arguments(e))
+        foreach(x -> get_variables!(vars, x, varlist), getargs(e))
     end
     return (vars isa AbstractVector) ? unique!(vars) : vars
 end
@@ -95,28 +95,28 @@ uˍtx(x, t)
 ```
 """
 function diff2term(O)
-    istree(O) || return O
+    isterm(O) || return O
     if is_derivative(O)
         ds = ""
         while is_derivative(O)
-            ds = string(operation(O).x) * ds
-            O = arguments(O)[1]
+            ds = string(gethead(O).x) * ds
+            O = getargs(O)[1]
         end
     else
         ds = nothing
     end
     T = symtype(O)
     if ds === nothing
-        return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
+        return similarterm(O, gethead(O), map(diff2term, getargs(O)); metadata=metadata(O))
     else
-        oldop = operation(O)
+        oldop = gethead(O)
         if !(oldop isa Sym)
             throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
         end
         d_separator = 'ˍ'
         opname = string(nameof(oldop))
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
+        return setname(similarterm(O, rename(oldop, newname), getargs(O), metadata=metadata(O)), newname)
     end
 end
 
@@ -145,19 +145,19 @@ julia>  Symbolics.tosymbol(z; escape=false)
 ```
 """
 function tosymbol(t::Term; states=nothing, escape=true)
-    if operation(t) isa Sym
+    if gethead(t) isa Sym
         if states !== nothing && !(t in states)
-            return nameof(operation(t))
+            return nameof(gethead(t))
         end
-        op = nameof(operation(t))
-        args = arguments(t)
-    elseif operation(t) isa Differential
+        op = nameof(gethead(t))
+        args = getargs(t)
+    elseif gethead(t) isa Differential
         term = diff2term(t)
-        op = Symbol(operation(term))
-        args = arguments(term)
+        op = Symbol(gethead(term))
+        args = getargs(term)
     else
-        op = Symbol(repr(operation(t)))
-        args = arguments(t)
+        op = Symbol(repr(gethead(t)))
+        args = getargs(t)
     end
 
     return escape ? Symbol(op, "(", join(args, ", "), ")") : op
@@ -199,7 +199,7 @@ function makesubscripts(n)
     end
 end
 
-var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
+var_from_nested_derivative(x::Term,i=0) = gethead(x) isa Differential ? var_from_nested_derivative(getargs(x)[1], i + 1) : (x, i)
 var_from_nested_derivative(x::Sym,i=0) = (x, i)
 
 function degree(p::Sym, sym=nothing)

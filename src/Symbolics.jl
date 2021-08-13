@@ -7,6 +7,8 @@ using DocStringExtensions
 
 using LinearAlgebra
 
+using TermInterface
+
 using Reexport
 
 using DomainSets
@@ -16,7 +18,7 @@ import DomainSets: Domain
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
                       FnType, @rule, Rewriters, substitute, similarterm,
-                      promote_symtype, istree, operation, arguments
+                      promote_symtype, isterm, gethead, getargs
 
 import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 

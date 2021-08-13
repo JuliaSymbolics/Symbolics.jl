@@ -8,6 +8,7 @@ tn(f,x,y) = SymbolicUtils.Term{Number}(f, [x,y])
 
 
 ex = 2a + 2b - (a*(a + b))
+prex = Symbolics.preprocess(ex)
 res = Symbolics.optimize(ex)
 
 @test isequal(res, tn(*, tn(+,a,b), tn(-, 2, a)))

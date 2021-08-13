@@ -1,19 +1,8 @@
 @metatheory_init ()
 
+Metatheory.iscall(x::Type{<:Symbolic}) = true
+
 using SymbolicUtils.Rewriters
-
-TermInterface.isterm(t::Type{<:Sym}) = false
-TermInterface.isterm(t::Type{<:Symbolic}) = true
-
-TermInterface.gethead(t::Symbolic) = :call 
-TermInterface.gethead(t::Sym) = t
-TermInterface.getargs(t::Symbolic) = [operation(t), arguments(t)...]
-TermInterface.arity(t::Symbolic) = length(arguments(t))
-
-function TermInterface.similarterm(x::Type{<:Symbolic{T}}, head, args; metadata=nothing) where T
-    @assert head == :call
-    Term{T}(args[1], args[2:end])
-end
 
 """
 Converts `Mul` and `Add` to `Term`.
@@ -46,10 +35,10 @@ Binarizes `Term`s with n-ary operations
 """
 function unflatten(t::Symbolic{T}) where{T}
     # TODO change to isterm after PR
-    if SymbolicUtils.istree(t)
-        f = operation(t)
+    if SymbolicUtils.isterm(t)
+        f = gethead(t)
         if f == (+) || f == (*) || f == (-)  # check out for other binary ops TODO
-            a = arguments(t)
+            a = getargs(t)
             return foldl((x,y) -> Term{T}(f, [x, y]), a)
         end
     end
@@ -62,14 +51,7 @@ function preprocess(t)
     Chain([Postwalk(toterm), Postwalk(unflatten)])(t) 
 end
 
-# TODO turn back a tree of `Term` into `Mul`, `Add` and `Pow` types
-#function rebuild(x::Term{T})
-#    if operation(T) == * 
-#        nothing
-#    end
-#end 
 
-rebuild(x) = x
 
 """
 Equational rewrite rules for optimizing expressions
@@ -83,13 +65,14 @@ opt_theory = @methodtheory begin
     x^-1 == 1/x 
     1/x * a == a/x
     # fraction rules 
-    # (a/b) + (c/b) => (a+c)*(1/b)
+    # (a/b) + (c/b) => (a+c)/b
     # trig functions
     sin(x)/cos(x) == tan(x)
     cos(x)/sin(x) == cot(x)
     sin(x)^2 + cos(x)^2 => 1
     sin(2a) == 2sin(a)cos(a)
 end
+
 
 """
 Approximation of costs of operators in number 
@@ -141,10 +124,11 @@ function optimize(ex; params=SaturationParams(timeout=20))
     prex = preprocess(unwrap(ex))
     g = EGraph()
     settermtype!(g, Term{symtype(ex), Any})
-    ec, _ = addexpr!(g, prex)
+    ec, _ = addexpr!(g, prex; addcall=true)
     g.root = ec.id
-    # display(g.classes); println()
+    display(g.classes); println()
     saturate!(g, opt_theory, params)
+    display(g.classes); println()
     extract!(g, costfun) # --> "term" head args
 end
 

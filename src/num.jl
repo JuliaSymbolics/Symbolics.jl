@@ -102,7 +102,7 @@ function Base.isone(x::Num)
     return (_x isa Number || _x isa SymbolicUtils.MP.AbstractPolynomialLike) && isone(_x)
 end
 
-import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
+import SymbolicUtils: <ₑ, Symbolic, Term, gethead, getargs
 
 Base.show(io::IO, n::Num) = show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
 
@@ -110,11 +110,11 @@ Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{<:Symbolic{<:Number}}, ::Type{<:Num}) = Num
 function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
     if f === :op
-        Base.depwarn("`x.op` is deprecated, use `operation(x)` instead", :getproperty, force=true)
-        operation(t)
+        Base.depwarn("`x.op` is deprecated, use `gethead(x)` instead", :getproperty, force=true)
+        gethead(t)
     elseif f === :args
-        Base.depwarn("`x.args` is deprecated, use `arguments(x)` instead", :getproperty, force=true)
-        arguments(t)
+        Base.depwarn("`x.args` is deprecated, use `getargs(x)` instead", :getproperty, force=true)
+        getargs(t)
     else
         getfield(t, f)
     end

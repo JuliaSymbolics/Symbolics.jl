@@ -71,9 +71,9 @@ end
 
 rename(x::Sym,name) = @set! x.name = name
 function rename(x::Symbolic, name)
-    if operation(x) isa Sym
+    if gethead(x) isa Sym
         @assert x isa Term
-        @set! x.f = rename(operation(x), name)
+        @set! x.f = rename(gethead(x), name)
         @set! x.hash = Ref{UInt}(0)
         return x
     else
@@ -209,7 +209,7 @@ struct CallWithMetadata{T,M} <: Symbolic{T}
     metadata::M
 end
 
-for f in [:istree, :operation, :arguments]
+for f in [:isterm, :gethead, :getargs]
     @eval SymbolicUtils.$f(x::CallWithMetadata) = $f(x.f)
 end
 
@@ -390,7 +390,7 @@ const _fail = Dict()
 _getname(x, _) = nameof(x)
 _getname(x::Symbol, _) = x
 function _getname(x::Symbolic, val)
-    if istree(x) && (op = operation(x)) isa Namespace
+    if isterm(x) && (op = gethead(x)) isa Namespace
         return getname(op)
     end
     ss = getsource(x, val)
@@ -408,8 +408,8 @@ function getparent(x, val=_fail)
     if maybe_parent !== nothing
         return maybe_parent
     else
-        if istree(x) && operation(x) === getindex
-            return arguments(x)[1]
+        if isterm(x) && gethead(x) === getindex
+            return getargs(x)[1]
         end
     end
     val === _fail && throw(ArgumentError("Cannot find the parent of $x."))

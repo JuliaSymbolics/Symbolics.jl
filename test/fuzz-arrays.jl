@@ -17,7 +17,7 @@ function adjmul_rand_leaf()
     a = rand(adjmul_leaf_nodes)
     rand(Bool) ?  a' : a
 end
-isadjvec(x::Symbolics.ArrayOp) = x.term.f == adjoint && ndims(Symbolics.arguments(x.term)[1]) == 1
+isadjvec(x::Symbolics.ArrayOp) = x.term.f == adjoint && ndims(Symbolics.getargs(x.term)[1]) == 1
 isadjvec(x) = false
 
 function rand_mul_expr(a=adjmul_rand_leaf(),

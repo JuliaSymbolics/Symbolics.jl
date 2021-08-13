@@ -35,7 +35,7 @@ end
 (D::Differential)(x::Num) = Num(D(value(x)))
 SymbolicUtils.promote_symtype(::Differential, x) = x
 
-is_derivative(x::Term) = operation(x) isa Differential
+is_derivative(x::Term) = gethead(x) isa Differential
 is_derivative(x) = false
 
 Base.:*(D1, D2::Differential) = D1 ∘ D2
@@ -50,14 +50,14 @@ Base.isequal(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
 Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 
 _isfalse(occ::Bool) = occ === false
-_isfalse(occ::Term) = _isfalse(operation(occ))
+_isfalse(occ::Term) = _isfalse(gethead(occ))
 
 function occursin_info(x, expr)
-    !istree(expr) && return false
+    !isterm(expr) && return false
     if isequal(x, expr)
         true
     else
-        args = map(a->occursin_info(x, a), arguments(expr))
+        args = map(a->occursin_info(x, a), getargs(expr))
         if all(_isfalse, args)
             return false
         end
@@ -69,7 +69,7 @@ function occursin_info(x, expr::Sym)
 end
 
 function hasderiv(O)
-    istree(O) ? operation(O) isa Differential || any(hasderiv, arguments(O)) : false
+    isterm(O) ? gethead(O) isa Differential || any(hasderiv, getargs(O)) : false
 end
 """
 $(SIGNATURES)
@@ -77,23 +77,23 @@ $(SIGNATURES)
 TODO
 """
 function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
-    if istree(O) && isa(operation(O), Differential)
-        @assert length(arguments(O)) == 1
-        arg = expand_derivatives(arguments(O)[1], false)
+    if isterm(O) && isa(gethead(O), Differential)
+        @assert length(getargs(O)) == 1
+        arg = expand_derivatives(getargs(O)[1], false)
 
         if occurances == nothing
-            occurances = occursin_info(operation(O).x, arg)
+            occurances = occursin_info(gethead(O).x, arg)
         end
 
         _isfalse(occurances) && return 0
         occurances isa Bool && return 1 # means it's a `true`
 
-        D = operation(O)
+        D = gethead(O)
 
-        if !istree(arg)
+        if !isterm(arg)
             return D(arg) # Cannot expand
-        elseif isa(operation(arg), Sym)
-            inner_args = arguments(arg)
+        elseif isa(gethead(arg), Sym)
+            inner_args = getargs(arg)
             if any(isequal(D.x), inner_args)
                 return D(arg) # base case if any argument is directly equal to the i.v.
             else
@@ -102,55 +102,55 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                            expand_derivatives(D(a))
                 end
             end
-        elseif isa(operation(arg), typeof(IfElse.ifelse))
-            args = arguments(arg)
-            op = operation(arg)
+        elseif isa(gethead(arg), typeof(IfElse.ifelse))
+            args = getargs(arg)
+            op = gethead(arg)
             O = op(args[1], D(args[2]), D(args[3]))
             return expand_derivatives(O, simplify; occurances)
-        elseif isa(operation(arg), Differential)
+        elseif isa(gethead(arg), Differential)
             # The recursive expand_derivatives was not able to remove
             # a nested Differential. We can attempt to differentiate the
             # inner expression wrt to the outer iv. And leave the
             # unexpandable Differential outside.
-            if isequal(operation(arg).x, D.x)
+            if isequal(gethead(arg).x, D.x)
                 return D(arg)
             else
-                inner = expand_derivatives(D(arguments(arg)[1]), false)
+                inner = expand_derivatives(D(getargs(arg)[1]), false)
                 # if the inner expression is not expandable either, return
-                if istree(inner) && operation(inner) isa Differential
+                if isterm(inner) && gethead(inner) isa Differential
                     return D(arg)
                 else
-                    return expand_derivatives(operation(arg)(inner), simplify)
+                    return expand_derivatives(gethead(arg)(inner), simplify)
                 end
             end
-        elseif isa(operation(arg), Integral)
-            if isa(operation(arg).domain.domain, AbstractInterval)
-                domain = operation(arg).domain.domain
+        elseif isa(gethead(arg), Integral)
+            if isa(gethead(arg).domain.domain, AbstractInterval)
+                domain = gethead(arg).domain.domain
                 a, b = DomainSets.endpoints(domain)
                 c = 0
-                inner_function = expand_derivatives(arguments(arg)[1])
-                if istree(value(a))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).x => value(a)))
+                inner_function = expand_derivatives(getargs(arg)[1])
+                if isterm(value(a))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(gethead(arg).x => value(a)))
                     t2 = D(a)
                     c -= t1*t2
                 end
-                if istree(value(b))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).x => value(b)))
+                if isterm(value(b))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(gethead(arg).x => value(b)))
                     t2 = D(b)
                     c += t1*t2
                 end
-                inner = expand_derivatives(D(arguments(arg)[1]))
-                c += operation(arg)(inner)
+                inner = expand_derivatives(D(getargs(arg)[1]))
+                c += gethead(arg)(inner)
                 return value(c)
             end
         end
 
-        l = length(arguments(arg))
+        l = length(getargs(arg))
         exprs = []
         c = 0
 
         for i in 1:l
-            t2 = expand_derivatives(D(arguments(arg)[i]),false, occurances=arguments(occurances)[i])
+            t2 = expand_derivatives(D(getargs(arg)[i]),false, occurances=getargs(occurances)[i])
 
             x = if _iszero(t2)
                 t2
@@ -181,13 +181,13 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             x = +((!_iszero(c) ? vcat(c, exprs) : exprs)...)
             return simplify ? SymbolicUtils.simplify(x) : x
         end
-    elseif istree(O) && isa(operation(O), Integral)
-        return operation(O)(expand_derivatives(arguments(O)[1]))
+    elseif isterm(O) && isa(gethead(O), Integral)
+        return gethead(O)(expand_derivatives(getargs(O)[1]))
     elseif !hasderiv(O)
         return O
     else
-        args = map(a->expand_derivatives(a, false), arguments(O))
-        O1 = operation(O)(args...)
+        args = map(a->expand_derivatives(a, false), getargs(O))
+        O1 = gethead(O)(args...)
         return simplify ? SymbolicUtils.simplify(O1) : O1
     end
 end
@@ -226,7 +226,7 @@ chain rule is not applied:
 julia> myop = Symbolics.value(sin(x) * y^2)
 sin(x)*(y^2)
 
-julia> typeof(Symbolics.operation(myop))  # Op is multiplication function
+julia> typeof(Symbolics.gethead(myop))  # Op is multiplication function
 typeof(*)
 
 julia> Symbolics.derivative_idx(myop, 1)  # wrt. sin(x)
@@ -238,7 +238,7 @@ sin(x)
 """
 derivative_idx(O::Any, ::Any) = 0
 function derivative_idx(O::Symbolic, idx)
-    istree(O) ? derivative(operation(O), (arguments(O)...,), Val(idx)) : 0
+    isterm(O) ? derivative(gethead(O), (getargs(O)...,), Val(idx)) : 0
 end
 
 # Indicate that no derivative is defined.
@@ -397,7 +397,7 @@ function jacobian_sparsity(du, u)
     J = Int[]
 
 
-    simterm(x, f, args; kw...) = similarterm(x, f, args, symtype(x); kw...)
+    simterm(x, f, args; kw...) = similarterm(x, f, args; type=symtype(x), kw...)
 
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)

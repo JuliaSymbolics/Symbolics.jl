@@ -63,7 +63,7 @@ shape(aop::ArrayOp) = aop.shape
 
 const show_arrayop = Ref{Bool}(false)
 function Base.show(io::IO, aop::ArrayOp)
-    if istree(aop.term) && !show_arrayop[]
+    if isterm(aop.term) && !show_arrayop[]
         show(io, aop.term)
     else
         print(io, "@arrayop")
@@ -79,13 +79,13 @@ function Base.show(io::IO, aop::ArrayOp)
 end
 
 symtype(a::ArrayOp{T}) where {T} = T
-istree(a::ArrayOp) = true
-operation(a::ArrayOp) = typeof(a)
-arguments(a::ArrayOp) = [a.output_idx, a.expr, a.reduce, a.term, a.shape, a.ranges, a.metadata]
+TermInterface.isterm(a::ArrayOp) = true
+TermInterface.gethead(a::ArrayOp) = typeof(a)
+getargs(a::ArrayOp) = [a.output_idx, a.expr, a.reduce, a.term, a.shape, a.ranges, a.metadata]
 
 function Base.isequal(a::ArrayOp, b::ArrayOp)
     a === b && return true
-    isequal(operation(a), operation(b)) &&
+    isequal(gethead(a), gethead(b)) &&
     isequal(a.output_idx, b.output_idx) &&
     isequal(a.expr, b.expr) &&
     isequal(a.reduce, b.reduce) &&
@@ -93,7 +93,7 @@ function Base.isequal(a::ArrayOp, b::ArrayOp)
 end
 
 function Base.hash(a::ArrayOp, u::UInt)
-    hash(a.shape, hash(a.expr, hash(a.expr, hash(a.output_idx, hash(operation(a), u)))))
+    hash(a.shape, hash(a.expr, hash(a.expr, hash(a.output_idx, hash(gethead(a), u)))))
 end
 
 macro arrayop(call, output_idx, expr, options...)
@@ -261,17 +261,17 @@ function Base.get(a::AxisOf)
 end
 
 function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
-    if istree(expr)
-        if operation(expr) === (getindex)
-            args = arguments(expr)
+    if isterm(expr)
+        if gethead(expr) === (getindex)
+            args = getargs(expr)
             for (axis, sym) in enumerate(@views args[2:end])
                 !(sym isa Sym) && continue
                 axesvec = Base.get!(() -> [], dict, sym)
                 push!(axesvec, AxisOf(first(args), axis))
             end
         else
-            idx_to_axes(operation(expr), dict)
-            foreach(ex->idx_to_axes(ex, dict), arguments(expr))
+            idx_to_axes(gethead(expr), dict)
+            foreach(ex->idx_to_axes(ex, dict), getargs(expr))
         end
     end
     dict
@@ -410,9 +410,9 @@ wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
 
 function Base.show(io::IO, arr::Arr)
     x = unwrap(arr)
-    istree(x) && print(io, "(")
+    isterm(x) && print(io, "(")
     print(io, unwrap(arr))
-    istree(x) && print(io, ")")
+    isterm(x) && print(io, ")")
     if !(shape(x) isa Unknown)
         print(io, "[", join(string.(axes(arr)), ","), "]")
     end
@@ -478,7 +478,7 @@ end
 function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
     haskey(st.symbolify, x) && return st.symbolify[x]
 
-    if istree(x.term)
+    if isterm(x.term)
         toexpr(x.term, st)
     else
         throw(ArgumentError("""Don't know how to turn $x
@@ -525,13 +525,13 @@ function replace_by_scalarizing(ex, dict)
     end
 
     function rewrite_operation(x)
-        if istree(x) && istree(operation(x))
-            f = operation(x)
+        if isterm(x) && isterm(gethead(x))
+            f = gethead(x)
             ff = replace_by_scalarizing(f, dict)
             if metadata(x) !== nothing
-                similarterm(x, ff, arguments(x); metadata=metadata(x))
+                similarterm(x, ff, getargs(x); metadata=metadata(x))
             else
-                ff(arguments(x)...)
+                ff(getargs(x)...)
             end
         else
             nothing
@@ -547,7 +547,7 @@ function scalarize(arr::AbstractArray, idx)
 end
 
 function scalarize(arr::Term, idx)
-    scalarize_op(operation(arr), arr, idx)
+    scalarize_op(gethead(arr), arr, idx)
 end
 
 scalarize_op(f, arr) = arr
@@ -558,7 +558,7 @@ function scalarize_op(f, arr, idx)
     if hasmetadata(arr, ScalarizeCache) && getmetadata(arr, ScalarizeCache)[] !== nothing
         wrap(getmetadata(arr, ScalarizeCache)[][idx...])
     else
-        thing = f(scalarize.(map(wrap, arguments(arr)))...)
+        thing = f(scalarize.(map(wrap, getargs(arr)))...)
         getmetadata(arr, ScalarizeCache)[] = thing
         wrap(thing[idx...])
     end
@@ -577,7 +577,7 @@ end
 _det(x, lp) = det(x, laplace=lp)
 
 function scalarize_op(f::typeof(_det), arr)
-    det(map(wrap, collect(arguments(arr)[1])), laplace=arguments(arr)[2])
+    det(map(wrap, collect(getargs(arr)[1])), laplace=getargs(arr)[2])
 end
 
 @wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace=true)
@@ -636,14 +636,14 @@ function scalarize(arr)
         map(Iterators.product(axes(arr)...)) do i
             scalarize(arr[i...])
         end
-    elseif istree(arr) && operation(arr) == getindex
-        args = arguments(arr)
+    elseif isterm(arr) && gethead(arr) == getindex
+        args = getargs(arr)
         scalarize(args[1], (args[2:end]...,))
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
-    elseif istree(arr) && symtype(arr) <: Number
-        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=arr.metadata)
-        scalarize_op(operation(t), t)
+    elseif isterm(arr) && symtype(arr) <: Number
+        t = similarterm(arr, gethead(arr), map(scalarize, getargs(arr)); type=symtype(arr), metadata=arr.metadata)
+        scalarize_op(gethead(t), t)
     else
         arr
     end
