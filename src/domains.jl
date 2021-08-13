@@ -1,4 +1,4 @@
-import DomainSets: Domain, Interval
+import DomainSets: Domain, Interval, AbstractInterval
 import Symbolics: value, Sym, Term, Num
 
 struct VarDomainPairing
@@ -14,3 +14,15 @@ Base.:∈(variable::Union{Sym,Term,Num},domain::NTuple{2,Real}) = VarDomainPairi
 
 # Multiple variables
 Base.:∈(variables::NTuple{N,Union{Sym,Term,Num}},domain::Domain) where N = VarDomainPairing(value.(variables),domain)
+
+function infimum(d::AbstractInterval{T}) where T <: Num
+    a = leftendpoint(d)
+    b = rightendpoint(d)
+    a
+end
+
+function supremum(d::AbstractInterval{Num}) where T <: Num
+    a = leftendpoint(d)
+    b = rightendpoint(d)
+    b
+end
