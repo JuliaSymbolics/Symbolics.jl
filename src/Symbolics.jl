@@ -88,6 +88,7 @@ export Difference
 
 include("difference.jl")
 
+export infimum, supremum
 include("domains.jl")
 
 export Integral
