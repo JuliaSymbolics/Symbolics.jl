@@ -84,7 +84,7 @@ export Differential, expand_derivatives
 
 include("diff.jl")
 
-export Difference
+export Difference, DiscreteUpdate
 
 include("difference.jl")
 

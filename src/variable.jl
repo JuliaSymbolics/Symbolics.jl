@@ -47,18 +47,18 @@ end
 
 struct GetindexParent end
 
-function scalarize_getindex(x, parent=x)
+function scalarize_getindex(x, parent=Ref{Any}(x))
     if symtype(x) <: AbstractArray
-        getindex_posthook(x) do r,x,i...
+        parent[] = getindex_posthook(x) do r,x,i...
             scalarize_getindex(r, parent)
         end
     else
         xx = scalarize(x)
         xx = metadata(xx, metadata(x))
         if symtype(xx) <: FnType
-            setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent)
+            setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent[])
         else
-            setmetadata(xx, GetindexParent, parent)
+            setmetadata(xx, GetindexParent, parent[])
         end
     end
 end
