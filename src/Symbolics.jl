@@ -98,6 +98,7 @@ include("array-lib.jl")
 
 include("linear_algebra.jl")
 
+using ArrayInterface
 import Libdl
 include("build_function.jl")
 export build_function

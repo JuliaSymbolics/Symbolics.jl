@@ -349,6 +349,10 @@ function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, ski
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
+    if ArrayInterface.ismutable(typeof(rhss))
+        expr = :($out = $(unflatten_long_ops(rhss)))
+        return LiteralExpr(checkbounds ? expr : :(@inbounds $expr))
+    end
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
@@ -370,8 +374,7 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
                 end)
 end
 
-_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = unflatten_long_ops(rhs)
-
+_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = @show unflatten_long_ops(rhs)
 
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())
     vs_names = tosymbol.(vs)
