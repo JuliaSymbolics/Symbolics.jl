@@ -20,6 +20,11 @@ function __init__()
                 name = string(nameof(expr))
                 return symtype(expr) <: FnType ? SymPy.SymFunction(name) : get(symbols, name, SymPy.Sym(name))
             end
+        end 
+
+        function symbolics_to_sympy(expr, symbols) 
+            d = Dict(string(symbol) => symbol for symbol in symbols)
+            return symbolics_to_sympy(expr,d)
         end
 
     end # SymPy
