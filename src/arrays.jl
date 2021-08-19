@@ -385,6 +385,7 @@ end
 @symbolic_wrap struct Arr{T,N} <: AbstractArray{T, N}
     value
 end
+SciMLBase.issymbollike(::Arr) = true
 
 Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
 Base.isequal(a::Arr, b::Arr) = isequal(unwrap(a), unwrap(b))
@@ -650,8 +651,9 @@ function scalarize(arr)
 end
 
 @wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x))
-Base.collect(x::Arr) = scalarize(x)
-Base.collect(x::SymArray) = scalarize(x)
+Base.collect(x::Union{Arr,Symbolic,Num}) = scalarize(x)
+Base.collect(x::Equation) = collect(x.lhs) ~ collect(x.rhs)
+Base.collect(xs::AbstractArray{<:Equation}) = map(collect, xs)
 isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
 
 Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalarize(arr)
