@@ -651,8 +651,8 @@ function scalarize(arr)
 end
 
 @wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x))
-Base.collect(x::Union{Arr,Symbolic,Num}) = scalarize(x)
-Base.collect(x::Equation) = collect(x.lhs) ~ collect(x.rhs)
+Base.collect(x::Union{Arr,SymArray}) = scalarize(x)
+Base.collect(x::Equation) = scalarize(x.lhs) ~ scalarize(x.rhs)
 Base.collect(xs::AbstractArray{<:Equation}) = map(collect, xs)
 isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
 
