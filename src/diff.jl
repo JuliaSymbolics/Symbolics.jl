@@ -129,12 +129,12 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                 c = 0
                 inner_function = expand_derivatives(arguments(arg)[1])
                 if istree(value(a))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).x => value(a)))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).domain.variables => value(a)))
                     t2 = D(a)
                     c -= t1*t2
                 end
                 if istree(value(b))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).x => value(b)))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).domain.variables => value(b)))
                     t2 = D(b)
                     c += t1*t2
                 end
