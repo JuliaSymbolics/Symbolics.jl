@@ -76,3 +76,12 @@ let
 
     @test Symbolics.getname(Symbolics.rename(y[2], :u)) === :u
 end
+
+let
+    s = :y
+    x = (1:2,1:3)
+    t, y = @variables t $s[x...](t)
+
+    @test ndims(y) == 2
+    @test size(y) == (2,3)
+end
