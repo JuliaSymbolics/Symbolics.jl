@@ -6,7 +6,6 @@ using Test
 tr(f,x,y) = SymbolicUtils.Term{Real}(f, [x,y])
 tn(f,x,y) = SymbolicUtils.Term{Number}(f, [x,y])
 
-
 ex = 2a + 2b - (a*(a + b))
 prex = Symbolics.preprocess(ex)
 res = Symbolics.optimize(ex)

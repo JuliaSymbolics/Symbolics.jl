@@ -397,7 +397,7 @@ function jacobian_sparsity(du, u)
     J = Int[]
 
 
-    simterm(x, f, args; kw...) = similarterm(x, f, args; type=symtype(x), kw...)
+    simterm(x, f, args; kw...) = similarterm(x, f, args, symtype(x); kw...)
 
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)

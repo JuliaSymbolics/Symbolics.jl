@@ -22,11 +22,11 @@ TermInterface.isterm(a::ComplexTerm) = true
 TermInterface.gethead(a::ComplexTerm{T}) where T = Complex{T}
 TermInterface.getargs(a::ComplexTerm) = [a.re, a.im]
 
-function TermInterface.similarterm(t::ComplexTerm, f, args; type=nothing, metadata=nothing)
+function TermInterface.similarterm(t::ComplexTerm, f, args, symtype=nothing; metadata=nothing)
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        similarterm(first(args), f, args; type=type, metadata=metadata)
+        similarterm(first(args), f, args, type; metadata=metadata)
     end
 end
 

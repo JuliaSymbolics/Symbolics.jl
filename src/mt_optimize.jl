@@ -121,15 +121,19 @@ function costfun(n::ENode, g::EGraph, an)
 end
 
 function optimize(ex; params=SaturationParams(timeout=20))
+    @show ex
     prex = preprocess(unwrap(ex))
     g = EGraph()
     settermtype!(g, Term{symtype(ex), Any})
     ec, _ = addexpr!(g, prex; addcall=true)
     g.root = ec.id
-    display(g.classes); println()
+    # display(g.classes); println()
     saturate!(g, opt_theory, params)
-    display(g.classes); println()
-    extract!(g, costfun) # --> "term" head args
+    # display(g.classes); println()
+    res = extract!(g, costfun) # --> "term" head args
+    dump(res)
+    @show res
+    res
 end
 
 function optimize(exs::Array; params=SaturationParams(timeout=20))

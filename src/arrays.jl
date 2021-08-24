@@ -642,7 +642,7 @@ function scalarize(arr)
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
     elseif isterm(arr) && symtype(arr) <: Number
-        t = similarterm(arr, gethead(arr), map(scalarize, getargs(arr)); type=symtype(arr), metadata=arr.metadata)
+        t = similarterm(arr, gethead(arr), map(scalarize, getargs(arr)), symtype(arr); metadata=arr.metadata)
         scalarize_op(gethead(t), t)
     else
         arr
