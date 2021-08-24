@@ -46,7 +46,7 @@ function sym_lu(A; check=true)
             end
         end
     end
-    check && LinearAlgebra.checknonsingular(info, Val{true}())
+    check && LinearAlgebra.checknonsingular(info)
     LU(F, p, convert(LinearAlgebra.BlasInt, info))
 end
 
