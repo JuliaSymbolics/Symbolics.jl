@@ -205,6 +205,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        expression_module = @__MODULE__(),
                        cpu_cycle_optimize = true,
                        checkbounds = false,
+                       postprocess_fbody=ex -> ex,
                        linenumbers = false,
                        outputidxs=nothing,
                        skipzeros = false,
@@ -217,17 +218,27 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
 
-    if cpu_cycle_optimize
-        rhss = map(optimize∘unwrap, rhss)
-    end
-    oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto))
+    # if cpu_cycle_optimize
+    #     rhss = map(optimize∘unwrap, rhss)
+    # end
+    rhss = optimize(rhss)
+
+    oop_expr = Func(dargs, [],
+                    postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
 
     if !isnothing(wrap_code[1])
         oop_expr = wrap_code[1](oop_expr)
     end
 
     out = Sym{Any}(:ˍ₋out)
-    ip_expr = Func([out, dargs...], [], set_array(parallel, dargs, out, outputidxs, rhss, checkbounds, skipzeros))
+    ip_expr = Func([out, dargs...], [],
+                   postprocess_fbody(set_array(parallel,
+                                               dargs,
+                                               out,
+                                               outputidxs,
+                                               rhss,
+                                               checkbounds,
+                                               skipzeros)))
 
     if !isnothing(wrap_code[2])
         ip_expr = wrap_code[2](ip_expr)

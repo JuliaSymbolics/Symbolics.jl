@@ -32,7 +32,7 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 export simplify, substitute
 
 using SciMLBase, IfElse
-export Num, Namespace
+export Num
 using MacroTools
 import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
@@ -86,10 +86,11 @@ export Differential, expand_derivatives
 
 include("diff.jl")
 
-export Difference
+export Difference, DiscreteUpdate
 
 include("difference.jl")
 
+export infimum, supremum
 include("domains.jl")
 
 export Integral

@@ -46,7 +46,6 @@ Base.:^(D::Differential, n::Integer) = _repeat_apply(D, n)
 Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ")")
 
 Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
-Base.isequal(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
 Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 
 _isfalse(occ::Bool) = occ === false
@@ -129,13 +128,13 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                 a, b = DomainSets.endpoints(domain)
                 c = 0
                 inner_function = expand_derivatives(getargs(arg)[1])
-                if isterm(value(a))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(gethead(arg).x => value(a)))
+                if istree(value(a))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(gethead(arg).domain.variables => value(a)))
                     t2 = D(a)
                     c -= t1*t2
                 end
-                if isterm(value(b))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(gethead(arg).x => value(b)))
+                if istree(value(b))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(gethead(arg).domain.variables => value(b)))
                     t2 = D(b)
                     c += t1*t2
                 end

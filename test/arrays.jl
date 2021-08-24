@@ -62,3 +62,9 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     @test isequal(collect(D.(x) ~ x), map(i->D(x[i]) ~ x[i], eachindex(x)))
     @test_throws ArgumentError A ~ t
 end
+
+@testset "Parent" begin
+    @variables t x[1:4](t)
+    x = unwrap(x)
+    @test Symbolics.getparent(collect(x)[1]).metadata === x.metadata
+end

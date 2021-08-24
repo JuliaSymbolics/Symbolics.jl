@@ -47,18 +47,18 @@ end
 
 struct GetindexParent end
 
-function scalarize_getindex(x, parent=x)
+function scalarize_getindex(x, parent=Ref{Any}(x))
     if symtype(x) <: AbstractArray
-        getindex_posthook(x) do r,x,i...
+        parent[] = getindex_posthook(x) do r,x,i...
             scalarize_getindex(r, parent)
         end
     else
         xx = scalarize(x)
         xx = metadata(xx, metadata(x))
         if symtype(xx) <: FnType
-            setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent)
+            setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent[])
         else
-            setmetadata(xx, GetindexParent, parent)
+            setmetadata(xx, GetindexParent, parent[])
         end
     end
 end
@@ -69,17 +69,6 @@ function map_subscripts(indices)
     join(IndexMap[c] for c in str)
 end
 
-rename(x::Sym,name) = @set! x.name = name
-function rename(x::Symbolic, name)
-    if gethead(x) isa Sym
-        @assert x isa Term
-        @set! x.f = rename(gethead(x), name)
-        @set! x.hash = Ref{UInt}(0)
-        return x
-    else
-        error("can't rename $x to $name")
-    end
-end
 
 function unwrap_runtime_var(v)
     isruntime = Meta.isexpr(v, :$) && length(v.args) == 1
@@ -250,7 +239,7 @@ end
 
 function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
     # TODO: just use Sym here
-    ndim = length(indices)
+    ndim = :(length(($(indices...),)))
 
     need_scalarize = false
     expr = if call_args === nothing
@@ -260,7 +249,7 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         need_scalarize = true
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map(f->$CallWithMetadata(f), $ex))
+        :($map($CallWithMetadata, $ex))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
@@ -357,47 +346,18 @@ function TreeViews.treelabel(io::IO,x::Sym,
   show(io,mime,Text(x.name))
 end
 
-struct Namespace{T} <: Symbolic{T}
-    parent::Any
-    named::Symbolic{T}
-    function Namespace(p, n)
-        n isa Namespace && error("Ill-formed namespacing. $n shouldn't be a namespace.")
-        new{symtype(n)}(p, n)
-    end
-end
-
-Base.hash(ns::Namespace, salt::UInt) = hash(ns.named, hash(getname(ns.parent), salt ⊻ 0x906e89687f904e4a))
-SymbolicUtils.metadata(ns::Namespace) = SymbolicUtils.metadata(ns.named)
-SymbolicUtils.metadata(ns::Namespace, meta) = @set ns.named = SymbolicUtils.metadata(ns.named, meta)
-SymbolicUtils.setmetadata(ns::Namespace, typ::DataType, data) = @set ns.named = SymbolicUtils.setmetadata(ns.named, typ, data)
-Base.nameof(x::Namespace) = getname(x)
-function SymbolicUtils.Code.toexpr(ns::Namespace, st)
-    if haskey(st.symbolify, ns)
-        st.symbolify[ns]
-    else
-        :($(getname(ns.parent)).$(SymbolicUtils.Code.toexpr(ns.named, st)))
-    end
-end
-Base.show(io::IO, x::Namespace) = print(io, getname(x))
-function Base.isequal(x::Namespace, y::Namespace)
-    isequal(x.named, y.named) && (x.parent === y.parent || isequal(x.parent, y.parent))
-end
-# Namespace must be treated as a variable
-SymbolicUtils.Code.get_symbolify(ns::Namespace) = (ns,)
-
 const _fail = Dict()
 
 _getname(x, _) = nameof(x)
 _getname(x::Symbol, _) = x
 function _getname(x::Symbolic, val)
-    if isterm(x) && (op = gethead(x)) isa Namespace
-        return getname(op)
+    ss = getsource(x, nothing)
+    if ss === nothing
+        ss = getsource(getparent(x), val)
     end
-    ss = getsource(x, val)
     ss === _fail && throw(ArgumentError("Variable $x doesn't have a source defined."))
     ss[2]
 end
-_getname(x::Namespace, val) = Symbol(getname(x.parent), :(.), getname(x.named, val))
 
 getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
@@ -471,6 +431,68 @@ function variable(name, idx...; T=Real)
     end
 end
 
+##### Renaming #####
+# getname
+# rename
+# getindex parent
+# calls
+# symbolic function x[1:3](..)
+#
+# x_t
+# sys.x
+
+function rename_getindex_source(x, parent=x)
+    getindex_posthook(x) do r,x,i...
+        hasmetadata(r, GetindexParent) ? setmetadata(r, GetindexParent, parent) : r
+    end
+end
+
+function rename_metadata(from, to, name)
+    if hasmetadata(from, VariableSource)
+        s = getmetadata(from, VariableSource)
+        to = setmetadata(to, VariableSource, (s[1], name))
+    end
+    if hasmetadata(from, GetindexParent)
+        s = getmetadata(from, GetindexParent)
+        to = setmetadata(to, GetindexParent, rename(s, name))
+    end
+    return to
+end
+
+function rename(x::Sym, name)
+    xx = @set! x.name = name
+    xx = rename_metadata(x, xx, name)
+    symtype(xx) <: AbstractArray ? rename_getindex_source(xx) : xx
+end
+
+rename(x::Union{Num, Arr}, name) = wrap(rename(unwrap(x), name))
+function rename(x::ArrayOp, name)
+    t = x.term
+    args = arguments(t)
+    # Hack:
+    @assert operation(t) === (map) && (args[1] isa CallWith || args[1] == CallWithMetadata)
+    rn = rename(args[2], name)
+
+    xx = metadata(operation(t)(args[1], rn), metadata(x))
+    rename_getindex_source(rename_metadata(x, xx, name))
+end
+
+function rename(x::CallWithMetadata, name)
+    rename_metadata(x, CallWithMetadata(rename(x.f, name), x.metadata), name)
+end
+
+function rename(x::Symbolic, name)
+    if istree(x) && operation(x) === getindex
+        rename(arguments(x)[1], name)[arguments(x)[2:end]...]
+    elseif istree(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
+        @assert x isa Term
+        xx = @set x.f = rename(operation(x), name)
+        @set! xx.hash = Ref{UInt}(0)
+        return rename_metadata(x, xx, name)
+    else
+        error("can't rename $x to $name")
+    end
+end
 
 # Deprecation below
 
