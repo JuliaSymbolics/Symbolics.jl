@@ -1,6 +1,6 @@
 function nterms(t)
-    if isterm(t)
-        return reduce(+, map(nterms, getargs(t)), init=0)
+    if istree(t)
+        return reduce(+, map(nterms, arguments(t)), init=0)
     else
         return 1
     end
@@ -198,10 +198,10 @@ function _linear_expansion(t, x)
     t = value(t)
     t isa Symbolic || return (0, t, true)
     x = value(x)
-    isterm(t) || return trival_linear_expansion(t, x)
+    istree(t) || return trival_linear_expansion(t, x)
     isequal(t, x) && return (1, 0, true)
 
-    op, args = gethead(t), getargs(t)
+    op, args = operation(t), arguments(t)
     op isa Differential && trival_linear_expansion(t, x)
 
     if op === (+)

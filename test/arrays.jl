@@ -2,7 +2,7 @@ using Symbolics
 using SymbolicUtils, Test
 using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm
 using Base: Slice
-using SymbolicUtils: Sym, term, gethead
+using SymbolicUtils: Sym, term, operation
 
 @testset "arrays" begin
     @variables X[1:5, 1:5] Y[1:5, 1:5]
@@ -36,7 +36,7 @@ end
 
     @variables t x[1:4](t)
     @syms i::Int
-    @test isequal(x[i], gethead(unwrap(x[i]))(t))
+    @test isequal(x[i], operation(unwrap(x[i]))(t))
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)

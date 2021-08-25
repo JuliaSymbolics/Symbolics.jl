@@ -18,7 +18,7 @@ import DomainSets: Domain
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
                       FnType, @rule, Rewriters, substitute, similarterm,
-                      promote_symtype, isterm, gethead, getargs
+                      promote_symtype, istree, operation, arguments
 
 import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 

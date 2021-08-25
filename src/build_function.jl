@@ -61,14 +61,14 @@ end
 # Speeds up by avoiding repeated sorting when you call `arguments`
 # after editing children in Postwalk in unflatten_long_ops
 function termify(op)
-    !isterm(op) && return op
-    Term{symtype(op)}(gethead(op), getargs(op); metadata=op.metadata)
+    !istree(op) && return op
+    Term{symtype(op)}(operation(op), arguments(op); metadata=op.metadata)
 end
 
 function unflatten_long_ops(op, N=4)
     op = value(op)
     op = termify(op)
-    !isterm(op) && return wrap(op)
+    !istree(op) && return wrap(op)
     rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, N) : nothing)
     rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, N) : nothing)
 
@@ -413,19 +413,19 @@ end
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
-    if (O isa Sym || isa(gethead(O), Sym)) || (isterm(O) && gethead(O) == getindex)
+    if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
         if !isnothing(j)
             return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
-    if isterm(O)
-        if gethead(O) === getindex
-            args = getargs(O)
+    if istree(O)
+        if operation(O) === getindex
+            args = arguments(O)
             Expr(:ref, toexpr(args[1]), toexpr.(args[2:end] .+ offset)...)
         else
-            Expr(:call, Symbol(gethead(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
-                                                             rhsnames=rhsnames,varordering=varordering) for x in getargs(O))...)
+            Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
+                                                             rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
         end
     elseif O isa Sym
         tosymbol(O, escape=false)
@@ -439,7 +439,7 @@ function numbered_expr(de::Equation,varnumbercache,args...;varordering = args[1]
 
     varordering = value.(args[1])
     var = var_from_nested_derivative(de.lhs)[1]
-    i = findfirst(x->isequal(tosymbol(x isa Sym ? x : gethead(x), escape=false), tosymbol(var, escape=false)),varordering)
+    i = findfirst(x->isequal(tosymbol(x isa Sym ? x : operation(x), escape=false), tosymbol(var, escape=false)),varordering)
     :($lhsname[$(i+offset)] = $(numbered_expr(de.rhs,varnumbercache,args...;offset=offset,
                                               varordering = varordering,
                                               lhsname = lhsname,

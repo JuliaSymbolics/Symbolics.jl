@@ -18,9 +18,9 @@ function wrapper_type(::Type{Complex{T}}) where T
 end
 
 TermInterface.symtype(a::ComplexTerm{T}) where T = Complex{T}
-TermInterface.isterm(a::ComplexTerm) = true
-TermInterface.gethead(a::ComplexTerm{T}) where T = Complex{T}
-TermInterface.getargs(a::ComplexTerm) = [a.re, a.im]
+TermInterface.istree(a::ComplexTerm) = true
+TermInterface.operation(a::ComplexTerm{T}) where T = Complex{T}
+TermInterface.arguments(a::ComplexTerm) = [a.re, a.im]
 
 function TermInterface.similarterm(t::ComplexTerm, f, args, symtype=nothing; metadata=nothing)
     if f <: Complex
@@ -40,11 +40,11 @@ function Base.show(io::IO, a::Complex{Num})
     rr = unwrap(real(a))
     ii = unwrap(imag(a))
 
-    if isterm(rr) && (gethead(rr) === real) &&
-        isterm(ii) && (gethead(ii) === imag) &&
-        isequal(getargs(rr)[1], getargs(ii)[1])
+    if istree(rr) && (operation(rr) === real) &&
+        istree(ii) && (operation(ii) === imag) &&
+        isequal(arguments(rr)[1], arguments(ii)[1])
 
-        return print(io, getargs(rr)[1])
+        return print(io, arguments(rr)[1])
     end
 
     i = Sym{Real}(:im)
@@ -56,7 +56,7 @@ function unwrap(a::Complex{<:Num})
     T = promote_type(symtype(re), symtype(im))
     ComplexTerm{T}(re, im)
 end
-wrap(a::ComplexTerm) = Complex(wrap.(getargs(a))...)
+wrap(a::ComplexTerm) = Complex(wrap.(arguments(a))...)
 wrap(a::Symbolic{<:Complex}) = Complex(wrap(real(a)), wrap(imag(a)))
 
 SymbolicUtils.@number_methods(

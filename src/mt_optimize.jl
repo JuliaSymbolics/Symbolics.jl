@@ -34,11 +34,11 @@ toterm(t) = t
 Binarizes `Term`s with n-ary operations
 """
 function unflatten(t::Symbolic{T}) where{T}
-    # TODO change to isterm after PR
-    if SymbolicUtils.isterm(t)
-        f = gethead(t)
+    # TODO change to istree after PR
+    if SymbolicUtils.istree(t)
+        f = operation(t)
         if f == (+) || f == (*) || f == (-)  # check out for other binary ops TODO
-            a = getargs(t)
+            a = arguments(t)
             return foldl((x,y) -> Term{T}(f, [x, y]), a)
         end
     end
@@ -137,10 +137,14 @@ function optimize(ex; params=SaturationParams(timeout=20))
 end
 
 function optimize(exs::Array; params=SaturationParams(timeout=20))
+    println("exs ", exs)
     prexs = preprocess.(unwrap.(exs))
+    println(prexs)
     g = EGraph()
     settermtype!(g, Term{Number})
-    ids = map(ex -> first(addexpr!(g, ex)).id, prexs)
+    ids = map(ex -> first(addexpr!(g, ex; addcall=true)).id, prexs)
     saturate!(g, opt_theory, params)
-    map(id -> extract!(g, costfun; root=id), ids)
+    res = map(id -> extract!(g, costfun; root=id), ids)
+    println("res, ", res)
+    res
 end

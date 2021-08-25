@@ -79,10 +79,10 @@ _toexpr(O::ArrayOp) = _toexpr(O.term)
 
 # `_toexpr` is only used for latexify
 function _toexpr(O)
-    !isterm(O) && return O
+    !istree(O) && return O
 
-    op = gethead(O)
-    args = getargs(O)
+    op = operation(O)
+    args = arguments(O)
 
     if (op===(*)) && (args[1] === -1)
         arg_mul = Expr(:call, :(*), _toexpr(args[2:end])...)
@@ -111,7 +111,7 @@ function _toexpr(m::Mul{<:Number})
 
     # We need to iterate over each term in m, ignoring the numeric coefficient.
     # This iteration needs to be stable, so we can't iterate over m.dict.
-    for term in Iterators.drop(getargs(m), isone(m.coeff) ? 0 : 1)
+    for term in Iterators.drop(arguments(m), isone(m.coeff) ? 0 : 1)
         if !(term isa Pow)
             push!(numer, _toexpr(term))
             continue
@@ -119,7 +119,7 @@ function _toexpr(m::Mul{<:Number})
 
         base = term.base
         pow  = term.exp
-        isneg = (pow isa Number && pow < 0) || (isterm(pow) && gethead(pow) === (-) && length(getargs(pow)) == 1)
+        isneg = (pow isa Number && pow < 0) || (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
         if !isneg
             if _isone(pow)
                 pushfirst!(numer, _toexpr(base))
@@ -167,8 +167,8 @@ _toexpr(eqs::AbstractArray) = map(eq->_toexpr(eq), eqs)
 _toexpr(x::Num) = _toexpr(value(x))
 
 function getindex_to_symbol(t)
-    @assert isterm(t) && gethead(t) === getindex && symtype(getargs(t)[1]) <: AbstractArray
-    args = getargs(t)
+    @assert istree(t) && operation(t) === getindex && symtype(arguments(t)[1]) <: AbstractArray
+    args = arguments(t)
     idxs = args[2:end]
     try
         sub = join(map(map_subscripts, idxs), "ˏ")

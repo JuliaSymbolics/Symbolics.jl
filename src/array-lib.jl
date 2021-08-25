@@ -192,8 +192,8 @@ isadjointvec(A::Adjoint) = ndims(parent(A)) == 1
 isadjointvec(A::Transpose) = ndims(parent(A)) == 1
 
 function isadjointvec(A::Term)
-    (gethead(A) === (adjoint) ||
-     gethead(A) == (transpose)) && ndims(getargs(A)[1]) == 1
+    (operation(A) === (adjoint) ||
+     operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
 end
 
 isadjointvec(A::ArrayOp) = isadjointvec(A.term)
@@ -224,8 +224,8 @@ end
 function _matmul(A,B)
     @syms i::Int j::Int k::Int
     if isadjointvec(A)
-        op = gethead(A.term)
-        return op(op(B) * first(getargs(A.term)))
+        op = operation(A.term)
+        return op(op(B) * first(arguments(A.term)))
     end
     return @arrayop (A*B) (i, j) A[i, k] * B[k, j]
 end
@@ -271,7 +271,7 @@ end
 @inline _mapreduce(f, g, x, dims, kw) = mapreduce(f, g, x; dims=dims, kw...)
 
 function scalarize_op(::typeof(_mapreduce), t)
-    f,g,x,dims,kw = getargs(t)
+    f,g,x,dims,kw = arguments(t)
     # we wrap and unwrap to make things work smoothly.
     # we need the result unwrapped to allow recursive scalarize to work.
     unwrap(_mapreduce(f, g, collect(wrap(x)), dims, kw))

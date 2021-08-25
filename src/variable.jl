@@ -198,7 +198,7 @@ struct CallWithMetadata{T,M} <: Symbolic{T}
     metadata::M
 end
 
-for f in [:isterm, :gethead, :getargs]
+for f in [:istree, :operation, :arguments]
     @eval SymbolicUtils.$f(x::CallWithMetadata) = $f(x.f)
 end
 
@@ -368,8 +368,8 @@ function getparent(x, val=_fail)
     if maybe_parent !== nothing
         return maybe_parent
     else
-        if isterm(x) && gethead(x) === getindex
-            return getargs(x)[1]
+        if istree(x) && operation(x) === getindex
+            return arguments(x)[1]
         end
     end
     val === _fail && throw(ArgumentError("Cannot find the parent of $x."))
