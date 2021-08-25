@@ -26,7 +26,7 @@ function TermInterface.similarterm(t::ComplexTerm, f, args, symtype=nothing; met
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        similarterm(first(args), f, args, type; metadata=metadata)
+        similarterm(first(args), f, args, symtype; metadata=metadata)
     end
 end
 
