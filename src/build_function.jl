@@ -61,7 +61,7 @@ end
 # Speeds up by avoiding repeated sorting when you call `arguments`
 # after editing children in Postwalk in unflatten_long_ops
 function termify(op)
-    !istree(op) && return op
+    (op isa Symbolic && istree(op)) || return op
     Term{symtype(op)}(operation(op), arguments(op); metadata=op.metadata)
 end
 
@@ -72,7 +72,11 @@ function unflatten_long_ops(op, N=4)
     rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, N) : nothing)
     rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, N) : nothing)
 
-    simterm(x,f,args; metadata=nothing) = Term{symtype(x)}(f, args, metadata=metadata)
+    simterm(x,f,args; metadata=nothing) = if x isa Symbolic
+        Term{symtype(x)}(f, args, metadata=metadata)
+    else
+        f(args...)
+    end
     Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]), similarterm=simterm)(op))
 end
 
