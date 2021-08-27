@@ -1,4 +1,4 @@
-@metatheory_init ()
+@metatheory_init
 
 Metatheory.iscall(x::Type{<:Symbolic}) = true
 
