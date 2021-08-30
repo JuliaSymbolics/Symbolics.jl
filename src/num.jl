@@ -91,23 +91,17 @@ Base.nameof(n::Num) = nameof(value(n))
 function Base.iszero(x::Num)
     x = value(x)
     x isa Number && iszero(x) && return true
-    _x = PolyForm(x)
-    if _x isa PolyForm
-        SymbolicUtils.MP.isconstant(_x.p) && iszero(_x.p)
-    else
-        _iszero(_x)
-    end
+    _x = PolyForm(simplify_fractions(x), recurse=true)
+
+    _x isa PolyForm ? iszero(_x.p) : _iszero(_x)
 end
 
 function Base.isone(x::Num)
     x = value(x)
     x isa Number && isone(x) && return true
-    _x = PolyForm(x)
-    if _x isa PolyForm
-        SymbolicUtils.MP.isconstant(_x.p) && isone(_x.p)
-    else
-        _isone(_x)
-    end
+    _x = PolyForm(simplify_fractions(x), recurse=true)
+
+    _x isa PolyForm ? isone(_x.p) : _isone(_x)
 end
 
 import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
