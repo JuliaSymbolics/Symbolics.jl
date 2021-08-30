@@ -85,7 +85,7 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     islinear || return nothing
     # a * x + b = 0
     x = a \ -b
-    simplify ? SymbolicUtils.simplify(x, expand=true) : x
+    simplify ? SymbolicUtils.simplify(simplify_fractions(x)) : x
 end
 
 function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
