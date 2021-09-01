@@ -88,21 +88,8 @@ end
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
 Base.nameof(n::Num) = nameof(value(n))
 
-function Base.iszero(x::Num)
-    x = value(x)
-    x isa Number && iszero(x) && return true
-    _x = PolyForm(simplify_fractions(x), recurse=true)
-
-    _x isa PolyForm ? iszero(_x.p) : _iszero(_x)
-end
-
-function Base.isone(x::Num)
-    x = value(x)
-    x isa Number && isone(x) && return true
-    _x = PolyForm(simplify_fractions(x), recurse=true)
-
-    _x isa PolyForm ? isone(_x.p) : _isone(_x)
-end
+Base.iszero(x::Num) = SymbolicUtils.fraction_iszero(unwrap(x))
+Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
 
 import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
 
