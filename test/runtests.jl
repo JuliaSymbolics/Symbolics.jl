@@ -8,6 +8,10 @@ function activate_downstream_env()
     Pkg.instantiate()
 end
 
+if haskey(ENV, "CI")
+    include("benchmark.jl")
+end
+
 if GROUP == "All" || GROUP == "Core"
     @safetestset "Macro Test" begin include("macro.jl") end
     @safetestset "Arrays" begin include("arrays.jl") end
