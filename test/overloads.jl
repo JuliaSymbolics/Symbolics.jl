@@ -138,7 +138,7 @@ z1 = a + b * im
 z2 = c + d * im
 @test z1 * 2 - Complex(2a, 2b) == 0
 @test isequal(2z1, Complex(2a, 2b))
-@test isequal(z1 / z1, 1)
+@test isequal(simplify_fractions(z1 / z1), 1)
 @test isequal(z1 / z2, Complex((a*c + b*d)/(c^2 + d^2), (b*c - a*d)/(c^2 + d^2)))
 @test isequal(1 / z2, Complex(c/(c^2 + d^2), -d/(c^2 + d^2)))
 @test isequal(z1 / c, Complex(a/c, b/c))
