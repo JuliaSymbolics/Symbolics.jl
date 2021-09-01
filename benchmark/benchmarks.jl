@@ -1,6 +1,8 @@
 using BenchmarkTools, Symbolics
 
-using Random, LinearAlgebra
+using Random, LinearAlgebra, Pkg
+
+Pkg.resolve() # use the right version of dependents
 
 SUITE = BenchmarkGroup()
 
