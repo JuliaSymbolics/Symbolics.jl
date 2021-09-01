@@ -1,6 +1,6 @@
 using BenchmarkTools, Symbolics
 
-using Random, LinearAlgebra, Pkg
+using LinearAlgebra, Pkg
 
 Pkg.resolve() # use the right version of dependents
 
