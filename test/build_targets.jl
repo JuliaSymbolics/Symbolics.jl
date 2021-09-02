@@ -86,7 +86,7 @@ let
   cfunc = build_function(expression, [x, y], [a], t; target = Symbolics.CTarget(), expression = Val{true})
 
   # Generated function should avoid scalar multiplication of the form "4t" (currently done by adding another "* 1") and other invalid C syntax
-  @test cfunc == "#include <math.h>\nvoid diffeqf(double* du, const double* RHS1, const double* RHS2, const double RHS3) {\n  du[0] = 2 * RHS3 * 1 + pow(RHS1[0], 2) + 1.0 / RHS1[1] + pow(sin(RHS2[0]), 3.5);\n}\n"
+  @test cfunc == "#include <math.h>\nvoid diffeqf(double* du, const double* RHS1, const double* RHS2, const double RHS3) {\n  du[0] = 2 * RHS3 * 1 + pow(RHS1[0], 2) + 1 / RHS1[1] + pow(sin(RHS2[0]), 3.5);\n}\n"
 end
 
 

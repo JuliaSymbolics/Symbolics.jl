@@ -209,7 +209,7 @@ expression2 = substitute(expression, Dict(collect(Differential(t).(x) .=> ẋ)))
 
 @test isequal(
     Symbolics.derivative(IfElse.ifelse(signbit(b), b^2, sqrt(b)), b),
-    IfElse.ifelse(signbit(b), 2b, (1//2)*(sqrt(b)^-1))
+    IfElse.ifelse(signbit(b), 2b, (1//2)*(SymbolicUtils.unstable_pow(Symbolics.unwrap(sqrt(b)), -1)))
 )
 
 # Chain rule

@@ -85,7 +85,7 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     islinear || return nothing
     # a * x + b = 0
     x = a \ -b
-    simplify ? SymbolicUtils.simplify(x, expand=true) : x
+    simplify ? SymbolicUtils.simplify(simplify_fractions(x)) : x
 end
 
 function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
@@ -97,10 +97,10 @@ function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check
 end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
-    A = SymbolicUtils.simplify.(Num.(A), expand=true)
-    b = SymbolicUtils.simplify.(Num.(b), expand=true)
+    A = SymbolicUtils.simplify_fractions.(Num.(A))
+    b = SymbolicUtils.simplify_fractions.(Num.(b))
     sol = value.(sym_lu(A) \ b)
-    do_simplify ? SymbolicUtils.simplify.(sol, expand=true) : sol
+    do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
 
 LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{Symbolic,Num}}, b::AbstractVector{<:Union{Symbolic,Num}}, x::AbstractVector{<:Union{Symbolic,Num}} = b) = symsub!(A, b, x)
