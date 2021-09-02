@@ -8,7 +8,7 @@ function activate_downstream_env()
     Pkg.instantiate()
 end
 
-if haskey(ENV, "CI")
+if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
 end
 

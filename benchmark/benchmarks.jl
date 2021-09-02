@@ -1,7 +1,4 @@
 
-using Pkg
-Pkg.resolve() # use the right version of dependencies
-
 using BenchmarkTools, Symbolics
 
 using LinearAlgebra
@@ -27,6 +24,8 @@ x = (f + ((((g*(c^2)*(e^2)) / d - e*h*(c^2)) / b + (-c*e*f*g) / d + c*e*i) /
 
 o = (d + (e*((c*(g + (-d*g) / d)) / (i + (-c*(h + (-e*g) / d)) / b + (-f*g) / d))) / b + (-f*(g + (-d*g) / d)) / (i + (-c*(h + (-e*g) / d)) / b + (-f*g) / d)) / d
 
+@show iszero(x)
+@show isone(o)
 SUITE["iszero/1"] = @benchmarkable iszero($((b*(h + (-e*g) / d)) / b + (e*g) / d - h))
 SUITE["isone/1"] = @benchmarkable FbyX == I
 

@@ -13,7 +13,7 @@ steps:
     if: build.message !~ /\[skip bench\]/
 
 env:
-  SU_BENCHMARK_ONLY: "yes"
+  BENCHMARK_ONLY: "yes"
   JULIA_PKG_SERVER: "" # it often struggles with our large artifacts
 
   # SECRET_CODECOV_TOKEN: "..."
