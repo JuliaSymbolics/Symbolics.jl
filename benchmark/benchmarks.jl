@@ -1,8 +1,10 @@
+
+using Pkg
+Pkg.resolve() # use the right version of dependencies
+
 using BenchmarkTools, Symbolics
 
-using LinearAlgebra, Pkg
-
-Pkg.resolve() # use the right version of dependents
+using LinearAlgebra
 
 SUITE = BenchmarkGroup()
 
