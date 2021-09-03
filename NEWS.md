@@ -7,3 +7,9 @@
   to implement `iszero` and `isone` respectively.
 - `x / x` etc. are no more simplified on construction, call
   `simplify_fractions` to simplify them.
+
+## 3.4.0
+
+- adds `optimize` function which can optimize an expression to minimize CPU usage
+  by re-arranging the expression. It does not guarrantee numerically identical results.
+- allows you to use `@methodtheory` macro to define equational rules using Metatheory.jl
