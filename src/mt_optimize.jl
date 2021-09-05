@@ -37,7 +37,7 @@ function unflatten(t::Symbolic{T}) where{T}
     # TODO change to istree after PR
     if SymbolicUtils.istree(t)
         f = operation(t)
-        if f == (+) || f == (*) || f == (-)  # check out for other binary ops TODO
+        if f == (+) || f == (*)   # check out for other binary ops TODO
             a = arguments(t)
             return foldl((x,y) -> Term{T}(f, [x, y]), a)
         end
