@@ -222,10 +222,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
 
-    # if cpu_cycle_optimize
+    if cpu_cycle_optimize
     #     rhss = map(optimize∘unwrap, rhss)
-    # end
-    rhss = optimize(rhss)
+        rhss = optimize(rhss)
+    end
 
     oop_expr = Func(dargs, [],
                     postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
