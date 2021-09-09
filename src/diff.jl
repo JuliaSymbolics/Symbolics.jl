@@ -418,6 +418,23 @@ function jacobian_sparsity(du, u)
 end
 
 """
+```julia
+jacobian_sparsity(op!,output::Array{T},input::Array{T}) where T<:Number
+```
+
+Return the sparsity pattern of the Jacobian of the mutating function `op!(output,input)`
+"""
+function Symbolics.jacobian_sparsity(op!,output::Array{T},input::Array{T}) where T<:Number
+ 	eqs=similar(output,Num)
+	vars=[variable(i) for i in eachindex(input)]
+	op!(eqs,vars)
+	jacobian_sparsity(eqs,vars)
+end
+
+
+
+
+"""
     exprs_occur_in(exprs::Vector, expr)
 
 Return an array of booleans `finds` where `finds[i]` is true if `exprs[i]` occurs in `expr`

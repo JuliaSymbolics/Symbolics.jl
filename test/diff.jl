@@ -182,6 +182,17 @@ end
 
 @test isequal(Symbolics.sparsejacobian(du, [x,y,z]), reference_jac)
 
+function f!(res,u)
+    (x,y,z)=u
+    res.=[x^2, y^3, x^4, sin(y), x+y, x+z^2, z+x, x+y^2+sin(z)]
+end
+
+@test let
+    input=rand(3)
+    output=rand(8)
+    findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
+end
+
 using Symbolics
 
 rosenbrock(X) = sum(1:length(X)-1) do i
