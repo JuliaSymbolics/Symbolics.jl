@@ -45,9 +45,9 @@ X = [0 b c;
 F = lu(X)
 @test_nowarn lu(X'), lu(transpose(X))
 @test F.p == [2, 1, 3]
-R = simplify.(F.L * F.U - X[F.p, :])
+R = simplify_fractions.(F.L * F.U - X[F.p, :])
 @test iszero(R)
-@test simplify.(F \ X) == I
+@test simplify_fractions.(F \ X) == I
 @test Symbolics._solve(X, X, true) == I
 inv(X)
 qr(X)
