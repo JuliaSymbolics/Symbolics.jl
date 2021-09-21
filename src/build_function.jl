@@ -213,7 +213,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        outputidxs=nothing,
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
-                       fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
+                       fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        parallel=SerialForm(), kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -362,9 +362,9 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
     exprs = []
     setterexpr = SetArray(!checkbounds,
                           out,
-                          [AtIndex(outputidxs[ii[i]],
+                          [AtIndex(outputidxs[i],
                                    unflatten_long_ops(rhss[i]))
-                           for i in 1:length(ii)])
+                           for i in ii])
     push!(exprs, setterexpr)
     for j in jj
         push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros))
