@@ -133,7 +133,7 @@ let # Symbolics.jl#123
     @variables qd[1:6]
     output_eq = u*(qd[1]*(M[1]*qd[1] + M[1]*qd[3] + M[1]*qd[4] + M[25]*qd[5] + M[31]*qd[6] + M[7]*qd[2]))
 
-    @test_reference "ctarget_functions/issue123.c" build_function(output_eq, x, target=Symbolics.CTarget())
+    @test_reference "target_functions/issue123.c" build_function(output_eq, x, target=Symbolics.CTarget())
 end
 
 using Symbolics: value
