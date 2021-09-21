@@ -150,3 +150,16 @@ expr = toexpr(Func([value(D(x))], [], value(D(x))))
 a = rand(4)
 @variables x[1:4]
 @test eval(build_function(sin.(cos.(x)), cos.(x)))(a) == sin.(a)
+
+# more skipzeros
+@variables x,y
+f = [0, x]
+f_expr = build_function(f, [x,y];skipzeros=true, expression = Val{false})
+
+out = Vector{Float64}(undef, 2)
+u = [5.0, 3.1]
+@test f_expr[1](u) == [0, 5]
+old = out[1]
+f_expr[2](out, u)
+@test out[1] === old
+@test out[2] === u[1]
