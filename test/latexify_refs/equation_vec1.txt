@@ -1,5 +1,4 @@
 \begin{align}
 x =& y + z \\
-y =& x - 3 z \\
-z =&  - 5 x + 4 y
+y =& x - 3 z
 \end{align}
