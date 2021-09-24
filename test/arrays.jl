@@ -45,6 +45,8 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     @test typeof(f.(x)) == Symbolics.Arr{Num, 1}
 
+    log.(x') # test that this does not throw key `i` not found error
+
     @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x[1:4](t)
     AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)

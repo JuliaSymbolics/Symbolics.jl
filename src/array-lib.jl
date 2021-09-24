@@ -125,10 +125,11 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
     ndim = mapfoldl(ndims, max, bc.args, init=0)
     subscripts = makesubscripts(ndim)
 
+    onedim_mask = trues(length(subscripts))
     expr_args′ = map(bc.args) do x
         if ndims(x) != 0
             subs = map(i-> isonedim(x, i) ?
-                       1 : subscripts[i], 1:ndims(x))
+                       1 : (onedim_mask[i] &= false; subscripts[i]), 1:ndims(x))
             x[subs...]
         else
             x
@@ -142,8 +143,12 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
     expr = expr₁ isa Symbolic ? expr₁ : expr₂
 
     Atype = propagate_atype(broadcast, bc.f, bc.args...)
+    subs = map(subscripts, onedim_mask) do i, m
+        m ?  1 : i
+    end
+
     ArrayOp(Atype{symtype(expr), ndim},
-            (subscripts...,),
+            (subs...,),
             expr,
             +,
             Term{Any}(broadcast, [bc.f, bc.args...]))
