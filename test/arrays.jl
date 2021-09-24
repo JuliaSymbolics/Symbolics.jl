@@ -41,6 +41,10 @@ end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
+    f(x) = exp(-x^2/2)
+
+    @test typeof(f.(x)) == Symbolics.Arr{Num, 1}
+
     @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x[1:4](t)
     AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)
