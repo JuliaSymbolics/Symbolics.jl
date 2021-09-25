@@ -249,13 +249,10 @@ end
 D = Differential(x)
 @test isequal(expand_derivatives(D(foo(x, y, [1.2]) * x^2)), Differential(x)(foo(x, y, [1.2]))*(x^2) + 2x*foo(x, y, [1.2]))
 
-using ModelingToolkit, Test
-@parameters σ=10 ρ=28 β=8/3
-@variables t x(t)=1 y(t)=0 z(t)=0
+@variables t x(t) y(t)
 D = Differential(t)
 
-eqs = [D(x) ~ σ*(y-x),
-D(y) ~ x*(ρ-z)-σ]
+eqs = [D(x) ~ x, D(y) ~ y + x]
 
-sub_eqs = substitute(eqs, Dict(σ=>1))
-@test sub_eqs == [D(x) ~ (y-x), D(y) ~ x*(ρ-z)- 1]
+sub_eqs = substitute(eqs, Dict([D(x)=>D(x), x=>1]))
+@test sub_eqs == [D(x) ~ 1, D(y) ~ 1 + y]
