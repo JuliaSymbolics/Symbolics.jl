@@ -163,3 +163,8 @@ old = out[1]
 f_expr[2](out, u)
 @test out[1] === old
 @test out[2] === u[1]
+
+# CSE
+@variables a b c
+ex = a * b + sin(a * b) + c
+build_function(ex, a, b, c, cse=true)

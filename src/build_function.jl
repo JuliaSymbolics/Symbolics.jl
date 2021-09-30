@@ -97,9 +97,14 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         cse = false,
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
+    op = unflatten_long_ops(op)
+    if cse
+        op = Code.cse(unwrap(op))
+    end
+    expr = toexpr(Func(dargs, [], op))
 
     if expression == Val{true}
         expr
@@ -114,11 +119,15 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
+                         cse = false,
                          checkbounds = false,
                          linenumbers = true)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+    if cse
+        op = Code.cse(op)
+    end
     expr = toexpr(Func(dargs, [], op))
 
     if expression == Val{true}
@@ -163,6 +172,7 @@ function _build_function(target::JuliaTarget, rhss, args...;
                          convert_oop = true, force_SA = false,
                          skipzeros = outputidxs===nothing,
                          fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
+                         cse = false,
                          parallel=SerialForm(), kwargs...)
 ```
 
@@ -203,6 +213,7 @@ Special Keyword Argumnets:
   filling function is 0.
 - `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
   safety with `skipzeros`.
+- `cse`: Whether to perform common subexpression elimination.
 """
 function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        expression = Val{true},
@@ -214,28 +225,49 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
+                       cse = false,
                        parallel=SerialForm(), kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
+
+    letpairs = []
+    if cse
+        if rhss isa Union{SparseMatrixCSC, SparseVector}
+            nzval = unwrap.(rhss.nzval)
+            rhssblock = Code.cse(Term{Any}(tuple, nzval))
+            if rhssblock isa Code.Let
+                letpairs = rhssblock.pairs
+                Setfield.@set! rhss.nzval = arguments(rhssblock.body)
+            end
+        else
+            rhssblock = Code.cse(Term{Any}(tuple, unwrap.(rhss)))
+            if rhssblock isa Code.Let
+                letpairs = rhssblock.pairs
+                rhss = arguments(rhssblock.body)
+            end
+        end
+    end
+
     oop_expr = Func(dargs, [],
-                    postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
+                    Let(letpairs,
+                        postprocess_fbody(make_array(parallel, dargs, rhss, similarto))))
 
     if !isnothing(wrap_code[1])
         oop_expr = wrap_code[1](oop_expr)
     end
 
     out = Sym{Any}(:ˍ₋out)
-    ip_expr = Func([out, dargs...], [],
-                   postprocess_fbody(set_array(parallel,
+    body = postprocess_fbody(set_array(parallel,
                                                dargs,
                                                out,
                                                outputidxs,
                                                rhss,
                                                checkbounds,
-                                               skipzeros)))
+                                               skipzeros))
+    ip_expr = Func([out, dargs...], [], Let(letpairs, body))
 
     if !isnothing(wrap_code[2])
         ip_expr = wrap_code[2](ip_expr)
