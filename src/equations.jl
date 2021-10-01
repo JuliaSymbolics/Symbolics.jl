@@ -26,6 +26,11 @@ function SymbolicUtils.substitute(x::Equation, rules; kw...)
     sub(x.lhs; kw...) ~ sub(x.rhs; kw...)
 end
 
+function SymbolicUtils.substitute(eqs::Vector{Equation}, rules; kw...)
+    sub = substituter(rules)
+    sub.(lhss(eqs); kw...) .~ sub.(rhss(eqs); kw...)
+end
+
 lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
 

@@ -248,3 +248,11 @@ end
 @register foo(x, y, z::Array)
 D = Differential(x)
 @test isequal(expand_derivatives(D(foo(x, y, [1.2]) * x^2)), Differential(x)(foo(x, y, [1.2]))*(x^2) + 2x*foo(x, y, [1.2]))
+
+@variables t x(t) y(t)
+D = Differential(t)
+
+eqs = [D(x) ~ x, D(y) ~ y + x]
+
+sub_eqs = substitute(eqs, Dict([D(x)=>D(x), x=>1]))
+@test sub_eqs == [D(x) ~ 1, D(y) ~ 1 + y]
