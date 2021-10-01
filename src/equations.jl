@@ -72,7 +72,7 @@ for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
     (T != :Complex && S != :Complex) && continue
     @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
                                       ai = value(imag(a)), bi = value(imag(b))
-        if ar isa Number && br isa Number && ai isa number && bi isa Number
+        if ar isa Number && br isa Number && ai isa Number && bi isa Number
             error("Equation $a ~ $b does not contain any symbols")
         elseif ar isa Number && br isa Number
             ai ~ bi
