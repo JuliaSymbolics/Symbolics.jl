@@ -136,11 +136,7 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
         end
     end
 
-    expr₁ = try bc.f(expr_args′...) catch err; nothing end
-    expr₂ = term(bc.f, expr_args′...) # Imagine x .=> y -- if you don't have a term
-                                     # then you get pairs, and index matcher cannot
-                                     # recurse into pairs
-    expr = expr₁ isa Symbolic ? expr₁ : expr₂
+    expr = graceful_apply(bc.f, expr_args′...)
 
     Atype = propagate_atype(broadcast, bc.f, bc.args...)
     subs = map(subscripts, onedim_mask) do i, m
@@ -152,6 +148,14 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
             expr,
             +,
             Term{Any}(broadcast, [bc.f, bc.args...]))
+end
+
+function graceful_apply(f, args...)
+    expr₁ = try f(args...) catch err; nothing end
+    expr₂ = term(f, args...) # Imagine x .=> y -- if you don't have a term
+                                     # then you get pairs, and index matcher cannot
+                                     # recurse into pairs
+    expr₁ isa Symbolic ? expr₁ : expr₂
 end
 
 # On wrapper:
@@ -266,7 +270,7 @@ function _map(f, x, xs...)
     N = ndims(x)
     idx = makesubscripts(N)
 
-    expr = f(map(a->a[idx...], [x, xs...])...)
+    expr = graceful_apply(f, map(a->a[idx...], [x, xs...])...)
 
     Atype = propagate_atype(map, f, x, xs...)
     ArrayOp(Atype{symtype(expr), N},
@@ -288,8 +292,8 @@ end
 @wrapped function Base.mapreduce(f, g, x::AbstractArray; dims=:, kw...)
     idx = makesubscripts(ndims(x))
     out_idx = [dims == (:) || i in dims ? 1 : idx[i] for i = 1:ndims(x)]
-    expr = f(x[idx...])
-    T = symtype(g(expr, expr))
+    expr = graceful_apply(f, x[idx...])
+    T = symtype(graceful_apply(g, expr, expr))
     if dims === (:)
         return Term{T}(_mapreduce, [f, g, x, dims, (kw...,)])
     end
