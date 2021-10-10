@@ -183,7 +183,24 @@ When `islinear`, return `a` and `b` such that `a * x + b == t`.
 """
 function linear_expansion(t, x)
     a, b, islinear = _linear_expansion(t, x)
-    x isa Num ? (Num(a), Num(b), islinear) : (a, b, islinear)
+    x isa Num ? (wrap(a), wrap(b), islinear) : (a, b, islinear)
+end
+function linear_expansion(ts::AbstractArray, xs::AbstractArray)
+    A = Matrix{Num}(undef, length(ts), length(xs))
+    bvec = Vector{Num}(undef, length(ts))
+    islinear = true
+    for (i, t) in enumerate(ts)
+        b = t isa Equation ? t.rhs - t.lhs : t
+        for (j, x) in enumerate(xs)
+            a, b, islinear = _linear_expansion(b, x)
+            islinear &= islinear
+            islinear || @goto FINISH
+            A[i, j] = a
+        end
+        bvec[i] = b
+    end
+    @label FINISH
+    return A, bvec, islinear
 end
 # _linear_expansion always returns `Symbolic`
 function _linear_expansion(t::Equation, x)

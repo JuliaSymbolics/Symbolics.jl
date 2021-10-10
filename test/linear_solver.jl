@@ -31,6 +31,16 @@ a, b, islinear = Symbolics.linear_expansion(expr, x)
 @test isequal(Symbolics.solve_for(expr ~ Dx, Dx), (-2//3*x)/(1 - t - x - y))
 @test isequal(Symbolics.solve_for(expr ~ Dx, x), (t*Dx + y*Dx - Dx) / ((2//3) - Dx))
 
+exprs = [
+ 3//2*x + 2y + 10
+ 7x + 3y - 8
+]
+xs = [x, y]
+A, b, islinear = Symbolics.linear_expansion(exprs, xs)
+@test islinear
+@test isequal(A, [3//2 2; 7 3])
+@test isequal(b, [10; -8])
+
 @variables x y z
 eqs = [
         2//1 * x + y - z ~ 2//1
