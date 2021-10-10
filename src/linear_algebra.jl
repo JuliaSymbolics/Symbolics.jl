@@ -84,16 +84,17 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     check && @assert islinear
     islinear || return nothing
     # a * x + b = 0
-    x = a \ -b
-    simplify ? SymbolicUtils.simplify(simplify_fractions(x)) : x
-end
-
-function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
-    length(eqs) == 1 == length(vars) && return [solve_for(eqs[1], vars[1]; simplify=simplify, check=check)]
-    A, b = A_b(eqs, vars, check)
-    #TODO: we need to make sure that `solve_for(eqs, vars)` contains no `vars`
-    sol = _solve(A, b, simplify)
-    map(Num, sol)
+    if eq isa AbstractArray && var isa AbstractArray
+        x = _solve(a, -b, simplify)
+    else
+        x = a \ -b
+    end
+    simplify || return x
+    if x isa AbstractArray
+        SymbolicUtils.simplify.(simplify_fractions.(x))
+    else
+        SymbolicUtils.simplify(simplify_fractions(x))
+    end
 end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
