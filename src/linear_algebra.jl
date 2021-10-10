@@ -84,16 +84,17 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     check && @assert islinear
     islinear || return nothing
     # a * x + b = 0
-    x = a \ -b
-    simplify ? SymbolicUtils.simplify(simplify_fractions(x)) : x
-end
-
-function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
-    length(eqs) == 1 == length(vars) && return [solve_for(eqs[1], vars[1]; simplify=simplify, check=check)]
-    A, b = A_b(eqs, vars, check)
-    #TODO: we need to make sure that `solve_for(eqs, vars)` contains no `vars`
-    sol = _solve(A, b, simplify)
-    map(Num, sol)
+    if eq isa AbstractArray && var isa AbstractArray
+        x = _solve(a, -b, simplify)
+    else
+        x = a \ -b
+    end
+    simplify || return x
+    if x isa AbstractArray
+        SymbolicUtils.simplify.(simplify_fractions.(x))
+    else
+        SymbolicUtils.simplify(simplify_fractions(x))
+    end
 end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
@@ -183,7 +184,24 @@ When `islinear`, return `a` and `b` such that `a * x + b == t`.
 """
 function linear_expansion(t, x)
     a, b, islinear = _linear_expansion(t, x)
-    x isa Num ? (Num(a), Num(b), islinear) : (a, b, islinear)
+    x isa Num ? (wrap(a), wrap(b), islinear) : (a, b, islinear)
+end
+function linear_expansion(ts::AbstractArray, xs::AbstractArray)
+    A = Matrix{Num}(undef, length(ts), length(xs))
+    bvec = Vector{Num}(undef, length(ts))
+    islinear = true
+    for (i, t) in enumerate(ts)
+        b = t isa Equation ? t.rhs - t.lhs : t
+        for (j, x) in enumerate(xs)
+            a, b, islinear = _linear_expansion(b, x)
+            islinear &= islinear
+            islinear || @goto FINISH
+            A[i, j] = a
+        end
+        bvec[i] = b
+    end
+    @label FINISH
+    return A, bvec, islinear
 end
 # _linear_expansion always returns `Symbolic`
 function _linear_expansion(t::Equation, x)
