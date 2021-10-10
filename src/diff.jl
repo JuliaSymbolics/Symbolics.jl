@@ -77,8 +77,8 @@ TODO
 """
 function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
     if istree(O) && isa(operation(O), Differential)
-        @assert length(arguments(O)) == 1
-        arg = expand_derivatives(arguments(O)[1], false)
+        arg = only(arguments(O))
+        arg = expand_derivatives(arg, false)
 
         if occurances == nothing
             occurances = occursin_info(operation(O).x, arg)
@@ -144,12 +144,13 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             end
         end
 
-        l = length(arguments(arg))
+        inner_args = arguments(arg)
+        l = length(inner_args)
         exprs = []
         c = 0
 
         for i in 1:l
-            t2 = expand_derivatives(D(arguments(arg)[i]),false, occurances=arguments(occurances)[i])
+            t2 = expand_derivatives(D(inner_args[i]),false, occurances=arguments(occurances)[i])
 
             x = if _iszero(t2)
                 t2
