@@ -24,6 +24,12 @@ a, b, islinear = Symbolics.linear_expansion(expr, p)
 @test isequal(Symbolics.solve_for(t*D(x) ~ y, D(x)), y/t)
 @test isequal(Symbolics.solve_for([t*D(x) ~ y], [D(x)]), [y/t])
 @test isequal(Symbolics.solve_for(t*D(x) ~ y, y), t*D(x))
+Dx = D(x)
+expr = Dx * x + Dx*t - 2//3*x + y*Dx
+a, b, islinear = Symbolics.linear_expansion(expr, x)
+@test iszero(expand(a * x + b - expr))
+@test isequal(Symbolics.solve_for(expr ~ Dx, Dx), (-2//3*x)/(1 - t - x - y))
+@test isequal(Symbolics.solve_for(expr ~ Dx, x), (t*Dx + y*Dx - Dx) / ((2//3) - Dx))
 
 @variables x y z
 eqs = [
