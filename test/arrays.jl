@@ -41,6 +41,7 @@ end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
+    @syms x[1:10]
     f(x) = exp(-x^2/2)
 
     @test typeof(f.(x)) == Symbolics.Arr{Num, 1}
