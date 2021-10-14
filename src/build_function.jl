@@ -52,35 +52,6 @@ function build_function(args...;target = JuliaTarget(),kwargs...)
   _build_function(target,args...;kwargs...)
 end
 
-function unflatten_args(f, args, N=4)
-    length(args) < N && return Term{Real}(f, args)
-    unflatten_args(f, [Term{Real}(f, group)
-                                       for group in Iterators.partition(args, N)], N)
-end
-
-# Speeds up by avoiding repeated sorting when you call `arguments`
-# after editing children in Postwalk in unflatten_long_ops
-function termify(op)
-    (op isa Symbolic && istree(op)) || return op
-    Term{symtype(op)}(operation(op), arguments(op); metadata=op.metadata)
-end
-
-function unflatten_long_ops(op, N=4)
-    op = value(op)
-    op = termify(op)
-    !istree(op) && return wrap(op)
-    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, N) : nothing)
-    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, N) : nothing)
-
-    simterm(x,f,args; metadata=nothing) = if x isa Symbolic
-        Term{symtype(x)}(f, args, metadata=metadata)
-    else
-        f(args...)
-    end
-    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]), similarterm=simterm)(op))
-end
-
-
 # Scalar output
 
 function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
@@ -99,7 +70,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          checkbounds = false,
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
+    expr = toexpr(Func(dargs, [], op))
 
     if expression == Val{true}
         expr
@@ -313,7 +284,7 @@ function _make_array(rhss::AbstractArray, similarto)
     end
 end
 
-_make_array(x, similarto) = unflatten_long_ops(x)
+_make_array(x, similarto) = x
 
 ## In-place version
 
@@ -363,7 +334,7 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
     setterexpr = SetArray(!checkbounds,
                           out,
                           [AtIndex(outputidxs[i],
-                                   unflatten_long_ops(rhss[i]))
+                                   rhss[i])
                            for i in ii])
     push!(exprs, setterexpr)
     for j in jj
@@ -374,7 +345,7 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
                 end)
 end
 
-_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = unflatten_long_ops(rhs)
+_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = rhs
 
 
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())
