@@ -249,7 +249,7 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(@RuntimeGeneratedFunction(:(@__MODULE__), toexpr(thunk, st), false)),
+        ex = :($Funcall($(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false)),
                        ($(toexpr.(a, (st,))...),)))
         quote
             let
@@ -512,7 +512,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
         open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
             print(f, ex)
         end
-        @RuntimeGeneratedFunction(:(@__MODULE__), :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
+        @RuntimeGeneratedFunction(@__MODULE__, :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
     end
 end
 
@@ -590,7 +590,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
             print(f, ccode)
         end
-        @RuntimeGeneratedFunction(:(@__MODULE__), :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
+        @RuntimeGeneratedFunction(@__MODULE__, :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
     end
 
 end

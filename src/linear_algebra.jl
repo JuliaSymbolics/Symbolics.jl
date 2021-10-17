@@ -276,7 +276,7 @@ end
 # Pretty much just copy-pasted from stdlib
 SparseArrays.SparseMatrixCSC{Tv,Ti}(M::StridedMatrix) where {Tv<:Num,Ti} = _sparse(Tv,  Ti, M)
 SparseArrays.SparseMatrixCSC{Tv,Ti}(M::AbstractMatrix) where {Tv<:Num,Ti} = _sparse(Tv,  Ti, M)
-function _sparse(::Type{Tv}, ::Type{Ti}, M)
+function _sparse(::Type{Tv}, ::Type{Ti}, M) where {Tv, Ti}
     nz = count(!_iszero, M)
     colptr = zeros(Ti, size(M, 2) + 1)
     nzval = Vector{Tv}(undef, nz)
