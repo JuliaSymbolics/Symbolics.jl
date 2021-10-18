@@ -89,12 +89,6 @@ h_oop_scalar = eval(h_str_scalar)
 @test h_oop_scalar(inputs...) == h_julia_scalar(inputs...)
 
 @variables z[1:100]
-@test isequal(simplify(Symbolics.unflatten_long_ops(sum(z))),
-              simplify(sum(z)))
-
-@test isequal(simplify(Symbolics.unflatten_long_ops(prod(z))),
-              simplify(prod(z)))
-
 @variables t x(t) y(t) k
 f = eval(build_function((x+y)/k, [x,y,k]))
 @test f([1,1,2]) == 1

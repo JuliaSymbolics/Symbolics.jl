@@ -68,7 +68,20 @@ function occursin_info(x, expr::Sym)
 end
 
 function hasderiv(O)
-    istree(O) ? operation(O) isa Differential || any(hasderiv, arguments(O)) : false
+    istree(O) || return false
+    if operation(O) isa Differential
+        return true
+    else
+        if O isa Union{Add, Mul}
+            any(hasderiv, keys(O.dict))
+        elseif O isa Pow
+            hasderiv(O.base) || hasderiv(O.exp)
+        elseif O isa SymbolicUtils.Div
+            hasderiv(O.num) || hasderiv(O.den)
+        else
+            any(hasderiv, arguments(O))
+        end
+    end
 end
 """
 $(SIGNATURES)
@@ -91,7 +104,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
 
         if !istree(arg)
             return D(arg) # Cannot expand
-        elseif isa(operation(arg), Sym)
+        elseif (op = operation(arg); isa(op, Sym))
             inner_args = arguments(arg)
             if any(isequal(D.x), inner_args)
                 return D(arg) # base case if any argument is directly equal to the i.v.
@@ -101,17 +114,16 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                            expand_derivatives(D(a))
                 end
             end
-        elseif isa(operation(arg), typeof(IfElse.ifelse))
+        elseif op === (IfElse.ifelse)
             args = arguments(arg)
-            op = operation(arg)
             O = op(args[1], D(args[2]), D(args[3]))
             return expand_derivatives(O, simplify; occurances)
-        elseif isa(operation(arg), Differential)
+        elseif isa(op, Differential)
             # The recursive expand_derivatives was not able to remove
             # a nested Differential. We can attempt to differentiate the
             # inner expression wrt to the outer iv. And leave the
             # unexpandable Differential outside.
-            if isequal(operation(arg).x, D.x)
+            if isequal(op.x, D.x)
                 return D(arg)
             else
                 inner = expand_derivatives(D(arguments(arg)[1]), false)
@@ -119,27 +131,27 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                 if istree(inner) && operation(inner) isa Differential
                     return D(arg)
                 else
-                    return expand_derivatives(operation(arg)(inner), simplify)
+                    return expand_derivatives(op(inner), simplify)
                 end
             end
-        elseif isa(operation(arg), Integral)
-            if isa(operation(arg).domain.domain, AbstractInterval)
-                domain = operation(arg).domain.domain
+        elseif isa(op, Integral)
+            if isa(op.domain.domain, AbstractInterval)
+                domain = op.domain.domain
                 a, b = DomainSets.endpoints(domain)
                 c = 0
                 inner_function = expand_derivatives(arguments(arg)[1])
                 if istree(value(a))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).domain.variables => value(a)))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(a)))
                     t2 = D(a)
                     c -= t1*t2
                 end
                 if istree(value(b))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(operation(arg).domain.variables => value(b)))
+                    t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(b)))
                     t2 = D(b)
                     c += t1*t2
                 end
                 inner = expand_derivatives(D(arguments(arg)[1]))
-                c += operation(arg)(inner)
+                c += op(inner)
                 return value(c)
             end
         end
@@ -376,7 +388,7 @@ function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=fals
     for (i,j) in zip(I, J)
         push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify)))
     end
-    sparse(I,J, exprs, length(ops), length(vars))
+    sparse(I, J, exprs, length(ops), length(vars))
 end
 
 """
