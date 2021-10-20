@@ -1,0 +1,3 @@
+\begin{equation}
+x^{2} - y^{2} + 2 x y i
+\end{equation}
