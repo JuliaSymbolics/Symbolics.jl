@@ -96,6 +96,8 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
         SymbolicUtils.simplify(simplify_fractions(x))
     end
 end
+solve_for(eq::Equation, var::T; x...) where {T<:AbstractArray} = solve_for([eq],var, x...)
+solve_for(eq::T, var::Num; x...) where {T<:AbstractArray} = first(solve_for(eq,[var], x...))
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     A = Num.(SymbolicUtils.quick_cancel.(A))
