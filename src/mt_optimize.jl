@@ -113,7 +113,7 @@ function costfun(n::ENode, g::EGraph, an)
     cost = 0
 
     for id ∈ n.args
-        eclass = geteclass(g, id)
+        eclass = g[id]
         !hasdata(eclass, an) && (cost += Inf; break)
         cost += last(getdata(eclass, an))
     end

@@ -12,6 +12,7 @@ res = Symbolics.optimize(ex)
 
 @test isequal(res, tn(*, tn(+,b,a), tn(-, 2, a)))
 
+# TODO test metadata
 
 res = Symbolics.optimize(sin(a^2)/cos(a^2))
 @test isequal(res, tan(a^2))
