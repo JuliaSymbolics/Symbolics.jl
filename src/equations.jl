@@ -26,6 +26,11 @@ function SymbolicUtils.substitute(x::Equation, rules; kw...)
     sub(x.lhs; kw...) ~ sub(x.rhs; kw...)
 end
 
+function SymbolicUtils.substitute(eqs::Vector{Equation}, rules; kw...)
+    sub = substituter(rules)
+    sub.(lhss(eqs); kw...) .~ sub.(rhss(eqs); kw...)
+end
+
 lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
 
@@ -72,7 +77,7 @@ for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
     (T != :Complex && S != :Complex) && continue
     @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
                                       ai = value(imag(a)), bi = value(imag(b))
-        if ar isa Number && br isa Number && ai isa number && bi isa Number
+        if ar isa Number && br isa Number && ai isa Number && bi isa Number
             error("Equation $a ~ $b does not contain any symbols")
         elseif ar isa Number && br isa Number
             ai ~ bi

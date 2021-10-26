@@ -84,21 +84,22 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     check && @assert islinear
     islinear || return nothing
     # a * x + b = 0
-    x = a \ -b
-    simplify ? SymbolicUtils.simplify(simplify_fractions(x)) : x
-end
-
-function solve_for(eqs::AbstractArray, vars::AbstractArray; simplify=true, check=true)
-    length(eqs) == 1 == length(vars) && return [solve_for(eqs[1], vars[1]; simplify=simplify, check=check)]
-    A, b = A_b(eqs, vars, check)
-    #TODO: we need to make sure that `solve_for(eqs, vars)` contains no `vars`
-    sol = _solve(A, b, simplify)
-    map(Num, sol)
+    if eq isa AbstractArray && var isa AbstractArray
+        x = _solve(a, -b, simplify)
+    else
+        x = a \ -b
+    end
+    simplify || return x
+    if x isa AbstractArray
+        SymbolicUtils.simplify.(simplify_fractions.(x))
+    else
+        SymbolicUtils.simplify(simplify_fractions(x))
+    end
 end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
-    A = SymbolicUtils.simplify_fractions.(Num.(A))
-    b = SymbolicUtils.simplify_fractions.(Num.(b))
+    A = Num.(SymbolicUtils.quick_cancel.(A))
+    b = Num.(SymbolicUtils.quick_cancel.(b))
     sol = value.(sym_lu(A) \ b)
     do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
@@ -183,7 +184,24 @@ When `islinear`, return `a` and `b` such that `a * x + b == t`.
 """
 function linear_expansion(t, x)
     a, b, islinear = _linear_expansion(t, x)
-    x isa Num ? (Num(a), Num(b), islinear) : (a, b, islinear)
+    x isa Num ? (wrap(a), wrap(b), islinear) : (a, b, islinear)
+end
+function linear_expansion(ts::AbstractArray, xs::AbstractArray)
+    A = Matrix{Num}(undef, length(ts), length(xs))
+    bvec = Vector{Num}(undef, length(ts))
+    islinear = true
+    for (i, t) in enumerate(ts)
+        b = t isa Equation ? t.rhs - t.lhs : t
+        for (j, x) in enumerate(xs)
+            a, b, islinear = _linear_expansion(b, x)
+            islinear &= islinear
+            islinear || @goto FINISH
+            A[i, j] = a
+        end
+        bvec[i] = b
+    end
+    @label FINISH
+    return A, bvec, islinear
 end
 # _linear_expansion always returns `Symbolic`
 function _linear_expansion(t::Equation, x)
@@ -193,16 +211,19 @@ function _linear_expansion(t::Equation, x)
     # t.rhs - t.lhs = 0
     return (a₂ - a₁, b₂ - b₁, islinear)
 end
-trival_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true) # trival case
+trival_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
+
+is_expansion_leaf(t) = !istree(t) || (operation(t) isa Differential)
+@noinline expansion_check(op) = op isa Differential && error("The operation is a Differential. This should never happen.")
 function _linear_expansion(t, x)
     t = value(t)
     t isa Symbolic || return (0, t, true)
     x = value(x)
-    istree(t) || return trival_linear_expansion(t, x)
+    is_expansion_leaf(t) && return trival_linear_expansion(t, x)
     isequal(t, x) && return (1, 0, true)
 
     op, args = operation(t), arguments(t)
-    op isa Differential && trival_linear_expansion(t, x)
+    expansion_check(op)
 
     if op === (+)
         a₁ = b₁ = 0
@@ -246,4 +267,32 @@ function _linear_expansion(t, x)
         end
         return (0, t, true)
     end
+end
+
+###
+### Utilities
+###
+
+# Pretty much just copy-pasted from stdlib
+SparseArrays.SparseMatrixCSC{Tv,Ti}(M::StridedMatrix) where {Tv<:Num,Ti} = _sparse(Tv,  Ti, M)
+SparseArrays.SparseMatrixCSC{Tv,Ti}(M::AbstractMatrix) where {Tv<:Num,Ti} = _sparse(Tv,  Ti, M)
+function _sparse(::Type{Tv}, ::Type{Ti}, M) where {Tv, Ti}
+    nz = count(!_iszero, M)
+    colptr = zeros(Ti, size(M, 2) + 1)
+    nzval = Vector{Tv}(undef, nz)
+    rowval = Vector{Ti}(undef, nz)
+    colptr[1] = 1
+    cnt = 1
+    @inbounds for j in 1:size(M, 2)
+        for i in 1:size(M, 1)
+            v = M[i, j]
+            if !_iszero(v)
+                rowval[cnt] = i
+                nzval[cnt] = v
+                cnt += 1
+            end
+        end
+        colptr[j+1] = cnt
+    end
+    return SparseMatrixCSC(size(M, 1), size(M, 2), colptr, rowval, nzval)
 end

@@ -89,12 +89,6 @@ h_oop_scalar = eval(h_str_scalar)
 @test h_oop_scalar(inputs...) == h_julia_scalar(inputs...)
 
 @variables z[1:100]
-@test isequal(simplify(Symbolics.unflatten_long_ops(sum(z))),
-              simplify(sum(z)))
-
-@test isequal(simplify(Symbolics.unflatten_long_ops(prod(z))),
-              simplify(prod(z)))
-
 @variables t x(t) y(t) k
 f = eval(build_function((x+y)/k, [x,y,k]))
 @test f([1,1,2]) == 1
@@ -131,9 +125,9 @@ let # Symbolics.jl#123
     @variables u
     @variables M[1:36]
     @variables qd[1:6]
-    output_eq = u*(qd[1]*(M[1]*qd[1] + M[1]*qd[3] + M[1]*qd[4] + M[25]*qd[5] + M[31]*qd[6] + M[7]*qd[2]))
+    output_eq = u*(qd[1]*(M[1]*qd[1] + M[7]*qd[2]))
 
-    @test_reference "ctarget_functions/issue123.c" build_function(output_eq, x, target=Symbolics.CTarget())
+    @test_reference "target_functions/issue123.c" build_function(output_eq, x, target=Symbolics.CTarget())
 end
 
 using Symbolics: value
@@ -150,3 +144,16 @@ expr = toexpr(Func([value(D(x))], [], value(D(x))))
 a = rand(4)
 @variables x[1:4]
 @test eval(build_function(sin.(cos.(x)), cos.(x)))(a) == sin.(a)
+
+# more skipzeros
+@variables x,y
+f = [0, x]
+f_expr = build_function(f, [x,y];skipzeros=true, expression = Val{false})
+
+out = Vector{Float64}(undef, 2)
+u = [5.0, 3.1]
+@test f_expr[1](u) == [0, 5]
+old = out[1]
+f_expr[2](out, u)
+@test out[1] === old
+@test out[2] === u[1]

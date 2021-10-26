@@ -37,9 +37,10 @@ Dy = Differential(y)
 @test_reference "latexify_refs/equation_vec1.txt" latexify([
     x ~   y +  z
     y ~   x - 3z
-    z ~ -5x + 4y
 ])
 @test_reference "latexify_refs/equation_vec2.txt" latexify([
     Dx(u) ~   z
     Dx(y) ~   y*x
 ])
+
+@test_reference "latexify_refs/complex1.txt" latexify(x^2-y^2+2im*x*y)

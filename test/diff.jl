@@ -182,6 +182,25 @@ end
 
 @test isequal(Symbolics.sparsejacobian(du, [x,y,z]), reference_jac)
 
+
+@test let
+    function f!(res,u)
+        (x,y,z)=u
+        res.=[x^2, y^3, x^4, sin(y), x+y, x+z^2, z+x, x+y^2+sin(z)]
+    end
+    function f1!(res,u,a,b,c)
+        (x,y,z)=u
+        res.=[a*x^2, y^3, b*x^4, sin(y), c*x+y, x+z^2, a*z+x, x+y^2+sin(z)]
+    end
+
+    
+    input=rand(3)
+    output=rand(8)
+
+    findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
+    findnz(Symbolics.jacobian_sparsity(f1!, output, input,1,2,3))[[1,2]] == findnz(reference_jac)[[1,2]]
+end
+
 using Symbolics
 
 rosenbrock(X) = sum(1:length(X)-1) do i
@@ -229,3 +248,11 @@ end
 @register foo(x, y, z::Array)
 D = Differential(x)
 @test isequal(expand_derivatives(D(foo(x, y, [1.2]) * x^2)), Differential(x)(foo(x, y, [1.2]))*(x^2) + 2x*foo(x, y, [1.2]))
+
+@variables t x(t) y(t)
+D = Differential(t)
+
+eqs = [D(x) ~ x, D(y) ~ y + x]
+
+sub_eqs = substitute(eqs, Dict([D(x)=>D(x), x=>1]))
+@test sub_eqs == [D(x) ~ 1, D(y) ~ 1 + y]

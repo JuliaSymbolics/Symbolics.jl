@@ -1,4 +1,4 @@
-# Symbolic Calculations and Building Fast Parallel Functions
+# Symbolic Calculations and Building Callable Functions
 
 Symbolics.jl is a symbolic modeling language.
 The way to define symbolic variables is via the `@variables` macro:
@@ -88,180 +88,6 @@ f(u)
  u[1]^2 - u[2]
   u[2] + u[3]
 ```
-
-## Building Functions
-
-The function for building functions from symbolic expressions is the aptly-named `build_function`.
-The first argument is the symbolic expression or the array of symbolic
-expressions to compile, and the trailing arguments are the arguments
-for the function. For example:
-
-```julia
-to_compute = [x^2 + y, y^2 + x]
-f_expr = build_function(to_compute, [x, y])
-```
-
-gives back two codes. The first is a function `f([x, y])` that computes
-and builds an output vector `[x^2 + y, y^2 + x]`. Because this tool
-was made to be used by all the cool kids writing fast Julia codes, it
-is specialized to Julia and supports features like StaticArrays. For
-example:
-
-```julia
-using StaticArrays
-myf = eval(f_expr[1])
-myf(SA[2.0, 3.0])
-
-2-element SArray{Tuple{2},Float64,1,2} with indices SOneTo(2):
-  7.0
- 11.0
-```
-
-The second function is an in-place non-allocating mutating function
-which mutates its first value:
-
-```julia
-Base.remove_linenums!(f_expr[2])
-
-:(function (var"##out#259", var"##arg#258")
-      let x = var"##arg#258"[1], y = var"##arg#258"[2]
-          @inbounds begin
-                  var"##out#259"[1] = (+)(y, (^)(x, 2))
-                  var"##out#259"[2] = (+)(x, (^)(y, 2))
-                  nothing
-          end
-      end
-  end)
-```
-
-Thus we'd use it like the following:
-
-```julia
-myf! = eval(f_expr[2])
-out = zeros(2)
-myf!(out, [2.0, 3.0])
-out
-
-2-element Array{Float64,1}:
-  7.0
- 11.0
-```
-
-To save the symbolic calculations for later, we can take this expression
-and save it out to a file:
-
-```julia
-write("function.jl", string(f_expr[2]))
-```
-
-Note that if we need to avoid `eval`, for example to avoid world-age
-issues, one could do `expression = Val{false}`:
-
-```julia
-build_function(to_compute, [x, y], expression=Val{false})
-```
-
-which will use [RuntimeGeneratedFunctions.jl](https://github.com/SciML/RuntimeGeneratedFunctions.jl)
-to build Julia functions which avoid world-age issues.
-
-## Building Non-Allocating Parallel Functions for Sparse Matrices
-
-Now let's show off a little bit. `build_function` is kind of like if
-[`lambdify`](https://docs.sympy.org/latest/modules/utilities/lambdify.html)
-ate its spinach. To show this, **let's build a non-allocating
-function that fills sparse matrices in a multithreaded manner**. To do
-this, we just have to represent the operation that we're turning into
-a function via a sparse matrix. For example:
-
-```julia
-using LinearAlgebra
-N = 8
-A = sparse(Tridiagonal([x^i for i in 1:N-1], [x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
-
-8×8 SparseMatrixCSC{Num, Int64} with 22 stored entries:
- x*(y^7)            y            ⋅  …            ⋅            ⋅        ⋅    ⋅
-       x  (x^2)*(y^6)          y^2               ⋅            ⋅        ⋅    ⋅
-       ⋅          x^2  (x^3)*(y^5)               ⋅            ⋅        ⋅    ⋅
-       ⋅            ⋅          x^3             y^4            ⋅        ⋅    ⋅
-       ⋅            ⋅            ⋅     (x^5)*(y^3)          y^5        ⋅    ⋅
-       ⋅            ⋅            ⋅  …          x^5  (x^6)*(y^2)      y^6    ⋅
-       ⋅            ⋅            ⋅               ⋅          x^6  y*(x^7)  y^7
-       ⋅            ⋅            ⋅               ⋅            ⋅      x^7  x^8
-```
-
-Now we call `build_function`:
-
-```julia
-build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2]
-```
-
-which generates the code:
-
-```julia
-(var"##MTIIPVar#317", var"##MTKArg#315")->begin
-        @inbounds begin
-                @sync begin
-                        let (x, y) = (var"##MTKArg#315"[1], var"##MTKArg#315"[2])
-                            begin
-                                Threads.@spawn begin
-                                        (var"##MTIIPVar#317").nzval[1] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 1), (getproperty(Base, :^))(y, 7))
-                                        (var"##MTIIPVar#317").nzval[2] = (getproperty(Base, :^))(x, 1)
-                                        (var"##MTIIPVar#317").nzval[3] = (getproperty(Base, :^))(y, 1)
-                                        (var"##MTIIPVar#317").nzval[4] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 2), (getproperty(Base, :^))(y, 6))
-                                        (var"##MTIIPVar#317").nzval[5] = (getproperty(Base, :^))(x, 2)
-                                        (var"##MTIIPVar#317").nzval[6] = (getproperty(Base, :^))(y, 2)
-                                    end
-                            end
-                            begin
-                                Threads.@spawn begin
-                                        (var"##MTIIPVar#317").nzval[7] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 3), (getproperty(Base, :^))(y, 5))
-                                        (var"##MTIIPVar#317").nzval[8] = (getproperty(Base, :^))(x, 3)
-                                        (var"##MTIIPVar#317").nzval[9] = (getproperty(Base, :^))(y, 3)
-                                        (var"##MTIIPVar#317").nzval[10] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 4), (getproperty(Base, :^))(y, 4))
-                                        (var"##MTIIPVar#317").nzval[11] = (getproperty(Base, :^))(x, 4)
-                                        (var"##MTIIPVar#317").nzval[12] = (getproperty(Base, :^))(y, 4)
-                                    end
-                            end
-                            begin
-                                Threads.@spawn begin
-                                        (var"##MTIIPVar#317").nzval[13] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 5), (getproperty(Base, :^))(y, 3))
-                                        (var"##MTIIPVar#317").nzval[14] = (getproperty(Base, :^))(x, 5)
-                                        (var"##MTIIPVar#317").nzval[15] = (getproperty(Base, :^))(y, 5)
-                                        (var"##MTIIPVar#317").nzval[16] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 6), (getproperty(Base, :^))(y, 2))
-                                        (var"##MTIIPVar#317").nzval[17] = (getproperty(Base, :^))(x, 6)
-                                        (var"##MTIIPVar#317").nzval[18] = (getproperty(Base, :^))(y, 6)
-                                    end
-                            end
-                            begin
-                                Threads.@spawn begin
-                                        (var"##MTIIPVar#317").nzval[19] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 7), (getproperty(Base, :^))(y, 1))
-                                        (var"##MTIIPVar#317").nzval[20] = (getproperty(Base, :^))(x, 7)
-                                        (var"##MTIIPVar#317").nzval[21] = (getproperty(Base, :^))(y, 7)
-                                        (var"##MTIIPVar#317").nzval[22] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 8), (getproperty(Base, :^))(y, 0))
-                                    end
-                            end
-                        end
-                    end
-            end
-        nothing
-    end
-```
-
-Let's unpack what that's doing. It's using `A.nzval` in order to linearly
-index through the sparse matrix, avoiding the `A[i,j]` form because that
-is a more expensive way to index a sparse matrix if you know exactly the
-order that the data is stored. Then, it's splitting up the calculation
-into Julia threads so they can be operated on in parallel. It synchronizes
-after spawning all of the tasks so the computation is ensured to be
-complete before moving on. And it does this with all in-place operations
-to the original matrix instead of generating arrays. This is the fanciest
-way you could fill a sparse matrix, and Symbolics makes this
-dead simple.
-
-(Note: this example may be slower with multithreading due to the
-thread spawning overhead, but the full version was not included in the
-documentation for brevity. It will be the faster version if `N` is
-sufficiently large!)
 
 ## Derivatives
 
@@ -474,3 +300,177 @@ and now it works with the rest of the system:
 Symbolics.derivative(h(x, y) + y^2, x) # 2x
 Symbolics.derivative(h(x, y) + y^2, y) # 1 + 2y
 ```
+
+## Building Functions
+
+The function for building functions from symbolic expressions is the aptly-named `build_function`.
+The first argument is the symbolic expression or the array of symbolic
+expressions to compile, and the trailing arguments are the arguments
+for the function. For example:
+
+```julia
+to_compute = [x^2 + y, y^2 + x]
+f_expr = build_function(to_compute, [x, y])
+```
+
+gives back two codes. The first is a function `f([x, y])` that computes
+and builds an output vector `[x^2 + y, y^2 + x]`. Because this tool
+was made to be used by all the cool kids writing fast Julia codes, it
+is specialized to Julia and supports features like StaticArrays. For
+example:
+
+```julia
+using StaticArrays
+myf = eval(f_expr[1])
+myf(SA[2.0, 3.0])
+
+2-element SArray{Tuple{2},Float64,1,2} with indices SOneTo(2):
+  7.0
+ 11.0
+```
+
+The second function is an in-place non-allocating mutating function
+which mutates its first value:
+
+```julia
+Base.remove_linenums!(f_expr[2])
+
+:(function (var"##out#259", var"##arg#258")
+      let x = var"##arg#258"[1], y = var"##arg#258"[2]
+          @inbounds begin
+                  var"##out#259"[1] = (+)(y, (^)(x, 2))
+                  var"##out#259"[2] = (+)(x, (^)(y, 2))
+                  nothing
+          end
+      end
+  end)
+```
+
+Thus we'd use it like the following:
+
+```julia
+myf! = eval(f_expr[2])
+out = zeros(2)
+myf!(out, [2.0, 3.0])
+out
+
+2-element Array{Float64,1}:
+  7.0
+ 11.0
+```
+
+To save the symbolic calculations for later, we can take this expression
+and save it out to a file:
+
+```julia
+write("function.jl", string(f_expr[2]))
+```
+
+Note that if we need to avoid `eval`, for example to avoid world-age
+issues, one could do `expression = Val{false}`:
+
+```julia
+build_function(to_compute, [x, y], expression=Val{false})
+```
+
+which will use [RuntimeGeneratedFunctions.jl](https://github.com/SciML/RuntimeGeneratedFunctions.jl)
+to build Julia functions which avoid world-age issues.
+
+## Building Non-Allocating Parallel Functions for Sparse Matrices
+
+Now let's show off a little bit. `build_function` is kind of like if
+[`lambdify`](https://docs.sympy.org/latest/modules/utilities/lambdify.html)
+ate its spinach. To show this, **let's build a non-allocating
+function that fills sparse matrices in a multithreaded manner**. To do
+this, we just have to represent the operation that we're turning into
+a function via a sparse matrix. For example:
+
+```julia
+using LinearAlgebra
+N = 8
+A = sparse(Tridiagonal([x^i for i in 1:N-1], [x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
+
+8×8 SparseMatrixCSC{Num, Int64} with 22 stored entries:
+ x*(y^7)            y            ⋅  …            ⋅            ⋅        ⋅    ⋅
+       x  (x^2)*(y^6)          y^2               ⋅            ⋅        ⋅    ⋅
+       ⋅          x^2  (x^3)*(y^5)               ⋅            ⋅        ⋅    ⋅
+       ⋅            ⋅          x^3             y^4            ⋅        ⋅    ⋅
+       ⋅            ⋅            ⋅     (x^5)*(y^3)          y^5        ⋅    ⋅
+       ⋅            ⋅            ⋅  …          x^5  (x^6)*(y^2)      y^6    ⋅
+       ⋅            ⋅            ⋅               ⋅          x^6  y*(x^7)  y^7
+       ⋅            ⋅            ⋅               ⋅            ⋅      x^7  x^8
+```
+
+Now we call `build_function`:
+
+```julia
+build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2]
+```
+
+which generates the code:
+
+```julia
+(var"##MTIIPVar#317", var"##MTKArg#315")->begin
+        @inbounds begin
+                @sync begin
+                        let (x, y) = (var"##MTKArg#315"[1], var"##MTKArg#315"[2])
+                            begin
+                                Threads.@spawn begin
+                                        (var"##MTIIPVar#317").nzval[1] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 1), (getproperty(Base, :^))(y, 7))
+                                        (var"##MTIIPVar#317").nzval[2] = (getproperty(Base, :^))(x, 1)
+                                        (var"##MTIIPVar#317").nzval[3] = (getproperty(Base, :^))(y, 1)
+                                        (var"##MTIIPVar#317").nzval[4] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 2), (getproperty(Base, :^))(y, 6))
+                                        (var"##MTIIPVar#317").nzval[5] = (getproperty(Base, :^))(x, 2)
+                                        (var"##MTIIPVar#317").nzval[6] = (getproperty(Base, :^))(y, 2)
+                                    end
+                            end
+                            begin
+                                Threads.@spawn begin
+                                        (var"##MTIIPVar#317").nzval[7] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 3), (getproperty(Base, :^))(y, 5))
+                                        (var"##MTIIPVar#317").nzval[8] = (getproperty(Base, :^))(x, 3)
+                                        (var"##MTIIPVar#317").nzval[9] = (getproperty(Base, :^))(y, 3)
+                                        (var"##MTIIPVar#317").nzval[10] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 4), (getproperty(Base, :^))(y, 4))
+                                        (var"##MTIIPVar#317").nzval[11] = (getproperty(Base, :^))(x, 4)
+                                        (var"##MTIIPVar#317").nzval[12] = (getproperty(Base, :^))(y, 4)
+                                    end
+                            end
+                            begin
+                                Threads.@spawn begin
+                                        (var"##MTIIPVar#317").nzval[13] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 5), (getproperty(Base, :^))(y, 3))
+                                        (var"##MTIIPVar#317").nzval[14] = (getproperty(Base, :^))(x, 5)
+                                        (var"##MTIIPVar#317").nzval[15] = (getproperty(Base, :^))(y, 5)
+                                        (var"##MTIIPVar#317").nzval[16] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 6), (getproperty(Base, :^))(y, 2))
+                                        (var"##MTIIPVar#317").nzval[17] = (getproperty(Base, :^))(x, 6)
+                                        (var"##MTIIPVar#317").nzval[18] = (getproperty(Base, :^))(y, 6)
+                                    end
+                            end
+                            begin
+                                Threads.@spawn begin
+                                        (var"##MTIIPVar#317").nzval[19] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 7), (getproperty(Base, :^))(y, 1))
+                                        (var"##MTIIPVar#317").nzval[20] = (getproperty(Base, :^))(x, 7)
+                                        (var"##MTIIPVar#317").nzval[21] = (getproperty(Base, :^))(y, 7)
+                                        (var"##MTIIPVar#317").nzval[22] = (getproperty(Base, :*))((getproperty(Base, :^))(x, 8), (getproperty(Base, :^))(y, 0))
+                                    end
+                            end
+                        end
+                    end
+            end
+        nothing
+    end
+```
+
+Let's unpack what that's doing. It's using `A.nzval` in order to linearly
+index through the sparse matrix, avoiding the `A[i,j]` form because that
+is a more expensive way to index a sparse matrix if you know exactly the
+order that the data is stored. Then, it's splitting up the calculation
+into Julia threads so they can be operated on in parallel. It synchronizes
+after spawning all of the tasks so the computation is ensured to be
+complete before moving on. And it does this with all in-place operations
+to the original matrix instead of generating arrays. This is the fanciest
+way you could fill a sparse matrix, and Symbolics makes this
+dead simple.
+
+(Note: this example may be slower with multithreading due to the
+thread spawning overhead, but the full version was not included in the
+documentation for brevity. It will be the faster version if `N` is
+sufficiently large!)

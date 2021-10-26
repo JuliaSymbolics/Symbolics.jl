@@ -23,17 +23,26 @@ function latexify_derivatives(ex)
     end
 end
 
+recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
+
 @latexrecipe function f(n::Num)
     env --> :equation
     cdot --> false
 
-    return latexify_derivatives(cleanup_exprs(_toexpr(n)))
+    return recipe(n)
+end
+
+@latexrecipe function f(z::Complex{Num})
+    env --> :equation
+    cdot --> false
+
+    return :($(recipe(real(z))) + $(recipe(imag(z))) * i)
 end
 
 @latexrecipe function f(n::ArrayOp)
     env --> :equation
     cdot --> false
-    return latexify_derivatives(cleanup_exprs(_toexpr(n.term)))
+    return recipe(n.term)
 end
 
 @latexrecipe function f(n::Function)
@@ -55,7 +64,7 @@ end
     env --> :equation
     cdot --> false
 
-    return latexify_derivatives(cleanup_exprs(_toexpr(n)))
+    return recipe(n)
 end
 
 @latexrecipe function f(eqs::Vector{Equation})

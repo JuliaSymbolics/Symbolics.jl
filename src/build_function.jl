@@ -52,35 +52,6 @@ function build_function(args...;target = JuliaTarget(),kwargs...)
   _build_function(target,args...;kwargs...)
 end
 
-function unflatten_args(f, args, N=4)
-    length(args) < N && return Term{Real}(f, args)
-    unflatten_args(f, [Term{Real}(f, group)
-                                       for group in Iterators.partition(args, N)], N)
-end
-
-# Speeds up by avoiding repeated sorting when you call `arguments`
-# after editing children in Postwalk in unflatten_long_ops
-function termify(op)
-    (op isa Symbolic && istree(op)) || return op
-    Term{symtype(op)}(operation(op), arguments(op); metadata=op.metadata)
-end
-
-function unflatten_long_ops(op, N=4)
-    op = value(op)
-    op = termify(op)
-    !istree(op) && return wrap(op)
-    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, N) : nothing)
-    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, N) : nothing)
-
-    simterm(x,f,args; metadata=nothing) = if x isa Symbolic
-        Term{symtype(x)}(f, args, metadata=metadata)
-    else
-        f(args...)
-    end
-    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]), similarterm=simterm)(op))
-end
-
-
 # Scalar output
 
 function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
@@ -99,7 +70,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          checkbounds = false,
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
+    expr = toexpr(Func(dargs, [], op))
 
     if expression == Val{true}
         expr
@@ -137,7 +108,7 @@ function _build_and_inject_function(mod::Module, ex)
     # XXX: Workaround to specify the module as both the cache module AND context module.
     # Currently, the @RuntimeGeneratedFunction macro only sets the context module.
     module_tag = getproperty(mod, RuntimeGeneratedFunctions._tagname)
-    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex)
+    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=false)
 end
 
 toexpr(n::Num, st) = toexpr(value(n), st)
@@ -214,7 +185,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        outputidxs=nothing,
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
-                       fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
+                       fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        parallel=SerialForm(), kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -285,7 +256,7 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(@RuntimeGeneratedFunction(toexpr(thunk, st))),
+        ex = :($Funcall($(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false)),
                        ($(toexpr.(a, (st,))...),)))
         quote
             let
@@ -320,7 +291,7 @@ function _make_array(rhss::AbstractArray, similarto)
     end
 end
 
-_make_array(x, similarto) = unflatten_long_ops(x)
+_make_array(x, similarto) = x
 
 ## In-place version
 
@@ -369,9 +340,9 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
     exprs = []
     setterexpr = SetArray(!checkbounds,
                           out,
-                          [AtIndex(outputidxs[ii[i]],
-                                   unflatten_long_ops(rhss[i]))
-                           for i in 1:length(ii)])
+                          [AtIndex(outputidxs[i],
+                                   rhss[i])
+                           for i in ii])
     push!(exprs, setterexpr)
     for j in jj
         push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros))
@@ -381,7 +352,7 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
                 end)
 end
 
-_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = unflatten_long_ops(rhs)
+_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = rhs
 
 
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())
@@ -548,7 +519,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
         open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
             print(f, ex)
         end
-        @RuntimeGeneratedFunction(:((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)))
+        @RuntimeGeneratedFunction(@__MODULE__, :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
     end
 end
 
@@ -626,7 +597,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
             print(f, ccode)
         end
-        @RuntimeGeneratedFunction(:((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)))
+        @RuntimeGeneratedFunction(@__MODULE__, :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
     end
 
 end
