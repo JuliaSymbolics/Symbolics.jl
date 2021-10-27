@@ -22,11 +22,11 @@ TermInterface.istree(a::ComplexTerm) = true
 TermInterface.operation(a::ComplexTerm{T}) where T = Complex{T}
 TermInterface.arguments(a::ComplexTerm) = [a.re, a.im]
 
-function TermInterface.similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing)
+function TermInterface.similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing, exprhead=exprhead(t))
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        similarterm(first(args), f, args, symtype; metadata=metadata)
+        similarterm(first(args), f, args, symtype; metadata=metadata, exprhead=exprhead)
     end
 end
 
