@@ -501,7 +501,7 @@ function replace_by_scalarizing(ex, dict)
     rule = @rule(getindex(~x, ~~i) =>
               scalarize(~x, (map(j->haskey(dict,j) ? dict[j] : j, ~~i)...,)))
 
-    simterm = (x, f, args) -> begin
+    simterm = (x, f, args; kws...) -> begin
         if f === Base.literal_pow && length(args) == 3
             #=
             julia> @variables u[1:3]
