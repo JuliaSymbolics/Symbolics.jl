@@ -19,5 +19,3 @@ end
     @test repr(z) == "z"
     @test repr(a + b*im) == "a + b*im"
 end
-
-
