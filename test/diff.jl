@@ -256,3 +256,6 @@ eqs = [D(x) ~ x, D(y) ~ y + x]
 
 sub_eqs = substitute(eqs, Dict([D(x)=>D(x), x=>1]))
 @test sub_eqs == [D(x) ~ 1, D(y) ~ 1 + y]
+
+@variables x y
+@test substitute([x + y; x - y], Dict(x=>1, y=>2)) == [3, -1]
