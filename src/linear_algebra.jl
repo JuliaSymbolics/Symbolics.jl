@@ -76,6 +76,22 @@ Assumes `length(eqs) == length(vars)`
 
 Currently only works if all equations are linear. `check` if the expr is linear
 w.r.t `vars`.
+
+# Examples
+```julia
+julia> @variables x y
+2-element Vector{Num}:
+ x
+ y
+
+julia> Symbolics.solve_for(x + y ~ 0, x)
+-y
+
+julia> Symbolics.solve_for([x + y ~ 0, x - y ~ 2], [x, y])
+2-element Vector{Float64}:
+  1.0
+ -1.0
+```
 """
 function solve_for(eq, var; simplify=false, check=true) # scalar case
     # simplify defaults for `false` as canonicalization should handle most of
@@ -96,6 +112,8 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
         SymbolicUtils.simplify(simplify_fractions(x))
     end
 end
+solve_for(eq::Equation, var::T; x...) where {T<:AbstractArray} = solve_for([eq],var, x...)
+solve_for(eq::T, var::Num; x...) where {T<:AbstractArray} = first(solve_for(eq,[var], x...))
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     A = Num.(SymbolicUtils.quick_cancel.(A))
