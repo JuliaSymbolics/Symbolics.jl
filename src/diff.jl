@@ -493,7 +493,7 @@ let
 
     _scalar = one(TermCombination)
 
-    simterm(t, f, args) = Term{Any}(f, args)
+    simterm(t, f, args; kws...) = Term{Any}(f, args)
     linearity_rules = [
           @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
           @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)

@@ -3,6 +3,10 @@ $(DocStringExtensions.README)
 """
 module Symbolics
 
+using TermInterface
+
+using Metatheory
+
 using DocStringExtensions
 
 using LinearAlgebra
@@ -14,11 +18,13 @@ using DomainSets
 import DomainSets: Domain
 @reexport using SymbolicUtils
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, symtype,
-                      FnType, @rule, Rewriters, substitute, similarterm,
-                      promote_symtype, istree, operation, arguments
+import TermInterface: similarterm, istree, operation, arguments, symtype
 
-import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
+import SymbolicUtils: Term, Add, Mul, Pow, Sym,
+                      FnType, @rule, Rewriters, substitute,
+                      promote_symtype
+
+import Metatheory.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 import SymbolicUtils.Code: toexpr
 
