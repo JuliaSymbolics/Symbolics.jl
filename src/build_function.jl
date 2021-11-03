@@ -67,9 +67,11 @@ function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
+                         cycle_optimize = false,
                          checkbounds = false,
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+    op = cycle_optimize ? SymbolicUtils.optimize(unwrap(op)) : op
     expr = toexpr(Func(dargs, [], op))
 
     if expression == Val{true}
@@ -86,11 +88,14 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         cycle_optimize = false,
                          linenumbers = true)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = toexpr(Func(dargs, [], op))
+
+    # TODO: cycle_optimize on ArrayOp inner expression
 
     if expression == Val{true}
         expr
@@ -183,6 +188,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        linenumbers = false,
                        outputidxs=nothing,
                        skipzeros = false,
+                       cycle_optimize = false,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        parallel=SerialForm(), kwargs...)
@@ -190,6 +196,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
+    if cycle_optimize
+        rhss = _cycle_optimize(rhss)
+    end
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [],
                     postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
@@ -219,6 +228,14 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
         _build_and_inject_function(expression_module, toexpr(ip_expr))
     end
 end
+
+function _cycle_optimize(x::AbstractSparseArray)
+    Setfield.@set! x.nzval = map(_cycle_optimize, x.nzval)
+    x
+end
+_cycle_optimize(x::AbstractArray) = map(_cycle_optimize, x)
+_cycle_optimize(x::Arr) = x
+_cycle_optimize(x) = wrap(SymbolicUtils.optimize(unwrap(x)))
 
 function make_array(s, dargs, arr, similarto)
     Base.@warn("Parallel form of $(typeof(s)) not implemented")
