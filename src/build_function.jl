@@ -230,10 +230,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 end
 
 function _cycle_optimize(x::AbstractSparseArray)
-    Setfield.@set! x.nzval = map(_cycle_optimize, x.nzval)
+    Setfield.@set! x.nzval = wrap.(SymbolicUtils.optimize(unwrap.(x.nzval)))
     x
 end
-_cycle_optimize(x::AbstractArray) = map(_cycle_optimize, x)
+_cycle_optimize(x::AbstractArray) = wrap.(SymbolicUtils.optimize(unwrap.(x)))
 _cycle_optimize(x::Arr) = x
 _cycle_optimize(x) = wrap(SymbolicUtils.optimize(unwrap(x)))
 
