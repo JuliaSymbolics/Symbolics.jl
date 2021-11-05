@@ -32,6 +32,7 @@ TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
 ConstructionBase = "1.1, 1.2"
+DataStructures = "0.18"
 DiffRules = "0.1, 1.0"
 Distributions = "0.23, 0.24, 0.25"
 DocStringExtensions = "0.7, 0.8"
