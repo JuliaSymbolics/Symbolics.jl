@@ -1,5 +1,5 @@
 import SymbolicUtils: @ordered_acrule, unpolyize
-import DynamicPolynomials
+using DataStructures
 
 struct BoundedDegreeMonomial
     p::Union{Mul, Pow, Int, Sym}
@@ -7,6 +7,7 @@ struct BoundedDegreeMonomial
     overdegree::Bool
 end
 
+# required by unsorted_arguments etc.
 SymbolicUtils.unstable_pow(x::BoundedDegreeMonomial, i::Integer) = (@assert(i==1); x)
 
 function Base.isequal(a::BoundedDegreeMonomial, b::BoundedDegreeMonomial)
@@ -15,9 +16,10 @@ function Base.isequal(a::BoundedDegreeMonomial, b::BoundedDegreeMonomial)
     isequal(a.p, b.p) && isequal(a.coeff, b.coeff)
 end
 
-function semipolyform(expr, vars, deg)
+function semipolyform_terms(expr, vars::OrderedSet, deg)
     # Step 1
     # Mark all the interesting variables -- substitute without recursing into nl forms
+
     expr′ = mark_vars(expr, vars)
 
 
@@ -41,20 +43,76 @@ function semipolyform(expr, vars, deg)
                                                       (~a).coeff * _mul(~~x) * _mul(~~y),
                                                       (~a).overdegree)]),
                      similarterm=st)(expr′)
+end
 
+function bifurcate_terms(expr)
     # Step 4: Bifurcate polynomial and nonlinear parts:
 
-    #=
-    if isbp(expr′)
-        return Dict(expr′.p => expr.coeff), 0
+    isbp(x) = x isa BoundedDegreeMonomial && !x.overdegree
+    if isbp(expr)
+        return Dict(expr.p => expr.coeff), 0
     elseif istree(expr) && operation(expr) == (+)
         args = unsorted_arguments(expr)
+        polys = filter(isbp, args)
+
+        poly = Dict()
+        for p in polys
+            if haskey(poly, p.p)
+                poly[p.p] += p.coeff
+            else
+                poly[p.p] = p.coeff
+            end
+        end
+
         nls = filter(!isbp, args)
-        nl = clean_sum(nls)
-        filter(isbp, args), nl
+        nl = cautious_sum(nls)
+
+        return poly, nl
     end
-    =#
 end
+
+function semipolynomial_form(exprs::AbstractArray, vars, degree)
+    exprs = unwrap.(exprs)
+    vars = OrderedSet(unwrap.(vars))
+
+    matches = map(x -> semipolyform_terms(x, vars, degree), exprs)
+    tmp = map(bifurcate_terms, matches)
+    dicts, nls = map(first, tmp), map(last, tmp)
+end
+
+function semipolynomial_form(expr, vars, degree)
+    expr = unwrap(expr)
+    vars = OrderedSet(unwrap.(vars))
+
+    bifurcate_terms(semipolyform_terms(x, vars, degree))
+end
+
+function semilinear_form(exprs::AbstractArray, vars)
+    exprs = unwrap.(exprs)
+    vars = OrderedSet(unwrap.(vars))
+    ds, nls = semipolynomial_form(exprs, vars, 1)
+
+    idxmap = Dict(v=>i for (i, v) in enumerate(vars))
+
+    I = Int[]
+    J = Int[]
+    V = Num[]
+
+    for (i, d) in enumerate(ds)
+        for (k, v) in d
+            push!(I, i)
+            push!(J, idxmap[k])
+            push!(V, v)
+        end
+    end
+
+    sparse(I,J,V, length(exprs), length(vars)), wrap.(nls)
+end
+
+unwrap_bp(x::BoundedDegreeMonomial) = x.p * x.coeff
+unwrap_bp(x) = x
+
+cautious_sum(nls) = isempty(nls) ? 0 : isone(length(nls)) ? first(nls) : sum(unwrap_bp, nls)
 
 _mul(x) = isempty(x) ? 1 : isone(length(x)) ? first(x) : prod(x)
 
@@ -82,7 +140,7 @@ mul(a, b::BoundedDegreeMonomial, deg) = BoundedDegreeMonomial(b.p, a * b.coeff, 
 
 function mark_vars(expr, vars)
     if !istree(expr)
-        if any(isequal(expr), vars)
+        if expr in vars
             return BoundedDegreeMonomial(expr, 1, false)
         else
             return expr
