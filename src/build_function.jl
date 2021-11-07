@@ -71,7 +71,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          checkbounds = false,
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    # op = cycle_optimize ? SymbolicUtils.optimize(unwrap(op)) : op
+    op = cycle_optimize ? optimize(op) : op
     expr = toexpr(Func(dargs, [], op))
 
     g = EGraph(expr)
@@ -200,9 +200,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
-    # if cycle_optimize
-    #     rhss = SymbolicUtils.optimize(rhss)
-    # end
+    if cycle_optimize
+        rhss = _cycle_optimize(rhss)
+    end
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [],
                     postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
@@ -229,20 +229,21 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
         e1 = toexpr(oop_expr)
         e2 = toexpr(ip_expr)
 
-        @show e1 
-        @show e2
+        # # TODO optimize expr instead of symbolic expr?
+        # @show e1 
+        # @show e2
 
-        if cycle_optimize
-            g1 = EGraph(e1)
-            saturate!(g1, SymbolicUtils.opt_theory, SymbolicUtils.default_opt_params)
-            e1 = extract!(g1, SymbolicUtils.costfun)
-            @show e1 
+        # if cycle_optimize
+        #     g1 = EGraph(e1)
+        #     saturate!(g1, SymbolicUtils.opt_theory, SymbolicUtils.default_opt_params)
+        #     e1 = extract!(g1, SymbolicUtils.costfun)
+        #     @show e1 
 
-            g2 = EGraph(e2)
-            saturate!(g2, SymbolicUtils.opt_theory, SymbolicUtils.default_opt_params)
-            e2 = extract!(g2, SymbolicUtils.costfun)
-            @show e2
-        end
+        #     g2 = EGraph(e2)
+        #     saturate!(g2, SymbolicUtils.opt_theory, SymbolicUtils.default_opt_params)
+        #     e2 = extract!(g2, SymbolicUtils.costfun)
+        #     @show e2
+        # end
 
         return e1, e2
     else
@@ -252,12 +253,11 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 end
 
 function _cycle_optimize(x::AbstractSparseArray)
-    Setfield.@set! x.nzval = wrap.(SymbolicUtils.optimize(unwrap.(x.nzval)))
+    Setfield.@set! x.nzval = optimize(x.nzval)
     x
 end
-_cycle_optimize(x::AbstractArray) = map(wrap, SymbolicUtils.optimize_many(map(unwrap, x)))
 _cycle_optimize(x::Arr) = x
-_cycle_optimize(x) = wrap(SymbolicUtils.optimize(unwrap(x)))
+_cycle_optimize(x) = optimize(x)
 
 function make_array(s, dargs, arr, similarto)
     Base.@warn("Parallel form of $(typeof(s)) not implemented")

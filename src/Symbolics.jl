@@ -108,6 +108,10 @@ import Libdl
 include("build_function.jl")
 export build_function
 
+include("optimize.jl")
+export optimize
+export getcost
+
 import Distributions
 include("extra_functions.jl")
 
