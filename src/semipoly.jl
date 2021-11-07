@@ -6,14 +6,19 @@ struct BoundedDegreeMonomial
     coeff::Any
     overdegree::Bool
 end
+SymbolicUtils.symtype(b::BoundedDegreeMonomial) = symtype(b.p)
 
 # required by unsorted_arguments etc.
 SymbolicUtils.unstable_pow(x::BoundedDegreeMonomial, i::Integer) = (@assert(i==1); x)
 
-function Base.isequal(a::BoundedDegreeMonomial, b::BoundedDegreeMonomial)
-    a === b && return true
-    a.p === b.p && a.coeff === b.coeff && return true
-    isequal(a.p, b.p) && isequal(a.coeff, b.coeff)
+
+function flatten_upto_deg(expr, deg)
+    isbp(x) = x isa BoundedDegreeMonomial && !x.overdegree
+    st(x, f, args;kw...) = Term{symtype(x)}(f, args)
+    rules = [@rule (~a::isbp) ^ (~b::(x-> x isa Integer)) =>
+             BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
+             @rule *(~~x) => mul_bounded(~~x, deg)]
+    Postwalk(RestartedChain(rules), similarterm=st)(expr)
 end
 
 function semipolyform_terms(expr, vars::OrderedSet, deg)
@@ -30,12 +35,8 @@ function semipolyform_terms(expr, vars::OrderedSet, deg)
 
     st(x, f, args;kw...) = Term{symtype(x)}(f, args)
 
-    rules = [@rule (~a::isbp) ^ (~b::(x-> x isa Integer)) =>
-             BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
-             @rule *(~~x) => mul_bounded(~~x, deg)]
 
-
-    expr′ = Postwalk(Chain(rules), similarterm=st)(expr′)
+    expr′ = flatten_upto_deg(expr′, deg)
 
     # Step 3: every term now has at most one valid monomial -- find the coefficient of it.
     expr′ = Postwalk(Chain([@rule *(~~x, ~a::isbp, ~~y) =>
@@ -71,9 +72,15 @@ function bifurcate_terms(expr)
     end
 end
 
+function init_semipoly_vars(vars)
+    set = OrderedSet(unwrap.(vars))
+    @assert length(set) == length(vars) "vars passed to semi-polynomial form must be unique"
+    set
+end
+
 function semipolynomial_form(exprs::AbstractArray, vars, degree)
     exprs = unwrap.(exprs)
-    vars = OrderedSet(unwrap.(vars))
+    vars = init_semipoly_vars(vars)
 
     matches = map(x -> semipolyform_terms(x, vars, degree), exprs)
     tmp = map(bifurcate_terms, matches)
@@ -82,14 +89,14 @@ end
 
 function semipolynomial_form(expr, vars, degree)
     expr = unwrap(expr)
-    vars = OrderedSet(unwrap.(vars))
+    vars = init_semipoly_vars(vars)
 
     bifurcate_terms(semipolyform_terms(x, vars, degree))
 end
 
 function semilinear_form(exprs::AbstractArray, vars)
     exprs = unwrap.(exprs)
-    vars = OrderedSet(unwrap.(vars))
+    vars = init_semipoly_vars(vars)
     ds, nls = semipolynomial_form(exprs, vars, 1)
 
     idxmap = Dict(v=>i for (i, v) in enumerate(vars))
@@ -124,8 +131,26 @@ end
 
 pdegree(x::Mul) = sum(values(x.dict))
 pdegree(x::Sym) = 1
-pdegree(x::Pow) = x.exp
+pdegree(x::Pow) = pdegree(x.base) * x.exp
 pdegree(x::Number) = 0
+
+_deg(x) = pdegree(x)
+_deg(x::Add) = maximum(_deg, unsorted_arguments(x))
+
+function mul(a, b, deg)
+    isop(x, op) = istree(x) && operation(x) === op
+    if isop(a, +)
+        return Term{symtype(a)}(+, mul.(unsorted_arguments(a), (b,), deg))
+    elseif isop(b, +)
+        return Term{symtype(a)}(+, mul.((a,), unsorted_arguments(b), deg))
+    elseif a isa BoundedDegreeMonomial
+        return BoundedDegreeMonomial(a.p, a.coeff * b, false)
+    elseif b isa BoundedDegreeMonomial
+        return BoundedDegreeMonomial(b.p, a * b.coeff, false)
+    else
+        return a * b
+    end
+end
 
 function mul(a::BoundedDegreeMonomial, b::BoundedDegreeMonomial, deg)
     if a.overdegree || b.overdegree || pdegree(a.p) + pdegree(b.p) > deg
@@ -135,8 +160,6 @@ function mul(a::BoundedDegreeMonomial, b::BoundedDegreeMonomial, deg)
     end
 end
 
-mul(a::BoundedDegreeMonomial, b, deg) = BoundedDegreeMonomial(a.p, a.coeff * b, false)
-mul(a, b::BoundedDegreeMonomial, deg) = BoundedDegreeMonomial(b.p, a * b.coeff, false)
 
 function mark_vars(expr, vars)
     if !istree(expr)
