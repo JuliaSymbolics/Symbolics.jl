@@ -46,6 +46,8 @@ function semipolyform_terms(expr, vars::OrderedSet, deg)
                      similarterm=st)(expr′)
 end
 
+all_terms(x) = istree(x) && operation(x) == (+) ? Iterators.flatten(map(all_terms, unsorted_arguments(x))) : (x,)
+
 function bifurcate_terms(expr)
     # Step 4: Bifurcate polynomial and nonlinear parts:
 
@@ -53,7 +55,7 @@ function bifurcate_terms(expr)
     if isbp(expr)
         return Dict(expr.p => expr.coeff), 0
     elseif istree(expr) && operation(expr) == (+)
-        args = unsorted_arguments(expr)
+        args = collect(all_terms(expr))
         polys = filter(isbp, args)
 
         poly = Dict()
@@ -119,7 +121,7 @@ end
 unwrap_bp(x::BoundedDegreeMonomial) = x.p * x.coeff
 unwrap_bp(x) = x
 
-cautious_sum(nls) = isempty(nls) ? 0 : isone(length(nls)) ? first(nls) : sum(unwrap_bp, nls)
+cautious_sum(nls) = isempty(nls) ? 0 : isone(length(nls)) ? unwrap_bp(first(nls)) : sum(unwrap_bp, nls)
 
 _mul(x) = isempty(x) ? 1 : isone(length(x)) ? first(x) : prod(x)
 
