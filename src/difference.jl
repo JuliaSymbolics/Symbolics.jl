@@ -49,3 +49,5 @@ Base.show(io::IO, D::Difference) = print(io, "Difference(", D.t, "; dt=", D.dt, 
 
 Base.:(==)(D1::Difference, D2::Difference) = isequal(D1.t, D2.t) && isequal(D1.dt, D2.dt) && isequal(D1.update, D2.update)
 Base.hash(D::Difference, u::UInt) = hash(D.dt, hash(D.t, xor(u, 0x055640d6d952f101)))
+
+Base.:^(D::Difference, n::Integer) = _repeat_apply(D, n)
