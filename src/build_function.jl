@@ -68,16 +68,19 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          cycle_optimize = false,
+                         cse = false,
                          checkbounds = false,
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    op = cycle_optimize ? optimize(op) : op
+    # op = cycle_optimize ? optimize(op) : op
+
     expr = toexpr(Func(dargs, [], op))
 
-    g = EGraph(expr)
-    saturate!(g, SymbolicUtils.opt_theory, SymbolicUtils.default_opt_params)
-    expr = extract!(g, SymbolicUtils.costfun)
-
+    # expr = cycle_optimize ? toexpr(cse(unwrap(optimize(expr)))) : expr
+    # TODO make sure that expr.head is function ?
+    expr.args[2] = cycle_optimize ? optimize(expr.args[2]; cse=cse) : expr.args[2]  
+    
+    println(expr)
     if expression == Val{true}
         expr
     else
@@ -193,6 +196,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        outputidxs=nothing,
                        skipzeros = false,
                        cycle_optimize = false,
+                       cse = false,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        parallel=SerialForm(), kwargs...)
@@ -200,9 +204,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
-    if cycle_optimize
-        rhss = _cycle_optimize(rhss)
-    end
+    # if cycle_optimize
+    #     rhss = _cycle_optimize(rhss)
+    # end
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [],
                     postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
@@ -225,30 +229,20 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
         ip_expr = wrap_code[2](ip_expr)
     end
 
+    e_oop = toexpr(oop_expr)
+    e_ip = toexpr(ip_expr)
+
+    if cycle_optimize
+        # optimize the function bodies with CSE 
+        e_oop.args[2] = optimize(e_oop.args[2]; cse=cse)  
+        e_ip.args[2] = optimize(e_ip.args[2]; cse=cse)
+    end
+
     if expression == Val{true}
-        e1 = toexpr(oop_expr)
-        e2 = toexpr(ip_expr)
-
-        # # TODO optimize expr instead of symbolic expr?
-        # @show e1 
-        # @show e2
-
-        # if cycle_optimize
-        #     g1 = EGraph(e1)
-        #     saturate!(g1, SymbolicUtils.opt_theory, SymbolicUtils.default_opt_params)
-        #     e1 = extract!(g1, SymbolicUtils.costfun)
-        #     @show e1 
-
-        #     g2 = EGraph(e2)
-        #     saturate!(g2, SymbolicUtils.opt_theory, SymbolicUtils.default_opt_params)
-        #     e2 = extract!(g2, SymbolicUtils.costfun)
-        #     @show e2
-        # end
-
-        return e1, e2
+        return e_oop, e_ip
     else
-        return _build_and_inject_function(expression_module, toexpr(oop_expr)),
-        _build_and_inject_function(expression_module, toexpr(ip_expr))
+        return _build_and_inject_function(expression_module, e_oop),
+        _build_and_inject_function(expression_module, e_ip)
     end
 end
 
