@@ -3,7 +3,7 @@ import SymbolicUtils.Rewriters: RestartedChain
 using DataStructures
 
 struct BoundedDegreeMonomial
-    p::Union{Mul, Pow, Int, Sym}
+    p::Union{Mul, Pow, Int, Sym, Term}
     coeff::Any
     overdegree::Bool
 end
@@ -60,7 +60,7 @@ function sum_pow(a, b, deg)
     maxdeg = maximum(_degree, args)
 
     if maxdeg * b <= deg
-        return expand(a^b) # & restart
+        return expand(a^b) # & TODO: this has BoundedDegreeMonomials so won't work, make it work nicely
     end
 
     if mindeg * b > deg
@@ -195,7 +195,7 @@ function mul_bounded(xs, deg)
 end
 
 pdegree(x::Mul) = sum(values(x.dict))
-pdegree(x::Sym) = 1
+pdegree(x::Union{Sym, Term}) = 1
 pdegree(x::Pow) = pdegree(x.base) * x.exp
 pdegree(x::Number) = 0
 
@@ -205,9 +205,9 @@ function mul(a, b, deg)
     elseif isop(b, +)
         return Term{symtype(a)}(+, mul.((a,), unsorted_arguments(b), deg))
     elseif a isa BoundedDegreeMonomial
-        return BoundedDegreeMonomial(a.p, a.coeff * b, false)
+        return BoundedDegreeMonomial(a.p, a.coeff * b, a.overdegree)
     elseif b isa BoundedDegreeMonomial
-        return BoundedDegreeMonomial(b.p, a * b.coeff, false)
+        return BoundedDegreeMonomial(b.p, a * b.coeff, b.overdegree)
     else
         return a * b
     end
@@ -228,12 +228,13 @@ pow(a, b, deg) = a^b
 
 
 function mark_vars(expr, vars)
+
+    if expr in vars
+        return BoundedDegreeMonomial(expr, 1, false)
+    end
+
     if !istree(expr)
-        if expr in vars
-            return BoundedDegreeMonomial(expr, 1, false)
-        else
-            return expr
-        end
+        return expr
     else
         op = operation(expr)
         args = unsorted_arguments(expr)
