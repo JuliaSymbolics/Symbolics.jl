@@ -70,17 +70,18 @@ function _build_function(target::JuliaTarget, op, args...;
                          cycle_optimize = false,
                          cse = false,
                          checkbounds = false,
-                         linenumbers = true)
+                         linenumbers = true,
+                         kwargs...)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    # op = cycle_optimize ? optimize(op) : op
-
+    op = cycle_optimize ? optimize(op; kwargs...) : op
+    
     expr = toexpr(Func(dargs, [], op))
 
     # expr = cycle_optimize ? toexpr(cse(unwrap(optimize(expr)))) : expr
     # TODO make sure that expr.head is function ?
-    expr.args[2] = cycle_optimize ? optimize(expr.args[2]; cse=cse) : expr.args[2]  
+    # expr.args[2] = cycle_optimize ? optimize(expr.args[2]; cse=cse) : expr.args[2]  
     
-    println(expr)
+    # println(expr)
     if expression == Val{true}
         expr
     else
@@ -204,9 +205,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
-    # if cycle_optimize
-    #     rhss = _cycle_optimize(rhss)
-    # end
+    if cycle_optimize
+        rhss = _cycle_optimize(rhss; kwargs...)
+    end
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [],
                     postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
@@ -232,11 +233,11 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     e_oop = toexpr(oop_expr)
     e_ip = toexpr(ip_expr)
 
-    if cycle_optimize
-        # optimize the function bodies with CSE 
-        e_oop.args[2] = optimize(e_oop.args[2]; cse=cse)  
-        e_ip.args[2] = optimize(e_ip.args[2]; cse=cse)
-    end
+    # if cycle_optimize
+    #     # optimize the function bodies with CSE 
+    #     e_oop.args[2] = optimize(e_oop.args[2]; cse=cse)  
+    #     e_ip.args[2] = optimize(e_ip.args[2]; cse=cse)
+    # end
 
     if expression == Val{true}
         return e_oop, e_ip
@@ -246,12 +247,12 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 end
 
-function _cycle_optimize(x::AbstractSparseArray)
-    Setfield.@set! x.nzval = optimize(x.nzval)
+function _cycle_optimize(x::AbstractSparseArray; kwargs...)
+    Setfield.@set! x.nzval = optimize(x.nzval; kwargs...)
     x
 end
-_cycle_optimize(x::Arr) = x
-_cycle_optimize(x) = optimize(x)
+_cycle_optimize(x::Arr; kwargs...) = x
+_cycle_optimize(x; kwargs...) = optimize(x; kwargs...)
 
 function make_array(s, dargs, arr, similarto)
     Base.@warn("Parallel form of $(typeof(s)) not implemented")

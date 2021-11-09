@@ -6,7 +6,7 @@ function optimize(x; kws...)
 end
 
 function optimize(x::AbstractArray; kws...)
-    return wrap.(SymbolicUtils.optimize(unwrap.(x)))
+    return wrap.(SymbolicUtils.optimize(unwrap.(x); kws...))
 end
 
 import Base.map 
