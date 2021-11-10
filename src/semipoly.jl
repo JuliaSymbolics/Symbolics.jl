@@ -55,10 +55,10 @@ function semipolyform_terms(expr, vars::OrderedSet, deg)
 
     rules = [@rule (~a::isbp) ^ (~b::(x-> x isa Integer)) =>
              BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
-             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg)
-             @rule *(~~x) => mul_bounded(~~x, deg)]
+             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars)]
 
     expr′ = Postwalk(RestartedChain(rules), similarterm=st)(expr′)
+    expr′ = Postwalk(RestartedChain([@rule *(~~x) => mul_bounded(~~x, deg)]), similarterm=st)(expr′)
 
     # Step 3: every term now show have at most one valid monomial -- find the coefficient for it.
     expr′ = Postwalk(Chain([@rule *(~~x, ~a::isbp, ~~y) =>
@@ -327,7 +327,7 @@ end
 
 pow(a, b, deg) = a^b
 
-function pow_of_add(a, b, deg)
+function pow_of_add(a, b, deg, vars)
     b == 0 && return 1
     b == 1 && return a
 
@@ -339,7 +339,7 @@ function pow_of_add(a, b, deg)
     maxdeg = maximum(_degree, args)
 
     if maxdeg * b <= deg
-        return mul(expand(a^b), 1, deg) # Use mul to do the work
+        return mark_vars(mul(expand(unwrap_bp(a^b)), 1, deg), vars) # Use mul to do the work
     end
 
     if mindeg * b > deg
@@ -379,3 +379,12 @@ function partial_multinomial_expansion(xs, exp, deg)
     end
     return Term{Real}(+, q)
 end
+
+
+#=
+#
+julia> semipolynomial_form((1+x)^2*b, [x,b], 1)
+(Dict{Any, Any}(b => (1 + Symbolics.BoundedDegreeMonomial(x, 1, false))^2 - x), b*x)
+
+julia> semipolynomial_form((1+x)^2*b, [x,b], 2)
+=#
