@@ -194,6 +194,9 @@ function semiquadratic_form(exprs, vars)
     J2 = Int[]
     V2 = Num[]
 
+    v2_I = Int[]
+    v2_V = Num[]
+
     for (i, d) in enumerate(ds)
         for (k, v) in d
             if pdegree(k) == 1
@@ -206,32 +209,28 @@ function semiquadratic_form(exprs, vars)
                     b, e = arguments(k)
                     @assert e == 2
                     q = idxmap[b]
-                    push!(J2, div(q*(q+1), 2)) # or div(q*(q-1), 2) + q
+                    j = div(q*(q+1), 2)
+                    push!(J2, j) # or div(q*(q-1), 2) + q
                     push!(V2, v)
                 else
                     @assert isop(k, *)
                     a, b = unsorted_arguments(k)
-                    q, p = extrema((idxmap[a], idxmap[b]))
-                    push!(J2, div(p*(p-1), 2) + q)
+                    p, q = extrema((idxmap[a], idxmap[b]))
+                    j = div(q*(q-1), 2) + p
+                    push!(J2, j)
                     push!(V2, v)
                 end
+                push!(v2_I, j)
+                push!(v2_V, k)
             else
                 error("This should never happen")
             end
         end
     end
 
-    vars_deg_2 = Num[]
-    n = length(vars)
-    for i in 1:n
-        for j in 1:i
-            push!(vars_deg_2, vars[i]*vars[j])
-        end
-    end
-
     tuple(sparse(I1,J1,V1, m, n),
           sparse(I2,J2,V2, m, div(n * (n + 1), 2)),
-          vars_deg_2,
+          SparseVector(div(n * (n + 1), 2), v2_I, v2_V),
           wrap.(nls))
 end
 
