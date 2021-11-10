@@ -38,6 +38,9 @@ _degree(x) = 0
 ## Semi-polynomial form
 
 function semipolyform_terms(expr, vars::OrderedSet, deg)
+    if deg <= 0
+        throw(ArgumentError("Degree for semi-polynomial form must be > 0"))
+    end
     # Step 1
     # Mark all the interesting variables -- substitute without recursing into nl forms
 
@@ -149,7 +152,7 @@ function semipolynomial_form(expr, vars, degree)
     expr = unwrap(expr)
     vars = init_semipoly_vars(vars)
 
-    bifurcate_terms(semipolyform_terms(x, vars, degree))
+    bifurcate_terms(semipolyform_terms(expr, vars, degree))
 end
 
 function semipolynomial_form(exprs::AbstractArray, vars, degree)
@@ -216,6 +219,7 @@ function semiquadratic_form(exprs, vars)
     I1 = Int[]
     J1 = Int[]
     V1 = Num[]
+
     I2 = Int[]
     J2 = Int[]
     V2 = Num[]
@@ -278,9 +282,12 @@ end
 all_terms(x) = istree(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
 
 unwrap_bp(x::BoundedDegreeMonomial) = x.p * x.coeff
-unwrap_bp(x) = istree(x) ? similarterm(x,
-                                       operation(x),
-                                       map(unwrap_bp, unsorted_arguments(x))) : x
+function unwrap_bp(x)
+    x = unwrap(x)
+    istree(x) ? similarterm(x,
+                            operation(x),
+                            map(unwrap_bp, unsorted_arguments(x))) : x
+end
 
 cautious_sum(nls) = isempty(nls) ? 0 : isone(length(nls)) ? unwrap_bp(first(nls)) : sum(unwrap_bp, nls)
 
