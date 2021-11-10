@@ -228,9 +228,15 @@ function semiquadratic_form(exprs, vars)
         end
     end
 
+
+    #v2 = SparseVector(div(n * (n + 1), 2), v2_I, v2_V) # When it works in the future
+    # until then
+    v2 = zeros(Num, div(n * (n + 1), 2))
+    v2[v2_I] .= v2_V
+
     tuple(sparse(I1,J1,V1, m, n),
           sparse(I2,J2,V2, m, div(n * (n + 1), 2)),
-          SparseVector(div(n * (n + 1), 2), v2_I, v2_V),
+          v2,
           wrap.(nls))
 end
 
