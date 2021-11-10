@@ -1,6 +1,10 @@
 import SymbolicUtils.Rewriters: RestartedChain
 using DataStructures
 
+export semipolynomial_form, semilinear_form, semiquadratic_form
+
+## BoundedDegreeMonomial helper type
+
 struct BoundedDegreeMonomial
     p::Union{Mul, Pow, Int, Sym, Term}
     coeff::Any
@@ -8,13 +12,30 @@ struct BoundedDegreeMonomial
 end
 
 highdegree(x) = BoundedDegreeMonomial(1, x, true)
+
 highdegree(x::BoundedDegreeMonomial) = (@assert(x.overdegree); x)
+
 SymbolicUtils.symtype(b::BoundedDegreeMonomial) = symtype(b.p)
 
 isop(x, op) = istree(x) && operation(x) === op
+
 isop(op) = x -> isop(x, op)
+
+pdegree(x::Mul) = sum(values(x.dict))
+pdegree(x::Union{Sym, Term}) = 1
+pdegree(x::Pow) = pdegree(x.base) * x.exp
+pdegree(x::Number) = 0
+
+
 # required by unsorted_arguments etc.
 SymbolicUtils.unstable_pow(x::BoundedDegreeMonomial, i::Integer) = (@assert(i==1); x)
+
+_degree(x::BoundedDegreeMonomial) = x.overdegree ? Inf : pdegree(x.p)
+
+_degree(x) = 0
+
+
+## Semi-polynomial form
 
 function semipolyform_terms(expr, vars::OrderedSet, deg)
     # Step 1
@@ -31,12 +52,12 @@ function semipolyform_terms(expr, vars::OrderedSet, deg)
 
     rules = [@rule (~a::isbp) ^ (~b::(x-> x isa Integer)) =>
              BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
-             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => sum_pow(~a, ~b, deg)
+             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg)
              @rule *(~~x) => mul_bounded(~~x, deg)]
 
     expr′ = Postwalk(RestartedChain(rules), similarterm=st)(expr′)
 
-    # Step 3: every term now has at most one valid monomial -- find the coefficient of it.
+    # Step 3: every term now show have at most one valid monomial -- find the coefficient for it.
     expr′ = Postwalk(Chain([@rule *(~~x, ~a::isbp, ~~y) =>
                                 BoundedDegreeMonomial((~a).p,
                                                       (~a).coeff * _mul(~~x) * _mul(~~y),
@@ -44,67 +65,34 @@ function semipolyform_terms(expr, vars::OrderedSet, deg)
                      similarterm=st)(expr′)
 end
 
-_degree(x::BoundedDegreeMonomial) = x.overdegree ? Inf : pdegree(x.p)
-_degree(x) = 0
 
-function sum_pow(a, b, deg)
-    b == 0 && return 1
-    b == 1 && return a
-
-    @assert isop(a, +)
-    within_deg(x) = (d=_degree(a);d <= deg)
-
-    args = all_terms(a)
-    mindeg = minimum(_degree, args)
-    maxdeg = maximum(_degree, args)
-
-    if maxdeg * b <= deg
-        return expand(a^b) # & TODO: this has BoundedDegreeMonomials so won't work, make it work nicely
+function mark_vars(expr, vars)
+    if expr in vars
+        return BoundedDegreeMonomial(expr, 1, false)
     end
 
-    if mindeg * b > deg
-        return highdegree(a^b) # That's pretty high degree
-    end
-
-    interesting = filter(within_deg, args)
-    nls = filter(!within_deg, args)
-
-    if isempty(interesting)
-        return a^b # Don't need to do anything!
+    if !istree(expr)
+        return expr
     else
-        q = partial_multinomial_expansion(interesting, b, deg)
-        return Term{Real}(+, [q, a^b - unwrap_bp(q)])
-    end
-end
+        op = operation(expr)
+        args = unsorted_arguments(expr)
 
-function partial_multinomial_expansion(xs, exp, deg)
-    zs = filter(iszero∘_degree, xs)
-    nzs = filter((!iszero)∘_degree, xs)
-    if isempty(zs)
-        terms = nzs
-    else
-        terms = [+(zs...), nzs...]
-    end
-    degs = map(_degree, terms)
-
-    q = []
-    for ks in partition(exp, length(terms))
-        td = sum(degs .* ks)
-        td == 0 && continue # We are not concerned about constants
-        if td <= deg
-            push!(q, mul_bounded([pow(x,y, deg) for (x, y) in zip(terms, ks) if !iszero(y)], deg))
+        if op === (+) || op === (*)
+            return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
+        elseif op === (^)
+            base, exp = arguments(expr)
+            Term{symtype(expr)}(^, [mark_vars(base, vars), exp])
+        elseif length(args) == 1
+            if linearity_1(op)
+                return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
+            else
+                return expr
+            end
+        else
+            return expr
         end
     end
-    return Term{Real}(+, q)
 end
-
-function partition(n, parts)
-    parts == 1 && return n
-    [[[i, p...] for p in partition(n-i, parts-1)]
-     for i=0:n] |> Iterators.flatten |> collect
-end
-
-all_terms(x) = istree(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
 
 function bifurcate_terms(expr)
     # Step 4: Bifurcate polynomial and nonlinear parts:
@@ -140,6 +128,16 @@ function init_semipoly_vars(vars)
     set
 end
 
+## API:
+#
+
+function semipolynomial_form(expr, vars, degree)
+    expr = unwrap(expr)
+    vars = init_semipoly_vars(vars)
+
+    bifurcate_terms(semipolyform_terms(x, vars, degree))
+end
+
 function semipolynomial_form(exprs::AbstractArray, vars, degree)
     exprs = unwrap.(exprs)
     vars = init_semipoly_vars(vars)
@@ -147,13 +145,6 @@ function semipolynomial_form(exprs::AbstractArray, vars, degree)
     matches = map(x -> semipolyform_terms(x, vars, degree), exprs)
     tmp = map(bifurcate_terms, matches)
     dicts, nls = map(first, tmp), map(last, tmp)
-end
-
-function semipolynomial_form(expr, vars, degree)
-    expr = unwrap(expr)
-    vars = init_semipoly_vars(vars)
-
-    bifurcate_terms(semipolyform_terms(x, vars, degree))
 end
 
 function semilinear_form(exprs::AbstractArray, vars)
@@ -177,7 +168,6 @@ function semilinear_form(exprs::AbstractArray, vars)
 
     sparse(I,J,V, length(exprs), length(vars)), wrap.(nls)
 end
-
 
 function semiquadratic_form(exprs, vars)
     exprs = unwrap.(exprs)
@@ -240,6 +230,17 @@ function semiquadratic_form(exprs, vars)
           wrap.(nls))
 end
 
+
+## Utilities
+
+function partition(n, parts)
+    parts == 1 && return n
+    [[[i, p...] for p in partition(n-i, parts-1)]
+     for i=0:n] |> Iterators.flatten |> collect
+end
+
+all_terms(x) = istree(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
+
 unwrap_bp(x::BoundedDegreeMonomial) = x.p * x.coeff
 unwrap_bp(x) = istree(x) ? similarterm(x,
                                        operation(x),
@@ -248,17 +249,6 @@ unwrap_bp(x) = istree(x) ? similarterm(x,
 cautious_sum(nls) = isempty(nls) ? 0 : isone(length(nls)) ? unwrap_bp(first(nls)) : sum(unwrap_bp, nls)
 
 _mul(x) = isempty(x) ? 1 : isone(length(x)) ? first(x) : prod(x)
-
-function mul_bounded(xs, deg)
-    length(xs) == 1 ?
-        first(xs) :
-        reduce((x,y) -> mul(x,y, deg), xs)
-end
-
-pdegree(x::Mul) = sum(values(x.dict))
-pdegree(x::Union{Sym, Term}) = 1
-pdegree(x::Pow) = pdegree(x.base) * x.exp
-pdegree(x::Number) = 0
 
 function mul(a, b, deg)
     if isop(a, +)
@@ -282,37 +272,67 @@ function mul(a::BoundedDegreeMonomial, b::BoundedDegreeMonomial, deg)
     end
 end
 
+function mul_bounded(xs, deg)
+    length(xs) == 1 ?
+        first(xs) :
+        reduce((x,y) -> mul(x,y, deg), xs)
+end
+
 function pow(a::BoundedDegreeMonomial, b, deg)
     return BoundedDegreeMonomial((a.p)^b, a.coeff ^ b, b > deg)
 end
+
 pow(a, b, deg) = a^b
 
+function pow_of_add(a, b, deg)
+    b == 0 && return 1
+    b == 1 && return a
 
-function mark_vars(expr, vars)
+    @assert isop(a, +)
+    within_deg(x) = (d=_degree(a);d <= deg)
 
-    if expr in vars
-        return BoundedDegreeMonomial(expr, 1, false)
+    args = all_terms(a)
+    mindeg = minimum(_degree, args)
+    maxdeg = maximum(_degree, args)
+
+    if maxdeg * b <= deg
+        return mul(expand(a^b), 1, deg) # Use mul to do the work
     end
 
-    if !istree(expr)
-        return expr
-    else
-        op = operation(expr)
-        args = unsorted_arguments(expr)
+    if mindeg * b > deg
+        return highdegree(a^b) # That's pretty high degree
+    end
 
-        if op === (+) || op === (*)
-            return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
-        elseif op === (^)
-            base, exp = arguments(expr)
-            Term{symtype(expr)}(^, [mark_vars(base, vars), exp])
-        elseif length(args) == 1
-            if linearity_1(op)
-                return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
-            else
-                return expr
-            end
-        else
-            return expr
+    interesting = filter(within_deg, args)
+    nls = filter(!within_deg, args)
+
+    if isempty(interesting)
+        return a^b # Don't need to do anything!
+    else
+        q = partial_multinomial_expansion(interesting, b, deg)
+        return Term{Real}(+, [q, a^b - unwrap_bp(q)])
+    end
+end
+
+function partial_multinomial_expansion(xs, exp, deg)
+    zs = filter(iszero∘_degree, xs)
+    nzs = filter((!iszero)∘_degree, xs)
+    if isempty(zs)
+        terms = nzs
+    else
+        terms = [+(zs...), nzs...]
+    end
+    degs = map(_degree, terms)
+
+    q = []
+    for ks in partition(exp, length(terms))
+        td = sum(degs .* ks)
+        td == 0 && continue # We are not concerned about constants
+        if td <= deg
+            push!(q,
+                  mul_bounded([pow(x,y, deg) for (x, y) in zip(terms, ks) if !iszero(y)],
+                              deg))
         end
     end
+    return Term{Real}(+, q)
 end
