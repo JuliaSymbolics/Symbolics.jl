@@ -1,4 +1,3 @@
-import SymbolicUtils: @ordered_acrule, unpolyize
 import SymbolicUtils.Rewriters: RestartedChain
 using DataStructures
 
@@ -177,6 +176,63 @@ function semilinear_form(exprs::AbstractArray, vars)
     end
 
     sparse(I,J,V, length(exprs), length(vars)), wrap.(nls)
+end
+
+
+function semiquadratic_form(exprs, vars)
+    exprs = unwrap.(exprs)
+    vars = init_semipoly_vars(vars)
+    ds, nls = semipolynomial_form(exprs, vars, 2)
+
+    idxmap = Dict(v=>i for (i, v) in enumerate(vars))
+
+    m, n = length(exprs), length(vars)
+    I1 = Int[]
+    J1 = Int[]
+    V1 = Num[]
+    I2 = Int[]
+    J2 = Int[]
+    V2 = Num[]
+
+    for (i, d) in enumerate(ds)
+        for (k, v) in d
+            if pdegree(k) == 1
+                push!(I1, i)
+                push!(J1, idxmap[k])
+                push!(V1, v)
+            elseif pdegree(k) == 2
+                push!(I2, i)
+                if isop(k, ^)
+                    b, e = arguments(k)
+                    @assert e == 2
+                    q = idxmap[b]
+                    push!(J2, div(q*(q+1), 2)) # or div(q*(q-1), 2) + q
+                    push!(V2, v)
+                else
+                    @assert isop(k, *)
+                    a, b = unsorted_arguments(k)
+                    q, p = extrema((idxmap[a], idxmap[b]))
+                    push!(J2, div(p*(p-1), 2) + q)
+                    push!(V2, v)
+                end
+            else
+                error("This should never happen")
+            end
+        end
+    end
+
+    vars_deg_2 = Num[]
+    n = length(vars)
+    for i in 1:n
+        for j in 1:i
+            push!(vars_deg_2, vars[i]*vars[j])
+        end
+    end
+
+    tuple(sparse(I1,J1,V1, m, n),
+          sparse(I2,J2,V2, m, div(n * (n + 1), 2)),
+          vars_deg_2,
+          wrap.(nls))
 end
 
 unwrap_bp(x::BoundedDegreeMonomial) = x.p * x.coeff
