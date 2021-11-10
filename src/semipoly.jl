@@ -131,6 +131,20 @@ end
 ## API:
 #
 
+"""
+    semipolynomial_form(expr, vars, degree)
+
+Semi-polynomial form. Returns a tuple of two objects:
+
+1. A dictionary of coefficients keyed by monomials in `vars` upto the given `degree`,
+2. A residual expression which has all terms not represented as a product of monomial and a coefficient
+
+    semipolynomial_form(exprs::AbstractArray, vars, degree)
+
+For every expression in `exprs` computes the semi-polynomial form as above and
+returns a tuple of two objects -- a vector of coefficient dictionaries,
+and a vector of residual terms.
+"""
 function semipolynomial_form(expr, vars, degree)
     expr = unwrap(expr)
     vars = init_semipoly_vars(vars)
@@ -147,6 +161,13 @@ function semipolynomial_form(exprs::AbstractArray, vars, degree)
     dicts, nls = map(first, tmp), map(last, tmp)
 end
 
+"""
+    semilinear_form(exprs::AbstractVector, vars::AbstractVector)
+
+Returns a tuple of a sparse matrix `A`, and a residual vector `c` such that,
+
+`A * vars + c` is the same as `exprs`.
+"""
 function semilinear_form(exprs::AbstractArray, vars)
     exprs = unwrap.(exprs)
     vars = init_semipoly_vars(vars)
@@ -169,6 +190,21 @@ function semilinear_form(exprs::AbstractArray, vars)
     sparse(I,J,V, length(exprs), length(vars)), wrap.(nls)
 end
 
+"""
+    semilinear_form(exprs::AbstractVector, vars::AbstractVector)
+
+Returns a tuple of 4 objects:
+
+1. a matrix `A` of dimensions (m x n)
+2. a matrix `B` of dimensions (m x (n+1)*n/2)
+3. a vector `v2` of length (n+1)*n/2 containing monomials of `vars` upto degree 2 and zero where they are not required.
+4. a residual vector `c` of length m.
+
+where `n == length(exprs)` and `m == length(vars)`.
+
+
+The result is arranged such that, `A * vars + B * v2 + c` is the same as `exprs`.
+"""
 function semiquadratic_form(exprs, vars)
     exprs = unwrap.(exprs)
     vars = init_semipoly_vars(vars)
