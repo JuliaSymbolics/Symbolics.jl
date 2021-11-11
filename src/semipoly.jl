@@ -37,35 +37,42 @@ _degree(x) = 0
 
 ## Semi-polynomial form
 
-function semipolyform_terms(expr, vars::OrderedSet, deg)
-    if deg <= 0
-        throw(ArgumentError("Degree for semi-polynomial form must be > 0"))
-    end
+isboundedmonom(x) = x isa BoundedDegreeMonomial && !x.overdegree
+bareterm(x, f, args;kw...) = Term{symtype(x)}(f, args)
+
+function mark_and_exponentiate(expr, vars, deg)
+
     # Step 1
     # Mark all the interesting variables -- substitute without recursing into nl forms
 
     expr′ = mark_vars(expr, vars)
 
-
     # Step 2
     # Construct and propagate BoundedDegreeMonomial for ^ and *
 
-    isbp(x) = x isa BoundedDegreeMonomial && !x.overdegree
-    st(x, f, args;kw...) = Term{symtype(x)}(f, args)
 
-    rules = [@rule (~a::isbp) ^ (~b::(x-> x isa Integer)) =>
+    rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer)) =>
              BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
              @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars)]
 
-    expr′ = Postwalk(RestartedChain(rules), similarterm=st)(expr′)
-    expr′ = Postwalk(RestartedChain([@rule *(~~x) => mul_bounded(~~x, deg)]), similarterm=st)(expr′)
+    expr′ = Postwalk(RestartedChain(rules), similarterm=bareterm)(expr′)
+end
+
+function semipolyform_terms(expr, vars::OrderedSet, deg)
+    if deg <= 0
+        throw(ArgumentError("Degree for semi-polynomial form must be > 0"))
+    end
+
+    expr′ = mark_and_exponentiate(expr, vars, deg)
+    expr′ = Postwalk(RestartedChain([@rule *(~~x) => mul_bounded(~~x, deg)]), similarterm=bareterm)(expr′)
 
     # Step 3: every term now show have at most one valid monomial -- find the coefficient for it.
-    expr′ = Postwalk(Chain([@rule *(~~x, ~a::isbp, ~~y) =>
+    expr′ = Postwalk(Chain([@rule *(~~x, ~a::isboundedmonom, ~~y) =>
                                 BoundedDegreeMonomial((~a).p,
                                                       (~a).coeff * _mul(~~x) * _mul(~~y),
                                                       (~a).overdegree)]),
-                     similarterm=st)(expr′)
+                     similarterm=bareterm)(expr′)
+
 end
 
 
@@ -100,12 +107,12 @@ end
 function bifurcate_terms(expr)
     # Step 4: Bifurcate polynomial and nonlinear parts:
 
-    isbp(x) = x isa BoundedDegreeMonomial && !x.overdegree
-    if isbp(expr)
+    isboundedmonom(x) = x isa BoundedDegreeMonomial && !x.overdegree
+    if isboundedmonom(expr)
         return Dict(expr.p => expr.coeff), 0
     elseif istree(expr) && operation(expr) == (+)
         args = collect(all_terms(expr))
-        polys = filter(isbp, args)
+        polys = filter(isboundedmonom, args)
 
         poly = Dict()
         for p in polys
@@ -116,7 +123,7 @@ function bifurcate_terms(expr)
             end
         end
 
-        nls = filter(!isbp, args)
+        nls = filter(!isboundedmonom, args)
         nl = cautious_sum(nls)
 
         return poly, nl
@@ -339,7 +346,7 @@ function pow_of_add(a, b, deg, vars)
     maxdeg = maximum(_degree, args)
 
     if maxdeg * b <= deg
-        return mark_vars(mul(expand(unwrap_bp(a^b)), 1, deg), vars) # Use mul to do the work
+        return mark_and_exponentiate(expand(unwrap_bp(a^b)), vars, deg)
     end
 
     if mindeg * b > deg
