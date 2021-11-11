@@ -345,9 +345,9 @@ function pow_of_add(a, b, deg, vars)
     mindeg = minimum(_degree, args)
     maxdeg = maximum(_degree, args)
 
-    if maxdeg * b <= deg
-        return mark_and_exponentiate(expand(unwrap_bp(a^b)), vars, deg)
-    end
+   #if maxdeg * b <= deg
+   #    return mark_and_exponentiate(expand(unwrap_bp(a^b)), vars, deg)
+   #end
 
     if mindeg * b > deg
         return highdegree(a^b) # That's pretty high degree
@@ -360,6 +360,9 @@ function pow_of_add(a, b, deg, vars)
         return a^b # Don't need to do anything!
     else
         q = partial_multinomial_expansion(interesting, b, deg)
+        if maxdeg * b <= deg
+            return q # q is the whole enchilada
+        end
         return Term{Real}(+, [q, a^b - unwrap_bp(q)])
     end
 end
@@ -377,8 +380,9 @@ function partial_multinomial_expansion(xs, exp, deg)
     q = []
     for ks in partition(exp, length(terms))
         td = sum(degs .* ks)
-        td == 0 && continue # We are not concerned about constants
-        if td <= deg
+        if td == 0
+            push!(q, *((x^y for (x, y) in zip(terms, ks) if !iszero(y))...))
+        elseif td <= deg
             push!(q,
                   mul_bounded([pow(x,y, deg) for (x, y) in zip(terms, ks) if !iszero(y)],
                               deg))
