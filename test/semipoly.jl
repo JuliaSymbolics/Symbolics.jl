@@ -23,19 +23,20 @@ d, r = semipolynomial_form(x^2+1+y, [x], 1)
 
 d, r = semipolynomial_form((x+2)^12, [x], 1)
 
-@test d == Dict(x => 2048)
-@test iszero(r + 2048x - (x+2)^12)
+@test d == Dict(x => 24576)
+@test iszero(r + 24576x - (x+2)^12)
 
 
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, x^2, x*y, y^2, z*y, z*x, z^2]
 
-function verify(t, d, nl)
+function verify(t, d, wrt, nl)
     try
         iszero(t - (isempty(d) ? nl : sum(k*v for (k, v) in d) + nl))
     catch err
         println("""Error verifying semi-pf result for $t
+                 wrt = $wrt
                  d = $d
                  nl = $nl""")
         rethrow(err)
@@ -57,7 +58,7 @@ function trial()
         wrt = unique(rand([a,b,c,x,y,z], rand(1:6)))
         for i=1:5
             d, nl = semipolynomial_form(t, wrt, i)
-            res = verify(t, d, nl)
+            res = verify(t, d, wrt, nl)
 
             if !res
                 println("""Semi-poly form is wrong: $t  w.r.t   $wrt  deg=$deg
