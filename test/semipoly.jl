@@ -29,7 +29,7 @@ d, r = semipolynomial_form((x+2)^12, [x], 1)
 
 @syms a b c
 
-const components = [2, a, b, c, x, y, z, x^2, x*y, y^2, z*y, z*x, z^2]
+const components = [2, a, b, c, x, y, z, (1+x), (1+y^2), x^2, x*y, y^2, z*y, z*x, z^2]
 
 function verify(t, d, wrt, nl)
     try
@@ -72,7 +72,7 @@ function trial()
                     @show A B v2 c
                 end
             else
-                if isfinite(I)
+                if isfinite(i)
                     d, nl = semipolynomial_form(t, wrt, i)
                 else
                     d, nl = polynomial_coeffs(t, wrt)
@@ -89,7 +89,6 @@ function trial()
         end
     end
 end
-
 
 for i=1:20
     @testset "fuzz semi-polynomial-form ($i/20)" begin

@@ -423,17 +423,3 @@ function partial_multinomial_expansion(xs, exp, deg)
 end
 
 
-#=
-#
-julia> semipolynomial_form((1+x)^2*b, [x,b], 1)
-(Dict{Any, Any}(b => (1 + Symbolics.BoundedDegreeMonomial(x, 1, false))^2 - x), b*x)
-
-julia> semipolynomial_form((1+x)^2*b, [x,b], 2)
-
-julia> ex = (9 + y*z)*(( y*z + z^2)^2)
-
-julia> ex =  (1.5 + z)*((1x+y)^2);
-
-
-julia> ex = (1 + y)*(( y*z + z)^3) WRT [z] deg=3
-=#
