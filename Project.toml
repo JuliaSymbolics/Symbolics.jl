@@ -5,6 +5,7 @@ version = "4.0.1"
 
 [deps]
 ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
@@ -31,6 +32,7 @@ TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
 ConstructionBase = "1.1, 1.2"
+DataStructures = "0.18"
 DiffRules = "0.1, 1.0"
 Distributions = "0.23, 0.24, 0.25"
 DocStringExtensions = "0.7, 0.8"
@@ -58,10 +60,11 @@ julia = "1.5"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PkgBenchmark = "32113eaa-f34f-5b0d-bd6c-c81e245fc73d"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 ReferenceTests = "324d217c-45ce-50fc-942e-d289b448e8cf"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "BenchmarkTools", "ReferenceTests", "SymPy"]
+test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "BenchmarkTools", "ReferenceTests", "SymPy", "Random"]
