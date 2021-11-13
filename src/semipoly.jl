@@ -5,6 +5,16 @@ export semipolynomial_form, semilinear_form, semiquadratic_form
 
 ## BoundedDegreeMonomial helper type
 
+"""
+    BoundedDegreeMonomial
+
+# Attrtibutes
+- p -- a monomial
+- coeff -- the coefficient (monomial means p * coeff)
+- overdegree -- boolean flag shows if degree of p * coeff
+  is too high (this is marked by the semi-polynomialization process)
+
+"""
 struct BoundedDegreeMonomial
     p::Union{Mul, Pow, Int, Sym, Term}
     coeff::Any
@@ -32,7 +42,7 @@ SymbolicUtils.unstable_pow(x::BoundedDegreeMonomial, i::Integer) = (@assert(i==1
 
 _degree(x::BoundedDegreeMonomial) = x.overdegree ? Inf : pdegree(x.p)
 
-_degree(x) = 0
+_degree(x) = isop(x, *) ? sum(_degree, unsorted_arguments(x)) : 0
 
 
 ## Semi-polynomial form
@@ -53,7 +63,9 @@ function mark_and_exponentiate(expr, vars, deg)
 
     rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer)) =>
              BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
-             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars)]
+             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars)
+
+             @rule *(~~x) => mul_bounded(~~x, deg)]
 
     expr′ = Postwalk(RestartedChain(rules), similarterm=bareterm)(expr′)
 end
@@ -64,14 +76,13 @@ function semipolyform_terms(expr, vars::OrderedSet, deg)
     end
 
     expr′ = mark_and_exponentiate(expr, vars, deg)
-    expr′ = Postwalk(RestartedChain([@rule *(~~x) => mul_bounded(~~x, deg)]), similarterm=bareterm)(expr′)
 
     # Step 3: every term now show have at most one valid monomial -- find the coefficient for it.
-    expr′ = Postwalk(Chain([@rule *(~~x, ~a::isboundedmonom, ~~y) =>
+    Postwalk(Chain([@rule *(~~x, ~a::isboundedmonom, ~~y) =>
                                 BoundedDegreeMonomial((~a).p,
                                                       (~a).coeff * _mul(~~x) * _mul(~~y),
                                                       (~a).overdegree)]),
-                     similarterm=bareterm)(expr′)
+             similarterm=bareterm)(expr′)
 
 end
 
@@ -291,9 +302,7 @@ all_terms(x) = istree(x) && operation(x) == (+) ? collect(Iterators.flatten(map(
 unwrap_bp(x::BoundedDegreeMonomial) = x.p * x.coeff
 function unwrap_bp(x)
     x = unwrap(x)
-    istree(x) ? similarterm(x,
-                            operation(x),
-                            map(unwrap_bp, unsorted_arguments(x))) : x
+    istree(x) ? similarterm(x, operation(x), map(unwrap_bp, unsorted_arguments(x))) : x
 end
 
 cautious_sum(nls) = isempty(nls) ? 0 : isone(length(nls)) ? unwrap_bp(first(nls)) : sum(unwrap_bp, nls)
@@ -341,6 +350,7 @@ function pow_of_add(a, b, deg, vars)
     @assert isop(a, +)
     within_deg(x) = (d=_degree(a);d <= deg)
 
+    a = mark_and_exponentiate(a, vars, deg)
     args = all_terms(a)
     mindeg = minimum(_degree, args)
     maxdeg = maximum(_degree, args)
@@ -350,20 +360,20 @@ function pow_of_add(a, b, deg, vars)
    #end
 
     if mindeg * b > deg
-        return highdegree(a^b) # That's pretty high degree
+        return highdegree(unwrap_bp(a^b)) # That's pretty high degree
     end
 
     interesting = filter(within_deg, args)
     nls = filter(!within_deg, args)
 
     if isempty(interesting)
-        return a^b # Don't need to do anything!
+        a^b # Don't need to do anything!
     else
         q = partial_multinomial_expansion(interesting, b, deg)
         if maxdeg * b <= deg
-            return q # q is the whole enchilada
+            q # q is the whole enchilada
         else
-            return Term{Real}(+, vcat(all_terms(q), highdegree(unwrap_bp(a^b - q))))
+            Term{Real}(+, vcat(all_terms(q), highdegree(unwrap_bp(a^b - q))))
         end
     end
 end
@@ -377,6 +387,7 @@ function partial_multinomial_expansion(xs, exp, deg)
         terms = [+(zs...), nzs...]
     end
     degs = map(_degree, terms)
+
 
     q = []
     nfact = factorial(exp)
@@ -403,4 +414,11 @@ julia> semipolynomial_form((1+x)^2*b, [x,b], 1)
 (Dict{Any, Any}(b => (1 + Symbolics.BoundedDegreeMonomial(x, 1, false))^2 - x), b*x)
 
 julia> semipolynomial_form((1+x)^2*b, [x,b], 2)
+
+julia> ex = (9 + y*z)*(( y*z + z^2)^2)
+
+julia> ex =  (1.5 + z)*((1x+y)^2);
+
+
+julia> ex = (1 + y)*(( y*z + z)^3) WRT [z] deg=3
 =#
