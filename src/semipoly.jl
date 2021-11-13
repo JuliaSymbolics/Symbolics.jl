@@ -118,8 +118,7 @@ end
 function bifurcate_terms(expr)
     # Step 4: Bifurcate polynomial and nonlinear parts:
 
-    isboundedmonom(x) = x isa BoundedDegreeMonomial && !x.overdegree
-    if isboundedmonom(expr)
+    if expr isa BoundedDegreeMonomial
         return Dict(expr.p => expr.coeff), 0
     elseif istree(expr) && operation(expr) == (+)
         args = collect(all_terms(expr))
@@ -311,7 +310,7 @@ _mul(x) = isempty(x) ? 1 : isone(length(x)) ? first(x) : prod(x)
 
 function mul(a, b, deg)
     if isop(a, +)
-        return Term{symtype(a)}(+, mul.(unsorted_arguments(a), (b,), deg))
+        return Term{symtype(a)}(+, map(x->mul(x, b, deg), unsorted_arguments(a)))
     elseif isop(b, +)
         return Term{symtype(a)}(+, mul.((a,), unsorted_arguments(b), deg))
     elseif a isa BoundedDegreeMonomial
@@ -373,7 +372,8 @@ function pow_of_add(a, b, deg, vars)
         if maxdeg * b <= deg
             q # q is the whole enchilada
         else
-            Term{Real}(+, vcat(all_terms(q), highdegree(unwrap_bp(a^b - q))))
+            Term{Real}(+, [all_terms(q)...,
+                           map(highdegree, all_terms(unwrap_bp(a^b - q)))...])
         end
     end
 end

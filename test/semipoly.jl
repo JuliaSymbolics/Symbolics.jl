@@ -54,15 +54,15 @@ function trial()
     end...)
 
 
-    for _ = 1:5
+    for _ = 1:3
         wrt = unique(rand([a,b,c,x,y,z], rand(1:6)))
-        for i=1:5
+        for i=1:4
             d, nl = semipolynomial_form(t, wrt, i)
             res = verify(t, d, wrt, nl)
 
             if !res
-                println("""Semi-poly form is wrong: $t  w.r.t   $wrt  deg=$deg
-                           Result: $d + $nl""")
+                println("""Semi-poly form is wrong: $t  w.r.t   $wrt  deg=$i
+                        Result: $d + $nl""")
             end
             @test res
         end
@@ -71,5 +71,7 @@ end
 
 
 for i=1:20
-    trial()
+    @testset "fuzz semi-polynomial-form ($i/20)" begin
+        trial()
+    end
 end
