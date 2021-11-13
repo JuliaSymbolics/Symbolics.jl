@@ -30,7 +30,10 @@ SymbolicUtils.promote_symtype(::Difference, t) = t
 """
 $(SIGNATURES)
 
-Represents a discrete update operator.
+Represents a discrete update (shift) operator with the semantics
+```
+DiscreteUpdate(t; dt=0.01)(y) ~ y(t+dt)
+```
 
 # Examples
 
