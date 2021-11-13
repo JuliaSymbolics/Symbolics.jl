@@ -1,6 +1,10 @@
 using Symbolics
 using Test
 
+using Random
+
+Random.seed!(667)
+
 @variables x y z
 
 
@@ -29,7 +33,7 @@ d, r = semipolynomial_form((x+2)^12, [x], 1)
 
 @syms a b c
 
-const components = [2, a, b, c, x, y, z, (1+x), (1+y^2), x^2, x*y, y^2, z*y, z*x, z^2]
+const components = [2, a, b, c, x, y, z, (1+x), (1+x*y), z*y, z*x]
 
 function verify(t, d, wrt, nl)
     try
@@ -44,7 +48,7 @@ function verify(t, d, wrt, nl)
 end
 
 function trial()
-    n = rand(2:length(components)-1)
+    n = rand(2:3)
     l, r = rand(components, n), vcat(rand(components, n), [1, 0, 1//2, 1.5])
 
     t = *(map(1:rand(1:3)) do _
@@ -56,15 +60,15 @@ function trial()
 
     for _ = 1:4
         wrt = unique(rand([a,b,c,x,y,z], rand(1:6)))
-        for i=[1,2,3,4,Inf]
-            if i == 1
+        for deg=Any[1,2,3,4,Inf]
+            if deg == 1
                 A, c = semilinear_form([t], wrt)
                 res = iszero(A*wrt + c - [t])
                 if !res
                     println("Semi-linear form is wrong: [$t]  w.r.t   $wrt ")
                     @show A c
                 end
-            elseif i == 2
+            elseif deg == 2
                 A,B,v2, c = semiquadratic_form([t], wrt)
                 res = iszero(A * wrt + B * v2 + c - [t])
                 if !res
@@ -72,15 +76,25 @@ function trial()
                     @show A B v2 c
                 end
             else
-                if isfinite(i)
-                    d, nl = semipolynomial_form(t, wrt, i)
+                if isfinite(deg)
+                    d, nl = semipolynomial_form(t, wrt, deg)
+                    @test all(x->Symbolics.pdegree(x) <= deg, keys(d))
+                    for x in wrt
+                        d2, enl = semipolynomial_form(expand(nl), wrt, Inf)
+                        elim = all(x->Symbolics.pdegree(x)>deg, keys(d2))
+                        if !elim
+                            println("Imperfect elimination:")
+                            @show t wrt deg nl expand(nl)
+                        end
+                        @test elim
+                    end
                 else
                     d, nl = polynomial_coeffs(t, wrt)
                 end
 
                 res = verify(t, d, wrt, nl)
                 if !res
-                    println("""Semi-poly form is wrong: $t  w.r.t   $wrt  deg=$i
+                    println("""Semi-poly form is wrong: $t  w.r.t   $wrt  deg=$deg
                             Result: $d + $nl""")
                 end
             end
