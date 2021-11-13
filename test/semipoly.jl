@@ -54,16 +54,32 @@ function trial()
     end...)
 
 
-    for _ = 1:3
+    for _ = 1:4
         wrt = unique(rand([a,b,c,x,y,z], rand(1:6)))
         for i=1:4
-            d, nl = semipolynomial_form(t, wrt, i)
-            res = verify(t, d, wrt, nl)
-
-            if !res
-                println("""Semi-poly form is wrong: $t  w.r.t   $wrt  deg=$i
-                        Result: $d + $nl""")
+            if i == 1
+                A, c = semilinear_form([t], wrt)
+                res = iszero(A*wrt + c - [t])
+                if !res
+                    println("Semi-linear form is wrong: [$t]  w.r.t   $wrt ")
+                    @show A c
+                end
+            elseif i == 2
+                A,B,v2, c = semiquadratic_form([t], wrt)
+                res = iszero(A * wrt + B * v2 + c - [t])
+                if !res
+                    println("Semi-quadratic form is wrong: $t  w.r.t   $wrt")
+                    @show A B v2 c
+                end
+            else
+                d, nl = semipolynomial_form(t, wrt, i)
+                res = verify(t, d, wrt, nl)
+                if !res
+                    println("""Semi-poly form is wrong: $t  w.r.t   $wrt  deg=$i
+                            Result: $d + $nl""")
+                end
             end
+
             @test res
         end
     end
