@@ -3,8 +3,6 @@ using Test
 
 using Random
 
-Random.seed!(667)
-
 @variables x y z
 
 
@@ -33,7 +31,7 @@ d, r = semipolynomial_form((x+2)^12, [x], 1)
 
 @syms a b c
 
-const components = [2, a, b, c, x, y, z, (1+x), (1+x*y), z*y, z*x]
+const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
 
 function verify(t, d, wrt, nl)
     try
@@ -47,16 +45,21 @@ function verify(t, d, wrt, nl)
     end
 end
 
+seed = 0
+
 function trial()
-    n = rand(2:3)
+    global seed += 1
+    Random.seed!(666+seed)
+    n = rand(2:length(components)-1)
     l, r = rand(components, n), vcat(rand(components, n), [1, 0, 1//2, 1.5])
 
     t = *(map(1:rand(1:3)) do _
         pow = rand([1,1,1,1,1,1,1,1,2,3])
-        nterms = rand(3:20)
+        nterms = rand(2:5)
         sum(rand(l, nterms) .* rand(r, nterms)) ^ pow
     end...)
 
+    @show t
 
     for _ = 1:4
         wrt = unique(rand([a,b,c,x,y,z], rand(1:6)))

@@ -119,7 +119,9 @@ function bifurcate_terms(expr)
     # Step 4: Bifurcate polynomial and nonlinear parts:
 
     if expr isa BoundedDegreeMonomial
-        return Dict(expr.p => expr.coeff), 0
+        return isboundedmonom(expr) ?
+            (Dict(expr.p => expr.coeff), 0) :
+            (Dict(), expr.p * expr.coeff)
     elseif istree(expr) && operation(expr) == (+)
         args = collect(all_terms(expr))
         polys = filter(isboundedmonom, args)
