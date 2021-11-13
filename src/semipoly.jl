@@ -1,7 +1,7 @@
 import SymbolicUtils.Rewriters: RestartedChain
 using DataStructures
 
-export semipolynomial_form, semilinear_form, semiquadratic_form
+export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
 ## BoundedDegreeMonomial helper type
 
@@ -180,6 +180,21 @@ function semipolynomial_form(exprs::AbstractArray, vars, degree)
     tmp = map(bifurcate_terms, matches)
     dicts, nls = map(first, tmp), map(last, tmp)
 end
+
+
+"""
+    polynomial_coeffs(expr, vars)
+
+
+Find coefficients of a polynomial in `vars`.
+
+Returns a tuple of two elements:
+1. A dictionary of coefficients keyed by monomials in `vars`
+2. A residual expression which is the constant term
+
+(Same as `semipolynomial_form(expr, vars, Inf)`)
+"""
+polynomial_coeffs(expr, vars) = semipolynomial_form(expr, vars, Inf)
 
 """
     semilinear_form(exprs::AbstractVector, vars::AbstractVector)

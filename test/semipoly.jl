@@ -56,7 +56,7 @@ function trial()
 
     for _ = 1:4
         wrt = unique(rand([a,b,c,x,y,z], rand(1:6)))
-        for i=1:4
+        for i=[1,2,3,4,Inf]
             if i == 1
                 A, c = semilinear_form([t], wrt)
                 res = iszero(A*wrt + c - [t])
@@ -72,7 +72,12 @@ function trial()
                     @show A B v2 c
                 end
             else
-                d, nl = semipolynomial_form(t, wrt, i)
+                if isfinite(I)
+                    d, nl = semipolynomial_form(t, wrt, i)
+                else
+                    d, nl = polynomial_coeffs(t, wrt)
+                end
+
                 res = verify(t, d, wrt, nl)
                 if !res
                     println("""Semi-poly form is wrong: $t  w.r.t   $wrt  deg=$i
