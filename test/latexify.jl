@@ -42,3 +42,5 @@ Dy = Differential(y)
     Dx(u) ~   z
     Dx(y) ~   y*x
 ])
+
+@test_reference "latexify_refs/complex1.txt" latexify(x^2-y^2+2im*x*y)
