@@ -430,7 +430,6 @@ geteltype(::Type{<:AbstractArray{T}}) where {T} = T
 geteltype(::Type{<:AbstractArray}) = Unknown()
 
 ndims(s::SymArray) = ndims(symtype(s))
-ndims(T::Type{<:AbstractArray}) = ndims(T)
 
 function eltype(A::Union{Arr, SymArray})
     T = geteltype(unwrap(A))
