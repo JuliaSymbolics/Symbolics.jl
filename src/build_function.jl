@@ -265,20 +265,42 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
 end
 
-function _make_array(rhss::AbstractSparseArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    if !(arr isa AbstractSparseArray)
-        _make_array(arr, similarto)
+function nzmap(f, x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose})
+    Setfield.@set! x.parent = nzmap(f, x.parent)
+    x
+end
+
+function nzmap(f, x::AbstractSparseArray)
+    Setfield.@set! x.nzval = nzmap(f, x.nzval)
+    x
+end
+nzmap(f, x) = map(f, x)
+
+_issparse(x::AbstractArray) = issparse(x)
+_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = issparse(parent(A))
+
+function _make_sparse_array(arr, similarto)
+    if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
+        quote
+            let reference = $(nzmap(x->true, arr));
+                $Setfield.@set reference.parent = $(_make_array(parent(arr),
+                                                                typeof(parent(arr))))
+            end
+        end
     else
-        MakeSparseArray(arr)
+        quote
+            let reference = $(nzmap(x->true, arr));
+                $Setfield.@set reference.nzval = $(_make_array(arr.nzval,
+                                                               Vector{symtype(eltype(arr))}))
+            end
+        end
     end
 end
 
 function _make_array(rhss::AbstractArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    # Ugh reshaped array of a sparse array when mapped gives a sparse array
-    if arr isa AbstractSparseArray
-        _make_array(arr, similarto)
+    arr = nzmap(x->_make_array(x, similarto), rhss)
+    if _issparse(arr)
+        _make_sparse_array(arr, similarto)
     else
         MakeArray(arr, similarto)
     end
