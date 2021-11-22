@@ -275,8 +275,7 @@ function toexpr(p::SpawnFetch{ShardedForm{false}}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        :($Funcall($(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false)),
-                   ($(toexpr.(a, (st,))...),)))
+        :($(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false))($(toexpr.(a, (st,))...),))
     end
     quote
         $(toexpr(p.combine, st))($(spawns...))
