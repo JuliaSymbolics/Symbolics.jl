@@ -135,6 +135,12 @@ end
 const SymArray = Union{ArrayOp, Symbolic{<:AbstractArray}}
 const SymMat = Union{ArrayOp{<:AbstractMatrix}, Symbolic{<:AbstractMatrix}}
 const SymVec = Union{ArrayOp{<:AbstractVector}, Symbolic{<:AbstractVector}}
+const ArrayLike{T,N} = Union{
+    ArrayOp{AbstractArray{T,N}},
+    Symbolic{AbstractArray{T,N}},
+    Arr{T,N},
+    SymbolicUtils.Term{Arr{T, N}}
+} # Like SymArray but includes Arr and Term{Arr}
 
 ### Propagate ###
 #

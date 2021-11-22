@@ -1,6 +1,6 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 
@@ -67,4 +67,39 @@ end
     @variables t x[1:4](t)
     x = unwrap(x)
     @test Symbolics.getparent(collect(x)[1]).metadata === x.metadata
+end
+
+n = 2
+A = randn(n,n)
+foo(x) = A*x # a function to represent symbolically, note, if this function is defined inside the testset, it's not found by the function fun_eval = eval(fun_ex)
+@testset "Functions and Jacobians" begin
+    @variables x[1:n]
+
+    function symbolic_call(n)
+        @variables x[1:n]
+        @syms foo(x::Symbolics.Arr{Num, 1})::Symbolics.Arr{Num, 1} # symbolic foo can not be created in global scope due to conflict with function foo
+        foo(x) # return a symbolic call to foo
+    end
+
+    x0 = randn(n)
+    @test foo(x0) == A*x0
+    ex = symbolic_call(n)
+
+    fun_genf = build_function(ex, x, expression=Val{false})
+    @test_broken fun_genf(x0) == A*x0# UndefVarError: foo not defined
+
+    # Generate an expression instead and eval it manually
+    fun_ex = build_function(ex, x, expression=Val{true})
+    fun_eval = eval(fun_ex)
+    @test fun_eval(x0) == foo(x0) 
+
+    # Try to provide the hidden argument `expression_module` to solve the scoping issue
+    @test_skip begin
+        fun_genf = build_function(ex, x, expression=Val{false}, expression_module=Main) # UndefVarError: #_RGF_ModTag not defined
+        fun_genf(x0) == A*x0 
+    end
+
+    ## Jacobians
+    @test Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
+    @test_skip Symbolics.value.(Symbolics.jacobian(ex , x)) == A #ERROR: axes of foo(x[1:2]) not known
 end
