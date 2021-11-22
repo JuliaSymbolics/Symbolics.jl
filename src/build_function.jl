@@ -9,9 +9,15 @@ struct MATLABTarget <: BuildTargets end
 
 abstract type ParallelForm end
 struct SerialForm <: ParallelForm end
-struct MultithreadedForm <: ParallelForm
+
+struct ShardedForm{multithreaded} <: ParallelForm
     ntasks::Int
 end
+
+ShardedForm(n) = ShardedForm{false}(n)
+
+const MultithreadedForm = ShardedForm{true}
+
 MultithreadedForm() = MultithreadedForm(2*nthreads())
 
 """
@@ -229,13 +235,13 @@ function make_array(s::SerialForm, dargs, arr, similarto)
     _make_array(arr, similarto)
 end
 
-function make_array(s::MultithreadedForm, closed_args, arr, similarto)
+function make_array(s::ShardedForm, closed_args, arr, similarto)
     per_task = ceil(Int, length(arr) / s.ntasks)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
         Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
-    SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), vcat)
+    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
 end
 
 struct Funcall{F, T}
@@ -262,6 +268,18 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
     quote
         $(toexpr(p.combine, st))(map(fetch, ($(spawns...),))...)
+    end
+end
+
+function toexpr(p::SpawnFetch{ShardedForm{false}}, st)
+    args = isnothing(p.args) ?
+              Iterators.repeated((), length(p.exprs)) : p.args
+    spawns = map(p.exprs, args) do thunk, a
+        :($Funcall($(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false)),
+                   ($(toexpr.(a, (st,))...),)))
+    end
+    quote
+        $(toexpr(p.combine, st))($(spawns...))
     end
 end
 
@@ -297,7 +315,7 @@ function set_array(s::SerialForm, closed_vars, args...)
     _set_array(args...)
 end
 
-function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
+function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
         return set_array(LiteralExpr(:($out.nzval)),
                          nothing,
@@ -316,7 +334,7 @@ function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, che
         Func([out, closed_args...], [],
              _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
     end
-    SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
+    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
