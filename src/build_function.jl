@@ -275,7 +275,7 @@ end
 nzmap(f, x) = map(f, x)
 
 _issparse(x::AbstractArray) = issparse(x)
-_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = issparse(parent(x))
+_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
 
 function _make_sparse_array(arr, similarto)
     if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
