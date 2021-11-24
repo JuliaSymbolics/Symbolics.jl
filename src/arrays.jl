@@ -481,6 +481,11 @@ function eachindex(A::Union{Arr, SymArray})
     return CartesianIndices(s)
 end
 
+function get_variables!(vars, e::Arr, varlist=nothing)
+    foreach(x -> get_variables!(vars, x, varlist), collect(e))
+    vars
+end
+
 
 function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
     haskey(st.symbolify, x) && return st.symbolify[x]

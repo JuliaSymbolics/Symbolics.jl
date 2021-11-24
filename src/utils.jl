@@ -45,11 +45,14 @@ julia> Symbolics.get_variables(ex)
 ```
 """
 get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
+get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
 function is_singleton(e::Term)
-    operation(e) === getindex && return true
-    operation(e) isa Sym
+    op = operation(e)
+    op === getindex && return true
+    op isa Term && return is_singleton(op) # recurse to reach getindex for array element variables
+    op isa Sym
 end
 
 is_singleton(e::Sym) = true
