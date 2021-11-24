@@ -62,7 +62,7 @@ end
 
 function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
     if !(arg isa Arr)
-        DestructuredArgs(map(unwrap, arg), name, inbounds=inbounds)
+        DestructuredArgs(map(unwrap, arg), name, inbounds=inbounds, create_bindings=false)
     else
         unwrap(arg)
     end
@@ -314,6 +314,22 @@ function set_array(s::SerialForm, closed_vars, args...)
     _set_array(args...)
 end
 
+function recursive_split(leaf_f, s, out, args, outputidxs, xs, cutoff, nspawns)
+    @show length(xs)
+    if length(xs) <= cutoff
+        return leaf_f(outputidxs, xs)
+    else
+        per_part = ceil(Int, length(xs) / nspawns)
+        slices = collect(Iterators.partition(zip(outputidxs, xs), per_part))
+        fs = map(slices) do slice
+            recursive_split(leaf_f, s, out, args, first.(slice), last.(slice), cutoff, nspawns)
+        end
+        return Func(args, [],
+                    SpawnFetch{typeof(s)}(fs, [args for f in fs],
+                                   @inline noop(x...) = nothing))
+    end
+end
+
 function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
         return set_array(LiteralExpr(:($out.nzval)),
@@ -325,15 +341,11 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
-    per_task = ceil(Int, length(rhss) / s.ntasks)
-    # TODO: do better partitioning when skipzeros is present
-    slices = collect(Iterators.partition(zip(outputidxs, rhss), per_task))
-    arrays = map(slices) do slice
-        idxs, vals = first.(slice), last.(slice)
-        Func([out, closed_args...], [],
-             _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
-    end
-    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
+    all_args = [out, closed_args...]
+    return recursive_split(s, out, all_args, outputidxs, rhss, 12, 4) do idxs, xs
+        Func(all_args, [],
+             _set_array(out, idxs, xs, checkbounds, skipzeros))
+    end.body
 end
 
 function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
