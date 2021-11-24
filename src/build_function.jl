@@ -282,17 +282,13 @@ _issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = iss
 function _make_sparse_array(arr, similarto)
     if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
         quote
-            let reference = $(nzmap(x->true, arr));
-                $Setfield.@set reference.parent = $(_make_array(parent(arr),
-                                                                typeof(parent(arr))))
-            end
+            $Setfield.@set $(nzmap(x->true, arr)).parent =
+                $(_make_array(parent(arr), typeof(parent(arr))))
         end
     else
         quote
-            let reference = $(nzmap(x->true, arr));
-                $Setfield.@set reference.nzval = $(_make_array(arr.nzval,
-                                                               Vector{symtype(eltype(arr))}))
-            end
+            $Setfield.@set $(nzmap(x->true, arr)).nzval =
+                $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
         end
     end
 end
