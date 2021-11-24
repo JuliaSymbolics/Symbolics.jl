@@ -266,30 +266,28 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
 end
 
 function nzmap(f, x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose})
-    Setfield.@set! x.parent = nzmap(f, x.parent)
-    x
+    Setfield.@set x.parent = nzmap(f, x.parent)
 end
 
 function nzmap(f, x::AbstractSparseArray)
-    Setfield.@set! x.nzval = nzmap(f, x.nzval)
-    x
+    Setfield.@set x.nzval = nzmap(f, x.nzval)
 end
 nzmap(f, x) = map(f, x)
 
 _issparse(x::AbstractArray) = issparse(x)
-_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = issparse(parent(A))
+_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = issparse(parent(x))
 
 function _make_sparse_array(arr, similarto)
     if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
-        quote
+        LiteralExpr(quote
             $Setfield.@set $(nzmap(x->true, arr)).parent =
                 $(_make_array(parent(arr), typeof(parent(arr))))
-        end
+            end)
     else
-        quote
+        LiteralExpr(quote
             $Setfield.@set $(nzmap(x->true, arr)).nzval =
                 $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
-        end
+            end)
     end
 end
 

@@ -115,7 +115,6 @@ let # ModelingToolkit.jl#800
     sf1, sf2 = string(f1), string(f2)
     @test !contains(sf1, "CartesianIndex")
     @test !contains(sf2, "CartesianIndex")
-    @test contains(sf1, "SparseMatrixCSC(")
     @test contains(sf2, ".nzval")
 end
 
