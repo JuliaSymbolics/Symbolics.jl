@@ -315,7 +315,6 @@ function set_array(s::SerialForm, closed_vars, args...)
 end
 
 function recursive_split(leaf_f, s, out, args, outputidxs, xs, cutoff, nspawns)
-    @show length(xs)
     if length(xs) <= cutoff
         return leaf_f(outputidxs, xs)
     else
@@ -326,7 +325,7 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs, cutoff, nspawns)
         end
         return Func(args, [],
                     SpawnFetch{typeof(s)}(fs, [args for f in fs],
-                                   @inline noop(x...) = nothing))
+                                          (@inline noop(x...) = nothing), false))
     end
 end
 
@@ -344,7 +343,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     all_args = [out, closed_args...]
     return recursive_split(s, out, all_args, outputidxs, rhss, 12, 4) do idxs, xs
         Func(all_args, [],
-             _set_array(out, idxs, xs, checkbounds, skipzeros))
+             _set_array(out, idxs, xs, checkbounds, skipzeros), false)
     end.body
 end
 
