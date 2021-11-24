@@ -285,9 +285,11 @@ function _make_sparse_array(arr, similarto)
             end)
     else
         LiteralExpr(quote
-            $Setfield.@set $(nzmap(x->true, arr)).nzval =
-                $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
-            end)
+                        let __reference = copy($(nzmap(x->true, arr)))
+                            $Setfield.@set __reference.nzval =
+                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
+                        end
+                    end)
     end
 end
 
