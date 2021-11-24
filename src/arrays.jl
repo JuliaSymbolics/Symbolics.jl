@@ -397,6 +397,13 @@ function Arr(x)
     Arr{maybewrap(eltype(A)), ndims(A)}(x)
 end
 
+const ArrayLike{T,N} = Union{
+    ArrayOp{AbstractArray{T,N}},
+    Symbolic{AbstractArray{T,N}},
+    Arr{T,N},
+    SymbolicUtils.Term{Arr{T, N}}
+} # Like SymArray but includes Arr and Term{Arr}
+
 unwrap(x::Arr) = x.value
 
 maybewrap(T) = has_symwrapper(T) ? wrapper_type(T) : T

@@ -1,6 +1,6 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 
@@ -68,3 +68,76 @@ end
     x = unwrap(x)
     @test Symbolics.getparent(collect(x)[1]).metadata === x.metadata
 end
+
+n = 2
+A = randn(n,n)
+foo(x) = A*x # a function to represent symbolically, note, if this function is defined inside the testset, it's not found by the function fun_eval = eval(fun_ex)
+function Symbolics.propagate_ndims(::typeof(foo), x)
+    ndims(x)
+end
+function Symbolics.propagate_shape(::typeof(foo), x)
+    shape(x)
+end
+@wrapped function foo(x::AbstractVector)
+    t = arrterm(foo, x)
+    setmetadata(t, Symbolics.ScalarizeCache, Ref{Any}(nothing))
+end
+
+#=
+The following two testsets test jacobians for symbolic functions of symbolic arrays. Getting it to work currently requires the user to manually specify propagate_ndims and propagate_shape. Making use of `@register` or `@syms` to specify symbolic functions fail to propagate array shape
+=#
+
+@testset "Functions and Jacobians using @syms" begin
+    @variables x[1:n]
+
+    function symbolic_call(x)
+        @syms foo(x::Symbolics.Arr{Num, 1})::Symbolics.Arr{Num, 1} # symbolic foo can not be created in global scope due to conflict with function foo
+        foo(x) # return a symbolic call to foo
+    end
+
+    x0 = randn(n)
+    @test foo(x0) == A*x0
+    ex = symbolic_call(x)
+
+    fun_genf = build_function(ex, x, expression=Val{false})
+    @test_broken fun_genf(x0) == A*x0# UndefVarError: foo not defined
+
+    # Generate an expression instead and eval it manually
+    fun_ex = build_function(ex, x, expression=Val{true})
+    fun_eval = eval(fun_ex)
+    @test fun_eval(x0) == foo(x0) 
+
+    # Try to provide the hidden argument `expression_module` to solve the scoping issue
+    @test_skip begin
+        fun_genf = build_function(ex, x, expression=Val{false}, expression_module=Main) # UndefVarError: #_RGF_ModTag not defined
+        fun_genf(x0) == A*x0 
+    end
+
+    ## Jacobians
+    @test Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
+    @test_skip Symbolics.value.(Symbolics.jacobian(ex , x)) == A #ERROR: axes of foo(x[1:2]) not known
+end 
+
+
+@testset "Functions and Jacobians using manual @wrapped" begin
+    @variables x[1:n]
+
+    x0 = randn(n)
+    @test foo(x0) == A*x0
+    ex = foo(x)
+
+    @test shape(ex) == shape(x)
+
+    fun_genf = build_function(ex, x, expression=Val{false})
+    @test fun_genf(x0) == A*x0
+
+    # Generate an expression instead and eval it manually
+    fun_ex = build_function(ex, x, expression=Val{true})
+    fun_eval = eval(fun_ex)
+    @test fun_eval(x0) == foo(x0) 
+
+    ## Jacobians
+    @test value.(jacobian(foo(x), x)) == A
+    @test value.(jacobian(ex , x)) == A 
+end
+
