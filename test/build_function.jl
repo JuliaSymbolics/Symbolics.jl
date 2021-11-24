@@ -121,9 +121,7 @@ let
 
     f1,f2=build_function(@views(x[2:3,1:2]), [a,b,c], expression=Val{false})
     y = f1([1,2,3])
-    @test y isa Base.SubArray
-    @test y.parent isa Base.ReshapedArray
-    @test y.parent.parent.rowval == x.parent.rowval
+    @test y isa SparseMatrixCSC
     @test y == [0 0; 1 3]
 end
 

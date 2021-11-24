@@ -265,8 +265,20 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
 end
 
-function nzmap(f, x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose})
+function nzmap(f, x::Union{Base.ReshapedArray, LinearAlgebra.Transpose})
     Setfield.@set x.parent = nzmap(f, x.parent)
+end
+
+function nzmap(f, x::SubArray)
+    unview = copy(x)
+    if unview isa Union{SparseMatrixCSC, SparseVector}
+        n = nnz(unview)
+        if n != length(unview.nzval)
+            resize!(unview.nzval, n)
+            resize!(unview.rowval, n)
+        end
+    end
+    nzmap(f, unview)
 end
 
 function nzmap(f, x::AbstractSparseArray)
