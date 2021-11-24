@@ -1,6 +1,6 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 
@@ -22,6 +22,11 @@ using SymbolicUtils: Sym, term, operation
     j = Sym{Int}(:j)
     @test symtype(X[i,j]) == Real
     @test symtype(X[1,j]) == Real
+
+    @variables t x[1:2](t)
+    @test isequal(get_variables(0 ~ x[1]), [x[1]])
+    @test Set(get_variables(2x)) == Set(collect(x)) # both array elements are present
+    @test isequal(get_variables(2x[1]), [x[1]])
 end
 
 @testset "getindex" begin
