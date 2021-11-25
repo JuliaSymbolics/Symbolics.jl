@@ -325,7 +325,7 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs, cutoff, nspawns)
         end
         return Func(args, [],
                     SpawnFetch{typeof(s)}(fs, [args for f in fs],
-                                          (@inline noop(x...) = nothing), false))
+                                          (@inline noop(x...) = nothing)), false)
     end
 end
 
