@@ -341,7 +341,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
         outputidxs = collect(eachindex(rhss))
     end
     all_args = [out, closed_args...]
-    return recursive_split(s, out, all_args, outputidxs, rhss, 12, 4) do idxs, xs
+    return recursive_split(s, out, all_args, outputidxs, rhss, 80, 4) do idxs, xs
         Func(all_args, [],
              _set_array(out, idxs, xs, checkbounds, skipzeros), false)
     end.body
