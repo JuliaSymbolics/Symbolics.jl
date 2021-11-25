@@ -107,6 +107,24 @@ f = eval(build_function(sparse([1],[1], [(x+y)/k], 10,10), [x,y,k])[1])
 @test f([1.,1.,2])[1,1] == 1.0
 @test sum(f([1.,1.,2])) == 1.0
 
+# Reshaped SparseMatrix optimization
+let
+    @variables a b c
+
+    x = reshape(sparse([0 a 0; 0 b c]), 3, 2)
+    f1,f2=build_function(x, [a,b,c], expression=Val{false})
+    y = f1([1,2,3])
+    @test y isa Base.ReshapedArray
+    @test y.parent isa SparseMatrixCSC
+    @test y.parent.rowval == x.parent.rowval
+    @test y == [0 2; 0 0; 1 3]
+
+    f1,f2=build_function(@views(x[2:3,1:2]), [a,b,c], expression=Val{false})
+    y = f1([1,2,3])
+    @test y isa SparseMatrixCSC
+    @test y == [0 0; 1 3]
+end
+
 let # ModelingToolkit.jl#800
     @variables x
     y = sparse(1:3,1:3,x)
@@ -115,7 +133,6 @@ let # ModelingToolkit.jl#800
     sf1, sf2 = string(f1), string(f2)
     @test !contains(sf1, "CartesianIndex")
     @test !contains(sf2, "CartesianIndex")
-    @test contains(sf1, "SparseMatrixCSC(")
     @test contains(sf2, ".nzval")
 end
 

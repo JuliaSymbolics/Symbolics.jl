@@ -265,20 +265,50 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
 end
 
-function _make_array(rhss::AbstractSparseArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    if !(arr isa AbstractSparseArray)
-        _make_array(arr, similarto)
+function nzmap(f, x::Union{Base.ReshapedArray, LinearAlgebra.Transpose})
+    Setfield.@set x.parent = nzmap(f, x.parent)
+end
+
+function nzmap(f, x::SubArray)
+    unview = copy(x)
+    if unview isa Union{SparseMatrixCSC, SparseVector}
+        n = nnz(unview)
+        if n != length(unview.nzval)
+            resize!(unview.nzval, n)
+            resize!(unview.rowval, n)
+        end
+    end
+    nzmap(f, unview)
+end
+
+function nzmap(f, x::AbstractSparseArray)
+    Setfield.@set x.nzval = nzmap(f, x.nzval)
+end
+nzmap(f, x) = map(f, x)
+
+_issparse(x::AbstractArray) = issparse(x)
+_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
+
+function _make_sparse_array(arr, similarto)
+    if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
+        LiteralExpr(quote
+            $Setfield.@set $(nzmap(x->true, arr)).parent =
+                $(_make_array(parent(arr), typeof(parent(arr))))
+            end)
     else
-        MakeSparseArray(arr)
+        LiteralExpr(quote
+                        let __reference = copy($(nzmap(x->true, arr)))
+                            $Setfield.@set __reference.nzval =
+                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
+                        end
+                    end)
     end
 end
 
 function _make_array(rhss::AbstractArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    # Ugh reshaped array of a sparse array when mapped gives a sparse array
-    if arr isa AbstractSparseArray
-        _make_array(arr, similarto)
+    arr = nzmap(x->_make_array(x, similarto), rhss)
+    if _issparse(arr)
+        _make_sparse_array(arr, similarto)
     else
         MakeArray(arr, similarto)
     end
