@@ -67,6 +67,13 @@ function occursin_info(x, expr::Sym)
     isequal(x, expr)
 end
 
+hasderiv(eq::Equation) = hasderiv(eq.lhs) || hasderiv(eq.rhs)
+
+"""
+    hasderiv(O)
+
+Returns true if the expression or equation `O` contains [`Differential`](@ref) terms.
+"""
 function hasderiv(O)
     istree(O) || return false
     if operation(O) isa Differential
