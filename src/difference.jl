@@ -16,13 +16,15 @@ julia> @variables t;
 julia> Δ = Difference(t; dt=0.01)
 (::Difference) (generic function with 2 methods)
 ```
+
+See also [`Shift`](@ref)
 """
 struct Difference <: Function
     """Fixed Difference"""
     t
     dt
-    update::Bool
-    Difference(t; dt, update=false) = new(value(t), dt, update)
+    shift::Bool
+    Difference(t; dt, shift=false) = new(value(t), dt, shift)
 end
 (D::Difference)(t) = Term{symtype(t)}(D, [t])
 (D::Difference)(t::Num) = Num(D(value(t)))
@@ -30,9 +32,9 @@ SymbolicUtils.promote_symtype(::Difference, t) = t
 """
 $(SIGNATURES)
 
-Represents a discrete update (shift) operator with the semantics
+Represents a discrete time-shift operator with the semantics
 ```
-DiscreteUpdate(t; dt=0.01)(y) ~ y(t+dt)
+Shift(t; dt=0.01)(y) ~ y(t+dt)
 ```
 
 # Examples
@@ -42,15 +44,17 @@ julia> using Symbolics
 
 julia> @variables t;
 
-julia> U = DiscreteUpdate(t; dt=0.01)
+julia> U = Shift(t; dt=0.01)
 (::Difference) (generic function with 2 methods)
 ```
 """
-DiscreteUpdate(t; dt) = Difference(t; dt=dt, update=true)
+Shift(t; dt) = Difference(t; dt=dt, shift=true)
 
-Base.show(io::IO, D::Difference) = print(io, "Difference(", D.t, "; dt=", D.dt, ", update=", D.update, ")")
+Base.@deprecate DiscreteUpdate(t; dt) Shift(t; dt)
 
-Base.:(==)(D1::Difference, D2::Difference) = isequal(D1.t, D2.t) && isequal(D1.dt, D2.dt) && isequal(D1.update, D2.update)
+Base.show(io::IO, D::Difference) = print(io, "Difference(", D.t, "; dt=", D.dt, ", shift=", D.shift, ")")
+
+Base.:(==)(D1::Difference, D2::Difference) = isequal(D1.t, D2.t) && isequal(D1.dt, D2.dt) && isequal(D1.shift, D2.shift)
 Base.hash(D::Difference, u::UInt) = hash(D.dt, hash(D.t, xor(u, 0x055640d6d952f101)))
 
 Base.:^(D::Difference, n::Integer) = _repeat_apply(D, n)
