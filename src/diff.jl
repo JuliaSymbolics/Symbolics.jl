@@ -69,29 +69,41 @@ function occursin_info(x, expr::Sym)
     isequal(x, expr)
 end
 
-hasderiv(eq::Equation) = hasderiv(eq.lhs) || hasderiv(eq.rhs)
-
 """
     hasderiv(O)
 
 Returns true if the expression or equation `O` contains [`Differential`](@ref) terms.
 """
-function hasderiv(O)
+hasderiv(O) = recursive_hasoperator(Differential, O)
+
+
+recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
+recursive_hasoperator(op) = O -> recursive_hasoperator(op, O) # curry version
+
+
+"""
+    recursive_hasoperator(op, O)
+
+An internal function that contains the logic for [`hasderiv`](@ref) and [`hasdiff`](@ref).
+Return true if `O` contains a term with `Operator` `op`.
+"""
+function recursive_hasoperator(op, O)
     istree(O) || return false
-    if operation(O) isa Differential
+    if operation(O) isa op
         return true
     else
         if O isa Union{Add, Mul}
-            any(hasderiv, keys(O.dict))
+            any(recursive_hasoperator(op), keys(O.dict))
         elseif O isa Pow
-            hasderiv(O.base) || hasderiv(O.exp)
+            recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
         elseif O isa SymbolicUtils.Div
-            hasderiv(O.num) || hasderiv(O.den)
+            recursive_hasoperator(op)(O.num) || recursive_hasoperator(op)(O.den)
         else
-            any(hasderiv, arguments(O))
+            any(recursive_hasoperator(op), arguments(O))
         end
     end
 end
+
 """
 $(SIGNATURES)
 
