@@ -15,6 +15,7 @@ D2 = Difference(t; dt=0.01)
 @test isequal((D1^2)(x), D1(D1(x)))
 
 # hasdiff
+@test hasdiff(D1)
 @test hasdiff(D1(x) ~ x)
 @test hasdiff(x ~ D1(x))
 @test !hasdiff(t ~ x)

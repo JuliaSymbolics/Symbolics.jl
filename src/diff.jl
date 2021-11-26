@@ -79,6 +79,7 @@ hasderiv(O) = recursive_hasoperator(Differential, O)
 
 recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
 recursive_hasoperator(op) = O -> recursive_hasoperator(op, O) # curry version
+recursive_hasoperator(::Type{T}, ::T) where T = true
 
 
 """
