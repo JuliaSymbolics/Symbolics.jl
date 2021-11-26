@@ -17,7 +17,7 @@ julia> Δ = Difference(t; dt=0.01)
 (::Difference) (generic function with 2 methods)
 ```
 """
-struct Difference <: Function
+struct Difference <: Operator
     """Fixed Difference"""
     t
     dt
@@ -61,7 +61,7 @@ hasdiff(eq::Equation) = hasdiff(eq.lhs) || hasdiff(eq.rhs)
 """
     hasdiff(O)
 
-Returns true if the expression or equation `O` contains [`Difference`](@ref) terms (this include [`Shift`](@ref)).
+Returns true if the expression or equation `O` contains [`Difference`](@ref) terms (this include [`DiscreteUpdate`](@ref)).
 """
 function hasdiff(O)
     istree(O) || return false

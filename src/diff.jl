@@ -1,3 +1,5 @@
+abstract type Operator <: Function end
+
 """
 $(TYPEDEF)
 
@@ -26,7 +28,7 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 (D'~x(t)) ∘ (D'~x(t)) ∘ (D'~x(t))
 ```
 """
-struct Differential <: Function
+struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x
     Differential(x) = new(value(x))
