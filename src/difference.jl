@@ -54,3 +54,28 @@ Base.:(==)(D1::Difference, D2::Difference) = isequal(D1.t, D2.t) && isequal(D1.d
 Base.hash(D::Difference, u::UInt) = hash(D.dt, hash(D.t, xor(u, 0x055640d6d952f101)))
 
 Base.:^(D::Difference, n::Integer) = _repeat_apply(D, n)
+
+hasdiff(eq::Equation) = hasdiff(eq.lhs) || hasdiff(eq.rhs)
+
+
+"""
+    hasdiff(O)
+
+Returns true if the expression or equation `O` contains [`Difference`](@ref) terms (this include [`Shift`](@ref)).
+"""
+function hasdiff(O)
+    istree(O) || return false
+    if operation(O) isa Difference
+        return true
+    else
+        if O isa Union{Add, Mul}
+            any(hasdiff, keys(O.dict))
+        elseif O isa Pow
+            hasdiff(O.base) || hasdiff(O.exp)
+        elseif O isa SymbolicUtils.Div
+            hasdiff(O.num) || hasdiff(O.den)
+        else
+            any(hasdiff, arguments(O))
+        end
+    end
+end
