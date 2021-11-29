@@ -34,41 +34,37 @@ macro register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
     f = expr.args[1]
     args = expr.args[2:end]
 
-    symbolic_args = findall(x->x isa Symbol, args)
-
-    types = vec(collect(Iterators.product(ntuple(_->Ts, length(symbolic_args))...)))
-
-    # remove Real Real Real methods
-    filter!(Ts->!all(T->T == Real, Ts), types)
-
-    annotype(name,T) = :($name :: $T)
-    setinds(xs, idx, vs) = (xs=copy(xs); xs[idx] .= map(annotype, xs[idx], vs); xs)
-    name(x::Symbol) = :($value($x))
-    name(x::Expr) = ((@assert x.head == :(::)); :($value($(x.args[1]))))
-
-    ex = Expr(:block)
-    for ts in types
-        push!(ex.args, quote
-            function $f($(setinds(args, symbolic_args, ts)...))
-                wrap =  any(x->typeof(x) <: $Num, tuple($(setinds(args, symbolic_args, ts)...),)) ? $Num : $identity
-                args = ($(map(name, args)...),)
-                if all(arg -> !(arg isa $Symbolic), args)
-                    wrap($f(args...,))
-                else
-                    wrap($Term{$ret_type}($f, collect(args)))
-                end
-            end
-        end)
+    types = map(args) do x
+        if x isa Symbol
+            :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
+        elseif Meta.isexpr(x, :(::))
+            T = x.args[2]
+            :($has_symwrapper($T) ? ($T, $Symbolic{<:$T} $wrapper_type($T),) : ($T, $Symbolic{<:$T}))
+        else
+            error("Invalid argument format $x")
+        end
     end
-    push!(
-          ex.args,
-          quote
-              if $define_promotion
-                  (::$typeof($promote_symtype))(::$typeof($f), args...) = $ret_type
-              end
-          end
-         )
-    esc(ex)
+
+    eval_method = :(@eval function $f($(Expr(:$, :(s...))))
+                        $wrap($Term($f, [$(Expr(:$, :(s_syms...)))]))
+                    end)
+    quote
+        if isdefined(@__MODULE__, $(QuoteNode(f)))
+            __existing_sigs = map(x->x.sig, methods($f))
+        else
+            __existing_sigs = []
+        end
+
+        __Ts = unique!(map(x->Tuple{x...}, Iterators.product($(types...),)))
+
+        for sig in __Ts
+            if !any(s->s == sig, __existing_sigs)
+                s = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
+                s_syms = map(x->x.args[1], s)
+                $eval_method
+            end
+        end
+    end |> esc
 end
 
 # Ensure that Num that get @registered from outside the ModelingToolkit
