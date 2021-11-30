@@ -125,9 +125,19 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
     ndim = mapfoldl(ndims, max, bc.args, init=0)
     subscripts = makesubscripts(ndim)
 
+    onedim_count = mapreduce(+, bc.args) do x
+        if ndims(x) != 0
+            map(i-> isonedim(x, i) ? 1 : 0, 1:ndim)
+        else
+            map(i-> 1, 1:ndim)
+        end
+    end
+
+    extruded = map(x->x < length(bc.args), onedim_count)
+
     expr_args′ = map(bc.args) do x
         if ndims(x) != 0
-            subs = map(i-> isonedim(x, i) ?
+            subs = map(i-> extruded[i] && isonedim(x, i) ?
                        1 : subscripts[i], 1:ndims(x))
             x[subs...]
         else
