@@ -4,7 +4,7 @@ import SymbolicUtils: Term, symtype, FnType
 using Test
 
 @variables t
-Symbolics.@register fff(t)
+Symbolics.@register_symbolic fff(t)
 @test isequal(fff(t), Symbolics.Num(Symbolics.Term{Real}(fff, [Symbolics.value(t)])))
 
 ## @variables

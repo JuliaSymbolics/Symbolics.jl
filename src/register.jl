@@ -1,7 +1,7 @@
 using SymbolicUtils: Symbolic
 
 """
-    @register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
+    @register_symbolic(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
 
 Overload appropriate methods so that Symbolics can stop tracing into the
 registered function. If `define_promotion` is true, then a promotion method in
@@ -16,13 +16,13 @@ overwritting.
 
 # Examples
 ```julia
-@register foo(x, y)
-@register foo(x, y::Bool) false # do not overload a duplicate promotion rule
-@register goo(x, y::Int) # `y` is not overloaded to take symbolic objects
-@register hoo(x, y)::Int # `hoo` returns `Int`
+@register_symbolic foo(x, y)
+@register_symbolic foo(x, y::Bool) false # do not overload a duplicate promotion rule
+@register_symbolic goo(x, y::Int) # `y` is not overloaded to take symbolic objects
+@register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
 """
-macro register(expr, define_promotion = true, Ts = [])
+macro register_symbolic(expr, define_promotion = true, Ts = [])
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
@@ -78,6 +78,8 @@ macro register(expr, define_promotion = true, Ts = [])
         end
     end |> esc
 end
+
+Base.@deprecate_binding var"@register" var"@register_symbolic"
 
 # Ensure that Num that get @registered from outside the ModelingToolkit
 # module can work without having to bring in the associated function into the

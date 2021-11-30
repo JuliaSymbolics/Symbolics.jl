@@ -145,7 +145,7 @@ canonequal(a, b) = isequal(simplify(a), simplify(b))
                  -sin(x) * cos(cos(x))
                 )
 
-Symbolics.@register no_der(x)
+Symbolics.@register_symbolic no_der(x)
 @test canonequal(
                  Symbolics.derivative([sin(cos(x)), hypot(x, no_der(x))], x),
                  [
@@ -155,7 +155,7 @@ Symbolics.@register no_der(x)
                  ]
                 )
 
-Symbolics.@register intfun(x)::Int
+Symbolics.@register_symbolic intfun(x)::Int
 @test Symbolics.symtype(intfun(x).val) === Int
 
 eqs = [σ*(y-x),
@@ -245,7 +245,7 @@ let
 end
 
 @variables x y
-@register foo(x, y, z::Array)
+@register_symbolic foo(x, y, z::Array)
 D = Differential(x)
 @test isequal(expand_derivatives(D(foo(x, y, [1.2]) * x^2)), Differential(x)(foo(x, y, [1.2]))*(x^2) + 2x*foo(x, y, [1.2]))
 
