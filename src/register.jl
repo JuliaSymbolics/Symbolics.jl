@@ -1,4 +1,5 @@
 using SymbolicUtils: Symbolic
+
 """
     @register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
 
@@ -21,7 +22,7 @@ overwritting.
 @register hoo(x, y)::Int # `hoo` returns `Int`
 ```
 """
-macro register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
+macro register(expr, define_promotion = true, Ts = [])
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
@@ -39,30 +40,35 @@ macro register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
             :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
         elseif Meta.isexpr(x, :(::))
             T = x.args[2]
-            :($has_symwrapper($T) ? ($T, $Symbolic{<:$T} $wrapper_type($T),) : ($T, $Symbolic{<:$T}))
+            :($has_symwrapper($T) ?
+              ($T, $Symbolic{<:$T}, $wrapper_type($T),) :
+              ($T, $Symbolic{<:$T}))
         else
             error("Invalid argument format $x")
         end
     end
 
-    eval_method = :(@eval function $f($(Expr(:$, :(s...))))
-                        $wrap($Term($f, [$(Expr(:$, :(s_syms...)))]))
+    eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
+                        $wrap($Term{$ret_type}($f, [$(Expr(:$, :(s_syms...)))]))
                     end)
+    verbose = false
+    mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
     quote
-        if isdefined(@__MODULE__, $(QuoteNode(f)))
-            __existing_sigs = map(x->x.sig, methods($f))
-        else
-            __existing_sigs = []
+        __Ts = [Tuple{x...} for x in Iterators.product($(types...),)
+                if !all(x->Symbolics.has_symwrapper(x) &&
+                        Symbolics.wrapper_type(x) != x, x)]
+        if $verbose
+            println("Candidates")
+            map(println, __Ts)
         end
 
-        __Ts = unique!(map(x->Tuple{x...}, Iterators.product($(types...),)))
-
         for sig in __Ts
-            if !any(s->s == sig, __existing_sigs)
-                s = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
-                s_syms = map(x->x.args[1], s)
-                $eval_method
-            end
+            s = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
+            s_syms = map(x->x.args[1], s)
+            $eval_method
+        end
+        if $define_promotion
+            (::$typeof($promote_symtype))(::$typeof($f), args...) = $ret_type
         end
     end |> esc
 end

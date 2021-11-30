@@ -43,7 +43,7 @@ end
 @register Distributions.Uniform(mu,sigma) false
 @register Distributions.Normal(mu,sigma) false
 
-@register ∈(x::Num, y::AbstractArray)
+@register ∈(x::Real, y::AbstractArray)::Bool
 @register ∪(x, y)
 @register ∩(x, y)
 @register ∨(x, y)
