@@ -68,10 +68,10 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     @test_throws ArgumentError A ~ t
 
     # #448
-    @test isequal(scalarize(u + u), [2u[1]])
+    @test isequal(Symbolics.scalarize(u + u), [2u[1]])
 
     # #417
-    @test isequal(scalarize(x', (1,1)), x[1])
+    @test isequal(Symbolics.scalarize(x', (1,1)), x[1])
 end
 
 @testset "Parent" begin
