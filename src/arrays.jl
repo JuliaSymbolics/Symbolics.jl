@@ -627,7 +627,7 @@ function scalarize(arr::ArrayOp, idx)
     contracted = setdiff(iidx, arr.output_idx)
 
     dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : axs[oi][i])
-                for (oi, i) in zip(arr.output_idx, idx))
+                for (oi, i) in zip(arr.output_idx, idx) if unwrap(oi) isa Symbolic)
     partial = replace_by_scalarizing(arr.expr, dict)
 
     axes = [axs[c] for c in contracted]
