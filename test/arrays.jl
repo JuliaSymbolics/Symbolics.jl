@@ -46,7 +46,7 @@ end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
-    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x[1:4](t)
+    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x[1:4](t) u[1:1]
     AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)
     @test all(isequal(42), getdef.(AA))
@@ -66,6 +66,12 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     D = Differential(t)
     @test isequal(collect(D.(x) ~ x), map(i->D(x[i]) ~ x[i], eachindex(x)))
     @test_throws ArgumentError A ~ t
+
+    # #448
+    @test isequal(Symbolics.scalarize(u + u), [2u[1]])
+
+    # #417
+    @test isequal(Symbolics.scalarize(x', (1,1)), x[1])
 end
 
 @testset "Parent" begin
