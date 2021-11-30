@@ -6,6 +6,7 @@ derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
 @register Base.signbit(x)::Bool
 derivative(::typeof(signbit), args::NTuple{1,Any}, ::Val{1}) = 0
 derivative(::typeof(abs), args::NTuple{1,Any}, ::Val{1}) = IfElse.ifelse(signbit(args[1]),-one(args[1]),one(args[1]))
+
 function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{1})
     x, y = args
     IfElse.ifelse(x < y, one(x), zero(x))
@@ -22,7 +23,7 @@ function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{2})
     x, y = args
     IfElse.ifelse(x > y, zero(y), one(y))
 end
-            
+
 @register Base.ceil(x)
 @register Base.floor(x)
 @register Base.factorial(x)
@@ -30,7 +31,7 @@ end
 function derivative(::Union{typeof(ceil),typeof(floor),typeof(factorial)}, args::NTuple{1,Any}, ::Val{1})
     zero(args[1])
 end
-            
+
 @register Base.rand(x)
 @register Base.randn(x)
 

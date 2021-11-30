@@ -194,7 +194,6 @@ end
         res.=[a*x^2, y^3, b*x^4, sin(y), c*x+y, x+z^2, a*z+x, x+y^2+sin(z)]
     end
 
-    
     input=rand(3)
     output=rand(8)
 

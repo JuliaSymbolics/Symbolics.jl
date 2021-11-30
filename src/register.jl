@@ -49,20 +49,26 @@ macro register(expr, define_promotion = true, Ts = [])
     end
 
     eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
-                        $wrap($Term{$ret_type}($f, map($unwrap, [$(Expr(:$, :(s_syms...)))])))
+                        args = map($unwrap, [$(Expr(:$, :(s_syms...)))])
+                        if !any(x->$issym(x) || $istree(x), args)
+                            $f(args...)
+                        else
+                            $Term{$ret_type}($f, args)
+                        end |> $wrap
                     end)
     verbose = false
     mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
+    Ts = Symbol("##__Ts")
     quote
-        __Ts = [Tuple{x...} for x in Iterators.product($(types...),)
+        $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
                 if !all(x->Symbolics.has_symwrapper(x) &&
                         Symbolics.wrapper_type(x) != x, x)]
         if $verbose
             println("Candidates")
-            map(println, __Ts)
+            map(println, $Ts)
         end
 
-        for sig in __Ts
+        for sig in $Ts
             s = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
             s_syms = map(x->x.args[1], s)
             $eval_method
