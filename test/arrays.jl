@@ -69,6 +69,9 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     # #448
     @test isequal(scalarize(u + u), [2u[1]])
+
+    # #417
+    @test isequal(scalarize(x', (1,1)), x[1])
 end
 
 @testset "Parent" begin
