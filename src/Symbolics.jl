@@ -73,7 +73,7 @@ export degree
 using ConstructionBase
 include("arrays.jl")
 
-export @register
+export @register, @register_symbolic
 include("register.jl")
 
 using TreeViews
