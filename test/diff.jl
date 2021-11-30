@@ -150,12 +150,13 @@ Symbolics.@register no_der(x)
                  Symbolics.derivative([sin(cos(x)), hypot(x, no_der(x))], x),
                  [
                   -sin(x) * cos(cos(x)),
-                  x/hypot(x, no_der(x)) + no_der(x)*Differential(x)(no_der(x))/hypot(x, no_der(x))
+                  x/hypot(x, no_der(x)) +
+                      no_der(x)*Differential(x)(no_der(x))/hypot(x, no_der(x))
                  ]
                 )
 
 Symbolics.@register intfun(x)::Int
-@test Symbolics.symtype(intfun(x)) === Int
+@test Symbolics.symtype(intfun(x).val) === Int
 
 eqs = [σ*(y-x),
        x*(ρ-z)-y,

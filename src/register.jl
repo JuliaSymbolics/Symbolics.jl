@@ -49,7 +49,7 @@ macro register(expr, define_promotion = true, Ts = [])
     end
 
     eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
-                        $wrap($Term{$ret_type}($f, [$(Expr(:$, :(s_syms...)))]))
+                        $wrap($Term{$ret_type}($f, map($unwrap, [$(Expr(:$, :(s_syms...)))])))
                     end)
     verbose = false
     mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
