@@ -15,6 +15,9 @@ jobs:
         group:
           - Core
           - Downstream
+        version:
+          - '1'
+          - '1.6'
     steps:
       - uses: actions/checkout@v2
         with:
@@ -23,7 +26,7 @@ jobs:
           if [ "`git rev-parse --abbrev-ref HEAD`" != master ]; then git fetch origin master:master; fi
       - uses: julia-actions/setup-julia@v1
         with:
-          version: 1
+          version: ${{ matrix.version }}
       - uses: actions/cache@v1
         env:
           cache-name: cache-artifacts
