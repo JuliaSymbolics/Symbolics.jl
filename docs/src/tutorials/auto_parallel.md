@@ -54,7 +54,7 @@ model function:
 ```julia
 # Define the initial condition as normal arrays
 @variables u[1:N, 1:N, 1:3]
-du = simplify.(f(u, nothing, 0.0))
+du = simplify.(f(collect(u), nothing, 0.0))
 ```
 
 The output, here the in-place modified `du`, is a symbolic representation of
