@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    name: ${{ matrix.package.repo }}/${{ matrix.package.group }}
+    name: ${{ matrix.package.repo }}/${{ matrix.package.group }}/${{ matrix.julia-version }}
     runs-on: ${{ matrix.os }}
     env:
       GROUP: ${{ matrix.package.group }}
@@ -33,7 +33,7 @@ jobs:
       - name: Clone Downstream
         uses: actions/checkout@v2
         with:
-          repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}/${{ matrix.julia-version }}
+          repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
       - name: Load this and run the downstream tests
         shell: julia --color=yes --project=downstream {0}
