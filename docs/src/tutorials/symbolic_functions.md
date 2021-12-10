@@ -84,7 +84,7 @@ Or we can build an array variable and use it to trace the function:
 f(u)
 
 3-element Vector{Num}:
-  u[4] - u[3]
+  u[1] - u[3]
  u[1]^2 - u[2]
   u[2] + u[3]
 ```
