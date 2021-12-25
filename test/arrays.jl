@@ -46,7 +46,7 @@ end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
-    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x[1:4](t) u[1:1]
+    @variables A[1:5,1:3]=42 B[1:2, 1:2] b[1:3]=[2, 3, 5] t x[1:4](t) u[1:1]
     AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)
     @test all(isequal(42), getdef.(AA))
@@ -72,6 +72,15 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     # #417
     @test isequal(Symbolics.scalarize(x', (1,1)), x[1])
+
+    test_mat = [1 2; 3 4]
+    repl_dict = Dict(Symbolics.scalarize(B .=> test_mat))
+    @test isequal(substitute(Symbolics.scalarize(B^2), repl_dict), test_mat^2)
+    @test isequal(substitute(Symbolics.scalarize(B^3), repl_dict), test_mat^3)
+    @test isequal(substitute(Symbolics.scalarize(B^4), repl_dict), test_mat^4)
+    @test_broken isequal(substitute(Symbolics.scalarize(B^5), repl_dict), test_mat^5)
+    @test_broken isequal(substitute(Symbolics.scalarize(B^6), repl_dict), test_mat^6)
+    @test_broken isequal(substitute(Symbolics.scalarize(B^7), repl_dict), test_mat^7)
 end
 
 @testset "Parent" begin
@@ -116,18 +125,18 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
     # Generate an expression instead and eval it manually
     fun_ex = build_function(ex, x, expression=Val{true})
     fun_eval = eval(fun_ex)
-    @test fun_eval(x0) == foo(x0) 
+    @test fun_eval(x0) == foo(x0)
 
     # Try to provide the hidden argument `expression_module` to solve the scoping issue
     @test_skip begin
         fun_genf = build_function(ex, x, expression=Val{false}, expression_module=Main) # UndefVarError: #_RGF_ModTag not defined
-        fun_genf(x0) == A*x0 
+        fun_genf(x0) == A*x0
     end
 
     ## Jacobians
     @test Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
     @test_skip Symbolics.value.(Symbolics.jacobian(ex , x)) == A #ERROR: axes of foo(x[1:2]) not known
-end 
+end
 
 
 @testset "Functions and Jacobians using manual @wrapped" begin
@@ -145,10 +154,9 @@ end
     # Generate an expression instead and eval it manually
     fun_ex = build_function(ex, x, expression=Val{true})
     fun_eval = eval(fun_ex)
-    @test fun_eval(x0) == foo(x0) 
+    @test fun_eval(x0) == foo(x0)
 
     ## Jacobians
     @test value.(jacobian(foo(x), x)) == A
-    @test value.(jacobian(ex , x)) == A 
+    @test value.(jacobian(ex , x)) == A
 end
-

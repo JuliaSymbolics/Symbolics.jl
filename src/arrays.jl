@@ -217,6 +217,11 @@ function ndims(aop::ArrayOp)
     length(aop.output_idx)
 end
 
+function SymbolicUtils.substitute(x::ArrayOp, dict; fold=true)
+  out_idx, expr, redop, ter, tail... = arguments(x)
+  s = x -> substitute(x, dict, fold=fold)
+  return operation(x)((map(s, out_idx)...,), s(expr), redop, s(ter), tail...)
+end
 
 ### Utils ###
 
@@ -618,6 +623,20 @@ function propagate_shape(::typeof(inv), A)
     shp
 end
 
+function dummy_idxs(idxs, exclude)
+    out = Vector{eltype(idxs)}()
+    for idx in idxs
+        idx_try = idx
+        while true
+            idx_try = typeof(idx)(Symbol("Dummy_"*string(idx_try.name)), idx.metadata)
+            any(isequal.(idx_try, union(exclude, out))) || break
+        end
+        push!(out, idx_try)
+    end
+    return out
+end
+
+
 function scalarize(arr::ArrayOp, idx)
     @assert length(arr.output_idx) == length(idx)
 
@@ -628,12 +647,13 @@ function scalarize(arr::ArrayOp, idx)
 
     dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : axs[oi][i])
                 for (oi, i) in zip(arr.output_idx, idx) if unwrap(oi) isa Symbolic)
-    partial = replace_by_scalarizing(arr.expr, dict)
-
-    axes = [axs[c] for c in contracted]
+    rename_dict = Dict(contracted .=> dummy_idxs(contracted, iidx))
+    partial = replace_by_scalarizing(substitute(arr.expr, rename_dict), dict)
     if isempty(contracted)
         partial
     else
+        axes = [axs[c] for c in contracted]
+        contracted = [rename_dict[c] for c in contracted]
         mapreduce(arr.reduce, Iterators.product(axes...)) do idx
             replace_by_scalarizing(partial, Dict(contracted .=> idx))
         end
