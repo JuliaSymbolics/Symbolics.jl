@@ -136,13 +136,9 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
     extruded = map(x->x < length(bc.args), onedim_count)
 
     expr_args′ = map(bc.args) do x
-        if ndims(x) != 0
-            subs = map(i-> extruded[i] && isonedim(x, i) ?
-                       1 : subscripts[i], 1:ndims(x))
-            x[subs...]
-        else
-            x
-        end
+        subs = map(i-> extruded[i] && isonedim(x, i) ?
+                   1 : subscripts[i], 1:ndims(x))
+        x[subs...]
     end
 
     expr = term(bc.f, expr_args′...) # Imagine x .=> y -- if you don't have a term

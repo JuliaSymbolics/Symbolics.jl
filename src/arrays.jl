@@ -436,7 +436,6 @@ geteltype(s::SymArray) = geteltype(symtype(s))
 geteltype(::Type{<:AbstractArray{T}}) where {T} = T
 geteltype(::Type{<:AbstractArray}) = Unknown()
 
-ndims(s::SymArray) = ndims(symtype(s))
 ndims(::Type{<:Arr{<:Any, N}}) where N = N
 
 function eltype(A::Union{Arr, SymArray})
@@ -524,8 +523,8 @@ function replace_by_scalarizing(ex, dict)
             (broadcast(literal_pow, Base.RefValue{typeof(^)}(^), u, Base.RefValue{Val{1}}(Val{1}())))[1:3]
             =#
             base = args[2]
-            exp = val2num(only(args[3]))
-            f = only(args[1])
+            exp = val2num(args[3])
+            f = args[1]
             args = [base,exp]
         end
 
