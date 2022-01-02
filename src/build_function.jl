@@ -1,5 +1,6 @@
 using SymbolicUtils.Code
 using Base.Threads
+using SymbolicUtils.Code: LazyState
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
@@ -68,9 +69,10 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -86,11 +88,12 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -185,6 +188,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
+                       states = LazyState(),
                        parallel=SerialForm(), kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -213,10 +217,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 
     if expression == Val{true}
-        return toexpr(oop_expr), toexpr(ip_expr)
+        return toexpr(oop_expr, states), toexpr(ip_expr, states)
     else
-        return _build_and_inject_function(expression_module, toexpr(oop_expr)),
-        _build_and_inject_function(expression_module, toexpr(ip_expr))
+        return _build_and_inject_function(expression_module, toexpr(oop_expr, states)),
+        _build_and_inject_function(expression_module, toexpr(ip_expr, states))
     end
 end
 
@@ -409,6 +413,7 @@ function buildvarnumbercache(args...)
 end
 
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
+                       states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
     if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
@@ -420,7 +425,7 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
     if istree(O)
         if operation(O) === getindex
             args = arguments(O)
-            Expr(:ref, toexpr(args[1]), toexpr.(args[2:end] .+ offset)...)
+            Expr(:ref, toexpr(args[1], states), toexpr.(args[2:end] .+ offset, (states,))...)
         else
             Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
                                                              rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
