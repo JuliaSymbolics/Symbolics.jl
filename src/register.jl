@@ -49,9 +49,16 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
     end
 
     eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
-                        args = map($unwrap, [$(Expr(:$, :(s_syms...)))])
-                        if !any(x->$issym(x) || $istree(x), args)
-                            $f(args...)
+                        args = [$(Expr(:$, :(s_syms...)))]
+                        args′ = map($unwrap, args)
+                        if !any(x->$issym(x) || $istree(x), args′)
+                            if typeof.(args) == typeof.(args′)
+                                # this means there was no method which already caught it.
+                                # so create a term
+                                $Term{$ret_type}($f, args′)
+                            else
+                                $f(args...)
+                            end
                         else
                             $Term{$ret_type}($f, args)
                         end |> $wrap
