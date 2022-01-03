@@ -85,3 +85,9 @@ let
     @test ndims(y) == 2
     @test size(y) == (2,3)
 end
+
+
+# Edge case when no symbolic values are passed
+struct A end
+Symbolics.@register_symbolic bar(t, x::A)
+@test isequal(bar(0.1, A()), Term{Real}(bar, [0.1, A()]))
