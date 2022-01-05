@@ -84,7 +84,7 @@ include("linearity.jl")
 
 using DiffRules, SpecialFunctions, NaNMath
 
-using SparseArrays
+using SparseArrays, OffsetArrays
 
 export Differential, expand_derivatives
 
