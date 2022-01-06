@@ -67,8 +67,7 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
     Ts = Symbol("##__Ts")
     quote
         $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
-                if any(x->x <: $Symbolic || (Symbolics.has_symwrapper(x) &&
-                                              Symbolics.wrapper_type(x) == x), x)]
+                if any(x->x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
         if $verbose
             println("Candidates")
             map(println, $Ts)
