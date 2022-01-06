@@ -199,6 +199,14 @@ end
 
     findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
     findnz(Symbolics.jacobian_sparsity(f1!, output, input,1,2,3))[[1,2]] == findnz(reference_jac)[[1,2]]
+
+    input = rand(2,2)
+    function f2!(res,u,a,b,c)
+        (x,y,z)=u[1,1],u[2,1],u[3,1]
+        res.=[a*x^2, y^3, b*x^4, sin(y), c*x+y, x+z^2, a*z+x, x+y^2+sin(z)]
+    end
+    
+    findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
 end
 
 using Symbolics
