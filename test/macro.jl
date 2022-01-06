@@ -90,4 +90,14 @@ end
 # Edge case when no symbolic values are passed
 struct A end
 Symbolics.@register_symbolic bar(t, x::A)
-@test isequal(bar(0.1, A()), Term{Real}(bar, [0.1, A()]))
+Symbolics.@register_symbolic baz(x, y)
+@test_throws MethodError bar(0.1, A())
+@test_throws MethodError bar(Num(0.1), A())
+
+let
+    @variables x y
+    @test typeof(bar(x, A())) == Num
+    @test typeof(bar(unwrap(x), A())) <: Term
+    @test typeof(baz(x, unwrap(y))) == Num
+    @test typeof(baz(unwrap(x), unwrap(y))) <: Term
+end
