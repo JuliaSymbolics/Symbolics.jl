@@ -51,17 +51,22 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
     eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
                         args = [$(Expr(:$, :(s_syms...)))]
                         unwrapped_args = map($unwrap, args)
-                        if !any(x->$issym(x) || $istree(x), unwrapped_args)
+                        res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
                             if typeof.(args) == typeof.(unwrapped_args)
                                 # this means there was no method which already caught it.
-                                # so create a term
-                                $Term{$ret_type}($f, unwrapped_args)
+                                # so rethrow method error
+                                throw(MethodError($f, unwrapped_args))
                             else
                                 $f(unwrapped_args...)
                             end
                         else
                             $Term{$ret_type}($f, unwrapped_args)
-                        end |> $wrap
+                        end
+                        if typeof.(args) == typeof.(unwrapped_args)
+                            return res
+                        else
+                            return $wrap(res)
+                        end
                     end)
     verbose = false
     mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
