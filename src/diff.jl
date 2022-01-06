@@ -1,3 +1,5 @@
+abstract type Operator <: Function end
+
 """
 $(TYPEDEF)
 
@@ -26,7 +28,7 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 (D'~x(t)) ∘ (D'~x(t)) ∘ (D'~x(t))
 ```
 """
-struct Differential <: Function
+struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x
     Differential(x) = new(value(x))
@@ -67,22 +69,42 @@ function occursin_info(x, expr::Sym)
     isequal(x, expr)
 end
 
-function hasderiv(O)
+"""
+    hasderiv(O)
+
+Returns true if the expression or equation `O` contains [`Differential`](@ref) terms.
+"""
+hasderiv(O) = recursive_hasoperator(Differential, O)
+
+
+recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
+recursive_hasoperator(op) = O -> recursive_hasoperator(op, O) # curry version
+recursive_hasoperator(::Type{T}, ::T) where T = true
+
+
+"""
+    recursive_hasoperator(op, O)
+
+An internal function that contains the logic for [`hasderiv`](@ref) and [`hasdiff`](@ref).
+Return true if `O` contains a term with `Operator` `op`.
+"""
+function recursive_hasoperator(op, O)
     istree(O) || return false
-    if operation(O) isa Differential
+    if operation(O) isa op
         return true
     else
         if O isa Union{Add, Mul}
-            any(hasderiv, keys(O.dict))
+            any(recursive_hasoperator(op), keys(O.dict))
         elseif O isa Pow
-            hasderiv(O.base) || hasderiv(O.exp)
+            recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
         elseif O isa SymbolicUtils.Div
-            hasderiv(O.num) || hasderiv(O.den)
+            recursive_hasoperator(op)(O.num) || recursive_hasoperator(op)(O.den)
         else
-            any(hasderiv, arguments(O))
+            any(recursive_hasoperator(op), arguments(O))
         end
     end
 end
+
 """
 $(SIGNATURES)
 
@@ -366,6 +388,12 @@ A helper function for computing the Jacobian of an array of expressions with res
 an array of variable expressions.
 """
 function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
+    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
+end
+
+function jacobian(ops::ArrayLike{T, 1}, vars::ArrayLike{T, 1}; simplify=false) where T
+    ops = scalarize(ops)
+    vars = scalarize(vars) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
     Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 

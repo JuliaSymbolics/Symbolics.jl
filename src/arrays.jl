@@ -397,6 +397,13 @@ function Arr(x)
     Arr{maybewrap(eltype(A)), ndims(A)}(x)
 end
 
+const ArrayLike{T,N} = Union{
+    ArrayOp{AbstractArray{T,N}},
+    Symbolic{AbstractArray{T,N}},
+    Arr{T,N},
+    SymbolicUtils.Term{Arr{T, N}}
+} # Like SymArray but includes Arr and Term{Arr}
+
 unwrap(x::Arr) = x.value
 
 maybewrap(T) = has_symwrapper(T) ? wrapper_type(T) : T
@@ -430,7 +437,7 @@ geteltype(::Type{<:AbstractArray{T}}) where {T} = T
 geteltype(::Type{<:AbstractArray}) = Unknown()
 
 ndims(s::SymArray) = ndims(symtype(s))
-ndims(T::Type{<:AbstractArray}) = ndims(T)
+ndims(::Type{<:Arr{<:Any, N}}) where N = N
 
 function eltype(A::Union{Arr, SymArray})
     T = geteltype(unwrap(A))
@@ -472,6 +479,11 @@ function eachindex(A::Union{Arr, SymArray})
     s = shape(unwrap(A))
     s === Unknown() && error("eachindex of $A not known")
     return CartesianIndices(s)
+end
+
+function get_variables!(vars, e::Arr, varlist=nothing)
+    foreach(x -> get_variables!(vars, x, varlist), collect(e))
+    vars
 end
 
 
@@ -615,7 +627,7 @@ function scalarize(arr::ArrayOp, idx)
     contracted = setdiff(iidx, arr.output_idx)
 
     dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : axs[oi][i])
-                for (oi, i) in zip(arr.output_idx, idx))
+                for (oi, i) in zip(arr.output_idx, idx) if unwrap(oi) isa Symbolic)
     partial = replace_by_scalarizing(arr.expr, dict)
 
     axes = [axs[c] for c in contracted]
@@ -643,7 +655,7 @@ function scalarize(arr)
         wrap(scalarize(unwrap(arr)))
     elseif istree(arr) && symtype(arr) <: Number
         t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=arr.metadata)
-        scalarize_op(operation(t), t)
+        istree(t) ? scalarize_op(operation(t), t) : t
     else
         arr
     end
