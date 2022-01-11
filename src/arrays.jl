@@ -80,8 +80,14 @@ end
 
 symtype(a::ArrayOp{T}) where {T} = T
 istree(a::ArrayOp) = true
-operation(a::ArrayOp) = typeof(a)
-arguments(a::ArrayOp) = [a.output_idx, a.expr, a.reduce, a.term, a.shape, a.ranges, a.metadata]
+function operation(a::ArrayOp)
+    isnothing(a.term) ? typeof(a) : operation(a.term)
+end
+function arguments(a::ArrayOp)
+    isnothing(a.term) ? [a.output_idx, a.expr, a.reduce,
+                         a.term, a.shape, a.ranges, a.metadata] :
+    arguments(a.term)
+end
 
 function Base.isequal(a::ArrayOp, b::ArrayOp)
     a === b && return true
