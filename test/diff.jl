@@ -41,7 +41,7 @@ test_equal(expand_derivatives(dsinsin), cos(sin(t))*cos(t))
 d1 = D(sin(t)*t)
 d2 = D(sin(t)*cos(t))
 @test isequal(expand_derivatives(d1), simplify(t*cos(t)+sin(t)))
-@test isequal(expand_derivatives(d2), simplify(cos(t)*cos(t)+(-sin(t))*sin(t)))
+@test isequal(expand_derivatives(d2), cos(t)^2-sin(t)^2)
 
 eqs = [σ*(y-x),
        x*(ρ-z)-y,
