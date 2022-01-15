@@ -76,7 +76,8 @@ julia> substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
 
 ## Citation
 
-If you use Symbolics.jl, please [cite this paper](https://arxiv.org/abs/2105.03949)
+If you use Symbolics.jl, please [cite this paper](https://dl.acm.org/doi/10.1145/3511528.3511535) 
+(or see the free [arxiv version](https://arxiv.org/abs/2105.03949))
 
 ```bib
 @article{10.1145/3511528.3511535,
