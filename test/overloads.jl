@@ -197,6 +197,10 @@ x = Num.(randn(10))
 @test isequal(substitute(y ~ x*p, Dict(x => z, y => t)), t ~ z*p)
 @test ~(!((1 < x) & (x < 2) | (x >= 100) ⊻ (x <= 1000) & (x != 100))) isa Num
 
+# 490
+@variables z[1:2]
+@test_nowarn Symbolics.gradient(z[1]^2 + z[2]^4,z)
+
 # Maybe move me
 
 @variables x[1:3]
