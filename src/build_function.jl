@@ -758,7 +758,7 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-    matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) ["*matstr*"];"
     matstr
 end
 
@@ -816,7 +816,7 @@ function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];\n"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) [\n"*matstr*"];\n"
 
     return matstr
 
