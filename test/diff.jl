@@ -221,7 +221,7 @@ end
                        0 1 0 0
                        0 0 1 1
                        0 0 0 0])
-    findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(udef_ref)[[1,2]]
+    findnz(sparsity_pattern)[[1,2]] == findnz(udef_ref)[[1,2]]
 end
 
 using Symbolics
