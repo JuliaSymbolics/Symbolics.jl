@@ -205,8 +205,23 @@ end
         (x,y,z)=u[1,1],u[2,1],u[3,1]
         res.=[a*x^2, y^3, b*x^4, sin(y), c*x+y, x+z^2, a*z+x, x+y^2+sin(z)]
     end
-    
+
     findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
+
+    # Check for failures due to du[4] undefined
+    function f_undef(du,u)
+      du[1] = u[1]
+      du[2] = u[2]
+      du[3] = u[3] + u[4]
+    end
+    u0 = rand(4)
+    du0 = similar(u0)
+    sparsity_pattern = Symbolics.jacobian_sparsity(f_undef,du0,u0)
+    udef_ref = sparse([1 0 0 0
+                       0 1 0 0
+                       0 0 1 1
+                       0 0 0 0])
+    findnz(sparsity_pattern)[[1,2]] == findnz(udef_ref)[[1,2]]
 end
 
 using Symbolics
