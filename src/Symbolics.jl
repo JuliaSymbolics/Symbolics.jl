@@ -106,6 +106,10 @@ include("array-lib.jl")
 
 include("linear_algebra.jl")
 
+using Groebner
+include("groebner_basis.jl")
+export groebner_basis
+
 import Libdl
 include("build_function.jl")
 export build_function
