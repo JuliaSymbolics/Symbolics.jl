@@ -13,7 +13,7 @@ syms = [
 for sym in syms
     polynoms, pvar2sym, sym2term = Symbolics.symbol_to_poly(sym)
     sym2 = Symbolics.poly_to_symbol(polynoms, pvar2sym, sym2term, Real)
-    @test isequal(Symbolics.expand.(sym2), Symbolics.expand.(sym))
+    @test isequal(expand.(sym2), expand.(sym))
 end
 
 @test isequal(expand.(groebner_basis([x, y])), [y, x])
@@ -24,6 +24,12 @@ end
 
 @variables x1 x2 x3 x4
 @test isequal(expand.(groebner_basis([x1, x, y])), [y, x1, x])
+
+# input unchanged
+f1 = [x2, x1, x4, x3]
+f2 = [x2, x1, x4, x3]
+groebner_basis(f1)
+@test isequal(expand.(f1), expand.(f2))
 
 @variables x1 x2 x3 x4 x5
 system = [
