@@ -15,9 +15,13 @@ into an array of DynamicPolynomials.Polynomials
 function symbol_to_poly(sympolys::AbstractArray)
     @assert !isempty(sympolys) "Empty input."
 
+    # standardize input
+    stdsympolys = map(unwrap, sympolys)
+    sort!(stdsympolys, lt=(<ₑ))
+
     pvar2sym  = Bijections.Bijection{Any,Any}()
     sym2term  = Dict{Sym,Any}()
-    polyforms = map(f -> PolyForm(unwrap(f), pvar2sym, sym2term), sympolys)
+    polyforms = map(f -> PolyForm(f, pvar2sym, sym2term), stdsympolys)
 
     # Discover common coefficient type
     commontype = mapreduce(coefftype, promote_type, polyforms, init=Int)
