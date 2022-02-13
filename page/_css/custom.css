@@ -73,6 +73,9 @@ pre.code-output {
 .repl-block .cell-output:empty {
     display: none;
 }
+.repl-block .cell-output > code{
+    background: none;
+}
 .repl-block .cell-output::before {
     display: inline-block;
     text-align: right;
