@@ -7,8 +7,7 @@ The most basic symbolic expressions are symbolic variables. They can be created 
 
 \repl{
 using Symbolics
-@variables x y z;
-x+y
+@variables x y z
 }
 
 Arithmetic on variables returns symbolic expressions:

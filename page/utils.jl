@@ -27,7 +27,12 @@ function hfun_doc(params)
     """
 end
 
-stringmime(m, x) = sprint(io->show(io, m, x))
+function stringmime(m, x)
+    open("/tmp/foo", "w") do io
+        show(io, m, x)
+    end
+    sprint(io->show(io, m, x))
+end
 
 const mime_renderers = [
     MIME("text/latex") => (x,m) -> stringmime(m, x),
@@ -72,5 +77,7 @@ function lx_repl(com, _) # the signature must look like this
     # dumb way to recover stuff
     lines = split(content, "\n")
     cells = join([repl_cell(l, endswith(strip(l), ";"))  for l in lines if !isempty(strip(l)) ], "\n")
-    return @show """~~~<div class="repl-block">~~~$cells~~~</div>~~~"""
+    str = """~~~<div class="repl-block">~~~$cells~~~</div>~~~"""
+    print(str)
+    str
 end
