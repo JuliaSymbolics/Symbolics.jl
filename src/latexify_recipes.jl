@@ -48,7 +48,6 @@ end
 recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 
 @latexrecipe function f(n::Num)
-    env --> :equation
     cdot --> false
     fmt --> FancyNumberFormatter(5)
 
@@ -56,7 +55,6 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 end
 
 @latexrecipe function f(z::Complex{Num})
-    env --> :equation
     cdot --> false
     
     iszero(z.im) && return :($(recipe(z.re)))
@@ -65,13 +63,11 @@ end
 end
 
 @latexrecipe function f(n::ArrayOp)
-    env --> :equation
     cdot --> false
     return recipe(n.term)
 end
 
 @latexrecipe function f(n::Function)
-    env --> :equation
     cdot --> false
 
     return nameof(n)
@@ -79,14 +75,12 @@ end
 
 
 @latexrecipe function f(n::Arr)
-    env --> :equation
     cdot --> false
 
     return unwrap(n)
 end
 
 @latexrecipe function f(n::Symbolic)
-    env --> :equation
     cdot --> false
 
     return recipe(n)
