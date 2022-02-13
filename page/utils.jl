@@ -58,7 +58,9 @@ function print_bestmime(x)
 end
 
 function repl_cell(ex, hide_output)
-    s = """```julia:repl-cell
+    s = """~~~
+    <div class="julia-prompt">julia&gt; </div>
+    ~~~```julia:repl-cell
     res = begin # hide
     $ex
     end # hide
