@@ -17,7 +17,7 @@ jobs:
     - name: Fix URLs for PR preview deployment (pull request previews)
       if: github.event_name == 'pull_request'
       run: |
-          echo "PREVIEW_FRANKLIN_WEBSITE_URL=https://{netlify name}.netlify.app/previews/PR${{ github.event.number }}/" >> $GITHUB_ENV
+          echo "PREVIEW_FRANKLIN_WEBSITE_URL=https://xenodochial-meninsky-43e5ec.netlify.app/previews/PR${{ github.event.number }}/" >> $GITHUB_ENV
           echo "PREVIEW_FRANKLIN_PREPATH=previews/PR${{ github.event.number }}" >> $GITHUB_ENV
     - name: Deploy (preview)
       if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.head.repo.full_name # if this build is a PR build and the PR is NOT from a fork
