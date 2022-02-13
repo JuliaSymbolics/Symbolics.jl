@@ -1,0 +1,70 @@
+name: Build and Deploy
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        persist-credentials: false
+    - name: Fix URLs for PR preview deployment (pull request previews)
+      if: github.event_name == 'pull_request'
+      run: |
+          echo "PREVIEW_FRANKLIN_WEBSITE_URL=https://{netlify name}.netlify.app/previews/PR${{ github.event.number }}/" >> $GITHUB_ENV
+          echo "PREVIEW_FRANKLIN_PREPATH=previews/PR${{ github.event.number }}" >> $GITHUB_ENV
+    - name: Deploy (preview)
+      if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.head.repo.full_name # if this build is a PR build and the PR is NOT from a fork
+      uses: JamesIves/github-pages-deploy-action@releases/v3
+      with:
+          BRANCH: gh-preview # The branch where the PRs previews are stored
+          FOLDER: __site
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_FOLDER: "previews/PR${{ github.event.number }}" # The website preview is going to be stored in a subfolder
+    - name: Deploy (main)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+      uses: JamesIves/github-pages-deploy-action@releases/v3
+      with:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    BRANCH: gh-pages # Replace here the branch where your website is deployed
+    FOLDER: __site
+    # NOTE: uncomment the following lines if you intend to use PyPlot
+    # - name: Install python
+    #   uses: actions/setup-python@v1
+    #   with:
+    #     python-version: '3.8'
+    # - run: pip install matplotlib
+    - name: Install Julia
+      uses: julia-actions/setup-julia@v1
+      with:
+        version: 1 # Latest stable Julia version.
+    # NOTE
+    # Adjust the `input=""` on the last line to indicate where
+    # the source of the package page is (`page/` by default).
+    #
+    # Adjust also `output=""` on the last line if you want
+    # the page to be deployed in a specific folder on gh-pages
+    # if you do that, make sure that you adjust the `prepath`
+    # variable in `config.md` accordingly! so for instance
+    # if you set here `folder="web"` change prepath for
+    # `@def prepath = "YourPackage.jl/web"`
+    - run: julia -e '
+            using Pkg;
+            Pkg.add(["NodeJS", "PkgPage"]);
+            Pkg.develop("Symbolics");
+            using NodeJS;
+            run(`$(npm_cmd()) install highlight.js purgecss`);
+            import PkgPage;
+            PkgPage.optimize(input="page", output="")'
+    - name: Build and Deploy
+      uses: JamesIves/github-pages-deploy-action@releases/v3
+      with:
+        GITHUB_TOKEN: ${{ secrets.FRANKLIN_SHASHI }}
+        BRANCH: gh-pages
+        FOLDER: page/__site
