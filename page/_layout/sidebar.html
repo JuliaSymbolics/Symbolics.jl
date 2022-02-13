@@ -1,0 +1,51 @@
+<div class="sidebar">
+  <div class="container sidebar-sticky">
+    <div class="sidebar-about">
+      <h1 class="sidebar-title"><a href="/">Symbolics<span style="opacity:0.4">.jl</span></a></h1>
+      <br>
+    </div>
+    <style>
+@media (min-width: 768px) {
+    .sidebar-nav {
+    }
+}
+    .sidebar .container.sidebar-sticky {
+        top: 4rem;
+    }
+    .sidebar-nav .sidebar-nav-item.active {
+        box-sizing: border-box;
+        border-bottom: 1px #f1f1f1 solid;
+        margin-right: -1em;
+        margin-left: -0.5em;
+        padding-left: 0.5em;
+        color: white;
+        font-weight: normal !important;
+    }
+    .sidebar-nav .sidebar-nav-item {
+        color: #cccccc;
+        margin: 0.25em 0;
+    }
+    </style>
+    <nav class="sidebar-nav" style="opacity: 0.9">
+      <a class="sidebar-nav-item {{ispage index.html}}active{{end}}" href="/">Getting Started</a>
+      <a class="sidebar-nav-item {{ispage numeric-expressions}}active{{end}}" href="/numeric-expressions/">Numeric expressions</a>
+      <a class="sidebar-nav-item {{ispage array-expressions/*}}active{{end}}" href="/array-expressions/">Array expressions</a>
+      <a class="sidebar-nav-item {{ispage simplification/*}}active{{end}}" href="/simplification/">Expression simplification</a>
+      <a class="sidebar-nav-item {{ispage substitution/*}}active{{end}}" href="/substitution/">Expression substitution</a>
+      <a class="sidebar-nav-item {{ispage code-generation/*}}active{{end}}" href="/code-generation/">Expression &rarr; Code</a>
+      <a class="sidebar-nav-item {{ispage differentiation/*}}active{{end}}" href="/code-generation/">Differentiation (all orders)</a>
+      <a class="sidebar-nav-item {{ispage differentiation/*}}active{{end}}" href="/code-generation/">Symbolic Linear Algebra</a>
+      <a class="sidebar-nav-item {{ispage differentiation/*}}active{{end}}" href="/code-generation/">Semi-polynomial form</a>
+      <a class="sidebar-nav-item {{ispage differentiation/*}}active{{end}}" href="/code-generation/">Groebner basis</a>
+      <a class="sidebar-nav-item {{ispage api/*}}active{{end}}" href="/api/">API reference</a>
+    </nav>
+
+  </div>
+  <div style="font-size: 0.85em; bottom: 3em; position: fixed">
+      <a href="https://github.com/JuliaSymbolics/Symbolics.jl">Go to GitHub repository &rarr;</a> <br>  <br>
+
+      <a href="https://julialang.org/"><img src="https://raw.githubusercontent.com/JuliaLang/julia-logo-graphics/master/images/julia-logo-dark.svg" height="32" style="display: inline-block; margin-bottom: -8px; opacity: 0.7">
+          powered.</a>
+  </div>
+</div>
+<div class="content container">

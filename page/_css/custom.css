@@ -1,0 +1,137 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+Pro:ital,wght@0,400;0,700;0,900;1,300;1,400;1,600;1,700;1,900&family=Work+Sans:ital,wght@0,400;0,600;1,400;1,600&display=swap');
+html, body {
+    font-family: 'Work Sans', serif;
+}
+
+h1 { color: #333; }
+h1, h2, h3 {
+    font-family: 'Source Serif Pro';
+}
+.franklin-content li > p {
+    padding: 0;
+    margin: 0;
+}
+
+h2 { color: #3f3f3f; }
+
+.franklin-content h1 {
+    margin-bottom: 0;
+    font-size: 1.66em;
+    border: none;
+    font-size: 2.24rem;
+    font-weight: 600;
+}
+
+
+.content {
+    padding-top: 0;
+}
+.franklin-content pre > code {
+    border: 1px solid #6B8E2340;
+    padding: 1.5em;
+    border-radius: 0;
+}
+pre.code-output {
+    background: #6B8E2340;
+    padding-left: 0.5em;
+}
+
+.code-output code {
+    border-radius: 0;
+    padding-left: 1em !important;
+    background: white;
+}
+
+.franklin-content .repl-block pre {
+    margin: 0;
+}
+
+.franklin-content .repl-block pre > code {
+    background: none;
+    padding: 0.5em;
+    padding-left: 0em;
+    border:none;
+}
+.franklin-content .repl-block {
+    padding: 1em 1em;
+    border: 2px solid #6B8E2340;
+    background: #fafafa;
+    border-radius: 0.5em;
+    margin-bottom: 1em;
+}
+.franklin-content .repl-block pre > code::before {
+    display: inline-block;
+    text-align: right;
+    content: "julia> ";
+    width: 4em;
+    margin-right: 1em;
+    color: #999;
+}
+.repl-block .cell-output {
+    font-family: monospace;
+}
+.repl-block .cell-output:empty {
+    display: none;
+}
+.repl-block .cell-output::before {
+    display: inline-block;
+    text-align: right;
+    margin-right: 1em;
+    width: 4em;
+    color: #8a8;
+}
+.franklin-content .repl-block > p {
+    display: none;
+}
+.repl-block pre.code-output {
+    background: #6B8E2340;
+    padding-left: 0.5em;
+}
+
+.code-output code {
+    border-radius: 0;
+    padding-left: 1em !important;
+    background: white;
+}
+.docstring {
+    border: 1px solid #f1f1f1;
+    padding: 1em;
+    margin-bottom: 2em;
+}
+
+.franklin-content .docstring h2.doc-header {
+    font-size: 1.25em;
+    color: #008080;
+    margin: 16px 0;
+}
+
+.franklin-content .docstring h1 {
+    font-size: 1.2em;
+}
+.franklin-content .docstring h2 {
+    font-size: 1em;
+}
+
+.docstring .doc-type {
+    font-size: 1em;
+    color: #6B8E2350;
+    float: right;
+}
+
+.franklin-content h2 {
+    border: none;
+    font-size: 1.5em;
+    margin-bottom: 0.2em;
+}
+
+.sidebar-about h1 {
+    font-family: 'Source Serif Pro', sans-serif;
+    font-style: italic;
+    opacity: 0.8;
+    font-size: 1.5em;
+}
+
+.lead {
+    display: none;
+    font-size: 0.96em;
+}
