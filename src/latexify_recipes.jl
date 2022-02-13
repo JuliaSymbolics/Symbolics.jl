@@ -116,6 +116,14 @@ Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, "\$\$ " * latexif
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
+function Base.show(io::IO, ::MIME"text/latex", x::AbstractVector{Num})
+    print(io, "\$\\left[~")
+    for (i, item) in enumerate(x)
+        print(io, latexraw(item))
+        i == length(x) || print(io, ",\\hspace{6pt}")
+    end
+    print(io, "~\\right]\$")
+end
 
 _toexpr(O::ArrayOp) = _toexpr(O.term)
 
