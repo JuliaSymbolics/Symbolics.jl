@@ -19,8 +19,8 @@ sin(y) / sin(z)
 
 **Simplifying assumptions**
 
-By default, variables created with `@variables` macro make some _simplifying_ assumptions. Namely, multiplication and addition are assumed to be commutative and associative, divison assumes that the domain of the denominator does not contain zero.
-These assumptions help Symbolics maintain a compact canonical representation of expressions. This saves on algorithmic complexity, memory and results in most expressions being simplified enough that calling `simplify` explicitly becomes unnecessary. (`simplify` is still necessary to apply things like trigonometric identities or to simplify fractions by eliminating the GCD from the numerator and denominator)
+By default, variables created with the `@variables` macro make some simplifying assumptions. Namely, multiplication and addition are assumed to be commutative and associative, and division assumes that the domain of the denominator does not contain zero.
+These assumptions help Symbolics maintain a compact canonical representation of expressions. This reduces algorithmic complexity and memory usage, and results in most expressions being simplified upon construction. This often makes calling `simplify` explicitly unnecessary. (`simplify` is still necessary to apply things like trigonometric identities or to simplify fractions by eliminating the GCD from the numerator and denominator)
 
 \repl{
 x + y
@@ -33,6 +33,7 @@ x/(x*y)
 **Avoiding simplifying assumptions**
 
 In some cases, you explicitly do not want these assumptions to be made. For example, if you wish to track the exact operations a symbolic expression was created with so as to apply some analysis that depends on the same, you may want to avoid the commutative and associative assumptions. In such cases, you can instantiate the variables of the `LiteralReal` type by specifying the same in `@variables` declaration:
+
 
 \repl{
 @variables a::LiteralReal b::LiteralReal c::LiteralReal
