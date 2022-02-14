@@ -22,14 +22,14 @@ jobs:
       uses: JamesIves/github-pages-deploy-action@releases/v4
       with:
           BRANCH: gh-preview
-          FOLDER: __site
+          FOLDER: page/__site
           TARGET_FOLDER: "previews/PR${{ github.event.number }}" # The website preview is going to be stored in a subfolder
     - name: Deploy (main)
       if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
       uses: JamesIves/github-pages-deploy-action@releases/v4
       with:
         BRANCH: gh-pages
-        FOLDER: __site
+        FOLDER: page/__site
     # NOTE: uncomment the following lines if you intend to use PyPlot
     # - name: Install python
     #   uses: actions/setup-python@v1
