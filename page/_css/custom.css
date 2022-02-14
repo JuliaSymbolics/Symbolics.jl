@@ -59,15 +59,10 @@ pre.code-output {
     border-radius: 0.5em;
     margin-bottom: 1em;
 }
-.franklin-content .repl-block pre > code::before {
-    display: inline-block;
-    text-align: right;
-    content: "julia> ";
-    width: 4em;
-    margin-right: 1em;
-    color: #999;
-}
 .repl-block .cell-output {
+    padding-left: 1em;
+    color: #333;
+    padding-bottom: 0.5em;
     font-family: monospace;
 }
 .repl-block .cell-output:empty {
@@ -76,19 +71,23 @@ pre.code-output {
 .repl-block .cell-output > code{
     background: none;
 }
-.repl-block .cell-output::before {
-    display: inline-block;
-    text-align: right;
-    margin-right: 1em;
-    width: 4em;
-    color: #8a8;
-}
 .franklin-content .repl-block > p {
     display: none;
 }
 .repl-block pre.code-output {
     background: #6B8E2340;
     padding-left: 0.5em;
+}
+
+.repl-block .julia-prompt {
+    color: #888;
+    display: inline;
+    padding-right: 1em;
+    padding-top: 0.33em;
+    font-size: 0.8em;
+    clear: both;
+    float: left;
+    font-family: monospace;
 }
 
 .code-output code {

@@ -97,17 +97,17 @@ arguments(ex)
 Complex number expressions are represented using Julia's native `Complex` type where the real and imaginary parts are `Real` symbolic expressions we saw so far. (These are wrapped in `Num`, but the `Complex` object itself is not.)
 
 \repl{
-ex = a+im*b
-typeof(ex)
-real(ex)
-imag(ex)
+w = x+im*y
+typeof(w)
+real(w)
+imag(w)
 }
 
 `unwrap` on a complex expression returns a special tree whose `operation` is `Complex` and the arguments are the real and imaginary parts. This makes generic tree-accessing code work with complex expressions.
 
 \repl{
-ex = unwrap(ex)
-istree(ex)
-operation(ex)
-arguments(ex)
+w = unwrap(w)
+istree(w)
+operation(w)
+arguments(w)
 }
