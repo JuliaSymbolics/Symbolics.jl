@@ -54,6 +54,9 @@ _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
 
 function occursin_info(x, expr)
+    if symtype(expr) <: AbstractArray
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+    end
     !istree(expr) && return false
     if isequal(x, expr)
         true
@@ -66,6 +69,9 @@ function occursin_info(x, expr)
     end
 end
 function occursin_info(x, expr::Sym)
+    if symtype(expr) <: AbstractArray
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+    end
     isequal(x, expr)
 end
 
