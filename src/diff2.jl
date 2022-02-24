@@ -61,3 +61,37 @@ end
 function onehot(n)
     sparse(1:n,1:n,ones(Num, n))
 end
+
+################# Reverse diff #################
+
+_wrap(x::Number) = x
+_wrap(x) = wrap(x)
+
+function ChainRules.rrule(::typeof(^), x::Num, n::Integer)
+    function power_pullback(dy)
+        (NoTangent(), n * x^(n-1), ChainRulesCore.NoTangent())
+    end
+    x^n, power_pullback
+end
+
+function rdiff(z, dz=1, dict = Dict{Any,Any}())
+    z = unwrap(z)
+    if istree(z)
+        pb = ChainRules.rrule(operation(z), _wrap.(arguments(z))...)
+        if pb === nothing
+            error("No rrule for $z")
+        end
+        _, pullback =  pb
+        t = pullback(dz)
+        t = map(ChainRules.unthunk, t)
+        for (i, x) in enumerate(arguments(z))
+            if haskey(dict, x)
+                dict[x] += t[1+i]
+            else
+                dict[x] = t[1+i]
+            end
+            rdiff2(x, t[1+i], dict)
+        end
+    end
+    dict
+end
