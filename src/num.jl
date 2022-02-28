@@ -110,6 +110,8 @@ function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
     end
 end
 <ₑ(s::Num, x) = value(s) <ₑ value(x)
+<ₑ(s::Num, x::Real) = value(s) <ₑ value(x)
+<ₑ(s::Real, x::Num) = value(s) <ₑ value(x)
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
 
