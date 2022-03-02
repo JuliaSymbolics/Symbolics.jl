@@ -33,7 +33,7 @@ TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
-ArrayInterface = "3, 4"
+ArrayInterface = "3, 4, 5"
 ConstructionBase = "1.1, 1.2"
 DataStructures = "0.18"
 DiffRules = "0.1, 1.0"
