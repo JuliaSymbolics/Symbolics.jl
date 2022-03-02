@@ -49,20 +49,25 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
     end
 
     eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
-                        args = map($unwrap, [$(Expr(:$, :(s_syms...)))])
-                        if !any(x->$issym(x) || $istree(x), args)
-                            $f(args...)
+                        args = [$(Expr(:$, :(s_syms...)))]
+                        unwrapped_args = map($unwrap, args)
+                        res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
+                            $f(unwrapped_args...)
                         else
-                            $Term{$ret_type}($f, args)
-                        end |> $wrap
+                            $Term{$ret_type}($f, unwrapped_args)
+                        end
+                        if typeof.(args) == typeof.(unwrapped_args)
+                            return res
+                        else
+                            return $wrap(res)
+                        end
                     end)
     verbose = false
     mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
     Ts = Symbol("##__Ts")
     quote
         $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
-                if !all(x->Symbolics.has_symwrapper(x) &&
-                        Symbolics.wrapper_type(x) != x, x)]
+                if any(x->x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
         if $verbose
             println("Candidates")
             map(println, $Ts)

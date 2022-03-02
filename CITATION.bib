@@ -2,9 +2,21 @@
 
 If you use Symbolics.jl, please [cite this paper](https://arxiv.org/abs/2105.03949)
 
-@article{gowda2021high,
-  title={High-performance symbolic-numerics via multiple dispatch},
-  author={Gowda, Shashi and Ma, Yingbo and Cheli, Alessandro and Gwozdz, Maja and Shah, Viral B and Edelman, Alan and Rackauckas, Christopher},
-  journal={arXiv preprint arXiv:2105.03949},
-  year={2021}
+@article{10.1145/3511528.3511535,
+author = {Gowda, Shashi and Ma, Yingbo and Cheli, Alessandro and Gw\'{o}\'{z}zd\'{z}, Maja and Shah, Viral B. and Edelman, Alan and Rackauckas, Christopher},
+title = {High-Performance Symbolic-Numerics via Multiple Dispatch},
+year = {2022},
+issue_date = {September 2021},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {55},
+number = {3},
+issn = {1932-2240},
+url = {https://doi.org/10.1145/3511528.3511535},
+doi = {10.1145/3511528.3511535},
+abstract = {As mathematical computing becomes more democratized in high-level languages, high-performance symbolic-numeric systems are necessary for domain scientists and engineers to get the best performance out of their machine without deep knowledge of code optimization. Naturally, users need different term types either to have different algebraic properties for them, or to use efficient data structures. To this end, we developed Symbolics.jl, an extendable symbolic system which uses dynamic multiple dispatch to change behavior depending on the domain needs. In this work we detail an underlying abstract term interface which allows for speed without sacrificing generality. We show that by formalizing a generic API on actions independent of implementation, we can retroactively add optimized data structures to our system without changing the pre-existing term rewriters. We showcase how this can be used to optimize term construction and give a 113x acceleration on general symbolic transformations. Further, we show that such a generic API allows for complementary term-rewriting implementations. Exploiting this feature, we demonstrate the ability to swap between classical term-rewriting simplifiers and e-graph-based term-rewriting simplifiers. We illustrate how this symbolic system improves numerical computing tasks by showcasing an e-graph ruleset which minimizes the number of CPU cycles during expression evaluation, and demonstrate how it simplifies a real-world reaction-network simulation to halve the runtime. Additionally, we show a reaction-diffusion partial differential equation solver which is able to be automatically converted into symbolic expressions via multiple dispatch tracing, which is subsequently accelerated and parallelized to give a 157x simulation speedup. Together, this presents Symbolics.jl as a next-generation symbolic-numeric computing environment geared towards modeling and simulation.},
+journal = {ACM Commun. Comput. Algebra},
+month = {jan},
+pages = {92–96},
+numpages = {5}
 }

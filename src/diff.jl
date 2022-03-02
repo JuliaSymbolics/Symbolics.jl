@@ -468,7 +468,8 @@ Return the sparsity pattern of the Jacobian of the mutating function `op!(output
 """
 function jacobian_sparsity(op!,output::Array{T},input::Array{T}, args...) where T<:Number
     eqs=similar(output,Num)
-    vars=[variable(i) for i in eachindex(input)]
+    fill!(eqs,false)
+    vars=ArrayInterface.restructure(input,[variable(i) for i in eachindex(input)])
     op!(eqs,vars, args...)
     jacobian_sparsity(eqs,vars)
 end

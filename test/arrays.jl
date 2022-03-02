@@ -153,3 +153,9 @@ end
     @test value.(jacobian(foo(x), x)) == A
     @test value.(jacobian(ex , x)) == A
 end
+
+@testset "Rules" begin
+    @variables X[1:10,1:5] Y[1:5, 1:10] b[1:10];
+    r = @rule ((~A*~B)*~C) => (~A*(~B*~C)) where size(~A,1)*size(~B,2) > size(~B,1)*size(~C,2)
+    @test isequal(r(unwrap((X*Y)*b)), unwrap(X*(Y*b)))
+end

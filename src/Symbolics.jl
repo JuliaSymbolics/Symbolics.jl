@@ -28,6 +28,8 @@ import Metatheory.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 import SymbolicUtils.Code: toexpr
 
+import ArrayInterface
+
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
@@ -103,6 +105,10 @@ include("integral.jl")
 include("array-lib.jl")
 
 include("linear_algebra.jl")
+
+using Groebner
+include("groebner_basis.jl")
+export groebner_basis
 
 import Libdl
 include("build_function.jl")

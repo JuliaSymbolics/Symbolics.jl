@@ -167,6 +167,8 @@ z2 = c + d * im
 @test sign(Num(1)) isa Num
 @test isequal(sign(Num(1)), Num(1))
 @test isequal(sign(Num(-1)), Num(-1))
+                    
+@test isequal(ℯ^a, exp(a))
 
 using IfElse: ifelse
 @test isequal(Symbolics.derivative(abs(x), x), ifelse(signbit(x), -1, 1))
