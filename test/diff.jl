@@ -270,7 +270,7 @@ end
 @variables x y
 @register_symbolic foo(x, y, z::Array)
 D = Differential(x)
-@test isequal(expand_derivatives(D(foo(x, y, [1.2]) * x^2)), Differential(x)(foo(x, y, [1.2]))*(x^2) + 2x*foo(x, y, [1.2]))
+@test_throws ErrorException expand_derivatives(D(foo(x, y, [1.2]) * x^2))
 
 @variables t x(t) y(t)
 D = Differential(t)
