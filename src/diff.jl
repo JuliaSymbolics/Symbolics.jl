@@ -54,12 +54,15 @@ _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
 
 function occursin_info(x, expr)
-    # Allow things like x[1]
-    if istree(x) && symtype(x) <: Number && operation(x) == (getindex)
-        return isequal(x, expr)
-    end
     if symtype(expr) <: AbstractArray
         error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+    end
+
+    # Allow scalarized expressions
+    is_scalar_indexed(ex) = istree(ex) && operation(x) == getindex && !(symtype(x) <: AbstractArray)
+    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
+        isequal(first(arguments(x)), first(arguments(expr)))
+        return isequal(arguments(x), arguments(expr))
     end
     !istree(expr) && return false
     if isequal(x, expr)
@@ -72,6 +75,7 @@ function occursin_info(x, expr)
         Term{Real}(true, args)
     end
 end
+
 function occursin_info(x, expr::Sym)
     if symtype(expr) <: AbstractArray
         error("Differentiation of expressions involving arrays and array variables is not yet supported.")

@@ -125,7 +125,7 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
     end
 
     ## Jacobians
-    @test_throws ErrorException Symbolics.value.(Symbolics.jacobian(foo(x), x))
+    @test Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
     @test_throws ErrorException Symbolics.value.(Symbolics.jacobian(ex , x))
 end
 
@@ -148,8 +148,8 @@ end
     @test fun_eval(x0) == foo(x0) 
 
     ## Jacobians
-    @test_throws ErrorException value.(jacobian(foo(x), x))
-    @test_throws ErrorException value.(jacobian(ex , x))
+    @test value.(jacobian(foo(x), x)) == A
+    @test value.(jacobian(ex , x)) == A
 end
 
 @testset "Rules" begin
