@@ -282,3 +282,16 @@ sub_eqs = substitute(eqs, Dict([D(x)=>D(x), x=>1]))
 
 @variables x y
 @test substitute([x + y; x - y], Dict(x=>1, y=>2)) == [3, -1]
+
+
+# 530#discussion_r825125589
+let
+    using Symbolics
+    @variables u[1:2] y[1:1] t
+    u = collect(u)
+    y = collect(y)
+    @test isequal(Symbolics.jacobian([u;u[1]^2; y], u), Num[1 0
+                                                            0 1
+                                                            2u[1] 0
+                                                            0 0])
+end
