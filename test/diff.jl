@@ -270,7 +270,7 @@ end
 @variables x y
 @register_symbolic foo(x, y, z::Array)
 D = Differential(x)
-@test isequal(expand_derivatives(D(foo(x, y, [1.2]) * x^2)), Differential(x)(foo(x, y, [1.2]))*(x^2) + 2x*foo(x, y, [1.2]))
+@test_throws ErrorException expand_derivatives(D(foo(x, y, [1.2]) * x^2))
 
 @variables t x(t) y(t)
 D = Differential(t)
@@ -282,3 +282,16 @@ sub_eqs = substitute(eqs, Dict([D(x)=>D(x), x=>1]))
 
 @variables x y
 @test substitute([x + y; x - y], Dict(x=>1, y=>2)) == [3, -1]
+
+
+# 530#discussion_r825125589
+let
+    using Symbolics
+    @variables u[1:2] y[1:1] t
+    u = collect(u)
+    y = collect(y)
+    @test isequal(Symbolics.jacobian([u;u[1]^2; y], u), Num[1 0
+                                                            0 1
+                                                            2u[1] 0
+                                                            0 0])
+end

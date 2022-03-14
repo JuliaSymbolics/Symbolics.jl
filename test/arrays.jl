@@ -126,8 +126,8 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
 
     ## Jacobians
     @test Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
-    @test_skip Symbolics.value.(Symbolics.jacobian(ex , x)) == A #ERROR: axes of foo(x[1:2]) not known
-end 
+    @test_throws ErrorException Symbolics.value.(Symbolics.jacobian(ex , x))
+end
 
 
 @testset "Functions and Jacobians using manual @wrapped" begin
@@ -149,7 +149,7 @@ end
 
     ## Jacobians
     @test value.(jacobian(foo(x), x)) == A
-    @test value.(jacobian(ex , x)) == A 
+    @test value.(jacobian(ex , x)) == A
 end
 
 @testset "Rules" begin

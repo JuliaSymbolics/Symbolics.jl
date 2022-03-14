@@ -54,6 +54,20 @@ _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
 
 function occursin_info(x, expr)
+    if symtype(expr) <: AbstractArray
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+    end
+
+    # Allow scalarized expressions
+    is_scalar_indexed(ex) = istree(ex) && operation(ex) == getindex && !(symtype(ex) <: AbstractArray)
+    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
+        isequal(first(arguments(x)), first(arguments(expr)))
+        return isequal(arguments(x), arguments(expr))
+    end
+    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
+        !occursin(first(arguments(x)), first(arguments(expr)))
+        return false
+    end
     !istree(expr) && return false
     if isequal(x, expr)
         true
@@ -65,7 +79,11 @@ function occursin_info(x, expr)
         Term{Real}(true, args)
     end
 end
+
 function occursin_info(x, expr::Sym)
+    if symtype(expr) <: AbstractArray
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+    end
     isequal(x, expr)
 end
 
@@ -516,13 +534,13 @@ Return the sparsity pattern of the Hessian of an array of expressions with respe
 an array of variable expressions.
 """
 function hessian_sparsity end
+basic_simterm(t, g, args; kws...) = Term{Any}(g, args)
 
 let
     # we do this in a let block so that Revise works on the list of rules
 
     _scalar = one(TermCombination)
 
-    simterm(t, f, args; kws...) = Term{Any}(f, args)
     linearity_rules = [
           @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
           @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
@@ -544,7 +562,7 @@ let
               end
           end
           @rule ~x::(x->x isa Sym) => 0]
-    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=simterm))
+    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=basic_simterm))
 
     global hessian_sparsity
 
@@ -554,7 +572,7 @@ let
         u = map(value, u)
         idx(i) = TermCombination(Set([Dict(i=>1)]))
         dict = Dict(u .=> idx.(1:length(u)))
-        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=simterm)(f)
+        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(f)
         lp = linearity_propagator(f)
         _sparse(lp, length(u))
     end
