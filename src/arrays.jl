@@ -43,12 +43,13 @@ struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
     shape
     ranges::Dict{Sym, AbstractRange} # index range each index symbol can take,
                                      # optional for each symbol
+    output_view
     metadata
 end
 
-function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(); metadata=nothing)
+function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(), output_view=nothing; metadata=nothing)
     sh = make_shape(output_idx, expr, ranges)
-    ArrayOp{T}(output_idx, expr, reduce, term, sh, ranges, metadata)
+    ArrayOp{T}(output_idx, expr, reduce, term, sh, ranges, output_view, metadata)
 end
 
 function ArrayOp(a::AbstractArray)
@@ -513,11 +514,18 @@ function best_order(output_idx, ks, rs)
 end
 
 function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
-    rs = ranges(x)
+    rs = copy(ranges(x))
     loops = best_order(x.output_idx, keys(rs), rs)
 
-    inner_expr = :($outsym[$(x.output_idx...)] = $(x.expr))
-    foldl(reverse(loops), init=x.expr) do acc, k
+    inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(x.expr)))
+
+    if x.output_view != nothing
+        for (i, rng) in zip(x.output_idx, x.output_view)
+            rs[i] = rng
+        end
+    end
+
+    foldl(reverse(loops), init=inner_expr) do acc, k
         :(for $k in $(rs[k])
               $acc
           end)
