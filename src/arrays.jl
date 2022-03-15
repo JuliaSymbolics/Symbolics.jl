@@ -41,7 +41,7 @@ struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
     reduce
     term
     shape
-    ranges::Dict{Sym, AbstractRange} # index range each index symbol can take,
+    ranges::Dict{BasicSymbolic, AbstractRange} # index range each index symbol can take,
                                      # optional for each symbol
     metadata
 end
@@ -181,7 +181,7 @@ function make_shape(output_idx, expr, ranges=Dict())
     end
 
     sz = map(output_idx) do i
-        if i isa Sym
+        if issym(i)
             if haskey(ranges, i)
                 return axes(ranges[i], 1)
             end
@@ -202,7 +202,7 @@ end
 
 
 function ranges(a::ArrayOp)
-    rs = Dict{Sym, Any}()
+    rs = Dict{BasicSymbolic, Any}()
     ax = idx_to_axes(a.expr)
     for i in keys(ax)
         if haskey(a.ranges, i)
@@ -266,12 +266,12 @@ function Base.get(a::AxisOf)
     axes(a.A, a.dim)
 end
 
-function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
+function idx_to_axes(expr, dict=Dict{BasicSymbolic, Vector}(), ranges=Dict())
     if istree(expr)
         if operation(expr) === (getindex)
             args = arguments(expr)
             for (axis, sym) in enumerate(@views args[2:end])
-                !(sym isa Sym) && continue
+                !issym(sym) && continue
                 axesvec = Base.get!(() -> [], dict, sym)
                 push!(axesvec, AxisOf(first(args), axis))
             end

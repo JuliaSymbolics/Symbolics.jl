@@ -51,8 +51,8 @@ get_variables!(vars, e, varlist=nothing) = vars
 function is_singleton(e::Term)
     op = operation(e)
     op === getindex && return true
-    op isa Term && return is_singleton(op) # recurse to reach getindex for array element variables
-    op isa Sym
+    istree(op) && return is_singleton(op) # recurse to reach getindex for array element variables
+    issym(op)
 end
 
 is_singleton(e::Sym) = true
@@ -113,7 +113,7 @@ function diff2term(O)
         return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
     else
         oldop = operation(O)
-        if !(oldop isa Sym)
+        if !issym(oldop)
             throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
         end
         d_separator = 'ˍ'
@@ -148,7 +148,7 @@ julia>  Symbolics.tosymbol(z; escape=false)
 ```
 """
 function tosymbol(t::Term; states=nothing, escape=true)
-    if operation(t) isa Sym
+    if issym(operation(t))
         if states !== nothing && !(t in states)
             return nameof(operation(t))
         end

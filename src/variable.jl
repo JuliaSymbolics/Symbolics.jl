@@ -459,12 +459,6 @@ function rename_metadata(from, to, name)
     return to
 end
 
-function rename(x::Sym, name)
-    xx = @set! x.name = name
-    xx = rename_metadata(x, xx, name)
-    symtype(xx) <: AbstractArray ? rename_getindex_source(xx) : xx
-end
-
 rename(x::Union{Num, Arr}, name) = wrap(rename(unwrap(x), name))
 function rename(x::ArrayOp, name)
     t = x.term
@@ -482,7 +476,11 @@ function rename(x::CallWithMetadata, name)
 end
 
 function rename(x::Symbolic, name)
-    if istree(x) && operation(x) === getindex
+    if issym(x)
+        xx = @set! x.name = name
+        xx = rename_metadata(x, xx, name)
+        symtype(xx) <: AbstractArray ? rename_getindex_source(xx) : xx
+    elseif istree(x) && operation(x) === getindex
         rename(arguments(x)[1], name)[arguments(x)[2:end]...]
     elseif istree(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
         @assert x isa Term
