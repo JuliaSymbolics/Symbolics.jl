@@ -508,6 +508,21 @@ function SymbolicUtils.Code.toexpr(x::Arr, st)
     toexpr(unwrap(x), st)
 end
 
+function best_order(output_idx, ks, rs)
+    unique!(filter(issym, vcat(reverse(output_idx)..., collect(ks))))
+end
+
+function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
+    rs = ranges(x)
+    loops = best_order(x.output_idx, keys(rs), rs)
+
+    inner_expr = :($outsym[$(x.output_idx...)] = $(x.expr))
+    foldl(reverse(loops), init=x.expr) do acc, k
+        :(for $k in $(rs[k])
+              $acc
+          end)
+    end |> SymbolicUtils.Code.LiteralExpr
+end
 
 ### Scalarize
 
