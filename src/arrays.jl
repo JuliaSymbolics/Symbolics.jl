@@ -509,8 +509,55 @@ function SymbolicUtils.Code.toexpr(x::Arr, st)
     toexpr(unwrap(x), st)
 end
 
+struct ArrayConstructor{T<:AbstractArray} <: Symbolic{T}
+    shape
+    sequence
+end
+
+export @sequence
+
+macro sequence(definition, sequence)
+
+    function get_indexers(ex)
+        @assert ex.head == :ref
+        ex.args[2:end]
+    end
+
+    output_shape = get_indexers(definition)
+    @show output_shape
+    output_name = definition.args[1]
+
+    seq = map(filter(x->!(x isa LineNumberNode), sequence.args)) do pair
+        @assert pair.head == :call && pair.args[1] == :(=>)
+        # TODO: make sure the same symbol is used for the lhs array
+        :(let
+              out = $(pair.args[3:end]...)
+              $Setfield.@set! out.output_view = ($(get_indexers(pair.args[2])...),)
+          end)
+    end
+
+    :($ArrayConstructor{AbstractArray{Float64, 2}}(
+        ($(output_shape...),),
+        [$(seq...),])) |> esc
+end
+
 function best_order(output_idx, ks, rs)
     unique!(filter(issym, vcat(reverse(output_idx)..., collect(ks))))
+end
+
+function SymbolicUtils.Code.toexpr(x::ArrayConstructor, st)
+    outsym = Symbol("_out")
+    N = length(x.shape)
+    ex = :(let $outsym = zeros(Float64, map(length, ($(x.shape...),)))
+          $(inplace_expr(x, outsym))
+      end) |> LiteralExpr
+    toexpr(ex, st)
+end
+
+function inplace_expr(x::ArrayConstructor, outsym = Symbol("_out"))
+    quote
+        $(map(inplace_expr, x.sequence)...)
+    end
 end
 
 function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
