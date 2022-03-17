@@ -483,7 +483,6 @@ function rename(x::Symbolic, name)
     elseif istree(x) && operation(x) === getindex
         rename(arguments(x)[1], name)[arguments(x)[2:end]...]
     elseif istree(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
-        @assert x isa Term
         xx = @set x.f = rename(operation(x), name)
         @set! xx.hash = Ref{UInt}(0)
         return rename_metadata(x, xx, name)

@@ -322,7 +322,7 @@ function arrterm(f, args...)
         atype{etype, nd}
     end
 
-    setmetadata(Term{S}(f, args),
+    setmetadata(Term{S}(f, Any[args...]),
                 ArrayShapeCtx,
                 propagate_shape(f, args...))
 end

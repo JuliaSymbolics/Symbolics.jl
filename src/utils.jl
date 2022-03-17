@@ -20,7 +20,7 @@ function build_expr(head::Symbol, args)
 end
 
 """
-    get_variables(O) -> Vector{Union{Sym, Term}}
+    get_variables(O) -> Vector{BasicSymbolic}
 
 Returns the variables in the expression. Note that the returned variables are
 not wrapped in the `Num` type.
@@ -48,15 +48,16 @@ get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
 get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
-function is_singleton(e::Term)
-    op = operation(e)
-    op === getindex && return true
-    istree(op) && return is_singleton(op) # recurse to reach getindex for array element variables
-    issym(op)
+function is_singleton(e)
+    if istree(e)
+        op = operation(e)
+        op === getindex && return true
+        istree(op) && return is_singleton(op) # recurse to reach getindex for array element variables
+        return issym(op)
+    else
+        return issym(e)
+    end
 end
-
-is_singleton(e::Sym) = true
-is_singleton(e) = false
 
 get_variables!(vars, e::Number, varlist=nothing) = vars
 
@@ -79,8 +80,7 @@ get_variables(e, varlist=nothing) = get_variables!([], e, varlist)
 
 # Sym / Term --> Symbol
 Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
-tosymbol(x; kwargs...) = x
-tosymbol(x::Sym; kwargs...) = nameof(x)
+tosymbol(x; kwargs...) = issym(x) ? nameof(x) : x
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """

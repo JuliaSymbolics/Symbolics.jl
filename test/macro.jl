@@ -1,6 +1,6 @@
 using Symbolics
 import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
-import SymbolicUtils: Term, symtype, FnType
+import SymbolicUtils: Term, symtype, FnType, BasicSymbolic
 using Test
 
 @variables t
@@ -105,8 +105,8 @@ bar(t, x::A) = 1
 let
     @variables x y
     @test bar(x, A()) isa Num
-    @test bar(unwrap(x), A()) isa Term
+    @test bar(unwrap(x), A()) isa BasicSymbolic
     @test typeof(baz(x, unwrap(y))) == Num
-    @test typeof(baz(unwrap(x), unwrap(y))) <: Term
+    @test typeof(baz(unwrap(x), unwrap(y))) <: BasicSymbolic
 end
 

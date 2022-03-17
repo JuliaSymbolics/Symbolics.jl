@@ -42,7 +42,7 @@ function Base.getindex(x::SymArray, idx...)
     else
         input_idx = []
         output_idx = []
-        ranges = Dict{Sym, AbstractRange}()
+        ranges = Dict{BasicSymbolic, AbstractRange}()
         subscripts = makesubscripts(length(idx))
         for (j, i) in enumerate(idx)
             if symtype(i) <: Integer
