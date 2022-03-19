@@ -91,10 +91,13 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
-julia> @variables x t u(x, t); Dt = Differential(t); Dx = Differential(x);
+julia> @variables x t u(x, t) z[1:2](t); Dt = Differential(t); Dx = Differential(x);
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
 uˍtx(x, t)
+
+julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
+z_t[1](t)
 ```
 """
 function diff2term(O)
@@ -108,16 +111,19 @@ function diff2term(O)
     else
         ds = nothing
     end
-    T = symtype(O)
+
     if ds === nothing
         return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
     else
         oldop = operation(O)
-        if !(oldop isa Sym)
+        if oldop isa Sym
+            opname = string(nameof(oldop))
+        elseif oldop isa Term && operation(oldop) === getindex
+            opname = string(nameof(arguments(oldop)[1]))
+        else
             throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
         end
         d_separator = 'ˍ'
-        opname = string(nameof(oldop))
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
         return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
     end
