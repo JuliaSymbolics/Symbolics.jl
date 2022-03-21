@@ -15,8 +15,7 @@ const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value,args)...))
-value(x) = x
-value(x::Num) = unwrap(x)
+value(x) = unwrap(x)
 
 SciMLBase.issymbollike(::Num) = true
 SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
