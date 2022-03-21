@@ -160,12 +160,12 @@ function make_shape(output_idx, expr, ranges=Dict())
         isempty(to_check) && continue
         restricted = false
         if haskey(ranges, sym)
-            ref_axis = axes(ranges[sym], 1)
+            ref_axis = ranges[sym]
             restricted = true
         else
             ref_axis = axes(first(to_check).A, first(to_check).dim)
         end
-        reference = axes(ref_axis, 1) # Reset to 1
+        reference = ref_axis
         for i in (restricted ? 1 : 2):length(ms)
             m = ms[i]
             s=shape(m.A)
@@ -185,6 +185,9 @@ function make_shape(output_idx, expr, ranges=Dict())
         if i isa Sym
             if haskey(ranges, i)
                 return axes(ranges[i], 1)
+            end
+            if !haskey(matches, i)
+                error("index $i not found in RHS")
             end
             mi = matches[i]
             @assert !isempty(mi)
@@ -260,6 +263,7 @@ end
 struct AxisOf
     A
     dim
+    boundary
 end
 
 function Base.get(a::AxisOf)
@@ -271,10 +275,12 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
     if istree(expr)
         if operation(expr) === (getindex)
             args = arguments(expr)
-            for (axis, sym) in enumerate(@views args[2:end])
-                !(sym isa Sym) && continue
-                axesvec = Base.get!(() -> [], dict, sym)
-                push!(axesvec, AxisOf(first(args), axis))
+            for (axis, idx_expr) in enumerate(@views args[2:end])
+                if idx_expr isa Sym || istree(idx_expr)
+                    sym = only(get_variables(idx_expr))
+                    axesvec = Base.get!(() -> [], dict, sym)
+                    push!(axesvec, AxisOf(first(args), axis, idx_expr - sym))
+                end
             end
         else
             idx_to_axes(operation(expr), dict)
