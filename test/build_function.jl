@@ -1,4 +1,4 @@
-using Symbolics, SparseArrays, Test
+using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 @variables a b c1 c2 c3 d e g
 
@@ -174,3 +174,27 @@ old = out[1]
 f_expr[2](out, u)
 @test out[1] === old
 @test out[2] === u[1]
+
+
+let # issue#136
+    N = 8
+    @variables x y
+    A = sparse(Tridiagonal([x^i for i in 1:N-1],
+                           [x^i * y^(8-i) for i in 1:N],
+                           [y^i for i in 1:N-1]))
+
+    val = Dict(x=>1, y=>2)
+    B = map(A) do e
+        Num(substitute(e, val))
+    end
+
+    C = copy(B) - 100*I
+
+
+    f = build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2]
+    g = eval(f)
+
+    g(C, [1,2])
+    @test contains(repr(f), "schedule")
+    @test isequal(C, B)
+end
