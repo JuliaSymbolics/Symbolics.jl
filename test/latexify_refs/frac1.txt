@@ -1,0 +1,3 @@
+\begin{equation}
+\frac{z + \frac{x}{y}}{\sin\left( z \right)}
+\end{equation}

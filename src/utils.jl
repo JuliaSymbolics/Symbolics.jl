@@ -2,7 +2,7 @@ isblock(x) = length(x) == 1 && x[1] isa Expr && x[1].head == :block
 function flatten_expr!(x)
     isblock(x) || return x
     x = MacroTools.striplines(x[1])
-    filter!(z->z isa Symbol || z.head != :line, x.args)
+    filter!(z -> z isa Symbol || z.head != :line, x.args)
     xs = []
     for ex in x.args
         if Meta.isexpr(ex, :tuple)
@@ -27,11 +27,12 @@ not wrapped in the `Num` type.
 
 # Examples
 ```julia
-julia> @parameters t
-(t,)
-
-julia> @variables x y z(t)
-(x, y, z(t))
+julia> @variables t x y z(t)
+4-element Vector{Num}:
+    t
+    x
+    y
+ z(t)
 
 julia> ex = x + y + sin(z)
 (x + y) + sin(z(t))
@@ -44,9 +45,16 @@ julia> Symbolics.get_variables(ex)
 ```
 """
 get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
+get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
-is_singleton(e::Term) = operation(e) isa Sym
+function is_singleton(e::Term)
+    op = operation(e)
+    op === getindex && return true
+    op isa Term && return is_singleton(op) # recurse to reach getindex for array element variables
+    op isa Sym
+end
+
 is_singleton(e::Sym) = true
 is_singleton(e) = false
 
@@ -76,17 +84,20 @@ tosymbol(x::Sym; kwargs...) = nameof(x)
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x::Term) -> Term
+    diff2term(x::Term) -> Symbolic
     diff2term(x) -> x
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
-julia> @variables x t u(x, t); Dt = Differential(t); Dx = Differential(x);
+julia> @variables x t u(x, t) z[1:2](t); Dt = Differential(t); Dx = Differential(x);
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
 uˍtx(x, t)
+
+julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
+z_t[1](t)
 ```
 """
 function diff2term(O)
@@ -100,36 +111,46 @@ function diff2term(O)
     else
         ds = nothing
     end
-    T = symtype(O)
+
     if ds === nothing
-        return Term{T}(operation(O), map(diff2term, arguments(O)))
+        return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
     else
         oldop = operation(O)
-        if !(oldop isa Sym)
+        if oldop isa Sym
+            opname = string(nameof(oldop))
+        elseif oldop isa Term && operation(oldop) === getindex
+            opname = string(nameof(arguments(oldop)[1]))
+        else
             throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
         end
         d_separator = 'ˍ'
-        opname = string(nameof(oldop))
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return Term{T}(rename(oldop, newname), arguments(O))
+        return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
     end
 end
+
+setname(v, name) = setmetadata(v, Symbolics.VariableSource, (:variables, name))
 
 """
     tosymbol(x::Union{Num,Symbolic}; states=nothing, escape=true) -> Symbol
 
 Convert `x` to a symbol. `states` are the states of a system, and `escape`
-means if the target has escapes like `val"y(t)"`. If `escape` then it will only
-output `y` instead of `y(t)`.
+means if the target has escapes like `val"y(t)"`. If `escape` is false then
+it will only output `y` instead of `y(t)`.
 
 # Examples
 
 ```julia
-julia> @parameters t; @variables z(t)
-(z(t),)
+julia> @variables t z(t)
+2-element Vector{Num}:
+    t
+ z(t)
 
 julia> Symbolics.tosymbol(z)
 Symbol("z(t)")
+
+julia>  Symbolics.tosymbol(z; escape=false)
+:z
 ```
 """
 function tosymbol(t::Term; states=nothing, escape=true)
@@ -144,12 +165,11 @@ function tosymbol(t::Term; states=nothing, escape=true)
         op = Symbol(operation(term))
         args = arguments(term)
     else
-        @goto err
+        op = Symbol(repr(operation(t)))
+        args = arguments(t)
     end
 
     return escape ? Symbol(op, "(", join(args, ", "), ")") : op
-    @label err
-    error("Cannot convert $t to a symbol")
 end
 
 function lower_varname(var::Symbolic, idv, order)
@@ -161,24 +181,75 @@ function lower_varname(var::Symbolic, idv, order)
     return diff2term(var)
 end
 
-"""
-    makesym(x::Union{Num,Symbolic}, kwargs...) -> Sym
-
-`makesym` takes the same arguments as [`tosymbol`](@ref), but it converts a
-`Term` in the form of `x(t)` to a `Sym` in the form of `x⦗t⦘`.
-
-# Examples
-```julia
-julia> @parameters t; @variables x(t)
-(x(t),)
-
-julia> Symbolics.makesym(x)
-x⦗t⦘
-```
-"""
-makesym(t::Symbolic; kwargs...) = Sym{symtype(t)}(tosymbol(t; kwargs...))
-makesym(t::Num; kwargs...) = makesym(value(t); kwargs...)
-
 var_from_nested_derivative(x, i=0) = (missing, missing)
-var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1],i+1) : (x,i)
-var_from_nested_derivative(x::Sym,i=0) = (x,i)
+
+### OOPS
+
+struct Unknown end
+
+macro oops(ex)
+    quote
+        tmp = $(esc(ex))
+        if tmp === Unknown()
+            return Unknown()
+        else
+            tmp
+        end
+    end
+end
+
+function makesubscripts(n)
+    set = 'i':'z'
+    m = length(set)
+    map(1:n) do i
+        repeats = ceil(Int, i / m)
+        c = set[(i-1) % m + 1]
+        Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
+    end
+end
+
+var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
+var_from_nested_derivative(x::Sym,i=0) = (x, i)
+
+function degree(p::Sym, sym=nothing)
+    if sym === nothing
+        return 1
+    else
+        return Int(isequal(p, sym))
+    end
+end
+
+function degree(p::Pow, sym=nothing)
+    return p.exp * degree(p.base, sym)
+end
+
+function degree(p::Add, sym=nothing)
+    return maximum(degree(key, sym) for key in keys(p.dict))
+end
+
+function degree(p::Mul, sym=nothing)
+    return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
+end
+
+function degree(p::Term, sym=nothing)
+    if sym === nothing
+        return 1
+    else
+        return Int(isequal(p, sym))
+    end
+end
+
+function degree(p, sym=nothing)
+    p = value(p)
+    sym = value(sym)
+    if p isa Number
+        return 0
+    end
+    if isequal(p, sym)
+        return 1
+    end
+    if p isa Symbolic
+        return degree(p, sym)
+    end
+    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
+end

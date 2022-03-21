@@ -1,4 +1,4 @@
-# Symbolic Calculations and Building Fast Parallel Functions
+# Symbolic Calculations and Building Callable Functions
 
 Symbolics.jl is a symbolic modeling language.
 The way to define symbolic variables is via the `@variables` macro:
@@ -77,16 +77,228 @@ f([x, y, z]) # Recall that z = x^2 + y
       x^2 + 2y
 ```
 
-Or we can build array variables and use these to trace:
+Or we can build an array variable and use it to trace the function:
 
 ```julia
-@variables u[1:3]
+@variables u[1:4]
 f(u)
 
-3-element Array{Num,1}:
-   u₁ - u₃
- u₁^2 - u₂
-   u₂ + u₃
+3-element Vector{Num}:
+  u[1] - u[3]
+ u[1]^2 - u[2]
+  u[2] + u[3]
+```
+
+## Derivatives
+
+One common thing to compute in a symbolic system is derivatives. In
+Symbolics.jl, derivatives are represented lazily via operations,
+just like any other function. To build a differential operator, use
+`Differential` like:
+
+```julia
+@variables t
+D = Differential(t)
+```
+
+This is the differential operator ``D = \frac{\partial}{\partial t}``. We can
+compose the differential operator by `*`, e.g.
+`Differential(t) * Differential(x)` or `Differential(t)^2`.
+Now let's write down the derivative of some expression:
+
+```julia
+z = t + t^2
+D(z) # Symbolics.derivative(t + t^2, t)
+```
+
+Notice that this hasn't computed anything yet: `D` is a lazy operator
+because it lets us symbolically represent "The derivative of ``z`` with
+respect to ``t``", which is useful for example when representing our
+favorite thing in the world, differential equations. However, if we
+want to expand the derivative operators, we'd use `expand_derivatives`:
+
+```julia
+expand_derivatives(D(z)) # 1 + 2t
+```
+
+To get the variable that you are taking the derivative with respect to is accessed with:
+
+```julia
+D.x # t
+```
+
+We can also have simplified functions for multivariable calculus.
+For example, we can compute the Jacobian of an array of expressions
+like:
+
+```julia
+Symbolics.jacobian([x + x*y, x^2 + y], [x, y])
+
+2×2 Matrix{Num}:
+ 1 + y  x
+    2x  1
+```
+
+and similarly we can do Hessians, gradients, and define whatever other
+derivatives you want.
+
+## Simplification and Substitution
+
+Symbolics interfaces with [SymbolicUtils.jl](https://github.com/JuliaSymbolics/SymbolicUtils.jl)
+to allow for simplifying symbolic expressions. This is done simply
+through the `simplify` command:
+
+```julia
+simplify(2x + 2y) # 2(x + y)
+```
+
+This can be applied to arrays by using Julia's broadcast mechanism:
+
+```julia
+B = simplify.([t + t^2 + t + t^2  2t + 4t
+               x + y + y + 2t     x^2 - x^2 + y^2])
+
+2×2 Matrix{Num}:
+   2(t + t^2)   6t
+ x + 2(t + y)  y^2
+```
+
+We can then use `substitute` to change values of an expression around:
+
+```julia
+simplify.(substitute.(B, (Dict(x => y^2),)))
+
+2×2 Matrix{Num}:
+     2(t + t^2)   6t
+ y^2 + 2(t + y)  y^2
+```
+
+and we can use this to interactively evaluate expressions without
+generating and compiling Julia functions:
+
+```julia
+V = substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
+
+2×2 Matrix{Num}:
+ 40.0  24.0
+ 16.0   9.0
+```
+
+Where we can reference the values via:
+
+```julia
+Symbolics.value.(V)
+
+2×2 Matrix{Float64}:
+ 40.0  24.0
+ 16.0   9.0
+```
+
+## Non-Interactive Development
+
+Note that the macros are for the high-level case where you're doing symbolic
+computation on your own code. If you want to do symbolic computation on someone
+else's code, like in a macro, you may not want to do `@variables x` because you
+might want the name "x" to come from the user's code. For these cases, you can
+use the interpolation operator to interpolate the runtime value of `x`, i.e.
+`@variables $x`. Check the documentation of `@variables` for more details.
+
+```julia-repl
+julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
+(:runtime_symbol_value, :value_b, :value_c)
+
+julia> vars = @variables t $a $b(t) $c[1:3](t)
+4-element Vector{Any}:
+      t
+ runtime_symbol_value
+   value_b(t)
+       (map(Symbolics.CallWith((t,)), value_c))[1:3]
+
+julia> (t, a, b, c)
+(t, :runtime_symbol_value, :value_b, :value_c)
+```
+
+One could also use `variable` and `variables`. Read their documentation for more
+details.
+
+If we need to use this to generate new Julia code, we can simply
+convert the output to an `Expr`:
+
+```julia
+Symbolics.toexpr(x + y^2)
+```
+
+## `Sym`s and callable `Sym`s
+
+In the definition
+
+```julia
+@variables t x(t) y(t)
+```
+
+`t` is of type `Sym{Real}` but the name `x` refers to an object that represents the `Term` `x(t)`. The operation of this expression is itself the object `Sym{FnType{Tuple{Real}, Real}}(:x)`. The type `Sym{FnType{...}}` represents a callable object. In this case specifically it's a function that takes 1 Real argument (noted by `Tuple{Real}`) and returns a `Real` result. You can call such a callable `Sym` with either a number or a symbolic expression of a permissible type.
+
+This expression also defines `t` as a independent variable while `x(t)` and `y(t)` are
+dependent variables. This is accounted for in differentiation:
+
+```julia
+z = x + y*t
+expand_derivatives(D(z)) # derivative(x(t), t) + y(t) + derivative(y(t), t) * t
+```
+
+Since `x` and `y` are time-dependent, they are not automatically eliminated
+from the expression and thus the `D(x)` and `D(y)` operations still
+exist in the expanded derivatives for correctness.
+
+We can also define unrestricted functions:
+
+```julia
+@variables g(..)
+```
+
+Here `g` is a variable that is a function of other variables. Any time
+that we reference `g` we have to utilize it as a function:
+
+```julia
+z = g(x) + g(y)
+```
+
+## Registering Functions
+
+One of the benefits of a one-language Julia symbolic stack is that the
+primitives are all written in Julia, and therefore it's trivially
+extendible from Julia itself. By default, new functions are traced
+to the primitives and the symbolic expressions are written on the
+primitives. However, we can expand the allowed primitives by registering
+new functions. For example, let's register a new function `h`:
+
+```julia
+h(x, y) = x^2 + y
+@register h(x, y)
+```
+
+Now when we use `h(x, y)`, it is a symbolic expression and doesn't expand:
+
+```julia
+julia> h(x, y) + y^2
+h(x(t), y(t)) + (y(t))^2
+```
+
+In order to use it with the differentiation system, we need to register
+its derivatives. We would do it like this:
+
+```julia
+# Derivative w.r.t. the first argument
+Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{1}) = 2args[1]
+# Derivative w.r.t. the second argument
+Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1
+```
+
+and now it works with the rest of the system:
+
+```julia
+Symbolics.derivative(h(x, y) + y^2, x) # 2x
+Symbolics.derivative(h(x, y) + y^2, y) # 1 + 2y
 ```
 
 ## Building Functions
@@ -262,222 +474,3 @@ dead simple.
 thread spawning overhead, but the full version was not included in the
 documentation for brevity. It will be the faster version if `N` is
 sufficiently large!)
-
-## Derivatives
-
-One common thing to compute in a symbolic system is derivatives. In
-Symbolics.jl, derivatives are represented lazily via operations,
-just like any other function. To build a differential operator, use
-`Differential` like:
-
-```julia
-@variables t
-D = Differential(t)
-```
-
-This is the differential operator ``D = \frac{\partial}{\partial t}``. We can
-compose the differential operator by `*`, e.g.
-`Differential(t) * Differential(x)` or `Differential(t)^2`.
-Now let's write down the derivative of some expression:
-
-```julia
-z = t + t^2
-D(z) # Symbolics.derivative(t + t^2, t)
-```
-
-Notice that this hasn't computed anything yet: `D` is a lazy operator
-because it lets us symbolically represent "The derivative of ``z`` with
-respect to ``t``", which is useful for example when representing our
-favorite thing in the world, differential equations. However, if we
-want to expand the derivative operators, we'd use `expand_derivatives`:
-
-```julia
-expand_derivatives(D(z)) # 1 + 2t
-```
-
-To get the variable that you are taking the derivative with respect to is accessed with:
-
-```julia
-D.x # t
-```
-
-We can also have simplified functions for multivariable calculus.
-For example, we can compute the Jacobian of an array of expressions
-like:
-
-```julia
-Symbolics.jacobian([x + x*y, x^2 + y], [x, y])
-
-2×2 Matrix{Num}:
- 1 + y  x
-    2x  1
-```
-
-and similarly we can do Hessians, gradients, and define whatever other
-derivatives you want.
-
-## Simplification and Substitution
-
-Symbolics interfaces with [SymbolicUtils.jl](https://github.com/JuliaSymbolics/SymbolicUtils.jl)
-to allow for simplifying symbolic expressions. This is done simply
-through the `simplify` command:
-
-```julia
-simplify(2x + 2y) # 2(x + y)
-```
-
-This can be applied to arrays by using Julia's broadcast mechanism:
-
-```julia
-B = simplify.([t + t^2 + t + t^2  2t + 4t
-               x + y + y + 2t     x^2 - x^2 + y^2])
-
-2×2 Matrix{Num}:
-   2(t + t^2)   6t
- x + 2(t + y)  y^2
-```
-
-We can then use `substitute` to change values of an expression around:
-
-```julia
-simplify.(substitute.(B, (Dict(x => y^2),)))
-
-2×2 Matrix{Num}:
-     2(t + t^2)   6t
- y^2 + 2(t + y)  y^2
-```
-
-and we can use this to interactively evaluate expressions without
-generating and compiling Julia functions:
-
-```julia
-V = substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
-
-2×2 Matrix{Num}:
- 40.0  24.0
- 16.0   9.0
-```
-
-Where we can reference the values via:
-
-```julia
-Symbolics.value.(V)
-
-2×2 Matrix{Float64}:
- 40.0  24.0
- 16.0   9.0
-```
-
-## Non-Interactive Development (No Macro Version)
-
-Note that the macros are for the high-level case where you're doing
-symbolic computation on your own code. If you want to do symbolic
-computation on someone else's code, like in a macro, you may not want
-to do `@variables x` because you might want the name "x" to come from
-the user's code. For these cases, Symbolics.jl allows for fully
-macro-free usage. For example:
-
-```julia
-using Symbolics: Sym
-
-x = Num(Sym{Float64}(:x))
-y = Num(Sym{Float64}(:y))
-x + y^2.0 # isa Num
-
-α = Num(Variable(:α))
-σ = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:σ)) # left uncalled, since it is used as a function
-w = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:w)) # unknown, left uncalled
-x = Num(Variable{Symbolics.FnType{Tuple{Any}, Real}}(:x))(t)  # unknown, depends on `t`
-y = Num(Variable(:y))   # unknown, no dependents
-# Line below throw an error since \alpha is not defined
-z = Num(Variable{Symbolics.FnType{NTuple{3, Any}, Real}}(:z))(t, α, x)  # unknown, multiple arguments
-β₁ = Num(Variable(:β, 1)) # with index 1
-β₂ = Num(Variable(:β, 2)) # with index 2
-
-expr = β₁ * x + y^α + σ(3) * (z - t) - β₂ * w(t - 1)
-```
-
-Does what you'd expect. Note that `Variable` is simply a convenient function for
-making variables with indices that always returns `Sym`. The reference
-documentation shows how to define any of the quantities in such a way that the
-names can come from runtime values.
-
-If we need to use this to generate new Julia code, we can simply
-convert the output to an `Expr`:
-
-```julia
-Symbolics.toexpr(x + y^2)
-```
-
-## `Sym`s and callable `Sym`s
-
-In the definition
-
-```julia
-@variables t x(t) y(t)
-```
-
-`t` is of type `Sym{Real}` but the name `x` refers to an object that represents the `Term` `x(t)`. The operation of this expression is itself the object `Sym{FnType{Tuple{Real}, Real}}(:x)`. The type `Sym{FnType{...}}` represents a callable object. In this case specifically it's a function that takes 1 Real argument (noted by `Tuple{Real}`) and returns a `Real` result. You can call such a callable `Sym` with either a number or a symbolic expression of a permissible type.
-
-This expression also defines `t` as a independent variable while `x(t)` and `y(t)` are
-dependent variables. This is accounted for in differentiation:
-
-```julia
-z = x + y*t
-expand_derivatives(D(z)) # derivative(x(t), t) + y(t) + derivative(y(t), t) * t
-```
-
-Since `x` and `y` are time-dependent, they are not automatically eliminated
-from the expression and thus the `D(x)` and `D(y)` operations still
-exist in the expanded derivatives for correctness.
-
-We can also define unrestricted functions:
-
-```julia
-@variables g(..)
-```
-
-Here `g` is a variable that is a function of other variables. Any time
-that we reference `g` we have to utilize it as a function:
-
-```julia
-z = g(x) + g(y)
-```
-
-## Registering Functions
-
-One of the benefits of a one-language Julia symbolic stack is that the
-primitives are all written in Julia, and therefore it's trivially
-extendible from Julia itself. By default, new functions are traced
-to the primitives and the symbolic expressions are written on the
-primitives. However, we can expand the allowed primitives by registering
-new functions. For example, let's register a new function `h`:
-
-```julia
-h(x, y) = x^2 + y
-@register h(x, y)
-```
-
-Now when we use `h(x, y)`, it is a symbolic expression and doesn't expand:
-
-```julia
-julia> h(x, y) + y^2
-h(x(t), y(t)) + (y(t))^2
-```
-
-In order to use it with the differentiation system, we need to register
-its derivatives. We would do it like this:
-
-```julia
-# Derivative w.r.t. the first argument
-Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{1}) = 2args[1]
-# Derivative w.r.t. the second argument
-Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1
-```
-
-and now it works with the rest of the system:
-
-```julia
-Symbolics.derivative(h(x, y) + y^2, x) # 2x
-Symbolics.derivative(h(x, y) + y^2, y) # 1 + 2y
-```

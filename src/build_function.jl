@@ -1,5 +1,6 @@
 using SymbolicUtils.Code
 using Base.Threads
+using SymbolicUtils.Code: LazyState
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
@@ -52,44 +53,47 @@ function build_function(args...;target = JuliaTarget(),kwargs...)
   _build_function(target,args...;kwargs...)
 end
 
-function unflatten_args(f, args, N=4)
-    length(args) < N && return Term{Real}(f, args)
-    unflatten_args(f, [Term{Real}(f, group)
-                                       for group in Iterators.partition(args, N)], N)
-end
-
-# Speeds up by avoiding repeated sorting when you call `arguments`
-# after editing children in Postwalk in unflatten_long_ops
-function termify(op)
-    !istree(op) && return op
-    Term{symtype(op)}(operation(op), arguments(op); metadata=op.metadata)
-end
-
-function unflatten_long_ops(op, N=4)
-    op = value(op)
-    op = termify(op)
-    !istree(op) && return Num(op)
-    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, 4) : nothing)
-    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, 4) : nothing)
-
-    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]))(op))
-end
-
-
 # Scalar output
 
-destructure_arg(arg::Union{AbstractArray, Tuple}) = DestructuredArgs(map(value, arg))
-destructure_arg(arg) = arg
+function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
+    if !(arg isa Arr)
+        DestructuredArgs(map(unwrap, arg), name, inbounds=inbounds)
+    else
+        unwrap(arg)
+    end
+end
+destructure_arg(arg, _, _) = unwrap(arg)
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
+                         linenumbers = true)
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+    expr = toexpr(Func(dargs, [], op), states)
+
+    if expression == Val{true}
+        expr
+    else
+        _build_and_inject_function(expression_module, expr)
+    end
+end
+
+SymbolicUtils.Code.get_symbolify(x::Arr) = SymbolicUtils.Code.get_symbolify(unwrap(x))
+
+function _build_function(target::JuliaTarget, op::Arr, args...;
+                         conv = toexpr,
+                         expression = Val{true},
+                         expression_module = @__MODULE__(),
+                         checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
 
-    dargs = map(destructure_arg, [args...])
-    expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds,
+                                  Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -107,7 +111,7 @@ function _build_and_inject_function(mod::Module, ex)
     # XXX: Workaround to specify the module as both the cache module AND context module.
     # Currently, the @RuntimeGeneratedFunction macro only sets the context module.
     module_tag = getproperty(mod, RuntimeGeneratedFunctions._tagname)
-    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex)
+    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=false)
 end
 
 function fill_array_with_zero!(x::AbstractArray)
@@ -176,33 +180,45 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        expression = Val{true},
                        expression_module = @__MODULE__(),
                        checkbounds = false,
+                       postprocess_fbody=ex -> ex,
                        linenumbers = false,
                        outputidxs=nothing,
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
-                       fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
+                       fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
+                       states = LazyState(),
                        parallel=SerialForm(), kwargs...)
 
-    dargs = map(destructure_arg, [args...])
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds,
+                                  Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
-    oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto))
+    oop_expr = Func(dargs, [],
+                    postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
+
     if !isnothing(wrap_code[1])
         oop_expr = wrap_code[1](oop_expr)
     end
 
-    out = Sym{Any}(gensym("out"))
-    ip_expr = Func([out, dargs...], [], set_array(parallel, dargs, out, outputidxs, rhss, checkbounds, skipzeros))
+    out = Sym{Any}(:ˍ₋out)
+    ip_expr = Func([out, dargs...], [],
+                   postprocess_fbody(set_array(parallel,
+                                               dargs,
+                                               out,
+                                               outputidxs,
+                                               rhss,
+                                               checkbounds,
+                                               skipzeros)))
 
     if !isnothing(wrap_code[2])
         ip_expr = wrap_code[2](ip_expr)
     end
 
     if expression == Val{true}
-        return toexpr(oop_expr), toexpr(ip_expr)
+        return toexpr(oop_expr, states), toexpr(ip_expr, states)
     else
-        return _build_and_inject_function(expression_module, toexpr(oop_expr)),
-        _build_and_inject_function(expression_module, toexpr(ip_expr))
+        return _build_and_inject_function(expression_module, toexpr(oop_expr, states)),
+        _build_and_inject_function(expression_module, toexpr(ip_expr, states))
     end
 end
 
@@ -235,12 +251,13 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(@RuntimeGeneratedFunction(toexpr(thunk, st))),
+        ex = :($Funcall($(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false)),
                        ($(toexpr.(a, (st,))...),)))
         quote
             let
-                task = Base.Threads.Task($ex)
-                Base.Threads.schedule(task)
+                task = Base.Task($ex)
+                task.sticky = false
+                Base.schedule(task)
                 task
             end
         end
@@ -250,26 +267,56 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
 end
 
-function _make_array(rhss::AbstractSparseArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    if !(arr isa AbstractSparseArray)
-        _make_array(arr, similarto)
+function nzmap(f, x::Union{Base.ReshapedArray, LinearAlgebra.Transpose})
+    Setfield.@set x.parent = nzmap(f, x.parent)
+end
+
+function nzmap(f, x::SubArray)
+    unview = copy(x)
+    if unview isa Union{SparseMatrixCSC, SparseVector}
+        n = nnz(unview)
+        if n != length(unview.nzval)
+            resize!(unview.nzval, n)
+            resize!(unview.rowval, n)
+        end
+    end
+    nzmap(f, unview)
+end
+
+function nzmap(f, x::AbstractSparseArray)
+    Setfield.@set x.nzval = nzmap(f, x.nzval)
+end
+nzmap(f, x) = map(f, x)
+
+_issparse(x::AbstractArray) = issparse(x)
+_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
+
+function _make_sparse_array(arr, similarto)
+    if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
+        LiteralExpr(quote
+            $Setfield.@set $(nzmap(x->true, arr)).parent =
+                $(_make_array(parent(arr), typeof(parent(arr))))
+            end)
     else
-        MakeSparseArray(arr)
+        LiteralExpr(quote
+                        let __reference = copy($(nzmap(x->true, arr)))
+                            $Setfield.@set __reference.nzval =
+                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
+                        end
+                    end)
     end
 end
 
 function _make_array(rhss::AbstractArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    # Ugh reshaped array of a sparse array when mapped gives a sparse array
-    if arr isa AbstractSparseArray
-        _make_array(arr, similarto)
+    arr = nzmap(x->_make_array(x, similarto), rhss)
+    if _issparse(arr)
+        _make_sparse_array(arr, similarto)
     else
         MakeArray(arr, similarto)
     end
 end
 
-_make_array(x, similarto) = unflatten_long_ops(x)
+_make_array(x, similarto) = x
 
 ## In-place version
 
@@ -316,11 +363,11 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
     ii = findall(i->!(rhss[i] isa AbstractArray) && !(skipzeros && _iszero(rhss[i])), eachindex(outputidxs))
     jj = findall(i->rhss[i] isa AbstractArray, eachindex(outputidxs))
     exprs = []
-    rhss_scalar = unflatten_long_ops.(vec(rhss[ii]))
     setterexpr = SetArray(!checkbounds,
                           out,
-                          AtIndex.(vec(collect(outputidxs[ii])),
-                                   rhss_scalar))
+                          [AtIndex(outputidxs[i],
+                                   rhss[i])
+                           for i in ii])
     push!(exprs, setterexpr)
     for j in jj
         push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros))
@@ -330,7 +377,7 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
                 end)
 end
 
-_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = unflatten_long_ops(rhs)
+_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = rhs
 
 
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())
@@ -349,20 +396,38 @@ end
 get_varnumber(varop, vars::Vector) =  findfirst(x->isequal(x,varop),vars)
 get_varnumber(varop, var) =  isequal(var,varop) ? 0 : nothing
 
-function numbered_expr(O::Symbolic,args...;varordering = args[1],offset = 0,
-                       lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)])
-    O = value(O)
-    if O isa Sym || isa(operation(O), Sym)
-        for j in 1:length(args)
-            i = get_varnumber(O,args[j])
-            if i !== nothing
-                return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
+function buildvarnumbercache(args...)
+    varnumsdict = Pair[]
+    for (argi,arg) in enumerate(args)
+        if isa(arg,AbstractArray)
+            for (eli,el) in enumerate(arg)
+                push!(varnumsdict, el=>(argi,eli))
             end
+        else
+            push!(varnumsdict ,arg=>(argi,0))
+        end
+    end
+    return Dict(varnumsdict)
+end
+
+function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
+                       states = LazyState(),
+                       lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
+    O = value(O)
+    if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
+        (j,i) = get(varnumbercache, O, (nothing, nothing))
+        if !isnothing(j)
+            return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
     if istree(O)
-        Expr(:call, Symbol(operation(O)), (numbered_expr(x,args...;offset=offset,lhsname=lhsname,
-                                                         rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+        if operation(O) === getindex
+            args = arguments(O)
+            Expr(:ref, toexpr(args[1], states), toexpr.(args[2:end] .+ offset, (states,))...)
+        else
+            Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
+                                                             rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+        end
     elseif O isa Sym
         tosymbol(O, escape=false)
     else
@@ -370,13 +435,13 @@ function numbered_expr(O::Symbolic,args...;varordering = args[1],offset = 0,
     end
 end
 
-function numbered_expr(de::Equation,args...;varordering = args[1],
-                       lhsname=gensym("du"),rhsnames=[gensym("MTK") for i in 1:length(args)],offset=0)
+function numbered_expr(de::Equation,varnumbercache,args...;varordering = args[1],
+                       lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)],offset=0)
 
     varordering = value.(args[1])
     var = var_from_nested_derivative(de.lhs)[1]
     i = findfirst(x->isequal(tosymbol(x isa Sym ? x : operation(x), escape=false), tosymbol(var, escape=false)),varordering)
-    :($lhsname[$(i+offset)] = $(numbered_expr(de.rhs,args...;offset=offset,
+    :($lhsname[$(i+offset)] = $(numbered_expr(de.rhs,varnumbercache,args...;offset=offset,
                                               varordering = varordering,
                                               lhsname = lhsname,
                                               rhsnames = rhsnames)))
@@ -460,11 +525,12 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
 
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
 
-    differential_equation = string(join([numbered_expr(eq,args...,lhsname=lhsname,
+    varnumbercache = buildvarnumbercache(args...)
+    differential_equation = string(join([numbered_expr(eq,varnumbercache,args...,lhsname=lhsname,
                                   rhsnames=rhsnames,offset=-1) for
                                   (i, eq) ∈ enumerate(eqs)],";\n  "),";")
 
-    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:AbstractArray ? "double* $(rhsnames[i])" : "double $(rhsnames[i])" for i in 1:length(args)]),", ")
     ex = """
     void $fname($(argstrs...)) {
       $differential_equation
@@ -479,7 +545,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
         open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
             print(f, ex)
         end
-        @RuntimeGeneratedFunction(:((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)))
+        @RuntimeGeneratedFunction(@__MODULE__, :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
     end
 end
 
@@ -529,11 +595,13 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
                                compiler    = compiler)
     end
 
+
+    varnumbercache = buildvarnumbercache(args...)
     equations = Vector{String}()
     for col ∈ 1:size(ex,2)
         for row ∈ 1:size(ex,1)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
-            rhs = numbered_expr(value(ex[row, col]), args...;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, args...;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = -1) |> coperators |> string  # Filter through coperators to produce valid C code in more cases
@@ -541,7 +609,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         end
     end
 
-    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:Array ? "const double* $(rhsnames[i])" : "const double $(rhsnames[i])" for i in 1:length(args)]),", ")
+    argstrs = join(vcat("double* $(lhsname)",[typeof(args[i])<:AbstractArray ? "const double* $(rhsnames[i])" : "const double $(rhsnames[i])" for i in 1:length(args)]),", ")
 
     ccode = """
     #include <math.h>
@@ -555,7 +623,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
             print(f, ccode)
         end
-        @RuntimeGeneratedFunction(:((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)))
+        @RuntimeGeneratedFunction(@__MODULE__, :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
     end
 
 end
@@ -584,12 +652,17 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    differential_equation = string(join([numbered_expr(eq,vs,ps,lhsname=lhsname,
-                                   rhsnames=rhsnames) for
+    varnumbercache = buildvarnumbercache(vs,ps...)
+    par_str = join(["real $(rhsnames[2])_$i" for i in 1:length(ps)], ", ")
+    rhsnames_mod = [:internal_var___u, [Symbol("$(rhsnames[2])_$i") for i in 1:length(ps)]..., :internal_var___t]
+    differential_equation = string(join([numbered_expr(eq,varnumbercache,vs,ps,lhsname=lhsname,
+                                   rhsnames=rhsnames_mod) for
                                    (i, eq) ∈ enumerate(eqs)],";\n  "),";")
+
+
     """
-    real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
-      real $lhsname[$(length(eqs))];
+    vector $fname(real $(conv(iv)),vector $(rhsnames[1]), $par_str) {
+      vector[$(length(eqs))] $lhsname;
       $differential_equation
       return $lhsname;
     }
@@ -631,11 +704,12 @@ function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
                             rhsnames    = rhsnames)
     end
 
+    varnumbercache = buildvarnumbercache(vs,ps,iv)
     equations = Vector{String}()
     for col ∈ 1:size(ex,2)
         for row ∈ 1:size(ex,1)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row, "]")
-            rhs = numbered_expr(value(ex[row, col]), vs, ps, iv;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, vs, ps, iv;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = 0) |> string
@@ -644,8 +718,8 @@ function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
     end
 
     """
-    real[] $fname(real $(conv(iv)),real[] $(rhsnames[1]),real[] $(rhsnames[2]),real[] x_r,int[] x_i) {
-      real $lhsname[$(length(equations))];
+    vector $fname(real $(conv(iv)),vector $(rhsnames[1]),vector $(rhsnames[2])) {
+      vector[$(length(equations))] $lhsname;
     $([eqn == equations[end] ? string("  ", eqn) : string("  ", eqn, "\n") for eqn ∈ equations]...)
       return $lhsname;
     }
@@ -675,13 +749,14 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
     @assert expression == Val{true}
 
-    matstr = join([numbered_expr(eq.rhs,args...,lhsname=lhsname,
+    varnumbercache = buildvarnumbercache(args...)
+    matstr = join([numbered_expr(eq.rhs,varnumbercache,args...,lhsname=lhsname,
                                   rhsnames=rhsnames) for
                                   (i, eq) ∈ enumerate(eqs)],"; ")
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-    matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) ["*matstr*"];"
     matstr
 end
 
@@ -722,12 +797,13 @@ function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
                                rhsnames    = rhsnames)
     end
 
+    varnumbercache = buildvarnumbercache(args...)
     matstr = ""
     for row ∈ 1:size(ex,1)
         row_strings = Vector{String}()
         for col ∈ 1:size(ex,2)
             lhs = string(lhsname, "[", (col-1) * size(ex,1) + row-1, "]")
-            rhs = numbered_expr(value(ex[row, col]), args...;
+            rhs = numbered_expr(value(ex[row, col]), varnumbercache, args...;
                                 lhsname  = lhsname,
                                 rhsnames = rhsnames,
                                 offset   = 0) |> string
@@ -738,7 +814,7 @@ function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];\n"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) [\n"*matstr*"];\n"
 
     return matstr
 

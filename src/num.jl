@@ -1,18 +1,22 @@
+@symbolic_wrap struct Num <: Real
+    val
+end
+
+unwrap(x::Num) = x.val
+
 """
     Num(val)
 
 Wrap anything in a type that is a subtype of Real
 """
-struct Num <: Real
-    val
-end
+Num
 
 const show_numwrap = Ref(false)
 
 Num(x::Union{Num,Complex{Num}}) = x
 (n::Num)(args...) = Num(value(n)(map(value,args)...))
 value(x) = x
-value(x::Num) = x.val
+value(x::Num) = unwrap(x)
 
 SciMLBase.issymbollike(::Num) = true
 SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
@@ -31,13 +35,15 @@ Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
 
+IfElse.ifelse(x::Num,y,z) = Num(IfElse.ifelse(value(x), value(y), value(z)))
+
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
 for C in [Complex, Complex{Bool}]
     @eval begin
         Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
         Base.:*(z::$C, x::Num) = Complex(real(z) * x, imag(z) * x)
         Base.:/(x::Num, z::$C) = let (a, b) = reim(z), den = a^2 + b^2
-            Complex(x * a / den, x * b / den)
+            Complex(x * a / den, -x * b / den)
         end
         Base.:/(z::$C, x::Num) = Complex(real(z) / x, imag(z) / x)
         Base.:+(x::Num, z::$C) = Complex(x + real(z), imag(z))
@@ -59,6 +65,7 @@ function Base.:/(x::Complex{Num}, y::Complex{Num})
     Complex((a*c + b*d)/den, (b*c - a*d)/den)
 end
 Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
+Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
 function Base.show(io::IO, z::Complex{<:Num})
     r, i = reim(z)
@@ -69,26 +76,6 @@ function Base.show(io::IO, z::Complex{<:Num})
     print(io, ")*im")
 end
 
-SymbolicUtils.simplify(n::Num; kw...) = Num(SymbolicUtils.simplify(value(n); kw...))
-"""
-    substitute(expr, s::Dict)
-
-Performs the substitution on `expr` according to rule(s) `s`.
-# Examples
-```julia
-julia> @parameters t
-(t,)
-julia> @variables x y z(t)
-(x, y, z(t))
-julia> ex = x + y + sin(z)
-(x + y) + sin(z(t))
-julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
-(z(t) + y) + (z(t) ^ 2)
-```
-"""
-substitute(expr::Num, s::Pair; kw...) = Num(substituter(s)(value(expr); kw...)) # backward compat
-substitute(expr::Num, s::Vector; kw...) = Num(substituter(s)(value(expr); kw...))
-substitute(expr::Num, s::Dict; kw...) = Num(substituter(s)(value(expr); kw...))
 # TODO: move this to SymbolicUtils
 substitute(expr, s::Pair; kw...) = substituter([s[1] => s[2]])(expr; kw...)
 substitute(expr, s::Vector; kw...) = substituter(s)(expr; kw...)
@@ -99,14 +86,11 @@ function substituter(pairs)
     (expr; kw...) -> SymbolicUtils.substitute(expr, dict; kw...)
 end
 
-SymbolicUtils.symtype(n::Num) = symtype(n.val)
+SymbolicUtils.symtype(n::Num) = symtype(value(n))
+Base.nameof(n::Num) = nameof(value(n))
 
-function Base.iszero(x::Num)
-    x = value(x)
-    x isa Number && iszero(x) && return true
-    _x = SymbolicUtils.to_mpoly(x)[1]
-    return (_x isa Number || _x isa SymbolicUtils.MPoly) && iszero(_x)
-end
+Base.iszero(x::Num) = SymbolicUtils.fraction_iszero(unwrap(x))
+Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
 
 import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
 
@@ -152,21 +136,20 @@ macro num_method(f, expr, Ts=nothing)
     end |> esc
 end
 
-"""
-    tosymbolic(a::Union{Sym,Num}) -> Sym{Real}
-    tosymbolic(a::T) -> T
-"""
-tosymbolic(a::Num) = tosymbolic(value(a))
-tosymbolic(a::Sym) = Sym{symtype(a)}(nameof(a)) # unwrap stuff like Parameter{<:Number}
-tosymbolic(a) = a
+# Boolean operations
+for (f, Domain) in [:(==) => :((AbstractFloat, Number)), :(!=) => :((AbstractFloat, Number)),
+                    :(<=) => :((Real,)),   :(>=) => :((Real,)),
+                    :(isless) => :((Real,)),
+                    :(<) => :((Real,)),   :(> ) => :((Real,)),
+                    :(& )=> :((Bool,)),  :(| ) => :((Bool,)),
+                    :xor => :((Bool,))]
+    @eval @num_method Base.$f (val = $f(value(a), value(b)); val isa Bool ? val : Num(val)) $Domain
+end
 
-@num_method Base.isless  (val = isless(tosymbolic(a), tosymbolic(b)); val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(<)    (val = tosymbolic(a) < tosymbolic(b)       ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(<=)   (val = tosymbolic(a) <= tosymbolic(b)      ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(>)    (val = tosymbolic(a) > tosymbolic(b)       ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(>=)   (val = tosymbolic(a) >= tosymbolic(b)      ; val isa Bool ? val : Num(val)) (Real,)
-@num_method Base.:(==)   (val = tosymbolic(a) == tosymbolic(b)      ; val isa Bool ? val : Num(val)) (AbstractFloat,Number)
-@num_method Base.isequal isequal(tosymbolic(a), tosymbolic(b)) (AbstractFloat, Number, Symbolic)
+for f in [:!, :~]
+    @eval Base.$f(x::Num) = (val = $f(value(x)); val isa Bool ? val : Num(val))
+end
+@num_method Base.isequal isequal(value(a), value(b)) (AbstractFloat, Number, Symbolic)
 
 Base.hash(x::Num, h::UInt) = hash(value(x), h)
 
@@ -193,3 +176,5 @@ SymbolicUtils.hasmetadata(x::Num, t) = SymbolicUtils.hasmetadata(value(x), t)
 
 toexpr(n::Num, st) = toexpr(value(n), st)
 toexpr(n::Complex{Num}, st) = :($Complex($(toexpr(real(n), st)), $(toexpr(imag(n), st))))
+toexpr(n::ComplexTerm, st) = :($Complex($(toexpr(n.re, st)), $(toexpr(n.im, st))))
+

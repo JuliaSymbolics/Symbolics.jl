@@ -1,4 +1,5 @@
 using Symbolics, SparseArrays, Test
+using ReferenceTests
 @variables a b c1 c2 c3 d e g
 
 # Multiple argument matrix
@@ -13,6 +14,10 @@ function h_julia!(out, a, b, c, d, e, g)
 end
 
 h_str = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g])
+h_str2 = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g])
+@test h_str[1] == h_str2[1]
+@test h_str[2] == h_str2[2]
+
 h_oop = eval(h_str[1])
 h_str_par = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm())
 h_oop_par = eval(h_str_par[1])
@@ -77,16 +82,13 @@ h_julia_skip!(out_2_skip_2, inputs_skip_2...)
 h_scalar = a + b + c1 + c2 + c3 + d + e + g
 h_julia_scalar(a, b, c, d, e, g) = a[1] + b[1] + c[1] + c[2] + c[3] + d[1] + e[1] + g[1]
 h_str_scalar = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], [e], [g])
+h_str_scalar2 = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], [e], [g])
+@test h_str_scalar == h_str_scalar2
+
 h_oop_scalar = eval(h_str_scalar)
 @test h_oop_scalar(inputs...) == h_julia_scalar(inputs...)
 
 @variables z[1:100]
-@test isequal(simplify(Symbolics.unflatten_long_ops(sum(z))),
-              simplify(sum(z)))
-
-@test isequal(simplify(Symbolics.unflatten_long_ops(prod(z))),
-              simplify(prod(z)))
-
 @variables t x(t) y(t) k
 f = eval(build_function((x+y)/k, [x,y,k]))
 @test f([1,1,2]) == 1
@@ -105,6 +107,24 @@ f = eval(build_function(sparse([1],[1], [(x+y)/k], 10,10), [x,y,k])[1])
 @test f([1.,1.,2])[1,1] == 1.0
 @test sum(f([1.,1.,2])) == 1.0
 
+# Reshaped SparseMatrix optimization
+let
+    @variables a b c
+
+    x = reshape(sparse([0 a 0; 0 b c]), 3, 2)
+    f1,f2=build_function(x, [a,b,c], expression=Val{false})
+    y = f1([1,2,3])
+    @test y isa Base.ReshapedArray
+    @test y.parent isa SparseMatrixCSC
+    @test y.parent.rowval == x.parent.rowval
+    @test y == [0 2; 0 0; 1 3]
+
+    f1,f2=build_function(@views(x[2:3,1:2]), [a,b,c], expression=Val{false})
+    y = f1([1,2,3])
+    @test y isa SparseMatrixCSC
+    @test y == [0 0; 1 3]
+end
+
 let # ModelingToolkit.jl#800
     @variables x
     y = sparse(1:3,1:3,x)
@@ -113,7 +133,6 @@ let # ModelingToolkit.jl#800
     sf1, sf2 = string(f1), string(f2)
     @test !contains(sf1, "CartesianIndex")
     @test !contains(sf2, "CartesianIndex")
-    @test contains(sf1, "SparseMatrixCSC(")
     @test contains(sf2, ".nzval")
 end
 
@@ -123,15 +142,9 @@ let # Symbolics.jl#123
     @variables u
     @variables M[1:36]
     @variables qd[1:6]
-    output_eq = u*(qd[1]*(M[1]*qd[1] + M[1]*qd[3] + M[1]*qd[4] + M[25]*qd[5] + M[31]*qd[6] + M[7]*qd[2]))
+    output_eq = u*(qd[1]*(M[1]*qd[1] + M[7]*qd[2]))
 
-    str = build_function(output_eq, x, target=Symbolics.CTarget())
-    @test str == """
-    #include <math.h>
-    void diffeqf(double* du, const double* RHS1) {
-      du[0] = qd₁ * u * (M₁ * qd₁ + M₁ * qd₃ + M₁ * qd₄ + M₂₅ * qd₅ + M₃₁ * qd₆ + M₇ * qd₂);
-    }
-    """
+    @test_reference "target_functions/issue123.c" build_function(output_eq, x, target=Symbolics.CTarget())
 end
 
 using Symbolics: value
@@ -147,3 +160,23 @@ expr = toexpr(Func([value(D(x))], [], value(D(x))))
 out = a + b*im
 f = eval(build_function(out, (a, b)))
 @test f((1, 2)) == 1 + 2im
+
+## Oop Arr case:
+#
+
+a = rand(4)
+@variables x[1:4]
+@test eval(build_function(sin.(cos.(x)), cos.(x)))(a) == sin.(a)
+
+# more skipzeros
+@variables x,y
+f = [0, x]
+f_expr = build_function(f, [x,y];skipzeros=true, expression = Val{false})
+
+out = Vector{Float64}(undef, 2)
+u = [5.0, 3.1]
+@test f_expr[1](u) == [0, 5]
+old = out[1]
+f_expr[2](out, u)
+@test out[1] === old
+@test out[2] === u[1]

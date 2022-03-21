@@ -1,0 +1,4 @@
+\begin{align}
+x =& y + z \\
+y =& x - 3 z
+\end{align}
