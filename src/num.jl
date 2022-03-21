@@ -176,5 +176,4 @@ SymbolicUtils.hasmetadata(x::Num, t) = SymbolicUtils.hasmetadata(value(x), t)
 
 toexpr(n::Num, st) = toexpr(value(n), st)
 toexpr(n::Complex{Num}, st) = :($Complex($(toexpr(real(n), st)), $(toexpr(imag(n), st))))
-toexpr(n::ComplexTerm, st) = :($Complex($(toexpr(n.re, st)), $(toexpr(n.im, st))))
 

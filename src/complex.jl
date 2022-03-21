@@ -77,3 +77,5 @@ Base.iszero(x::Complex{<:Num}) = iszero(real(x)) && iszero(imag(x))
 Base.isone(x::Complex{<:Num}) = isone(real(x)) && iszero(imag(x))
 _iszero(x::Complex{<:Num}) = _iszero(unwrap(x))
 _isone(x::Complex{<:Num}) = _isone(unwrap(x))
+
+toexpr(n::ComplexTerm, st) = :($Complex($(toexpr(n.re, st)), $(toexpr(n.im, st))))
