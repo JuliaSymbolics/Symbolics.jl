@@ -174,3 +174,25 @@ old = out[1]
 f_expr[2](out, u)
 @test out[1] === old
 @test out[2] === u[1]
+@test expr.args[2].args[end] == :(xˍt(t))
+
+
+let # issue#136
+    @variables x y
+    A = sparse(Tridiagonal([x^i for i in 1:N-1],
+                           [x^i * y^(8-i) for i in 1:N],
+                           [y^i for i in 1:N-1]))
+
+    val = Dict(x=>1, y=>2)
+    B = map(A) do e
+        Num(substitute(e, val))
+    end
+
+    C = copy(B) - 100*I
+
+
+    f = build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2] |> eval
+
+    f(C, [1,2])
+    @test isequal(C, B)
+end
