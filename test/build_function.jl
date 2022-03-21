@@ -1,4 +1,4 @@
-using Symbolics, SparseArrays, Test
+using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 @variables a b c1 c2 c3 d e g
 
@@ -174,10 +174,10 @@ old = out[1]
 f_expr[2](out, u)
 @test out[1] === old
 @test out[2] === u[1]
-@test expr.args[2].args[end] == :(xˍt(t))
 
 
 let # issue#136
+    N = 8
     @variables x y
     A = sparse(Tridiagonal([x^i for i in 1:N-1],
                            [x^i * y^(8-i) for i in 1:N],
