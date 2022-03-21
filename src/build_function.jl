@@ -1,5 +1,6 @@
 using SymbolicUtils.Code
 using Base.Threads
+using SymbolicUtils.Code: LazyState
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
@@ -52,31 +53,6 @@ function build_function(args...;target = JuliaTarget(),kwargs...)
   _build_function(target,args...;kwargs...)
 end
 
-function unflatten_args(f, args, N=4)
-    length(args) < N && return Term{Real}(f, args)
-    unflatten_args(f, [Term{Real}(f, group)
-                                       for group in Iterators.partition(args, N)], N)
-end
-
-# Speeds up by avoiding repeated sorting when you call `arguments`
-# after editing children in Postwalk in unflatten_long_ops
-function termify(op)
-    !istree(op) && return op
-    Term{symtype(op)}(operation(op), arguments(op); metadata=op.metadata)
-end
-
-function unflatten_long_ops(op, N=4)
-    op = value(op)
-    op = termify(op)
-    !istree(op) && return wrap(op)
-    rule1 = @rule((+)(~~x) => length(~~x) > N ? unflatten_args(+, ~~x, N) : nothing)
-    rule2 = @rule((*)(~~x) => length(~~x) > N ? unflatten_args(*, ~~x, N) : nothing)
-
-    simterm(x,f,args; metadata=nothing) = Term{symtype(x)}(f, args, metadata=metadata)
-    Num(Rewriters.Postwalk(Rewriters.Chain([rule1, rule2]), similarterm=simterm)(op))
-end
-
-
 # Scalar output
 
 function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
@@ -93,9 +69,10 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], unflatten_long_ops(op)))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -111,11 +88,12 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -133,7 +111,7 @@ function _build_and_inject_function(mod::Module, ex)
     # XXX: Workaround to specify the module as both the cache module AND context module.
     # Currently, the @RuntimeGeneratedFunction macro only sets the context module.
     module_tag = getproperty(mod, RuntimeGeneratedFunctions._tagname)
-    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex)
+    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=false)
 end
 
 toexpr(n::Num, st) = toexpr(value(n), st)
@@ -209,7 +187,8 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        outputidxs=nothing,
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
-                       fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
+                       fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
+                       states = LazyState(),
                        parallel=SerialForm(), kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -238,10 +217,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 
     if expression == Val{true}
-        return toexpr(oop_expr), toexpr(ip_expr)
+        return toexpr(oop_expr, states), toexpr(ip_expr, states)
     else
-        return _build_and_inject_function(expression_module, toexpr(oop_expr)),
-        _build_and_inject_function(expression_module, toexpr(ip_expr))
+        return _build_and_inject_function(expression_module, toexpr(oop_expr, states)),
+        _build_and_inject_function(expression_module, toexpr(ip_expr, states))
     end
 end
 
@@ -274,7 +253,7 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(@RuntimeGeneratedFunction(toexpr(thunk, st))),
+        ex = :($Funcall($(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false)),
                        ($(toexpr.(a, (st,))...),)))
         quote
             let
@@ -290,26 +269,56 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
 end
 
-function _make_array(rhss::AbstractSparseArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    if !(arr isa AbstractSparseArray)
-        _make_array(arr, similarto)
+function nzmap(f, x::Union{Base.ReshapedArray, LinearAlgebra.Transpose})
+    Setfield.@set x.parent = nzmap(f, x.parent)
+end
+
+function nzmap(f, x::SubArray)
+    unview = copy(x)
+    if unview isa Union{SparseMatrixCSC, SparseVector}
+        n = nnz(unview)
+        if n != length(unview.nzval)
+            resize!(unview.nzval, n)
+            resize!(unview.rowval, n)
+        end
+    end
+    nzmap(f, unview)
+end
+
+function nzmap(f, x::AbstractSparseArray)
+    Setfield.@set x.nzval = nzmap(f, x.nzval)
+end
+nzmap(f, x) = map(f, x)
+
+_issparse(x::AbstractArray) = issparse(x)
+_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
+
+function _make_sparse_array(arr, similarto)
+    if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
+        LiteralExpr(quote
+            $Setfield.@set $(nzmap(x->true, arr)).parent =
+                $(_make_array(parent(arr), typeof(parent(arr))))
+            end)
     else
-        MakeSparseArray(arr)
+        LiteralExpr(quote
+                        let __reference = copy($(nzmap(x->true, arr)))
+                            $Setfield.@set __reference.nzval =
+                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
+                        end
+                    end)
     end
 end
 
 function _make_array(rhss::AbstractArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    # Ugh reshaped array of a sparse array when mapped gives a sparse array
-    if arr isa AbstractSparseArray
-        _make_array(arr, similarto)
+    arr = nzmap(x->_make_array(x, similarto), rhss)
+    if _issparse(arr)
+        _make_sparse_array(arr, similarto)
     else
         MakeArray(arr, similarto)
     end
 end
 
-_make_array(x, similarto) = unflatten_long_ops(x)
+_make_array(x, similarto) = x
 
 ## In-place version
 
@@ -324,12 +333,17 @@ end
 
 function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
-        return set_array(LiteralExpr(:($out.nzval)),
+        return set_array(s,
+                         closed_args,
+                         LiteralExpr(:($out.nzval)),
                          nothing,
                          rhss.nzval,
                          checkbounds,
                          skipzeros)
     end
+
+    outvar = !(out isa Sym) ? gensym("out") : out
+
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
@@ -338,8 +352,8 @@ function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, che
     slices = collect(Iterators.partition(zip(outputidxs, rhss), per_task))
     arrays = map(slices) do slice
         idxs, vals = first.(slice), last.(slice)
-        Func([out, closed_args...], [],
-             _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
+        Func([outvar, closed_args...], [],
+             _set_array(outvar, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
     end
     SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
 end
@@ -362,9 +376,9 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
     exprs = []
     setterexpr = SetArray(!checkbounds,
                           out,
-                          [AtIndex(outputidxs[ii[i]],
-                                   unflatten_long_ops(rhss[i]))
-                           for i in 1:length(ii)])
+                          [AtIndex(outputidxs[i],
+                                   rhss[i])
+                           for i in ii])
     push!(exprs, setterexpr)
     for j in jj
         push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros))
@@ -374,7 +388,7 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
                 end)
 end
 
-_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = @show unflatten_long_ops(rhs)
+_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = rhs
 
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())
     vs_names = tosymbol.(vs)
@@ -407,6 +421,7 @@ function buildvarnumbercache(args...)
 end
 
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
+                       states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
     if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
@@ -418,7 +433,7 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
     if istree(O)
         if operation(O) === getindex
             args = arguments(O)
-            Expr(:ref, toexpr(args[1]), toexpr.(args[2:end] .+ offset)...)
+            Expr(:ref, toexpr(args[1], states), toexpr.(args[2:end] .+ offset, (states,))...)
         else
             Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
                                                              rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
@@ -540,7 +555,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
         open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
             print(f, ex)
         end
-        @RuntimeGeneratedFunction(:((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)))
+        @RuntimeGeneratedFunction(@__MODULE__, :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
     end
 end
 
@@ -618,7 +633,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
         open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
             print(f, ccode)
         end
-        @RuntimeGeneratedFunction(:((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)))
+        @RuntimeGeneratedFunction(@__MODULE__, :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64) -> ccall(("diffeqf", $libpath), Cvoid, (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64), du, u, p, t)), false)
     end
 
 end
@@ -751,7 +766,7 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-    matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) ["*matstr*"];"
     matstr
 end
 
@@ -809,7 +824,7 @@ function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];\n"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) [\n"*matstr*"];\n"
 
     return matstr
 

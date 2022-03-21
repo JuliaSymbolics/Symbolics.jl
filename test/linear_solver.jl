@@ -24,6 +24,22 @@ a, b, islinear = Symbolics.linear_expansion(expr, p)
 @test isequal(Symbolics.solve_for(t*D(x) ~ y, D(x)), y/t)
 @test isequal(Symbolics.solve_for([t*D(x) ~ y], [D(x)]), [y/t])
 @test isequal(Symbolics.solve_for(t*D(x) ~ y, y), t*D(x))
+Dx = D(x)
+expr = Dx * x + Dx*t - 2//3*x + y*Dx
+a, b, islinear = Symbolics.linear_expansion(expr, x)
+@test iszero(expand(a * x + b - expr))
+@test isequal(Symbolics.solve_for(expr ~ Dx, Dx), (-2//3*x)/(1 - t - x - y))
+@test isequal(Symbolics.solve_for(expr ~ Dx, x), (t*Dx + y*Dx - Dx) / ((2//3) - Dx))
+
+exprs = [
+ 3//2*x + 2y + 10
+ 7x + 3y - 8
+]
+xs = [x, y]
+A, b, islinear = Symbolics.linear_expansion(exprs, xs)
+@test islinear
+@test isequal(A, [3//2 2; 7 3])
+@test isequal(b, [10; -8])
 
 @variables x y z
 eqs = [
@@ -33,3 +49,5 @@ eqs = [
       ]
 @test [2 1 -1; -3 1 -1; 0 1 -5] * Symbolics.solve_for(eqs, [x, y, z]) == [2; -2; -2]
 @test isequal(Symbolics.solve_for(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x), 1//7*y - 2//7*z)
+@test isequal(Symbolics.solve_for(x + y ~ 0, x), Symbolics.solve_for([x + y ~ 0], x))
+@test isequal(Symbolics.solve_for([x + y ~ 0], [x]), Symbolics.solve_for(x + y ~ 0, [x]))

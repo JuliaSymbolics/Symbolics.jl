@@ -239,7 +239,7 @@ end
 
 function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
     # TODO: just use Sym here
-    ndim = length(indices)
+    ndim = :($length(($(indices...),)))
 
     need_scalarize = false
     expr = if call_args === nothing

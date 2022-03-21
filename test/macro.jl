@@ -4,7 +4,7 @@ import SymbolicUtils: Term, symtype, FnType
 using Test
 
 @variables t
-Symbolics.@register fff(t)
+Symbolics.@register_symbolic fff(t)
 @test isequal(fff(t), Symbolics.Num(Symbolics.Term{Real}(fff, [Symbolics.value(t)])))
 
 ## @variables
@@ -76,3 +76,37 @@ let
 
     @test Symbolics.getname(Symbolics.rename(y[2], :u)) === :u
 end
+
+let
+    s = :y
+    x = (1:2,1:3)
+    t, y = @variables t $s[x...](t)
+
+    @test ndims(y) == 2
+    @test size(y) == (2,3)
+end
+
+
+# Edge case when no symbolic values are passed
+struct A end
+Symbolics.@register_symbolic bar(t, x::A)
+Symbolics.@register_symbolic baz(x, y)
+if !@isdefined(bar_catchall_defined)
+    @test_throws MethodError bar(0.1, A())
+    @test_throws MethodError bar(Num(0.1), A())
+else
+    @warn("skipping 2 tests because this file was run more than once")
+end
+
+bar_catchall_defined = true
+bar(t, x::A) = 1
+@test bar(1, A()) == 1
+
+let
+    @variables x y
+    @test bar(x, A()) isa Num
+    @test bar(unwrap(x), A()) isa Term
+    @test typeof(baz(x, unwrap(y))) == Num
+    @test typeof(baz(unwrap(x), unwrap(y))) <: Term
+end
+

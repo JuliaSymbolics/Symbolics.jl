@@ -17,16 +17,16 @@ function wrapper_type(::Type{Complex{T}}) where T
     Symbolics.has_symwrapper(T) ? Complex{wrapper_type(T)} : Complex{T}
 end
 
-symtype(a::ComplexTerm{T}) where T = Complex{T}
-istree(a::ComplexTerm) = true
-operation(a::ComplexTerm{T}) where T = Complex{T}
-arguments(a::ComplexTerm) = [a.re, a.im]
+TermInterface.symtype(a::ComplexTerm{T}) where T = Complex{T}
+TermInterface.istree(a::ComplexTerm) = true
+TermInterface.operation(a::ComplexTerm{T}) where T = Complex{T}
+TermInterface.arguments(a::ComplexTerm) = [a.re, a.im]
 
-function similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing)
+function TermInterface.similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing, exprhead=exprhead(t))
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        similarterm(first(args), f, args, symtype; metadata=metadata)
+        similarterm(first(args), f, args, symtype; metadata=metadata, exprhead=exprhead)
     end
 end
 
@@ -52,9 +52,12 @@ function Base.show(io::IO, a::Complex{Num})
 end
 
 function unwrap(a::Complex{<:Num})
-    re, im = unwrap(real(a)), unwrap(imag(a))
-    T = promote_type(symtype(re), symtype(im))
-    ComplexTerm{T}(re, im)
+    re, img = unwrap(real(a)), unwrap(imag(a))
+    if re isa Real && img isa Real
+        return re + im * img
+    end
+    T = promote_type(symtype(re), symtype(img))
+    ComplexTerm{T}(re, img)
 end
 wrap(a::ComplexTerm) = Complex(wrap.(arguments(a))...)
 wrap(a::Symbolic{<:Complex}) = Complex(wrap(real(a)), wrap(imag(a)))

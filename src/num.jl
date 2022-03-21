@@ -15,8 +15,7 @@ const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value,args)...))
-value(x) = x
-value(x::Num) = unwrap(x)
+value(x) = unwrap(x)
 
 SciMLBase.issymbollike(::Num) = true
 SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
@@ -43,7 +42,7 @@ for C in [Complex, Complex{Bool}]
         Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
         Base.:*(z::$C, x::Num) = Complex(real(z) * x, imag(z) * x)
         Base.:/(x::Num, z::$C) = let (a, b) = reim(z), den = a^2 + b^2
-            Complex(x * a / den, x * b / den)
+            Complex(x * a / den, -x * b / den)
         end
         Base.:/(z::$C, x::Num) = Complex(real(z) / x, imag(z) / x)
         Base.:+(x::Num, z::$C) = Complex(x + real(z), imag(z))
@@ -65,6 +64,7 @@ function Base.:/(x::Complex{Num}, y::Complex{Num})
     Complex((a*c + b*d)/den, (b*c - a*d)/den)
 end
 Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
+Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
 function Base.show(io::IO, z::Complex{<:Num})
     r, i = reim(z)
@@ -88,19 +88,8 @@ end
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
 Base.nameof(n::Num) = nameof(value(n))
 
-function Base.iszero(x::Num)
-    x = value(x)
-    x isa Number && iszero(x) && return true
-    _x = SymbolicUtils.to_mpoly(x)[1]
-    return (_x isa Number || _x isa SymbolicUtils.MP.AbstractPolynomialLike) && iszero(_x)
-end
-
-function Base.isone(x::Num)
-    x = value(x)
-    x isa Number && isone(x) && return true
-    _x = SymbolicUtils.to_mpoly(x)[1]
-    return (_x isa Number || _x isa SymbolicUtils.MP.AbstractPolynomialLike) && isone(_x)
-end
+Base.iszero(x::Num) = SymbolicUtils.fraction_iszero(unwrap(x))
+Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
 
 import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
 
