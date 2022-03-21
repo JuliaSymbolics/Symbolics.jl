@@ -52,9 +52,12 @@ function Base.show(io::IO, a::Complex{Num})
 end
 
 function unwrap(a::Complex{<:Num})
-    re, im = unwrap(real(a)), unwrap(imag(a))
-    T = promote_type(symtype(re), symtype(im))
-    ComplexTerm{T}(re, im)
+    re, img = unwrap(real(a)), unwrap(imag(a))
+    if re isa Real && img isa Real
+        return re + im * img
+    end
+    T = promote_type(symtype(re), symtype(img))
+    ComplexTerm{T}(re, img)
 end
 wrap(a::ComplexTerm) = Complex(wrap.(arguments(a))...)
 wrap(a::Symbolic{<:Complex}) = Complex(wrap(real(a)), wrap(imag(a)))
