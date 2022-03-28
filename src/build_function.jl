@@ -70,7 +70,11 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          states = LazyState(),
-                         linenumbers = true)
+                         kwargs...)
+    if length(kwargs) > 0
+        invalid_kwargs = join([k for (k, v) in kwargs], ", ")
+        @warn("Ignoring invalid keyword arguments: $(invalid_kwargs)")
+    end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = toexpr(Func(dargs, [], op), states)
 
@@ -89,8 +93,11 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          states = LazyState(),
-                         linenumbers = true)
-
+                         kwargs...)
+    if length(kwargs) > 0
+        invalid_kwargs = join([k for (k, v) in kwargs], ", ")
+        @warn("Ignoring invalid keyword arguments: $(invalid_kwargs)")
+    end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = toexpr(Func(dargs, [], op), states)
@@ -132,12 +139,9 @@ Build function target: `JuliaTarget`
 function _build_function(target::JuliaTarget, rhss, args...;
                          conv = toexpr, expression = Val{true},
                          checkbounds = false,
-                         linenumbers = false,
                          headerfun = addheader, outputidxs=nothing,
-                         convert_oop = true, force_SA = false,
                          skipzeros = outputidxs===nothing,
-                         fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
-                         parallel=SerialForm(), kwargs...)
+                         parallel=SerialForm())
 ```
 
 Generates a Julia function which can then be utilized for further evaluations.
@@ -151,7 +155,7 @@ is a mutating function. The outputted functions match the given argument order,
 i.e., f(u,p,args...) for the out-of-place and scalar functions and
 `f!(du,u,p,args..)` for the in-place version.
 
-Special Keyword Argumnets:
+Special Keyword Arguments:
 
 - `parallel`: The kind of parallelism to use in the generated function. Defaults
   to `SerialForm()`, i.e. no parallelism. Note that the parallel forms are not
@@ -164,33 +168,23 @@ Special Keyword Argumnets:
   the `toexpr` function.
 - `checkbounds`: For whether to enable bounds checking inside of the generated
   function. Defaults to false, meaning that `@inbounds` is applied.
-- `linenumbers`: Determines whether the generated function expression retains
-  the line numbers. Defaults to true.
-- `convert_oop`: Determines whether the OOP version should try to convert
-  the output to match the type of the first input. This is useful for
-  cases like LabelledArrays or other array types that carry extra
-  information. Defaults to true.
-- `force_SA`: Forces the output of the OOP version to be a StaticArray.
-  Defaults to `false`, and outputs a static array when the first argument
-  is a static array.
 - `skipzeros`: Whether to skip filling zeros in the in-place version if the
   filling function is 0.
-- `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
-  safety with `skipzeros`.
 """
 function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        expression = Val{true},
                        expression_module = @__MODULE__(),
                        checkbounds = false,
                        postprocess_fbody=ex -> ex,
-                       linenumbers = false,
                        outputidxs=nothing,
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
-                       fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
                        parallel=SerialForm(), kwargs...)
-
+    if length(kwargs) > 0
+        invalid_kwargs = join([k for (k, v) in kwargs], ", ")
+        @warn("Ignoring invalid keyword arguments: $(invalid_kwargs)")
+    end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
