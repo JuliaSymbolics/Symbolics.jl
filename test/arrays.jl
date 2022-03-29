@@ -1,6 +1,6 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 
@@ -72,6 +72,43 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     # #417
     @test isequal(Symbolics.scalarize(x', (1,1)), x[1])
+
+    # #483
+    # examples by @gronniger
+    @variables A[1:2, 1:2]
+
+    test_mat = [1 2; 3 4]
+    repl_dict = Dict(Symbolics.scalarize(A .=> test_mat))
+    A2 = A^2
+    A3 = A^3
+    A4 = A^4
+    A5 = A^5
+    A6 = A^6
+    A7 = A^7
+
+    @syms i::Int j::Int k::Int l::Int m::Int n::Int
+
+    A_ = unwrap(A)
+    A3_ = wrap(@arrayop (A_*A_*A_) (i, j) A_[i, k] * A_[k, l] * A_[l, j])
+    A4_ = wrap(@arrayop (A_*A_*A_*A_) (i, j) A_[i, k] * A_[k, l] * A_[l, m] * A_[m, j])
+    A5_ = wrap(@arrayop (A_*A_*A_*A_*A_) (i, j) A_[i, k] * A_[k, l] * A_[l, m] * A_[m, n] * A_[n, j])
+
+    @test isequal(Symbolics.scalarize((A*A)[k,k]), A[k, 1]*A[1, k] + A[2, k]*A[k, 2])
+
+    # basic tests:
+    @test iszero((Symbolics.scalarize(A^2) * Symbolics.scalarize(A))[1,1] -
+                  Symbolics.scalarize(A^3)[1,1])
+    @testset "nested scalarize" begin
+        @test isequal(substitute(Symbolics.scalarize(A2 ), repl_dict), test_mat^2)
+        @test isequal(substitute(Symbolics.scalarize(A3_), repl_dict), test_mat^3)
+        @test isequal(substitute(Symbolics.scalarize(A3 ), repl_dict), test_mat^3)
+        @test isequal(substitute(Symbolics.scalarize(A4_), repl_dict), test_mat^4)
+        @test isequal(substitute(Symbolics.scalarize(A4 ), repl_dict), test_mat^4)
+        @test isequal(substitute(Symbolics.scalarize(A5_), repl_dict), test_mat^5)
+        @test isequal(substitute(Symbolics.scalarize(A5 ), repl_dict), test_mat^5)
+        @test isequal(substitute(Symbolics.scalarize(A6 ), repl_dict), test_mat^6)
+        @test isequal(substitute(Symbolics.scalarize(A7 ), repl_dict), test_mat^7)
+    end
 end
 
 @testset "Parent" begin
