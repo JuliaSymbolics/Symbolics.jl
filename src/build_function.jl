@@ -11,11 +11,19 @@ struct MATLABTarget <: BuildTargets end
 abstract type ParallelForm end
 struct SerialForm <: ParallelForm end
 
+"""
+    ShardedForm{multithread}(cutoff, ncalls)
+
+Split a long array construction into nested functions where each function calls
+`ncalls` other functions, and the leaf functions populate at most `cutoff` number
+of items in the array. If `multithread` is true, uses threading.
+"""
 struct ShardedForm{multithreaded} <: ParallelForm
-    ntasks::Int
+    cutoff::Int
+    ncalls::Int
 end
 
-ShardedForm(n) = ShardedForm{false}(n)
+ShardedForm() = ShardedForm{false}(80, 4)
 
 const MultithreadedForm = ShardedForm{true}
 
@@ -195,8 +203,11 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
-                       parallel=SerialForm(), kwargs...)
+                       parallel=nothing, kwargs...)
 
+    if parallel == nothing && length(rhss) >= 1000
+        parallel = ShardedForm() # by default switch for arrays longer than 1000 exprs
+    end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
@@ -348,14 +359,14 @@ function set_array(s::SerialForm, closed_vars, args...)
     _set_array(args...)
 end
 
-function recursive_split(leaf_f, s, out, args, outputidxs, xs, cutoff, nspawns)
-    if length(xs) <= cutoff
+function recursive_split(leaf_f, s, out, args, outputidxs, xs)
+    if length(xs) <= s.cutoff
         return leaf_f(outputidxs, xs)
     else
-        per_part = ceil(Int, length(xs) / nspawns)
+        per_part = ceil(Int, length(xs) / s.ncalls)
         slices = collect(Iterators.partition(zip(outputidxs, xs), per_part))
         fs = map(slices) do slice
-            recursive_split(leaf_f, s, out, args, first.(slice), last.(slice), cutoff, nspawns)
+            recursive_split(leaf_f, s, out, args, first.(slice), last.(slice))
         end
         return Func(args, [],
                     SpawnFetch{typeof(s)}(fs, [args for f in fs],
@@ -380,7 +391,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
         outputidxs = collect(eachindex(rhss))
     end
     all_args = [out, closed_args...]
-    return recursive_split(s, out, all_args, outputidxs, rhss, 80, 4) do idxs, xs
+    return recursive_split(s, out, all_args, outputidxs, rhss) do idxs, xs
         Func(all_args, [],
              _set_array(out, idxs, xs, checkbounds, skipzeros), false)
     end.body
