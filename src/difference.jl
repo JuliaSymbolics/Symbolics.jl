@@ -17,7 +17,7 @@ julia> Δ = Difference(t; dt=0.01)
 (::Difference) (generic function with 2 methods)
 ```
 """
-struct Difference <: Function
+struct Difference <: Operator
     """Fixed Difference"""
     t
     dt
@@ -54,3 +54,10 @@ Base.:(==)(D1::Difference, D2::Difference) = isequal(D1.t, D2.t) && isequal(D1.d
 Base.hash(D::Difference, u::UInt) = hash(D.dt, hash(D.t, xor(u, 0x055640d6d952f101)))
 
 Base.:^(D::Difference, n::Integer) = _repeat_apply(D, n)
+
+"""
+    hasdiff(O)
+
+Returns true if the expression or equation `O` contains [`Difference`](@ref) terms (this include [`DiscreteUpdate`](@ref)).
+"""
+hasdiff(O) = recursive_hasoperator(Difference, O)

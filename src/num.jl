@@ -15,8 +15,7 @@ const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value,args)...))
-value(x) = x
-value(x::Num) = unwrap(x)
+value(x) = unwrap(x)
 
 SciMLBase.issymbollike(::Num) = true
 SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
@@ -65,6 +64,7 @@ function Base.:/(x::Complex{Num}, y::Complex{Num})
     Complex((a*c + b*d)/den, (b*c - a*d)/den)
 end
 Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
+Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
 function Base.show(io::IO, z::Complex{<:Num})
     r, i = reim(z)

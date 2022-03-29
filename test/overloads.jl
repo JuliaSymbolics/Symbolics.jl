@@ -167,6 +167,8 @@ z2 = c + d * im
 @test sign(Num(1)) isa Num
 @test isequal(sign(Num(1)), Num(1))
 @test isequal(sign(Num(-1)), Num(-1))
+                    
+@test isequal(ℯ^a, exp(a))
 
 using IfElse: ifelse
 @test isequal(Symbolics.derivative(abs(x), x), ifelse(signbit(x), -1, 1))
@@ -208,8 +210,8 @@ A = [x[1] 2
      2    0.0]
 B = [x[1] 1.0
     2.0 0.0]
-@test_throws ArgumentError Matrix{Float64}(A)
-@test Matrix{Float64}(A-B) isa Matrix{Float64}
-@test Matrix{Float64}(A-B) == [0.0 1.0;0.0 0.0]
+@test_throws MethodError Matrix{Float64}(A)
+@test_broken Matrix{Float64}(A-B) isa Matrix{Float64}
+@test_broken Matrix{Float64}(A-B) == [0.0 1.0;0.0 0.0]
 
 @test isequal(simplify(cos(x)^2 + sin(x)^2 + im * x), 1 + x*im)

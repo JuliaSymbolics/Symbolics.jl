@@ -1,3 +1,5 @@
+abstract type Operator <: Function end
+
 """
 $(TYPEDEF)
 
@@ -26,7 +28,7 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 (D'~x(t)) ∘ (D'~x(t)) ∘ (D'~x(t))
 ```
 """
-struct Differential <: Function
+struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x
     Differential(x) = new(value(x))
@@ -52,6 +54,20 @@ _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
 
 function occursin_info(x, expr)
+    if symtype(expr) <: AbstractArray
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+    end
+
+    # Allow scalarized expressions
+    is_scalar_indexed(ex) = istree(ex) && operation(ex) == getindex && !(symtype(ex) <: AbstractArray)
+    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
+        isequal(first(arguments(x)), first(arguments(expr)))
+        return isequal(arguments(x), arguments(expr))
+    end
+    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
+        !occursin(first(arguments(x)), first(arguments(expr)))
+        return false
+    end
     !istree(expr) && return false
     if isequal(x, expr)
         true
@@ -63,26 +79,50 @@ function occursin_info(x, expr)
         Term{Real}(true, args)
     end
 end
+
 function occursin_info(x, expr::Sym)
+    if symtype(expr) <: AbstractArray
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+    end
     isequal(x, expr)
 end
 
-function hasderiv(O)
+"""
+    hasderiv(O)
+
+Returns true if the expression or equation `O` contains [`Differential`](@ref) terms.
+"""
+hasderiv(O) = recursive_hasoperator(Differential, O)
+
+
+recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
+recursive_hasoperator(op) = O -> recursive_hasoperator(op, O) # curry version
+recursive_hasoperator(::Type{T}, ::T) where T = true
+
+
+"""
+    recursive_hasoperator(op, O)
+
+An internal function that contains the logic for [`hasderiv`](@ref) and [`hasdiff`](@ref).
+Return true if `O` contains a term with `Operator` `op`.
+"""
+function recursive_hasoperator(op, O)
     istree(O) || return false
-    if operation(O) isa Differential
+    if operation(O) isa op
         return true
     else
         if O isa Union{Add, Mul}
-            any(hasderiv, keys(O.dict))
+            any(recursive_hasoperator(op), keys(O.dict))
         elseif O isa Pow
-            hasderiv(O.base) || hasderiv(O.exp)
+            recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
         elseif O isa SymbolicUtils.Div
-            hasderiv(O.num) || hasderiv(O.den)
+            recursive_hasoperator(op)(O.num) || recursive_hasoperator(op)(O.den)
         else
-            any(hasderiv, arguments(O))
+            any(recursive_hasoperator(op), arguments(O))
         end
     end
 end
+
 """
 $(SIGNATURES)
 
@@ -369,6 +409,12 @@ function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
     Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 
+function jacobian(ops::ArrayLike{T, 1}, vars::ArrayLike{T, 1}; simplify=false) where T
+    ops = scalarize(ops)
+    vars = scalarize(vars) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
+    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
+end
+
 """
 $(SIGNATURES)
 
@@ -440,7 +486,8 @@ Return the sparsity pattern of the Jacobian of the mutating function `op!(output
 """
 function jacobian_sparsity(op!,output::Array{T},input::Array{T}, args...) where T<:Number
     eqs=similar(output,Num)
-    vars=[variable(i) for i in eachindex(input)]
+    fill!(eqs,false)
+    vars=ArrayInterface.restructure(input,[variable(i) for i in eachindex(input)])
     op!(eqs,vars, args...)
     jacobian_sparsity(eqs,vars)
 end
@@ -487,13 +534,13 @@ Return the sparsity pattern of the Hessian of an array of expressions with respe
 an array of variable expressions.
 """
 function hessian_sparsity end
+basic_simterm(t, g, args; kws...) = Term{Any}(g, args)
 
 let
     # we do this in a let block so that Revise works on the list of rules
 
     _scalar = one(TermCombination)
 
-    simterm(t, f, args; kws...) = Term{Any}(f, args)
     linearity_rules = [
           @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
           @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
@@ -515,7 +562,7 @@ let
               end
           end
           @rule ~x::(x->x isa Sym) => 0]
-    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=simterm))
+    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=basic_simterm))
 
     global hessian_sparsity
 
@@ -525,7 +572,7 @@ let
         u = map(value, u)
         idx(i) = TermCombination(Set([Dict(i=>1)]))
         dict = Dict(u .=> idx.(1:length(u)))
-        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=simterm)(f)
+        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(f)
         lp = linearity_propagator(f)
         _sparse(lp, length(u))
     end

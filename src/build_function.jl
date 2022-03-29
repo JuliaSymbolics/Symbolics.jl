@@ -1,5 +1,6 @@
 using SymbolicUtils.Code
 using Base.Threads
+using SymbolicUtils.Code: LazyState
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
@@ -74,9 +75,10 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -92,11 +94,12 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -191,6 +194,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
+                       states = LazyState(),
                        parallel=SerialForm(), kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -219,10 +223,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 
     if expression == Val{true}
-        return toexpr(oop_expr), toexpr(ip_expr)
+        return toexpr(oop_expr, states), toexpr(ip_expr, states)
     else
-        return _build_and_inject_function(expression_module, toexpr(oop_expr)),
-        _build_and_inject_function(expression_module, toexpr(ip_expr))
+        return _build_and_inject_function(expression_module, toexpr(oop_expr, states)),
+        _build_and_inject_function(expression_module, toexpr(ip_expr, states))
     end
 end
 
@@ -282,20 +286,50 @@ function toexpr(p::SpawnFetch{ShardedForm{false}}, st)
     end
 end
 
-function _make_array(rhss::AbstractSparseArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    if !(arr isa AbstractSparseArray)
-        _make_array(arr, similarto)
+function nzmap(f, x::Union{Base.ReshapedArray, LinearAlgebra.Transpose})
+    Setfield.@set x.parent = nzmap(f, x.parent)
+end
+
+function nzmap(f, x::SubArray)
+    unview = copy(x)
+    if unview isa Union{SparseMatrixCSC, SparseVector}
+        n = nnz(unview)
+        if n != length(unview.nzval)
+            resize!(unview.nzval, n)
+            resize!(unview.rowval, n)
+        end
+    end
+    nzmap(f, unview)
+end
+
+function nzmap(f, x::AbstractSparseArray)
+    Setfield.@set x.nzval = nzmap(f, x.nzval)
+end
+nzmap(f, x) = map(f, x)
+
+_issparse(x::AbstractArray) = issparse(x)
+_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
+
+function _make_sparse_array(arr, similarto)
+    if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
+        LiteralExpr(quote
+            $Setfield.@set $(nzmap(x->true, arr)).parent =
+                $(_make_array(parent(arr), typeof(parent(arr))))
+            end)
     else
-        MakeSparseArray(arr)
+        LiteralExpr(quote
+                        let __reference = copy($(nzmap(x->true, arr)))
+                            $Setfield.@set __reference.nzval =
+                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
+                        end
+                    end)
     end
 end
 
 function _make_array(rhss::AbstractArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    # Ugh reshaped array of a sparse array when mapped gives a sparse array
-    if arr isa AbstractSparseArray
-        _make_array(arr, similarto)
+    arr = nzmap(x->_make_array(x, similarto), rhss)
+    if _issparse(arr)
+        _make_sparse_array(arr, similarto)
     else
         MakeArray(arr, similarto)
     end
@@ -331,12 +365,17 @@ end
 
 function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
-        return set_array(LiteralExpr(:($out.nzval)),
+        return set_array(s,
+                         closed_args,
+                         LiteralExpr(:($out.nzval)),
                          nothing,
                          rhss.nzval,
                          checkbounds,
                          skipzeros)
     end
+
+    outvar = !(out isa Sym) ? gensym("out") : out
+
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
@@ -407,6 +446,7 @@ function buildvarnumbercache(args...)
 end
 
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
+                       states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
     if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
@@ -418,7 +458,7 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
     if istree(O)
         if operation(O) === getindex
             args = arguments(O)
-            Expr(:ref, toexpr(args[1]), toexpr.(args[2:end] .+ offset)...)
+            Expr(:ref, toexpr(args[1], states), toexpr.(args[2:end] .+ offset, (states,))...)
         else
             Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
                                                              rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
@@ -751,7 +791,7 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-    matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) ["*matstr*"];"
     matstr
 end
 
@@ -809,7 +849,7 @@ function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];\n"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) [\n"*matstr*"];\n"
 
     return matstr
 

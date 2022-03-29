@@ -29,7 +29,7 @@ for the version of the documentation which contains the unreleased features.
 - [SymbolicUtils.jl](https://github.com/JuliaSymbolics/SymbolicUtils.jl): This is a
   rule-rewriting system that is the core of Symbolics.jl. Symbolics.jl builds off of
   SymbolicUtils.jl to extend it to a whole symbolic algebra system, complete with
-  support for differentation, solving symbolic systems of equations, etc. If you're
+  support for differentiation, solving symbolic systems of equations, etc. If you're
   looking for the barebones to build a new CAS for specific algebras, SymbolicUtils.jl
   is that foundation. Otherwise, Symbolics.jl is for you.
 - [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl): This is a
@@ -76,13 +76,26 @@ julia> substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
 
 ## Citation
 
-If you use Symbolics.jl, please [cite this paper](https://arxiv.org/abs/2105.03949)
+If you use Symbolics.jl, please [cite this paper](https://dl.acm.org/doi/10.1145/3511528.3511535) 
+(or see the free [arxiv version](https://arxiv.org/abs/2105.03949))
 
 ```bib
-@article{gowda2021high,
-  title={High-performance symbolic-numerics via multiple dispatch},
-  author={Gowda, Shashi and Ma, Yingbo and Cheli, Alessandro and Gwozdz, Maja and Shah, Viral B and Edelman, Alan and Rackauckas, Christopher},
-  journal={arXiv preprint arXiv:2105.03949},
-  year={2021}
+@article{10.1145/3511528.3511535,
+author = {Gowda, Shashi and Ma, Yingbo and Cheli, Alessandro and Gw\'{o}\'{z}zd\'{z}, Maja and Shah, Viral B. and Edelman, Alan and Rackauckas, Christopher},
+title = {High-Performance Symbolic-Numerics via Multiple Dispatch},
+year = {2022},
+issue_date = {September 2021},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {55},
+number = {3},
+issn = {1932-2240},
+url = {https://doi.org/10.1145/3511528.3511535},
+doi = {10.1145/3511528.3511535},
+abstract = {As mathematical computing becomes more democratized in high-level languages, high-performance symbolic-numeric systems are necessary for domain scientists and engineers to get the best performance out of their machine without deep knowledge of code optimization. Naturally, users need different term types either to have different algebraic properties for them, or to use efficient data structures. To this end, we developed Symbolics.jl, an extendable symbolic system which uses dynamic multiple dispatch to change behavior depending on the domain needs. In this work we detail an underlying abstract term interface which allows for speed without sacrificing generality. We show that by formalizing a generic API on actions independent of implementation, we can retroactively add optimized data structures to our system without changing the pre-existing term rewriters. We showcase how this can be used to optimize term construction and give a 113x acceleration on general symbolic transformations. Further, we show that such a generic API allows for complementary term-rewriting implementations. Exploiting this feature, we demonstrate the ability to swap between classical term-rewriting simplifiers and e-graph-based term-rewriting simplifiers. We illustrate how this symbolic system improves numerical computing tasks by showcasing an e-graph ruleset which minimizes the number of CPU cycles during expression evaluation, and demonstrate how it simplifies a real-world reaction-network simulation to halve the runtime. Additionally, we show a reaction-diffusion partial differential equation solver which is able to be automatically converted into symbolic expressions via multiple dispatch tracing, which is subsequently accelerated and parallelized to give a 157x simulation speedup. Together, this presents Symbolics.jl as a next-generation symbolic-numeric computing environment geared towards modeling and simulation.},
+journal = {ACM Commun. Comput. Algebra},
+month = {jan},
+pages = {92–96},
+numpages = {5}
 }
 ```
