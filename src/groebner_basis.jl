@@ -2,6 +2,10 @@
 DP = SymbolicUtils.DynamicPolynomials
 Bijections = SymbolicUtils.Bijections
 
+########################
+#### Groebner bases ####
+########################
+
 # extracting underlying polynomial and coefficient type from Polyforms
 underlyingpoly(x::Number)    = x
 underlyingpoly(pf::PolyForm) = pf.p
@@ -63,4 +67,204 @@ function groebner_basis(polynomials; reduced=true)
     # polynomials is nonemtpy
     T = symtype(first(polynomials))
     poly_to_symbol(basis, pvar2sym, sym2term, T)
+end
+
+########################
+#### System Solving ####
+########################
+
+# A struct to store system solutions
+struct Solution
+    complex_solutions::Vector{Vector{ComplexF64}}
+end
+
+# get all solutions
+solutions(s::Solution) = s.complex_solutions
+
+# get only real solutions
+function realsolutions(s::Solution)
+    realsols = Vector{Vector{Float64}}(undef, length(s.complex_solutions))
+    i = 1
+    for sol in s.complex_solutions
+        if all(x -> isapprox(0.0, imag(x), atol=1e-15), sol)
+            realsols[i] = sol
+            i += 1
+        end
+    end
+    resize!(realsols, i - 1)
+    realsols
+end
+
+function Base.show(io::IO, ::MIME"text/plain", s::Solution)
+    rs = realsolutions(s)
+    cs = s.complex_solutions
+    println(io, "$(length(cs)) solutions, $(length(rs)) are real")
+end
+
+"""
+
+solve(system)
+
+Solve polynomial `system = 0` numerically and return a `Solution` object.
+
+Groebner bases algorithms are used internally.
+
+"""
+function solve(system)
+    #=
+        The algorithm is based on several Groebner bases theory theorems.
+        Check out chapter "The Problem of Solving Polynomial Equations"
+        in "Ideals, Varieties, and Algorithms" by O'Shea et al
+        for a quick summary.
+
+        Main obervations
+        1. If a system is solvable, then its Groebner basis in lexicographic order
+            contains one *univariate* polynomial, say, f(xn)
+        2. f(xn) = 0 can be solved to find system solutions in the variable xn.
+            These solutions can be then substituted into the original system.
+            After the substitution the system is guaranteed to contain
+            at least one univariate polynomial in another variable. GOTO step 1.
+
+        Step 1. is correct due to the Finiteness Theorem
+         (see §3 Theorem 6, Ideals, Varieties, and Algorithms, Fourth Edition)
+        The Extension Theorem ensures overall correctness
+         (for ref. see §1 Theorem 3, -//-)
+    =#
+
+    polynoms, pvar2sym, sym2term = symbol_to_poly(system)
+
+    basis = groebner(polynoms)
+    # basis = groebner(polynoms, forsolve=true)
+    # uncomment when Groebner 0.1.2 is released
+
+    generic_extension_solve(basis)
+end
+
+#=
+    Solve the `system` in generic position
+=#
+function generic_extension_solve(system)
+    nvars = DP.nvariables(first(system))
+    complex_solutions = Vector{Vector{ComplexF64}}(undef, 1)
+    complex_solutions[1] = Vector{ComplexF64}(undef, nvars)
+
+    # map coefficients to complex for type stability further
+    system = map(f -> DP.mapcoefficients(c -> ComplexF64(c), f), system)
+
+    # recursively dive into solving:
+    # for a given variable find a univariate polynomial in it,
+    # solve polynomial, and substitute this variable in sysyem with found roots.
+    # Then call do same for each specialization
+    branchidx = 1
+    sz = solving_branch!(system, complex_solutions, nvars, branchidx)
+
+    resize!(complex_solutions, sz)
+
+    Solution(complex_solutions)
+end
+
+function solving_branch!(system, sols, varidx, branchidx)
+    # find one univariate poly
+    idx, var = findunivariate(system, varidx)
+
+    # solve it somehow
+    roots = solveunivariate(system[idx], var)
+
+    for (i, root) in enumerate(roots)
+        # substitute one root into the system
+        specsystem = specializesystem(system, var, root)
+
+        # keep track of solutions
+        updatesolutions!(sols, root, varidx, branchidx)
+
+        # recursively call for the next variable
+        if varidx > 1
+            branchidx = solving_branch!(specsystem, sols, varidx - 1, branchidx)
+        else
+            continue
+        end
+
+        if i != length(roots)
+            branchidx += 1
+        end
+    end
+
+    branchidx
+end
+
+# substitute variable `var` with `root` value everywhere in `system`
+function specializesystem(system, var, root)
+    specsystem = similar(system)
+    for (i, f) in enumerate(system)
+        specsystem[i] = DP.subs(f, var=>root)
+    end
+    specsystem
+end
+
+# in `sols` set solution at position `solidx` and variable `varidx` to `root`
+function updatesolutions!(sols, root, varidx, solidx)
+    if solidx > length(sols)
+        resize!(sols, max(2*length(sols), 2^2))
+    end
+
+    # preserve solutions acquired up to this point
+    if solidx >= 2 && !isassigned(sols, solidx)
+        sols[solidx] = copy(sols[solidx - 1])
+    end
+
+    sols[solidx][varidx] = root
+end
+
+# solve univariate `poly` in `var` numerically
+function solveunivariate(poly, var)
+    deg = DP.degree(DP.leadingmonomial(poly))
+    coeffs = [DP.coefficient(poly, var^i) for i in 0:deg]
+    PolynomialRoots.roots(coeffs)
+end
+
+# Find the index of univariate polynomial in `system`
+function findunivariate(system, varidx)
+    var = DP.variables(first(system))[varidx]
+
+    mindeg = 2^31
+    index = 0
+
+    # traverse a system..
+    for (i, f) in enumerate(system)
+        DP.isapproxzero(f) && continue
+
+        # check if univariate
+        isuni = isunivariate(f, var)
+        !isuni && continue
+
+        # and select a polynomial with the smallest degree (heuristic),
+        # correctness does not depend on the choice
+        deg = DP.degree(DP.leadingmonomial(f), var)
+        if deg <= mindeg
+            index = i
+            mindeg = deg
+        end
+    end
+
+    index, var
+end
+
+# Checks if `poly` is univariate in `var` and returns the present variable
+function isunivariate(poly, var)
+    # A placeholder for now.. DP does not have isunivariate or something..
+
+    for m in DP.monomials(poly)
+        if count(!iszero, DP.exponents(m)) > 1
+            return false
+        end
+    end
+
+    # there is at least one nonzero,
+    # otherwise, the system is incompatible
+    vi = findfirst(!iszero, DP.exponents(DP.leadingmonomial(poly)))
+    vv = DP.variables(poly)[vi]
+
+    vv == var && return true
+
+    return false
 end
