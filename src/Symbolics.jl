@@ -106,12 +106,13 @@ include("array-lib.jl")
 
 include("linear_algebra.jl")
 
-
 import PolynomialRoots
 using Groebner
 include("groebner_basis.jl")
 export groebner_basis
 export solve, solutions, realsolutions
+
+include("roots.jl")
 
 import Libdl
 include("build_function.jl")

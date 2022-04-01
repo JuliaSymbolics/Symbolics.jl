@@ -12,6 +12,11 @@ underlyingpoly(pf::PolyForm) = pf.p
 coefftype(x::Number)    = typeof(x)
 coefftype(pf::PolyForm) = DP.coefficienttype(underlyingpoly(pf))
 
+function symbol_to_poly(sympoly)
+    polys, pvar2sym, sym2term = symbol_to_poly([sympoly])
+    only(polys), pvar2sym, sym2term
+end
+
 #=
 Converts an array of symbolic polynomials
 into an array of DynamicPolynomials.Polynomials
@@ -29,7 +34,7 @@ function symbol_to_poly(sympolys::AbstractArray)
 
     # Discover common coefficient type
     commontype = mapreduce(coefftype, promote_type, polyforms, init=Int)
-    @assert commontype <: Union{Integer,Rational} "Only integer and rational coefficients are supported as input."
+    # @assert commontype <: Union{Integer,Rational} "Only integer and rational coefficients are supported as input."
 
     # Convert all to DP.Polynomial, so that coefficients are of same type,
     # and constants are treated as polynomials
@@ -46,8 +51,12 @@ end
 Converts an array of AbstractPolynomialLike`s into an array of
 symbolic expressions mapping variables w.r.t pvar2sym
 =#
-function poly_to_symbol(polys, pvar2sym, sym2term, ::Type{T}) where {T}
-    map(f -> PolyForm{T}(f, pvar2sym, sym2term), polys)
+function poly_to_symbol(polys::AbstractArray, pvar2sym, sym2term, ::Type{T}) where {T}
+    map(poly -> poly_to_symbol(poly, pvar2sym, sym2term, T), polys)
+end
+
+function poly_to_symbol(poly, pvar2sym, sym2term, ::Type{T}) where {T}
+    PolyForm{T}(poly, pvar2sym, sym2term)
 end
 
 """
