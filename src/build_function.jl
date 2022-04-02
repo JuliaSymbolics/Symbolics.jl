@@ -251,7 +251,7 @@ function make_array(s::SerialForm, dargs, arr, similarto)
 end
 
 function make_array(s::ShardedForm, closed_args, arr, similarto)
-    per_task = ceil(Int, length(arr) / s.ntasks)
+    per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
         Func(closed_args, [], _make_array(slice, similarto)), closed_args
