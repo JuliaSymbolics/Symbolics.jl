@@ -27,7 +27,7 @@ ShardedForm() = ShardedForm{false}(80, 4)
 
 const MultithreadedForm = ShardedForm{true}
 
-MultithreadedForm() = MultithreadedForm(2*nthreads())
+MultithreadedForm() = MultithreadedForm(200, 2*nthreads())
 
 """
 `build_function`
@@ -370,7 +370,8 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
         end
         return Func(args, [],
                     SpawnFetch{typeof(s)}(fs, [args for f in fs],
-                                          (@inline noop(x...) = nothing)), false)
+                                          (@inline noop(x...) = nothing)),
+                    [])
     end
 end
 
