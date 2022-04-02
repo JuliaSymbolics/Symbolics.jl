@@ -391,11 +391,17 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
-    all_args = [out, closed_args...]
-    return recursive_split(s, out, all_args, outputidxs, rhss) do idxs, xs
+    all_args = [outvar, closed_args...]
+    ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
         Func(all_args, [],
-             _set_array(out, idxs, xs, checkbounds, skipzeros), false)
+             _set_array(outvar, idxs, xs, checkbounds, skipzeros),
+             [])
     end.body
+
+    return out isa Sym ? ex : LiteralExpr(quote
+        $outvar = $out
+        $ex
+    end)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
