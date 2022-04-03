@@ -86,14 +86,16 @@ end
 
 # Scalar output
 
+unwrap_nometa(x) = unwrap(x)
+unwrap_nometa(x::CallWithMetadata) = unwrap(x.f)
 function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
     if !(arg isa Arr)
-        DestructuredArgs(map(unwrap, arg), name, inbounds=inbounds, create_bindings=false)
+        DestructuredArgs(map(unwrap_nometa, arg), name, inbounds=inbounds, create_bindings=false)
     else
-        unwrap(arg)
+        unwrap_nometa(arg)
     end
 end
-destructure_arg(arg, _, _) = unwrap(arg)
+destructure_arg(arg, _, _) = unwrap_nometa(arg)
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
