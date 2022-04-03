@@ -23,8 +23,8 @@ struct ShardedForm{multithreaded} <: ParallelForm
     ncalls::Int
 end
 
-ShardedForm(cutoff, ncalls=Threads.nthreads()) = ShardedForm{false}(cutoff, ncalls)
-ShardedForm() = ShardedForm(80)
+ShardedForm(cutoff, ncalls) = ShardedForm{false}(cutoff, ncalls)
+ShardedForm() = ShardedForm(80, 4)
 
 const MultithreadedForm = ShardedForm{true}
 
@@ -39,6 +39,7 @@ Generates a numerically-usable function from a Symbolics `Num`.
 build_function(ex, args...;
                expression = Val{true},
                target = JuliaTarget(),
+               parallel=nothing,
                kwargs...)
 ```
 
@@ -59,6 +60,21 @@ Keyword Arguments:
       programming language
     - `MATLABTarget`: Generates an anonymous function for use in MATLAB and Octave
       environments
+- `parallel`: The kind of parallelism to use in the generated function. Defaults
+  to `SerialForm()`, i.e. no parallelism, if `ex` is a single expression or an
+  array containing <= 1500 non-zero expressions. If `ex` is an array of > 1500
+  non-zero expressions then `ShardedForm(80, 4)` is used. See below for more on
+  `ShardedForm`.
+  Note that the parallel forms are not exported and thus need to be chosen like
+  `Symbolics.SerialForm()`.
+  The choices are:
+  - `SerialForm()`: Serial execution.
+  - `ShardedForm(cutoff, ncalls)`: splits the output function into sub-functions
+     which contain at most `cutoff` number of output `rhss`. These sub-functions
+     are called by the top-level function that _build_function returns.
+     This helps in reducing the compile time of the generated function.
+  - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
+    splitting the number of expressions per thread.
 - `fname`: Used by some targets for the name of the function in the target space.
 
 Note that not all build targets support the full compilation interface. Check the
@@ -173,6 +189,9 @@ Special Keyword Argumnets:
   exported and thus need to be chosen like `Symbolics.SerialForm()`.
   The choices are:
   - `SerialForm()`: Serial execution.
+  - `ShardedForm(cutoff, ncalls)`: splits the output function into sub-functions
+     which contain at most `cutoff` number of output `rhss`. These sub-functions
+     are called by the top-level function that _build_function returns.
   - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
     splitting the number of expressions per thread.
 - `conv`: The conversion function of symbolic types to Expr. By default this uses
