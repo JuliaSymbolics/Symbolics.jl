@@ -19,15 +19,16 @@ Split a long array construction into nested functions where each function calls
 of items in the array. If `multithread` is true, uses threading.
 """
 struct ShardedForm{multithreaded} <: ParallelForm
-    cutoff::Int
+    cutoff::Union{Nothing,Int}
     ncalls::Int
 end
 
-ShardedForm() = ShardedForm{false}(80, 4)
+ShardedForm(cutoff, ncalls=Threads.nthreads()) = ShardedForm{false}(cutoff, ncalls)
+ShardedForm() = ShardedForm(80)
 
 const MultithreadedForm = ShardedForm{true}
 
-MultithreadedForm() = MultithreadedForm(200, 2*nthreads())
+MultithreadedForm() = MultithreadedForm(nothing, 2*nthreads())
 
 """
 `build_function`
@@ -242,7 +243,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 end
 
 function make_array(s, dargs, arr, similarto)
-    Base.@warn("Parallel form of $(typeof(s)) not implemented")
+    s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
     _make_array(arr, similarto)
 end
 
@@ -351,7 +352,7 @@ _make_array(x, similarto) = x
 ## In-place version
 
 function set_array(p, closed_vars, args...)
-    Base.@warn("Parallel form of $(typeof(p)) not implemented")
+    p !== nothing && Base.@warn("Parallel form of $(typeof(p)) not implemented")
     _set_array(args...)
 end
 
@@ -360,7 +361,8 @@ function set_array(s::SerialForm, closed_vars, args...)
 end
 
 function recursive_split(leaf_f, s, out, args, outputidxs, xs)
-    if length(xs) <= s.cutoff
+    cutoff = isnothing(s.cutoff) ? ceil(Int, length(xs) / (2*s.ncalls)) : s.cutoff
+    if length(xs) <= cutoff
         return leaf_f(outputidxs, xs)
     else
         per_part = ceil(Int, length(xs) / s.ncalls)

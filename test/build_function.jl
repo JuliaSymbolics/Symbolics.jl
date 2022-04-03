@@ -20,6 +20,9 @@ h_str2 = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g])
 
 h_oop = eval(h_str[1])
 h_str_par = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm())
+
+@test contains(repr(h_str_par[1]), "schedule")
+@test contains(repr(h_str_par[2]), "schedule")
 h_oop_par = eval(h_str_par[1])
 h_par_rgf = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm(), expression=false)
 h_ip! = eval(h_str[2])
