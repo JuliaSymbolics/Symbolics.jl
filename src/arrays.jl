@@ -48,8 +48,8 @@ struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
 end
 
 function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(), output_view=nothing; metadata=nothing)
-    sh = make_shape(output_idx, expr, ranges)
-    ArrayOp{T}(output_idx, expr, reduce, term, sh, ranges, output_view, metadata)
+    sh = make_shape(output_idx, unwrap(expr), ranges)
+    ArrayOp{T}(output_idx, unwrap(expr), reduce, term, sh, ranges, output_view, metadata)
 end
 
 function ArrayOp(a::AbstractArray)
@@ -103,17 +103,30 @@ function Base.hash(a::ArrayOp, u::UInt)
     hash(a.shape, hash(a.expr, hash(a.expr, hash(a.output_idx, hash(operation(a), u)))))
 end
 
-macro arrayop(call, output_idx, expr, options...)
-    @assert output_idx.head == :tuple
+macro arrayop(output_idx, expr, options...)
     rs = []
     reduce = +
+    call = nothing
+
+    extra = []
     for o in options
         if isexpr(o, :call) && o.args[1] == :in
             push!(rs, :($(o.args[2]) => $(o.args[3])))
         elseif isexpr(o, :(=)) && o.args[1] == :reduce
             reduce = o.args[2]
+        elseif isexpr(o, :(=)) && o.args[1] == :term
+            call = o.args[2]
+        else
+            push!(extra, o)
         end
     end
+    if length(extra) == 1
+        @warn("@arrayop <call> <idx> <expr> is deprecated, use @arrayop <idx> <expr> term=<call> instead")
+        call = output_idx
+        output_idx = expr
+        expr = extra[1]
+    end
+    @assert output_idx.head == :tuple
 
     oidxs = filter(x->x isa Symbol, output_idx.args)
     iidxs = find_indices(expr)
@@ -187,7 +200,8 @@ function make_shape(output_idx, expr, ranges=Dict())
                 return axes(ranges[i], 1)
             end
             if !haskey(matches, i)
-                error("index $i not found in RHS")
+                error("There was an error processing arrayop expression $expr.\n" *
+                      "Dimension of output index $i in $output_idx could not be inferred")
             end
             mi = matches[i]
             @assert !isempty(mi)
@@ -276,7 +290,7 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
         if operation(expr) === (getindex)
             args = arguments(expr)
             for (axis, idx_expr) in enumerate(@views args[2:end])
-                if idx_expr isa Sym || istree(idx_expr)
+                if issym(idx_expr) || istree(idx_expr)
                     sym = only(get_variables(idx_expr))
                     axesvec = Base.get!(() -> [], dict, sym)
                     push!(axesvec, AxisOf(first(args), axis, idx_expr - sym))
@@ -530,7 +544,6 @@ macro sequence(definition, sequence)
     end
 
     output_shape = get_indexers(definition)
-    @show output_shape
     output_name = definition.args[1]
 
     seq = map(filter(x->!(x isa LineNumberNode), sequence.args)) do pair
