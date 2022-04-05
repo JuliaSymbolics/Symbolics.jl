@@ -184,12 +184,12 @@ end
 #
 @wrapped function Base.adjoint(A::AbstractMatrix)
     @syms i::Int j::Int
-    @arrayop A' (i, j) A[j, i]
+    @arrayop (i, j) A[j, i] term=A'
 end
 
 @wrapped function Base.adjoint(b::AbstractVector)
     @syms i::Int
-    @arrayop b' (1, i) b[i]
+    @arrayop (1, i) b[i] term=b'
 end
 
 import Base: *, \
@@ -237,7 +237,7 @@ function _matmul(A,B)
         op = operation(A.term)
         return op(op(B) * first(arguments(A.term)))
     end
-    return @arrayop (A*B) (i, j) A[i, k] * B[k, j]
+    return @arrayop (i, j) A[i, k] * B[k, j] term=(A*B)
 end
 
 @wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B)
@@ -251,7 +251,7 @@ function _matvec(A,b)
         S = SymbolicUtils.promote_symtype(+, T,T)
         return Term{S}(*, [A, b])
     end
-    @arrayop (A*b) (i,) A[i, k] * b[k]
+    @arrayop (i,) A[i, k] * b[k] term=(A*b)
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
 (*)(A::AbstractArray, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
