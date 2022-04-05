@@ -248,7 +248,7 @@ end
 # turn `f(x...)` into `term(f, x...)`
 #
 function call2term(expr, arrs=[])
-    !(expr isa Expr) && return expr
+    !(expr isa Expr) && return :($unwrap($expr))
     if expr.head == :call
         if expr.args[1] == :(:)
             return expr
@@ -291,6 +291,8 @@ function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
             args = arguments(expr)
             for (axis, idx_expr) in enumerate(@views args[2:end])
                 if issym(idx_expr) || istree(idx_expr)
+                    vs = get_variables(idx_expr)
+                    isempty(vs) && continue
                     sym = only(get_variables(idx_expr))
                     axesvec = Base.get!(() -> [], dict, sym)
                     push!(axesvec, AxisOf(first(args), axis, idx_expr - sym))
@@ -536,12 +538,26 @@ end
 
 export @sequence
 
-macro sequence(definition, sequence)
+function get_indexers(ex)
+    @assert ex.head == :ref
+    arr = ex.args[1]
+    replace_ends(arr, ex.args[2:end])
+end
 
-    function get_indexers(ex)
-        @assert ex.head == :ref
-        ex.args[2:end]
-    end
+function search_and_replace(expr, key, val)
+    isequal(expr, key) && return val
+
+    expr isa Expr ?
+        Expr(expr.head, map(x->search_and_replace(x, key,val), expr.args)...) :
+        expr
+end
+
+function replace_ends(arr, idx)
+    [search_and_replace(ix, :end, :(lastindex($arr, $i)))
+     for (i, ix) in enumerate(idx)]
+end
+
+macro sequence(definition, sequence)
 
     output_shape = get_indexers(definition)
     output_name = definition.args[1]
@@ -550,6 +566,7 @@ macro sequence(definition, sequence)
         @assert pair.head == :call && pair.args[1] == :(=>)
         # TODO: make sure the same symbol is used for the lhs array
         :(let
+             @variables $definition
               out = $(pair.args[3:end]...)
               $Setfield.@set! out.output_view = ($(get_indexers(pair.args[2])...),)
           end)
