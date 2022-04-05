@@ -572,7 +572,7 @@ macro sequence(definition, sequence)
           end)
     end
 
-    :($ArrayConstructor{AbstractArray{Float64, 2}}(
+    :($output_name = $ArrayConstructor{AbstractArray{Float64, 2}}(
         ($(output_shape...),),
         [$(seq...),])) |> esc
 end
