@@ -2,6 +2,8 @@ using SymbolicUtils
 using StaticArrays
 import Base: eltype, length, ndims, size, axes, eachindex
 
+export @arrayop
+
 ### Store Shape as a metadata in Term{<:AbstractArray} objects
 struct ArrayShapeCtx end
 
@@ -534,6 +536,12 @@ end
 struct ArrayConstructor{T<:AbstractArray} <: Symbolic{T}
     shape
     sequence
+end
+
+function Base.show(io::IO, ac::ArrayConstructor)
+    ovs = map(x -> x.output_view, ac.sequence)
+    print(io, "@sequence $(ac.shape) ")
+    print(io, Expr(:block, (ovs .=> ac.sequence)...))
 end
 
 export @sequence
