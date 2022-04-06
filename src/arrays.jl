@@ -2,7 +2,7 @@ using SymbolicUtils
 using StaticArrays
 import Base: eltype, length, ndims, size, axes, eachindex
 
-export @arrayop
+export @arrayop, ArrayMaker, @makearray, @setview, @setview!
 
 ### Store Shape as a metadata in Term{<:AbstractArray} objects
 struct ArrayShapeCtx end
@@ -532,12 +532,12 @@ end
 function SymbolicUtils.Code.toexpr(x::Arr, st)
     toexpr(unwrap(x), st)
 end
-
-export ArrayMaker
-struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{T}
+struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{AT}
     shape
     sequence
 end
+
+shape(am::ArrayMaker) = am.shape
 
 function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array=[]; atype=Array) where {N,T}
     ArrayMaker{T, atype{T, N}}(map(x->1:x, sz), seq)
@@ -550,8 +550,6 @@ function Base.show(io::IO, ac::ArrayMaker)
     print(io, Expr(:call, :ArrayMaker, ac.shape,
                    Expr(:block, (ovs .=> ac.sequence)...)))
 end
-
-export @sequence
 
 function get_indexers(ex)
     @assert ex.head == :ref
@@ -572,8 +570,6 @@ function replace_ends(arr, idx)
      for (i, ix) in enumerate(idx)]
 end
 
-export @setview!, @setview
-
 macro setview!(definition, arrayop)
     setview(definition, arrayop, true)
 end
@@ -583,37 +579,33 @@ macro setview(definition, arrayop)
 end
 
 function setview(definition, arrayop, inplace)
-    output_shape = get_indexers(definition)
+    output_view = get_indexers(definition)
     output_ref = definition.args[1]
     push = inplace ? (am, op) -> push!(am.sequence, op) : (am, op) -> typeof(am)(am.shape, vcat(am.sequence, op))
     quote
         let
             _aop = $arrayop
             $push($output_ref,
-                   $Setfield.@set! _aop.output_view = $output_shape)
+                  $Setfield.@set! _aop.output_view = ($(output_view...),))
             $output_ref
         end
     end |> esc
 end
 
-macro sequence(definition, sequence)
-
+macro makearray(definition, sequence)
     output_shape = get_indexers(definition)
     output_name = definition.args[1]
 
     seq = map(filter(x->!(x isa LineNumberNode), sequence.args)) do pair
         @assert pair.head == :call && pair.args[1] == :(=>)
         # TODO: make sure the same symbol is used for the lhs array
-        :(let
-             @variables $definition
-              out = $(pair.args[3:end]...)
-              $Setfield.@set! out.output_view = ($(get_indexers(pair.args[2])...),)
-          end)
+        :(@setview! $(pair.args[2]) $(pair.args[3]))
     end
 
-    :($output_name = $ArrayMaker{Float64}(
-        ($(output_shape...),),
-        [$(seq...),])) |> esc
+    quote
+        $output_name = $ArrayMaker{Real}(map(length, ($(output_shape...),)))
+        $(seq...)
+    end |> esc
 end
 
 function best_order(output_idx, ks, rs)
