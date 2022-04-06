@@ -533,15 +533,22 @@ function SymbolicUtils.Code.toexpr(x::Arr, st)
     toexpr(unwrap(x), st)
 end
 
-struct ArrayConstructor{T<:AbstractArray} <: Symbolic{T}
+export ArrayMaker
+struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{T}
     shape
     sequence
 end
 
-function Base.show(io::IO, ac::ArrayConstructor)
+function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array=[]; atype=Array) where {N,T}
+    ArrayMaker{T, atype{T, N}}(map(x->1:x, sz), seq)
+end
+
+(::Type{ArrayMaker{T}})(i::Int...; atype=Array) where {T} = ArrayMaker{T}(i, atype=atype)
+
+function Base.show(io::IO, ac::ArrayMaker)
     ovs = map(x -> x.output_view, ac.sequence)
-    print(io, "@sequence $(ac.shape) ")
-    print(io, Expr(:block, (ovs .=> ac.sequence)...))
+    print(io, Expr(:call, :ArrayMaker, ac.shape,
+                   Expr(:block, (ovs .=> ac.sequence)...)))
 end
 
 export @sequence
@@ -565,6 +572,30 @@ function replace_ends(arr, idx)
      for (i, ix) in enumerate(idx)]
 end
 
+export @setview!, @setview
+
+macro setview!(definition, arrayop)
+    setview(definition, arrayop, true)
+end
+
+macro setview(definition, arrayop)
+    setview(definition, arrayop, false)
+end
+
+function setview(definition, arrayop, inplace)
+    output_shape = get_indexers(definition)
+    output_ref = definition.args[1]
+    push = inplace ? (am, op) -> push!(am.sequence, op) : (am, op) -> typeof(am)(am.shape, vcat(am.sequence, op))
+    quote
+        let
+            _aop = $arrayop
+            $push($output_ref,
+                   $Setfield.@set! _aop.output_view = $output_shape)
+            $output_ref
+        end
+    end |> esc
+end
+
 macro sequence(definition, sequence)
 
     output_shape = get_indexers(definition)
@@ -580,7 +611,7 @@ macro sequence(definition, sequence)
           end)
     end
 
-    :($output_name = $ArrayConstructor{AbstractArray{Float64, 2}}(
+    :($output_name = $ArrayMaker{Float64}(
         ($(output_shape...),),
         [$(seq...),])) |> esc
 end
@@ -589,7 +620,7 @@ function best_order(output_idx, ks, rs)
     unique!(filter(issym, vcat(reverse(output_idx)..., collect(ks))))
 end
 
-function SymbolicUtils.Code.toexpr(x::ArrayConstructor, st)
+function SymbolicUtils.Code.toexpr(x::ArrayMaker, st)
     outsym = Symbol("_out")
     N = length(x.shape)
     ex = :(let $outsym = zeros(Float64, map(length, ($(x.shape...),)))
@@ -598,7 +629,7 @@ function SymbolicUtils.Code.toexpr(x::ArrayConstructor, st)
     toexpr(ex, st)
 end
 
-function inplace_expr(x::ArrayConstructor, outsym = Symbol("_out"))
+function inplace_expr(x::ArrayMaker, outsym = Symbol("_out"))
     quote
         $(map(inplace_expr, x.sequence)...)
     end
