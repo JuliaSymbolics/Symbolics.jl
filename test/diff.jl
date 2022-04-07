@@ -299,8 +299,10 @@ end
 
 # make sure derivative(x[1](t), y) does not fail
 let
-    @variables t
+    @variables t a(t)
     vars = collect(@variables(x[1:1](t))[1])
     ps = collect(@variables(ps[1:1])[1])
     @test Symbolics.derivative(ps[1], vars[1]) == 0
+    @test Symbolics.derivative(ps[1], a) == 0
+    @test Symbolics.derivative(x[1], a) == 0
 end
