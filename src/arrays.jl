@@ -626,7 +626,7 @@ end
 
 function inplace_expr(x::ArrayMaker, outsym = Symbol("_out"))
     quote
-        $(map(inplace_expr, x.sequence)...)
+        $(map(a->inplace_expr(a, outsym), x.sequence)...)
     end
 end
 
