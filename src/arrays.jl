@@ -45,13 +45,12 @@ struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
     shape
     ranges::Dict{Sym, AbstractRange} # index range each index symbol can take,
                                      # optional for each symbol
-    output_view
     metadata
 end
 
-function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(), output_view=nothing; metadata=nothing)
+function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(); metadata=nothing)
     sh = make_shape(output_idx, unwrap(expr), ranges)
-    ArrayOp{T}(output_idx, unwrap(expr), reduce, term, sh, ranges, output_view, metadata)
+    ArrayOp{T}(output_idx, unwrap(expr), reduce, term, sh, ranges, metadata)
 end
 
 function ArrayOp(a::AbstractArray)
@@ -755,9 +754,8 @@ function setview(definition, arrayop, inplace)
     push = inplace ? (am, op) -> push!(am.sequence, op) : (am, op) -> typeof(am)(am.shape, vcat(am.sequence, op))
     quote
         let
-            _aop = $arrayop
             $push($output_ref,
-                  $Setfield.@set! _aop.output_view = $output_index_ranges($(output_view...)))
+                  $output_index_ranges($(output_view...)) => $arrayop)
             $output_ref
         end
     end |> esc
@@ -792,9 +790,10 @@ function SymbolicUtils.Code.toexpr(x::ArrayMaker, st)
     toexpr(ex, st)
 end
 
-function inplace_expr(x::ArrayMaker, outsym = Symbol("_out"))
+function inplace_expr(x::ArrayMaker, out_array = Symbol("_out"))
     quote
-        $(map(a->inplace_expr(a, outsym), x.sequence)...)
+        $([inplace_expr(a, :(view(outsym, $(vw...))))
+           for (vw, op) in x.sequence]...)
     end
 end
 
@@ -804,15 +803,16 @@ function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
 
     inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(x.expr)))
 
-    if x.output_view != nothing
-        for (i, rng) in zip(x.output_idx, x.output_view)
-            rs[i] = rng
-        end
-    end
 
     foldl(reverse(loops), init=inner_expr) do acc, k
         :(for $k in $(rs[k])
               $acc
           end)
     end |> SymbolicUtils.Code.LiteralExpr
+end
+
+function Base.cat(x::Arr, xs...; dims)
+    sz = Base.cat_size_shape(Base.dims2cat(dims), x, xs...)
+    T = reduce(promote_type, eltype.(xs), init=eltype(x))
+    A = ArrayMaker{T}(sz...)
 end
