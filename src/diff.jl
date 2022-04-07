@@ -73,6 +73,11 @@ function occursin_info(x, expr)
         !occursin(first(arguments(x)), first(arguments(expr)))
         return false
     end
+
+    if is_scalar_indexed(expr) && !is_scalar_indexed(x) && !occursin(x, expr)
+        return false
+    end
+
     !istree(expr) && return false
     if isequal(x, expr)
         true
