@@ -578,6 +578,9 @@ macro setview(definition, arrayop)
     setview(definition, arrayop, false)
 end
 
+output_index_ranges(c::CartesianIndices) = c.indices
+output_index_ranges(ix...) = ix
+
 function setview(definition, arrayop, inplace)
     output_view = get_indexers(definition)
     output_ref = definition.args[1]
@@ -586,7 +589,7 @@ function setview(definition, arrayop, inplace)
         let
             _aop = $arrayop
             $push($output_ref,
-                  $Setfield.@set! _aop.output_view = ($(output_view...),))
+                  $Setfield.@set! _aop.output_view = $output_index_ranges($(output_view...)))
             $output_ref
         end
     end |> esc
