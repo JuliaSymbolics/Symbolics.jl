@@ -532,123 +532,6 @@ end
 function SymbolicUtils.Code.toexpr(x::Arr, st)
     toexpr(unwrap(x), st)
 end
-struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{AT}
-    shape
-    sequence
-end
-
-shape(am::ArrayMaker) = am.shape
-
-function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array=[]; atype=Array) where {N,T}
-    ArrayMaker{T, atype{T, N}}(map(x->1:x, sz), seq)
-end
-
-(::Type{ArrayMaker{T}})(i::Int...; atype=Array) where {T} = ArrayMaker{T}(i, atype=atype)
-
-function Base.show(io::IO, ac::ArrayMaker)
-    ovs = map(x -> x.output_view, ac.sequence)
-    print(io, Expr(:call, :ArrayMaker, ac.shape,
-                   Expr(:block, (ovs .=> ac.sequence)...)))
-end
-
-function get_indexers(ex)
-    @assert ex.head == :ref
-    arr = ex.args[1]
-    replace_ends(arr, ex.args[2:end])
-end
-
-function search_and_replace(expr, key, val)
-    isequal(expr, key) && return val
-
-    expr isa Expr ?
-        Expr(expr.head, map(x->search_and_replace(x, key,val), expr.args)...) :
-        expr
-end
-
-function replace_ends(arr, idx)
-    [search_and_replace(ix, :end, :(lastindex($arr, $i)))
-     for (i, ix) in enumerate(idx)]
-end
-
-macro setview!(definition, arrayop)
-    setview(definition, arrayop, true)
-end
-
-macro setview(definition, arrayop)
-    setview(definition, arrayop, false)
-end
-
-output_index_ranges(c::CartesianIndices) = c.indices
-output_index_ranges(ix...) = ix
-
-function setview(definition, arrayop, inplace)
-    output_view = get_indexers(definition)
-    output_ref = definition.args[1]
-    push = inplace ? (am, op) -> push!(am.sequence, op) : (am, op) -> typeof(am)(am.shape, vcat(am.sequence, op))
-    quote
-        let
-            _aop = $arrayop
-            $push($output_ref,
-                  $Setfield.@set! _aop.output_view = $output_index_ranges($(output_view...)))
-            $output_ref
-        end
-    end |> esc
-end
-
-macro makearray(definition, sequence)
-    output_shape = get_indexers(definition)
-    output_name = definition.args[1]
-
-    seq = map(filter(x->!(x isa LineNumberNode), sequence.args)) do pair
-        @assert pair.head == :call && pair.args[1] == :(=>)
-        # TODO: make sure the same symbol is used for the lhs array
-        :(@setview! $(pair.args[2]) $(pair.args[3]))
-    end
-
-    quote
-        $output_name = $ArrayMaker{Real}(map(length, ($(output_shape...),)))
-        $(seq...)
-    end |> esc
-end
-
-function best_order(output_idx, ks, rs)
-    unique!(filter(issym, vcat(reverse(output_idx)..., collect(ks))))
-end
-
-function SymbolicUtils.Code.toexpr(x::ArrayMaker, st)
-    outsym = Symbol("_out")
-    N = length(x.shape)
-    ex = :(let $outsym = zeros(Float64, map(length, ($(x.shape...),)))
-          $(inplace_expr(x, outsym))
-      end) |> LiteralExpr
-    toexpr(ex, st)
-end
-
-function inplace_expr(x::ArrayMaker, outsym = Symbol("_out"))
-    quote
-        $(map(a->inplace_expr(a, outsym), x.sequence)...)
-    end
-end
-
-function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
-    rs = copy(ranges(x))
-    loops = best_order(x.output_idx, keys(rs), rs)
-
-    inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(x.expr)))
-
-    if x.output_view != nothing
-        for (i, rng) in zip(x.output_idx, x.output_view)
-            rs[i] = rng
-        end
-    end
-
-    foldl(reverse(loops), init=inner_expr) do acc, k
-        :(for $k in $(rs[k])
-              $acc
-          end)
-    end |> SymbolicUtils.Code.LiteralExpr
-end
-
 ### Scalarize
 
 scalarize(a::Array) = map(scalarize, a)
@@ -813,3 +696,123 @@ Base.collect(x::SymArray) = scalarize(x)
 isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
 
 Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalarize(arr)
+
+
+### Stencils
+
+struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{AT}
+    shape
+    sequence
+end
+
+shape(am::ArrayMaker) = am.shape
+
+function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array=[]; atype=Array) where {N,T}
+    ArrayMaker{T, atype{T, N}}(map(x->1:x, sz), seq)
+end
+
+(::Type{ArrayMaker{T}})(i::Int...; atype=Array) where {T} = ArrayMaker{T}(i, atype=atype)
+
+function Base.show(io::IO, ac::ArrayMaker)
+    ovs = map(x -> x.output_view, ac.sequence)
+    print(io, Expr(:call, :ArrayMaker, ac.shape,
+                   Expr(:block, (ovs .=> ac.sequence)...)))
+end
+
+function get_indexers(ex)
+    @assert ex.head == :ref
+    arr = ex.args[1]
+    replace_ends(arr, ex.args[2:end])
+end
+
+function search_and_replace(expr, key, val)
+    isequal(expr, key) && return val
+
+    expr isa Expr ?
+        Expr(expr.head, map(x->search_and_replace(x, key,val), expr.args)...) :
+        expr
+end
+
+function replace_ends(arr, idx)
+    [search_and_replace(ix, :end, :(lastindex($arr, $i)))
+     for (i, ix) in enumerate(idx)]
+end
+
+macro setview!(definition, arrayop)
+    setview(definition, arrayop, true)
+end
+
+macro setview(definition, arrayop)
+    setview(definition, arrayop, false)
+end
+
+output_index_ranges(c::CartesianIndices) = c.indices
+output_index_ranges(ix...) = ix
+
+function setview(definition, arrayop, inplace)
+    output_view = get_indexers(definition)
+    output_ref = definition.args[1]
+    push = inplace ? (am, op) -> push!(am.sequence, op) : (am, op) -> typeof(am)(am.shape, vcat(am.sequence, op))
+    quote
+        let
+            _aop = $arrayop
+            $push($output_ref,
+                  $Setfield.@set! _aop.output_view = $output_index_ranges($(output_view...)))
+            $output_ref
+        end
+    end |> esc
+end
+
+macro makearray(definition, sequence)
+    output_shape = get_indexers(definition)
+    output_name = definition.args[1]
+
+    seq = map(filter(x->!(x isa LineNumberNode), sequence.args)) do pair
+        @assert pair.head == :call && pair.args[1] == :(=>)
+        # TODO: make sure the same symbol is used for the lhs array
+        :(@setview! $(pair.args[2]) $(pair.args[3]))
+    end
+
+    quote
+        $output_name = $ArrayMaker{Real}(map(length, ($(output_shape...),)))
+        $(seq...)
+    end |> esc
+end
+
+function best_order(output_idx, ks, rs)
+    unique!(filter(issym, vcat(reverse(output_idx)..., collect(ks))))
+end
+
+function SymbolicUtils.Code.toexpr(x::ArrayMaker, st)
+    outsym = Symbol("_out")
+    N = length(x.shape)
+    ex = :(let $outsym = zeros(Float64, map(length, ($(x.shape...),)))
+          $(inplace_expr(x, outsym))
+      end) |> LiteralExpr
+    toexpr(ex, st)
+end
+
+function inplace_expr(x::ArrayMaker, outsym = Symbol("_out"))
+    quote
+        $(map(a->inplace_expr(a, outsym), x.sequence)...)
+    end
+end
+
+function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
+    rs = copy(ranges(x))
+    loops = best_order(x.output_idx, keys(rs), rs)
+
+    inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(x.expr)))
+
+    if x.output_view != nothing
+        for (i, rng) in zip(x.output_idx, x.output_view)
+            rs[i] = rng
+        end
+    end
+
+    foldl(reverse(loops), init=inner_expr) do acc, k
+        :(for $k in $(rs[k])
+              $acc
+          end)
+    end |> SymbolicUtils.Code.LiteralExpr
+end
