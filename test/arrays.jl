@@ -254,7 +254,7 @@ end
     @test D == Dxxu .+ Dyyu
 end
 
-@testset "Brusselator" begin
+@testset "Brusselator stencils" begin
     @variables t u[1:n, 1:n](t) v[1:n, 1:n](t)
     n = rand(8:32)
 
@@ -272,21 +272,21 @@ end
     end
 
     @makearray dtv[1:n, 1:n] begin
-        v[1:end, 1:end] => @arrayop (i, j) alpha * (v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]) - u[i, j]^2 * v[i, j] + A * u[i, j]
+        dtv[1:end, 1:end] => @arrayop (i, j) alpha * (v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]) - u[i, j]^2 * v[i, j] + A * u[i, j]
     end
 
     @makearray lapu[1:n, 1:n] begin
        lapu[1:end, 1:end] => @arrayop (i, j) u[i, j] + u[limit(i - 1, n), j] + u[limit(i + 1, n), j] + u[i, limit(j + 1, n)] + u[i, limit(j - 1, n)] - 4u[i, j]
     end
 
-    lapv = @makearray v[1:n, 1:n] begin
+    @makearray lapv[1:n, 1:n] begin
         lapv[1:end, 1:end] => @arrayop (i, j) v[i, j] + v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]
     end
 
-    source = @makearray s[1:n, 1:n] begin
-        s[1:end, 1:end] => @arrayop nothing (i, j) brusselator_f(x[i], y[j], t)
+    @makearray s[1:n, 1:n] begin
+        s[1:end, 1:end] => @arrayop (i, j) brusselator_f(x[i], y[j], t)
     end
 
-    @test fulldtu == 1 + arrayv * arrayu^2 - (A + 1) * arrayu + alpha * laplacianu + source
-    @test fulldtv == A * arrayu - arrayu^2 * arrayv + alpha * laplacianv
+    @test fulldtu == 1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s
+    @test fulldtv == A .* u .- u.^2 .* v .+ alpha .* lapv
 end
