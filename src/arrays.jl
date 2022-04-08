@@ -206,7 +206,7 @@ function make_shape(output_idx, expr, ranges=Dict())
             end
             mi = matches[i]
             @assert !isempty(mi)
-            get(first(mi))
+            get_extents(mi)
         elseif i isa Integer
             return Base.OneTo(1)
         end
@@ -227,7 +227,7 @@ function ranges(a::ArrayOp)
         if haskey(a.ranges, i)
             rs[i] = a.ranges[i]
         else
-            rs[i] = get(first(ax[i]))
+            rs[i] = get_extents(ax[i])
         end
     end
     return rs
@@ -284,6 +284,19 @@ end
 function Base.get(a::AxisOf)
     @oops shape(a.A)
     axes(a.A, a.dim)
+end
+
+function get_extents(xs)
+    boundaries = map(x->simplify(x.boundary), xs)
+    if all(iszero, boundaries)
+        get(first(xs))
+    else
+        extent = get(first(xs))
+        start_offset = -reduce(min, filter(x->x<0, boundaries), init=0)
+        end_offset = reduce(max, filter(x->x<0, boundaries), init=0)
+
+        (first(extent) + start_offset):(last(extent) - end_offset)
+    end
 end
 
 function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
@@ -539,7 +552,7 @@ val2num(::Val{n}) where n = n
 
 function replace_by_scalarizing(ex, dict)
     rule = @rule(getindex(~x, ~~i) =>
-              scalarize(~x, (map(j->haskey(dict,j) ? dict[j] : j, ~~i)...,)))
+                 scalarize(~x, (map(j->substitute(j, dict), ~~i)...,)))
 
     simterm = (x, f, args; kws...) -> begin
         if f === Base.literal_pow && length(args) == 3
