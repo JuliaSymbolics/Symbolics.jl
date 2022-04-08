@@ -713,9 +713,8 @@ end
 (::Type{ArrayMaker{T}})(i::Int...; atype=Array) where {T} = ArrayMaker{T}(i, atype=atype)
 
 function Base.show(io::IO, ac::ArrayMaker)
-    ovs = map(x -> x.output_view, ac.sequence)
     print(io, Expr(:call, :ArrayMaker, ac.shape,
-                   Expr(:block, (ovs .=> ac.sequence)...)))
+                   Expr(:block, ac.sequence...)))
 end
 
 function get_indexers(ex)
@@ -812,7 +811,22 @@ function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
 end
 
 function Base.cat(x::Arr, xs...; dims)
-    sz = Base.cat_size_shape(Base.dims2cat(dims), x, xs...)
-    T = reduce(promote_type, eltype.(xs), init=eltype(x))
-    A = ArrayMaker{T}(sz...)
+    arrays = (x, xs...)
+    if dims isa Integer
+        sz = Base.cat_size_shape(Base.dims2cat(dims), arrays...)
+        T = reduce(promote_type, eltype.(xs), init=eltype(x))
+        newdim = cumsum(map(a->size(a, dims), arrays))
+        start = 1
+        A = ArrayMaker{T}(sz...)
+        for (dim, array) in zip(newdim, arrays)
+            idx = CartesianIndices(ntuple(n -> n==dims ?
+                                          (start:dim) : (1:sz[n]), length(sz)))
+            start = dim + 1
+
+            @setview! A[idx] unwrap(array)
+        end
+        return A
+    else
+        error("Block diagonal concatenation not supported")
+    end
 end
