@@ -154,7 +154,7 @@ end
 
 @testset "Rules" begin
     @variables X[1:10, 1:5] Y[1:5, 1:10] b[1:10]
-    r = @rule ((~A * ~B) * ~C) => (~A * (~B * ~C)) where {{size(~A, 1)}*size(~B, 2)} > size(~B, 1) * size(~C, 2)
+    r = @rule ((~A * ~B) * ~C) => (~A * (~B * ~C)) where {{{size(~A, 1)} * size(~B, 2)}>size(~B, 1)} * size(~C, 2)
     @test isequal(r(unwrap((X * Y) * b)), unwrap(X * (Y * b)))
 end
 
@@ -244,12 +244,49 @@ end
     D = Diffusion(N, n)
 
     Dxxu = @makearray u[1:n, 1:n] begin
-        u[2:end-1, 2:end-1]  => @arrayop (i,j) u[i-1, j] + u[i+1, j] - 2 * u[i, j]
+        u[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] - 2 * u[i, j]
     end
 
     Dyyu = @makearray u[1:n, 1:n] begin
-        u[2:end-1, 2:end-1]  => @arrayop (i,j) u[i, j-1] + u[i, j+1] - 2 * u[i, j]
+        u[2:end-1, 2:end-1] => @arrayop (i, j) u[i, j-1] + u[i, j+1] - 2 * u[i, j]
     end
 
     @test D == Dxxu .+ Dyyu
+end
+
+@testset "Brusselator" begin
+    @variables t u[1:n, 1:n](t) v[1:n, 1:n](t)
+    n = rand(8:32)
+
+    limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
+    brusselator_f(x, y, t) = (((x - 0.3)^2 + (y - 0.6)^2) <= 0.1^2) * (t >= 1.1) * 5.0
+
+    x = y = range(0, stop=1, length=N)
+    dx = step(x)
+
+    A = 3.4
+    alpha = 10.0
+
+    @makearray dtu[1:n, 1:n] begin
+        dtu[1:end, 1:end] => @arrayop (i, j) alpha * (u[limit(i - 1, n), j] + u[limit(i + 1, n), j] + u[i, limit(j + 1, n)] + u[i, limit(j - 1, n)] - 4u[i, j]) + 1.0 + u[i, j]^2 * v[i, j] - (A + 1) * u[i, j] + brusselator_f(x[i], y[j], t)
+    end
+
+    @makearray dtv[1:n, 1:n] begin
+        v[1:end, 1:end] => @arrayop (i, j) alpha * (v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]) - u[i, j]^2 * v[i, j] + A * u[i, j]
+    end
+
+    @makearray lapu[1:n, 1:n] begin
+       lapu[1:end, 1:end] => @arrayop (i, j) u[i, j] + u[limit(i - 1, n), j] + u[limit(i + 1, n), j] + u[i, limit(j + 1, n)] + u[i, limit(j - 1, n)] - 4u[i, j]
+    end
+
+    lapv = @makearray v[1:n, 1:n] begin
+        lapv[1:end, 1:end] => @arrayop (i, j) v[i, j] + v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]
+    end
+
+    source = @makearray s[1:n, 1:n] begin
+        s[1:end, 1:end] => @arrayop nothing (i, j) brusselator_f(x[i], y[j], t)
+    end
+
+    @test fulldtu == 1 + arrayv * arrayu^2 - (A + 1) * arrayu + alpha * laplacianu + source
+    @test fulldtv == A * arrayu - arrayu^2 * arrayv + alpha * laplacianv
 end
