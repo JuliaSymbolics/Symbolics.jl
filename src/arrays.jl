@@ -830,3 +830,22 @@ function Base.cat(x::Arr, xs...; dims)
         error("Block diagonal concatenation not supported")
     end
 end
+
+function scalarize(x::ArrayMaker)
+    T = eltype(x)
+    A = Array{wrapper_type(T)}(undef, size(x))
+    for (vw, arr) in x.sequence
+        A[vw...] .= scalarize(arr)
+    end
+    A
+end
+
+function scalarize(x::ArrayMaker, idx...)
+    for (vw, arr) in x.sequence
+        if all(in.(idx, vw))
+            el = [v isa AbstractArray ? searchsorted(v, i) : v  for (v, i) in zip(vw, idx)]
+            return scalarize(arr, (el...,))
+        end
+    end
+    throw(BoundsError(x, idx))
+end
