@@ -261,7 +261,7 @@ end
     limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
     brusselator_f(x, y, t) = (((x - 0.3)^2 + (y - 0.6)^2) <= 0.1^2) * (t >= 1.1) * 5.0
 
-    x = y = range(0, stop=1, length=N)
+    x = y = range(0, stop=1, length=n)
     dx = step(x)
 
     A = 3.4
@@ -287,6 +287,6 @@ end
         s[1:end, 1:end] => @arrayop (i, j) brusselator_f(x[i], y[j], t)
     end
 
-    @test fulldtu == 1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s
-    @test fulldtv == A .* u .- u.^2 .* v .+ alpha .* lapv
+    @test dtu == 1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s
+    @test dtv == A .* u .- u.^2 .* v .+ alpha .* lapv
 end
