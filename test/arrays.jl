@@ -206,3 +206,50 @@ end
 
     @test u == uc
 end
+
+@testset "ND Diffusion, Stencils with CartesianIndices" begin
+    n = rand(8:32)
+    N = 2
+
+    @variables t u[fill(1:n, N)...](t)
+
+    Igrid = CartesianIndices((fill(1:n, N)...))
+    Iinterior = CartesianIndices((fill(2:n-1, N)...))
+
+    function unitindices(N::Int) #create unit CartesianIndex for each dimension
+        null = zeros(Int, N)
+        if N == 0
+            return CartesianIndex()
+        else
+            return map(1:N) do i
+                unit_i = copy(null)
+                unit_i[i] = 1
+                CartesianIndex(Tuple(unit_i))
+            end
+        end
+    end
+
+    function Diffusion(N)
+        ē = unitindices(N) # for i.e N = 3 => ē = [CartesianIndex((1,0,0)),CartesianIndex((0,1,0)),CartesianIndex((0,0,1))]
+
+        Dss = map(1:N) do d
+            @makearray u[Igrid] begin
+                u[Iinterior] => @arrayop (I) u[I-ē[d]] + u[I+ē[d]] - 2 * u[I]
+            end
+        end
+
+        return reduce((D1, D2) -> D1 .+ D2, Dss)
+    end
+
+    D = Diffusion(N, n)
+
+    Dxxu = @makearray u[1:n, 1:n] begin
+        u[2:end-1, 2:end-1]  => @arrayop (i,j) u[i-1, j] + u[i+1, j] - 2 * u[i, j]
+    end
+
+    Dyyu = @makearray u[1:n, 1:n] begin
+        u[2:end-1, 2:end-1]  => @arrayop (i,j) u[i, j-1] + u[i, j+1] - 2 * u[i, j]
+    end
+
+    @test D == Dxxu .+ Dyyu
+end
