@@ -255,6 +255,8 @@ function call2term(expr, arrs=[])
             return expr
         end
         return Expr(:call, term, map(call2term, expr.args)...)
+    elseif expr.head == :ref
+        return Expr(:ref, call2term(expr.args[1]), expr.args[2:end]...)
     elseif expr.head == Symbol("'")
         return Expr(:call, term, adjoint, map(call2term, expr.args)...)
     end
@@ -287,7 +289,7 @@ function Base.get(a::AxisOf)
 end
 
 function get_extents(xs)
-    boundaries = map(x->simplify(x.boundary), xs)
+    boundaries = map(x->x.boundary, xs)
     if all(iszero, boundaries)
         get(first(xs))
     else
@@ -299,6 +301,14 @@ function get_extents(xs)
     end
 end
 
+## Walk expr looking for symbols used in getindex expressions
+# Returns a dictionary of Sym to a vector of AxisOf objects.
+# The vector has as many elements as the number of times the symbol
+# appears in the expr. AxisOf has three fields:
+# A: the array whose indexing it appears in
+# dim: The dimension of the array indexed
+# boundary: how much padding is this indexing requiring, for example
+#   boundary is 2 for x[i + 2], and boundary = -2 for x[i - 2]
 function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
     if istree(expr)
         if operation(expr) === (getindex)
@@ -823,7 +833,7 @@ function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
     end |> SymbolicUtils.Code.LiteralExpr
 end
 
-function Base.cat(x::Arr, xs...; dims)
+function _cat(x, xs...; dims)
     arrays = (x, xs...)
     if dims isa Integer
         sz = Base.cat_size_shape(Base.dims2cat(dims), arrays...)
@@ -843,6 +853,14 @@ function Base.cat(x::Arr, xs...; dims)
         error("Block diagonal concatenation not supported")
     end
 end
+
+Base.cat(x::Arr, xs...; dims) = _cat(x, xs...; dims)
+Base.cat(x::AbstractArray, y::Arr, xs...; dims) = _cat(x, y, xs...; dims)
+
+Base.vcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=1)
+Base.hcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=2)
+Base.vcat(x::AbstractVecOrMat, y::Arr, xs::AbstractVecOrMat...) = _cat(x, y, xs..., dims=1)
+Base.hcat(x::AbstractVecOrMat, y::Arr, xs::AbstractVecOrMat...) = _cat(x, y, xs..., dims=2)
 
 function scalarize(x::ArrayMaker)
     T = eltype(x)
