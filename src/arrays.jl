@@ -206,7 +206,7 @@ function make_shape(output_idx, expr, ranges=Dict())
             end
             mi = matches[i]
             @assert !isempty(mi)
-            get_extents(mi)
+            return get_extents(mi)
         elseif i isa Integer
             return Base.OneTo(1)
         end
@@ -293,7 +293,7 @@ function get_extents(xs)
     else
         extent = get(first(xs))
         start_offset = -reduce(min, filter(x->x<0, boundaries), init=0)
-        end_offset = reduce(max, filter(x->x<0, boundaries), init=0)
+        end_offset = reduce(max, filter(x->x>0, boundaries), init=0)
 
         (first(extent) + start_offset):(last(extent) - end_offset)
     end
@@ -508,7 +508,7 @@ end
 function axes(A::Union{Arr, SymArray})
     s = shape(unwrap(A))
     s === Unknown() && error("axes of $A not known")
-    return s
+    return map(x->1:length(x), s)
 end
 
 
@@ -667,7 +667,7 @@ function scalarize(arr::ArrayOp, idx)
     iidx = collect(keys(axs))
     contracted = setdiff(iidx, arr.output_idx)
 
-    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : axs[oi][i])
+    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : (@assert(i in axs[oi]); i))
                 for (oi, i) in zip(arr.output_idx, idx) if unwrap(oi) isa Symbolic)
     partial = replace_by_scalarizing(arr.expr, dict)
 
@@ -686,8 +686,8 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
-        map(Iterators.product(axes(arr)...)) do i
-            scalarize(arr[i...])
+        map(Iterators.product(shape(arr)...)) do i
+            scalarize(arr, (i...,))
         end
     elseif istree(arr) && operation(arr) == getindex
         args = arguments(arr)
@@ -853,7 +853,7 @@ function scalarize(x::ArrayMaker)
     A
 end
 
-function scalarize(x::ArrayMaker, idx...)
+function scalarize(x::ArrayMaker, idx)
     for (vw, arr) in x.sequence
         if all(in.(idx, vw))
             el = [v isa AbstractArray ? searchsorted(v, i) : v  for (v, i) in zip(vw, idx)]
