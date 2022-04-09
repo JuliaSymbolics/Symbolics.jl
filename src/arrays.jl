@@ -540,20 +540,6 @@ function get_variables!(vars, e::Arr, varlist=nothing)
 end
 
 
-function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
-    haskey(st.symbolify, x) && return st.symbolify[x]
-
-    if istree(x.term)
-        toexpr(x.term, st)
-    else
-        throw(ArgumentError("""Don't know how to turn $x
-                               into code yet"""))
-    end
-end
-
-function SymbolicUtils.Code.toexpr(x::Arr, st)
-    toexpr(unwrap(x), st)
-end
 ### Scalarize
 
 scalarize(a::Array) = map(scalarize, a)
@@ -777,7 +763,7 @@ function setview(definition, arrayop, inplace)
     quote
         let
             $push($output_ref,
-                  $output_index_ranges($(output_view...)) => $arrayop)
+                  $output_index_ranges($(output_view...)) => $unwrap($arrayop))
             $output_ref
         end
     end |> esc
@@ -803,36 +789,6 @@ function best_order(output_idx, ks, rs)
     unique!(filter(issym, vcat(reverse(output_idx)..., collect(ks))))
 end
 
-function SymbolicUtils.Code.toexpr(x::ArrayMaker, st)
-    outsym = Symbol("_out")
-    N = length(x.shape)
-    ex = :(let $outsym = zeros(Float64, map(length, ($(x.shape...),)))
-          $(inplace_expr(x, outsym))
-      end) |> LiteralExpr
-    toexpr(ex, st)
-end
-
-function inplace_expr(x::ArrayMaker, out_array = Symbol("_out"))
-    quote
-        $([inplace_expr(a, :(view(outsym, $(vw...))))
-           for (vw, op) in x.sequence]...)
-    end
-end
-
-function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
-    rs = copy(ranges(x))
-    loops = best_order(x.output_idx, keys(rs), rs)
-
-    inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(x.expr)))
-
-
-    foldl(reverse(loops), init=inner_expr) do acc, k
-        :(for $k in $(rs[k])
-              $acc
-          end)
-    end |> SymbolicUtils.Code.LiteralExpr
-end
-
 function _cat(x, xs...; dims)
     arrays = (x, xs...)
     if dims isa Integer
@@ -846,7 +802,7 @@ function _cat(x, xs...; dims)
                                           (start:dim) : (1:sz[n]), length(sz)))
             start = dim + 1
 
-            @setview! A[idx] unwrap(array)
+            @setview! A[idx] array
         end
         return A
     else
@@ -879,4 +835,56 @@ function scalarize(x::ArrayMaker, idx)
         end
     end
     throw(BoundsError(x, idx))
+end
+
+
+### Codegen
+
+function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
+    haskey(st.symbolify, x) && return st.symbolify[x]
+
+    if istree(x.term)
+        toexpr(x.term, st)
+    else
+        throw(ArgumentError("""Don't know how to turn $x
+                               into code yet"""))
+    end
+end
+
+function SymbolicUtils.Code.toexpr(x::Arr, st)
+    toexpr(unwrap(x), st)
+end
+
+function SymbolicUtils.Code.toexpr(x::ArrayMaker, st)
+    outsym = Symbol("_out")
+    N = length(x.shape)
+    ex = :(let $outsym = zeros(Float64, map(length, ($(x.shape...),)))
+          $(inplace_expr(x, outsym))
+      end) |> LiteralExpr
+    toexpr(ex, st)
+end
+
+function inplace_expr(x, out_array)
+    :(copy!($out_array, $x))
+end
+
+function inplace_expr(x::ArrayMaker, out_array = Symbol("_out"))
+    quote
+        $([inplace_expr(op, :(view($out_array, $(vw...))))
+           for (vw, op) in x.sequence]...)
+    end
+end
+
+function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
+    rs = copy(ranges(x))
+    loops = best_order(x.output_idx, keys(rs), rs)
+
+    inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(x.expr)))
+
+
+    foldl(reverse(loops), init=inner_expr) do acc, k
+        :(for $k in $(rs[k])
+              $acc
+          end)
+    end |> SymbolicUtils.Code.LiteralExpr
 end
