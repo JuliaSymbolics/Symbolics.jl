@@ -868,14 +868,19 @@ function inplace_expr(x, out_array)
     :(copy!($out_array, $x))
 end
 
-function inplace_expr(x::ArrayMaker, out_array = Symbol("_out"))
-    quote
-        $([inplace_expr(op, :(view($out_array, $(vw...))))
-           for (vw, op) in x.sequence]...)
+function inplace_expr(x::ArrayMaker, out = :_out)
+    ex = []
+
+    for (i, (vw, op)) in enumerate(x.sequence)
+        out′ = Symbol(out, "_", i)
+        push!(ex, :($out′ = $view($out, $(vw...))))
+        push!(ex, inplace_expr(op, out′))
     end
+
+    Expr(:block, ex...)
 end
 
-function inplace_expr(x::ArrayOp, outsym = Symbol("_out"))
+function inplace_expr(x::ArrayOp, outsym = :_out)
     rs = copy(ranges(x))
     loops = best_order(x.output_idx, keys(rs), rs)
 
