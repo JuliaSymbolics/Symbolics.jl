@@ -663,7 +663,7 @@ function scalarize(arr::ArrayOp, idx)
     iidx = collect(keys(axs))
     contracted = setdiff(iidx, arr.output_idx)
 
-    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : (@assert(i in axs[oi]); i))
+    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : axs[oi][i])
                 for (oi, i) in zip(arr.output_idx, idx) if unwrap(oi) isa Symbolic)
     partial = replace_by_scalarizing(arr.expr, dict)
 
@@ -682,7 +682,7 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
-        map(Iterators.product(shape(arr)...)) do i
+        map(Iterators.product(axes(arr)...)) do i
             scalarize(arr, (i...,))
         end
     elseif istree(arr) && operation(arr) == getindex
@@ -860,6 +860,7 @@ function SymbolicUtils.Code.toexpr(x::ArrayMaker, st)
     N = length(x.shape)
     ex = :(let $outsym = zeros(Float64, map(length, ($(x.shape...),)))
           $(inplace_expr(x, outsym))
+          $outsym
       end) |> LiteralExpr
     toexpr(ex, st)
 end
