@@ -1,4 +1,5 @@
 using SymbolicUtils
+using SymbolicUtils: @capture
 using StaticArrays
 import Base: eltype, length, ndims, size, axes, eachindex
 
@@ -877,13 +878,29 @@ function inplace_expr(x::ArrayMaker, out = :_out)
     for (i, (vw, op)) in enumerate(x.sequence)
         out′ = Symbol(out, "_", i)
         push!(ex, :($out′ = $view($out, $(vw...))))
-        push!(ex, inplace_expr(op, out′))
+        push!(ex, inplace_expr(unwrap(op), out′))
     end
 
     Expr(:block, ex...)
 end
 
+function inplace_builtin(term, outsym)
+    isarr(n) = x->symtype(x) <: AbstractArray{<:Any, n}
+    if istree(term) && operation(term) == (*) && length(arguments(term)) == 2
+        A, B = arguments(term)
+        isarr(2)(A) && (isarr(1)(B) || isarr(2)(B)) && return :($mul!($outsym, $A, $B))
+    end
+    return nothing
+end
+
 function inplace_expr(x::ArrayOp, outsym = :_out)
+    if x.term !== nothing
+        ex = inplace_builtin(x.term, outsym)
+        if ex !== nothing
+            return ex
+        end
+    end
+
     rs = copy(ranges(x))
     loops = best_order(x.output_idx, keys(rs), rs)
 
