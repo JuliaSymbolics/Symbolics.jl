@@ -712,12 +712,13 @@ Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalariz
 struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{AT}
     shape
     sequence
+    metadata
 end
 
 shape(am::ArrayMaker) = am.shape
 
-function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array=[]; atype=Array) where {N,T}
-    ArrayMaker{T, atype{T, N}}(map(x->1:x, sz), seq)
+function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array=[]; atype=Array, metadata=nothing) where {N,T}
+    ArrayMaker{T, atype{T, N}}(map(x->1:x, sz), seq, metadata)
 end
 
 (::Type{ArrayMaker{T}})(i::Int...; atype=Array) where {T} = ArrayMaker{T}(i, atype=atype)
@@ -783,6 +784,7 @@ macro makearray(definition, sequence)
     quote
         $output_name = $ArrayMaker{Real}(map(length, ($(output_shape...),)))
         $(seq...)
+        $output_name = $wrap($output_name)
     end |> esc
 end
 
