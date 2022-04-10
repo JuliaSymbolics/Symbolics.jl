@@ -830,7 +830,9 @@ end
 function scalarize(x::ArrayMaker, idx)
     for (vw, arr) in x.sequence
         if all(in.(idx, vw))
-            el = [v isa AbstractArray ? searchsorted(v, i) : v  for (v, i) in zip(vw, idx)]
+            # Filter out non-array indices because the RHS will be one dim less
+            el = [searchsortedfirst(v, i)
+                  for (v, i) in zip(vw, idx) if v isa AbstractArray]
             return scalarize(arr, (el...,))
         end
     end
