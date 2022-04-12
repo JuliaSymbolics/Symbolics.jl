@@ -566,7 +566,7 @@ function replace_by_scalarizing(ex, dict)
             base = args[2]
             exp = val2num(only(args[3]))
             f = only(args[1])
-            args = [base,exp]
+            args = [base, exp]
         end
 
         if metadata(x) !== nothing
@@ -590,9 +590,21 @@ function replace_by_scalarizing(ex, dict)
         end
     end
 
-    # This must be a Prewalk to avoid descending into ArrayOp (madness)
-    Prewalk(Rewriters.PassThrough(Rewriters.If(x->!(x isa ArrayOp), Chain([rewrite_operation, rule]))), similarterm=simterm)(ex)
+    prewalk_if(x->!(x isa ArrayOp || x isa ArrayMaker),
+               Rewriters.PassThrough(Chain([rewrite_operation, rule])),
+              ex, simterm)
 end
+
+function prewalk_if(cond, f, t, similarterm)
+    t′ = cond(t) ? f(t) : return t
+    if istree(t′)
+        return similarterm(t′, operation(t′),
+                           map(x->prewalk_if(cond, f, x, similarterm), arguments(t′)))
+    else
+        return t′
+    end
+end
+
 
 function scalarize(arr::AbstractArray, idx)
     arr[idx...]
@@ -717,6 +729,14 @@ struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{AT}
     metadata
 end
 
+function arraymaker(T, shape, views, seq...)
+    ArrayMaker{T}(shape, [(views .=> seq)...])
+end
+
+TermInterface.istree(x::ArrayMaker) = true
+TermInterface.operation(x::ArrayMaker) = arraymaker
+TermInterface.arguments(x::ArrayMaker) = [eltype(x), shape(x), map(first, x.sequence), map(last, x.sequence)...]
+
 shape(am::ArrayMaker) = am.shape
 
 function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array=[]; atype=Array, metadata=nothing) where {N,T}
@@ -834,6 +854,10 @@ end
 
 function scalarize(x::ArrayMaker, idx)
     for (vw, arr) in x.sequence
+        if any(x->issym(x) || istree(x), idx)
+            return term(getindex, x, idx...)
+        end
+
         if all(in.(idx, vw))
             # Filter out non-array indices because the RHS will be one dim less
             el = [searchsortedfirst(v, i)
@@ -919,6 +943,7 @@ function inplace_expr(x::ArrayOp, outsym = :_out)
 end
 
 
+#=
 """
 Find any inputs to ArrayOp that are ArrayMaker, and return
 how to split all the inputs simultaneously so that the blocks
@@ -962,3 +987,4 @@ function get_simultaneous_ranges(ex::ArrayOp)
     end
     collected
 end
+=#
