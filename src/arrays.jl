@@ -228,7 +228,7 @@ function ranges(a::ArrayOp)
         if haskey(a.ranges, i)
             rs[i] = a.ranges[i]
         else
-            rs[i] = get_extents(ax[i])
+            rs[i] = ax[i] #get_extents(ax[i])
         end
     end
     return rs
@@ -301,6 +301,8 @@ function get_extents(xs)
         (first(extent) + start_offset):(last(extent) - end_offset)
     end
 end
+
+get_extents(x::AbstractRange) = x
 
 ## Walk expr looking for symbols used in getindex expressions
 # Returns a dictionary of Sym to a vector of AxisOf objects.
@@ -664,11 +666,11 @@ function scalarize(arr::ArrayOp, idx)
     iidx = collect(keys(axs))
     contracted = setdiff(iidx, arr.output_idx)
 
-    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : axs[oi][i])
+    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : get_extents(axs[oi])[i])
                 for (oi, i) in zip(arr.output_idx, idx) if unwrap(oi) isa Symbolic)
     partial = replace_by_scalarizing(arr.expr, dict)
 
-    axes = [axs[c] for c in contracted]
+    axes = [get_extents(axs[c]) for c in contracted]
     if isempty(contracted)
         partial
     else
@@ -910,8 +912,53 @@ function inplace_expr(x::ArrayOp, outsym = :_out)
 
 
     foldl(reverse(loops), init=inner_expr) do acc, k
-        :(for $k in $(rs[k])
+        :(for $k in $(get_extents(rs[k]))
               $acc
           end)
     end |> SymbolicUtils.Code.LiteralExpr
+end
+
+
+"""
+Find any inputs to ArrayOp that are ArrayMaker, and return
+how to split all the inputs simultaneously so that the blocks
+can now interact.
+"""
+function get_simultaneous_ranges(ex::ArrayOp)
+    rs = ranges(ex)
+    combine_together = []
+    for (i, arrs) in rs
+        together = unique(map(a->(a.A, a.dim), arrs))
+        if length(together) > 1
+            push!(combine_together, together)
+        end
+    end
+
+    splits = map(combine_together) do group
+        map(group) do a
+            (A, dim) = a
+            if A isa ArrayMaker
+                sort(map(x->x[dim], map(first, A.sequence)), by=first)
+            else
+                [axes(A, dim)]
+            end
+        end
+    end
+
+    combined_splits = map(splits) do rs
+        new_starts = sort!(unique!(reduce(vcat, map(x->first.(x), rs))))
+        lst = maximum(map(maximum, map(x->last.(x), rs)))
+        UnitRange.(new_starts, vcat((new_starts .- 1)[2:end], lst))
+    end
+
+    collected = Dict(A => Any[[1:size(A, dim)] for dim in 1:ndims(A)]
+                     for A in unique(reduce(vcat, map(x->map(a->a.A, x),
+                                                      collect(values(rs))))))
+
+    for (dims, rs) in zip(combine_together, combined_splits)
+        for d in dims
+            collected[d[1]][d[2]] = rs
+        end
+    end
+    collected
 end
