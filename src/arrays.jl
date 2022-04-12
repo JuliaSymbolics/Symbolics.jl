@@ -904,13 +904,14 @@ end
 function inplace_expr(x::ArrayMaker, out = :_out)
     ex = []
 
+    intermediates = Dict()
     for (i, (vw, op)) in enumerate(x.sequence)
         out′ = Symbol(out, "_", i)
         push!(ex, :($out′ = $view($out, $(vw...))))
-        push!(ex, inplace_expr(unwrap(op), out′))
+        push!(ex, inplace_expr(unwrap(op), out′, intermediates))
     end
 
-    Expr(:block, ex...)
+    Expr(:block, (:($sym = $ex) for (ex, sym) in  intermediates)..., ex...)
 end
 
 function inplace_builtin(term, outsym)
@@ -930,7 +931,7 @@ function similar_arrayvar(ex, name)
     Sym{symtype(ex)}(name) #TODO: shape?
 end
 
-function inplace_expr(x::ArrayOp, outsym = :_out)
+function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
     if x.term !== nothing
         ex = inplace_builtin(x.term, outsym)
         if ex !== nothing
@@ -940,9 +941,20 @@ function inplace_expr(x::ArrayOp, outsym = :_out)
 
     rs = copy(ranges(x))
 
-    intermediates = filter(!issym, get_inputs(x))
-    intermediate_exprs = [ex => similar_arrayvar(ex, Symbol(outsym, :_input_, i))
-                          for (i, ex) in enumerate(intermediates)]
+    inters = filter(!issym, get_inputs(x))
+    intermediate_exprs = map(enumerate(inters)) do (i, ex)
+        if !isnothing(intermediates)
+            if haskey(intermediates, ex)
+                return ex => intermediates[ex]
+            else
+                sym = similar_arrayvar(ex, Symbol(outsym, :_input_, i))
+                intermediates[ex] = sym
+                return ex => sym
+            end
+        else
+            return ex => similar_arrayvar(ex, Symbol(outsym, :_input_, i))
+        end
+    end
 
     loops = best_order(x.output_idx, keys(rs), rs)
 
@@ -957,7 +969,13 @@ function inplace_expr(x::ArrayOp, outsym = :_out)
           end)
     end
 
-    :($(map(x->:($(x[2]) = $(x[1])), intermediate_exprs)...); $loops) |> SymbolicUtils.Code.LiteralExpr
+    if intermediates === nothing
+        # output the intermediate generation
+        :($(map(x->:($(x[2]) = $(x[1])), intermediate_exprs)...);
+          $loops) |> SymbolicUtils.Code.LiteralExpr
+    else
+        SymbolicUtils.Code.LiteralExpr(loops)
+    end
 end
 
 
