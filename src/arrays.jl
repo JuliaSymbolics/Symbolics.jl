@@ -914,6 +914,13 @@ function inplace_expr(x::ArrayMaker, out = :_out)
     Expr(:block, (:($sym = $ex) for (ex, sym) in  intermediates)..., ex...)
 end
 
+function inplace_expr(x::AbstractArray, out, intermediates=Dict())
+    # TODO: extract more intermediates
+    :(begin
+          $([:($out[$(Tuple(idx)...)] = $(substitute(x, intermediates)[Tuple(idx)...])) for idx in eachindex(x)]...)
+      end)
+end
+
 function inplace_builtin(term, outsym)
     isarr(n) = x->symtype(x) <: AbstractArray{<:Any, n}
     if istree(term) && operation(term) == (*) && length(arguments(term)) == 2
