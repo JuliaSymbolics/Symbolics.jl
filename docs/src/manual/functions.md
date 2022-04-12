@@ -50,9 +50,10 @@ The Symbolics graph only allows registered Julia functions within its type.
 All other functions are automatically traced down to registered
 functions. By default, Symbolics.jl pre-registers the common functions
 utilized in [SymbolicUtils.jl](https://github.com/JuliaSymbolics/SymbolicUtils.jl)
-and pre-defines their derivatives. However, the user can utilize the `@register`
-macro to add their function to allowed functions of the computation graph.
+and pre-defines their derivatives. However, the user can utilize the
+[`@register_symbolic`](@ref) macro to add their function to allowed functions
+of the computation graph.
 
 ```@docs
-@register
+@register_symbolic
 ```

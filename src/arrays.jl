@@ -678,18 +678,19 @@ function scalarize(arr::ArrayOp, idx)
     iidx = collect(keys(axs))
     contracted = setdiff(iidx, arr.output_idx)
 
-    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : get_extents(axs[oi])[i])
-                for (oi, i) in zip(arr.output_idx, idx) if unwrap(oi) isa Symbolic)
-    partial = replace_by_scalarizing(arr.expr, dict)
-
     axes = [get_extents(axs[c]) for c in contracted]
-    if isempty(contracted)
-        partial
+    summed = if isempty(contracted)
+        arr.expr
     else
         mapreduce(arr.reduce, Iterators.product(axes...)) do idx
-            replace_by_scalarizing(partial, Dict(contracted .=> idx))
+            replace_by_scalarizing(arr.expr, Dict(contracted .=> idx))
         end
     end
+
+    dict = Dict(oi => (unwrap(i) isa Symbolic ? unwrap(i) : get_extents(axs[oi])[i])
+                for (oi, i) in zip(arr.output_idx, idx) if unwrap(oi) isa Symbolic)
+
+    replace_by_scalarizing(summed, dict)
 end
 
 scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),

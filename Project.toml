@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 authors = ["Shashi Gowda <gowda@mit.edu>"]
-version = "4.3.1"
+version = "4.4.1"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -56,7 +56,7 @@ Setfield = "0.7, 0.8"
 SpecialFunctions = "0.7, 0.8, 0.9, 0.10, 1.0, 2"
 StaticArrays = "1.1"
 SymbolicUtils = "0.18, 0.19"
-TermInterface = "0.2"
+TermInterface = "0.2, 0.3"
 TreeViews = "0.3"
 julia = "1.6"
 

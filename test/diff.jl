@@ -6,13 +6,14 @@ using Symbolics: value
 # Derivatives
 @variables t σ ρ β
 @variables x y z
-@variables uu(t) uuˍt(t)
+@variables uu(t) uuˍt(t) v[1:3](t)
 D = Differential(t)
 D2 = Differential(t)^2
 Dx = Differential(x)
 
 @test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
 @test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
+@test Symbol(D(v[2])) === Symbol("getindex(vˍt, 2)(t)")
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
 
@@ -294,4 +295,14 @@ let
                                                             0 1
                                                             2u[1] 0
                                                             0 0])
+end
+
+# make sure derivative(x[1](t), y) does not fail
+let
+    @variables t a(t)
+    vars = collect(@variables(x[1:1](t))[1])
+    ps = collect(@variables(ps[1:1])[1])
+    @test Symbolics.derivative(ps[1], vars[1]) == 0
+    @test Symbolics.derivative(ps[1], a) == 0
+    @test Symbolics.derivative(x[1], a) == 0
 end
