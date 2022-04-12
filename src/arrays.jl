@@ -922,6 +922,14 @@ function inplace_builtin(term, outsym)
     return nothing
 end
 
+function get_inputs(x::ArrayOp)
+    unique(mapreduce(axs->map(x->x.A, axs), vcat, values(ranges(x))))
+end
+
+function similar_arrayvar(ex, name)
+    Sym{symtype(ex)}(name) #TODO: shape?
+end
+
 function inplace_expr(x::ArrayOp, outsym = :_out)
     if x.term !== nothing
         ex = inplace_builtin(x.term, outsym)
@@ -931,16 +939,25 @@ function inplace_expr(x::ArrayOp, outsym = :_out)
     end
 
     rs = copy(ranges(x))
+
+    intermediates = filter(!issym, get_inputs(x))
+    intermediate_exprs = [ex => similar_arrayvar(ex, Symbol(outsym, :_input_, i))
+                          for (i, ex) in enumerate(intermediates)]
+
     loops = best_order(x.output_idx, keys(rs), rs)
 
-    inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(x.expr)))
+    expr = substitute(unwrap(x.expr), Dict(intermediate_exprs))
+
+    inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(expr)))
 
 
-    foldl(reverse(loops), init=inner_expr) do acc, k
+    loops = foldl(reverse(loops), init=inner_expr) do acc, k
         :(for $k in $(get_extents(rs[k]))
               $acc
           end)
-    end |> SymbolicUtils.Code.LiteralExpr
+    end
+
+    :($(map(x->:($(x[2]) = $(x[1])), intermediate_exprs)...); $loops) |> SymbolicUtils.Code.LiteralExpr
 end
 
 
