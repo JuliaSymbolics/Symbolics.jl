@@ -147,8 +147,6 @@ function _build_and_inject_function(mod::Module, ex)
     RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=false)
 end
 
-toexpr(n::Num, st) = toexpr(value(n), st)
-
 function fill_array_with_zero!(x::AbstractArray)
     if eltype(x) <: AbstractArray
         foreach(fill_array_with_zero!, x)
