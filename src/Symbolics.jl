@@ -111,6 +111,7 @@ include("groebner_basis.jl")
 export groebner_basis
 
 import Libdl
+using ArrayInterface
 include("build_function.jl")
 export build_function
 
