@@ -730,6 +730,10 @@ struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{AT}
     metadata
 end
 
+function ArrayMaker(a::ArrayLike; eltype=eltype(a))
+    ArrayMaker{eltype}(axes(a), [axes(a) => a], nothing)
+end
+
 function arraymaker(T, shape, views, seq...)
     ArrayMaker{T}(shape, [(views .=> seq)...])
 end
@@ -784,13 +788,12 @@ output_index_ranges(ix...) = ix
 function setview(definition, arrayop, inplace)
     output_view = get_indexers(definition)
     output_ref = definition.args[1]
-    push = inplace ? (am, op) -> push!(am.sequence, op) : (am, op) -> typeof(am)(am.shape, vcat(am.sequence, op))
+    push = inplace ? (am, op) -> (push!(am.sequence, op); am) :
+            (am, op) -> am isa ArrayMaker ? typeof(am)(am.shape, vcat(am.sequence, op)) :
+                                            (am = ArrayMaker(am); push!(am.sequence, op); am)
     quote
-        let
             $push($output_ref,
                   $output_index_ranges($(output_view...)) => $unwrap($arrayop))
-            $output_ref
-        end
     end |> esc
 end
 
