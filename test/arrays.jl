@@ -37,7 +37,7 @@ end
     XX = unwrap(X)
     @test isequal(unwrap(X[1, :]), Symbolics.@arrayop(XX[1, :], (j,), XX[1, j]))
     @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop(XX[:, 2], (i,), XX[i, 2]))
-    @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop(XX[:, 2:3], (i, j), XX[i, j], (+), (j in 2:3)))
+    @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop(XX[:, 2:3], (i, j), XX[i, j], (j in 2:3)))
 
     @variables t x[1:4](t)
     @syms i::Int
@@ -192,57 +192,40 @@ end
 
 @testset "Rules" begin
     @variables X[1:10, 1:5] Y[1:5, 1:10] b[1:10]
-    r = @rule ((~A * ~B) * ~C) => (~A * (~B * ~C)) where {{{size(~A, 1)} * size(~B, 2)}>size(~B, 1)} * size(~C, 2)
+    r = @rule ((~A * ~B) * ~C) => (~A * (~B * ~C)) where size(~A, 1) * size(~B, 2) >size(~B, 1)  * size(~C, 2)
     @test isequal(r(unwrap((X * Y) * b)), unwrap(X * (Y * b)))
 end
 
 @testset "2D Diffusion Composed With Stencil Interface" begin
     n = rand(8:32)
 
-    @makearray u[1:n, 1:n] begin
+    @variables u[1:n, 1:n]
+    @makearray v[1:n, 1:n] begin
         #interior
-        u[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] + u[i, j-1] + u[i, j+1] - 4 * u[i, j]
+        v[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] + u[i, j-1] + u[i, j+1] - 4 * u[i, j]
         #BCs
-        u[1, 1:end-1] => @arrayop (i, j) 0.0
-        u[n, 1:end-1] => @arrayop (i, j) 0.0
-        u[1:end-1, 1] => @arrayop (i, j) 0.0
-        u[1:end-1, n] => @arrayop (i, j) 0.0
-        #corners
-        u[1, 1] => @arrayop (i, j) 0.0
-        u[n, 1] => @arrayop (i, j) 0.0
-        u[1, n] => @arrayop (i, j) 0.0
-        u[n, n] => @arrayop (i, j) 0.0
+        v[1, 1:end] => 0.0
+        v[n, 1:end] => 0.0
+        v[1:end, 1] => 0.0
+        v[1:end, n] => 0.0
     end
 
     #2D Diffusion composed
     @makearray ucx[1:n, 1:n] begin
-        uc[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] - 2 * u[i, j]
+        ucx[1:end, 1:end] => 0.0 # fill zeros
+        ucx[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] - 2 * u[i, j] (j in 2:n-1)
     end
 
-    @makearray ucy[2:end-1, 2:end-1] begin
-        ucy[2:end-1, 2:end-1] => @arrayop (i, j) u[i, j-1] + u[i, j+1] - 2 * u[i, j]
+    @makearray ucy[1:n, 1:n] begin
+        ucy[1:end, 1:end] => 0.0 # fill zeros
+        ucy[2:end-1, 2:end-1] => @arrayop (i, j) u[i, j-1] + u[i, j+1] - 2 * u[i, j] (i in 2:n-1)
     end
 
     uc = ucx .+ ucy
-    # BCs
-    @setview! uc[1, 2:end-1] @arrayop (i, j) 0.0
 
-
-    @setview! uc[n, 2:end-1] @arrayop (i, j) 0.0
-
-
-    @setview! uc[2:end-1, 1] @arrayop (i, j) 0.0
-
-
-    @setview! uc[2:end-1, n] @arrayop (i, j) 0.0
-
-    # Corners
-    @setview! u[1, 1] @arrayop (i, j) 0.0
-    @setview! u[n, 1] @arrayop (i, j) 0.0
-    @setview! u[1, n] @arrayop (i, j) 0.0
-    @setview! u[n, n] @arrayop (i, j) 0.0
-
-    @test u == uc
+    global V, UC, UCX
+    V, UC, UCX = v, uc, (ucx, ucy)
+    @test isequal(collect(v), collect(uc))
 end
 
 @testset "ND Diffusion, Stencils with CartesianIndices" begin
@@ -272,7 +255,7 @@ end
 
         Dss = map(1:N) do d
             @makearray u[Igrid] begin
-                u[Iinterior] => @arrayop (I) u[I-ē[d]] + u[I+ē[d]] - 2 * u[I]
+                u[Iinterior] => @arrayop u[I-ē[d]] + u[I+ē[d]] - 2 * u[I]
             end
         end
 

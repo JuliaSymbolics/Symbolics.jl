@@ -699,7 +699,7 @@ scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
         map(Iterators.product(axes(arr)...)) do i
-            scalarize(arr, (i...,))
+            scalarize(arr[i...]) # Use arr[i...] here to trigger any getindex hooks
         end
     elseif istree(arr) && operation(arr) == getindex
         args = arguments(arr)
@@ -731,11 +731,11 @@ struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{AT}
 end
 
 function ArrayMaker(a::ArrayLike; eltype=eltype(a))
-    ArrayMaker{eltype}(axes(a), [axes(a) => a], nothing)
+    ArrayMaker{eltype}(size(a), Any[axes(a) => a])
 end
 
 function arraymaker(T, shape, views, seq...)
-    ArrayMaker{T}(shape, [(views .=> seq)...])
+    ArrayMaker{T}(shape, [(views .=> seq)...], nothing)
 end
 
 TermInterface.istree(x::ArrayMaker) = true
@@ -788,12 +788,45 @@ output_index_ranges(ix...) = ix
 function setview(definition, arrayop, inplace)
     output_view = get_indexers(definition)
     output_ref = definition.args[1]
-    push = inplace ? (am, op) -> (push!(am.sequence, op); am) :
-            (am, op) -> am isa ArrayMaker ? typeof(am)(am.shape, vcat(am.sequence, op)) :
-                                            (am = ArrayMaker(am); push!(am.sequence, op); am)
+
+    function check_assignment(vw, op)
+        try Base.Broadcast.broadcast_shape(map(length, vw), size(op))
+        catch err
+            if err isa DimensionMismatch
+                throw(DimensionMismatch("setview did not work while assigning " *
+                                        "$vw to $op. LHS has size $(map(length, vw)) "*
+                                        "and RHS has size $(size(op)) " *
+                                        "-- they need to be broadcastable."))
+            else
+                rethrow(err)
+            end
+        end
+    end
+
+    function push(inplace)
+        if inplace
+            function (am, vw, op)
+                check_assignment(vw, op)
+                # assert proper size match
+                push!(am.sequence, vw => op)
+                am
+            end
+        else
+            function (am, vw, op)
+                check_assignment(vw, op)
+                if am isa ArrayMaker
+                    typeof(am)(am.shape, vcat(am.sequence, vw => op))
+                else
+                    am = ArrayMaker(am)
+                    push!(am.sequence, vw => op)
+                    am
+                end
+            end
+        end
+    end
     quote
-            $push($output_ref,
-                  $output_index_ranges($(output_view...)) => $unwrap($arrayop))
+        $(push(inplace))($output_ref,
+                         $output_index_ranges($(output_view...)), $unwrap($arrayop))
     end |> esc
 end
 
@@ -846,27 +879,36 @@ Base.vcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=1)
 Base.hcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=2)
 Base.vcat(x::AbstractVecOrMat, y::Arr, xs::AbstractVecOrMat...) = _cat(x, y, xs..., dims=1)
 Base.hcat(x::AbstractVecOrMat, y::Arr, xs::AbstractVecOrMat...) = _cat(x, y, xs..., dims=2)
+Base.vcat(x::Arr, y::Arr) = _cat(x, y, dims=1) # plug ambiguity
+Base.hcat(x::Arr, y::Arr) = _cat(x, y, dims=2)
 
 function scalarize(x::ArrayMaker)
     T = eltype(x)
     A = Array{wrapper_type(T)}(undef, size(x))
     for (vw, arr) in x.sequence
-        A[vw...] .= scalarize(arr)
+        if any(x->x isa AbstractArray, vw)
+            A[vw...] .= scalarize(arr)
+        else
+            A[vw...] = scalarize(arr)
+        end
     end
     A
 end
 
 function scalarize(x::ArrayMaker, idx)
-    for (vw, arr) in x.sequence
+    for (vw, arr) in reverse(x.sequence) # last one wins
         if any(x->issym(x) || istree(x), idx)
             return term(getindex, x, idx...)
         end
-
         if all(in.(idx, vw))
-            # Filter out non-array indices because the RHS will be one dim less
-            el = [searchsortedfirst(v, i)
-                  for (v, i) in zip(vw, idx) if v isa AbstractArray]
-            return scalarize(arr, (el...,))
+            if symtype(arr) <: AbstractArray
+                # Filter out non-array indices because the RHS will be one dim less
+                el = [searchsortedfirst(v, i)
+                      for (v, i) in zip(vw, idx) if v isa AbstractArray]
+                return scalarize(arr[el...])
+            else
+                return arr
+            end
         end
     end
     throw(BoundsError(x, idx))
