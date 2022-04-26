@@ -416,7 +416,7 @@ A helper function for computing the Jacobian of an array of expressions with res
 an array of variable expressions.
 """
 function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
-    ops = Symbolics.scalarize.(ops)
+    ops = Symbolics.scalarize(ops)
     Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 
@@ -437,6 +437,8 @@ function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=fals
     J = Int[]
     du = Num[]
 
+    ops = Symbolics.scalarize(ops)
+    vars = Symbolics.scalarize(vars)
     sp = jacobian_sparsity(ops, vars)
     I,J,_ = findnz(sp)
 
