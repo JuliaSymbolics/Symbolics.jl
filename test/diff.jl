@@ -306,3 +306,15 @@ let
     @test Symbolics.derivative(ps[1], a) == 0
     @test Symbolics.derivative(x[1], a) == 0
 end
+
+# 580
+let
+    @variables x[1:3]
+    y = [sin.(x); cos.(x)]
+    dj = Symbolics.jacobian(y, x)
+    @test !iszero(dj)
+    @test isequal(dj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
+    sj = Symbolics.sparsejacobian(y, x)
+    @test !iszero(sj)
+    @test isequal(sj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
+end
