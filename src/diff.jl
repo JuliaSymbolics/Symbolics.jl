@@ -417,6 +417,7 @@ an array of variable expressions.
 """
 function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
     ops = Symbolics.scalarize(ops)
+    vars = Symbolics.scalarize(vars)
     Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 
