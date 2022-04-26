@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 authors = ["Shashi Gowda <gowda@mit.edu>"]
-version = "4.4.1"
+version = "4.4.2"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
