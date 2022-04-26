@@ -416,6 +416,7 @@ A helper function for computing the Jacobian of an array of expressions with res
 an array of variable expressions.
 """
 function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
+    ops = Symbolics.scalarize.(ops)
     Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 
