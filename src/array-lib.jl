@@ -55,6 +55,14 @@ function Base.getindex(x::SymArray, idx...)
                 push!(output_idx, isym)
                 push!(input_idx, isym)
                 ranges[isym] = i
+            elseif symtype(i) <: CartesianIndex
+                if i isa CartesianIndex
+                    idx = Tuple(i)
+                    append!(input_idx, [idx...])
+                else
+                    idx = arguments(i)
+                    append!(input_idx, [arguments(i)...])
+                end
             else
                 error("Don't know how to index by $i")
             end
@@ -85,6 +93,20 @@ function Base.getindex(x::Arr, idx...)
 end
 function Base.getindex(x::Arr, idx::Symbolic{<:Integer}...)
     wrap(unwrap(x)[idx...])
+end
+
+function Base.CartesianIndex(x::Symbolic{<:Integer}, xs::Symbolic{<:Integer}...)
+    term(CartesianIndex, x, xs..., type=CartesianIndex)
+end
+
+import Base: +, -
+tup(c::CartesianIndex) = Tuple(c)
+tup(c::Term{CartesianIndex}) = arguments(c)
+@wrapped function -(x::CartesianIndex, y::CartesianIndex)
+    CartesianIndex((tup(x) .- tup(y))...)
+end
+@wrapped function +(x::CartesianIndex, y::CartesianIndex)
+    CartesianIndex((tup(x) .+ tup(y))...)
 end
 
 function propagate_ndims(::typeof(getindex), x, idx...)

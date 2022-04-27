@@ -35,9 +35,9 @@ end
     @test isequal(X[1, 1], wrap(term(getindex, unwrap(X), 1, 1)))
 
     XX = unwrap(X)
-    @test isequal(unwrap(X[1, :]), Symbolics.@arrayop(XX[1, :], (j,), XX[1, j]))
-    @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop(XX[:, 2], (i,), XX[i, 2]))
-    @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop(XX[:, 2:3], (i, j), XX[i, j], (j in 2:3)))
+    @test isequal(unwrap(X[1, :]), Symbolics.@arrayop((j,), XX[1, j], term=XX[1, :]))
+    @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop((i,), XX[i, 2], term=XX[:, 2]))
+    @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop((i, j), XX[i, j], (j in 2:3), term=XX[:, 2:3]))
 
     @variables t x[1:4](t)
     @syms i::Int
@@ -89,9 +89,9 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     @syms i::Int j::Int k::Int l::Int m::Int n::Int
 
     A_ = unwrap(A)
-    A3_ = wrap(@arrayop (A_*A_*A_) (i, j) A_[i, k] * A_[k, l] * A_[l, j])
-    A4_ = wrap(@arrayop (A_*A_*A_*A_) (i, j) A_[i, k] * A_[k, l] * A_[l, m] * A_[m, j])
-    A5_ = wrap(@arrayop (A_*A_*A_*A_*A_) (i, j) A_[i, k] * A_[k, l] * A_[l, m] * A_[m, n] * A_[n, j])
+    A3_ = wrap(@arrayop (i, j) A_[i, k] * A_[k, l] * A_[l, j])
+    A4_ = wrap(@arrayop (i, j) A_[i, k] * A_[k, l] * A_[l, m] * A_[m, j])
+    A5_ = wrap(@arrayop (i, j) A_[i, k] * A_[k, l] * A_[l, m] * A_[m, n] * A_[n, j])
 
     @test isequal(Symbolics.scalarize((A*A)[k,k]), A[k, 1]*A[1, k] + A[2, k]*A[k, 2])
 
@@ -234,8 +234,8 @@ end
 
     @variables t u[fill(1:n, N)...](t)
 
-    Igrid = CartesianIndices((fill(1:n, N)...))
-    Iinterior = CartesianIndices((fill(2:n-1, N)...))
+    Igrid = CartesianIndices((fill(1:n, N)...,))
+    Iinterior = CartesianIndices((fill(2:n-1, N)...,))
 
     function unitindices(N::Int) #create unit CartesianIndex for each dimension
         null = zeros(Int, N)
@@ -249,13 +249,15 @@ end
             end
         end
     end
-
-    function Diffusion(N)
+    function Diffusion(N, n)
         ē = unitindices(N) # for i.e N = 3 => ē = [CartesianIndex((1,0,0)),CartesianIndex((0,1,0)),CartesianIndex((0,0,1))]
 
         Dss = map(1:N) do d
-            @makearray u[Igrid] begin
-                u[Iinterior] => @arrayop u[I-ē[d]] + u[I+ē[d]] - 2 * u[I]
+            ranges = CartesianIndices((map(i->d == i ? (2:n-1) : (1:n), 1:N)...,))
+            @makearray x[1:n, 1:n] begin
+                x[1:n, 1:n] => 0
+                x[ranges] => @arrayop (i, j) u[CartesianIndex(i, j)-ē[d]] +
+                                                u[CartesianIndex(i, j)+ē[d]] - 2 * u[i, j]
             end
         end
 
@@ -264,15 +266,17 @@ end
 
     D = Diffusion(N, n)
 
-    Dxxu = @makearray u[1:n, 1:n] begin
-        u[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] - 2 * u[i, j]
+    @makearray Dxxu[1:n, 1:n] begin
+        Dxxu[1:n, 1:n] => 0
+        Dxxu[2:end-1, 1:end] => @arrayop (i, j) u[i-1, j] + u[i+1, j] - 2 * u[i, j]
     end
 
-    Dyyu = @makearray u[1:n, 1:n] begin
-        u[2:end-1, 2:end-1] => @arrayop (i, j) u[i, j-1] + u[i, j+1] - 2 * u[i, j]
+    @makearray Dyyu[1:n, 1:n] begin
+        Dyyu[1:n, 1:n] => 0
+        Dyyu[1:end, 2:end-1] => @arrayop (i, j) u[i, j-1] + u[i, j+1] - 2 * u[i, j]
     end
 
-    @test D == Dxxu .+ Dyyu
+    @test isequal(collect(D), collect(Dxxu .+ Dyyu))
 end
 
 @testset "Brusselator stencils" begin
