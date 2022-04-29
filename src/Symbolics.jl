@@ -15,6 +15,8 @@ using Reexport
 
 using DomainSets
 
+using Setfield
+
 import DomainSets: Domain
 @reexport using SymbolicUtils
 

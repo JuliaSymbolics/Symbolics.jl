@@ -318,3 +318,10 @@ let
     @test !iszero(sj)
     @test isequal(sj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
 end
+
+# substituting iv of differentials
+@variables t t2 x(t)
+D = Differential(t)
+ex = D(x)
+ex2 = substitute(ex, [t=>t2])
+@test isequal(operation(Symbolics.unwrap(ex2)).x, t2)

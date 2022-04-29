@@ -640,3 +640,7 @@ function sparsehessian(O, vars::AbstractVector; simplify=false)
     end
     return H
 end
+
+function SymbolicUtils.substitute(op::Differential, dict; kwargs...)
+    @set! op.x = substitute(op.x, dict; kwargs...)
+end
