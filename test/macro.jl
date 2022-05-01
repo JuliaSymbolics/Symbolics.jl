@@ -113,4 +113,4 @@ end
 # 402#issuecomment-1074261734
 Symbolics.@register_symbolic oof(x::AbstractVector)
 Symbolics.@variables x[1:100]
-@test Symbolics.oof(x) isa Num
+@test oof(x) isa Num
