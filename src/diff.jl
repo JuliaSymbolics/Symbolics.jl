@@ -337,7 +337,7 @@ function count_order(x)
     n, x.args[1]
 end
 
-_repeat_apply(f, n) = n == 1 ? f : f ∘ _repeat_apply(f, n-1)
+_repeat_apply(f, n) = n == 1 ? f : ComposedFunction{Any,Any}(f, _repeat_apply(f, n-1))
 function _differential_macro(x)
     ex = Expr(:block)
     push!(ex.args,  :(Base.depwarn("`@derivatives D'''~x` is deprecated. Use `Differential(x)^3` instead.", Symbol("@derivatives"), force=true)))
