@@ -227,7 +227,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        states = LazyState(),
                        parallel=nothing, kwargs...)
 
-    if parallel == nothing && length(rhss) >= 1000
+    if parallel == nothing && _nnz(rhss) >= 1000
         parallel = ShardedForm() # by default switch for arrays longer than 1000 exprs
     end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -263,6 +263,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 end
 
+_nnz(x::AbstractArray) = length(x)
+_nnz(x::AbstractSparseArray) = nnz(x)
+_nnz(x::Union{Base.ReshapedArray, LinearAlgebra.Transpose}) = _nnz(parent(x))
+
 function make_array(s, dargs, arr, similarto)
     s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
     _make_array(arr, similarto)
@@ -273,6 +277,19 @@ function make_array(s::SerialForm, dargs, arr, similarto)
 end
 
 function make_array(s::ShardedForm, closed_args, arr, similarto)
+    if arr isa AbstractSparseArray
+
+        return LiteralExpr(quote
+                               $SparseMatrixCSC($(arr.m),
+                                               $(arr.n),
+                                               copy($(arr.colptr)),
+                                               copy($(arr.rowval)),
+                                               $(make_array(s,
+                                                            closed_args,
+                                                            arr.nzval,
+                                                            Vector,)))
+                           end)
+    end
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice

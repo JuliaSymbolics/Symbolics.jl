@@ -201,3 +201,28 @@ let # issue#136
     @test contains(repr(f), "schedule")
     @test isequal(C, B)
 end
+
+
+let #issue#587
+    using Symbolics, SparseArrays
+
+    N = 100 # try with N = 5 and N = 100
+    _S = sprand(N, N, 0.1)
+    _Q = Array(sprand(N, N, 0.1))
+
+    F(z) = [
+            _S * z
+            _Q * z.^2
+           ]
+
+    Symbolics.@variables z[1:N]
+
+    sj = Symbolics.sparsejacobian(F(z), z)
+
+    f_expr = build_function(sj, z)
+    myf = eval(first(f_expr))
+    J = myf(rand(N))
+
+    @test typeof(J) <: SparseMatrixCSC
+    @test nnz(J) == nnz(sj)
+end
