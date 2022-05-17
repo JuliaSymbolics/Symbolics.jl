@@ -39,6 +39,11 @@ function Base.getindex(x::SymArray, idx...)
             end
         end
         res = Term{eltype(symtype(x))}(getindex, [x, idx...])
+    elseif length(idx) == 1 && symtype(first(idx)) <: CartesianIndex
+        i = first(idx)
+        ii = i isa CartesianIndex ? Tuple(i) : arguments(i)
+
+        return getindex(x, ii...)
     else
         input_idx = []
         output_idx = []
@@ -55,14 +60,6 @@ function Base.getindex(x::SymArray, idx...)
                 push!(output_idx, isym)
                 push!(input_idx, isym)
                 ranges[isym] = i
-            elseif symtype(i) <: CartesianIndex
-                if i isa CartesianIndex
-                    idx = Tuple(i)
-                    append!(input_idx, [idx...])
-                else
-                    idx = arguments(i)
-                    append!(input_idx, [arguments(i)...])
-                end
             else
                 error("Don't know how to index by $i")
             end

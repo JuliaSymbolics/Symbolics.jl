@@ -793,7 +793,7 @@ function setview(definition, arrayop, inplace)
         try Base.Broadcast.broadcast_shape(map(length, vw), size(op))
         catch err
             if err isa DimensionMismatch
-                throw(DimensionMismatch("setview did not work while assigning " *
+                throw(DimensionMismatch("setview did not work while assigning indices " *
                                         "$vw to $op. LHS has size $(map(length, vw)) "*
                                         "and RHS has size $(size(op)) " *
                                         "-- they need to be broadcastable."))
