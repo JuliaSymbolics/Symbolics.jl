@@ -279,11 +279,12 @@ end
     @test isequal(collect(D), collect(Dxxu .+ Dyyu))
 end
 
-@testset "Brusselator stencils" begin
+limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
+@register limit(a, N)::Integer
+let
+    n = 8
     @variables t u[1:n, 1:n](t) v[1:n, 1:n](t)
-    n = rand(8:32)
 
-    limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
     brusselator_f(x, y, t) = (((x - 0.3)^2 + (y - 0.6)^2) <= 0.1^2) * (t >= 1.1) * 5.0
 
     x = y = range(0, stop=1, length=n)
@@ -292,26 +293,23 @@ end
     A = 3.4
     alpha = 10.0
 
-    @makearray dtu[1:n, 1:n] begin
-        dtu[1:end, 1:end] => @arrayop (i, j) alpha * (u[limit(i - 1, n), j] + u[limit(i + 1, n), j] + u[i, limit(j + 1, n)] + u[i, limit(j - 1, n)] - 4u[i, j]) + 1.0 + u[i, j]^2 * v[i, j] - (A + 1) * u[i, j] + brusselator_f(x[i], y[j], t)
-    end
+    dtu = @arrayop (i, j) alpha * (u[limit(i - 1, n), j] +
+                                   u[limit(i + 1, n), j] +
+                                   u[i, limit(j + 1, n)] +
+                                   u[i, limit(j - 1, n)] -
+                                   4u[i, j]) +
+                          1.0 + u[i, j]^2 * v[i, j] - (A + 1) *
+                            u[i, j] + brusselator_f(x[i], y[j], t) i in 1:n j in 1:n
+    dtv = @arrayop (i, j) alpha * (v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]) - u[i, j]^2 * v[i, j] + A * u[i, j] i in 1:n j in 1:n
+    lapu = @arrayop (i, j) u[limit(i - 1, n), j] + u[limit(i + 1, n), j] + u[i, limit(j + 1, n)] + u[i, limit(j - 1, n)] - 4u[i, j] i in 1:n j in 1:n
+    lapv = @arrayop (i, j) v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j] i in 1:n j in 1:n
+    s = brusselator_f.(x, y', t)
 
-    @makearray dtv[1:n, 1:n] begin
-        dtv[1:end, 1:end] => @arrayop (i, j) alpha * (v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]) - u[i, j]^2 * v[i, j] + A * u[i, j]
-    end
+    dtu = wrap(dtu)
+    dtv = wrap(dtv)
+    lapu = wrap(lapu)
+    lapv = wrap(lapv)
 
-    @makearray lapu[1:n, 1:n] begin
-       lapu[1:end, 1:end] => @arrayop (i, j) u[i, j] + u[limit(i - 1, n), j] + u[limit(i + 1, n), j] + u[i, limit(j + 1, n)] + u[i, limit(j - 1, n)] - 4u[i, j]
-    end
-
-    @makearray lapv[1:n, 1:n] begin
-        lapv[1:end, 1:end] => @arrayop (i, j) v[i, j] + v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]
-    end
-
-    @makearray s[1:n, 1:n] begin
-        s[1:end, 1:end] => @arrayop (i, j) brusselator_f(x[i], y[j], t)
-    end
-
-    @test dtu == 1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s
-    @test dtv == A .* u .- u.^2 .* v .+ alpha .* lapv
+    @test isequal(collect(dtu), collect(1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s))
+    @test isequal(collect(dtv), collect(A .* u .- u.^2 .* v .+ alpha .* lapv))
 end

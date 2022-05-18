@@ -186,6 +186,8 @@ Broadcast.result_style(::SymWrapBroadcast) = SymWrapBroadcast()
 
 Broadcast.BroadcastStyle(::SymWrapBroadcast,
                          ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
+Broadcast.BroadcastStyle(::SymBroadcast,
+                         ::SymWrapBroadcast) = Broadcast.Unknown()
 
 function Broadcast.materialize(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     args = map(bc.args) do arg
