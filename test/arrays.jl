@@ -281,7 +281,7 @@ end
 
 limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 @register limit(a, N)::Integer
-let
+@testset "Brusselator stencil" begin
     n = 8
     @variables t u[1:n, 1:n](t) v[1:n, 1:n](t)
 
@@ -300,9 +300,22 @@ let
                                    4u[i, j]) +
                           1.0 + u[i, j]^2 * v[i, j] - (A + 1) *
                             u[i, j] + brusselator_f(x[i], y[j], t) i in 1:n j in 1:n
-    dtv = @arrayop (i, j) alpha * (v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j]) - u[i, j]^2 * v[i, j] + A * u[i, j] i in 1:n j in 1:n
-    lapu = @arrayop (i, j) u[limit(i - 1, n), j] + u[limit(i + 1, n), j] + u[i, limit(j + 1, n)] + u[i, limit(j - 1, n)] - 4u[i, j] i in 1:n j in 1:n
-    lapv = @arrayop (i, j) v[limit(i - 1, n), j] + v[limit(i + 1, n), j] + v[i, limit(j + 1, n)] + v[i, limit(j - 1, n)] - 4v[i, j] i in 1:n j in 1:n
+    dtv = @arrayop (i, j) alpha * (v[limit(i - 1, n), j] +
+                                   v[limit(i + 1, n), j] +
+                                   v[i, limit(j + 1, n)] +
+                                   v[i, limit(j - 1, n)] -
+                                   4v[i, j]) -
+                          u[i, j]^2 * v[i, j] + A * u[i, j] i in 1:n j in 1:n
+    lapu = @arrayop (i, j) (u[limit(i - 1, n), j] +
+                            u[limit(i + 1, n), j] +
+                            u[i, limit(j + 1, n)] +
+                            u[i, limit(j - 1, n)] -
+                            4u[i, j]) i in 1:n j in 1:n
+    lapv = @arrayop (i, j) (v[limit(i - 1, n), j] +
+                            v[limit(i + 1, n), j] +
+                            v[i, limit(j + 1, n)] +
+                            v[i, limit(j - 1, n)] -
+                            4v[i, j]) i in 1:n j in 1:n
     s = brusselator_f.(x, y', t)
 
     dtu = wrap(dtu)
