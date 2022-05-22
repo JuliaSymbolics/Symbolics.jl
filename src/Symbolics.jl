@@ -30,7 +30,7 @@ import Metatheory.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 import SymbolicUtils.Code: toexpr
 
-import ArrayInterface
+import ArrayInterfaceCore
 
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)

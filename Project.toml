@@ -4,7 +4,7 @@ authors = ["Shashi Gowda <gowda@mit.edu>"]
 version = "4.5.1"
 
 [deps]
-ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+ArrayInterfaceCore = "30b0a656-2188-435a-8636-2ec0e6a096e2"
 ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
@@ -33,7 +33,7 @@ TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [compat]
-ArrayInterface = "3, 4, 5"
+ArrayInterfaceCore = "0.1.1"
 ConstructionBase = "1.1, 1.2"
 DataStructures = "0.18"
 DiffRules = "0.1, 1.0"
