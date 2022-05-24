@@ -116,7 +116,7 @@ end
 
 SymbolicUtils.Code.get_symbolify(x::Arr) = SymbolicUtils.Code.get_symbolify(unwrap(x))
 
-function _build_function(target::JuliaTarget, op::Arr, args...;
+function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
@@ -126,12 +126,22 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op), states)
 
+    outsym = Symbol("ˍ₋out")
+    body = inplace_expr(unwrap(op), outsym)
+    oop_expr = toexpr(Func([outsym, dargs...], [], body), states)
+
+    N = length(shape(op))
+    op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
+               $body
+          $outsym
+      end) |> LiteralExpr
+    ip_expr = toexpr(Func(dargs, [], op_body), states)
     if expression == Val{true}
-        expr
+        oop_expr, ip_expr
     else
-        _build_and_inject_function(expression_module, expr)
+        _build_and_inject_function(expression_module, oop_expr),
+        _build_and_inject_function(expression_module, ip_expr)
     end
 end
 
