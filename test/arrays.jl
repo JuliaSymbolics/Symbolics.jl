@@ -323,6 +323,9 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
+    f = build_function(dtu, u, v, t, expression=Val{false})
+    @test isequal(collect(f(u,v,t)), collect(dtu))
+
     @test isequal(collect(dtu), collect(1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s))
     @test isequal(collect(dtv), collect(A .* u .- u.^2 .* v .+ alpha .* lapv))
 end

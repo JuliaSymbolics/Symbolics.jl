@@ -762,7 +762,8 @@ end
 function get_indexers(ex)
     @assert ex.head == :ref
     arr = ex.args[1]
-    replace_ends(arr, ex.args[2:end])
+    args = map(((i,x),)->x == Symbol(":") ? :(1:lastindex($arr, $i)) : x, enumerate(ex.args[2:end]))
+    replace_ends(arr, args)
 end
 
 function search_and_replace(expr, key, val)
@@ -879,12 +880,13 @@ end
 Base.cat(x::Arr, xs...; dims) = _cat(x, xs...; dims)
 Base.cat(x::AbstractArray, y::Arr, xs...; dims) = _cat(x, y, xs...; dims)
 
-Base.vcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=1)
-Base.hcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=2)
-Base.vcat(x::AbstractVecOrMat, y::Arr, xs::AbstractVecOrMat...) = _cat(x, y, xs..., dims=1)
-Base.hcat(x::AbstractVecOrMat, y::Arr, xs::AbstractVecOrMat...) = _cat(x, y, xs..., dims=2)
-Base.vcat(x::Arr, y::Arr) = _cat(x, y, dims=1) # plug ambiguity
-Base.hcat(x::Arr, y::Arr) = _cat(x, y, dims=2)
+# vv uncomment these for a major release
+# Base.vcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=1)
+# Base.hcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=2)
+# Base.vcat(x::AbstractVecOrMat, y::Arr, xs::AbstractVecOrMat...) = _cat(x, y, xs..., dims=1)
+# Base.hcat(x::AbstractVecOrMat, y::Arr, xs::AbstractVecOrMat...) = _cat(x, y, xs..., dims=2)
+# Base.vcat(x::Arr, y::Arr) = _cat(x, y, dims=1) # plug ambiguity
+# Base.hcat(x::Arr, y::Arr) = _cat(x, y, dims=2)
 
 function scalarize(x::ArrayMaker)
     T = eltype(x)
@@ -915,6 +917,10 @@ function scalarize(x::ArrayMaker, idx)
             end
         end
     end
+    if !any(x->issym(x) || istree(x), idx) && all(in.(idx, axes(x)))
+        throw(UndefRefError())
+    end
+
     throw(BoundsError(x, idx))
 end
 
@@ -927,8 +933,7 @@ function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
     if istree(x.term)
         toexpr(x.term, st)
     else
-        throw(ArgumentError("""Don't know how to turn $x
-                               into code yet"""))
+        _array_toexpr(x, st)
     end
 end
 
@@ -937,9 +942,13 @@ function SymbolicUtils.Code.toexpr(x::Arr, st)
 end
 
 function SymbolicUtils.Code.toexpr(x::ArrayMaker, st)
+    _array_toexpr(x, st)
+end
+
+function _array_toexpr(x, st)
     outsym = Symbol("_out")
-    N = length(x.shape)
-    ex = :(let $outsym = zeros(Float64, map(length, ($(x.shape...),)))
+    N = length(shape(x))
+    ex = :(let $outsym = zeros(Float64, map(length, ($(shape(x)...),)))
           $(inplace_expr(x, outsym))
           $outsym
       end) |> LiteralExpr
