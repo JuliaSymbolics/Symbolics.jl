@@ -955,11 +955,16 @@ function _array_toexpr(x, st)
     toexpr(ex, st)
 end
 
-function inplace_expr(x, out_array)
-    :(copy!($out_array, $x))
+function inplace_expr(x, out_array, dict=nothing)
+    x = unwrap(x)
+    if symtype(x) <: Number
+        :($out_array .= $x)
+    else
+        :($copy!($out_array, $x))
+    end
 end
 
-function inplace_expr(x::ArrayMaker, out = :_out)
+function inplace_expr(x::ArrayMaker, out, dict=Dict())
     ex = []
 
     intermediates = Dict()
@@ -996,6 +1001,15 @@ function similar_arrayvar(ex, name)
     Sym{symtype(ex)}(name) #TODO: shape?
 end
 
+function reset_to_one(range)
+    @assert step(range) == 1
+    Base.OneTo(length(range))
+end
+
+function reset_sym(i)
+    Sym{Int}(Symbol(nameof(i), "′"))
+end
+
 function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
     if x.term !== nothing
         ex = inplace_builtin(x.term, outsym)
@@ -1022,16 +1036,26 @@ function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
     end
 
     loops = best_order(x.output_idx, keys(rs), rs)
+    range_syms = map(x.output_idx) do i
+        :($(Symbol(nameof(i), "_range")) = $reset_to_one($(rs[i])))
+    end
 
     expr = substitute(unwrap(x.expr), Dict(intermediate_exprs))
 
-    inner_expr = :($outsym[$(x.output_idx...)] = $(x.reduce)($outsym[$(x.output_idx...)], $(expr)))
+    inner_expr = :($outsym[$(map(reset_sym, x.output_idx)...)] = $(x.reduce)($outsym[$(map(reset_sym, x.output_idx)...)], $(expr)))
 
 
     loops = foldl(reverse(loops), init=inner_expr) do acc, k
-        :(for $k in $(get_extents(rs[k]))
-              $acc
-          end)
+        if any(isequal(k), x.output_idx)
+            :(for ($k, $(reset_sym(k))) in zip($(get_extents(rs[k])),
+                                               reset_to_one($(get_extents(rs[k]))))
+                  $acc
+              end)
+        else
+            :(for $k in $(get_extents(rs[k]))
+                  $acc
+              end)
+        end
     end
 
     if intermediates === nothing

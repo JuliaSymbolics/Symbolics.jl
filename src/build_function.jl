@@ -132,10 +132,14 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
     oop_expr = toexpr(Func([outsym, dargs...], [], body), states)
 
     N = length(shape(op))
-    op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
-               $body
-          $outsym
-      end) |> LiteralExpr
+    if unwrap(op) isa ArrayOp && istree(op.term)
+        op_body = op.term
+    else
+        op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
+                   $body
+              $outsym
+          end) |> LiteralExpr
+    end
     ip_expr = toexpr(Func(dargs, [], op_body), states)
     if expression == Val{true}
         oop_expr, ip_expr
