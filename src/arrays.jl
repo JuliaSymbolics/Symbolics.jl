@@ -1036,13 +1036,11 @@ function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
     end
 
     loops = best_order(x.output_idx, keys(rs), rs)
-    range_syms = map(x.output_idx) do i
-        :($(Symbol(nameof(i), "_range")) = $reset_to_one($(rs[i])))
-    end
 
     expr = substitute(unwrap(x.expr), Dict(intermediate_exprs))
 
-    inner_expr = :($outsym[$(map(reset_sym, x.output_idx)...)] = $(x.reduce)($outsym[$(map(reset_sym, x.output_idx)...)], $(expr)))
+    out_idxs = map(reset_sym, x.output_idx)
+    inner_expr = :($outsym[$(out_idxs...)] = $(x.reduce)($outsym[$(out_idxs...)], $(expr)))
 
 
     loops = foldl(reverse(loops), init=inner_expr) do acc, k
