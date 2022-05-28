@@ -194,3 +194,12 @@ end
     r = @rule ((~A*~B)*~C) => (~A*(~B*~C)) where size(~A,1)*size(~B,2) > size(~B,1)*size(~C,2)
     @test isequal(r(unwrap((X*Y)*b)), unwrap(X*(Y*b)))
 end
+
+@testset "Partial array substitution" begin
+    @variables x[1:3] A[1:2, 1:2, 1:2]
+
+    @test substitute(x[1], Dict(x => [1, 2, 3])) === Num(1)
+    @test substitute(A[1,2,1], Dict(A => reshape(1:8, 2, 2, 2))) === Num(3)
+
+    @test substitute(A[1,2,1], Dict(A[1,2,1] => 9)) === Num(9)
+end
