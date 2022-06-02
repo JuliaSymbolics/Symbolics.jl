@@ -239,6 +239,10 @@ function degree(p::Term, sym=nothing)
     end
 end
 
+function degree(p::SymbolicUtils.Div, sym=nothing)
+    return degree(p.num,sym)
+end
+
 function degree(p, sym=nothing)
     p = value(p)
     sym = value(sym)
