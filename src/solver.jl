@@ -1,5 +1,45 @@
 using Symbolics
 
+function remove_eq(equs::Vector{Equation},var,removed::Vector{Equation})
+    for i in 1:length(equs)
+        solution = solve_single_eq(equs[i],var)
+        if(solution isa Vector)
+            solution = solution[1]
+        end
+        solution == nothing && continue
+
+        push!(removed,solution)
+        deleteat!(equs,i)
+        
+        for j in 1:length(equs)
+            equs[j] = substitute(equs[j],Dict(solution.lhs => solution.rhs))
+        end
+        return
+    end
+end
+
+#returns a dictionary of the solutions
+function solve_system_eq(equs::Vector{Equation},vars)
+    removed = Vector{Equation}()
+
+    reduced::Vector{Equation} = copy(equs)
+    
+    for i in 1:length(vars)
+        remove_eq(reduced,vars[i],removed)
+    end
+    
+    #solve last equation in the reduced set
+    
+    solutions = Dict()
+
+    for i in length(removed):-1:1
+        current_eq = substitute(removed[i],solutions)
+        solutions[current_eq.lhs]=current_eq.rhs
+    end
+
+    return solutions
+end
+
 inverseOps = Dict(
                   sin => asin,
                   cos => acos,
@@ -11,8 +51,7 @@ inverseOps = Dict(
                   log => exp)
 
 function solve_single_eq(eq::Equation,var)
-    
-    eq = (eq.lhs-eq.rhs ~ 0)#move everything to the left side
+    eq = (SymbolicUtils.add_with_div(eq.lhs-eq.rhs) ~ 0)#move everything to the left side
     while(true)
         oldState = eq
         #println("eq $eq var $var")

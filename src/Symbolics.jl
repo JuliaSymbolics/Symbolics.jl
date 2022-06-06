@@ -134,7 +134,7 @@ include("semipoly.jl")
 
 include("solver.jl")
 export solve_single_eq
-
+export solve_system_eq
 
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
