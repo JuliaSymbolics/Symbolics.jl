@@ -67,7 +67,8 @@ function occursin_info(x, expr)
 
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         isequal(first(arguments(x)), first(arguments(expr)))
-        return isequal(arguments(x), arguments(expr))
+        return isequal(operation(x), operation(expr)) &&
+               isequal(arguments(x), arguments(expr))
     end
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         !occursin(first(arguments(x)), first(arguments(expr)))
