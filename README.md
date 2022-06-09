@@ -29,7 +29,7 @@ for the version of the documentation which contains the unreleased features.
 - [SymbolicUtils.jl](https://github.com/JuliaSymbolics/SymbolicUtils.jl): This is a
   rule-rewriting system that is the core of Symbolics.jl. Symbolics.jl builds off of
   SymbolicUtils.jl to extend it to a whole symbolic algebra system, complete with
-  support for differentation, solving symbolic systems of equations, etc. If you're
+  support for differentiation, solving symbolic systems of equations, etc. If you're
   looking for the barebones to build a new CAS for specific algebras, SymbolicUtils.jl
   is that foundation. Otherwise, Symbolics.jl is for you.
 - [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl): This is a

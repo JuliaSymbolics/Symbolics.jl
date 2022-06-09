@@ -68,15 +68,28 @@ end
 end
 
 @latexrecipe function f(eqs::Vector{Equation})
-    env --> :align
-
-    return Num.(getfield.(eqs, :lhs)), Num.(getfield.(eqs, :rhs))
+    has_connections = any(x->x.lhs isa Connection, eqs)
+    if has_connections
+        env --> :equation
+        return map(first∘first∘Latexify.apply_recipe, eqs)
+    else
+        env --> :align
+        return Num.(getfield.(eqs, :lhs)), Num.(getfield.(eqs, :rhs))
+    end
 end
 
 @latexrecipe function f(eq::Equation)
     env --> :equation
 
-    return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
+    if eq.lhs isa Connection
+        return eq.rhs
+    else
+        return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
+    end
+end
+
+@latexrecipe function f(c::Connection)
+    return Expr(:call, :connect, map(nameof, c.systems)...)
 end
 
 Base.show(io::IO, ::MIME"text/latex", x::Num) = print(io, latexify(x))

@@ -1,3 +1,27 @@
+const NAMESPACE_SEPARATOR = '₊'
+
+struct Connection
+    systems
+end
+Connection() = Connection(nothing)
+
+function connect(sys1, sys2, syss...)
+    syss = (sys1, sys2, syss...)
+    length(unique(nameof, syss)) == length(syss) || error("connect takes distinct systems!")
+    Equation(Connection(), Connection(syss)) # the RHS are connected systems
+end
+
+function Base.show(io::IO, c::Connection)
+    print(io, "connect(")
+    n = length(c.systems)
+    for (i, s) in enumerate(c.systems)
+        str = join(split(string(nameof(s)), NAMESPACE_SEPARATOR), '.')
+        print(io, str)
+        i != n && print(io, ", ")
+    end
+    print(io, ")")
+end
+
 """
 $(TYPEDEF)
 
@@ -18,7 +42,13 @@ end
 Base.:(==)(a::Equation, b::Equation) = all(isequal.((a.lhs, a.rhs), (b.lhs, b.rhs)))
 Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 
-Base.show(io::IO, eq::Equation) = print(io, eq.lhs, " ~ ", eq.rhs)
+function Base.show(io::IO, eq::Equation)
+    if eq.lhs isa Connection
+        show(io, eq.rhs)
+    else
+        print(io, eq.lhs, " ~ ", eq.rhs)
+    end
+end
 
 scalarize(eq::Equation) = scalarize(eq.lhs) ~ scalarize(eq.rhs)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)

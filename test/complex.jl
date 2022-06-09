@@ -13,6 +13,13 @@ using Symbolics, Test
         @test imag(x) isa Num
         @test conj(x) isa Complex{Num}
     end
+
+    # issue #314
+    bi = a+a*im
+    bs = substitute(bi, (Dict(a=>1.0))) # returns 1.0 + im
+    typeof(bs) # Complex{Num}
+    bv = Symbolics.value.(bs)
+    @test typeof(bv) == ComplexF64
 end
 
 @testset "repr" begin
