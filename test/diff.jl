@@ -328,3 +328,11 @@ ex2 = substitute(ex, [t=>t2])
 ex3 = substitute(D(x) * 2 + x / t, [t=>t2])
 xt2 = substitute(x, [t => t2])
 @test isequal(ex3, xt2 / t2 + 2Differential(t2)(xt2))
+
+# 581
+#
+let
+    @variables x[1:3](t)
+    @test iszero(Symbolics.derivative(x[1], x[2]))
+end
+
