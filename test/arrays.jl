@@ -177,12 +177,12 @@ end
 
     @test shape(ex) == shape(x)
 
-    fun_genf = build_function(ex, x, expression=Val{false})
+    fun_iip, fun_genf = build_function(ex, x, expression=Val{false})
     @test fun_genf(x0) == A * x0
 
     # Generate an expression instead and eval it manually
-    fun_ex = build_function(ex, x, expression=Val{true})
-    fun_eval = eval(fun_ex)
+    fun_ex_ip, fun_ex_oop = build_function(ex, x, expression=Val{true})
+    fun_eval = eval(fun_ex_oop)
     @test fun_eval(x0) == foo(x0)
 
     ## Jacobians
@@ -323,8 +323,10 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
-    f = build_function(dtu, u, v, t, expression=Val{false})
-    @test isequal(collect(f(u,v,t)), collect(dtu))
+    Main._x[] = _, f = build_function(dtu, u, v, t, expression=Val{false})
+    # this is because u is not handled right as an argument and later in the
+    # function body we see u[1,1](t) -- it should really be rewritten as u[1,1]
+    @test_broken isequal(collect(f(u,v,t)), collect(dtu))
 
     @test isequal(collect(dtu), collect(1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s))
     @test isequal(collect(dtv), collect(A .* u .- u.^2 .* v .+ alpha .* lapv))

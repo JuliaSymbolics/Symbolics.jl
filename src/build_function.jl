@@ -92,10 +92,14 @@ function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
     if !(arg isa Arr)
         DestructuredArgs(map(unwrap_nometa, arg), name, inbounds=inbounds, create_bindings=false)
     else
-        unwrap_nometa(arg)
+        extract_name(unwrap_nometa(arg))
     end
 end
-destructure_arg(arg, _, _) = unwrap_nometa(arg)
+destructure_arg(arg, _, _) = extract_name(unwrap_nometa(arg))
+
+function extract_name(arg)
+    hasmetadata(arg, VariableSource) ? getmetadata(arg, VariableSource)[2] : arg
+end
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
@@ -132,7 +136,8 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
     oop_expr = toexpr(Func([outsym, dargs...], [], body), states)
 
     N = length(shape(op))
-    if unwrap(op) isa ArrayOp && istree(op.term)
+    op = unwrap(op)
+    if op isa ArrayOp && istree(op.term)
         op_body = op.term
     else
         op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
