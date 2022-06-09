@@ -116,15 +116,17 @@ function diff2term(O)
         return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
     else
         oldop = operation(O)
-        if oldop isa Sym
+        if issym(oldop)
             opname = string(nameof(oldop))
-        elseif oldop isa Term && operation(oldop) === getindex
-            opname = string(nameof(arguments(oldop)[1]))
+        elseif oldop === getindex
+            v = arguments(O)[1]
+            opname = string(getname(v))
         else
             throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
         end
         d_separator = 'ˍ'
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
+        @show newname
         return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
     end
 end

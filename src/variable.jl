@@ -251,21 +251,14 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWithMetadata, $ex))
     else
-        # [(R -> R)(R) ....]
         need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($var_name)($(call_args...)) |> $unwrap)
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map($CallWith(($(call_args...),)), $ex))
     end
 
     if val !== nothing
         expr = :($setdefaultval($expr, $val))
     end
-    expr = setprops_expr(expr, prop, macroname, var_name)
-    if need_scalarize
-        expr = :($scalarize_getindex($expr))
-    end
-
     expr = :($wrap($expr))
 
     return expr
@@ -348,20 +341,13 @@ end
 
 const _fail = Dict()
 
-_getname(x, _) = nameof(x)
-_getname(x::Symbol, _) = x
-function _getname(x::Symbolic, val)
-    ss = getsource(x, nothing)
-    if ss === nothing
-        ss = getsource(getparent(x), val)
-    end
-    ss === _fail && throw(ArgumentError("Variable $x doesn't have a source defined."))
-    ss[2]
-end
+_getname(x) = nameof(x)
+_getname(x::Symbol) = x
+_getname(x::Symbolic) = istree(x) ? _getname(operation(x)) : nameof(x)
 
 getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
-getname(x, val=_fail) = _getname(unwrap(x), val)
+getname(x) = _getname(unwrap(x))
 
 function getparent(x, val=_fail)
     maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
