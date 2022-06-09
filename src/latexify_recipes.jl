@@ -101,6 +101,58 @@ _toexpr(O::ArrayOp) = _toexpr(O.term)
 
 # `_toexpr` is only used for latexify
 function _toexpr(O)
+    if ismul(O)
+        m = O
+        numer = Any[]
+        denom = Any[]
+
+        # We need to iterate over each term in m, ignoring the numeric coefficient.
+        # This iteration needs to be stable, so we can't iterate over m.dict.
+        for term in Iterators.drop(arguments(m), isone(m.coeff) ? 0 : 1)
+            if !ispow(term)
+                push!(numer, _toexpr(term))
+                continue
+            end
+
+            base = term.base
+            pow  = term.exp
+            isneg = (pow isa Number && pow < 0) || (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
+            if !isneg
+                if _isone(pow)
+                    pushfirst!(numer, _toexpr(base))
+                else
+                    pushfirst!(numer, Expr(:call, :^, _toexpr(base), _toexpr(pow)))
+                end
+            else
+                newpow = -1*pow
+                if _isone(newpow)
+                    pushfirst!(denom, _toexpr(base))
+                else
+                    pushfirst!(denom, Expr(:call, :^, _toexpr(base), _toexpr(newpow)))
+                end
+            end
+        end
+
+        if isempty(numer) || !isone(abs(m.coeff))
+            numer_expr = Expr(:call, :*, abs(m.coeff), numer...)
+        else
+            numer_expr = length(numer) > 1 ? Expr(:call, :*, numer...) : numer[1]
+        end
+
+        if isempty(denom)
+            frac_expr = numer_expr
+        else
+            denom_expr = length(denom) > 1 ? Expr(:call, :*, denom...) : denom[1]
+            frac_expr = Expr(:call, :/, numer_expr, denom_expr)
+        end
+
+        if m.coeff < 0
+            return Expr(:call, :-, frac_expr)
+        else
+            return frac_expr
+        end
+    end
+    issym(O) && return nameof(O)
     !istree(O) && return O
 
     op = operation(O)
@@ -122,62 +174,11 @@ function _toexpr(O)
         return getindex_to_symbol(O)
     elseif op === (\)
         return :(solve($(_toexpr(args[1])), $(_toexpr(args[2]))))
-    elseif op isa Sym && symtype(op) <: AbstractArray
+    elseif issym(op) && symtype(op) <: AbstractArray
         return :(_textbf($(nameof(op))))
     end
     return Expr(:call, Symbol(op), _toexpr(args)...)
 end
-function _toexpr(m::Mul{<:Number})
-    numer = Any[]
-    denom = Any[]
-
-    # We need to iterate over each term in m, ignoring the numeric coefficient.
-    # This iteration needs to be stable, so we can't iterate over m.dict.
-    for term in Iterators.drop(arguments(m), isone(m.coeff) ? 0 : 1)
-        if !(term isa Pow)
-            push!(numer, _toexpr(term))
-            continue
-        end
-
-        base = term.base
-        pow  = term.exp
-        isneg = (pow isa Number && pow < 0) || (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
-        if !isneg
-            if _isone(pow)
-                pushfirst!(numer, _toexpr(base))
-            else
-                pushfirst!(numer, Expr(:call, :^, _toexpr(base), _toexpr(pow)))
-            end
-        else
-            newpow = -1*pow
-            if _isone(newpow)
-                pushfirst!(denom, _toexpr(base))
-            else
-                pushfirst!(denom, Expr(:call, :^, _toexpr(base), _toexpr(newpow)))
-            end
-        end
-    end
-
-    if isempty(numer) || !isone(abs(m.coeff))
-        numer_expr = Expr(:call, :*, abs(m.coeff), numer...)
-    else
-        numer_expr = length(numer) > 1 ? Expr(:call, :*, numer...) : numer[1]
-    end
-
-    if isempty(denom)
-        frac_expr = numer_expr
-    else
-        denom_expr = length(denom) > 1 ? Expr(:call, :*, denom...) : denom[1]
-        frac_expr = Expr(:call, :/, numer_expr, denom_expr)
-    end
-
-    if m.coeff < 0
-        return Expr(:call, :-, frac_expr)
-    else
-        return frac_expr
-    end
-end
-_toexpr(s::Sym) = nameof(s)
 _toexpr(x::Integer) = x
 _toexpr(x::AbstractFloat) = x
 
