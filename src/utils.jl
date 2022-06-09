@@ -80,12 +80,10 @@ get_variables(e, varlist=nothing) = get_variables!([], e, varlist)
 
 # Sym / Term --> Symbol
 Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
-tosymbol(x; kwargs...) = issym(x) ? nameof(x) : x
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x::Term) -> Symbolic
-    diff2term(x) -> x
+    diff2term(x) -> Symbolic
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
@@ -153,23 +151,29 @@ julia>  Symbolics.tosymbol(z; escape=false)
 :z
 ```
 """
-function tosymbol(t::Term; states=nothing, escape=true)
-    if issym(operation(t))
-        if states !== nothing && !(t in states)
-            return nameof(operation(t))
+function tosymbol(t; states=nothing, escape=true)
+    if issym(t)
+        return nameof(t)
+    elseif istree(t)
+        if issym(operation(t))
+            if states !== nothing && !(t in states)
+                return nameof(operation(t))
+            end
+            op = nameof(operation(t))
+            args = arguments(t)
+        elseif operation(t) isa Differential
+            term = diff2term(t)
+            op = Symbol(operation(term))
+            args = arguments(term)
+        else
+            op = Symbol(repr(operation(t)))
+            args = arguments(t)
         end
-        op = nameof(operation(t))
-        args = arguments(t)
-    elseif operation(t) isa Differential
-        term = diff2term(t)
-        op = Symbol(operation(term))
-        args = arguments(term)
-    else
-        op = Symbol(repr(operation(t)))
-        args = arguments(t)
-    end
 
-    return escape ? Symbol(op, "(", join(args, ", "), ")") : op
+        return escape ? Symbol(op, "(", join(args, ", "), ")") : op
+    else
+        x
+    end
 end
 
 function lower_varname(var::Symbolic, idv, order)
@@ -208,8 +212,17 @@ function makesubscripts(n)
     end
 end
 
-var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
-var_from_nested_derivative(x::Sym,i=0) = (x, i)
+function var_from_nested_derivative(x,i=0)
+    if istree(x)
+        if operation(x) isa Differential
+            var_from_nested_derivative(arguments(x)[1], i + 1)
+        else
+            (x, i)
+        end
+    elseif issym(x)
+        (x, i)
+    end
+end
 
 function degree(p::Sym, sym=nothing)
     if sym === nothing

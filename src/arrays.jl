@@ -564,8 +564,12 @@ function scalarize(arr::AbstractArray, idx)
     arr[idx...]
 end
 
-function scalarize(arr::Term, idx)
-    scalarize_op(operation(arr), arr, idx)
+function scalarize(arr, idx)
+    if istree(arr)
+        scalarize_op(operation(arr), arr, idx)
+    else
+        error("scalarize is not defined for $arr at idx=$idx")
+    end
 end
 
 scalarize_op(f, arr) = arr

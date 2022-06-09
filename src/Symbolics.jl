@@ -24,7 +24,7 @@ import TermInterface: similarterm, istree, operation, arguments, symtype
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, BasicSymbolic,
                       FnType, @rule, Rewriters, substitute,
-                      promote_symtype, isadd, ismul, ispow, isterm, issym
+                      promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
 
 import Metatheory.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
