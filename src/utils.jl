@@ -185,8 +185,6 @@ function lower_varname(var::Symbolic, idv, order)
     return diff2term(var)
 end
 
-var_from_nested_derivative(x, i=0) = (missing, missing)
-
 ### OOPS
 
 struct Unknown end
@@ -221,6 +219,8 @@ function var_from_nested_derivative(x,i=0)
         end
     elseif issym(x)
         (x, i)
+    else
+        (missing, missing)
     end
 end
 
