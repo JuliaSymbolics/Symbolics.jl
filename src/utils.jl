@@ -224,34 +224,6 @@ function var_from_nested_derivative(x,i=0)
     end
 end
 
-function degree(p::Sym, sym=nothing)
-    if sym === nothing
-        return 1
-    else
-        return Int(isequal(p, sym))
-    end
-end
-
-function degree(p::Pow, sym=nothing)
-    return p.exp * degree(p.base, sym)
-end
-
-function degree(p::Add, sym=nothing)
-    return maximum(degree(key, sym) for key in keys(p.dict))
-end
-
-function degree(p::Mul, sym=nothing)
-    return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
-end
-
-function degree(p::Term, sym=nothing)
-    if sym === nothing
-        return 1
-    else
-        return Int(isequal(p, sym))
-    end
-end
-
 function degree(p, sym=nothing)
     p = value(p)
     sym = value(sym)
@@ -263,6 +235,25 @@ function degree(p, sym=nothing)
     end
     if p isa Symbolic
         return degree(p, sym)
+    end
+    if isterm(p)
+        if sym === nothing
+            return 1
+        else
+            return Int(isequal(p, sym))
+        end
+    elseif ismul(p)
+        return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
+    elseif isadd(p)
+        return maximum(degree(key, sym) for key in keys(p.dict))
+    elseif ispow(p)
+        return p.exp * degree(p.base, sym)
+    elseif issym(p)
+        if sym === nothing
+            return 1
+        else
+            return Int(isequal(p, sym))
+        end
     end
     throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end

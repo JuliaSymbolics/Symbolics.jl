@@ -72,7 +72,6 @@ export Equation, ConstrainedEquation
 include("equations.jl")
 
 include("utils.jl")
-export degree
 
 using ConstructionBase
 include("arrays.jl")
