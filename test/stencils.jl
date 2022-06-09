@@ -68,4 +68,7 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
     n = 5
     y = @arrayop (i, j) u[limit(i-1, n), limit(j+1,n)] i in 1:n j in 1:n
     test_funcs("manual-limits", y, u)
+
+    z = @arrayop (i, j) y[j, i]
+    test_funcs("intermediate-exprs", z, u)
 end
