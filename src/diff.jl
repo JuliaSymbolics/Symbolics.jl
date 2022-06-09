@@ -54,6 +54,7 @@ _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
 
 function occursin_info(x, expr)
+    @show expr, symtype(expr)
     if symtype(expr) <: AbstractArray
         error("Differentiation of expressions involving arrays and array variables is not yet supported.")
     end
@@ -70,6 +71,7 @@ function occursin_info(x, expr)
         return isequal(operation(x), operation(expr)) &&
                isequal(arguments(x), arguments(expr))
     end
+    @show x expr
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         !occursin(first(arguments(x)), first(arguments(expr)))
         return false

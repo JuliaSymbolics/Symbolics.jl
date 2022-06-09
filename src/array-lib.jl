@@ -201,14 +201,16 @@ isdot(A, b) = isadjointvec(A) && ndims(b) == 1
 isadjointvec(A::Adjoint) = ndims(parent(A)) == 1
 isadjointvec(A::Transpose) = ndims(parent(A)) == 1
 
-function isadjointvec(A::Term)
-    (operation(A) === (adjoint) ||
-     operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
+function isadjointvec(A)
+    if istree(A)
+        (operation(A) === (adjoint) ||
+         operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
+    else
+        false
+    end
 end
 
 isadjointvec(A::ArrayOp) = isadjointvec(A.term)
-
-isadjointvec(A) = false
 
 # TODO: add more such methods
 function getindex(A::AbstractArray, i::Symbolic{<:Integer}, ii::Symbolic{<:Integer}...)
@@ -254,7 +256,6 @@ function _matvec(A,b)
     @arrayop (A*b) (i,) A[i, k] * b[k]
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
-(*)(A::AbstractArray, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
 
 #################### MAP-REDUCE ################
 #

@@ -16,7 +16,7 @@ export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coef
 
 """
 struct BoundedDegreeMonomial
-    p::Union{Mul, Pow, Int, Sym, Term}
+    p::Union{BasicSymbolic, Int}
     coeff::Any
     overdegree::Bool
 end
@@ -31,9 +31,18 @@ isop(x, op) = istree(x) && operation(x) === op
 
 isop(op) = x -> isop(x, op)
 
-pdegree(x::Mul) = sum(values(x.dict))
-pdegree(x::Union{Sym, Term}) = 1
-pdegree(x::Pow) = pdegree(x.base) * x.exp
+function pdegree(x::BasicSymbolic)
+    if ismul(x)
+        sum(values(x.dict))
+    elseif issym(x) || isterm(x)
+        1
+    elseif ispow(x)
+        pdegree(x.base) * x.exp
+    else
+        error("pdegree not defined for $x")
+    end
+end
+
 pdegree(x::Number) = 0
 
 
