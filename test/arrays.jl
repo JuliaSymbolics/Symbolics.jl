@@ -279,8 +279,6 @@ end
     @test isequal(collect(D), collect(Dxxu .+ Dyyu))
 end
 
-limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
-@register limit(a, N)::Integer
 @testset "Brusselator stencil" begin
     n = 8
     @variables t u[1:n, 1:n](t) v[1:n, 1:n](t)
@@ -293,6 +291,7 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
     A = 3.4
     alpha = 10.0
 
+    limit = Main.limit
     dtu = @arrayop (i, j) alpha * (u[limit(i - 1, n), j] +
                                    u[limit(i + 1, n), j] +
                                    u[i, limit(j + 1, n)] +
@@ -323,7 +322,7 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
-    Main._x[] = _, f = build_function(dtu, u, v, t, expression=Val{false})
+    _, f = build_function(dtu, u, v, t, expression=Val{false})
     # this is because u is not handled right as an argument and later in the
     # function body we see u[1,1](t) -- it should really be rewritten as u[1,1]
     @test_broken isequal(collect(f(u,v,t)), collect(dtu))

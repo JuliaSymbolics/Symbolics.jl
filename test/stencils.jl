@@ -12,9 +12,6 @@ function test_funcs(name, f, args...)
     @test_reference "build_function_tests/$name-inplace.jl" _repr(inplace)
 end
 
-limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
-@register limit(a, N)::Integer
-
 @testset "array codegen basics" begin
     @variables x[1:4, 1:4]
 
@@ -66,6 +63,7 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 
     @variables u[1:5, 1:5]
     n = 5
+    limit = Main.limit
     y = @arrayop (i, j) u[limit(i-1, n), limit(j+1,n)] i in 1:n j in 1:n
     test_funcs("manual-limits", y, u)
 
