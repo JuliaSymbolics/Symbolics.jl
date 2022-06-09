@@ -993,8 +993,17 @@ function inplace_builtin(term, outsym)
     return nothing
 end
 
+function find_inter(acc, expr)
+    if !issym(expr) && symtype(expr) <: AbstractArray
+        push!(acc, expr)
+    elseif istree(expr)
+        foreach(x -> find_inter(acc, x), arguments(expr))
+    end
+    acc
+end
+
 function get_inputs(x::ArrayOp)
-    unique(mapreduce(axs->map(x->x.A, axs), vcat, values(ranges(x))))
+    unique(find_inter([], x.expr))
 end
 
 function similar_arrayvar(ex, name)
