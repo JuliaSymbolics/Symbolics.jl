@@ -138,6 +138,21 @@ end
 $(SIGNATURES)
 
 TODO
+    
+# Examples
+```jldoctest
+
+julia> @variables x y z k; 
+    
+julia> f=k*(abs(x-y)/y-z)^2
+k*((abs(x - y) / y - z)^2)
+
+julia> Dx=Differential(x) # Differentiate wrt x
+(::Differential) (generic function with 2 methods)
+
+julia> dfx=expand_derivatives(Dx(f))
+(k*((2abs(x - y)) / y - 2z)*IfElse.ifelse(signbit(x - y), -1, 1)) / y
+```    
 """
 function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
     if istree(O) && isa(operation(O), Differential)
