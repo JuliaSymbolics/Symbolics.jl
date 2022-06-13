@@ -168,3 +168,5 @@ _iszero(::Symbolic) = false
 _isone(::Symbolic) = false
 _iszero(x::Num) = _iszero(value(x))
 _isone(x::Num) = _isone(value(x))
+
+Code.cse(x::Num) = Code.cse(unwrap(x))
