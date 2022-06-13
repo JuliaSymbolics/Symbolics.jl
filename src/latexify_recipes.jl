@@ -94,6 +94,7 @@ end
 
 Base.show(io::IO, ::MIME"text/latex", x::Num) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, latexify(x))
+Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, latexify(x))                
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, latexify(x))
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num}) = print(io, latexify(x))
 
