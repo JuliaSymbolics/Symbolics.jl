@@ -1,6 +1,7 @@
 using SymbolicUtils: Symbolic
+
 """
-    @register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
+    @register_symbolic(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
 
 Overload appropriate methods so that Symbolics can stop tracing into the
 registered function. If `define_promotion` is true, then a promotion method in
@@ -15,13 +16,13 @@ overwritting.
 
 # Examples
 ```julia
-@register foo(x, y)
-@register foo(x, y::Bool) false # do not overload a duplicate promotion rule
-@register goo(x, y::Int) # `y` is not overloaded to take symbolic objects
-@register hoo(x, y)::Int # `hoo` returns `Int`
+@register_symbolic foo(x, y)
+@register_symbolic foo(x, y::Bool) false # do not overload a duplicate promotion rule
+@register_symbolic goo(x, y::Int) # `y` is not overloaded to take symbolic objects
+@register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
 """
-macro register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
+macro register_symbolic(expr, define_promotion = true, Ts = [])
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
@@ -34,42 +35,56 @@ macro register(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
     f = expr.args[1]
     args = expr.args[2:end]
 
-    symbolic_args = findall(x->x isa Symbol, args)
-
-    types = vec(collect(Iterators.product(ntuple(_->Ts, length(symbolic_args))...)))
-
-    # remove Real Real Real methods
-    filter!(Ts->!all(T->T == Real, Ts), types)
-
-    annotype(name,T) = :($name :: $T)
-    setinds(xs, idx, vs) = (xs=copy(xs); xs[idx] .= map(annotype, xs[idx], vs); xs)
-    name(x::Symbol) = :($value($x))
-    name(x::Expr) = ((@assert x.head == :(::)); :($value($(x.args[1]))))
-
-    ex = Expr(:block)
-    for ts in types
-        push!(ex.args, quote
-            function $f($(setinds(args, symbolic_args, ts)...))
-                wrap =  any(x->typeof(x) <: $Num, tuple($(setinds(args, symbolic_args, ts)...),)) ? $Num : $identity
-                args = ($(map(name, args)...),)
-                if all(arg -> !(arg isa $Symbolic), args)
-                    wrap($f(args...,))
-                else
-                    wrap($Term{$ret_type}($f, collect(args)))
-                end
-            end
-        end)
+    types = map(args) do x
+        if x isa Symbol
+            :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
+        elseif Meta.isexpr(x, :(::))
+            T = x.args[2]
+            :($has_symwrapper($T) ?
+              ($T, $Symbolic{<:$T}, $wrapper_type($T),) :
+              ($T, $Symbolic{<:$T}))
+        else
+            error("Invalid argument format $x")
+        end
     end
-    push!(
-          ex.args,
-          quote
-              if $define_promotion
-                  (::$typeof($promote_symtype))(::$typeof($f), args...) = $ret_type
-              end
-          end
-         )
-    esc(ex)
+
+    eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
+                        args = [$(Expr(:$, :(s_syms...)))]
+                        unwrapped_args = map($unwrap, args)
+                        res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
+                            $f(unwrapped_args...)
+                        else
+                            $Term{$ret_type}($f, unwrapped_args)
+                        end
+                        if typeof.(args) == typeof.(unwrapped_args)
+                            return res
+                        else
+                            return $wrap(res)
+                        end
+                    end)
+    verbose = false
+    mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
+    Ts = Symbol("##__Ts")
+    quote
+        $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
+                if any(x->x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
+        if $verbose
+            println("Candidates")
+            map(println, $Ts)
+        end
+
+        for sig in $Ts
+            s = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
+            s_syms = map(x->x.args[1], s)
+            $eval_method
+        end
+        if $define_promotion
+            (::$typeof($promote_symtype))(::$typeof($f), args...) = $ret_type
+        end
+    end |> esc
 end
+
+Base.@deprecate_binding var"@register" var"@register_symbolic"
 
 # Ensure that Num that get @registered from outside the ModelingToolkit
 # module can work without having to bring in the associated function into the

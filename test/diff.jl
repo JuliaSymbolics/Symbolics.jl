@@ -6,13 +6,14 @@ using Symbolics: value
 # Derivatives
 @variables t σ ρ β
 @variables x y z
-@variables uu(t) uuˍt(t)
+@variables uu(t) uuˍt(t) v[1:3](t)
 D = Differential(t)
 D2 = Differential(t)^2
 Dx = Differential(x)
 
 @test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
 @test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
+@test Symbol(D(v[2])) === Symbol("getindex(vˍt, 2)(t)")
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
 
@@ -41,7 +42,7 @@ test_equal(expand_derivatives(dsinsin), cos(sin(t))*cos(t))
 d1 = D(sin(t)*t)
 d2 = D(sin(t)*cos(t))
 @test isequal(expand_derivatives(d1), simplify(t*cos(t)+sin(t)))
-@test isequal(expand_derivatives(d2), simplify(cos(t)*cos(t)+(-sin(t))*sin(t)))
+@test isequal(expand_derivatives(d2), cos(t)^2-sin(t)^2)
 
 eqs = [σ*(y-x),
        x*(ρ-z)-y,
@@ -145,17 +146,18 @@ canonequal(a, b) = isequal(simplify(a), simplify(b))
                  -sin(x) * cos(cos(x))
                 )
 
-Symbolics.@register no_der(x)
+Symbolics.@register_symbolic no_der(x)
 @test canonequal(
                  Symbolics.derivative([sin(cos(x)), hypot(x, no_der(x))], x),
                  [
                   -sin(x) * cos(cos(x)),
-                  x/hypot(x, no_der(x)) + no_der(x)*Differential(x)(no_der(x))/hypot(x, no_der(x))
+                  x/hypot(x, no_der(x)) +
+                      no_der(x)*Differential(x)(no_der(x))/hypot(x, no_der(x))
                  ]
                 )
 
-Symbolics.@register intfun(x)::Int
-@test Symbolics.symtype(intfun(x)) === Int
+Symbolics.@register_symbolic intfun(x)::Int
+@test Symbolics.symtype(intfun(x).val) === Int
 
 eqs = [σ*(y-x),
        x*(ρ-z)-y,
@@ -193,12 +195,34 @@ end
         res.=[a*x^2, y^3, b*x^4, sin(y), c*x+y, x+z^2, a*z+x, x+y^2+sin(z)]
     end
 
-    
     input=rand(3)
     output=rand(8)
 
     findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
     findnz(Symbolics.jacobian_sparsity(f1!, output, input,1,2,3))[[1,2]] == findnz(reference_jac)[[1,2]]
+
+    input = rand(2,2)
+    function f2!(res,u,a,b,c)
+        (x,y,z)=u[1,1],u[2,1],u[3,1]
+        res.=[a*x^2, y^3, b*x^4, sin(y), c*x+y, x+z^2, a*z+x, x+y^2+sin(z)]
+    end
+
+    findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
+
+    # Check for failures due to du[4] undefined
+    function f_undef(du,u)
+      du[1] = u[1]
+      du[2] = u[2]
+      du[3] = u[3] + u[4]
+    end
+    u0 = rand(4)
+    du0 = similar(u0)
+    sparsity_pattern = Symbolics.jacobian_sparsity(f_undef,du0,u0)
+    udef_ref = sparse([1 0 0 0
+                       0 1 0 0
+                       0 0 1 1
+                       0 0 0 0])
+    findnz(sparsity_pattern)[[1,2]] == findnz(udef_ref)[[1,2]]
 end
 
 using Symbolics
@@ -245,9 +269,9 @@ let
 end
 
 @variables x y
-@register foo(x, y, z::Array)
+@register_symbolic foo(x, y, z::Array)
 D = Differential(x)
-@test isequal(expand_derivatives(D(foo(x, y, [1.2]) * x^2)), Differential(x)(foo(x, y, [1.2]))*(x^2) + 2x*foo(x, y, [1.2]))
+@test_throws ErrorException expand_derivatives(D(foo(x, y, [1.2]) * x^2))
 
 @variables t x(t) y(t)
 D = Differential(t)
@@ -259,3 +283,56 @@ sub_eqs = substitute(eqs, Dict([D(x)=>D(x), x=>1]))
 
 @variables x y
 @test substitute([x + y; x - y], Dict(x=>1, y=>2)) == [3, -1]
+
+
+# 530#discussion_r825125589
+let
+    using Symbolics
+    @variables u[1:2] y[1:1] t
+    u = collect(u)
+    y = collect(y)
+    @test isequal(Symbolics.jacobian([u;u[1]^2; y], u), Num[1 0
+                                                            0 1
+                                                            2u[1] 0
+                                                            0 0])
+end
+
+# make sure derivative(x[1](t), y) does not fail
+let
+    @variables t a(t)
+    vars = collect(@variables(x[1:1](t))[1])
+    ps = collect(@variables(ps[1:1])[1])
+    @test Symbolics.derivative(ps[1], vars[1]) == 0
+    @test Symbolics.derivative(ps[1], a) == 0
+    @test Symbolics.derivative(x[1], a) == 0
+end
+
+# 580
+let
+    @variables x[1:3]
+    y = [sin.(x); cos.(x)]
+    dj = Symbolics.jacobian(y, x)
+    @test !iszero(dj)
+    @test isequal(dj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
+    sj = Symbolics.sparsejacobian(y, x)
+    @test !iszero(sj)
+    @test isequal(sj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
+end
+
+# substituting iv of differentials
+@variables t t2 x(t)
+D = Differential(t)
+ex = D(x)
+ex2 = substitute(ex, [t=>t2])
+@test isequal(operation(Symbolics.unwrap(ex2)).x, t2)
+ex3 = substitute(D(x) * 2 + x / t, [t=>t2])
+xt2 = substitute(x, [t => t2])
+@test isequal(ex3, xt2 / t2 + 2Differential(t2)(xt2))
+
+# 581
+#
+let
+    @variables x[1:3](t)
+    @test iszero(Symbolics.derivative(x[1], x[2]))
+end
+

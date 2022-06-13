@@ -1,5 +1,6 @@
 using SymbolicUtils.Code
 using Base.Threads
+using SymbolicUtils.Code: LazyState
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
@@ -9,10 +10,25 @@ struct MATLABTarget <: BuildTargets end
 
 abstract type ParallelForm end
 struct SerialForm <: ParallelForm end
-struct MultithreadedForm <: ParallelForm
-    ntasks::Int
+
+"""
+    ShardedForm{multithread}(cutoff, ncalls)
+
+Split a long array construction into nested functions where each function calls
+`ncalls` other functions, and the leaf functions populate at most `cutoff` number
+of items in the array. If `multithread` is true, uses threading.
+"""
+struct ShardedForm{multithreaded} <: ParallelForm
+    cutoff::Union{Nothing,Int}
+    ncalls::Int
 end
-MultithreadedForm() = MultithreadedForm(2*nthreads())
+
+ShardedForm(cutoff, ncalls) = ShardedForm{false}(cutoff, ncalls)
+ShardedForm() = ShardedForm(80, 4)
+
+const MultithreadedForm = ShardedForm{true}
+
+MultithreadedForm() = MultithreadedForm(nothing, 2*nthreads())
 
 """
 `build_function`
@@ -23,6 +39,7 @@ Generates a numerically-usable function from a Symbolics `Num`.
 build_function(ex, args...;
                expression = Val{true},
                target = JuliaTarget(),
+               parallel=nothing,
                kwargs...)
 ```
 
@@ -43,6 +60,21 @@ Keyword Arguments:
       programming language
     - `MATLABTarget`: Generates an anonymous function for use in MATLAB and Octave
       environments
+- `parallel`: The kind of parallelism to use in the generated function. Defaults
+  to `SerialForm()`, i.e. no parallelism, if `ex` is a single expression or an
+  array containing <= 1500 non-zero expressions. If `ex` is an array of > 1500
+  non-zero expressions then `ShardedForm(80, 4)` is used. See below for more on
+  `ShardedForm`.
+  Note that the parallel forms are not exported and thus need to be chosen like
+  `Symbolics.SerialForm()`.
+  The choices are:
+  - `SerialForm()`: Serial execution.
+  - `ShardedForm(cutoff, ncalls)`: splits the output function into sub-functions
+     which contain at most `cutoff` number of output `rhss`. These sub-functions
+     are called by the top-level function that _build_function returns.
+     This helps in reducing the compile time of the generated function.
+  - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
+    splitting the number of expressions per thread.
 - `fname`: Used by some targets for the name of the function in the target space.
 
 Note that not all build targets support the full compilation interface. Check the
@@ -54,23 +86,26 @@ end
 
 # Scalar output
 
+unwrap_nometa(x) = unwrap(x)
+unwrap_nometa(x::CallWithMetadata) = unwrap(x.f)
 function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
     if !(arg isa Arr)
-        DestructuredArgs(map(unwrap, arg), name, inbounds=inbounds)
+        DestructuredArgs(map(unwrap_nometa, arg), name, inbounds=inbounds, create_bindings=false)
     else
-        unwrap(arg)
+        unwrap_nometa(arg)
     end
 end
-destructure_arg(arg, _, _) = unwrap(arg)
+destructure_arg(arg, _, _) = unwrap_nometa(arg)
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -86,11 +121,12 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
+                         states = LazyState(),
                          linenumbers = true)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op))
+    expr = toexpr(Func(dargs, [], op), states)
 
     if expression == Val{true}
         expr
@@ -155,6 +191,9 @@ Special Keyword Argumnets:
   exported and thus need to be chosen like `Symbolics.SerialForm()`.
   The choices are:
   - `SerialForm()`: Serial execution.
+  - `ShardedForm(cutoff, ncalls)`: splits the output function into sub-functions
+     which contain at most `cutoff` number of output `rhss`. These sub-functions
+     are called by the top-level function that _build_function returns.
   - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
     splitting the number of expressions per thread.
 - `conv`: The conversion function of symbolic types to Expr. By default this uses
@@ -185,8 +224,12 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        skipzeros = false,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
-                       parallel=SerialForm(), kwargs...)
+                       states = LazyState(),
+                       parallel=nothing, kwargs...)
 
+    if parallel == nothing && _nnz(rhss) >= 1000
+        parallel = ShardedForm() # by default switch for arrays longer than 1000 exprs
+    end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
@@ -213,15 +256,19 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 
     if expression == Val{true}
-        return toexpr(oop_expr), toexpr(ip_expr)
+        return toexpr(oop_expr, states), toexpr(ip_expr, states)
     else
-        return _build_and_inject_function(expression_module, toexpr(oop_expr)),
-        _build_and_inject_function(expression_module, toexpr(ip_expr))
+        return _build_and_inject_function(expression_module, toexpr(oop_expr, states)),
+        _build_and_inject_function(expression_module, toexpr(ip_expr, states))
     end
 end
 
+_nnz(x::AbstractArray) = length(x)
+_nnz(x::AbstractSparseArray) = nnz(x)
+_nnz(x::Union{Base.ReshapedArray, LinearAlgebra.Transpose}) = _nnz(parent(x))
+
 function make_array(s, dargs, arr, similarto)
-    Base.@warn("Parallel form of $(typeof(s)) not implemented")
+    s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
     _make_array(arr, similarto)
 end
 
@@ -229,13 +276,26 @@ function make_array(s::SerialForm, dargs, arr, similarto)
     _make_array(arr, similarto)
 end
 
-function make_array(s::MultithreadedForm, closed_args, arr, similarto)
-    per_task = ceil(Int, length(arr) / s.ntasks)
+function make_array(s::ShardedForm, closed_args, arr, similarto)
+    if arr isa AbstractSparseArray
+
+        return LiteralExpr(quote
+                               $SparseMatrixCSC($(arr.m),
+                                               $(arr.n),
+                                               copy($(arr.colptr)),
+                                               copy($(arr.rowval)),
+                                               $(make_array(s,
+                                                            closed_args,
+                                                            arr.nzval,
+                                                            Vector,)))
+                           end)
+    end
+    per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
         Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
-    SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), vcat)
+    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
 end
 
 struct Funcall{F, T}
@@ -265,20 +325,61 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     end
 end
 
-function _make_array(rhss::AbstractSparseArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    if !(arr isa AbstractSparseArray)
-        _make_array(arr, similarto)
+function toexpr(p::SpawnFetch{ShardedForm{false}}, st)
+    args = isnothing(p.args) ?
+              Iterators.repeated((), length(p.exprs)) : p.args
+    spawns = map(p.exprs, args) do thunk, a
+        :($(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false))($(toexpr.(a, (st,))...),))
+    end
+    quote
+        $(toexpr(p.combine, st))($(spawns...))
+    end
+end
+
+function nzmap(f, x::Union{Base.ReshapedArray, LinearAlgebra.Transpose})
+    Setfield.@set x.parent = nzmap(f, x.parent)
+end
+
+function nzmap(f, x::SubArray)
+    unview = copy(x)
+    if unview isa Union{SparseMatrixCSC, SparseVector}
+        n = nnz(unview)
+        if n != length(unview.nzval)
+            resize!(unview.nzval, n)
+            resize!(unview.rowval, n)
+        end
+    end
+    nzmap(f, unview)
+end
+
+function nzmap(f, x::AbstractSparseArray)
+    Setfield.@set x.nzval = nzmap(f, x.nzval)
+end
+nzmap(f, x) = map(f, x)
+
+_issparse(x::AbstractArray) = issparse(x)
+_issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
+
+function _make_sparse_array(arr, similarto)
+    if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
+        LiteralExpr(quote
+            $Setfield.@set $(nzmap(x->true, arr)).parent =
+                $(_make_array(parent(arr), typeof(parent(arr))))
+            end)
     else
-        MakeSparseArray(arr)
+        LiteralExpr(quote
+                        let __reference = copy($(nzmap(x->true, arr)))
+                            $Setfield.@set __reference.nzval =
+                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
+                        end
+                    end)
     end
 end
 
 function _make_array(rhss::AbstractArray, similarto)
-    arr = map(x->_make_array(x, similarto), rhss)
-    # Ugh reshaped array of a sparse array when mapped gives a sparse array
-    if arr isa AbstractSparseArray
-        _make_array(arr, similarto)
+    arr = nzmap(x->_make_array(x, similarto), rhss)
+    if _issparse(arr)
+        _make_sparse_array(arr, similarto)
     else
         MakeArray(arr, similarto)
     end
@@ -289,7 +390,7 @@ _make_array(x, similarto) = x
 ## In-place version
 
 function set_array(p, closed_vars, args...)
-    Base.@warn("Parallel form of $(typeof(p)) not implemented")
+    p !== nothing && Base.@warn("Parallel form of $(typeof(p)) not implemented")
     _set_array(args...)
 end
 
@@ -297,26 +398,50 @@ function set_array(s::SerialForm, closed_vars, args...)
     _set_array(args...)
 end
 
-function set_array(s::MultithreadedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
+function recursive_split(leaf_f, s, out, args, outputidxs, xs)
+    cutoff = isnothing(s.cutoff) ? ceil(Int, length(xs) / (2*s.ncalls)) : s.cutoff
+    if length(xs) <= cutoff
+        return leaf_f(outputidxs, xs)
+    else
+        per_part = ceil(Int, length(xs) / s.ncalls)
+        slices = collect(Iterators.partition(zip(outputidxs, xs), per_part))
+        fs = map(slices) do slice
+            recursive_split(leaf_f, s, out, args, first.(slice), last.(slice))
+        end
+        return Func(args, [],
+                    SpawnFetch{typeof(s)}(fs, [args for f in fs],
+                                          (@inline noop(x...) = nothing)),
+                    [])
+    end
+end
+
+function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
-        return set_array(LiteralExpr(:($out.nzval)),
+        return set_array(s,
+                         closed_args,
+                         LiteralExpr(:($out.nzval)),
                          nothing,
                          rhss.nzval,
                          checkbounds,
                          skipzeros)
     end
+
+    outvar = !(out isa Sym) ? gensym("out") : out
+
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
-    per_task = ceil(Int, length(rhss) / s.ntasks)
-    # TODO: do better partitioning when skipzeros is present
-    slices = collect(Iterators.partition(zip(outputidxs, rhss), per_task))
-    arrays = map(slices) do slice
-        idxs, vals = first.(slice), last.(slice)
-        Func([out, closed_args...], [],
-             _set_array(out, idxs, vals, checkbounds, skipzeros)), [out, closed_args...]
-    end
-    SpawnFetch{MultithreadedForm}(first.(arrays), last.(arrays), @inline noop(args...) = nothing)
+    all_args = [outvar, closed_args...]
+    ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
+        Func(all_args, [],
+             _set_array(outvar, idxs, xs, checkbounds, skipzeros),
+             [])
+    end.body
+
+    return out isa Sym ? ex : LiteralExpr(quote
+        $outvar = $out
+        $ex
+    end)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
@@ -379,6 +504,7 @@ function buildvarnumbercache(args...)
 end
 
 function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
+                       states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
     if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
@@ -390,7 +516,7 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
     if istree(O)
         if operation(O) === getindex
             args = arguments(O)
-            Expr(:ref, toexpr(args[1]), toexpr.(args[2:end] .+ offset)...)
+            Expr(:ref, toexpr(args[1], states), toexpr.(args[2:end] .+ offset, (states,))...)
         else
             Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
                                                              rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
@@ -723,7 +849,7 @@ function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-    matstr = "$fname = @(t,$(rhsnames[1])) ["*matstr*"];"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) ["*matstr*"];"
     matstr
 end
 
@@ -781,7 +907,7 @@ function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
 
     matstr = replace(matstr,"["=>"(")
     matstr = replace(matstr,"]"=>")")
-        matstr = "$fname = @(t,$(rhsnames[1])) [\n"*matstr*"];\n"
+    matstr = "$fname = @($(rhsnames[3]),$(rhsnames[1])) [\n"*matstr*"];\n"
 
     return matstr
 

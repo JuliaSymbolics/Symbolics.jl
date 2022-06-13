@@ -1,4 +1,4 @@
-using Symbolics, SparseArrays, Test
+using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 @variables a b c1 c2 c3 d e g
 
@@ -20,6 +20,9 @@ h_str2 = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g])
 
 h_oop = eval(h_str[1])
 h_str_par = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm())
+
+@test contains(repr(h_str_par[1]), "schedule")
+@test contains(repr(h_str_par[2]), "schedule")
 h_oop_par = eval(h_str_par[1])
 h_par_rgf = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm(), expression=false)
 h_ip! = eval(h_str[2])
@@ -107,6 +110,24 @@ f = eval(build_function(sparse([1],[1], [(x+y)/k], 10,10), [x,y,k])[1])
 @test f([1.,1.,2])[1,1] == 1.0
 @test sum(f([1.,1.,2])) == 1.0
 
+# Reshaped SparseMatrix optimization
+let
+    @variables a b c
+
+    x = reshape(sparse([0 a 0; 0 b c]), 3, 2)
+    f1,f2=build_function(x, [a,b,c], expression=Val{false})
+    y = f1([1,2,3])
+    @test y isa Base.ReshapedArray
+    @test y.parent isa SparseMatrixCSC
+    @test y.parent.rowval == x.parent.rowval
+    @test y == [0 2; 0 0; 1 3]
+
+    f1,f2=build_function(@views(x[2:3,1:2]), [a,b,c], expression=Val{false})
+    y = f1([1,2,3])
+    @test y isa SparseMatrixCSC
+    @test y == [0 0; 1 3]
+end
+
 let # ModelingToolkit.jl#800
     @variables x
     y = sparse(1:3,1:3,x)
@@ -115,7 +136,6 @@ let # ModelingToolkit.jl#800
     sf1, sf2 = string(f1), string(f2)
     @test !contains(sf1, "CartesianIndex")
     @test !contains(sf2, "CartesianIndex")
-    @test contains(sf1, "SparseMatrixCSC(")
     @test contains(sf2, ".nzval")
 end
 
@@ -157,3 +177,52 @@ old = out[1]
 f_expr[2](out, u)
 @test out[1] === old
 @test out[2] === u[1]
+
+
+let # issue#136
+    N = 8
+    @variables x y
+    A = sparse(Tridiagonal([x^i for i in 1:N-1],
+                           [x^i * y^(8-i) for i in 1:N],
+                           [y^i for i in 1:N-1]))
+
+    val = Dict(x=>1, y=>2)
+    B = map(A) do e
+        Num(substitute(e, val))
+    end
+
+    C = copy(B) - 100*I
+
+
+    f = build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2]
+    g = eval(f)
+
+    g(C, [1,2])
+    @test contains(repr(f), "schedule")
+    @test isequal(C, B)
+end
+
+
+let #issue#587
+    using Symbolics, SparseArrays
+
+    N = 100 # try with N = 5 and N = 100
+    _S = sprand(N, N, 0.1)
+    _Q = Array(sprand(N, N, 0.1))
+
+    F(z) = [
+            _S * z
+            _Q * z.^2
+           ]
+
+    Symbolics.@variables z[1:N]
+
+    sj = Symbolics.sparsejacobian(F(z), z)
+
+    f_expr = build_function(sj, z)
+    myf = eval(first(f_expr))
+    J = myf(rand(N))
+
+    @test typeof(J) <: SparseMatrixCSC
+    @test nnz(J) == nnz(sj)
+end
