@@ -61,11 +61,14 @@ function h_julia_skip!(out, a, b, c, d, e, g)
 end
 
 h_str_skip = Symbolics.build_function(h_skip, [a], [b], [c1, c2, c3], [], [], [g], checkbounds=true)
+h_str_skip_cse = Symbolics.build_function(h_skip, [a], [b], [c1, c2, c3], [], [], [g], checkbounds=true, cse=true)
 h_oop_skip = eval(h_str_skip[1])
 h_ip!_skip = eval(h_str_skip[2])
+h_oop_skip_cse = eval(h_str_skip_cse[1])
+h_ip!_skip_cse = eval(h_str_skip_cse[2])
 inputs_skip = ([1], [2], [3, 4, 5], [], [], [8])
 
-@test h_oop_skip(inputs_skip...) == h_julia_skip(inputs_skip...)
+@test h_oop_skip(inputs_skip...) == h_julia_skip(inputs_skip...) == h_oop_skip_cse(inputs_skip...)
 out_1_skip = Array{Int64}(undef, 2)
 out_2_skip = similar(out_1_skip)
 h_ip!_skip(out_1_skip, inputs_skip...)
@@ -86,10 +89,12 @@ h_scalar = a + b + c1 + c2 + c3 + d + e + g
 h_julia_scalar(a, b, c, d, e, g) = a[1] + b[1] + c[1] + c[2] + c[3] + d[1] + e[1] + g[1]
 h_str_scalar = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], [e], [g])
 h_str_scalar2 = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], [e], [g])
+h_str_scalar_cse = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], [e], [g], cse=true)
 @test h_str_scalar == h_str_scalar2
 
 h_oop_scalar = eval(h_str_scalar)
-@test h_oop_scalar(inputs...) == h_julia_scalar(inputs...)
+h_oop_scalar_cse = eval(h_str_scalar_cse)
+@test h_oop_scalar(inputs...) == h_julia_scalar(inputs...) == h_oop_scalar_cse(inputs...)
 
 @variables z[1:100]
 @variables t x(t) y(t) k
@@ -192,14 +197,18 @@ let # issue#136
     end
 
     C = copy(B) - 100*I
-
+    C_2 = copy(C);
 
     f = build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2]
     g = eval(f)
+    f_cse = build_function(A,[x,y],parallel=Symbolics.MultithreadedForm(),cse=true)[2]
+    g_cse = eval(f_cse)
 
     g(C, [1,2])
     @test contains(repr(f), "schedule")
     @test isequal(C, B)
+    g_cse(C_2, [1,2])
+    @test isequal(C_2, B)
 end
 
 
