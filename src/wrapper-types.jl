@@ -36,7 +36,7 @@ macro symbolic_wrap(expr)
 
         Symbolics.has_symwrapper(::Type{<:$supertype}) = true
         Symbolics.wrapper_type(::Type{<:$supertype}) = $T
-        Symbolics.is_wrapper_type(::Type{$T}) = true # used in `@register`
+        Symbolics.is_wrapper_type(::Type{<:$T}) = true # used in `@register`
         Symbolics.wraps_type(::Type{$T}) = $supertype
         Symbolics.iswrapped(::$T) = true
     end |> esc

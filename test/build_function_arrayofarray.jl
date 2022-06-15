@@ -40,12 +40,16 @@ function h_dense_arraymat_het_julia!(out, x)
 end
 
 h_dense_arraymat_het_str = Symbolics.build_function(h_dense_arraymat_het, [a, b, c])
+h_dense_arraymat_het_cse_str = Symbolics.build_function(h_dense_arraymat_het, [a, b, c], cse=true)
 h_dense_arraymat_het_ip! = eval(h_dense_arraymat_het_str[2])
+h_dense_arraymat_het_cse_ip! = eval(h_dense_arraymat_het_cse_str[2])
 out_1_arraymat_het = [Array{Float64}(undef, 2, 2) for i in 1:2]
 out_2_arraymat_het = [similar(x) for x in out_1_arraymat_het]
+out_3_arraymat_het = [similar(x) for x in out_1_arraymat_het]
 h_dense_arraymat_het_julia!(out_1_arraymat_het, input)
 h_dense_arraymat_het_ip!(out_2_arraymat_het, input)
-@test out_1_arraymat_het == out_2_arraymat_het
+h_dense_arraymat_het_cse_ip!(out_3_arraymat_het, input)
+@test out_1_arraymat_het == out_2_arraymat_het == out_3_arraymat_het
 
 # Arrays of 1D Vectors
 h_dense_arrayvec = [[a, 0, c], [0, 0, 0], [1, a, b]] # same for empty vectors, etc.

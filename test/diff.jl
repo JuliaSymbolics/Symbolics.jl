@@ -318,3 +318,21 @@ let
     @test !iszero(sj)
     @test isequal(sj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
 end
+
+# substituting iv of differentials
+@variables t t2 x(t)
+D = Differential(t)
+ex = D(x)
+ex2 = substitute(ex, [t=>t2])
+@test isequal(operation(Symbolics.unwrap(ex2)).x, t2)
+ex3 = substitute(D(x) * 2 + x / t, [t=>t2])
+xt2 = substitute(x, [t => t2])
+@test isequal(ex3, xt2 / t2 + 2Differential(t2)(xt2))
+
+# 581
+#
+let
+    @variables x[1:3](t)
+    @test iszero(Symbolics.derivative(x[1], x[2]))
+end
+

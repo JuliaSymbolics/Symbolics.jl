@@ -67,7 +67,8 @@ function occursin_info(x, expr)
 
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         isequal(first(arguments(x)), first(arguments(expr)))
-        return isequal(arguments(x), arguments(expr))
+        return isequal(operation(x), operation(expr)) &&
+               isequal(arguments(x), arguments(expr))
     end
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         !occursin(first(arguments(x)), first(arguments(expr)))
@@ -137,6 +138,21 @@ end
 $(SIGNATURES)
 
 TODO
+    
+# Examples
+```jldoctest
+
+julia> @variables x y z k; 
+    
+julia> f=k*(abs(x-y)/y-z)^2
+k*((abs(x - y) / y - z)^2)
+
+julia> Dx=Differential(x) # Differentiate wrt x
+(::Differential) (generic function with 2 methods)
+
+julia> dfx=expand_derivatives(Dx(f))
+(k*((2abs(x - y)) / y - 2z)*IfElse.ifelse(signbit(x - y), -1, 1)) / y
+```    
 """
 function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
     if istree(O) && isa(operation(O), Differential)
@@ -337,7 +353,7 @@ function count_order(x)
     n, x.args[1]
 end
 
-_repeat_apply(f, n) = n == 1 ? f : f ∘ _repeat_apply(f, n-1)
+_repeat_apply(f, n) = n == 1 ? f : ComposedFunction{Any,Any}(f, _repeat_apply(f, n-1))
 function _differential_macro(x)
     ex = Expr(:block)
     push!(ex.args,  :(Base.depwarn("`@derivatives D'''~x` is deprecated. Use `Differential(x)^3` instead.", Symbol("@derivatives"), force=true)))
@@ -501,7 +517,7 @@ Return the sparsity pattern of the Jacobian of the mutating function `op!(output
 function jacobian_sparsity(op!,output::Array{T},input::Array{T}, args...) where T<:Number
     eqs=similar(output,Num)
     fill!(eqs,false)
-    vars=ArrayInterface.restructure(input,[variable(i) for i in eachindex(input)])
+    vars=ArrayInterfaceCore.restructure(input,[variable(i) for i in eachindex(input)])
     op!(eqs,vars, args...)
     jacobian_sparsity(eqs,vars)
 end
@@ -639,4 +655,8 @@ function sparsehessian(O, vars::AbstractVector; simplify=false)
         j > i && (H[i, j] = H[j, i])
     end
     return H
+end
+
+function SymbolicUtils.substitute(op::Differential, dict; kwargs...)
+    @set! op.x = substitute(op.x, dict; kwargs...)
 end

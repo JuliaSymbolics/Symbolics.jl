@@ -330,3 +330,12 @@ end
     @test isequal(collect(dtu), collect(1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s))
     @test isequal(collect(dtv), collect(A .* u .- u.^2 .* v .+ alpha .* lapv))
 end
+
+@testset "Partial array substitution" begin
+    @variables x[1:3] A[1:2, 1:2, 1:2]
+
+    @test substitute(x[1], Dict(x => [1, 2, 3])) === Num(1)
+    @test substitute(A[1,2,1], Dict(A => reshape(1:8, 2, 2, 2))) === Num(3)
+
+    @test substitute(A[1,2,1], Dict(A[1,2,1] => 9)) === Num(9)
+end
