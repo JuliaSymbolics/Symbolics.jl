@@ -219,7 +219,7 @@ function construct_var(macroname, var_name, type, call_args, val, prop)
     expr = if call_args === nothing
         :($Sym{$type}($var_name))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($CallWithMetadata($Sym{$FnType{Tuple, $type}}($var_name)))
+        :($Sym{$FnType{Tuple, $type}}($var_name))
     else
         :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
     end
@@ -238,37 +238,25 @@ end
 (c::CallWith)(f) = unwrap(f(c.args...))
 
 function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
-    # TODO: just use Sym here
     ndim = :($length(($(indices...),)))
 
-    need_scalarize = false
     expr = if call_args === nothing
         ex = :($Sym{Array{$type, $ndim}}($var_name))
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
     elseif !isempty(call_args) && call_args[end] == :..
-        need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
-        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map($CallWithMetadata, $ex))
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($var_name))
+        ex = :((args...,) -> $wrap($setmetadata($unwrap($ex)(map($unwrap, args)...), $ArrayShapeCtx, ($(indices...),))))
     else
         # [(R -> R)(R) ....]
-        need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($var_name)($(call_args...)) |> $unwrap)
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map($CallWith(($(call_args...),)), $ex))
+        if val !== nothing
+            expr = :($setdefaultval($expr, $val))
+        end
+        ex = :($wrap($ex))
     end
 
-    if val !== nothing
-        expr = :($setdefaultval($expr, $val))
-    end
-    expr = setprops_expr(expr, prop, macroname, var_name)
-    if need_scalarize
-        expr = :($scalarize_getindex($expr))
-    end
-
-    expr = :($wrap($expr))
-
-    return expr
+    return ex
 end
 
 
@@ -348,32 +336,17 @@ end
 
 const _fail = Dict()
 
-_getname(x, _) = nameof(x)
-_getname(x::Symbol, _) = x
-function _getname(x::Symbolic, val)
-    ss = getsource(x, nothing)
-    if ss === nothing
-        ss = getsource(getparent(x), val)
+getname(x) = _getname(unwrap(x))
+
+_getname(x::Symbol) = x
+function _getname(x::Symbolic)
+    if issym(x)
+        return nameof(x)
+    elseif istree(x) && operation(x) == (getindex)
+        return getname(first(arguments(x)))
+    elseif istree(x) && (istree(operation(x)) || issym(operation(x)))
+        return _getname(operation(x))
     end
-    ss === _fail && throw(ArgumentError("Variable $x doesn't have a source defined."))
-    ss[2]
-end
-
-getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
-
-getname(x, val=_fail) = _getname(unwrap(x), val)
-
-function getparent(x, val=_fail)
-    maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
-    if maybe_parent !== nothing
-        return maybe_parent
-    else
-        if istree(x) && operation(x) === getindex
-            return arguments(x)[1]
-        end
-    end
-    val === _fail && throw(ArgumentError("Cannot find the parent of $x."))
-    return val
 end
 
 function getdefaultval(x, val=_fail)
@@ -441,54 +414,14 @@ end
 # x_t
 # sys.x
 
-function rename_getindex_source(x, parent=x)
-    getindex_posthook(x) do r,x,i...
-        hasmetadata(r, GetindexParent) ? setmetadata(r, GetindexParent, parent) : r
-    end
-end
-
-function rename_metadata(from, to, name)
-    if hasmetadata(from, VariableSource)
-        s = getmetadata(from, VariableSource)
-        to = setmetadata(to, VariableSource, (s[1], name))
-    end
-    if hasmetadata(from, GetindexParent)
-        s = getmetadata(from, GetindexParent)
-        to = setmetadata(to, GetindexParent, rename(s, name))
-    end
-    return to
-end
-
-function rename(x::Sym, name)
-    xx = @set! x.name = name
-    xx = rename_metadata(x, xx, name)
-    symtype(xx) <: AbstractArray ? rename_getindex_source(xx) : xx
-end
-
-rename(x::Union{Num, Arr}, name) = wrap(rename(unwrap(x), name))
-function rename(x::ArrayOp, name)
-    t = x.term
-    args = arguments(t)
-    # Hack:
-    @assert operation(t) === (map) && (args[1] isa CallWith || args[1] == CallWithMetadata)
-    rn = rename(args[2], name)
-
-    xx = metadata(operation(t)(args[1], rn), metadata(x))
-    rename_getindex_source(rename_metadata(x, xx, name))
-end
-
-function rename(x::CallWithMetadata, name)
-    rename_metadata(x, CallWithMetadata(rename(x.f, name), x.metadata), name)
-end
-
 function rename(x::Symbolic, name)
     if istree(x) && operation(x) === getindex
         rename(arguments(x)[1], name)[arguments(x)[2:end]...]
-    elseif istree(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
-        @assert x isa Term
+    elseif istree(x) && symtype(operation(x)) <: FnType
+        @assert isterm(x)
         xx = @set x.f = rename(operation(x), name)
         @set! xx.hash = Ref{UInt}(0)
-        return rename_metadata(x, xx, name)
+        return xx
     else
         error("can't rename $x to $name")
     end
