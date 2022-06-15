@@ -45,25 +45,6 @@ function setdefaultval(x, val)
     end
 end
 
-struct GetindexParent end
-
-function scalarize_getindex(x, parent=Ref{Any}(x))
-    if symtype(x) <: AbstractArray
-        parent[] = getindex_posthook(x) do r,x,i...
-            scalarize_getindex(r, parent)
-        end
-    else
-        xx = scalarize(x)
-        xx = metadata(xx, metadata(x))
-        if symtype(xx) <: FnType
-            setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent[])
-        else
-            setmetadata(xx, GetindexParent, parent[])
-        end
-    end
-end
-
-
 function map_subscripts(indices)
     str = string(indices)
     join(IndexMap[c] for c in str)
@@ -193,28 +174,6 @@ function setprops_expr(expr, props, macroname, varname)
     expr
 end
 
-struct CallWithMetadata{T,M} <: Symbolic{T}
-    f::Symbolic{T}
-    metadata::M
-end
-
-for f in [:istree, :operation, :arguments]
-    @eval SymbolicUtils.$f(x::CallWithMetadata) = $f(x.f)
-end
-
-SymbolicUtils.Code.toexpr(x::CallWithMetadata, st) = SymbolicUtils.Code.toexpr(x.f, st)
-
-CallWithMetadata(f) = CallWithMetadata(f, nothing)
-
-function Base.show(io::IO, c::CallWithMetadata)
-    show(io, c.f)
-    print(io, "⋆")
-end
-
-function (f::CallWithMetadata)(args...)
-    wrap(metadata(f.f(args...), metadata(f)))
-end
-
 function construct_var(macroname, var_name, type, call_args, val, prop)
     expr = if call_args === nothing
         :($Sym{$type}($var_name))
@@ -230,12 +189,6 @@ function construct_var(macroname, var_name, type, call_args, val, prop)
 
     :($wrap($(setprops_expr(expr, prop, macroname, var_name))))
 end
-
-struct CallWith
-    args
-end
-
-(c::CallWith)(f) = unwrap(f(c.args...))
 
 function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
     ndim = :($length(($(indices...),)))
