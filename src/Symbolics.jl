@@ -156,7 +156,7 @@ for T in [Num, Complex{Num}]
 
         Broadcast.broadcastable(x::$T) = x
     end
-    for S in [:(Symbolic{<:FnType}), :CallWithMetadata]
+    for S in [:(Symbolic{<:FnType})]
         @eval (f::$S)(x::$T, y...) = wrap(f(unwrap(x), unwrap.(y)...))
     end
 end

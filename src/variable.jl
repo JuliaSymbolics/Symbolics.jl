@@ -198,18 +198,18 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
     elseif !isempty(call_args) && call_args[end] == :..
         ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($var_name))
-        ex = :((args...,) -> $wrap($setmetadata($unwrap($ex)(map($unwrap, args)...), $ArrayShapeCtx, ($(indices...),))))
+        :((args...,) -> $wrap($setmetadata($unwrap($ex)(map($unwrap, args)...), $ArrayShapeCtx, ($(indices...),))))
     else
         # [(R -> R)(R) ....]
         ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($var_name)($(call_args...)) |> $unwrap)
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         if val !== nothing
-            expr = :($setdefaultval($expr, $val))
+            ex = :($setdefaultval($ex, $val))
         end
-        ex = :($wrap($ex))
+        :($wrap($ex))
     end
 
-    return ex
+    return expr
 end
 
 
