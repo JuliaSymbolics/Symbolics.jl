@@ -246,7 +246,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     function zero_filler(out, x)
         !fillzeros && return x
-        LiteralExpr(:($out = broadcast!!(identity, $out, zero(eltype($out))); $x))
+        LiteralExpr(:($out = $broadcast!!($identity, $out, $zero($eltype($out))); $x))
     end
 
     oop_expr = Func(dargs, [],

@@ -28,6 +28,7 @@ h_par_rgf = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], p
 h_ip! = eval(h_str[2])
 h_ip_skip! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true, fillzeros=false)[2])
 h_ip_skip_par! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true, parallel=Symbolics.MultithreadedForm(), fillzeros=false)[2])
+h_ip_skip_fillzeros! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true)[2])
 inputs = ([1], [2], [3, 4, 5], [6], [7], [8])
 
 @test h_oop(inputs...) == h_julia(inputs...)
@@ -46,6 +47,9 @@ h_ip_skip!(out_1, inputs...)
 @test out_1[3] == 10
 out_1[3] = 0
 @test out_1 == out_2
+fill!(out_1, 1)
+h_ip_skip_fillzeros!(out_1, inputs...)
+@test out_1[3] == 0
 
 fill!(out_1, 10)
 h_ip_skip_par!(out_1, inputs...)
