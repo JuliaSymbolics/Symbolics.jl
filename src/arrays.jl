@@ -877,8 +877,8 @@ function _cat(x, xs...; dims)
     end
 end
 
-Base.cat(x::Arr, xs...; dims) = _cat(x, xs...; dims)
-Base.cat(x::AbstractArray, y::Arr, xs...; dims) = _cat(x, y, xs...; dims)
+# Base.cat(x::Arr, xs...; dims) = _cat(x, xs...; dims)
+# Base.cat(x::AbstractArray, y::Arr, xs...; dims) = _cat(x, y, xs...; dims)
 
 # vv uncomment these for a major release
 # Base.vcat(x::Arr, xs::AbstractVecOrMat...) = cat(x, xs..., dims=1)
