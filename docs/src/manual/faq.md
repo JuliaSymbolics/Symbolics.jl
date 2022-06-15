@@ -55,5 +55,5 @@ If you need to represent this function `f` symbolically, then you'll need to mak
 sure it's not traced and instead is directly represented in the underlying
 computational graph. Just like how `sqrt(x)` symbolically does not try to
 represent the underlying algorithm, this needs to be done to your `f`. This is
-done by doing `@register f(x)`. If you need to define things like derivatives to
+done by doing `@register_symbolic f(x)`. If you need to define things like derivatives to
 `f`, then [the function registration documentation](@ref function_registration).

@@ -110,3 +110,7 @@ let
     @test typeof(baz(unwrap(x), unwrap(y))) <: Term
 end
 
+# 402#issuecomment-1074261734
+Symbolics.@register_symbolic oof(x::AbstractVector)
+Symbolics.@variables x[1:100]
+@test oof(x) isa Num
