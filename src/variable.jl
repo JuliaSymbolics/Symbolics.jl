@@ -154,9 +154,9 @@ function _parse_vars(macroname, type, x, transform=identity)
 end
 
 function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime)
-    ndim = length(indices)
+    ndim = :($length(($(indices...),)))
     if call_args[1] == :..
-        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($(Meta.quot(lhs)))(map($unwrap, x)...))
+        ex = :($CallWithMetadata($Sym{$FnType{Tuple, Array{$type, $ndim}}}($(Meta.quot(lhs)))))
     else
         ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($(Meta.quot(lhs)))(map($unwrap, ($(call_args...),))...))
     end
@@ -165,13 +165,13 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
     if val !== nothing
         ex = :($setdefaultval($ex, $val))
     end
-    ex = setprops_expr(ex, prop, macroname, lhs)
+    ex = setprops_expr(ex, prop, macroname, Meta.quot(lhs))
     ex = :($scalarize_getindex($ex))
 
     ex = :($wrap($ex))
 
     if call_args[1] == :..
-        ex = :((x...,) -> $transform($ex))
+        ex = :($transform($ex))
     end
     lhs, :($lhs = $ex)
 end
@@ -244,7 +244,7 @@ function Base.show(io::IO, c::CallWithMetadata)
 end
 
 function (f::CallWithMetadata)(args...)
-    wrap(metadata(f.f(args...), metadata(f)))
+    wrap(metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f)))
 end
 
 function construct_var(macroname, var_name, type, call_args, val, prop)
@@ -383,6 +383,12 @@ const _fail = Dict()
 _getname(x, _) = nameof(x)
 _getname(x::Symbol, _) = x
 function _getname(x::Symbolic, val)
+    if istree(x) && issym(operation(x))
+        return nameof(operation(x))
+    end
+    if !hasmetadata(x, Symbolics.GetindexParent) && istree(x) && operation(x) == getindex
+        return _getname(arguments(x)[1], val)
+    end
     ss = getsource(x, nothing)
     if ss === nothing
         ss = getsource(getparent(x), val)
