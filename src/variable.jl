@@ -155,7 +155,11 @@ end
 
 function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime)
     ndim = length(indices)
-    ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($(Meta.quot(lhs)))(map($unwrap, ($(call_args...),))...))
+    if call_args[1] == :..
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($(Meta.quot(lhs)))(map($unwrap, x)...))
+    else
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($(Meta.quot(lhs)))(map($unwrap, ($(call_args...),))...))
+    end
     ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
 
     if val !== nothing
@@ -166,8 +170,10 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
 
     ex = :($wrap($ex))
 
-    @show ex
-    lhs, :($lhs = $transform($ex))
+    if call_args[1] == :..
+        ex = :((x...,) -> $transform($ex))
+    end
+    lhs, :($lhs = $ex)
 end
 
 function construct_vars(macroname, v, type, call_args, val, prop, transform, isruntime)
