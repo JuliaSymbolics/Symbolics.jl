@@ -3,6 +3,7 @@
 end
 
 unwrap(x::Num) = x.val
+istree(x::Num) = istree(unwrap(x))
 
 """
     Num(val)

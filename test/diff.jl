@@ -11,6 +11,8 @@ D = Differential(t)
 D2 = Differential(t)^2
 Dx = Differential(x)
 
+@test istree(D(uu))
+
 @test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
 @test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
 @test Symbol(D(v[2])) === Symbol("getindex(vˍt, 2)(t)")
