@@ -23,7 +23,7 @@ using SymbolicUtils: Sym, term, operation
     @test symtype(X[i,j]) == Real
     @test symtype(X[1,j]) == Real
 
-    @variables t x[1:2](t)
+    @variables t x(t)[1:2]
     @test isequal(get_variables(0 ~ x[1]), [x[1]])
     @test Set(get_variables(2x)) == Set(collect(x)) # both array elements are present
     @test isequal(get_variables(2x[1]), [x[1]])
@@ -39,9 +39,9 @@ end
     @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop(XX[:,2], (i,), XX[i, 2]))
     @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop(XX[:,2:3], (i,j), XX[i, j], (+), (j in 2:3)))
 
-    @variables t x[1:4](t)
+    @variables t x(t)[1:4]
     @syms i::Int
-    @test isequal(x[i], operation(unwrap(x[i]))(t))
+    @test isequal(x[i], operation(unwrap(x))(t)[i])
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
@@ -112,7 +112,7 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 end
 
 @testset "Parent" begin
-    @variables t x[1:4](t)
+    @variables t x(t)[1:4]
     x = unwrap(x)
     @test Symbolics.getparent(collect(x)[1]).metadata === x.metadata
 end

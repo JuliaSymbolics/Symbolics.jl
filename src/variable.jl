@@ -166,7 +166,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
         ex = :($setdefaultval($ex, $val))
     end
     ex = setprops_expr(ex, prop, macroname, Meta.quot(lhs))
-    ex = :($scalarize_getindex($ex))
+    #ex = :($scalarize_getindex($ex))
 
     ex = :($wrap($ex))
 
