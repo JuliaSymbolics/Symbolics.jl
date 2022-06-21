@@ -155,10 +155,11 @@ end
 
 function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime)
     ndim = :($length(($(indices...),)))
+    vname = !isruntime ? Meta.quot(lhs) : lhs
     if call_args[1] == :..
-        ex = :($CallWithMetadata($Sym{$FnType{Tuple, Array{$type, $ndim}}}($(Meta.quot(lhs)))))
+        ex = :($CallWithMetadata($Sym{$FnType{Tuple, Array{$type, $ndim}}}($vname)))
     else
-        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($(Meta.quot(lhs)))(map($unwrap, ($(call_args...),))...))
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($vname)(map($unwrap, ($(call_args...),))...))
     end
     ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
 
@@ -172,6 +173,9 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
 
     if call_args[1] == :..
         ex = :($transform($ex))
+    end
+    if isruntime
+        lhs = gensym(lhs)
     end
     lhs, :($lhs = $ex)
 end

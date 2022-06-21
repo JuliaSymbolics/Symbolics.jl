@@ -46,7 +46,7 @@ end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
-    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x[1:4](t) u[1:1]
+    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x(t)[1:4] u[1:1]
     AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)
     @test all(isequal(42), getdef.(AA))
@@ -109,12 +109,6 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
         @test isequal(substitute(Symbolics.scalarize(A6 ), repl_dict), test_mat^6)
         @test isequal(substitute(Symbolics.scalarize(A7 ), repl_dict), test_mat^7)
     end
-end
-
-@testset "Parent" begin
-    @variables t x(t)[1:4]
-    x = unwrap(x)
-    @test Symbolics.getparent(collect(x)[1]).metadata === x.metadata
 end
 
 n = 2

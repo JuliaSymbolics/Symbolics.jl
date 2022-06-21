@@ -6,14 +6,14 @@ using Symbolics: value
 # Derivatives
 @variables t σ ρ β
 @variables x y z
-@variables uu(t) uuˍt(t) v[1:3](t)
+@variables uu(t) uuˍt(t) v(t)[1:3]
 D = Differential(t)
 D2 = Differential(t)^2
 Dx = Differential(x)
 
 @test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
 @test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
-@test Symbol(D(v[2])) === Symbol("getindex(vˍt, 2)(t)")
+@test Symbol(D(v[2])) === Symbol("v(t)[2]ˍt")
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
 
@@ -245,7 +245,7 @@ sp_hess = Symbolics.sparsehessian(rr, X)
 @test isequal(map(spoly, findnz(sparse(reference_hes))[3]), map(spoly, findnz(sp_hess)[3]))
 
 #96
-@variables t x[1:4](t) ẋ[1:4](t)
+@variables t x(t)[1:4] ẋ(t)[1:4]
 expression = sin(x[1] + x[2] + x[3] + x[4]) |> Differential(t) |> expand_derivatives
 expression2 = substitute(expression, Dict(collect(Differential(t).(x) .=> ẋ)))
 @test isequal(expression2, (ẋ[1] + ẋ[2] + ẋ[3] + ẋ[4])*cos(x[1] + x[2] + x[3] + x[4]))
@@ -300,7 +300,7 @@ end
 # make sure derivative(x[1](t), y) does not fail
 let
     @variables t a(t)
-    vars = collect(@variables(x[1:1](t))[1])
+    vars = collect(@variables(x(t)[1:1])[1])
     ps = collect(@variables(ps[1:1])[1])
     @test Symbolics.derivative(ps[1], vars[1]) == 0
     @test Symbolics.derivative(ps[1], a) == 0
@@ -332,7 +332,7 @@ xt2 = substitute(x, [t => t2])
 # 581
 #
 let
-    @variables x[1:3](t)
+    @variables x(t)[1:3]
     @test iszero(Symbolics.derivative(x[1], x[2]))
 end
 
