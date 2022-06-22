@@ -363,7 +363,7 @@ syntax also applies here.
 julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
 (:runtime_symbol_value, :value_b, :value_c)
 
-julia> vars = @variables t $a $b(t) $c(t)[1:3]
+julia> vars = @variables t \$a \$b(t) \$c(t)[1:3]
 4-element Vector{Any}:
       t
  runtime_symbol_value
