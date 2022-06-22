@@ -19,7 +19,7 @@ end
 @testset "array codegen basics" begin
     @variables x[1:4, 1:4]
 
-    broken = VERSION <= v"1.6"
+    broken = VERSION < v"1.7"
     # Simple test with ArrayOp and no term
     test_funcs("transpose", @arrayop((i, j), x[j, i]), x)
 
