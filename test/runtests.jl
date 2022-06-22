@@ -15,7 +15,7 @@ end
 
 # this needs to be defined at top level
 limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
-@register limit(a, N)::Integer
+@register_symbolic limit(a, N)::Integer
 
 if GROUP == "All" || GROUP == "Core"
     @safetestset "Macro Test" begin include("macro.jl") end
