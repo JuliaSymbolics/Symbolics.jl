@@ -126,7 +126,10 @@ function _parse_vars(macroname, type, x, transform=identity)
         iscall = Meta.isexpr(v, :call)
         isarray = Meta.isexpr(v, :ref)
         if iscall && Meta.isexpr(v.args[1], :ref)
-            @warn("Array of function variable $v is deprecated. Use dependent array variables instead, for example: $(Expr(:ref, Expr(:call, v.args[1].args[1], v.args[2]), v.args[1].args[2:end]...)). Note that this changes the semantics of the variable, the deprecated semantics will be deleted in the next release in order to facilitate better implementation of various features of Symbolics.")
+            @warn("The variable syntax $v is deprecated. Use $(Expr(:ref, Expr(:call, v.args[1].args[1], v.args[2]), v.args[1].args[2:end]...)) instead.
+                  The former creates an array of functions, while the latter creates an array valued function.
+                  The deprecated syntax will cause an error in the next major release of Symbolics.
+                  This change will facilitate better implementation of various features of Symbolics.")
         end
         issym  = v isa Symbol
         @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
