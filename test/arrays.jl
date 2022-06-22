@@ -226,7 +226,7 @@ end
     n = rand(8:32)
     N = 2
 
-    @variables t u[fill(1:n, N)...](t)
+    @variables t u(t)[fill(1:n, N)...]
 
     Igrid = CartesianIndices((fill(1:n, N)...,))
     Iinterior = CartesianIndices((fill(2:n-1, N)...,))
@@ -275,7 +275,7 @@ end
 
 @testset "Brusselator stencil" begin
     n = 8
-    @variables t u[1:n, 1:n](t) v[1:n, 1:n](t)
+    @variables t u(t)[1:n, 1:n] v(t)[1:n, 1:n]
 
     brusselator_f(x, y, t) = (((x - 0.3)^2 + (y - 0.6)^2) <= 0.1^2) * (t >= 1.1) * 5.0
 
@@ -316,10 +316,10 @@ end
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
-    _, f = build_function(dtu, u, v, t, expression=Val{false})
-    # this is because u is not handled right as an argument and later in the
-    # function body we see u[1,1](t) -- it should really be rewritten as u[1,1]
-    @test_broken isequal(collect(f(u,v,t)), collect(dtu))
+    f, g = build_function(dtu, u, v, t, expression=Val{false})
+    du = zeros(Num, 8, 8)
+    f(du, u,v,t)
+    @test isequal(collect(du), collect(dtu))
 
     @test isequal(collect(dtu), collect(1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s))
     @test isequal(collect(dtv), collect(A .* u .- u.^2 .* v .+ alpha .* lapv))

@@ -91,14 +91,10 @@ function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
     if !(arg isa Arr)
         DestructuredArgs(map(unwrap_nometa, arg), name, inbounds=inbounds, create_bindings=false)
     else
-        extract_name(unwrap_nometa(arg))
+        unwrap_nometa(arg)
     end
 end
-destructure_arg(arg, _, _) = extract_name(unwrap_nometa(arg))
-
-function extract_name(arg)
-    hasmetadata(arg, VariableSource) ? getmetadata(arg, VariableSource)[2] : arg
-end
+destructure_arg(arg, _, _) = unwrap_nometa(arg)
 
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
