@@ -91,13 +91,13 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
-julia> @variables x t u(x, t) z[1:2](t); Dt = Differential(t); Dx = Differential(x);
+julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
 uˍtx(x, t)
 
 julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
-z_t[1](t)
+var"z(t)[1]ˍt"
 ```
 """
 function diff2term(O)

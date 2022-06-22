@@ -335,10 +335,10 @@ julia> @variables y[1:3, 1:6] # support for  tensors
 1-element Vector{Symbolics.Arr{Num, 2}}:
  y[1:3,1:6]
 
-julia> @variables t z[1:3](t) # also works for dependent variables
+julia> @variables t z(t)[1:3] # also works for dependent variables
 2-element Vector{Any}:
  t
-  (map(#5, z))[1:3]
+  (z(t))[1:3]
 ```
 
 A symbol or expression that represents an array can be turned into an array of
@@ -347,9 +347,9 @@ symbols or expressions using the `scalarize` function.
 ```julia
 julia> Symbolics.scalarize(z)
 3-element Vector{Num}:
- z[1](t)
- z[2](t)
- z[3](t)
+ (z(t))[1]
+ (z(t))[2]
+ (z(t))[3]
 ```
 
 Note that `@variables` returns a vector of all the defined variables.
@@ -361,14 +361,14 @@ syntax also applies here.
 
 ```julia
 julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
-:runtime_symbol_value
+(:runtime_symbol_value, :value_b, :value_c)
 
-julia> vars = @variables t \$a \$b(t) \$c[1:3](t)
+julia> vars = @variables t $a $b(t) $c(t)[1:3]
 4-element Vector{Any}:
       t
  runtime_symbol_value
    value_b(t)
-       (map(#9, value_c))[1:3]
+       (value_c(t))[1:3]
 
 julia> (t, a, b, c)
 (t, :runtime_symbol_value, :value_b, :value_c)

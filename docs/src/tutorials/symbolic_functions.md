@@ -207,12 +207,12 @@ use the interpolation operator to interpolate the runtime value of `x`, i.e.
 julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
 (:runtime_symbol_value, :value_b, :value_c)
 
-julia> vars = @variables t $a $b(t) $c[1:3](t)
+julia> vars = @variables t $a $b(t) $c(t)[1:3]
 4-element Vector{Any}:
       t
  runtime_symbol_value
    value_b(t)
-       (map(Symbolics.CallWith((t,)), value_c))[1:3]
+       (value_c(t))[1:3]
 
 julia> (t, a, b, c)
 (t, :runtime_symbol_value, :value_b, :value_c)
