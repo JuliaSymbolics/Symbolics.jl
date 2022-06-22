@@ -23,7 +23,7 @@ using SymbolicUtils: Sym, term, operation
     @test symtype(X[i, j]) == Real
     @test symtype(X[1, j]) == Real
 
-    @variables t x[1:2](t)
+    @variables t x(t)[1:2]
     @test isequal(get_variables(0 ~ x[1]), [x[1]])
     @test Set(get_variables(2x)) == Set(collect(x)) # both array elements are present
     @test isequal(get_variables(2x[1]), [x[1]])
@@ -39,14 +39,14 @@ end
     @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop((i,), XX[i, 2], term=XX[:, 2]))
     @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop((i, j), XX[i, j], (j in 2:3), term=XX[:, 2:3]))
 
-    @variables t x[1:4](t)
+    @variables t x(t)[1:4]
     @syms i::Int
-    @test isequal(x[i], operation(unwrap(x[i]))(t))
+    @test isequal(x[i], operation(unwrap(x))(t)[i])
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
-    @variables A[1:5, 1:3] = 42 b[1:3] = [2, 3, 5] t x[1:4](t) u[1:1]
+    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x(t)[1:4] u[1:1]
     AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)
     @test all(isequal(42), getdef.(AA))
@@ -110,12 +110,6 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
         @test isequal(substitute(Symbolics.scalarize(A7 ), repl_dict), test_mat^7)
     end
     @test isequal(Symbolics.scalarize(x', (1, 1)), x[1])
-end
-
-@testset "Parent" begin
-    @variables t x[1:4](t)
-    x = unwrap(x)
-    @test Symbolics.getparent(collect(x)[1]).metadata === x.metadata
 end
 
 n = 2
