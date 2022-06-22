@@ -57,14 +57,6 @@ end
     @test iszero(scalarize(y[1,1]))
     test_funcs("stencil-extents", y, x, broken=broken)
 
-    @variables x[1:5, 1:5]
-    @makearray y[1:5, 1:5] begin
-        y[:, :] => 0
-        y[2:end-1, 2:end-1] => @arrayop (i, j) (x[i+1,j] + x[i-1, j] + x[i, j+1] + x[i, j-1])/2
-    end
-
-    test_funcs("stencil-extents", y, x)
-
     @variables u[1:5, 1:5]
     n = 5
     limit = Main.limit
