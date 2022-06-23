@@ -275,7 +275,6 @@ function _matvec(A,b)
     @arrayop (i,) A[i, k] * b[k] term=(A*b)
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
-(*)(A::AbstractArray, b::Union{AbstractVector, SymVec}) = _matvec(A, b)
 
 #################### MAP-REDUCE ################
 #
