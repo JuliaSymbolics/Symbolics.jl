@@ -1,11 +1,11 @@
-using Symbolics: Sym, FnType, Term, value, scalarize
 using Symbolics
+using Symbolics: Sym, FnType, Term, value, scalarize
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
 
 a, b, c = :runtime_symbol_value, :value_b, :value_c
-vars = @variables t $a $b(t) $c(t)[1:3]
+vars = @variables t $a $b(t) $c[1:3](t)
 @test t isa Num
 @test a === :runtime_symbol_value
 @test b === :value_b

@@ -53,13 +53,9 @@ Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
 
-function occursin_info(x, expr, fail = true)
+function occursin_info(x, expr)
     if symtype(expr) <: AbstractArray
-        if fail
-            error("Differentiation with array expressions is not yet supported")
-        else
-            return occursin(x, expr)
-        end
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
     end
 
     # Allow scalarized expressions
@@ -69,13 +65,11 @@ function occursin_info(x, expr, fail = true)
          is_scalar_indexed(operation(ex)))
     end
 
-    # x[1] == x[1] but not x[2]
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         isequal(first(arguments(x)), first(arguments(expr)))
         return isequal(operation(x), operation(expr)) &&
                isequal(arguments(x), arguments(expr))
     end
-
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         !occursin(first(arguments(x)), first(arguments(expr)))
         return false
@@ -89,7 +83,7 @@ function occursin_info(x, expr, fail = true)
     if isequal(x, expr)
         true
     else
-        args = map(a->occursin_info(x, a, operation(expr) !== getindex), arguments(expr))
+        args = map(a->occursin_info(x, a), arguments(expr))
         if all(_isfalse, args)
             return false
         end
@@ -97,9 +91,9 @@ function occursin_info(x, expr, fail = true)
     end
 end
 
-function occursin_info(x, expr::Sym, fail)
-    if symtype(expr) <: AbstractArray && fail
-            error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+function occursin_info(x, expr::Sym)
+    if symtype(expr) <: AbstractArray
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
     end
     isequal(x, expr)
 end
