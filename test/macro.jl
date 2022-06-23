@@ -9,7 +9,7 @@ Symbolics.@register_symbolic fff(t)
 
 ## @variables
 
-many_vars = @variables t=0 a=1 x[1:4]=2 y[1:4](t)=3 w[1:4] = 1:4 z[1:4](t) = 2:5 p[1:4](..)
+many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5 p(..)[1:4]
 
 @test all(t->getsource(t)[1] === :variables, many_vars)
 @test getdefaultval(t) == 0
@@ -21,9 +21,8 @@ many_vars = @variables t=0 a=1 x[1:4]=2 y[1:4](t)=3 w[1:4] = 1:4 z[1:4](t) = 2:5
 @test getdefaultval(w[4]) == 4
 @test getdefaultval(z[3]) == 4
 
-@test p[1] isa Symbolics.CallWithMetadata
-@test symtype(p[1]) <: FnType{Tuple, Real}
-@test p[1](t) isa Symbolics.Num
+@test symtype(p) <: FnType{Tuple, Array{Real,1}}
+@test p(t)[1] isa Symbolics.Num
 
 
 ## Wrapper types
@@ -63,7 +62,7 @@ end
 
 
 let
-    vars = @variables t a b(a) c(..) x[1:2] y[1:3](t) z[1:2](..)
+    vars = @variables t a b(a) c(..) x[1:2] y(t)[1:3] z(..)[1:2]
     vars2 = [Symbolics.rename(v, Symbol(Symbolics.getname(v), "_2")) for v in vars]
 
     for (v, v2) in zip(vars, vars2)
@@ -71,8 +70,6 @@ let
         @test Symbol(Symbolics.getname(v), "_2") == Symbolics.getname(v2)
     end
 
-    @test Symbolics.getname(getmetadata(z[2](t), Symbolics.GetindexParent)) === :z
-    @test Symbolics.getname(getmetadata(vars2[end][2](t), Symbolics.GetindexParent)) === :z_2
 
     @test Symbolics.getname(Symbolics.rename(y[2], :u)) === :u
 end
@@ -80,7 +77,7 @@ end
 let
     s = :y
     x = (1:2,1:3)
-    t, y = @variables t $s[x...](t)
+    t, y = @variables t $s(t)[x...]
 
     @test ndims(y) == 2
     @test size(y) == (2,3)
