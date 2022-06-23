@@ -627,9 +627,6 @@ function scalarize_op(f, arr, idx)
         wrap(getmetadata(arr, ScalarizeCache)[][idx...])
     else
         thing = f(scalarize.(map(wrap, arguments(arr)))...)
-        if !hasmetadata(arr, ScalarizeCache)
-            arr = setmetadata(arr, ScalarizeCache, Ref{Any}(nothing))
-        end
         getmetadata(arr, ScalarizeCache)[] = thing
         wrap(thing[idx...])
     end

@@ -1,5 +1,4 @@
 using SafeTestsets, Test, Pkg
-using Symbolics
 
 const GROUP = get(ENV, "GROUP", "All")
 
