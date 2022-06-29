@@ -188,8 +188,6 @@ function lower_varname(var::Symbolic, idv, order)
     return diff2term(var)
 end
 
-var_from_nested_derivative(x, i=0) = (missing, missing)
-
 ### OOPS
 
 struct Unknown end
@@ -215,8 +213,17 @@ function makesubscripts(n)
     end
 end
 
-var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
-var_from_nested_derivative(x::Sym,i=0) = (x, i)
+function var_from_nested_derivative(x,i=0)
+    x = unwrap(x)
+    if issym(x)
+        (x, i)
+    elseif istree(x)
+        operation(x) isa Differential ?
+            var_from_nested_derivative(first(arguments(x)), i + 1) : (x, i)
+    else
+        error("Not a well formed derivative expression $x")
+    end
+end
 
 function degree(p::Sym, sym=nothing)
     if sym === nothing
