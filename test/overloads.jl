@@ -215,3 +215,10 @@ B = [x[1] 1.0
 @test_broken Matrix{Float64}(A-B) == [0.0 1.0;0.0 0.0]
 
 @test isequal(simplify(cos(x)^2 + sin(x)^2 + im * x), 1 + x*im)
+
+using Base.MathConstants: catalan, γ, π, φ, ℯ
+for q in (catalan, γ, π, φ, ℯ)
+    nq = Num(q)
+    @test 3nq^5/7 isa Num
+    @test Symbolics.value(substitute(3nq^5/7, Dict(nq=>big(q)))) ≈ 3big(q)^5/7
+end

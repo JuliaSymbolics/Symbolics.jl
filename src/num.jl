@@ -112,6 +112,8 @@ end
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
 
+Num(q::Irrational) = Num(Term(identity, q))
+
 for T in (Integer, Rational)
     @eval Base.:(^)(n::Num, i::$T) = Num(value(n)^i)
 end
