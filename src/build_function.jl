@@ -103,12 +103,17 @@ function _build_function(target::JuliaTarget, op, args...;
                          checkbounds = false,
                          states = LazyState(),
                          linenumbers = true,
+                         wrap_code = nothing,
                          cse = false)
   dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = if cse
-        toexpr(Func(dargs, [], Code.cse(op)), states)
+        fun = Func(dargs, [], Code.cse(op))
+        (wrap_code !== nothing) && (fun = wrap_code(fun))
+        toexpr(fun, states)
     else
-        toexpr(Func(dargs, [], op), states)
+        fun = Func(dargs, [], op)
+        (wrap_code !== nothing) && (fun = wrap_code(fun))        
+        toexpr(fun, states)
     end
 
     if expression == Val{true}
