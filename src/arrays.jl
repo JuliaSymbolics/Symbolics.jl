@@ -627,6 +627,14 @@ function scalarize_op(f, arr, idx)
         getmetadata(arr, ScalarizeCache)[][idx...]
     else
         thing = f(scalarize.(arguments(arr))...)
+        if metadata(arr) != nothing
+            # forward any metadata
+            try
+                thing = metadata(thing, metadata(arr))
+            catch err
+                @warn "could not attach metadata of subexpression $arr to the scalarized form at idx"
+            end
+        end
         if !hasmetadata(arr, ScalarizeCache)
             arr = setmetadata(arr, ScalarizeCache, Ref{Any}(nothing))
         end
