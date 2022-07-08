@@ -251,7 +251,7 @@ function Base.show(io::IO, c::CallWithMetadata)
 end
 
 function (f::CallWithMetadata)(args...)
-    wrap(metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f)))
+    metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f))
 end
 
 function construct_var(macroname, var_name, type, call_args, val, prop)
