@@ -7,7 +7,7 @@ using TermInterface
 
 using Metatheory
 
-using DocStringExtensions
+using DocStringExtensions, Markdown
 
 using LinearAlgebra
 
