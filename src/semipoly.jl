@@ -228,7 +228,7 @@ function semilinear_form(exprs::AbstractArray, vars)
 end
 
 """
-    semilinear_form(exprs::AbstractVector, vars::AbstractVector)
+    semiquadratic_form(exprs::AbstractVector, vars::AbstractVector)
 
 Returns a tuple of 4 objects:
 
