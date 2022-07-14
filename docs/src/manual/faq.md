@@ -57,3 +57,13 @@ computational graph. Just like how `sqrt(x)` symbolically does not try to
 represent the underlying algorithm, this needs to be done to your `f`. This is
 done by doing `@register_symbolic f(x)`. If you need to define things like derivatives to
 `f`, then [the function registration documentation](@ref function_registration).
+
+## Equality and set membership tests
+Comparing symbols with `==` produces a symbolic equality, not a `Bool`. To produce a `Bool`, call `isequal`.
+
+To test if a symbol is part of a collection of symbols, i.e., a vector, create a `Set` and use `in`, e.g.
+```julia
+@variables x
+x in [x] # error
+x in Set([x]) # true
+```
