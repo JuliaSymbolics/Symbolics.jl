@@ -61,9 +61,14 @@ done by doing `@register_symbolic f(x)`. If you need to define things like deriv
 ## Equality and set membership tests
 Comparing symbols with `==` produces a symbolic equality, not a `Bool`. To produce a `Bool`, call `isequal`.
 
-To test if a symbol is part of a collection of symbols, i.e., a vector, create a `Set` and use `in`, e.g.
+To test if a symbol is part of a collection of symbols, i.e., a vector, either create a `Set` and use `in`, e.g.
 ```julia
 @variables x
 x in [x] # error
 x in Set([x]) # true
 ```
+or use
+```julia
+any(isequal(x), collection)
+```
+
