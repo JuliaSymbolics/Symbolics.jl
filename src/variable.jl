@@ -53,7 +53,7 @@ function scalarize_getindex(x, parent=Ref{Any}(x))
             scalarize_getindex(r, parent)
         end
     else
-        xx = scalarize(x)
+        xx = unwrap(scalarize(x))
         xx = metadata(xx, metadata(x))
         if symtype(xx) <: FnType
             setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent[])
@@ -125,10 +125,22 @@ function _parse_vars(macroname, type, x, transform=identity)
         isruntime, v = unwrap_runtime_var(v)
         iscall = Meta.isexpr(v, :call)
         isarray = Meta.isexpr(v, :ref)
+        if iscall && Meta.isexpr(v.args[1], :ref)
+            @warn("The variable syntax $v is deprecated. Use $(Expr(:ref, Expr(:call, v.args[1].args[1], v.args[2]), v.args[1].args[2:end]...)) instead.
+                  The former creates an array of functions, while the latter creates an array valued function.
+                  The deprecated syntax will cause an error in the next major release of Symbolics.
+                  This change will facilitate better implementation of various features of Symbolics.")
+        end
         issym  = v isa Symbol
         @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
 
-        if iscall
+        if isarray && Meta.isexpr(v.args[1], :call)
+            # This is the new syntax
+            isruntime, fname = unwrap_runtime_var(v.args[1].args[1])
+            call_args = map(last∘unwrap_runtime_var, @view v.args[1].args[2:end])
+            size = v.args[2:end]
+            var_name, expr = construct_dep_array_vars(macroname, fname, type′, call_args, size, val, options, transform, isruntime)
+        elseif iscall
             isruntime, fname = unwrap_runtime_var(v.args[1])
             call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
             var_name, expr = construct_vars(macroname, fname, type′, call_args, val, options, transform, isruntime)
@@ -142,6 +154,33 @@ function _parse_vars(macroname, type, x, transform=identity)
     rhs = build_expr(:vect, var_names)
     push!(ex.args, rhs)
     return ex
+end
+
+function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime)
+    ndim = :($length(($(indices...),)))
+    vname = !isruntime ? Meta.quot(lhs) : lhs
+    if call_args[1] == :..
+        ex = :($CallWithMetadata($Sym{$FnType{Tuple, Array{$type, $ndim}}}($vname)))
+    else
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($vname)(map($unwrap, ($(call_args...),))...))
+    end
+    ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+
+    if val !== nothing
+        ex = :($setdefaultval($ex, $val))
+    end
+    ex = setprops_expr(ex, prop, macroname, Meta.quot(lhs))
+    #ex = :($scalarize_getindex($ex))
+
+    ex = :($wrap($ex))
+
+    if call_args[1] == :..
+        ex = :($transform($ex))
+    end
+    if isruntime
+        lhs = gensym(lhs)
+    end
+    lhs, :($lhs = $ex)
 end
 
 function construct_vars(macroname, v, type, call_args, val, prop, transform, isruntime)
@@ -212,7 +251,7 @@ function Base.show(io::IO, c::CallWithMetadata)
 end
 
 function (f::CallWithMetadata)(args...)
-    wrap(metadata(f.f(args...), metadata(f)))
+    metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f))
 end
 
 function construct_var(macroname, var_name, type, call_args, val, prop)
@@ -296,10 +335,10 @@ julia> @variables y[1:3, 1:6] # support for  tensors
 1-element Vector{Symbolics.Arr{Num, 2}}:
  y[1:3,1:6]
 
-julia> @variables t z[1:3](t) # also works for dependent variables
+julia> @variables t z(t)[1:3] # also works for dependent variables
 2-element Vector{Any}:
  t
-  (map(#5, z))[1:3]
+  (z(t))[1:3]
 ```
 
 A symbol or expression that represents an array can be turned into an array of
@@ -308,9 +347,9 @@ symbols or expressions using the `scalarize` function.
 ```julia
 julia> Symbolics.scalarize(z)
 3-element Vector{Num}:
- z[1](t)
- z[2](t)
- z[3](t)
+ (z(t))[1]
+ (z(t))[2]
+ (z(t))[3]
 ```
 
 Note that `@variables` returns a vector of all the defined variables.
@@ -322,14 +361,14 @@ syntax also applies here.
 
 ```julia
 julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
-:runtime_symbol_value
+(:runtime_symbol_value, :value_b, :value_c)
 
-julia> vars = @variables t \$a \$b(t) \$c[1:3](t)
+julia> vars = @variables t \$a \$b(t) \$c(t)[1:3]
 4-element Vector{Any}:
       t
  runtime_symbol_value
    value_b(t)
-       (map(#9, value_c))[1:3]
+       (value_c(t))[1:3]
 
 julia> (t, a, b, c)
 (t, :runtime_symbol_value, :value_b, :value_c)
@@ -351,6 +390,12 @@ const _fail = Dict()
 _getname(x, _) = nameof(x)
 _getname(x::Symbol, _) = x
 function _getname(x::Symbolic, val)
+    if istree(x) && issym(operation(x))
+        return nameof(operation(x))
+    end
+    if !hasmetadata(x, Symbolics.GetindexParent) && istree(x) && operation(x) == getindex
+        return _getname(arguments(x)[1], val)
+    end
     ss = getsource(x, nothing)
     if ss === nothing
         ss = getsource(getparent(x), val)

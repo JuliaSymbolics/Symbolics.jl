@@ -39,6 +39,11 @@ function Base.getindex(x::SymArray, idx...)
             end
         end
         res = Term{eltype(symtype(x))}(getindex, [x, idx...])
+    elseif length(idx) == 1 && symtype(first(idx)) <: CartesianIndex
+        i = first(idx)
+        ii = i isa CartesianIndex ? Tuple(i) : arguments(i)
+
+        return getindex(x, ii...)
     else
         input_idx = []
         output_idx = []
@@ -85,6 +90,20 @@ function Base.getindex(x::Arr, idx...)
 end
 function Base.getindex(x::Arr, idx::Symbolic{<:Integer}...)
     wrap(unwrap(x)[idx...])
+end
+
+function Base.CartesianIndex(x::Symbolic{<:Integer}, xs::Symbolic{<:Integer}...)
+    term(CartesianIndex, x, xs..., type=CartesianIndex)
+end
+
+import Base: +, -
+tup(c::CartesianIndex) = Tuple(c)
+tup(c::Term{CartesianIndex}) = arguments(c)
+@wrapped function -(x::CartesianIndex, y::CartesianIndex)
+    CartesianIndex((tup(x) .- tup(y))...)
+end
+@wrapped function +(x::CartesianIndex, y::CartesianIndex)
+    CartesianIndex((tup(x) .+ tup(y))...)
 end
 
 function propagate_ndims(::typeof(getindex), x, idx...)
@@ -167,6 +186,8 @@ Broadcast.result_style(::SymWrapBroadcast) = SymWrapBroadcast()
 
 Broadcast.BroadcastStyle(::SymWrapBroadcast,
                          ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
+Broadcast.BroadcastStyle(::SymBroadcast,
+                         ::SymWrapBroadcast) = Broadcast.Unknown()
 
 function Broadcast.materialize(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     args = map(bc.args) do arg
@@ -184,12 +205,12 @@ end
 #
 @wrapped function Base.adjoint(A::AbstractMatrix)
     @syms i::Int j::Int
-    @arrayop A' (i, j) A[j, i]
+    @arrayop (i, j) A[j, i] term=A'
 end
 
 @wrapped function Base.adjoint(b::AbstractVector)
     @syms i::Int
-    @arrayop b' (1, i) b[i]
+    @arrayop (1, i) b[i] term=b'
 end
 
 import Base: *, \
@@ -239,7 +260,7 @@ function _matmul(A,B)
         op = operation(A.term)
         return op(op(B) * first(arguments(A.term)))
     end
-    return @arrayop (A*B) (i, j) A[i, k] * B[k, j]
+    return @arrayop (i, j) A[i, k] * B[k, j] term=(A*B)
 end
 
 @wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B)
@@ -253,7 +274,7 @@ function _matvec(A,b)
         S = SymbolicUtils.promote_symtype(+, T,T)
         return Term{S}(*, [A, b])
     end
-    @arrayop (A*b) (i,) A[i, k] * b[k]
+    @arrayop (i,) A[i, k] * b[k] term=(A*b)
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
 

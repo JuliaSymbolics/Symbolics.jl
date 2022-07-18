@@ -1,4 +1,3 @@
-using SymbolicUtils.Code
 using Base.Threads
 using SymbolicUtils.Code: LazyState
 
@@ -103,9 +102,19 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          states = LazyState(),
-                         linenumbers = true)
-    dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op), states)
+                         linenumbers = true,
+                         wrap_code = nothing,
+                         cse = false)
+  dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+    expr = if cse
+        fun = Func(dargs, [], Code.cse(op))
+        (wrap_code !== nothing) && (fun = wrap_code(fun))
+        toexpr(fun, states)
+    else
+        fun = Func(dargs, [], op)
+        (wrap_code !== nothing) && (fun = wrap_code(fun))        
+        toexpr(fun, states)
+    end
 
     if expression == Val{true}
         expr
@@ -116,22 +125,44 @@ end
 
 SymbolicUtils.Code.get_symbolify(x::Arr) = SymbolicUtils.Code.get_symbolify(unwrap(x))
 
-function _build_function(target::JuliaTarget, op::Arr, args...;
+function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          states = LazyState(),
-                         linenumbers = true)
+                         linenumbers = true,
+                         cse = false)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = toexpr(Func(dargs, [], op), states)
 
-    if expression == Val{true}
-        expr
+    expr = if cse
+        toexpr(Func(dargs, [], Code.cse(op)), states)
     else
-        _build_and_inject_function(expression_module, expr)
+        toexpr(Func(dargs, [], op), states)
+    end
+
+    outsym = Symbol("ˍ₋out")
+    body = inplace_expr(unwrap(op), outsym)
+    oop_expr = toexpr(Func([outsym, dargs...], [], body), states)
+
+    N = length(shape(op))
+    op = unwrap(op)
+    if op isa ArrayOp && istree(op.term)
+        op_body = op.term
+    else
+        op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
+                   $body
+              $outsym
+          end) |> LiteralExpr
+    end
+    ip_expr = toexpr(Func(dargs, [], op_body), states)
+    if expression == Val{true}
+        oop_expr, ip_expr
+    else
+        _build_and_inject_function(expression_module, oop_expr),
+        _build_and_inject_function(expression_module, ip_expr)
     end
 end
 
@@ -225,9 +256,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
-                       parallel=nothing, kwargs...)
+                       parallel=nothing, cse = false, kwargs...)
 
-    if parallel == nothing && _nnz(rhss) >= 1000
+  if parallel == nothing && _nnz(rhss) >= 1000
         parallel = ShardedForm() # by default switch for arrays longer than 1000 exprs
     end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -235,7 +266,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [],
-                    postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
+                    postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse)))
 
     if !isnothing(wrap_code[1])
         oop_expr = wrap_code[1](oop_expr)
@@ -249,7 +280,8 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                                                outputidxs,
                                                rhss,
                                                checkbounds,
-                                               skipzeros)))
+                                               skipzeros,
+                                               cse,)))
 
     if !isnothing(wrap_code[2])
         ip_expr = wrap_code[2](ip_expr)
@@ -267,16 +299,16 @@ _nnz(x::AbstractArray) = length(x)
 _nnz(x::AbstractSparseArray) = nnz(x)
 _nnz(x::Union{Base.ReshapedArray, LinearAlgebra.Transpose}) = _nnz(parent(x))
 
-function make_array(s, dargs, arr, similarto)
+function make_array(s, dargs, arr, similarto, cse)
     s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
-    _make_array(arr, similarto)
+    _make_array(arr, similarto, cse)
 end
 
-function make_array(s::SerialForm, dargs, arr, similarto)
-    _make_array(arr, similarto)
+function make_array(s::SerialForm, dargs, arr, similarto, cse)
+    _make_array(arr, similarto, cse)
 end
 
-function make_array(s::ShardedForm, closed_args, arr, similarto)
+function make_array(s::ShardedForm, closed_args, arr, similarto, cse)
     if arr isa AbstractSparseArray
 
         return LiteralExpr(quote
@@ -287,13 +319,13 @@ function make_array(s::ShardedForm, closed_args, arr, similarto)
                                                $(make_array(s,
                                                             closed_args,
                                                             arr.nzval,
-                                                            Vector,)))
+                                                            Vector,cse)))
                            end)
     end
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
-        Func(closed_args, [], _make_array(slice, similarto)), closed_args
+        Func(closed_args, [], _make_array(slice, similarto, cse)), closed_args
     end
     SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
 end
@@ -360,32 +392,34 @@ nzmap(f, x) = map(f, x)
 _issparse(x::AbstractArray) = issparse(x)
 _issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
 
-function _make_sparse_array(arr, similarto)
+function _make_sparse_array(arr, similarto, cse)
     if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
         LiteralExpr(quote
             $Setfield.@set $(nzmap(x->true, arr)).parent =
-                $(_make_array(parent(arr), typeof(parent(arr))))
+                $(_make_array(parent(arr), typeof(parent(arr)), cse))
             end)
     else
         LiteralExpr(quote
                         let __reference = copy($(nzmap(x->true, arr)))
                             $Setfield.@set __reference.nzval =
-                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}))
+                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}, cse))
                         end
                     end)
     end
 end
 
-function _make_array(rhss::AbstractArray, similarto)
-    arr = nzmap(x->_make_array(x, similarto), rhss)
+function _make_array(rhss::AbstractArray, similarto, cse)
+    arr = nzmap(x->_make_array(x, similarto, cse), rhss)
     if _issparse(arr)
-        _make_sparse_array(arr, similarto)
+        _make_sparse_array(arr, similarto, cse)
+    elseif cse
+        Code.cse(MakeArray(arr, similarto))
     else
         MakeArray(arr, similarto)
     end
 end
 
-_make_array(x, similarto) = x
+_make_array(x, similarto, cse) = x
 
 ## In-place version
 
@@ -415,7 +449,7 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
     end
 end
 
-function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
+function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros, cse)
     if rhss isa AbstractSparseArray
         return set_array(s,
                          closed_args,
@@ -423,7 +457,8 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
                          nothing,
                          rhss.nzval,
                          checkbounds,
-                         skipzeros)
+                         skipzeros,
+                         cse)
     end
 
     outvar = !(out isa Sym) ? gensym("out") : out
@@ -434,7 +469,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     all_args = [outvar, closed_args...]
     ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
         Func(all_args, [],
-             _set_array(outvar, idxs, xs, checkbounds, skipzeros),
+             _set_array(outvar, idxs, xs, checkbounds, skipzeros, cse),
              [])
     end.body
 
@@ -444,11 +479,11 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     end)
 end
 
-function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
-    _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros)
+function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros, cse)
+    _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros, cse)
 end
 
-function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
+function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros, cse)
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
@@ -461,16 +496,16 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
                           [AtIndex(outputidxs[i],
                                    rhss[i])
                            for i in ii])
-    push!(exprs, setterexpr)
+    cse ? push!(exprs, Code.cse(setterexpr)) : push!(exprs, setterexpr)
     for j in jj
-        push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros))
+        push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros, cse))
     end
     LiteralExpr(quote
                     $(exprs...)
                 end)
 end
 
-_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = rhs
+_set_array(out, outputidxs, rhs, checkbounds, skipzeros, cse) = rhs
 
 
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())

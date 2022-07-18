@@ -89,13 +89,13 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
-julia> @variables x t u(x, t) z[1:2](t); Dt = Differential(t); Dx = Differential(x);
+julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
 uˍtx(x, t)
 
 julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
-z_t[1](t)
+var"z(t)[1]ˍt"
 ```
 """
 function diff2term(O)
@@ -109,6 +109,7 @@ function diff2term(O)
     else
         ds = nothing
     end
+    d_separator = 'ˍ'
 
     if ds === nothing
         return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
@@ -118,10 +119,12 @@ function diff2term(O)
             opname = string(nameof(oldop))
         elseif istree(oldop) && operation(oldop) === getindex
             opname = string(nameof(arguments(oldop)[1]))
-        else
-            throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
+            args = arguments(O)
+        elseif oldop == getindex
+            args = arguments(O)
+            opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
+            return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
         end
-        d_separator = 'ˍ'
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
         return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
     end
@@ -169,8 +172,16 @@ function tosymbol(t; states=nothing, escape=true)
             op = Symbol(repr(operation(t)))
             args = arguments(t)
         end
+        op = nameof(operation(t))
+        args = arguments(t)
+    elseif operation(t) isa Differential
+        term = diff2term(t)
+        if issym(term)
+            return nameof(term)
+        end
+        op = Symbol(operation(term))
+        args = arguments(term)
 
-        return escape ? Symbol(op, "(", join(args, ", "), ")") : op
     else
         x
     end
@@ -211,16 +222,14 @@ function makesubscripts(n)
 end
 
 function var_from_nested_derivative(x,i=0)
-    if istree(x)
-        if operation(x) isa Differential
-            var_from_nested_derivative(arguments(x)[1], i + 1)
-        else
-            (x, i)
-        end
-    elseif issym(x)
+    x = unwrap(x)
+    if issym(x)
         (x, i)
+    elseif istree(x)
+        operation(x) isa Differential ?
+            var_from_nested_derivative(first(arguments(x)), i + 1) : (x, i)
     else
-        (missing, missing)
+        error("Not a well formed derivative expression $x")
     end
 end
 

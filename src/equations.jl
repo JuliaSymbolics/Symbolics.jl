@@ -52,14 +52,17 @@ end
 
 scalarize(eq::Equation) = scalarize(eq.lhs) ~ scalarize(eq.rhs)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
-function SymbolicUtils.substitute(x::Equation, rules; kw...)
-    sub = substituter(rules)
-    sub(x.lhs; kw...) ~ sub(x.rhs; kw...)
-end
+# ambiguity
+for T in [:Pair, :Any]
+    @eval function SymbolicUtils.substitute(x::Equation, rules::$T; kw...)
+        sub = substituter(rules)
+        sub(x.lhs; kw...) ~ sub(x.rhs; kw...)
+    end
 
-function SymbolicUtils.substitute(eqs::Array{Equation}, rules; kw...)
-    sub = substituter(rules)
-    sub.(lhss(eqs); kw...) .~ sub.(rhss(eqs); kw...)
+    @eval function SymbolicUtils.substitute(eqs::Array{Equation}, rules::$T; kw...)
+        sub = substituter(rules)
+        sub.(lhss(eqs); kw...) .~ sub.(rhss(eqs); kw...)
+    end
 end
 
 SymbolicUtils.substitute(nums::Array{Num}, rules; kw...) = substituter(rules).(nums; kw...)

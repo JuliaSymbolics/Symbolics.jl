@@ -26,6 +26,8 @@ import SymbolicUtils: Term, Add, Mul, Pow, Sym, BasicSymbolic,
                       FnType, @rule, Rewriters, substitute,
                       promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
 
+using SymbolicUtils.Code
+
 import Metatheory.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 import SymbolicUtils.Code: toexpr
