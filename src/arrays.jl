@@ -316,7 +316,7 @@ get_extents(x::AbstractRange) = x
 # dim: The dimension of the array indexed
 # boundary: how much padding is this indexing requiring, for example
 #   boundary is 2 for x[i + 2], and boundary = -2 for x[i - 2]
-function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
+function idx_to_axes(expr, dict=Dict{Any, Vector}(), ranges=Dict())
     if istree(expr)
         if operation(expr) === (getindex)
             args = arguments(expr)
