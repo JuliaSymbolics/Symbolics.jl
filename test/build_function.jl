@@ -252,3 +252,10 @@ let
     p = (a = 10, p = [2])
     @test f([3], 1, p) == 19
 end
+
+let #658
+    using Symbolics
+    @variables a, X1[1:3], X2[1:3]
+    k = eval(build_function(a * X1 + X2, X1, X2, a)[2])
+    @test k(ones(3), ones(3), 1.5) == [2.5, 2.5, 2.5]
+end
