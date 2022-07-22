@@ -86,6 +86,9 @@ function semipolyform_terms(expr, vars::OrderedSet, deg)
 
 end
 
+function has_vars(expr, vars)
+    expr in vars || (istree(expr) && any(x->has_vars(x, vars), unsorted_arguments(expr)))
+end
 
 function mark_vars(expr, vars)
     if expr in vars
@@ -107,7 +110,7 @@ function mark_vars(expr, vars)
             if linearity_1(op)
                 return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
             else
-                return expr
+                return has_vars(expr, vars) ? BoundedDegreeMonomial(1, expr, true) : expr
             end
         else
             return expr
