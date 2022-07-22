@@ -50,12 +50,12 @@ _degree(x) = isop(x, *) ? sum(_degree, unsorted_arguments(x)) : 0
 isboundedmonom(x) = x isa BoundedDegreeMonomial && !x.overdegree
 bareterm(x, f, args;kw...) = Term{symtype(x)}(f, args)
 
-function mark_and_exponentiate(expr, vars, deg)
+function mark_and_exponentiate(expr, vars, deg, consts)
 
     # Step 1
     # Mark all the interesting variables -- substitute without recursing into nl forms
 
-    expr′ = mark_vars(expr, vars)
+    expr′ = mark_vars(expr, vars, consts)
 
     # Step 2
     # Construct and propagate BoundedDegreeMonomial for ^ and *
@@ -63,19 +63,19 @@ function mark_and_exponentiate(expr, vars, deg)
 
     rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer && x > 0)) =>
              BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
-             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars)
+             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars, consts)
 
              @rule *(~~x) => mul_bounded(~~x, deg)]
 
     expr′ = Postwalk(RestartedChain(rules), similarterm=bareterm)(expr′)
 end
 
-function semipolyform_terms(expr, vars::OrderedSet, deg)
+function semipolyform_terms(expr, vars::OrderedSet, deg, consts)
     if deg <= 0
         throw(ArgumentError("Degree for semi-polynomial form must be > 0"))
     end
 
-    expr′ = mark_and_exponentiate(expr, vars, deg)
+    expr′ = mark_and_exponentiate(expr, vars, deg, consts)
 
     # Step 3: every term now show have at most one valid monomial -- find the coefficient for it.
     Postwalk(Chain([@rule *(~~x, ~a::isboundedmonom, ~~y) =>
@@ -90,25 +90,28 @@ function has_vars(expr, vars)
     expr in vars || (istree(expr) && any(x->has_vars(x, vars), unsorted_arguments(expr)))
 end
 
-function mark_vars(expr, vars)
+function mark_vars(expr, vars, consts)
     if expr in vars
         return BoundedDegreeMonomial(expr, 1, false)
     end
 
     if !istree(expr)
+        if consts
+            return BoundedDegreeMonomial(1, expr, false)
+        end
         return expr
     else
         op = operation(expr)
         args = unsorted_arguments(expr)
 
         if op === (+) || op === (*)
-            return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
+            return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars, consts), args))
         elseif op === (^)
             base, exp = arguments(expr)
-            Term{symtype(expr)}(^, [mark_vars(base, vars), exp])
+            Term{symtype(expr)}(^, [mark_vars(base, vars, consts), exp])
         elseif length(args) == 1
             if linearity_1(op)
-                return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
+                return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars, consts), args))
             else
                 return has_vars(expr, vars) ? BoundedDegreeMonomial(1, expr, true) : expr
             end
@@ -170,18 +173,18 @@ For every expression in `exprs` computes the semi-polynomial form as above and
 returns a tuple of two objects -- a vector of coefficient dictionaries,
 and a vector of residual terms.
 """
-function semipolynomial_form(expr, vars, degree)
+function semipolynomial_form(expr, vars, degree, consts=false)
     expr = unwrap(expr)
     vars = init_semipoly_vars(vars)
 
-    bifurcate_terms(semipolyform_terms(expr, vars, degree))
+    bifurcate_terms(semipolyform_terms(expr, vars, degree, consts))
 end
 
-function semipolynomial_form(exprs::AbstractArray, vars, degree)
+function semipolynomial_form(exprs::AbstractArray, vars, degree, consts=false)
     exprs = unwrap.(exprs)
     vars = init_semipoly_vars(vars)
 
-    matches = map(x -> semipolyform_terms(x, vars, degree), exprs)
+    matches = map(x -> semipolyform_terms(x, vars, degree, consts), exprs)
     tmp = map(bifurcate_terms, matches)
     dicts, nls = map(first, tmp), map(last, tmp)
 end
@@ -208,12 +211,12 @@ Returns a tuple of a sparse matrix `A`, and a residual vector `c` such that,
 
 `A * vars + c` is the same as `exprs`.
 """
-function semilinear_form(exprs::AbstractArray, vars)
+function semilinear_form(exprs::AbstractArray, vars, consts=false)
     exprs = unwrap.(exprs)
     vars = init_semipoly_vars(vars)
-    ds, nls = semipolynomial_form(exprs, vars, 1)
+    ds, nls = semipolynomial_form(exprs, vars, 1, consts)
 
-    idxmap = Dict(v=>i for (i, v) in enumerate(vars))
+    idxmap = Dict(v=>i for (i, v) in enumerate(consts ? [1, vars...] : vars))
 
     I = Int[]
     J = Int[]
@@ -227,7 +230,7 @@ function semilinear_form(exprs::AbstractArray, vars)
         end
     end
 
-    sparse(I,J,V, length(exprs), length(vars)), wrap.(nls)
+    sparse(I,J,V, length(exprs), length(vars) + consts), wrap.(nls)
 end
 
 """
@@ -362,14 +365,14 @@ end
 
 pow(a, b, deg) = a^b
 
-function pow_of_add(a, b, deg, vars)
+function pow_of_add(a, b, deg, vars, consts)
     b == 0 && return 1
     b == 1 && return a
 
     @assert isop(a, +)
     within_deg(x) = (d=_degree(a);d <= deg)
 
-    a = mark_and_exponentiate(a, vars, deg)
+    a = mark_and_exponentiate(a, vars, deg, consts)
     args = all_terms(a)
     mindeg = minimum(_degree, args)
     maxdeg = maximum(_degree, args)
