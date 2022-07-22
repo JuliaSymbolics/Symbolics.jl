@@ -28,6 +28,8 @@ d, r = semipolynomial_form((x+2)^12, [x], 1)
 @test d == Dict(x => 24576)
 @test iszero(r + 24576x - (x+2)^12)
 
+# 657
+@test iszero(semilinear_form([x * cos(x) + x^2 * 3sin(x) + 4exp(x)], [x])[1])
 
 @syms a b c
 
