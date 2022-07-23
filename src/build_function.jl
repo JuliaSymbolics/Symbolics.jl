@@ -325,7 +325,11 @@ function make_array(s::ShardedForm, closed_args, arr, similarto, cse)
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
-        Func(closed_args, [], _make_array(slice, similarto, cse)), closed_args
+        Func(closed_args, [],
+             quote
+                 $(Expr(:meta, :noinline))
+                 $(LiteralExpr(_make_array(slice, similarto, cse)))
+             end), closed_args
     end
     SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
 end
