@@ -468,8 +468,10 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     end
     all_args = [outvar, closed_args...]
     ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
-        Func(all_args, [],
-             _set_array(outvar, idxs, xs, checkbounds, skipzeros, cse),
+        Func(all_args, [], LiteralExpr(quote
+                                           $(Expr(:meta, :noinline))
+                                           $(_set_array(outvar, idxs, xs, checkbounds, skipzeros, cse))
+                                       end),
              [])
     end.body
 
