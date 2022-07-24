@@ -143,7 +143,7 @@ function bifurcate_terms(expr)
 
         return poly, nl
     else
-        return Dict(), expr
+        return Dict(), unwrap_bp(expr)
     end
 end
 
