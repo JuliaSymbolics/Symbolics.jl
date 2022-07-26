@@ -61,7 +61,7 @@ function mark_and_exponentiate(expr, vars, deg)
     # Construct and propagate BoundedDegreeMonomial for ^ and *
 
 
-    rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer)) =>
+    rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer && x > 0)) =>
              BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
              @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars)
 
