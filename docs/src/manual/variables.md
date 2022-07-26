@@ -50,6 +50,24 @@ julia> Symbolics.arguments(Symbolics.value(x + y))
  y
 ```
 
+Note that Julia converts irrationals — like `π` and `ℯ` — to `Float64`
+whenever they are involved in arithmetic with other numbers, including
+integers.  An expression like `2π` will be converted to a float immediately,
+so an expression like `2π * x` will leave the symbolic `x` multiplied by a
+`Float64`.  It may be preferable to have a symbolic representation of `π`
+also, which can be achieved with `Num(π)`.  For generic programming, it may be
+helpful to simply redefine the variable `π` to be of the same type as some
+other argument, as in
+```julia
+function f(x)
+    let π=oftype(x, π)
+        1 + (2//3 + 4π/5) * x
+    end
+end
+```
+This will work for any floating-point input, as well as symbolic input.
+
+
 ## Symbolic Control Flow
 
 Control flow can be expressed in Symbolics.jl in the following ways:
