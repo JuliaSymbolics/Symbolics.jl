@@ -111,6 +111,7 @@ function diff2term(O)
     else
         ds = nothing
     end
+    d_separator = 'ˍ'
 
     if ds === nothing
         return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
@@ -118,12 +119,15 @@ function diff2term(O)
         oldop = operation(O)
         if oldop isa Sym
             opname = string(nameof(oldop))
+            args = arguments(O)
         elseif oldop isa Term && operation(oldop) === getindex
             opname = string(nameof(arguments(oldop)[1]))
-        else
-            throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
+            args = arguments(O)
+        elseif oldop == getindex
+            args = arguments(O)
+            opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
+            return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
         end
-        d_separator = 'ˍ'
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
         return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
     end
@@ -162,6 +166,9 @@ function tosymbol(t::Term; states=nothing, escape=true)
         args = arguments(t)
     elseif operation(t) isa Differential
         term = diff2term(t)
+        if issym(term)
+            return nameof(term)
+        end
         op = Symbol(operation(term))
         args = arguments(term)
     else
@@ -180,8 +187,6 @@ function lower_varname(var::Symbolic, idv, order)
     end
     return diff2term(var)
 end
-
-var_from_nested_derivative(x, i=0) = (missing, missing)
 
 ### OOPS
 
@@ -208,8 +213,17 @@ function makesubscripts(n)
     end
 end
 
-var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
-var_from_nested_derivative(x::Sym,i=0) = (x, i)
+function var_from_nested_derivative(x,i=0)
+    x = unwrap(x)
+    if issym(x)
+        (x, i)
+    elseif istree(x)
+        operation(x) isa Differential ?
+            var_from_nested_derivative(first(arguments(x)), i + 1) : (x, i)
+    else
+        error("Not a well formed derivative expression $x")
+    end
+end
 
 function degree(p::Sym, sym=nothing)
     if sym === nothing

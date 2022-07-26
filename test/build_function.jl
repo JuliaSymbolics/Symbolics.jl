@@ -1,5 +1,7 @@
 using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
+using Symbolics: value
+using SymbolicUtils.Code: DestructuredArgs, Func
 @variables a b c1 c2 c3 d e g
 
 # Multiple argument matrix
@@ -234,4 +236,26 @@ let #issue#587
 
     @test typeof(J) <: SparseMatrixCSC
     @test nnz(J) == nnz(sj)
+end
+
+# test header wrapping of scalar build function
+let
+    @variables x p t
+    ex = t + p * x^2
+    integrator = gensym(:MTKIntegrator)
+    header = expr -> let integrator = integrator
+        Func([expr.args[1], expr.args[2], DestructuredArgs(expr.args[3:end], integrator,
+                                                           inds = [:p])], [], expr.body)
+    end
+    f = build_function(ex, [value(x)], value(t), [value(p)]; expression = Val{false},
+                                                                wrap_code = header)
+    p = (a = 10, p = [2])
+    @test f([3], 1, p) == 19
+end
+
+let #658
+    using Symbolics
+    @variables a, X1[1:3], X2[1:3]
+    k = eval(build_function(a * X1 + X2, X1, X2, a)[2])
+    @test k(ones(3), ones(3), 1.5) == [2.5, 2.5, 2.5]
 end

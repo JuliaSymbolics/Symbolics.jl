@@ -624,11 +624,22 @@ struct ScalarizeCache end
 
 function scalarize_op(f, arr, idx)
     if hasmetadata(arr, ScalarizeCache) && getmetadata(arr, ScalarizeCache)[] !== nothing
-        wrap(getmetadata(arr, ScalarizeCache)[][idx...])
+        getmetadata(arr, ScalarizeCache)[][idx...]
     else
         thing = f(scalarize.(map(wrap, arguments(arr)))...)
+        if metadata(arr) != nothing
+            # forward any metadata
+            try
+                thing = metadata(thing, metadata(arr))
+            catch err
+                @warn "could not attach metadata of subexpression $arr to the scalarized form at idx"
+            end
+        end
+        if !hasmetadata(arr, ScalarizeCache)
+            arr = setmetadata(arr, ScalarizeCache, Ref{Any}(nothing))
+        end
         getmetadata(arr, ScalarizeCache)[] = thing
-        wrap(thing[idx...])
+        thing[idx...]
     end
 end
 
@@ -645,7 +656,7 @@ end
 _det(x, lp) = det(x, laplace=lp)
 
 function scalarize_op(f::typeof(_det), arr)
-    det(map(wrap, collect(arguments(arr)[1])), laplace=arguments(arr)[2])
+    unwrap(det(map(wrap, collect(arguments(arr)[1])), laplace=arguments(arr)[2]))
 end
 
 @wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace=true)
@@ -700,8 +711,17 @@ end
 scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
                                           unwrap.(idx)))
 
+
+eval_array_term(op, arr) = arr
+eval_array_term(op::typeof(inv), arr) = inv(scalarize(wrap(arguments(arr)[1]))) #issue 653
+eval_array_term(op::Arr) = wrap(eval_array_term(unwrap(op)))
+eval_array_term(op) = eval_array_term(operation(op), op)
+
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
+        if istree(arr)
+            arr = eval_array_term(arr)
+        end
         map(Iterators.product(axes(arr)...)) do i
             scalarize(arr[i...]) # Use arr[i...] here to trigger any getindex hooks
         end

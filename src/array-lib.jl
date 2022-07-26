@@ -168,11 +168,12 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
                                      # then you get pairs, and index matcher cannot
                                      # recurse into pairs
     Atype = propagate_atype(broadcast, bc.f, bc.args...)
+    args = map(x->x isa Base.RefValue ? Term{Any}(Ref, [x[]]) : x, bc.args)
     ArrayOp(Atype{symtype(expr), ndim},
             (subscripts...,),
             expr,
             +,
-            Term{Any}(broadcast, [bc.f, bc.args...]))
+            Term{Any}(broadcast, [bc.f, args...]))
 end
 
 # On wrapper:
