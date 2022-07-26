@@ -132,6 +132,9 @@ using Requires
 export symbolics_to_sympy
 include("init.jl")
 
+export partial_fraction
+include("integration_utils.jl")
+
 include("semipoly.jl")
 
 # Hacks to make wrappers "nicer"
