@@ -61,7 +61,7 @@ function mark_and_exponentiate(expr, vars, deg)
     # Construct and propagate BoundedDegreeMonomial for ^ and *
 
 
-    rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer)) =>
+    rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer && x > 0)) =>
              BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
              @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars)
 
@@ -86,6 +86,9 @@ function semipolyform_terms(expr, vars::OrderedSet, deg)
 
 end
 
+function has_vars(expr, vars)
+    expr in vars || (istree(expr) && any(x->has_vars(x, vars), unsorted_arguments(expr)))
+end
 
 function mark_vars(expr, vars)
     if expr in vars
@@ -107,7 +110,7 @@ function mark_vars(expr, vars)
             if linearity_1(op)
                 return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
             else
-                return expr
+                return has_vars(expr, vars) ? BoundedDegreeMonomial(1, expr, true) : expr
             end
         else
             return expr
@@ -228,7 +231,7 @@ function semilinear_form(exprs::AbstractArray, vars)
 end
 
 """
-    semilinear_form(exprs::AbstractVector, vars::AbstractVector)
+    semiquadratic_form(exprs::AbstractVector, vars::AbstractVector)
 
 Returns a tuple of 4 objects:
 

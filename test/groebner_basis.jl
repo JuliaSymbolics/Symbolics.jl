@@ -22,6 +22,10 @@ end
 @test isequal(expand.(groebner_basis([x, x^2])), [x])
 @test isequal(expand.(groebner_basis([BigInt(1)x + 2//3])), [x  + 2//3])
 
+@test Symbolics.is_groebner_basis([x, y, z])
+@test Symbolics.is_groebner_basis([x^2 - x, y^2 - y])
+@test !Symbolics.is_groebner_basis([x^2 + y, x*y^3 - 1, y^4 - 1])
+
 @variables x1 x2 x3 x4
 @test isequal(expand.(groebner_basis([x1, x, y])), [y, x1, x])
 

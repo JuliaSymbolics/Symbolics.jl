@@ -103,6 +103,8 @@ function _build_function(target::JuliaTarget, op, args...;
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          states = LazyState(),
+                         linenumbers = true,
+                         wrap_code = nothing,
                          cse = false,
                          kwargs...)
     if length(kwargs) > 0
@@ -110,10 +112,15 @@ function _build_function(target::JuliaTarget, op, args...;
         @warn("Ignoring invalid keyword arguments: $(invalid_kwargs)")
     end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+
     expr = if cse
-        toexpr(Func(dargs, [], Code.cse(op)), states)
+        fun = Func(dargs, [], Code.cse(op))
+        (wrap_code !== nothing) && (fun = wrap_code(fun))
+        toexpr(fun, states)
     else
-        toexpr(Func(dargs, [], op), states)
+        fun = Func(dargs, [], op)
+        (wrap_code !== nothing) && (fun = wrap_code(fun))        
+        toexpr(fun, states)
     end
 
     if expression == Val{true}
@@ -125,7 +132,7 @@ end
 
 SymbolicUtils.Code.get_symbolify(x::Arr) = SymbolicUtils.Code.get_symbolify(unwrap(x))
 
-function _build_function(target::JuliaTarget, op::Arr, args...;
+function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
@@ -140,16 +147,33 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+
     expr = if cse
         toexpr(Func(dargs, [], Code.cse(op)), states)
     else
         toexpr(Func(dargs, [], op), states)
     end
 
-    if expression == Val{true}
-        expr
+    outsym = Symbol("ˍ₋out")
+    body = inplace_expr(unwrap(op), outsym)
+    oop_expr = toexpr(Func([outsym, dargs...], [], body), states)
+
+    N = length(shape(op))
+    op = unwrap(op)
+    if op isa ArrayOp && istree(op.term)
+        op_body = op.term
     else
-        _build_and_inject_function(expression_module, expr)
+        op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
+                   $body
+              $outsym
+          end) |> LiteralExpr
+    end
+    ip_expr = toexpr(Func(dargs, [], op_body), states)
+    if expression == Val{true}
+        oop_expr, ip_expr
+    else
+        _build_and_inject_function(expression_module, oop_expr),
+        _build_and_inject_function(expression_module, ip_expr)
     end
 end
 

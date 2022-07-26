@@ -53,9 +53,13 @@ Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Term) = _isfalse(operation(occ))
 
-function occursin_info(x, expr)
+function occursin_info(x, expr, fail = true)
     if symtype(expr) <: AbstractArray
-        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+        if fail
+            error("Differentiation with array expressions is not yet supported")
+        else
+            return occursin(x, expr)
+        end
     end
 
     # Allow scalarized expressions
@@ -65,11 +69,13 @@ function occursin_info(x, expr)
          is_scalar_indexed(operation(ex)))
     end
 
+    # x[1] == x[1] but not x[2]
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         isequal(first(arguments(x)), first(arguments(expr)))
         return isequal(operation(x), operation(expr)) &&
                isequal(arguments(x), arguments(expr))
     end
+
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
         !occursin(first(arguments(x)), first(arguments(expr)))
         return false
@@ -83,7 +89,7 @@ function occursin_info(x, expr)
     if isequal(x, expr)
         true
     else
-        args = map(a->occursin_info(x, a), arguments(expr))
+        args = map(a->occursin_info(x, a, operation(expr) !== getindex), arguments(expr))
         if all(_isfalse, args)
             return false
         end
@@ -91,9 +97,9 @@ function occursin_info(x, expr)
     end
 end
 
-function occursin_info(x, expr::Sym)
-    if symtype(expr) <: AbstractArray
-        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+function occursin_info(x, expr::Sym, fail)
+    if symtype(expr) <: AbstractArray && fail
+            error("Differentiation of expressions involving arrays and array variables is not yet supported.")
     end
     isequal(x, expr)
 end
@@ -138,12 +144,12 @@ end
 $(SIGNATURES)
 
 TODO
-    
+
 # Examples
 ```jldoctest
 
-julia> @variables x y z k; 
-    
+julia> @variables x y z k;
+
 julia> f=k*(abs(x-y)/y-z)^2
 k*((abs(x - y) / y - z)^2)
 
@@ -152,7 +158,7 @@ julia> Dx=Differential(x) # Differentiate wrt x
 
 julia> dfx=expand_derivatives(Dx(f))
 (k*((2abs(x - y)) / y - 2z)*IfElse.ifelse(signbit(x - y), -1, 1)) / y
-```    
+```
 """
 function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
     if istree(O) && isa(operation(O), Differential)
@@ -326,7 +332,7 @@ derivative(f, args, v) = NoDeriv()
 
 # Pre-defined derivatives
 import DiffRules
-for (modu, fun, arity) ∈ DiffRules.diffrules()
+for (modu, fun, arity) ∈ DiffRules.diffrules(; filter_modules=(:Base, :SpecialFunctions, :NaNMath))
     fun in [:*, :+, :abs, :mod, :rem, :max, :min] && continue # special
     for i ∈ 1:arity
 

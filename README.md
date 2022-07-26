@@ -20,7 +20,7 @@ julia> Pkg.add("Symbolics")
 
 ## Documentation
 
-For information on using the package, see the [stable documentation](https://juliasymbolics.github.io/Symbolics.jl/dev/).
+For information on using the package, see the [stable documentation](https://juliasymbolics.github.io/Symbolics.jl/stable/).
 Use the [in-development documentation](https://juliasymbolics.github.io/Symbolics.jl/dev/)
 for the version of the documentation which contains the unreleased features.
 
