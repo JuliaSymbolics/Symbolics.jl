@@ -62,7 +62,7 @@ function mark_and_exponentiate(expr, vars, deg, consts)
 
 
     rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer && x > 0)) =>
-             BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
+             BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), !_isone((~a).p) && ~b > deg)
              @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars, consts)
 
              @rule *(~~x) => mul_bounded(~~x, deg)]
@@ -96,7 +96,7 @@ function mark_vars(expr, vars, consts)
     end
 
     if !istree(expr)
-        if consts
+        if consts && !(expr isa BoundedDegreeMonomial)
             return BoundedDegreeMonomial(1, expr, false)
         end
         return expr
@@ -360,7 +360,7 @@ function mul_bounded(xs, deg)
 end
 
 function pow(a::BoundedDegreeMonomial, b, deg)
-    return BoundedDegreeMonomial((a.p)^b, a.coeff ^ b, b > deg)
+    return BoundedDegreeMonomial((a.p)^b, a.coeff ^ b, !_isone(a.p) && b > deg)
 end
 
 pow(a, b, deg) = a^b
@@ -391,7 +391,7 @@ function pow_of_add(a, b, deg, vars, consts)
     if isempty(interesting)
         a^b # Don't need to do anything!
     else
-        q = partial_multinomial_expansion(interesting, b, deg)
+        q = partial_multinomial_expansion(interesting, b, deg, consts)
         if maxdeg * b <= deg
             q # q is the whole enchilada
         else
@@ -401,13 +401,26 @@ function pow_of_add(a, b, deg, vars, consts)
     end
 end
 
-function partial_multinomial_expansion(xs, exp, deg)
+function partial_multinomial_expansion(xs, exp, deg, consts)
     zs = filter(iszero∘_degree, xs)
     nzs = filter((!iszero)∘_degree, xs)
+    function add_consts(xs)
+        !consts && return +(xs...)
+        s = 0
+        for x in xs
+            if x isa BoundedDegreeMonomial
+                @assert x.p == 1
+                s += x.coeff
+            else
+                s += x
+            end
+        end
+        return BoundedDegreeMonomial(1, s, false)
+    end
     if isempty(zs)
         terms = nzs
     else
-        terms = [+(zs...), nzs...]
+        terms = [add_consts(zs), nzs...]
     end
     degs = map(_degree, terms)
 
@@ -418,12 +431,19 @@ function partial_multinomial_expansion(xs, exp, deg)
         td = sum(degs .* ks)
 
         coeff = div(nfact, prod(factorial, ks))
+        function monomial(coeff, terms, ks)
+            mul_bounded([coeff, (pow(x,y, deg) for (x, y)
+                                 in zip(terms, ks)
+                                 if !iszero(y))...], Inf)
+        end
         if td == 0
-            push!(q, *(coeff, (x^y for (x, y) in zip(terms, ks) if !iszero(y))...))
+            m = monomial(coeff, terms, ks)
+            push!(q, monomial(coeff, terms, ks))
         elseif td <= deg
             push!(q,
                   mul_bounded(vcat(coeff,
-                                   [pow(x,y, deg) for (x, y) in zip(terms, ks) if !iszero(y)]),
+                                   [pow(x,y, deg)
+                                    for (x, y) in zip(terms, ks) if !iszero(y)]),
                               deg))
         end
     end
