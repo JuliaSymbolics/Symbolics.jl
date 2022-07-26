@@ -31,6 +31,16 @@ d, r = semipolynomial_form((x+2)^12, [x], 1)
 # 657
 @test iszero(semilinear_form([x * cos(x) + x^2 * 3sin(x) + 4exp(x)], [x])[1])
 
+# check negative exponent
+# `SymbolicUtils.Pow` object with a negative exponent normally cannot be created.
+# For example, `x^-1` returns `1 / x` which is a `SymbolicUtils.Div`.
+# But `expand_derivatives` may result in a `SymbolicUtils.Pow` with a negative exponent.
+sqrt_x = sqrt(x)
+deriv = expand_derivatives(Differential(x)(sqrt_x)) # (1//2)*(sqrt(x)^-1)
+expr = substitute(deriv, Dict(sqrt_x => y)) # (1//2)*(y^-1)
+d, r = semipolynomial_form(expr, [x, y], Inf)
+@test isempty(d)
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
