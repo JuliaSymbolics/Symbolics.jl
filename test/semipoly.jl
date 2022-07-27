@@ -31,6 +31,30 @@ d, r = semipolynomial_form((x+2)^12, [x], 1)
 # 657
 @test iszero(semilinear_form([x * cos(x) + x^2 * 3sin(x) + 4exp(x)], [x])[1])
 
+pow_expr = 7^(3y + sin(y))
+@test SymbolicUtils.ispow(Symbolics.unwrap(pow_expr))
+dict, nl = semipolynomial_form(pow_expr, [y], Inf)
+@test isempty(dict)
+# expect a SymbolicUtils.Pow object instead of SymbolicUtils.Term with f = ^
+@test isequal(nl, pow_expr)
+@test SymbolicUtils.ispow(nl)
+
+mul_expr = 9 * 7^y * sin(x)^4 * tan(x + y)^3
+@test SymbolicUtils.ismul(Symbolics.unwrap(mul_expr))
+dict, nl = semipolynomial_form(mul_expr, [x, y], Inf)
+@test isempty(dict)
+# expect a SymbolicUtils.Mul object instead of SymbolicUtils.Term with f = *
+@test isequal(nl, mul_expr)
+@test SymbolicUtils.ismul(nl)
+
+div_expr = x / y
+@test SymbolicUtils.isdiv(Symbolics.unwrap(div_expr))
+dict, nl = semipolynomial_form(div_expr, [x, y], Inf)
+@test isempty(dict)
+# expect a SymbolicUtils.Div object instead of SymbolicUtils.Term with f = /
+@test isequal(nl, div_expr)
+@test SymbolicUtils.isdiv(nl)
+
 # check negative exponent
 # `SymbolicUtils.Pow` object with a negative exponent normally cannot be created.
 # For example, `x^-1` returns `1 / x` which is a `SymbolicUtils.Div`.
@@ -40,6 +64,7 @@ deriv = expand_derivatives(Differential(x)(sqrt_x)) # (1//2)*(sqrt(x)^-1)
 expr = substitute(deriv, Dict(sqrt_x => y)) # (1//2)*(y^-1)
 d, r = semipolynomial_form(expr, [x, y], Inf)
 @test isempty(d)
+
 
 @syms a b c
 
