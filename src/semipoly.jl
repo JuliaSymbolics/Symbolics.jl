@@ -3,22 +3,37 @@ using DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
-## BoundedDegreeMonomial helper type
-
 """
-    BoundedDegreeMonomial
+$(TYPEDEF)
+
+A compact notation for monomials and also non-monomial terms.
 
 # Attrtibutes
-- p -- a monomial
-- coeff -- the coefficient (monomial means p * coeff)
-- overdegree -- boolean flag shows if degree of p * coeff
-  is too high (this is marked by the semi-polynomialization process)
+$(TYPEDFIELDS)
 
+For example, the monomial ``2 x^3 y^5 z^7`` about the variables ``(x, y, z)`` is simply
+expressed as `SemiMonomial(coeff = 2, degrees = [3, 5, 7])`.
+
+This struct is called *semi* because it can also represent non-monomial terms.
+For example, ``5 b^{2.5} \\tan(c) / a^{\\frac12}`` about ``(a, b)`` is
+`SemiMonomial(coeff = 5tan(c), degrees = [-1//2, 2.5])`.
+Note that here ``c`` is treated as a constant.
+
+This notation transforms multiplication into addition of exponent vertors, division into
+subtraction, exponentiation into addition.
+
+The parametric type `T` depends on the types of the associated variables. For example,
+when the variables are declared using `@variables x::Int32 y::Int64 z::Rational{Int32}`,
+`T` should be `Rational{Int64}` derived by `promote_type(Symbolics.symtype.([x, y, z])...)`.
+
+See also
+[Wikipedia: Monomial - Multi-index notation](https://en.wikipedia.org/wiki/Monomial#Multi-index_notation).
 """
-struct BoundedDegreeMonomial
-    p::Union{Mul, Pow, Int, Sym, Term}
+struct SemiMonomial{T}
+    "coefficient"
     coeff::Any
-    overdegree::Bool
+    "exponent vector"
+    degrees::Vector{N} where {N <: Real}
 end
 
 highdegree(x) = BoundedDegreeMonomial(1, x, true)
@@ -454,5 +469,3 @@ function partial_multinomial_expansion(xs, exp, deg, consts)
     end
     return Term{Real}(+, q)
 end
-
-
