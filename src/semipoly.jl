@@ -160,7 +160,7 @@ end
 #
 
 """
-    semipolynomial_form(expr, vars, degree)
+    semipolynomial_form(expr, vars, degree, [consts=false])
 
 Semi-polynomial form. Returns a tuple of two objects:
 
@@ -172,6 +172,9 @@ Semi-polynomial form. Returns a tuple of two objects:
 For every expression in `exprs` computes the semi-polynomial form as above and
 returns a tuple of two objects -- a vector of coefficient dictionaries,
 and a vector of residual terms.
+
+If  `consts` is set to `true`, then the returned dictionary will contain
+a key `1` and the corresponding value will be the constant term. If `false`, the constant term will be part of the residual.
 """
 function semipolynomial_form(expr, vars, degree, consts=false)
     expr = unwrap(expr)
@@ -191,7 +194,7 @@ end
 
 
 """
-    polynomial_coeffs(expr, vars)
+    polynomial_coeffs(expr, vars, [consts=false])
 
 
 Find coefficients of a polynomial in `vars`.
@@ -200,16 +203,18 @@ Returns a tuple of two elements:
 1. A dictionary of coefficients keyed by monomials in `vars`
 2. A residual expression which is the constant term
 
-(Same as `semipolynomial_form(expr, vars, Inf)`)
+(Same as `semipolynomial_form(expr, vars, Inf, consts)`)
 """
-polynomial_coeffs(expr, vars) = semipolynomial_form(expr, vars, Inf)
+polynomial_coeffs(expr, vars, consts=false) = semipolynomial_form(expr, vars, Inf, consts)
 
 """
-    semilinear_form(exprs::AbstractVector, vars::AbstractVector)
+    semilinear_form(exprs::AbstractVector, vars::AbstractVector, [consts=false])
 
 Returns a tuple of a sparse matrix `A`, and a residual vector `c` such that,
 
 `A * vars + c` is the same as `exprs`.
+If `consts` = true then, `A * [1, vars] + c == exprs`.
+Here `c` will only contain nonlinear terms and not constant terms.
 """
 function semilinear_form(exprs::AbstractArray, vars, consts=false)
     exprs = unwrap.(exprs)
