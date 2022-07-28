@@ -5,6 +5,16 @@ using Random
 
 @variables x y z
 
+@testset "SemiMonomial constructor" begin
+    c = 4
+    ds = [1, 2]
+    T = Rational{Int32}
+    m = Symbolics.SemiMonomial{T}(c, ds)
+    @test c == m.coeff
+    @test ds == m.degrees
+    @test Int == typeof(m.coeff)
+    @test Int == eltype(m.degrees)
+end
 
 @test_throws ArgumentError semipolynomial_form(x,[x],0)
 
