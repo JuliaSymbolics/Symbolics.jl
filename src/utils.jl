@@ -225,45 +225,31 @@ function var_from_nested_derivative(x,i=0)
     end
 end
 
-function degree(p::Sym, sym=nothing)
-    if sym === nothing
-        return 1
-    else
-        return Int(isequal(p, sym))
-    end
-end
-
-function degree(p::Pow, sym=nothing)
-    return p.exp * degree(p.base, sym)
-end
-
-function degree(p::Add, sym=nothing)
-    return maximum(degree(key, sym) for key in keys(p.dict))
-end
-
-function degree(p::Mul, sym=nothing)
-    return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
-end
-
-function degree(p::Term, sym=nothing)
-    if sym === nothing
-        return 1
-    else
-        return Int(isequal(p, sym))
-    end
-end
+degree(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 1 : Int(isequal(p, sym))
+degree(p::Add, sym=nothing) = maximum(degree.(arguments(p), sym))
+degree(p::Mul, sym=nothing) = sum(degree(k^v, sym) for (k, v) in p.dict)
+degree(p::Pow, sym=nothing) = p.exp * degree(p.base, sym)
 
 function degree(p, sym=nothing)
-    p = value(p)
-    sym = value(sym)
-    if p isa Number
-        return 0
-    end
-    if isequal(p, sym)
-        return 1
-    end
-    if p isa Symbolic
-        return degree(p, sym)
-    end
+    p, sym = value(p), value(sym)
+    p isa Number && return 0
+    isequal(p, sym) && return 1
+    p isa Symbolic && return degree(p, sym)
+    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
+end
+
+coeff(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
+coeff(p::Pow, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
+coeff(p::Add, sym=nothing) = sum(coeff.(arguments(p), sym))
+function coeff(p::Mul, sym=nothing)
+    args = arguments(p)
+    I = findall(a -> !isequal(a, sym), args)
+    length(I) == length(args) ? 0 : prod(args[I])
+end
+
+function coeff(p, sym=nothing)
+    p, sym = value(p), value(sym)
+    p isa Number && return sym === nothing ? p : 0
+    p isa Symbolic && return coeff(p, sym)
     throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end
