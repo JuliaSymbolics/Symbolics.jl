@@ -239,6 +239,67 @@ end
     @test iszero(r)
 end
 
+@testset "(y^-1)*(x^4 + y^4)" begin
+    sqrt_x = sqrt(x)
+    Dx = Differential(x)
+    deriv = expand_derivatives(Dx(sqrt_x)) # (1//2)*(sqrt(x)^-1)
+    expr = substitute(deriv, Dict(sqrt_x => y)) # (1//2)*(y^-1)
+    y_1 = expr * 2 # y^-1
+    expr = y_1 * (x^4 + y^4) # (y^-1)*(x^4 + y^4)
+
+    d, r = semipolynomial_form(expr, [x, y], 2)
+    @test isempty(d)
+    @test isequal(r, y_1 * x^4 + y^3) || isequal(r, x^4 / y + y^3)
+
+    d, r = semipolynomial_form(expr, [x, y], 3)
+    @test isequal(d, Dict(y^3 => 1))
+    @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
+
+    d, r = semipolynomial_form(expr, [x, y], 4)
+    @test isequal(d, Dict(y^3 => 1))
+    @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
+
+    d, r = semipolynomial_form(expr, [x], 2)
+    @test isequal(d, Dict(1 => y^3))
+    @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
+
+    d, r = semipolynomial_form(expr, [x], 3)
+    @test isequal(d, Dict(1 => y^3))
+    @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
+
+    d, r = semipolynomial_form(expr, [x], 4)
+    @test isequal(d, Dict(1 => y^3, x^4 => y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [y], 2)
+    @test isempty(d)
+    @test isequal(r, y_1 * x^4 + y^3) || isequal(r, x^4 / y + y^3)
+
+    d, r = semipolynomial_form(expr, [y], 3)
+    @test isequal(d, Dict(y^3 => 1))
+    @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
+
+    d, r = semipolynomial_form(expr, [y], 4)
+    @test isequal(d, Dict(y^3 => 1))
+    @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
+
+    d, r = semipolynomial_form(expr, [], 0)
+    @test isequal(d, Dict(1 => y_1 * x^4 + y^3)) || isequal(d, Dict(1 => x^4 / y + y^3))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [], 2)
+    @test isequal(d, Dict(1 => y_1 * x^4 + y^3)) || isequal(d, Dict(1 => x^4 / y + y^3))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [], 3)
+    @test isequal(d, Dict(1 => y_1 * x^4 + y^3)) || isequal(d, Dict(1 => x^4 / y + y^3))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [], 4)
+    @test isequal(d, Dict(1 => y_1 * x^4 + y^3)) || isequal(d, Dict(1 => x^4 / y + y^3))
+    @test iszero(r)
+end
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
