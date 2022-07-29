@@ -488,8 +488,6 @@ function partition(n, parts)
      for i=0:n] |> Iterators.flatten |> collect
 end
 
-all_terms(x) = istree(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
-
 unwrap_bp(x::BoundedDegreeMonomial) = x.p * x.coeff
 function unwrap_bp(x)
     x = unwrap(x)
@@ -617,4 +615,13 @@ function partial_multinomial_expansion(xs, exp, deg, consts)
         end
     end
     return Term{Real}(+, q)
+end
+
+# used to get all arguments of a possibly nested `Term` with + operation or `Add`.
+function all_terms(x)
+    if istree(x) && operation(x) == (+)
+        collect(Iterators.flatten(map(all_terms, unsorted_arguments(x))))
+    else
+        (x,)
+    end
 end
