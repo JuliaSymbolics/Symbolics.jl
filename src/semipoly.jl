@@ -66,6 +66,79 @@ function Base.:^(base::SemiMonomial{T}, exp::Real) where {T}
     SemiMonomial{promote_symtype(^, T, typeof(exp))}(base.coeff^exp, base.degrees * exp)
 end
 
+"""
+$(SIGNATURES)
+
+Check if `x` is of type [`SemiMonomial`](@ref).
+"""
+issemimonomial(x) = x isa SemiMonomial
+
+"""
+$(SIGNATURES)
+
+Return true if `m` is a [`SemiMonomial`](@ref) and satisfies the definition of a monomial.
+
+A monomial, also called power product, is a product of powers of variables with nonnegative
+integer exponents.
+
+See also [Wikipedia: Monomial](https://en.wikipedia.org/wiki/Monomial).
+"""
+function ismonomial(m, vars)::Bool
+    if !(m isa SemiMonomial)
+        return false
+    end
+    for degree in m.degrees
+        if !isinteger(degree) || degree < 0
+            return false
+        end
+    end
+    !has_vars(m.coeff, vars)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Return true is `m` is a [`SemiMonomial`](@ref), satisfies the definition of a monomial and
+its degree is less than or equal to `degree_bound`. See also [`ismonomial`](@ref).
+"""
+function isboundedmonomial(m, vars, degree_bound::Real)::Bool
+    ismonomial(m, vars) && _degree(m) <= degree_bound
+end
+
+"""
+$(SIGNATURES)
+
+Construct a [`SemiMonomial`](@ref) object with `expr` as its coefficient and 0 degrees.
+"""
+function non_monomial(expr, vars)::SemiMonomial
+    degrees = zeros(Int, length(vars))
+    SemiMonomial{symtype(expr)}(expr, degrees)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Return true if the degrees of `m` are all 0s and its coefficient is a `Real`.
+"""
+function Base.:isreal(m::SemiMonomial)::Bool
+    _degree(m) == 0 && unwrap(m.coeff) isa Real
+end
+Base.:isreal(::Symbolic) = false
+
+"""
+$(TYPEDSIGNATURES)
+
+Transform `m` to a `Real`.
+
+Assume `isreal(m) == true`, otherwise calling this function does not make sense.
+"""
+function Base.:real(m::SemiMonomial)::Real
+    if isinteger(m.coeff)
+        return Int(m.coeff)
+    end
+    return m.coeff
+end
+
 highdegree(x) = BoundedDegreeMonomial(1, x, true)
 
 highdegree(x::BoundedDegreeMonomial) = (@assert(x.overdegree); x)
