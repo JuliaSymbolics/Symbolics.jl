@@ -358,10 +358,8 @@ function semipolynomial_form(exprs::AbstractArray, vars, degree::Real)
     map(first, tmp), map(last, tmp)
 end
 
-
 """
-    polynomial_coeffs(expr, vars, [consts=false])
-
+$(SIGNATURES)
 
 Find coefficients of a polynomial in `vars`.
 
@@ -369,9 +367,9 @@ Returns a tuple of two elements:
 1. A dictionary of coefficients keyed by monomials in `vars`
 2. A residual expression which is the constant term
 
-(Same as `semipolynomial_form(expr, vars, Inf, consts)`)
+(Same as `semipolynomial_form(expr, vars, Inf)`)
 """
-polynomial_coeffs(expr, vars, consts=false) = semipolynomial_form(expr, vars, Inf, consts)
+polynomial_coeffs(expr, vars) = semipolynomial_form(expr, vars, Inf)
 
 """
     semilinear_form(exprs::AbstractVector, vars::AbstractVector, [consts=false])
