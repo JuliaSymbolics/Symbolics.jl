@@ -116,32 +116,40 @@ end
     @test isequal(d, Dict(1 => 1 << 12, x => (1 << 11) * 12))
 end
 
+@testset "maintein SymbolicUtils.Symbolic subtype" begin
+    pow_expr = 7^(3y + sin(y))
+    @test SymbolicUtils.ispow(Symbolics.unwrap(pow_expr))
+    dict, nl = semipolynomial_form(pow_expr, [y], Inf)
+    @test isempty(dict)
+    # expect a SymbolicUtils.Pow object instead of SymbolicUtils.Term with f = ^
+    @test isequal(nl, pow_expr)
+    @test SymbolicUtils.ispow(nl)
+
+    mul_expr = 9 * 7^y * sin(x)^4 * tan(x + y)^3
+    @test SymbolicUtils.ismul(Symbolics.unwrap(mul_expr))
+    dict, nl = semipolynomial_form(mul_expr, [x, y], Inf)
+    @test isempty(dict)
+    # expect a SymbolicUtils.Mul object instead of SymbolicUtils.Term with f = *
+    @test isequal(nl, mul_expr)
+    @test SymbolicUtils.ismul(nl)
+
+    div_expr = x / y
+    @test SymbolicUtils.isdiv(Symbolics.unwrap(div_expr))
+    dict, nl = semipolynomial_form(div_expr, [x, y], Inf)
+    @test isempty(dict)
+    # expect a SymbolicUtils.Div object instead of SymbolicUtils.Term with f = /
+    @test isequal(nl, div_expr)
+    @test SymbolicUtils.isdiv(nl)
+    dict, nl = semipolynomial_form(div_expr, [x], Inf)
+    @test isequal(dict, Dict(x => 1 / y))
+    @test iszero(nl)
+    dict, nl = semipolynomial_form(div_expr, [y], Inf)
+    @test isempty(dict)
+    @test isequal(nl, div_expr)
+end
+
 # 657
 @test iszero(semilinear_form([x * cos(x) + x^2 * 3sin(x) + 4exp(x)], [x])[1])
-
-pow_expr = 7^(3y + sin(y))
-@test SymbolicUtils.ispow(Symbolics.unwrap(pow_expr))
-dict, nl = semipolynomial_form(pow_expr, [y], Inf)
-@test isempty(dict)
-# expect a SymbolicUtils.Pow object instead of SymbolicUtils.Term with f = ^
-@test isequal(nl, pow_expr)
-@test SymbolicUtils.ispow(nl)
-
-mul_expr = 9 * 7^y * sin(x)^4 * tan(x + y)^3
-@test SymbolicUtils.ismul(Symbolics.unwrap(mul_expr))
-dict, nl = semipolynomial_form(mul_expr, [x, y], Inf)
-@test isempty(dict)
-# expect a SymbolicUtils.Mul object instead of SymbolicUtils.Term with f = *
-@test isequal(nl, mul_expr)
-@test SymbolicUtils.ismul(nl)
-
-div_expr = x / y
-@test SymbolicUtils.isdiv(Symbolics.unwrap(div_expr))
-dict, nl = semipolynomial_form(div_expr, [x, y], Inf)
-@test isempty(dict)
-# expect a SymbolicUtils.Div object instead of SymbolicUtils.Term with f = /
-@test isequal(nl, div_expr)
-@test SymbolicUtils.isdiv(nl)
 
 # check negative exponent
 # `SymbolicUtils.Pow` object with a negative exponent normally cannot be created.
