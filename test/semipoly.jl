@@ -300,6 +300,106 @@ end
     @test iszero(r)
 end
 
+@testset "rational exponent" begin
+    expr = y^(1//1)
+
+    d, r = semipolynomial_form(expr, [x], 0)
+    @test isequal(d, Dict(1 => y))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [x], 1)
+    @test isequal(d, Dict(1 => y))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [y], 0)
+    @test isempty(d)
+    @test isequal(r, y)
+
+    d, r = semipolynomial_form(expr, [y], 1)
+    @test isequal(d, Dict(y => 1))
+    @test iszero(r)
+
+    expr = (x^(4//3) + y^(5//2))^3
+
+    d, r = semipolynomial_form(expr, [x, y], 0)
+    @test isempty(d)
+    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [x, y], 1)
+    @test isempty(d)
+    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [x, y], 2)
+    @test isempty(d)
+    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [x, y], 3)
+    @test isempty(d)
+    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [x, y], 4)
+    @test isequal(d, Dict(x^4 => 1))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [x, y], 5)
+    @test isequal(d, Dict(x^4 => 1))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [x, y], 6)
+    @test isequal(d, Dict(x^4 => 1))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [y], 3)
+    @test isequal(d, Dict(1 => x^4))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [y], 4)
+    @test isequal(d, Dict(1 => x^4))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [y], 5)
+    @test isequal(d, Dict(1 => x^4, y^5 => 3x^(4//3)))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [y], 6)
+    @test isequal(d, Dict(1 => x^4, y^5 => 3x^(4//3)))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + y^(15//2))
+
+    d, r = semipolynomial_form(expr, [x], 3)
+    @test isequal(d, Dict(1 => y^(15//2)))
+    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
+
+    d, r = semipolynomial_form(expr, [x], 4)
+    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
+
+    d, r = semipolynomial_form(expr, [x], 5)
+    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
+
+    d, r = semipolynomial_form(expr, [x], 6)
+    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
+    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
+
+    d, r = semipolynomial_form(expr, [], 0)
+    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [], 1)
+    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [], 2)
+    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test iszero(r)
+
+    expr = (x + y)^(1//2)
+
+    d, r = semipolynomial_form(expr, [x, y], 2)
+    @test isempty(d)
+    @test isequal(r, expr)
+end
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
