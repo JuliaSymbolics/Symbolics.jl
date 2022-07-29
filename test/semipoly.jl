@@ -66,6 +66,39 @@ end
     @test m.degrees == [0.7, -0.35]
 end
 
+@testset "SemiMonomial isreal" begin
+    a = Symbolics.SemiMonomial{Int32}(4.0, [-1.0, 1//2])
+    @test !isreal(a)
+
+    b = Symbolics.SemiMonomial{Int32}(9, [-0.0, 0//1])
+    @test isreal(b)
+
+    c = Symbolics.SemiMonomial{Int32}(tan(x), [-0.0, 0//1])
+    @test !isreal(c)
+end
+
+@testset "SemiMonomial real" begin
+    b = Symbolics.SemiMonomial{Int32}(9, [-0.0, 0//1])
+    @test real(b) == 9
+end
+
+@testset "tomonomial" begin
+    a = Symbolics.SemiMonomial{Real}(3, [1, 2])
+    m = Symbolics.tomonomial(a, [x, y])
+    @test isequal(m, x * y^2)
+
+    b = Symbolics.SemiMonomial{Real}(z, [0.0, 0.0])
+    n = Symbolics.tomonomial(b, [x, y])
+    @test n == 1
+
+    c = Symbolics.SemiMonomial{Real}(4.0, [1//2, 2.0])
+    @test_throws InexactError Symbolics.tomonomial(c, [x, y])
+
+    d = Symbolics.SemiMonomial{Real}(9.0, [0.0, 4])
+    r = Symbolics.tomonomial(d, [x, y])
+    @test isequal(r, y^4)
+end
+
 @test_throws ArgumentError semipolynomial_form(x,[x],0)
 
 d, r = semipolynomial_form(x, [x], 1)
