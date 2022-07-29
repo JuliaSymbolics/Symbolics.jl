@@ -236,6 +236,56 @@ function mark_vars(expr, vars)
 end
 mark_vars(vars) = Base.Fix2(mark_vars, vars)
 
+"""
+$(TYPEDSIGNATURES)
+
+Transform `m` into its corresponding `Real` number or `SymbolicUtils.Symbolic` form.
+
+Assume `m` satisfies [`ismonomial`](@ref).
+"""
+function tomonomial(m::SemiMonomial{T}, vars)::Union{Real, Symbolic} where {T}
+    indices = findall(x -> x > 0, m.degrees)
+    dict = Dict(vars[i] => Int(m.degrees[i]) for i in indices)
+    Mul(T, 1, dict)
+end
+
+# Transform `SemiMonomial` and `SymbolicUtils.Symbolic` to their corresponding appropriate
+# `SymbolicUtils.Symbolic` subtypes.
+function unwrap_sm(m::SemiMonomial{T}, vars) where {T}
+    dict_positive = Dict()
+    sizehint!(dict_positive, length(vars))
+    # deal with negative powers separately to avoid making negative degrees
+    # in `Mul` or `Pow`
+    dict_negative = Dict()
+    sizehint!(dict_positive, length(vars))
+    for (var, degree) in zip(vars, m.degrees)
+        if isinteger(degree)
+            degree = Int(degree)
+        end
+        if degree > 0
+            dict_positive[var] = degree
+        elseif degree < 0
+            dict_negative[var] = -degree
+        end
+    end
+    positive = if m.coeff isa Number
+        Mul(T, m.coeff, dict_positive)
+    else
+        m.coeff * Mul(T, 1, dict_positive)
+    end
+    negative = Mul(T, 1, dict_negative)
+    positive / negative
+end
+function unwrap_sm(x, vars)
+    x = unwrap(x)
+    if istree(x)
+        similarterm(x, operation(x), map(unwrap_sm(vars), arguments(x)))
+    else
+        x
+    end
+end
+unwrap_sm(vars) = Base.Fix2(unwrap_sm, vars)
+
 function bifurcate_terms(expr)
     # Step 4: Bifurcate polynomial and nonlinear parts:
 
