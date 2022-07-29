@@ -175,24 +175,35 @@ function mark_and_exponentiate(expr, vars)
     expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
 end
 
-function semipolyform_terms(expr, vars::OrderedSet, deg, consts)
-    if deg <= 0
-        throw(ArgumentError("Degree for semi-polynomial form must be > 0"))
+function semipolyform_terms(expr, vars)
+    expr = mark_and_exponentiate(expr, vars)
+    if istree(expr) && operation(expr) == (+)
+        args = collect(all_terms(expr))
+        return args
+    elseif isreal(expr) && iszero(real(expr)) # when `expr` is just a 0
+        return []
+    else
+        return [expr]
     end
-
-    expr′ = mark_and_exponentiate(expr, vars, deg, consts)
-
-    # Step 3: every term now show have at most one valid monomial -- find the coefficient for it.
-    Postwalk(Chain([@rule *(~~x, ~a::isboundedmonom, ~~y) =>
-                                BoundedDegreeMonomial((~a).p,
-                                                      (~a).coeff * _mul(~~x) * _mul(~~y),
-                                                      (~a).overdegree)]),
-             similarterm=bareterm)(expr′)
-
 end
+semipolyform_terms(vars) = Base.Fix2(semipolyform_terms, vars)
 
-function has_vars(expr, vars)
-    expr in vars || (istree(expr) && any(x->has_vars(x, vars), unsorted_arguments(expr)))
+"""
+$(TYPEDSIGNATURES)
+
+Return true if `expr` contains any variables in `vars`.
+"""
+function has_vars(expr, vars)::Bool
+    if expr in vars
+        return true
+    elseif istree(expr)
+        for arg in unsorted_arguments(expr)
+            if has_vars(arg, vars)
+                return true
+            end
+        end
+    end
+    return false
 end
 
 function mark_vars(expr, vars)
