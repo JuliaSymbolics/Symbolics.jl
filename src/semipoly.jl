@@ -58,6 +58,10 @@ function Base.:*(m::SemiMonomial{T}, t) where {T}
 end
 Base.:*(t, m::SemiMonomial) = m * t
 
+function Base.:/(a::SemiMonomial{S}, b::SemiMonomial{T}) where {S, T}
+    SemiMonomial{promote_symtype(/, S, T)}(a.coeff / b.coeff, a.degrees - b.degrees)
+end
+
 highdegree(x) = BoundedDegreeMonomial(1, x, true)
 
 highdegree(x::BoundedDegreeMonomial) = (@assert(x.overdegree); x)

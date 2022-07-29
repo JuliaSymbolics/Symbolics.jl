@@ -42,6 +42,15 @@ end
     @test m.degrees == [0.0, 5//2]
 end
 
+@testset "SemiMonomial /" begin
+    a = Symbolics.SemiMonomial{Float32}(3, [1, 2])
+    b = Symbolics.SemiMonomial{Rational{Int64}}(4.0, [-1.0, 1//2])
+    m = a / b
+    @test m isa Symbolics.SemiMonomial{Float32}
+    @test m.coeff == 0.75
+    @test m.degrees == [2.0, 3//2]
+end
+
 @test_throws ArgumentError semipolynomial_form(x,[x],0)
 
 d, r = semipolynomial_form(x, [x], 1)
