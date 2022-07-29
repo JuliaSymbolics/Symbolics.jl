@@ -311,44 +311,51 @@ end
 
 function init_semipoly_vars(vars)
     set = OrderedSet(unwrap.(vars))
-    @assert length(set) == length(vars) "vars passed to semi-polynomial form must be unique"
+    @assert length(set) == length(vars) # vars passed to semi-polynomial form must be unique
     set
 end
 
-## API:
-#
-
 """
-    semipolynomial_form(expr, vars, degree, [consts=false])
+$(TYPEDSIGNATURES)
 
-Semi-polynomial form. Returns a tuple of two objects:
+Returns a tuple of two objects:
 
 1. A dictionary of coefficients keyed by monomials in `vars` upto the given `degree`,
 2. A residual expression which has all terms not represented as a product of monomial and a coefficient
 
-    semipolynomial_form(exprs::AbstractArray, vars, degree)
+`degree` should be a nonnegative number.
 
-For every expression in `exprs` computes the semi-polynomial form as above and
-returns a tuple of two objects -- a vector of coefficient dictionaries,
-and a vector of residual terms.
-
-If  `consts` is set to `true`, then the returned dictionary will contain
-a key `1` and the corresponding value will be the constant term. If `false`, the constant term will be part of the residual.
+See also
+[Wikipedia: Polynomial](https://en.wikipedia.org/wiki/Polynomial).
 """
-function semipolynomial_form(expr, vars, degree, consts=false)
-    expr = unwrap(expr)
+function semipolynomial_form(expr, vars, degree::Real)
+    if degree < 0
+        @warn "Degree for semi-polynomial form should be ≥ 0"
+        return Dict(), expr
+    end
     vars = init_semipoly_vars(vars)
-
-    bifurcate_terms(semipolyform_terms(expr, vars, degree, consts))
+    expr = unwrap(expr)
+    terms = semipolyform_terms(expr, vars)
+    bifurcate_terms(terms, vars, degree)
 end
 
-function semipolynomial_form(exprs::AbstractArray, vars, degree, consts=false)
-    exprs = unwrap.(exprs)
-    vars = init_semipoly_vars(vars)
+"""
+$(TYPEDSIGNATURES)
 
-    matches = map(x -> semipolyform_terms(x, vars, degree, consts), exprs)
-    tmp = map(bifurcate_terms, matches)
-    dicts, nls = map(first, tmp), map(last, tmp)
+For every expression in `exprs` computes the semi-polynomial form and
+returns a tuple of two objects -- a vector of coefficient dictionaries,
+and a vector of residual terms.
+"""
+function semipolynomial_form(exprs::AbstractArray, vars, degree::Real)
+    if degree < 0
+        @warn "Degree for semi-polynomial form should be ≥ 0"
+        return fill(Dict(), length), exprs
+    end
+    vars = init_semipoly_vars(vars)
+    exprs = unwrap.(exprs)
+    matches = map(semipolyform_terms(vars), exprs)
+    tmp = map(match -> bifurcate_terms(match, vars, degree), matches)
+    map(first, tmp), map(last, tmp)
 end
 
 
