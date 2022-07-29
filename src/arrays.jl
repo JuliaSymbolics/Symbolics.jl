@@ -626,7 +626,8 @@ function scalarize_op(f, arr, idx)
     if hasmetadata(arr, ScalarizeCache) && getmetadata(arr, ScalarizeCache)[] !== nothing
         getmetadata(arr, ScalarizeCache)[][idx...]
     else
-        thing = f(scalarize.(map(wrap, arguments(arr)))...)
+        # wrap and unwrap to call generic methods
+        thing = unwrap(f(scalarize.(map(wrap, arguments(arr)))...))
         if metadata(arr) != nothing
             # forward any metadata
             try
