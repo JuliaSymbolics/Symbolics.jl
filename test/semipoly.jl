@@ -159,49 +159,11 @@ end
     @test isempty(d)
 end
 
-@testset "constants as 0-degree monomials" begin
-    # expect no ArgumentError when degree = 0 and consts = true
-    @test_broken semipolynomial_form(1 + x, [x], 0, true)
-
-    d, r = semipolynomial_form(1 + x + y, [x], 1, true)
-    @test length(d) == 2
-    @test iszero(r)
-    @test isequal(d[1], 1 + y)
-    @test d[x] == 1
-
-    d, r = semipolynomial_form(1 + x + y, [x, y], 1, true)
-    @test length(d) == 3
-    @test iszero(r)
-    @test d[1] == 1
-    @test d[x] == 1
-    @test d[y] == 1
-
-    expr = 4(1 + x + y)^3
-    lin, nl = semipolynomial_form(expr, [x], 1, true)
-    @test length(lin) == 2
-    @test haskey(lin, x)
-    @test haskey(lin, 1)
-    @test isequal(lin[x], 12(1 + y)^2) || isequal(lin[x], 12 + 24y + 12y^2)
-    @test isequal(lin[1], 4(1 + y)^3) || isequal(lin[1], 4 + 12y + 12y^2 + 4y^3)
-
-    @testset "type $T degree $degree" for T in [Float32, Float64, Int32, Int64, UInt32,
-                                                UInt64, Rational],
-                                          degree in [1, 2, Inf]
-        expr = one(T)
-        d, r = semipolynomial_form(expr, [], degree, true)
-        @test iszero(r)
-        @test length(d) == 1
-        @test d[1] isa T
-        @test expr == d[1]
-
-        expr = one(T) + x + x^y + sin(x)
-        d, r = semipolynomial_form(expr, [x], degree, true)
-        @test isequal(r, x^y + sin(x))
-        @test length(d) == 2
-        # @test d[1] isa T
-        @test isone(d[1])
-        @test d[x] == 1
-    end
+@testset "negative input degree" begin
+    @test_logs (:warn,) semipolynomial_form(x, [x], -1.2)
+    @test_logs (:warn,) semipolynomial_form(x, [x], -10)
+    @test_logs (:warn,) semipolynomial_form(x, [x], -Inf)
+    @test_logs (:warn,) semipolynomial_form(x, [], -1 // 2)
 end
 
 @syms a b c
