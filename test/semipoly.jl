@@ -99,27 +99,22 @@ end
     @test isequal(r, y^4)
 end
 
-@test_throws ArgumentError semipolynomial_form(x,[x],0)
+@testset "simple expressions" begin
+    d, r = semipolynomial_form(x, [x], 1)
+    @test d == Dict(x => 1)
+    @test r == 0
 
-d, r = semipolynomial_form(x, [x], 1)
+    d, r = semipolynomial_form(x + sin(x) + 1 + y, [x], 1)
+    @test isequal(d, Dict(1 => 1 + y, x => 1))
+    @test isequal(r, sin(x))
 
-@test d == Dict(x=>1)
-@test r == 0
+    d, r = semipolynomial_form(x^2 + 1 + y, [x], 1)
+    @test isequal(d, Dict(1 => 1 + y))
+    @test isequal(r, x^2)
 
-d, r = semipolynomial_form(x + sin(x) + 1 + y, [x], 1)
-
-@test d == Dict(x=>1)
-@test iszero(r - sin(x) - 1 - y)
-
-d, r = semipolynomial_form(x^2+1+y, [x], 1)
-
-@test isempty(d)
-@test iszero(r - (x^2+1+y))
-
-d, r = semipolynomial_form((x+2)^12, [x], 1)
-
-@test d == Dict(x => 24576)
-@test iszero(r + 24576x - (x+2)^12)
+    d, r = semipolynomial_form((x + 2)^12, [x], 1)
+    @test isequal(d, Dict(1 => 1 << 12, x => (1 << 11) * 12))
+end
 
 # 657
 @test iszero(semilinear_form([x * cos(x) + x^2 * 3sin(x) + 4exp(x)], [x])[1])
