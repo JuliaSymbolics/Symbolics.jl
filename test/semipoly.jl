@@ -400,6 +400,34 @@ end
     @test isequal(r, expr)
 end
 
+@testset "floating-point exponent" begin
+    expr = (x^0.5 + y)^2
+
+    d, r = semipolynomial_form(expr, [x, y], 0)
+    @test isempty(d)
+    @test isequal(r, x + 2x^0.5 * y + y^2)
+
+    d, r = semipolynomial_form(expr, [x, y], 1)
+    @test isequal(d, Dict(x => 1))
+    @test isequal(r, 2x^0.5 * y + y^2)
+
+    d, r = semipolynomial_form(expr, [x, y], 2)
+    @test isequal(d, Dict(x => 1, y^2 => 1))
+    @test isequal(r, 2x^0.5 * y)
+
+    d, r = semipolynomial_form(expr, [x, y], 3)
+    @test isequal(d, Dict(x => 1, y^2 => 1))
+    @test isequal(r, 2x^0.5 * y)
+
+    expr = (3x^4 + y)^0.5
+
+    for degree in [0, 1, 2]
+        d, r = semipolynomial_form(expr, [x, y], degree)
+        @test isempty(d)
+        @test isequal(r, expr)
+    end
+end
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
