@@ -16,6 +16,23 @@ using Random
     @test Int == eltype(m.degrees)
 end
 
+@testset "SemiMonomial +" begin
+    a = Symbolics.SemiMonomial{Int64}(3, [1, 2])
+    b = Symbolics.SemiMonomial{Rational{Int32}}(4, [-1, 2.0])
+    t = a + b
+    @test t isa SymbolicUtils.Term
+    @test operation(t) == +
+    @test arguments(t) == [a, b]
+    @test Symbolics.symtype(t) == Rational{Int64}
+
+    c = Symbolics.SemiMonomial{Float32}(4, [-1, 2.0])
+    s = c + t
+    @test s isa SymbolicUtils.Term
+    @test operation(s) == +
+    @test arguments(s) == [a, b, c]
+    @test Symbolics.symtype(s) == Float32
+end
+
 @test_throws ArgumentError semipolynomial_form(x,[x],0)
 
 d, r = semipolynomial_form(x, [x], 1)
