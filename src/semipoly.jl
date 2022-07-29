@@ -286,33 +286,27 @@ function unwrap_sm(x, vars)
 end
 unwrap_sm(vars) = Base.Fix2(unwrap_sm, vars)
 
-function bifurcate_terms(expr)
+function bifurcate_terms(terms, vars, degree_bound::Real)
     # Step 4: Bifurcate polynomial and nonlinear parts:
 
-    if expr isa BoundedDegreeMonomial
-        return isboundedmonom(expr) ?
-            (Dict(expr.p => expr.coeff), 0) :
-            (Dict(), expr.p * expr.coeff)
-    elseif istree(expr) && operation(expr) == (+)
-        args = collect(all_terms(expr))
-        polys = filter(isboundedmonom, args)
+    monomials = filter(arg -> isboundedmonomial(arg, vars, degree_bound), terms)
 
-        poly = Dict()
-        for p in polys
-            if haskey(poly, p.p)
-                poly[p.p] += p.coeff
-            else
-                poly[p.p] = p.coeff
-            end
+    polys_dict = Dict()
+    sizehint!(polys_dict, length(monomials))
+    for m in monomials
+        monomial = tomonomial(m, vars)
+        if haskey(polys_dict, monomial)
+            polys_dict[monomial] += m.coeff
+        else
+            polys_dict[monomial] = m.coeff
         end
-
-        nls = filter(!isboundedmonom, args)
-        nl = cautious_sum(nls)
-
-        return poly, nl
-    else
-        return Dict(), unwrap_bp(expr)
     end
+    if length(monomials) == length(terms)
+        return polys_dict, 0
+    end
+    nl_terms = setdiff(terms, monomials)
+    nl = unwrap_sm(sum(unwrap_sm(vars), nl_terms), vars)
+    return polys_dict, nl
 end
 
 function init_semipoly_vars(vars)
