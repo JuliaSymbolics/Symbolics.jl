@@ -45,6 +45,19 @@ function Base.:+(a::SymbolicUtils.Term{S, M}, b::SemiMonomial{T}) where {S, T, M
 end
 Base.:+(a::SemiMonomial{T}, b::SymbolicUtils.Term{S, M}) where {S, T, M} = b + a
 
+Base.:*(m::SemiMonomial) = m
+function Base.:*(a::SemiMonomial{S}, b::SemiMonomial{T}) where {S, T}
+    SemiMonomial{promote_symtype(*, S, T)}(a.coeff * b.coeff, a.degrees + b.degrees)
+end
+function Base.:*(m::SemiMonomial{T}, t) where {T}
+    if istree(t) && operation(t) == (+)
+        args = collect(all_terms(t))
+        return SymbolicUtils.Term(+, (m,) .* args)
+    end
+    SemiMonomial{promote_symtype(*, T, symtype(t))}(m.coeff * t, m.degrees)
+end
+Base.:*(t, m::SemiMonomial) = m * t
+
 highdegree(x) = BoundedDegreeMonomial(1, x, true)
 
 highdegree(x::BoundedDegreeMonomial) = (@assert(x.overdegree); x)
