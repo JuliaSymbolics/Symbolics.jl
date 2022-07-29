@@ -33,6 +33,15 @@ end
     @test Symbolics.symtype(s) == Float32
 end
 
+@testset "SemiMonomial *" begin
+    a = Symbolics.SemiMonomial{Int64}(3, [1, 2])
+    b = Symbolics.SemiMonomial{Rational{Int32}}(4.0, [-1.0, 1//2])
+    m = a * b
+    @test m isa Symbolics.SemiMonomial{Rational{Int64}}
+    @test m.coeff == 12.0
+    @test m.degrees == [0.0, 5//2]
+end
+
 @test_throws ArgumentError semipolynomial_form(x,[x],0)
 
 d, r = semipolynomial_form(x, [x], 1)
