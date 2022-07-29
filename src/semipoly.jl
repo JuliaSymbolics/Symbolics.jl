@@ -36,6 +36,15 @@ struct SemiMonomial{T}
     degrees::Vector{N} where {N <: Real}
 end
 
+Base.:+(a::SemiMonomial) = a
+function Base.:+(a::SemiMonomial{S}, b::SemiMonomial{T}) where {S, T}
+    SymbolicUtils.Term{promote_symtype(+, S, T)}(+, [a, b])
+end
+function Base.:+(a::SymbolicUtils.Term{S, M}, b::SemiMonomial{T}) where {S, T, M}
+    SymbolicUtils.Term{promote_symtype(+, S, T)}(+, [a.arguments; b])
+end
+Base.:+(a::SemiMonomial{T}, b::SymbolicUtils.Term{S, M}) where {S, T, M} = b + a
+
 highdegree(x) = BoundedDegreeMonomial(1, x, true)
 
 highdegree(x::BoundedDegreeMonomial) = (@assert(x.overdegree); x)
