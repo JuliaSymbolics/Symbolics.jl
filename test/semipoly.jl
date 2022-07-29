@@ -428,6 +428,16 @@ end
     end
 end
 
+# SymbolicUtils.simplify_fractions takes a bit long time at the time of writing this code,
+# so semipolyform_terms does not do fraction simplification.
+# but this may be changed later.
+@testset "unsimplified fraction" begin
+    expr = (x^2 - 1) / (x - 1)
+    d, r = semipolynomial_form(expr, [x, y], Inf)
+    @test isempty(d)
+    @test isequal(r, expr)
+end
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
