@@ -139,34 +139,25 @@ function Base.:real(m::SemiMonomial)::Real
     return m.coeff
 end
 
-highdegree(x) = BoundedDegreeMonomial(1, x, true)
+# needed for `SymbolicUtils.expand`
+symtype(::SemiMonomial{T}) where {T} = T
 
-highdegree(x::BoundedDegreeMonomial) = (@assert(x.overdegree); x)
+TermInterface.issym(::SemiMonomial) = true
 
-SymbolicUtils.symtype(b::BoundedDegreeMonomial) = symtype(b.p)
+Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.coeff, m.degrees)
 
 isop(x, op) = istree(x) && operation(x) === op
-
-isop(op) = x -> isop(x, op)
+isop(op) = Base.Fix2(isop, op)
 
 pdegree(x::Mul) = sum(values(x.dict))
 pdegree(x::Union{Sym, Term}) = 1
 pdegree(x::Pow) = pdegree(x.base) * x.exp
 pdegree(x::Number) = 0
 
+_degree(x::SemiMonomial) = sum(x.degrees)
+_degree(x::Symbolic) = isop(x, *) ? sum(_degree, unsorted_arguments(x)) : 0
 
-# required by unsorted_arguments etc.
-SymbolicUtils.unstable_pow(x::BoundedDegreeMonomial, i::Integer) = (@assert(i==1); x)
-
-_degree(x::BoundedDegreeMonomial) = x.overdegree ? Inf : pdegree(x.p)
-
-_degree(x) = isop(x, *) ? sum(_degree, unsorted_arguments(x)) : 0
-
-
-## Semi-polynomial form
-
-isboundedmonom(x) = x isa BoundedDegreeMonomial && !x.overdegree
-bareterm(x, f, args;kw...) = Term{symtype(x)}(f, args)
+bareterm(x, f, args; kw...) = Term{symtype(x)}(f, args)
 
 function mark_and_exponentiate(expr, vars, deg, consts)
 
