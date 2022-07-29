@@ -159,24 +159,20 @@ _degree(x::Symbolic) = isop(x, *) ? sum(_degree, unsorted_arguments(x)) : 0
 
 bareterm(x, f, args; kw...) = Term{symtype(x)}(f, args)
 
-function mark_and_exponentiate(expr, vars, deg, consts)
-
+function mark_and_exponentiate(expr, vars)
     # Step 1
     # Mark all the interesting variables -- substitute without recursing into nl forms
-
-    expr′ = mark_vars(expr, vars, consts)
+    expr′ = mark_vars(expr, vars)
 
     # Step 2
-    # Construct and propagate BoundedDegreeMonomial for ^ and *
+    # Construct and propagate BoundedDegreeMonomial for ^ and * and /
 
-
-    rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer && x > 0)) =>
-             BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), !_isone((~a).p) && ~b > deg)
-             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars, consts)
-
-             @rule *(~~x) => mul_bounded(~~x, deg)]
-
-    expr′ = Postwalk(RestartedChain(rules), similarterm=bareterm)(expr′)
+    # does not do fraction simplification
+    rules = [@rule (~a::issemimonomial)^(~b::isreal) => (~a)^real(~b)
+             @rule (~a::isop(+))^(~b::isreal) => expand((~a)^real(~b))
+             @rule *(~~xs) => expand(*(~~xs...))
+             @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
+    expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
 end
 
 function semipolyform_terms(expr, vars::OrderedSet, deg, consts)
@@ -199,36 +195,35 @@ function has_vars(expr, vars)
     expr in vars || (istree(expr) && any(x->has_vars(x, vars), unsorted_arguments(expr)))
 end
 
-function mark_vars(expr, vars, consts)
-    if expr in vars
-        return BoundedDegreeMonomial(expr, 1, false)
+function mark_vars(expr, vars)
+    index = findfirst(isequal(expr), vars)
+    if !isnothing(index)
+        degrees = zeros(Int, length(vars))
+        degrees[index] = 1
+        return SemiMonomial{symtype(expr)}(1, degrees)
+    elseif !istree(expr)
+        return non_monomial(expr, vars)
     end
-
-    if !istree(expr)
-        if consts && !(expr isa BoundedDegreeMonomial)
-            return BoundedDegreeMonomial(1, expr, false)
-        end
-        return expr
-    else
-        op = operation(expr)
-        args = unsorted_arguments(expr)
-
-        if op === (+) || op === (*)
-            return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars, consts), args))
-        elseif op === (^)
-            base, exp = arguments(expr)
-            Term{symtype(expr)}(^, [mark_vars(base, vars, consts), exp])
-        elseif length(args) == 1
-            if linearity_1(op)
-                return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars, consts), args))
-            else
-                return has_vars(expr, vars) ? BoundedDegreeMonomial(1, expr, true) : expr
-            end
-        else
-            return expr
+    op = operation(expr)
+    args = arguments(expr)
+    if op === (+) || op === (*)
+        return Term{symtype(expr)}(op, map(mark_vars(vars), args))
+    elseif op === (^) || op == (/)
+        @assert length(args) == 2
+        return Term{symtype(expr)}(op, map(mark_vars(vars), args))
+    elseif length(args) == 1
+        if op == sqrt
+            base = mark_vars(args[1], vars)
+            degrees = zeros(Int, length(vars))
+            exp = SemiMonomial{Rational{Int}}(1 // 2, degrees)
+            return Pow(base, exp)
+        elseif linearity_1(op)
+            return Term{symtype(expr)}(op, mark_vars(args[1], vars))
         end
     end
+    return non_monomial(expr, vars)
 end
+mark_vars(vars) = Base.Fix2(mark_vars, vars)
 
 function bifurcate_terms(expr)
     # Step 4: Bifurcate polynomial and nonlinear parts:
