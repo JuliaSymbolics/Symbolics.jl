@@ -51,6 +51,21 @@ end
     @test m.degrees == [2.0, 3//2]
 end
 
+@testset "SemiMonomial ^" begin
+    a = Symbolics.SemiMonomial{Int32}(4.0, [-1.0, 1//2])
+    b = 3
+    e = a^b
+    @test e isa Symbolics.SemiMonomial{Int64}
+    @test e.coeff == 64.0
+    @test e.degrees == [-3.0, 3//2]
+
+    c = -0.7
+    m = a^c
+    @test m isa Symbolics.SemiMonomial{Float64}
+    @test m.coeff == 4.0^-0.7
+    @test m.degrees == [0.7, -0.35]
+end
+
 @test_throws ArgumentError semipolynomial_form(x,[x],0)
 
 d, r = semipolynomial_form(x, [x], 1)
