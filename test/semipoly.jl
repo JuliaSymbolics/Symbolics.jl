@@ -166,6 +166,79 @@ end
     @test_logs (:warn,) semipolynomial_form(x, [], -1 // 2)
 end
 
+@testset "(x + y)*(y^-1)" begin
+    sqrt_x = sqrt(x)
+    Dx = Differential(x)
+    deriv = expand_derivatives(Dx(sqrt_x)) # (1//2)*(sqrt(x)^-1)
+    expr = substitute(deriv, Dict(sqrt_x => y)) # (1//2)*(y^-1)
+    y_1 = expr * 2 # y^-1
+    expr = y_1 * (x + y) # (x + y)*(y^-1)
+
+    d, r = semipolynomial_form(expr, [x, y], Inf)
+    @test isequal(d, Dict(1 => 1))
+    @test isequal(r, x / y)
+
+    d, r = semipolynomial_form(expr, [x, y], 0)
+    @test isequal(d, Dict(1 => 1))
+    @test isequal(r, x / y)
+
+    d, r = semipolynomial_form(expr, [x, y], 0.3)
+    @test isequal(d, Dict(1 => 1))
+    @test isequal(r, x / y)
+
+    d, r = semipolynomial_form(expr, [x, y], 1 // 2)
+    @test isequal(d, Dict(1 => 1))
+    @test isequal(r, x / y)
+
+    d, r = semipolynomial_form(expr, [x], 1)
+    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [x], 1 // 1)
+    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [x], Int32(1))
+    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [x], 1.0)
+    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [x], Float32(1.0))
+    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [x], 1.5)
+    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [x], 0.9)
+    @test isequal(d, Dict(1 => 1))
+    @test isequal(r, x / y) || isequal(r, x * y_1)
+
+    d, r = semipolynomial_form(expr, [x], 99 // 100)
+    @test isequal(d, Dict(1 => 1))
+    @test isequal(r, x / y) || isequal(r, x * y_1)
+
+    d, r = semipolynomial_form(expr, [], 0.9)
+    @test isequal(d, Dict(1 => 1 + x / y)) || isequal(d, Dict(1 => 1 + x * y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [], 0)
+    @test isequal(d, Dict(1 => 1 + x / y)) || isequal(d, Dict(1 => 1 + x * y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [], 0.0)
+    @test isequal(d, Dict(1 => 1 + x / y)) || isequal(d, Dict(1 => 1 + x * y_1))
+    @test iszero(r)
+
+    d, r = semipolynomial_form(expr, [], 0 // 1)
+    @test isequal(d, Dict(1 => 1 + x / y)) || isequal(d, Dict(1 => 1 + x * y_1))
+    @test iszero(r)
+end
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
