@@ -458,6 +458,20 @@ end
     @test isequal(c, [tan(z), y / z, x * y + y * z / x])
 end
 
+@testset "expr = 0" begin
+    d, r = semipolynomial_form(0, [], Inf)
+    @test isempty(d)
+    @test iszero(r)
+
+    d, r = semipolynomial_form(0//1, [], Inf)
+    @test isempty(d)
+    @test iszero(r)
+
+    d, r = semipolynomial_form(0.0, [], Inf)
+    @test isempty(d)
+    @test iszero(r)
+end
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
