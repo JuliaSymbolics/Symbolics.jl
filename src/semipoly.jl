@@ -372,34 +372,43 @@ Returns a tuple of two elements:
 polynomial_coeffs(expr, vars) = semipolynomial_form(expr, vars, Inf)
 
 """
-    semilinear_form(exprs::AbstractVector, vars::AbstractVector, [consts=false])
+$(TYPEDSIGNATURES)
 
 Returns a tuple of a sparse matrix `A`, and a residual vector `c` such that,
 
 `A * vars + c` is the same as `exprs`.
-If `consts` = true then, `A * [1, vars] + c == exprs`.
-Here `c` will only contain nonlinear terms and not constant terms.
 """
-function semilinear_form(exprs::AbstractArray, vars, consts=false)
-    exprs = unwrap.(exprs)
+function semilinear_form(exprs::AbstractArray, vars::AbstractVector)
     vars = init_semipoly_vars(vars)
-    ds, nls = semipolynomial_form(exprs, vars, 1, consts)
+    exprs = unwrap.(exprs)
 
-    idxmap = Dict(v=>i for (i, v) in enumerate(consts ? [1, vars...] : vars))
+    matches = map(semipolyform_terms(vars), exprs)
 
     I = Int[]
     J = Int[]
     V = Num[]
 
-    for (i, d) in enumerate(ds)
-        for (k, v) in d
-            push!(I, i)
-            push!(J, idxmap[k])
-            push!(V, v)
+    nls = Vector{Union{Real, SymbolicUtils.Symbolic}}(undef, length(exprs))
+    nls .= 0
+    for (row_index, terms) in enumerate(matches)
+        constant_linear_terms = filter(t -> isboundedmonomial(t, vars, 1), terms)
+        for term in constant_linear_terms
+            if _degree(term) == 1 # linear term
+                col_index = findfirst(Bool.(term.degrees))
+                push!(I, row_index)
+                push!(J, col_index)
+                push!(V, term.coeff)
+            else # constant term
+                nls[row_index] += unwrap_sm(term, vars)
+            end
+        end
+        nonlinear_terms = setdiff(terms, constant_linear_terms)
+        if !isempty(nonlinear_terms)
+            nls[row_index] += sum(unwrap_sm(vars), nonlinear_terms)
         end
     end
 
-    sparse(I,J,V, length(exprs), length(vars) + consts), wrap.(nls)
+    sparse(I, J, V, length(exprs), length(vars)), wrap.(nls)
 end
 
 """
