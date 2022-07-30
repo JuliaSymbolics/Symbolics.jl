@@ -19,8 +19,10 @@ For example, ``5 b^{2.5} \\tan(c) / a^{\\frac12}`` about ``(a, b)`` is
 `SemiMonomial(coeff = 5tan(c), degrees = [-1//2, 2.5])`.
 Note that here ``c`` is treated as a constant.
 
-This notation transforms multiplication into addition of exponent vertors, division into
-subtraction, exponentiation into addition.
+This notation transforms multiplication of monomials into the addition of exponent vertors,
+and division into subtraction. The exponentiation with a monomial as the base and a real
+number as the exponent is tranformed to the multiplication of the exponent vector and a
+scalar.
 
 The parametric type `T` depends on the types of the associated variables. For example,
 when the variables are declared using `@variables x::Int32 y::Int64 z::Rational{Int32}`,
