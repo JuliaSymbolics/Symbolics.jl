@@ -412,7 +412,7 @@ function semilinear_form(exprs::AbstractArray, vars::AbstractVector)
 end
 
 """
-    semiquadratic_form(exprs::AbstractVector, vars::AbstractVector)
+$(TYPEDSIGNATURES)
 
 Returns a tuple of 4 objects:
 
@@ -421,19 +421,16 @@ Returns a tuple of 4 objects:
 3. a vector `v2` of length (n+1)*n/2 containing monomials of `vars` upto degree 2 and zero where they are not required.
 4. a residual vector `c` of length m.
 
-where `n == length(exprs)` and `m == length(vars)`.
-
+where `m == length(exprs)` and `n == length(vars)`.
 
 The result is arranged such that, `A * vars + B * v2 + c` is the same as `exprs`.
 """
-function semiquadratic_form(exprs, vars)
-    exprs = unwrap.(exprs)
+function semiquadratic_form(exprs::AbstractVector, vars::AbstractVector)
     vars = init_semipoly_vars(vars)
-    ds, nls = semipolynomial_form(exprs, vars, 2)
+    exprs = unwrap.(exprs)
 
-    idxmap = Dict(v=>i for (i, v) in enumerate(vars))
+    matches = map(semipolyform_terms(vars), exprs)
 
-    m, n = length(exprs), length(vars)
     I1 = Int[]
     J1 = Int[]
     V1 = Num[]
@@ -445,45 +442,52 @@ function semiquadratic_form(exprs, vars)
     v2_I = Int[]
     v2_V = Num[]
 
-    for (i, d) in enumerate(ds)
-        for (k, v) in d
-            if pdegree(k) == 1
-                push!(I1, i)
-                push!(J1, idxmap[k])
-                push!(V1, v)
-            elseif pdegree(k) == 2
-                push!(I2, i)
-                if isop(k, ^)
-                    b, e = arguments(k)
-                    @assert e == 2
-                    q = idxmap[b]
-                    j = div(q*(q+1), 2)
-                    push!(J2, j) # or div(q*(q-1), 2) + q
-                    push!(V2, v)
-                else
-                    @assert isop(k, *)
-                    a, b = unsorted_arguments(k)
-                    p, q = extrema((idxmap[a], idxmap[b]))
-                    j = div(q*(q-1), 2) + p
-                    push!(J2, j)
-                    push!(V2, v)
+    nls = Vector{Union{Real, SymbolicUtils.Symbolic}}(undef, length(exprs))
+    nls .= 0
+    for (row_index, terms) in enumerate(matches)
+        const_linear_quadratic_terms = filter(t -> isboundedmonomial(t, vars, 2), terms)
+        for term in const_linear_quadratic_terms
+            degree = _degree(term)
+            if degree == 1 # linear term
+                col_index = findfirst(Bool.(term.degrees))
+                push!(I1, row_index)
+                push!(J1, col_index)
+                push!(V1, term.coeff)
+            elseif degree == 2 # quadratic term
+                push!(I2, row_index)
+                push!(V2, term.coeff)
+                var_indices = findall(Bool.(sign.(term.degrees)))
+                if length(var_indices) == 1 # of the form x²
+                    var_index = var_indices[1]
+                    col_index = var_index * (var_index + 1) ÷ 2
+                    push!(v2_V, vars[var_index]^2)
+                else # of the form x * y
+                    index₁, index₂ = extrema(var_indices)
+                    col_index = index₂ * (index₂ - 1) ÷ 2 + index₁
+                    push!(v2_V, vars[index₁] * vars[index₂])
                 end
-                push!(v2_I, j)
-                push!(v2_V, k)
-            else
-                error("This should never happen")
+                push!(J2, col_index)
+                push!(v2_I, col_index)
+            else # constant term
+                nls[row_index] += unwrap_sm(term, vars)
             end
         end
+        # nonquadratic_terms = filter(t -> !isboundedmonomial(t, vars, 2), terms)
+        nonquadratic_terms = setdiff(terms, const_linear_quadratic_terms)
+        if !isempty(nonquadratic_terms)
+            nls[row_index] += sum(unwrap_sm(vars), nonquadratic_terms)
+        end
     end
-
+    m = length(exprs)
+    n = length(vars)
 
     #v2 = SparseVector(div(n * (n + 1), 2), v2_I, v2_V) # When it works in the future
     # until then
     v2 = zeros(Num, div(n * (n + 1), 2))
     v2[v2_I] .= v2_V
 
-    tuple(sparse(I1,J1,V1, m, n),
-          sparse(I2,J2,V2, m, div(n * (n + 1), 2)),
+    tuple(sparse(I1, J1, V1, m, n),
+          sparse(I2, J2, V2, m, div(n * (n + 1), 2)),
           v2,
           wrap.(nls))
 end
