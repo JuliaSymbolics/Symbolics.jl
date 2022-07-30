@@ -82,23 +82,6 @@ end
     @test real(b) == 9
 end
 
-@testset "tomonomial" begin
-    a = Symbolics.SemiMonomial{Real}(3, [1, 2])
-    m = Symbolics.tomonomial(a, [x, y])
-    @test isequal(m, x * y^2)
-
-    b = Symbolics.SemiMonomial{Real}(z, [0.0, 0.0])
-    n = Symbolics.tomonomial(b, [x, y])
-    @test n == 1
-
-    c = Symbolics.SemiMonomial{Real}(4.0, [1//2, 2.0])
-    @test_throws InexactError Symbolics.tomonomial(c, [x, y])
-
-    d = Symbolics.SemiMonomial{Real}(9.0, [0.0, 4])
-    r = Symbolics.tomonomial(d, [x, y])
-    @test isequal(r, y^4)
-end
-
 @testset "simple expressions" begin
     d, r = semipolynomial_form(x, [x], 1)
     @test d == Dict(x => 1)

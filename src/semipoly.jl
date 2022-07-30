@@ -245,9 +245,9 @@ Transform `m` into its corresponding `Real` number or `SymbolicUtils.Symbolic` f
 
 Assume `m` satisfies [`ismonomial`](@ref).
 """
-function tomonomial(m::SemiMonomial{T}, vars)::Union{Real, Symbolic} where {T}
+function tomonomial(m::SemiMonomial{T}, vars::OrderedSet)::Union{Real, Symbolic} where {T}
     indices = findall(x -> x > 0, m.degrees)
-    dict = Dict(vars[i] => Int(m.degrees[i]) for i in indices)
+    dict = Dict(vars.dict.keys[i] => Int(m.degrees[i]) for i in indices)
     Mul(T, 1, dict)
 end
 
@@ -311,7 +311,7 @@ function bifurcate_terms(terms, vars, degree_bound::Real)
     return polys_dict, nl
 end
 
-function init_semipoly_vars(vars)
+function init_semipoly_vars(vars)::OrderedSet
     set = OrderedSet(unwrap.(vars))
     @assert length(set) == length(vars) # vars passed to semi-polynomial form must be unique
     set
@@ -462,11 +462,11 @@ function semiquadratic_form(exprs::AbstractVector, vars::AbstractVector)
                 if length(var_indices) == 1 # of the form x²
                     var_index = var_indices[1]
                     col_index = var_index * (var_index + 1) ÷ 2
-                    push!(v2_V, vars[var_index]^2)
+                    push!(v2_V, vars.dict.keys[var_index]^2)
                 else # of the form x * y
                     index₁, index₂ = extrema(var_indices)
                     col_index = index₂ * (index₂ - 1) ÷ 2 + index₁
-                    push!(v2_V, vars[index₁] * vars[index₂])
+                    push!(v2_V, vars.dict.keys[index₁] * vars.dict.keys[index₂])
                 end
                 push!(J2, col_index)
                 push!(v2_I, col_index)
