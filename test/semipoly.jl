@@ -438,6 +438,26 @@ end
     @test isequal(r, expr)
 end
 
+@testset "semilinear" begin
+    # 657
+    @test iszero(semilinear_form([x * cos(x) + x^2 * 3sin(x) + 4exp(x)], [x])[1])
+
+    exprs = [3x + tan(z),
+             y / z + 5z,
+             x * y + y * z / x]
+    A , c = semilinear_form(exprs, [x, y, z])
+    @test A[1, 1] == 3
+    @test A[1, 2] == 0
+    @test A[1, 3] == 0
+    @test A[2, 1] == 0
+    @test A[2, 2] == 0
+    @test A[2, 3] == 5
+    @test A[3, 1] == 0
+    @test A[3, 2] == 0
+    @test A[3, 3] == 0
+    @test isequal(c, [tan(z), y / z, x * y + y * z / x])
+end
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
