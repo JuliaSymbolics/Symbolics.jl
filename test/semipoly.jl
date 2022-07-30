@@ -472,6 +472,34 @@ end
     @test iszero(r)
 end
 
+@testset "sqrt" begin
+    expr = sqrt(x)
+
+    d, r = semipolynomial_form(expr, [x], Inf)
+    @test isempty(d)
+    @test isequal(r, x^(1//2))
+
+    expr = sqrt(x)^2
+
+    d, r = semipolynomial_form(expr, [x], Inf)
+    @test isequal(d, Dict(x => 1))
+    @test iszero(r)
+
+    expr = (sqrt(x) + sqrt(y))^2
+
+    d, r = semipolynomial_form(expr, [x, y], Inf)
+    @test isequal(d, Dict(x => 1, y => 1))
+    @test isequal(r, 2x^(1//2) * y^(1//2))
+
+    d, r = semipolynomial_form(expr, [x], Inf)
+    @test isequal(d, Dict(x => 1, 1 => y))
+    @test isequal(r, 2x^(1//2) * y^(1//2))
+
+    d, r = semipolynomial_form(expr, [], Inf)
+    @test isequal(d, Dict(1 => x + y + 2x^(1//2) * y^(1//2)))
+    @test iszero(r)
+end
+
 @syms a b c
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
