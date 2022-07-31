@@ -1,5 +1,6 @@
 using Base.Threads
 using SymbolicUtils.Code: LazyState
+using BangBang
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
@@ -104,8 +105,14 @@ function _build_function(target::JuliaTarget, op, args...;
                          states = LazyState(),
                          linenumbers = true,
                          wrap_code = nothing,
-                         cse = false)
-  dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+                         cse = false,
+                         kwargs...)
+    if length(kwargs) > 0
+        invalid_kwargs = join([k for (k, v) in kwargs], ", ")
+        @warn("Ignoring invalid keyword arguments: $(invalid_kwargs)")
+    end
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
+
     expr = if cse
         fun = Func(dargs, [], Code.cse(op))
         (wrap_code !== nothing) && (fun = wrap_code(fun))
@@ -131,8 +138,12 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          states = LazyState(),
-                         linenumbers = true,
-                         cse = false)
+                         cse = false,
+                         kwargs...)
+    if length(kwargs) > 0
+        invalid_kwargs = join([k for (k, v) in kwargs], ", ")
+        @warn("Ignoring invalid keyword arguments: $(invalid_kwargs)")
+    end
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
@@ -196,12 +207,9 @@ Build function target: `JuliaTarget`
 function _build_function(target::JuliaTarget, rhss, args...;
                          conv = toexpr, expression = Val{true},
                          checkbounds = false,
-                         linenumbers = false,
                          headerfun = addheader, outputidxs=nothing,
-                         convert_oop = true, force_SA = false,
                          skipzeros = outputidxs===nothing,
-                         fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
-                         parallel=SerialForm(), kwargs...)
+                         parallel=SerialForm())
 ```
 
 Generates a Julia function which can then be utilized for further evaluations.
@@ -215,7 +223,7 @@ is a mutating function. The outputted functions match the given argument order,
 i.e., f(u,p,args...) for the out-of-place and scalar functions and
 `f!(du,u,p,args..)` for the in-place version.
 
-Special Keyword Argumnets:
+Special Keyword Arguments:
 
 - `parallel`: The kind of parallelism to use in the generated function. Defaults
   to `SerialForm()`, i.e. no parallelism. Note that the parallel forms are not
@@ -231,15 +239,6 @@ Special Keyword Argumnets:
   the `toexpr` function.
 - `checkbounds`: For whether to enable bounds checking inside of the generated
   function. Defaults to false, meaning that `@inbounds` is applied.
-- `linenumbers`: Determines whether the generated function expression retains
-  the line numbers. Defaults to true.
-- `convert_oop`: Determines whether the OOP version should try to convert
-  the output to match the type of the first input. This is useful for
-  cases like LabelledArrays or other array types that carry extra
-  information. Defaults to true.
-- `force_SA`: Forces the output of the OOP version to be a StaticArray.
-  Defaults to `false`, and outputs a static array when the first argument
-  is a static array.
 - `skipzeros`: Whether to skip filling zeros in the in-place version if the
   filling function is 0.
 - `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
@@ -250,38 +249,53 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        expression_module = @__MODULE__(),
                        checkbounds = false,
                        postprocess_fbody=ex -> ex,
-                       linenumbers = false,
                        outputidxs=nothing,
                        skipzeros = false,
+                       fillzeros=skipzeros && !(rhss isa SparseMatrixCSC),
                        wrap_code = (nothing, nothing),
-                       fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
                        parallel=nothing, cse = false, kwargs...)
+    if length(kwargs) > 0
+        invalid_kwargs = join([k for (k, v) in kwargs], ", ")
+        @warn("Ignoring invalid keyword arguments: $(invalid_kwargs)")
+    end
 
-  if parallel == nothing && _nnz(rhss) >= 1000
+    if parallel == nothing && _nnz(rhss) >= 1000
         parallel = ShardedForm() # by default switch for arrays longer than 1000 exprs
     end
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
+
+    function zero_filler(out, x)
+        !fillzeros && return x
+        LiteralExpr(:($out = broadcast!!(identity, $out, zero(eltype($out))); $x))
+    end
+
     oop_expr = Func(dargs, [],
-                    postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse)))
+                    postprocess_fbody(make_array(parallel,
+                                                 dargs,
+                                                 rhss,
+                                                 similarto,
+                                                 cse)))
 
     if !isnothing(wrap_code[1])
         oop_expr = wrap_code[1](oop_expr)
     end
 
     out = Sym{Any}(:ˍ₋out)
+
     ip_expr = Func([out, dargs...], [],
-                   postprocess_fbody(set_array(parallel,
+                   zero_filler(out,
+                               postprocess_fbody(set_array(parallel,
                                                dargs,
                                                out,
                                                outputidxs,
                                                rhss,
                                                checkbounds,
                                                skipzeros,
-                                               cse,)))
+                                               cse,))))
 
     if !isnothing(wrap_code[2])
         ip_expr = wrap_code[2](ip_expr)

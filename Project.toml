@@ -5,6 +5,7 @@ version = "4.10.3"
 
 [deps]
 ArrayInterfaceCore = "30b0a656-2188-435a-8636-2ec0e6a096e2"
+BangBang = "198e06fe-97b7-11e9-32a5-e1d131e6ad66"
 ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 DiffRules = "b552c78f-8df3-52c6-915a-8e097449b14b"
