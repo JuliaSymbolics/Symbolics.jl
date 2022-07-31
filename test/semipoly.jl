@@ -145,6 +145,7 @@ end
     @test iszero(r)
 end
 
+# 682
 @testset "(y^-1)*(x^4 + y^4)" begin
     sqrt_x = sqrt(x)
     Dx = Differential(x)
