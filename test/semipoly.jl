@@ -325,6 +325,12 @@ end
     @test isequal(d, Dict(x => 1, y^2 => 1))
     @test isequal(r, 2x^0.5 * y)
 
+    # 680
+    expr = (x^(1//2) + y^0.5)^2
+    d, r = semipolynomial_form(expr, [x, y], 4)
+    @test isequal(d, Dict(x => 1, y => 1))
+    @test isequal(r, 2x^(1//2) * y^(1//2))
+
     expr = (3x^4 + y)^0.5
 
     for degree in [0, 1, 2]
