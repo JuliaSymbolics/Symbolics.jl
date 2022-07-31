@@ -206,7 +206,9 @@ mark_vars(vars) = Base.Fix2(mark_vars, vars)
 
 function bifurcate_terms(terms, vars, degree::Real; consts = true)
     # Step 4: Bifurcate polynomial and nonlinear parts:
-    monomials = filter(t -> isboundedmonomial(t, vars, degree; consts = consts), terms)
+    monomial_indices = findall(t -> isboundedmonomial(t, vars, degree; consts = consts),
+                               terms)
+    monomials = @view terms[monomial_indices]
     polys_dict = Dict()
     sizehint!(polys_dict, length(monomials))
     for m in monomials
@@ -219,8 +221,8 @@ function bifurcate_terms(terms, vars, degree::Real; consts = true)
     if length(monomials) == length(terms)
         return polys_dict, 0
     end
-    nl_terms = setdiff(terms, monomials)
-    nl = cautious_sum(nl_terms)
+    deleteat!(terms, monomial_indices) # the remaining elements in terms are not monomials
+    nl = cautious_sum(terms)
     return polys_dict, nl
 end
 
@@ -296,8 +298,6 @@ Returns a tuple of a sparse matrix `A`, and a residual vector `c` such that,
 `A * vars + c` is the same as `exprs`.
 """
 function semilinear_form(exprs::AbstractArray, vars)
-    exprs = unwrap.(exprs)
-    vars = init_semipoly_vars(vars)
     ds, nls = semipolynomial_form(exprs, vars, 1; consts = false)
 
     idxmap = Dict(v=>i for (i, v) in enumerate(vars))
@@ -333,8 +333,6 @@ where `n == length(exprs)` and `m == length(vars)`.
 The result is arranged such that, `A * vars + B * v2 + c` is the same as `exprs`.
 """
 function semiquadratic_form(exprs, vars)
-    exprs = unwrap.(exprs)
-    vars = init_semipoly_vars(vars)
     ds, nls = semipolynomial_form(exprs, vars, 2; consts = false)
 
     idxmap = Dict(v=>i for (i, v) in enumerate(vars))
