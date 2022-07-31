@@ -84,6 +84,8 @@ issemimonomial(x) = x isa SemiMonomial
 
 # Return true is `m` is a `SemiMonomial`, satisfies the definition of a monomial and
 # its degree is less than or equal to `degree_bound`.
+# If `m` is a constant about `vars`, return true if `consts = true` and return false if
+# `consts = false`.
 function isboundedmonomial(m, vars, degree_bound::Real; consts = true)::Bool
     if !(m isa SemiMonomial)
         return false
@@ -109,7 +111,7 @@ Base.:isreal(m::SemiMonomial) = m.p isa Number && isone(m.p) && unwrap(m.coeff) 
 Base.:isreal(::Symbolic) = false
 
 # Transform `m` to a `Real`.
-#Assume `isreal(m) == true`, otherwise calling this function does not make sense.
+# Assume `isreal(m) == true`, otherwise calling this function does not make sense.
 function Base.:real(m::SemiMonomial)::Real
     if isinteger(m.coeff)
         return Int(m.coeff)
@@ -238,8 +240,8 @@ Returns a tuple of two objects:
 
 `degree` should be a nonnegative number.
 
-See also
-[Wikipedia: Polynomial](https://en.wikipedia.org/wiki/Polynomial).
+If  `consts` is set to `true`, then the returned dictionary will contain
+a key `1` and the corresponding value will be the constant term. If `false`, the constant term will be part of the residual.
 """
 function semipolynomial_form(expr, vars, degree::Real; consts = true)
     if degree < 0
@@ -258,6 +260,9 @@ $(TYPEDSIGNATURES)
 For every expression in `exprs` computes the semi-polynomial form and
 returns a tuple of two objects -- a vector of coefficient dictionaries,
 and a vector of residual terms.
+
+If  `consts` is set to `true`, then the returned dictionary will contain
+a key `1` and the corresponding value will be the constant term. If `false`, the constant term will be part of the residual.
 """
 function semipolynomial_form(exprs::AbstractArray, vars, degree::Real; consts = true)
     if degree < 0
