@@ -22,7 +22,7 @@ import DomainSets: Domain
 
 import TermInterface: similarterm, istree, operation, arguments, symtype
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym,
+import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div,
                       FnType, @rule, Rewriters, substitute,
                       promote_symtype
 
