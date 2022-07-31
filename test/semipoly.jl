@@ -207,6 +207,15 @@ end
     @test iszero(r)
 end
 
+@testset "nested ^ exponentiation" begin
+    expr = ((x + 1)^4 + x)^3
+    d, r = semipolynomial_form(expr, [x], 2)
+
+    @test isequal(d, Dict(1 => 1, x => 15, x^2 => 93))
+    @test isequal(r, 317x^3 + 681x^4 + 1014x^5 + 1095x^6 + 876x^7 + 519x^8 + 223x^9
+                     + 66x^10 + 12x^11 + x^12)
+end
+
 @testset "rational exponent" begin
     expr = y^(1//1)
 
