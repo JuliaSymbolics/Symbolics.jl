@@ -140,8 +140,8 @@ function mark_and_exponentiate(expr, vars)
 
     # does not do fraction simplification
     rules = [@rule (~a::issemimonomial)^(~b::isreal) => (~a)^real(~b)
-             @rule (~a::isop(+))^(~b::isreal) => expand((~a)^real(~b))
-             @rule (*(~~xs::(xs -> all(issemimonomial, xs)))) => *(~~xs...)
+             @rule (~a::isop(+))^(~b::isreal) => expand(Pow((~a), real(~b)))
+             @rule *(~~xs::(xs -> all(issemimonomial, xs))) => *(~~xs...)
              @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
              @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
     expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
