@@ -242,7 +242,7 @@ function degree(p::Add, sym=nothing)
 end
 
 function degree(p::Mul, sym=nothing)
-    dot(degree.(keys(p.dict), sym), values(p.dict))
+    sum(degree(k, sym) * v for (k, v) in p.dict)
 end
 
 function degree(p::Term, sym=nothing)
