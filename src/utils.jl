@@ -230,6 +230,11 @@ degree(p::Add, sym=nothing) = maximum(degree.(arguments(p), sym))
 degree(p::Mul, sym=nothing) = sum(degree(k^v, sym) for (k, v) in p.dict)
 degree(p::Pow, sym=nothing) = p.exp * degree(p.base, sym)
 
+"""
+    degree(p, sym=nothing)
+
+Extract the degree of `p` with respect to `sym`.
+"""
 function degree(p, sym=nothing)
     p, sym = value(p), value(sym)
     p isa Number && return 0
@@ -247,6 +252,12 @@ function coeff(p::Mul, sym=nothing)
     length(I) == length(args) ? 0 : prod(args[I])
 end
 
+"""
+    coeff(p, sym=nothing)
+
+Extract the coefficient of `p` with respect to `sym`.
+Note that `p` might need to be expanded and/or simplified with `expand` and/or `simplify`.
+"""
 function coeff(p, sym=nothing)
     p, sym = value(p), value(sym)
     p isa Number && return sym === nothing ? p : 0
