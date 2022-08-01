@@ -242,7 +242,7 @@ function degree(p::Add, sym=nothing)
 end
 
 function degree(p::Mul, sym=nothing)
-    return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
+    dot(degree.(keys(p.dict), sym), values(p.dict))
 end
 
 function degree(p::Term, sym=nothing)
