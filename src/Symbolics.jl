@@ -7,7 +7,7 @@ using TermInterface
 
 using Metatheory
 
-using DocStringExtensions
+using DocStringExtensions, Markdown
 
 using LinearAlgebra
 
@@ -22,7 +22,7 @@ import DomainSets: Domain
 
 import TermInterface: similarterm, istree, operation, arguments, symtype
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, BasicSymbolic,
+import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
                       FnType, @rule, Rewriters, substitute,
                       promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
 

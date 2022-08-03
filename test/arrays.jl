@@ -110,6 +110,9 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
         @test isequal(substitute(Symbolics.scalarize(A7 ), repl_dict), test_mat^7)
     end
     @test isequal(Symbolics.scalarize(x', (1, 1)), x[1])
+
+    ##653
+    Symbolics.scalarize(inv(A)[1,1])
 end
 
 n = 2

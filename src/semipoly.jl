@@ -3,199 +3,289 @@ using DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
-## BoundedDegreeMonomial helper type
-
 """
-    BoundedDegreeMonomial
+$(TYPEDEF)
 
 # Attrtibutes
-- p -- a monomial
-- coeff -- the coefficient (monomial means p * coeff)
-- overdegree -- boolean flag shows if degree of p * coeff
-  is too high (this is marked by the semi-polynomialization process)
-
+$(TYPEDFIELDS)
 """
-struct BoundedDegreeMonomial
-    p::Union{BasicSymbolic, Int}
+struct SemiMonomial
+    "monomial"
+    p::Union{S, N} where {S <: Symbolic, N <: Real}
+    "coefficient"
     coeff::Any
-    overdegree::Bool
 end
 
-highdegree(x) = BoundedDegreeMonomial(1, x, true)
+Base.:+(a::SemiMonomial) = a
+function Base.:+(a::SemiMonomial, b::SemiMonomial)
+    Term(+, [a, b])
+end
+function Base.:+(m::SemiMonomial, t)
+    if istree(t) && operation(t) == (+)
+        return Term(+, [unsorted_arguments(t); m])
+    end
+    Term(+, [m, t])
+end
+Base.:+(t, m::SemiMonomial) = m + t
 
-highdegree(x::BoundedDegreeMonomial) = (@assert(x.overdegree); x)
+Base.:*(m::SemiMonomial) = m
+function Base.:*(a::SemiMonomial, b::SemiMonomial)
+    SemiMonomial(a.p * b.p, a.coeff * b.coeff)
+end
+Base.:*(m::SemiMonomial, n::Number) = SemiMonomial(m.p, m.coeff * n)
+function Base.:*(m::SemiMonomial, t::Symbolic)
+    if istree(t)
+        op = operation(t)
+        if op == (+)
+            args = collect(all_terms(t))
+            return Term(+, (m,) .* args)
+        elseif op == (*)
+            return Term(*, [unsorted_arguments(t); m])
+        end
+    end
+    Term(*, [t, m])
+end
+Base.:*(t, m::SemiMonomial) = m * t
 
-SymbolicUtils.symtype(b::BoundedDegreeMonomial) = symtype(b.p)
+function Base.:/(a::SemiMonomial, b::SemiMonomial)
+    SemiMonomial(a.p / b.p, a.coeff / b.coeff)
+end
 
-isop(x, op) = istree(x) && operation(x) === op
+function Base.:^(base::SemiMonomial, exp::Real)
+    SemiMonomial(base.p^exp, base.coeff^exp)
+end
 
-isop(op) = x -> isop(x, op)
-
-function pdegree(x::BasicSymbolic)
+# return a dictionary of exponents with respect to variables
+function pdegrees(x)
     if ismul(x)
-        sum(values(x.dict))
-    elseif issym(x) || isterm(x)
-        1
+        return x.dict
+    elseif isdiv(x)
+        num_dict = pdegrees(x.num)
+        den_dict = pdegrees(x.den)
+        inv_den_dict = Dict(keys(den_dict) .=> map(-, values(den_dict)))
+        mergewith(+, num_dict, inv_den_dict)
     elseif ispow(x)
-        pdegree(x.base) * x.exp
+        dict = pdegrees(x.base)
+        degrees = map(degree -> degree * x.exp, values(dict))
+        Dict(keys(dict) .=> degrees)
+    elseif issym(x) || istree(x)
+        return Dict(x=>1)
+    elseif x isa Number
+        return Dict()
     else
-        error("pdegree not defined for $x")
+        error("pdegrees for $x unknown")
     end
 end
 
 pdegree(x::Number) = 0
+function pdegree(x::Symbolic)
+    degree_dict = pdegrees(x)
+    if isempty(degree_dict)
+        return 0
+    end
+    sum(values(degree_dict))
+end
 
+issemimonomial(x) = x isa SemiMonomial
 
-# required by unsorted_arguments etc.
-SymbolicUtils.unstable_pow(x::BoundedDegreeMonomial, i::Integer) = (@assert(i==1); x)
+# Return true is `m` is a `SemiMonomial`, satisfies the definition of a monomial and
+# its degree is less than or equal to `degree_bound`.
+# If `m` is a constant about `vars`, return true if `consts = true` and return false if
+# `consts = false`.
+function isboundedmonomial(m, vars, degree_bound::Real; consts = true)::Bool
+    if !(m isa SemiMonomial)
+        return false
+    end
+    degree_dict = pdegrees(m.p)
+    if isempty(degree_dict)
+        return consts && !has_vars(m.coeff, vars)
+    end
+    degrees = values(degree_dict)
+    for degree in degrees
+        if !isinteger(degree) || degree < 0
+            return false
+        end
+    end
+    if sum(degrees) > degree_bound
+        return false
+    end
+    !has_vars(m.coeff, vars)
+end
 
-_degree(x::BoundedDegreeMonomial) = x.overdegree ? Inf : pdegree(x.p)
+# Return true if the degrees of `m` are all 0s and its coefficient is a `Real`.
+Base.:isreal(m::SemiMonomial) = m.p isa Number && isone(m.p) && unwrap(m.coeff) isa Real
+Base.:isreal(::Symbolic) = false
 
-_degree(x) = isop(x, *) ? sum(_degree, unsorted_arguments(x)) : 0
+# Transform `m` to a `Real`.
+# Assume `isreal(m) == true`, otherwise calling this function does not make sense.
+function Base.:real(m::SemiMonomial)::Real
+    if isinteger(m.coeff)
+        return Int(m.coeff)
+    end
+    return m.coeff
+end
 
+symtype(m::SemiMonomial) = symtype(m.p)
 
-## Semi-polynomial form
+TermInterface.issym(::SemiMonomial) = true
 
-isboundedmonom(x) = x isa BoundedDegreeMonomial && !x.overdegree
-bareterm(x, f, args;kw...) = Term{symtype(x)}(f, args)
+Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.p, m.coeff)
 
-function mark_and_exponentiate(expr, vars, deg)
+isop(x, op) = istree(x) && operation(x) === op
+isop(op) = Base.Fix2(isop, op)
 
+bareterm(x, f, args; kw...) = Term{symtype(x)}(f, args)
+
+function mark_and_exponentiate(expr, vars)
     # Step 1
     # Mark all the interesting variables -- substitute without recursing into nl forms
-
     expr′ = mark_vars(expr, vars)
 
     # Step 2
-    # Construct and propagate BoundedDegreeMonomial for ^ and *
+    # Construct and propagate BoundedDegreeMonomial for ^ and * and /
 
-
-    rules = [@rule (~a::isboundedmonom) ^ (~b::(x-> x isa Integer)) =>
-             BoundedDegreeMonomial(((~a).p)^(~b), (~a).coeff ^ (~b), ~b > deg)
-             @rule (~a::isop(+)) ^ (~b::(x -> x isa Integer)) => pow_of_add(~a, ~b, deg, vars)
-
-             @rule *(~~x) => mul_bounded(~~x, deg)]
-
-    expr′ = Postwalk(RestartedChain(rules), similarterm=bareterm)(expr′)
+    # does not do fraction simplification
+    rules = [@rule (~a::issemimonomial)^(~b::isreal) => (~a)^real(~b)
+             @rule (~a::isop(+))^(~b::isreal) => expand(Pow((~a), real(~b)))
+             @rule *(~~xs::(xs -> all(issemimonomial, xs))) => *(~~xs...)
+             @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
+             @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
+    expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
 end
 
-function semipolyform_terms(expr, vars::OrderedSet, deg)
-    if deg <= 0
-        throw(ArgumentError("Degree for semi-polynomial form must be > 0"))
+function semipolyform_terms(expr, vars)
+    expr = mark_and_exponentiate(expr, vars)
+    if istree(expr) && operation(expr) == (+)
+        args = collect(all_terms(expr))
+        return args
+    elseif isreal(expr) && iszero(real(expr)) # when `expr` is just a 0
+        return []
+    else
+        return [expr]
     end
-
-    expr′ = mark_and_exponentiate(expr, vars, deg)
-
-    # Step 3: every term now show have at most one valid monomial -- find the coefficient for it.
-    Postwalk(Chain([@rule *(~~x, ~a::isboundedmonom, ~~y) =>
-                                BoundedDegreeMonomial((~a).p,
-                                                      (~a).coeff * _mul(~~x) * _mul(~~y),
-                                                      (~a).overdegree)]),
-             similarterm=bareterm)(expr′)
-
 end
+semipolyform_terms(vars) = Base.Fix2(semipolyform_terms, vars)
 
+"""
+$(TYPEDSIGNATURES)
+
+Return true if `expr` contains any variables in `vars`.
+"""
+function has_vars(expr, vars)::Bool
+    if expr in vars
+        return true
+    elseif istree(expr)
+        for arg in unsorted_arguments(expr)
+            if has_vars(arg, vars)
+                return true
+            end
+        end
+    end
+    return false
+end
 
 function mark_vars(expr, vars)
     if expr in vars
-        return BoundedDegreeMonomial(expr, 1, false)
+        return SemiMonomial(expr, 1)
+    elseif !istree(expr)
+        return SemiMonomial(1, expr)
     end
-
-    if !istree(expr)
-        return expr
-    else
-        op = operation(expr)
-        args = unsorted_arguments(expr)
-
-        if op === (+) || op === (*)
-            return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
-        elseif op === (^)
-            base, exp = arguments(expr)
-            Term{symtype(expr)}(^, [mark_vars(base, vars), exp])
-        elseif length(args) == 1
-            if linearity_1(op)
-                return Term{symtype(expr)}(op, map(x -> mark_vars(x, vars), args))
-            else
-                return expr
-            end
-        else
-            return expr
+    op = operation(expr)
+    if op === (^) || op == (/)
+        args = arguments(expr)
+        @assert length(args) == 2
+        return Term{symtype(expr)}(op, map(mark_vars(vars), args))
+    end
+    args = unsorted_arguments(expr)
+    if op === (+) || op === (*)
+        return Term{symtype(expr)}(op, map(mark_vars(vars), args))
+    elseif length(args) == 1
+        if op == sqrt
+            return mark_vars(args[1]^(1//2), vars)
+        elseif linearity_1(op)
+            return Term{symtype(expr)}(op, mark_vars(args[1], vars))
         end
     end
+    return SemiMonomial(1, expr)
 end
+mark_vars(vars) = Base.Fix2(mark_vars, vars)
 
-function bifurcate_terms(expr)
+function bifurcate_terms(terms, vars, degree::Real; consts = true)
     # Step 4: Bifurcate polynomial and nonlinear parts:
-
-    if expr isa BoundedDegreeMonomial
-        return isboundedmonom(expr) ?
-            (Dict(expr.p => expr.coeff), 0) :
-            (Dict(), expr.p * expr.coeff)
-    elseif istree(expr) && operation(expr) == (+)
-        args = collect(all_terms(expr))
-        polys = filter(isboundedmonom, args)
-
-        poly = Dict()
-        for p in polys
-            if haskey(poly, p.p)
-                poly[p.p] += p.coeff
-            else
-                poly[p.p] = p.coeff
-            end
+    monomial_indices = findall(t -> isboundedmonomial(t, vars, degree; consts = consts),
+                               terms)
+    monomials = @view terms[monomial_indices]
+    polys_dict = Dict()
+    sizehint!(polys_dict, length(monomials))
+    for m in monomials
+        if haskey(polys_dict, m.p)
+            polys_dict[m.p] += m.coeff
+        else
+            polys_dict[m.p] = m.coeff
         end
-
-        nls = filter(!isboundedmonom, args)
-        nl = cautious_sum(nls)
-
-        return poly, nl
-    else
-        return Dict(), expr
     end
+    if length(monomials) == length(terms)
+        return polys_dict, 0
+    end
+    deleteat!(terms, monomial_indices) # the remaining elements in terms are not monomials
+    nl = cautious_sum(terms)
+    return polys_dict, nl
 end
 
 function init_semipoly_vars(vars)
     set = OrderedSet(unwrap.(vars))
-    @assert length(set) == length(vars) "vars passed to semi-polynomial form must be unique"
+    @assert length(set) == length(vars) # vars passed to semi-polynomial form must be unique
     set
 end
 
-## API:
-#
-
 """
-    semipolynomial_form(expr, vars, degree)
+$(TYPEDSIGNATURES)
 
-Semi-polynomial form. Returns a tuple of two objects:
+Returns a tuple of two objects:
 
 1. A dictionary of coefficients keyed by monomials in `vars` upto the given `degree`,
 2. A residual expression which has all terms not represented as a product of monomial and a coefficient
 
-    semipolynomial_form(exprs::AbstractArray, vars, degree)
+`degree` should be a nonnegative number.
 
-For every expression in `exprs` computes the semi-polynomial form as above and
+If  `consts` is set to `true`, then the returned dictionary will contain
+a key `1` and the corresponding value will be the constant term. If `false`, the constant term will be part of the residual.
+"""
+function semipolynomial_form(expr, vars, degree::Real; consts = true)
+    if degree < 0
+        @warn "Degree for semi-polynomial form should be ≥ 0"
+        return Dict(), expr
+    end
+    vars = init_semipoly_vars(vars)
+    expr = unwrap(expr)
+    terms = semipolyform_terms(expr, vars)
+    bifurcate_terms(terms, vars, degree; consts = consts)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+For every expression in `exprs` computes the semi-polynomial form and
 returns a tuple of two objects -- a vector of coefficient dictionaries,
 and a vector of residual terms.
+
+If  `consts` is set to `true`, then the returned dictionary will contain
+a key `1` and the corresponding value will be the constant term. If `false`, the constant term will be part of the residual.
 """
-function semipolynomial_form(expr, vars, degree)
-    expr = unwrap(expr)
+function semipolynomial_form(exprs::AbstractArray, vars, degree::Real; consts = true)
+    if degree < 0
+        @warn "Degree for semi-polynomial form should be ≥ 0"
+        return fill(Dict(), length), exprs
+    end
     vars = init_semipoly_vars(vars)
-
-    bifurcate_terms(semipolyform_terms(expr, vars, degree))
-end
-
-function semipolynomial_form(exprs::AbstractArray, vars, degree)
     exprs = unwrap.(exprs)
-    vars = init_semipoly_vars(vars)
-
-    matches = map(x -> semipolyform_terms(x, vars, degree), exprs)
-    tmp = map(bifurcate_terms, matches)
-    dicts, nls = map(first, tmp), map(last, tmp)
+    matches = map(semipolyform_terms(vars), exprs)
+    tmp = map(match -> bifurcate_terms(match, vars, degree; consts = consts), matches)
+    map(first, tmp), map(last, tmp)
 end
 
-
 """
-    polynomial_coeffs(expr, vars)
-
+$(SIGNATURES)
 
 Find coefficients of a polynomial in `vars`.
 
@@ -208,16 +298,13 @@ Returns a tuple of two elements:
 polynomial_coeffs(expr, vars) = semipolynomial_form(expr, vars, Inf)
 
 """
-    semilinear_form(exprs::AbstractVector, vars::AbstractVector)
+$(TYPEDSIGNATURES)
 
 Returns a tuple of a sparse matrix `A`, and a residual vector `c` such that,
-
 `A * vars + c` is the same as `exprs`.
 """
 function semilinear_form(exprs::AbstractArray, vars)
-    exprs = unwrap.(exprs)
-    vars = init_semipoly_vars(vars)
-    ds, nls = semipolynomial_form(exprs, vars, 1)
+    ds, nls = semipolynomial_form(exprs, vars, 1; consts = false)
 
     idxmap = Dict(v=>i for (i, v) in enumerate(vars))
 
@@ -237,7 +324,7 @@ function semilinear_form(exprs::AbstractArray, vars)
 end
 
 """
-    semiquadratic_form(exprs::AbstractVector, vars::AbstractVector)
+$(TYPEDSIGNATURES)
 
 Returns a tuple of 4 objects:
 
@@ -252,9 +339,7 @@ where `n == length(exprs)` and `m == length(vars)`.
 The result is arranged such that, `A * vars + B * v2 + c` is the same as `exprs`.
 """
 function semiquadratic_form(exprs, vars)
-    exprs = unwrap.(exprs)
-    vars = init_semipoly_vars(vars)
-    ds, nls = semipolynomial_form(exprs, vars, 2)
+    ds, nls = semipolynomial_form(exprs, vars, 2; consts = false)
 
     idxmap = Dict(v=>i for (i, v) in enumerate(vars))
 
@@ -313,124 +398,35 @@ function semiquadratic_form(exprs, vars)
           wrap.(nls))
 end
 
-
 ## Utilities
-
-function partition(n, parts)
-    parts == 1 && return n
-    [[[i, p...] for p in partition(n-i, parts-1)]
-     for i=0:n] |> Iterators.flatten |> collect
-end
 
 all_terms(x) = istree(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
 
-unwrap_bp(x::BoundedDegreeMonomial) = x.p * x.coeff
-function unwrap_bp(x)
-    x = unwrap(x)
-    istree(x) ? similarterm(x, operation(x), map(unwrap_bp, unsorted_arguments(x))) : x
-end
-
-cautious_sum(nls) = isempty(nls) ? 0 : isone(length(nls)) ? unwrap_bp(first(nls)) : sum(unwrap_bp, nls)
-
-_mul(x) = isempty(x) ? 1 : isone(length(x)) ? first(x) : prod(x)
-
-function mul(a, b, deg)
-    if isop(a, +)
-        return Term{symtype(a)}(+, map(x->mul(x, b, deg), unsorted_arguments(a)))
-    elseif isop(b, +)
-        return Term{symtype(a)}(+, mul.((a,), unsorted_arguments(b), deg))
-    elseif a isa BoundedDegreeMonomial
-        return BoundedDegreeMonomial(a.p, a.coeff * b, a.overdegree)
-    elseif b isa BoundedDegreeMonomial
-        return BoundedDegreeMonomial(b.p, a * b.coeff, b.overdegree)
-    else
-        return a * b
-    end
-end
-
-function mul(a::BoundedDegreeMonomial, b::BoundedDegreeMonomial, deg)
-    if a.overdegree || b.overdegree || pdegree(a.p) + pdegree(b.p) > deg
-        highdegree(a.p * b.p * a.coeff * b.coeff)
-    else
-        BoundedDegreeMonomial(a.p * b.p, a.coeff * b.coeff, false)
-    end
-end
-
-function mul_bounded(xs, deg)
-    length(xs) == 1 ?
-        first(xs) :
-        reduce((x,y) -> mul(x,y, deg), xs)
-end
-
-function pow(a::BoundedDegreeMonomial, b, deg)
-    return BoundedDegreeMonomial((a.p)^b, a.coeff ^ b, b > deg)
-end
-
-pow(a, b, deg) = a^b
-
-function pow_of_add(a, b, deg, vars)
-    b == 0 && return 1
-    b == 1 && return a
-
-    @assert isop(a, +)
-    within_deg(x) = (d=_degree(a);d <= deg)
-
-    a = mark_and_exponentiate(a, vars, deg)
-    args = all_terms(a)
-    mindeg = minimum(_degree, args)
-    maxdeg = maximum(_degree, args)
-
-   #if maxdeg * b <= deg
-   #    return mark_and_exponentiate(expand(unwrap_bp(a^b)), vars, deg)
-   #end
-
-    if mindeg * b > deg
-        return highdegree(unwrap_bp(a^b)) # That's pretty high degree
-    end
-
-    interesting = filter(within_deg, args)
-    nls = filter(!within_deg, args)
-
-    if isempty(interesting)
-        a^b # Don't need to do anything!
-    else
-        q = partial_multinomial_expansion(interesting, b, deg)
-        if maxdeg * b <= deg
-            q # q is the whole enchilada
+function unwrap_sp(m::SemiMonomial)
+    degree_dict = pdegrees(m.p)
+    # avoid making negative exponent in `Mul` dict
+    positive_dict = Dict()
+    negative_dict = Dict()
+    for (var, degree) in degree_dict
+        if isinteger(degree)
+            degree = Int(degree)
+        end
+        if degree > 0
+            positive_dict[var] = degree
         else
-            Term{Real}(+, [all_terms(q)...,
-                           map(highdegree, all_terms(unwrap_bp(a^b - q)))...])
+            negative_dict[var] = -degree
         end
     end
+    m.coeff * Mul(symtype(m.p), 1, positive_dict) / Mul(symtype(m.p), 1, negative_dict)
+end
+function unwrap_sp(x)
+    x = unwrap(x)
+    istree(x) ? similarterm(x, operation(x), map(unwrap_sp, unsorted_arguments(x))) : x
 end
 
-function partial_multinomial_expansion(xs, exp, deg)
-    zs = filter(iszero∘_degree, xs)
-    nzs = filter((!iszero)∘_degree, xs)
-    if isempty(zs)
-        terms = nzs
-    else
-        terms = [+(zs...), nzs...]
+function cautious_sum(nls)
+    if isempty(nls)
+        return 0
     end
-    degs = map(_degree, terms)
-
-
-    q = []
-    nfact = factorial(exp)
-    for ks in partition(exp, length(terms))
-        td = sum(degs .* ks)
-
-        coeff = div(nfact, prod(factorial, ks))
-        if td == 0
-            push!(q, *(coeff, (x^y for (x, y) in zip(terms, ks) if !iszero(y))...))
-        elseif td <= deg
-            push!(q,
-                  mul_bounded(vcat(coeff,
-                                   [pow(x,y, deg) for (x, y) in zip(terms, ks) if !iszero(y)]),
-                              deg))
-        end
-    end
-    return Term{Real}(+, q)
+    sum(unwrap_sp, nls)
 end
-
-

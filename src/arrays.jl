@@ -630,7 +630,8 @@ function scalarize_op(f, arr, idx)
     if hasmetadata(arr, ScalarizeCache) && getmetadata(arr, ScalarizeCache)[] !== nothing
         getmetadata(arr, ScalarizeCache)[][idx...]
     else
-        thing = f(scalarize.(arguments(arr))...)
+        # wrap and unwrap to call generic methods
+        thing = unwrap(f(scalarize.(map(wrap, arguments(arr)))...))
         if metadata(arr) != nothing
             # forward any metadata
             try
@@ -715,8 +716,17 @@ end
 scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
                                           unwrap.(idx)))
 
+
+eval_array_term(op, arr) = arr
+eval_array_term(op::typeof(inv), arr) = inv(scalarize(wrap(arguments(arr)[1]))) #issue 653
+eval_array_term(op::Arr) = wrap(eval_array_term(unwrap(op)))
+eval_array_term(op) = eval_array_term(operation(op), op)
+
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
+        if istree(arr)
+            arr = eval_array_term(arr)
+        end
         map(Iterators.product(axes(arr)...)) do i
             scalarize(arr[i...]) # Use arr[i...] here to trigger any getindex hooks
         end
