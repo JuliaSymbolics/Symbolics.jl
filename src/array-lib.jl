@@ -159,6 +159,8 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
             subs = map(i-> extruded[i] && isonedim(x, i) ?
                        1 : subscripts[i], 1:ndims(x))
             x[subs...]
+        elseif x isa Base.RefValue
+            x[]
         else
             x
         end
