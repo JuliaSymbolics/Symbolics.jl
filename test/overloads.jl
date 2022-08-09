@@ -196,6 +196,17 @@ y = x * s
 @test isequal(y[1] * y[2], x[1] * x[2] * s ^ 2)
 @test isequal(y[1] + y[2], (x[1] + x[2]) * s)
 @test isequal(y[1] - y[2], (x[1] - x[2]) * s)
+y = x / s
+@test isequal(y[1] / y[2], x[1] / x[2])
+@test isequal(y[1] * y[2], x[1] * x[2] / s ^ 2)
+@test isequal(y[1] + y[2], (x[1] + x[2]) / s)
+@test isequal(y[1] - y[2], (x[1] - x[2]) / s)
+y = x .+ s
+@test isequal(y[1] + y[2], x[1] - x[2] + 2 * s)
+@test isequal(y[1] - y[2], x[1] - x[2])
+y = x .- s
+@test isequal(y[1] + y[2], x[1] - x[2] - 2 * s)
+@test isequal(y[1] - y[2], x[1] - x[2])
 
 @variables x y
 @test isequal(expand((x+y)^2), x^2 + y^2 + 2x*y)
