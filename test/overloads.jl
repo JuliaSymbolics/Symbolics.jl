@@ -186,7 +186,7 @@ x = Num.(randn(10))
 @test norm(x, 1) == norm(Symbolics.value.(x), 1)
 @test norm(x, 1.2) == norm(Symbolics.value.(x), 1.2)
 
-@variables x[1:2] y[1:2] s
+@variables x[1:2]
 @test isequal(scalarize(norm(x)), sqrt(abs2(x[1]) + abs2(x[2])))
 @test isequal(scalarize(norm(x, Inf)), max(abs(x[1]), abs(x[2])))
 @test isequal(scalarize(norm(x, 1)), abs(x[1]) + abs(x[2]))
