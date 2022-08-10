@@ -159,11 +159,12 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
             subs = map(i-> extruded[i] && isonedim(x, i) ?
                        1 : subscripts[i], 1:ndims(x))
             x[subs...]
+        elseif x isa Base.RefValue
+            x[]
         else
             x
         end
     end
-
     expr = term(bc.f, expr_args′...) # Imagine x .=> y -- if you don't have a term
                                      # then you get pairs, and index matcher cannot
                                      # recurse into pairs
