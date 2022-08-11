@@ -247,7 +247,7 @@ coeff(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sy
 coeff(p::Pow, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
 coeff(p::Add, sym=nothing) = sum(coeff(k, sym) * v for (k, v) in p.dict)
 function coeff(p::Mul, sym=nothing)
-    args = arguments(p)
+    args = unsorted_arguments(p)
     I = findall(a -> !isequal(a, sym), args)
     length(I) == length(args) ? 0 : prod(args[I])
 end
