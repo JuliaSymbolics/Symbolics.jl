@@ -226,7 +226,7 @@ function var_from_nested_derivative(x,i=0)
 end
 
 degree(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 1 : Int(isequal(p, sym))
-degree(p::Add, sym=nothing) = maximum(degree.(arguments(p), sym))
+degree(p::Add, sym=nothing) = maximum(degree.(keys(p.dict), sym))
 degree(p::Mul, sym=nothing) = sum(degree(k, sym) * v for (k, v) in p.dict)
 degree(p::Pow, sym=nothing) = p.exp * degree(p.base, sym)
 
