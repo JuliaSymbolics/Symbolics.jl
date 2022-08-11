@@ -274,7 +274,7 @@ new functions. For example, let's register a new function `h`:
 
 ```julia
 h(x, y) = x^2 + y
-@register h(x, y)
+@register_symbolic h(x, y)
 ```
 
 Now when we use `h(x, y)`, it is a symbolic expression and doesn't expand:

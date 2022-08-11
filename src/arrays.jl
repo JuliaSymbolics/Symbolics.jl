@@ -558,21 +558,6 @@ function replace_by_scalarizing(ex, dict)
                  scalarize(~x, (map(j->substitute(j, dict), ~~i)...,)))
 
     simterm = (x, f, args; kws...) -> begin
-        if f === Base.literal_pow && length(args) == 3
-            #=
-            julia> @variables u[1:3]
-            1-element Vector{Symbolics.Arr{Num, 1}}:
-             u[1:3]
-
-            julia> u.^1
-            (broadcast(literal_pow, Base.RefValue{typeof(^)}(^), u, Base.RefValue{Val{1}}(Val{1}())))[1:3]
-            =#
-            base = args[2]
-            exp = val2num(only(args[3]))
-            f = only(args[1])
-            args = [base, exp]
-        end
-
         if metadata(x) !== nothing
             similarterm(x, f, args; metadata=metadata(x))
         else
