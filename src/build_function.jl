@@ -104,7 +104,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          states = LazyState(),
                          linenumbers = true,
                          wrap_code = nothing,
-                         cse = false)
+                         cse = false, kwargs...)
   dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = if cse
         fun = Func(dargs, [], Code.cse(op))
@@ -132,7 +132,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          checkbounds = false,
                          states = LazyState(),
                          linenumbers = true,
-                         cse = false)
+                         cse = false, kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
