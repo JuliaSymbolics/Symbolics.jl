@@ -160,17 +160,17 @@ julia> dfx=expand_derivatives(Dx(f))
 (k*((2abs(x - y)) / y - 2z)*IfElse.ifelse(signbit(x - y), -1, 1)) / y
 ```
 """
-function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
+function expand_derivatives(O::Symbolic, simplify=false; occurrences=nothing)
     if istree(O) && isa(operation(O), Differential)
         arg = only(arguments(O))
         arg = expand_derivatives(arg, false)
 
-        if occurances == nothing
-            occurances = occursin_info(operation(O).x, arg)
+        if occurrences == nothing
+            occurrences = occursin_info(operation(O).x, arg)
         end
 
-        _isfalse(occurances) && return 0
-        occurances isa Bool && return 1 # means it's a `true`
+        _isfalse(occurrences) && return 0
+        occurrences isa Bool && return 1 # means it's a `true`
 
         D = operation(O)
 
@@ -189,7 +189,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
         elseif op === (IfElse.ifelse)
             args = arguments(arg)
             O = op(args[1], D(args[2]), D(args[3]))
-            return expand_derivatives(O, simplify; occurances)
+            return expand_derivatives(O, simplify; occurrences)
         elseif isa(op, Differential)
             # The recursive expand_derivatives was not able to remove
             # a nested Differential. We can attempt to differentiate the
@@ -234,7 +234,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
         c = 0
 
         for i in 1:l
-            t2 = expand_derivatives(D(inner_args[i]),false, occurances=arguments(occurances)[i])
+            t2 = expand_derivatives(D(inner_args[i]),false, occurrences=arguments(occurrences)[i])
 
             x = if _iszero(t2)
                 t2
@@ -276,14 +276,14 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
     end
 end
 
-function expand_derivatives(n::Num, simplify=false; occurances=nothing)
-    Num(expand_derivatives(value(n), simplify; occurances=occurances))
+function expand_derivatives(n::Num, simplify=false; occurrences=nothing)
+    Num(expand_derivatives(value(n), simplify; occurrences=occurrences))
 end
 
 _iszero(x) = false
 _isone(x) = false
 
-expand_derivatives(x, simplify=false;occurances=nothing) = x
+expand_derivatives(x, simplify=false;occurrences=nothing) = x
 
 # Don't specialize on the function here
 """
