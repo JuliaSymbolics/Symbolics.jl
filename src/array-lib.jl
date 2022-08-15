@@ -165,7 +165,6 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
             x
         end
     end
-
     expr = term(bc.f, expr_args′...) # Imagine x .=> y -- if you don't have a term
                                      # then you get pairs, and index matcher cannot
                                      # recurse into pairs

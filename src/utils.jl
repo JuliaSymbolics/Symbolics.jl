@@ -233,6 +233,11 @@ function var_from_nested_derivative(x,i=0)
     end
 end
 
+"""
+    degree(p, sym=nothing)
+
+Extract the degree of `p` with respect to `sym`.
+"""
 function degree(p, sym=nothing)
     p = value(p)
     sym = value(sym)
@@ -264,5 +269,26 @@ function degree(p, sym=nothing)
             return Int(isequal(p, sym))
         end
     end
+end
+
+coeff(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
+coeff(p::Pow, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
+coeff(p::Add, sym=nothing) = sum(coeff.(arguments(p), sym))
+function coeff(p::Mul, sym=nothing)
+    args = arguments(p)
+    I = findall(a -> !isequal(a, sym), args)
+    length(I) == length(args) ? 0 : prod(args[I])
+end
+
+"""
+    coeff(p, sym=nothing)
+
+Extract the coefficient of `p` with respect to `sym`.
+Note that `p` might need to be expanded and/or simplified with `expand` and/or `simplify`.
+"""
+function coeff(p, sym=nothing)
+    p, sym = value(p), value(sym)
+    p isa Number && return sym === nothing ? p : 0
+    p isa Symbolic && return coeff(p, sym)
     throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end

@@ -113,6 +113,12 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     ##653
     Symbolics.scalarize(inv(A)[1,1])
+
+    # ModelingToolkit.jl#1736
+    #
+    @variables t F(t)[1:1]
+
+    @test isequal(collect(F ./ t), [F[1] / t])
 end
 
 n = 2
