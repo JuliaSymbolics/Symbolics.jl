@@ -226,8 +226,8 @@ function var_from_nested_derivative(x,i=0)
 end
 
 degree(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 1 : Int(isequal(p, sym))
-degree(p::Add, sym=nothing) = maximum(degree.(arguments(p), sym))
-degree(p::Mul, sym=nothing) = sum(degree(k^v, sym) for (k, v) in p.dict)
+degree(p::Add, sym=nothing) = maximum(degree.(keys(p.dict), sym))
+degree(p::Mul, sym=nothing) = sum(degree(k, sym) * v for (k, v) in p.dict)
 degree(p::Pow, sym=nothing) = p.exp * degree(p.base, sym)
 
 """
@@ -245,9 +245,15 @@ end
 
 coeff(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
 coeff(p::Pow, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
-coeff(p::Add, sym=nothing) = sum(coeff.(arguments(p), sym))
+function coeff(p::Add, sym=nothing)
+    if sym === nothing
+        p.coeff
+    else
+        sum(coeff(k, sym) * v for (k, v) in p.dict)
+    end
+end
 function coeff(p::Mul, sym=nothing)
-    args = arguments(p)
+    args = unsorted_arguments(p)
     I = findall(a -> !isequal(a, sym), args)
     length(I) == length(args) ? 0 : prod(args[I])
 end
