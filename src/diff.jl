@@ -458,7 +458,6 @@ an array of variable expressions.
 function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
     I = Int[]
     J = Int[]
-    du = Num[]
 
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
