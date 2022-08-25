@@ -465,12 +465,27 @@ function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=fals
     sp = jacobian_sparsity(ops, vars)
     I,J,_ = findnz(sp)
 
+    exprs = sparsejacobian_vals(ops, vars, I, J, simplify=simplify)
+
+    sparse(I, J, exprs, length(ops), length(vars))
+end
+
+"""
+$(SIGNATURES)
+
+A helper function for computing the values of the sparse Jacobian of an array of expressions with respect to
+an array of variable expressions given the sparsity structure.
+"""
+function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify=false)
+    ops = Symbolics.scalarize(ops)
+    vars = Symbolics.scalarize(vars)
+
     exprs = Num[]
 
     for (i,j) in zip(I, J)
         push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify)))
     end
-    sparse(I, J, exprs, length(ops), length(vars))
+    exprs
 end
 
 """
