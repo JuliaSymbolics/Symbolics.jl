@@ -73,6 +73,9 @@ substitute
 export Equation, ConstrainedEquation
 include("equations.jl")
 
+export Inequality, ≲, ≳
+include("inequality.jl")
+
 include("utils.jl")
 
 using ConstructionBase

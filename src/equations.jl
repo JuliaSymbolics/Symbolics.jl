@@ -126,6 +126,8 @@ for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
     end
 end
 
+canonical_form(eq::Equation) = eq.lhs - eq.rhs ~ 0
+
 struct ConstrainedEquation
   constraints
   eq
