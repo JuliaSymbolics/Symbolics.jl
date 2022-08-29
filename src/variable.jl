@@ -134,18 +134,20 @@ function _parse_vars(macroname, type, x, transform=identity)
         issym  = v isa Symbol
         @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
 
+        collect= macroname != :arrayvariables
+
         if isarray && Meta.isexpr(v.args[1], :call)
             # This is the new syntax
             isruntime, fname = unwrap_runtime_var(v.args[1].args[1])
             call_args = map(last∘unwrap_runtime_var, @view v.args[1].args[2:end])
             size = v.args[2:end]
-            var_name, expr = construct_dep_array_vars(macroname, fname, type′, call_args, size, val, options, transform, isruntime)
+            var_name, expr = construct_dep_array_vars(macroname, fname, type′, call_args, size, val, options, transform, isruntime, collect)
         elseif iscall
             isruntime, fname = unwrap_runtime_var(v.args[1])
             call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
-            var_name, expr = construct_vars(macroname, fname, type′, call_args, val, options, transform, isruntime)
+            var_name, expr = construct_vars(macroname, fname, type′, call_args, val, options, transform, isruntime, collect)
         else
-            var_name, expr = construct_vars(macroname, v, type′, nothing, val, options, transform, isruntime)
+            var_name, expr = construct_vars(macroname, v, type′, nothing, val, options, transform, isruntime, collect)
         end
 
         push!(var_names, var_name)
@@ -156,7 +158,7 @@ function _parse_vars(macroname, type, x, transform=identity)
     return ex
 end
 
-function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime)
+function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime, collect)
     ndim = :($length(($(indices...),)))
     vname = !isruntime ? Meta.quot(lhs) : lhs
     if call_args[1] == :..
@@ -176,14 +178,16 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
 
     if call_args[1] == :..
         ex = :($transform($ex))
+        collect = false
     end
     if isruntime
         lhs = gensym(lhs)
     end
+    ex = collect ?  :($(Base.collect)($ex)) : ex
     lhs, :($lhs = $ex)
 end
 
-function construct_vars(macroname, v, type, call_args, val, prop, transform, isruntime)
+function construct_vars(macroname, v, type, call_args, val, prop, transform, isruntime, collect)
     issym  = v isa Symbol
     isarray = isa(v, Expr) && v.head == :ref
     if isarray
@@ -194,7 +198,7 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
         end
         isruntime, var_name = unwrap_runtime_var(var_name)
         indices = v.args[2:end]
-        expr = _construct_array_vars(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, indices...)
+        expr = _construct_array_vars(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, collect, indices...)
     else
         var_name = v
         if Meta.isexpr(v, :(::))
@@ -276,7 +280,7 @@ end
 
 (c::CallWith)(f) = unwrap(f(c.args...))
 
-function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
+function _construct_array_vars(macroname, var_name, type, call_args, val, prop, collect, indices...)
     # TODO: just use Sym here
     ndim = :($length(($(indices...),)))
 
@@ -306,6 +310,7 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
     end
 
     expr = :($wrap($expr))
+    expr = collect ? :($(Base.collect)($expr)) : expr
 
     return expr
 end
@@ -378,6 +383,10 @@ macro variables(xs...)
     esc(_parse_vars(:variables, Real, xs))
 end
 
+macro arrayvariables(xs...)
+    esc(_parse_vars(:arrayvariables, Real, xs))
+end
+
 TreeViews.hastreeview(x::Sym) = true
 
 function TreeViews.treelabel(io::IO,x::Sym,
@@ -447,8 +456,8 @@ julia> Symbolics.variables(:x, 1:3, 3:6)
  x₃ˏ₃  x₃ˏ₄  x₃ˏ₅  x₃ˏ₆
 ```
 """
-function variables(name, indices...; T=Real)
-    [variable(name, ij...; T=T) for ij in Iterators.product(indices...)]
+function variables(name, indices...; T=Real, collect=true)
+    [variable(name, ij...; T=T, collect=collect) for ij in Iterators.product(indices...)]
 end
 
 """

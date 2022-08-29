@@ -5,7 +5,7 @@ using Base: Slice
 using SymbolicUtils: Sym, term, operation
 
 @testset "arrays" begin
-    @variables X[1:5, 1:5] Y[1:5, 1:5]
+    @arrayvariables X[1:5, 1:5] Y[1:5, 1:5]
     @test_throws BoundsError X[1000]
     @test typeof(X) <: Arr
     @test shape(X) == Slice.((1:5, 1:5))
@@ -23,14 +23,14 @@ using SymbolicUtils: Sym, term, operation
     @test symtype(X[i, j]) == Real
     @test symtype(X[1, j]) == Real
 
-    @variables t x(t)[1:2]
+    @arrayvariables t x(t)[1:2]
     @test isequal(get_variables(0 ~ x[1]), [x[1]])
     @test Set(get_variables(2x)) == Set(collect(x)) # both array elements are present
     @test isequal(get_variables(2x[1]), [x[1]])
 end
 
 @testset "getindex" begin
-    @variables X[1:5, 1:5] Y[1:5, 1:5]
+    @arrayvariables X[1:5, 1:5] Y[1:5, 1:5]
 
     @test isequal(X[1, 1], wrap(term(getindex, unwrap(X), 1, 1)))
 
@@ -39,14 +39,14 @@ end
     @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop((i,), XX[i, 2], term=XX[:, 2]))
     @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop((i, j), XX[i, j], (j in 2:3), term=XX[:, 2:3]))
 
-    @variables t x(t)[1:4]
+    @arrayvariables t x(t)[1:4]
     @syms i::Int
     @test isequal(x[i], operation(unwrap(x))(t)[i])
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
-    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x(t)[1:4] u[1:1]
+    @arrayvariables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x(t)[1:4] u[1:1]
     AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)
     @test all(isequal(42), getdef.(AA))
@@ -75,7 +75,7 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     # #483
     # examples by @gronniger
-    @variables A[1:2, 1:2]
+    @arrayvariables A[1:2, 1:2]
 
     test_mat = [1 2; 3 4]
     repl_dict = Dict(Symbolics.scalarize(A .=> test_mat))
@@ -116,7 +116,7 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     # ModelingToolkit.jl#1736
     #
-    @variables t F(t)[1:1]
+    @arrayvariables t F(t)[1:1]
 
     @test isequal(collect(F ./ t), [F[1] / t])
 end
@@ -140,7 +140,7 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
 =#
 
 @testset "Functions and Jacobians using @syms" begin
-    @variables x[1:n]
+    @arrayvariables x[1:n]
 
     function symbolic_call(x)
         @syms foo(x::Symbolics.Arr{Num,1})::Symbolics.Arr{Num,1} # symbolic foo can not be created in global scope due to conflict with function foo
@@ -172,7 +172,7 @@ end
 
 
 @testset "Functions and Jacobians using manual @wrapped" begin
-    @variables x[1:n]
+    @arrayvariables x[1:n]
 
     x0 = randn(n)
     @test foo(x0) == A * x0
@@ -194,7 +194,7 @@ end
 end
 
 @testset "Rules" begin
-    @variables X[1:10, 1:5] Y[1:5, 1:10] b[1:10]
+    @arrayvariables X[1:10, 1:5] Y[1:5, 1:10] b[1:10]
     r = @rule ((~A * ~B) * ~C) => (~A * (~B * ~C)) where size(~A, 1) * size(~B, 2) >size(~B, 1)  * size(~C, 2)
     @test isequal(r(unwrap((X * Y) * b)), unwrap(X * (Y * b)))
 end
@@ -202,7 +202,7 @@ end
 @testset "2D Diffusion Composed With Stencil Interface" begin
     n = rand(8:32)
 
-    @variables u[1:n, 1:n]
+    @arrayvariables u[1:n, 1:n]
     @makearray v[1:n, 1:n] begin
         #interior
         v[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] + u[i, j-1] + u[i, j+1] - 4 * u[i, j]
@@ -235,7 +235,7 @@ end
     n = rand(8:32)
     N = 2
 
-    @variables t u(t)[fill(1:n, N)...]
+    @arrayvariables t u(t)[fill(1:n, N)...]
 
     Igrid = CartesianIndices((fill(1:n, N)...,))
     Iinterior = CartesianIndices((fill(2:n-1, N)...,))
@@ -284,7 +284,7 @@ end
 
 @testset "Brusselator stencil" begin
     n = 8
-    @variables t u(t)[1:n, 1:n] v(t)[1:n, 1:n]
+    @arrayvariables t u(t)[1:n, 1:n] v(t)[1:n, 1:n]
 
     brusselator_f(x, y, t) = (((x - 0.3)^2 + (y - 0.6)^2) <= 0.1^2) * (t >= 1.1) * 5.0
 
@@ -335,7 +335,7 @@ end
 end
 
 @testset "Partial array substitution" begin
-    @variables x[1:3] A[1:2, 1:2, 1:2]
+    @arrayvariables x[1:3] A[1:2, 1:2, 1:2]
 
     @test substitute(x[1], Dict(x => [1, 2, 3])) === Num(1)
     @test substitute(A[1,2,1], Dict(A => reshape(1:8, 2, 2, 2))) === Num(3)
