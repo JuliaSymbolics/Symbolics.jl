@@ -27,7 +27,7 @@ function latexify_derivatives(ex)
                             num
                            )
             end
-        elseif arguments(x)[1] === :_textbf
+        elseif operation(x) === :_textbf
             ls = latexify(latexify_derivatives(arguments(x)[1])).s
             return "\\textbf{" * strip(ls, '\$') * "}"
         else
