@@ -121,6 +121,7 @@ import Distributions
 include("extra_functions.jl")
 
 using Latexify
+using LaTeXStrings
 include("latexify_recipes.jl")
 
 using RecipesBase
