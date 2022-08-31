@@ -8,13 +8,28 @@ end
 
 function latexify_derivatives(ex)
     return postwalk(ex) do x
-        if x isa Expr && x.args[1] == :_derivative
-            if x.args[2] isa Expr && length(x.args[2].args) == 2
-                return :($(Symbol(:d, x.args[2]))/$(Symbol(:d, x.args[3])))
+        Meta.isexpr(x, :call) || return x
+        if x.args[1] == :_derivative
+            num = x.args[2]
+            den = x.args[3]
+            deg = x.args[4]
+            if num isa Expr && length(num.args) == 2
+                return Expr(:call, :/,
+                            Expr(:call, :*,
+                                 "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")", num
+                                ),
+                            diffdenom(den)
+                           )
             else
-                return Expr(:call, Expr(:call, :/, :d, Expr(:call, :*, :d, x.args[3])), x.args[2])
+                return Expr(:call, :*,
+                            Expr(:call, :/,
+                                 "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")",
+                                 diffdenom(den)
+                                ),
+                            num
+                           )
             end
-        elseif x isa Expr && x.args[1] === :_textbf
+        elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(x.args[2])).s
             return "\\textbf{" * strip(ls, '\$') * "}"
         else
@@ -114,9 +129,15 @@ function _toexpr(O)
     end
 
     if op isa Differential
-        ex = _toexpr(args[1])
-        wrt = _toexpr(op.x)
-        return :(_derivative($ex, $wrt))
+        num = args[1]
+        den = op.x
+        deg = 1
+        while num isa Term && num.f isa Differential
+            deg += 1
+            den *= num.f.x
+            num = num.arguments[1]
+        end
+        return :(_derivative($(_toexpr(num)), $den, $deg))
     elseif symtype(op) <: FnType
         isempty(args) && return nameof(op)
         return Expr(:call, _toexpr(op), _toexpr(args)...)
@@ -201,3 +222,14 @@ function getindex_to_symbol(t)
         return :($(_toexpr(args[1]))[$(idxs...)])
     end
 end
+
+diffdenom(e) = e
+diffdenom(e::Sym) = LaTeXString("\\mathrm{d}$e")
+diffdenom(e::Pow) = LaTeXString("\\mathrm{d}$(e.base)$(isone(e.exp) ? "" : "^{$(e.exp)}")")
+function diffdenom(e::Mul)
+    return LaTeXString(prod(
+                "\\mathrm{d}$(k)$(isone(v) ? "" : "^{$v}")"
+                for (k, v) in e.dict
+               ))
+end
+
