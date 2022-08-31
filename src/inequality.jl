@@ -18,9 +18,12 @@ struct Inequality
     end
 end
 
-Base.:(==)(a::Inequality, b::Inequality) = all(isequal.((a.lhs, a.rhs), (b.lhs, b.rhs), (a.relational_op, b.relational_op)))
+Base.:(==)(a::Inequality, b::Inequality) = all([isequal(a.lhs, b.lhs), isequal(a.rhs, b.rhs), isequal(a.relational_op, b.relational_op)])
+Base.hash(a::Inequality, salt::UInt) = hash(a.lhs, hash(a.rhs, hash(a.relational_op, salt)))
 
 @enum RelationalOperator leq geq # strict less than or strict greater than are not supported by any solver
+
+scalarize(ineq::Inequality) = Inequality(scalarize(eq.lhs), scalarize(eq.rhs), ineq.relational_op)
 
 function Base.show(io::IO, ineq::Inequality)
     print(io, ineq.lhs, ineq.relational_op == leq ? " ≲ " : " ≳ ", ineq.rhs)
@@ -46,7 +49,17 @@ julia> x - y ≲ 0
 x - y ≲ 0
 ```
 """
-≲(lhs, rhs) = Inequality(lhs, rhs, leq)
+function ≲(lhs, rhs) 
+    if isarraysymbolic(lhs) || isarraysymbolic(rhs)
+        if isarraysymbolic(lhs) && isarraysymbolic(rhs)
+            lhs .≲ rhs
+        else
+            throw(ArgumentError("Cannot equate an array with a scalar. Please use broadcast `.≲`."))
+        end
+    else
+        Inequality(lhs, rhs, leq)
+    end
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -68,7 +81,17 @@ julia> x - y ≳ 0
 x - y ≳ 0
 ```
 """
-≳(lhs, rhs) = Inequality(lhs, rhs, geq)
+function ≳(lhs, rhs)
+    if isarraysymbolic(lhs) || isarraysymbolic(rhs)
+        if isarraysymbolic(lhs) && isarraysymbolic(rhs)
+            lhs .≳ rhs
+        else
+            throw(ArgumentError("Cannot equate an array with a scalar. Please use broadcast `.≳`."))
+        end
+    else
+    Inequality(lhs, rhs, geq)
+    end
+end
 
 function canonical_form(cs::Inequality; form=leq)
     # do we need to flip the operator?

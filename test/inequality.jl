@@ -1,0 +1,15 @@
+using Symbolics
+using Test
+
+@variables t a b c
+@variables x y z
+@variables u(t) v(t)[1:3]
+
+@test (a ≲ 2) == Inequality(a, 2, Symbolics.leq)
+@test (a * x ≲ b / z) == Inequality(a * x, b / z, Symbolics.leq)
+@test (a ≲ u) == Inequality(a, u, Symbolics.leq)
+@test (a ≲ u) == Inequality(a, u, Symbolics.leq)
+@test Symbolics.scalarize(v .≲ u) == [Inequality(v[1], u, Symbolics.leq), Inequality(v[2], u, Symbolics.leq), Inequality(v[3], u, Symbolics.leq)]
+
+@test Symbolics.canonical_form(a + b *c ≲ x + 2 * x) == (a + b*c - 3x ≲ 0)
+
