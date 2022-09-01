@@ -23,7 +23,7 @@ Base.hash(a::Inequality, salt::UInt) = hash(a.lhs, hash(a.rhs, hash(a.relational
 
 @enum RelationalOperator leq geq # strict less than or strict greater than are not supported by any solver
 
-scalarize(ineq::Inequality) = Inequality(scalarize(eq.lhs), scalarize(eq.rhs), ineq.relational_op)
+scalarize(ineq::Inequality) = Inequality(scalarize(ineq.lhs), scalarize(ineq.rhs), ineq.relational_op)
 
 function Base.show(io::IO, ineq::Inequality)
     print(io, ineq.lhs, ineq.relational_op == leq ? " ≲ " : " ≳ ", ineq.rhs)
