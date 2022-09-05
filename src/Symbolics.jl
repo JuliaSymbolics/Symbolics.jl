@@ -7,7 +7,7 @@ using TermInterface
 
 using Metatheory
 
-using DocStringExtensions
+using DocStringExtensions, Markdown
 
 using LinearAlgebra
 
@@ -22,9 +22,11 @@ import DomainSets: Domain
 
 import TermInterface: similarterm, istree, operation, arguments, symtype
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym,
+import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div,
                       FnType, @rule, Rewriters, substitute,
                       promote_symtype
+
+using SymbolicUtils.Code
 
 import Metatheory.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
@@ -72,7 +74,6 @@ export Equation, ConstrainedEquation
 include("equations.jl")
 
 include("utils.jl")
-export degree
 
 using ConstructionBase
 include("arrays.jl")
@@ -120,6 +121,7 @@ import Distributions
 include("extra_functions.jl")
 
 using Latexify
+using LaTeXStrings
 include("latexify_recipes.jl")
 
 using RecipesBase

@@ -1,4 +1,5 @@
 using SafeTestsets, Test, Pkg
+using Symbolics
 
 const GROUP = get(ENV, "GROUP", "All")
 
@@ -12,15 +13,21 @@ if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
 end
 
+# this needs to be defined at top level
+limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
+@register_symbolic limit(a, N)::Integer
+
 if GROUP == "All" || GROUP == "Core"
     @safetestset "Macro Test" begin include("macro.jl") end
     @safetestset "Arrays" begin include("arrays.jl") end
+    @safetestset "Arrays" begin include("stencils.jl") end
     @safetestset "Complex" begin include("complex.jl") end
     @safetestset "Semi-polynomial" begin include("semipoly.jl") end
     @safetestset "Fuzz Arrays" begin include("fuzz-arrays.jl") end
     @safetestset "Differentiation Test" begin include("diff.jl") end
     @safetestset "Difference Test" begin include("difference.jl") end
     @safetestset "Degree Test" begin include("degree.jl") end
+    @safetestset "Coeff Test" begin include("coeff.jl") end
     @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
     @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
     @safetestset "Groebner Bases Test" begin include("groebner_basis.jl") end

@@ -1,11 +1,11 @@
-using Symbolics
 using Symbolics: Sym, FnType, Term, value, scalarize
+using Symbolics
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
 
 a, b, c = :runtime_symbol_value, :value_b, :value_c
-vars = @variables t $a $b(t) $c[1:3](t)
+vars = @variables t $a $b(t) $c(t)[1:3]
 @test t isa Num
 @test a === :runtime_symbol_value
 @test b === :value_b
@@ -215,3 +215,18 @@ B = [x[1] 1.0
 @test_broken Matrix{Float64}(A-B) == [0.0 1.0;0.0 0.0]
 
 @test isequal(simplify(cos(x)^2 + sin(x)^2 + im * x), 1 + x*im)
+
+using Base.MathConstants: catalan, γ, π, φ, ℯ
+for q in (catalan, γ, π, φ, ℯ)
+    nq = Num(q)
+    @test 3nq^5/7 isa Num
+    @test Symbolics.value(substitute(3nq^5/7, Dict(nq=>big(q)))) ≈ 3big(q)^5/7
+end
+
+using Markdown
+@variables x
+d = Base.Docs.getdoc(x)
+@test d isa Markdown.MD
+stringcontent = string(d.content)
+@test occursin("Metadata", stringcontent)
+@test occursin("(:variables, :x)", stringcontent)

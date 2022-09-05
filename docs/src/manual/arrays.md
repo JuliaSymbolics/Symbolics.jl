@@ -70,7 +70,7 @@ julia> size(b*b')
 
 ```julia
 julia> A .* b'
-(broadcast(*, A, adjoint(b))[1:5,1:3]
+(broadcast(*, A, adjoint(b)))[1:5,1:3]
 ```
 
 ```julia

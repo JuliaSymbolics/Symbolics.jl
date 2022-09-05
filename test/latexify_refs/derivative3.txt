@@ -1,3 +1,3 @@
 \begin{equation}
-\mathrm{\frac{d}{d x}}\left( x^{2} + y^{2} + z^{2} \right)
+\frac{\mathrm{d}}{\mathrm{d}x} \left( x^{2} + y^{2} + z^{2} \right)
 \end{equation}

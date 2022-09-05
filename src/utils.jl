@@ -91,13 +91,13 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
-julia> @variables x t u(x, t) z[1:2](t); Dt = Differential(t); Dx = Differential(x);
+julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
 uˍtx(x, t)
 
 julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
-z_t[1](t)
+var"z(t)[1]ˍt"
 ```
 """
 function diff2term(O)
@@ -111,6 +111,7 @@ function diff2term(O)
     else
         ds = nothing
     end
+    d_separator = 'ˍ'
 
     if ds === nothing
         return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
@@ -118,12 +119,15 @@ function diff2term(O)
         oldop = operation(O)
         if oldop isa Sym
             opname = string(nameof(oldop))
+            args = arguments(O)
         elseif oldop isa Term && operation(oldop) === getindex
             opname = string(nameof(arguments(oldop)[1]))
-        else
-            throw(ArgumentError("A differentiated state's operation must be a `Sym`, so states like `D(u + u)` are disallowed. Got `$oldop`."))
+            args = arguments(O)
+        elseif oldop == getindex
+            args = arguments(O)
+            opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
+            return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
         end
-        d_separator = 'ˍ'
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
         return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
     end
@@ -162,6 +166,9 @@ function tosymbol(t::Term; states=nothing, escape=true)
         args = arguments(t)
     elseif operation(t) isa Differential
         term = diff2term(t)
+        if issym(term)
+            return nameof(term)
+        end
         op = Symbol(operation(term))
         args = arguments(term)
     else
@@ -180,8 +187,6 @@ function lower_varname(var::Symbolic, idv, order)
     end
     return diff2term(var)
 end
-
-var_from_nested_derivative(x, i=0) = (missing, missing)
 
 ### OOPS
 
@@ -208,52 +213,64 @@ function makesubscripts(n)
     end
 end
 
-var_from_nested_derivative(x::Term,i=0) = operation(x) isa Differential ? var_from_nested_derivative(arguments(x)[1], i + 1) : (x, i)
-var_from_nested_derivative(x::Sym,i=0) = (x, i)
-
-function degree(p::Sym, sym=nothing)
-    if sym === nothing
-        return 1
+function var_from_nested_derivative(x,i=0)
+    x = unwrap(x)
+    if issym(x)
+        (x, i)
+    elseif istree(x)
+        operation(x) isa Differential ?
+            var_from_nested_derivative(first(arguments(x)), i + 1) : (x, i)
     else
-        return Int(isequal(p, sym))
+        error("Not a well formed derivative expression $x")
     end
 end
 
-function degree(p::Pow, sym=nothing)
-    return p.exp * degree(p.base, sym)
-end
+degree(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 1 : Int(isequal(p, sym))
+degree(p::Add, sym=nothing) = maximum(degree.(keys(p.dict), sym))
+degree(p::Mul, sym=nothing) = sum(degree(k, sym) * v for (k, v) in p.dict)
+degree(p::Pow, sym=nothing) = p.exp * degree(p.base, sym)
 
-function degree(p::Add, sym=nothing)
-    return maximum(degree(key, sym) for key in keys(p.dict))
-end
+"""
+    degree(p, sym=nothing)
 
-function degree(p::Mul, sym=nothing)
-    return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
-end
-
-function degree(p::Term, sym=nothing)
-    if sym === nothing
-        return 1
-    else
-        return Int(isequal(p, sym))
-    end
+Extract the degree of `p` with respect to `sym`.
+"""
+function degree(p, sym=nothing)
+    p, sym = value(p), value(sym)
+    p isa Number && return 0
+    isequal(p, sym) && return 1
+    p isa Symbolic && return degree(p, sym)
+    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end
 
 function degree(p::SymbolicUtils.Div, sym=nothing)
     return degree(p.num,sym)
 end
 
-function degree(p, sym=nothing)
-    p = value(p)
-    sym = value(sym)
-    if p isa Number
-        return 0
+coeff(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
+coeff(p::Pow, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
+function coeff(p::Add, sym=nothing)
+    if sym === nothing
+        p.coeff
+    else
+        sum(coeff(k, sym) * v for (k, v) in p.dict)
     end
-    if isequal(p, sym)
-        return 1
-    end
-    if p isa Symbolic
-        return degree(p, sym)
-    end
+end
+function coeff(p::Mul, sym=nothing)
+    args = unsorted_arguments(p)
+    I = findall(a -> !isequal(a, sym), args)
+    length(I) == length(args) ? 0 : prod(args[I])
+end
+
+"""
+    coeff(p, sym=nothing)
+
+Extract the coefficient of `p` with respect to `sym`.
+Note that `p` might need to be expanded and/or simplified with `expand` and/or `simplify`.
+"""
+function coeff(p, sym=nothing)
+    p, sym = value(p), value(sym)
+    p isa Number && return sym === nothing ? p : 0
+    p isa Symbolic && return coeff(p, sym)
     throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end
