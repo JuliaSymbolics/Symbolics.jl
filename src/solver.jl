@@ -78,7 +78,7 @@ end
 #  =======  MAIN FUNCTIONS END ======
 
 function get_parts_list(a, b, a_list = Vector{Any}(), b_list = Vector{Any}())
-    if a isa SymbolicUtils.Sym
+    if SymbolicUtils.issym(a)
         push!(a_list, a)
         push!(b_list, b)
     elseif istree(a) && istree(b) && isequal(operation(a), operation(b))
@@ -158,7 +158,7 @@ function create_eq_pairs(a, b)
 end
 
 function replace(expr, dic::Dict)
-    if expr isa SymbolicUtils.Sym && haskey(dic, expr)
+    if SymbolicUtils.issym(expr) && haskey(dic, expr)
         return dic[expr]
     elseif istree(expr)
         args = Any[]
@@ -169,7 +169,7 @@ function replace(expr, dic::Dict)
 
         op = operation(expr)
 
-        if expr isa SymbolicUtils.Term
+        if SymbolicUtils.isterm(expr)
             return term(op, args...)
         else
             op == (/) && return SymbolicUtils.Div(args[1], args[2])
@@ -201,8 +201,8 @@ end
 
 function similar(ref_expr, expr, check_matches = true)
 
-    ref_expr isa SymbolicUtils.Sym && return true
-    expr isa SymbolicUtils.Sym && istree(ref_expr) && return false
+    SymbolicUtils.issym(ref_expr) && return true
+    SymbolicUtils.issym(expr) && istree(ref_expr) && return false
 
     if istree(ref_expr)
         ref_args = arguments(ref_expr)
@@ -324,7 +324,7 @@ function solve_single_eq_unchecked(
 end
 
 function left_prod_right_zero(eq::Equation, var::SymbolicUtils.Sym, single_solution)
-    if eq.lhs isa SymbolicUtils.Mul && isequal(0, eq.rhs)
+    if SymbolicUtils.ismul(eq.lhs) && isequal(0, eq.rhs)
         if (single_solution)
             eq = arguments(eq.lhs)[1] ~ 0
         else
@@ -469,7 +469,7 @@ reduce_root(term(sqrt,32)) = 4*sqrt(2)
 
 function reduce_root(a)
 
-    if a isa SymbolicUtils.Pow && a.exp isa Rational
+    if SymbolicUtils.ismul(a) && a.exp isa Rational
         a = term(^, a.base, a.exp)
     end
 
