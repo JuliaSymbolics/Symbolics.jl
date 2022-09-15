@@ -469,7 +469,7 @@ reduce_root(term(sqrt,32)) = 4*sqrt(2)
 
 function reduce_root(a)
 
-    if SymbolicUtils.ismul(a) && a.exp isa Rational
+    if SymbolicUtils.ispow(a) && a.exp isa Rational
         a = term(^, a.base, a.exp)
     end
 
