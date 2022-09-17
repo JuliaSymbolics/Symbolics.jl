@@ -19,4 +19,4 @@ using Test
 @test (a ≳ sin(u)) == Inequality(a, sin(u), Symbolics.geq)
 @test Symbolics.scalarize(v .≳ u) == [Inequality(v[1], u, Symbolics.geq), Inequality(v[2], u, Symbolics.geq), Inequality(v[3], u, Symbolics.geq)]
 
-@test Symbolics.canonical_form(a + b *c ≳ x + 2 * x) == (a + b*c - 3x ≳ 0)
+@test Symbolics.canonical_form(a + b *c ≳ x + 2 * x) == (3x - a - b*c ≲ 0)
