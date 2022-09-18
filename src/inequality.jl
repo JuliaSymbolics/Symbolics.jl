@@ -54,7 +54,7 @@ function ≲(lhs, rhs)
         if isarraysymbolic(lhs) && isarraysymbolic(rhs)
             lhs .≲ rhs
         else
-            throw(ArgumentError("Cannot equate an array with a scalar. Please use broadcast `.≲`."))
+            throw(ArgumentError("Cannot relate an array with a scalar. Please use broadcast `.≲`."))
         end
     else
         Inequality(lhs, rhs, leq)
@@ -86,7 +86,7 @@ function ≳(lhs, rhs)
         if isarraysymbolic(lhs) && isarraysymbolic(rhs)
             lhs .≳ rhs
         else
-            throw(ArgumentError("Cannot equate an array with a scalar. Please use broadcast `.≳`."))
+            throw(ArgumentError("Cannot relate an array with a scalar. Please use broadcast `.≳`."))
         end
     else
     Inequality(lhs, rhs, geq)
