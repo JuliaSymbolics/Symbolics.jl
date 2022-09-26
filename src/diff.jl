@@ -579,7 +579,7 @@ end
 isidx(x) = x isa TermCombination
 
 """
-    hessian_sparsity(ops::AbstractVector, vars::AbstractVector)
+    hessian_sparsity(op, vars::AbstractVector)
 
 Return the sparsity pattern of the Hessian of an array of expressions with respect to
 an array of variable expressions.
