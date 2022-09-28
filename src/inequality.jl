@@ -108,7 +108,7 @@ function canonical_form(cs::Inequality; form=leq)
     end
 end
 
-get_variables(ineq::Inequality) = vcat(get_variables(ineq.lhs), get_variables(ineq.rhs))
+get_variables(ineq::Inequality) = unique(vcat(get_variables(ineq.lhs), get_variables(ineq.rhs)))
 
 SymbolicUtils.simplify(cs::Inequality; kw...) = 
     Inequality(simplify(cs.lhs; kw...), simplify(cs.rhs; kw...), cs.relational_op)
