@@ -110,3 +110,18 @@ end
 
 SymbolicUtils.simplify(cs::Inequality; kw...) = 
     Inequality(simplify(cs.lhs; kw...), simplify(cs.rhs; kw...), cs.relational_op)
+
+# ambiguity
+for T in [:Pair, :Any]
+    @eval function SymbolicUtils.substitute(x::Inequality, rules::$T; kw...)
+        sub = substituter(rules)
+        Inequality(sub(x.lhs; kw...), sub(x.rhs; kw...), x.relational_op)
+    end
+
+    @eval function SymbolicUtils.substitute(x::Array{Inequality}, rules::$T; kw...)
+        sub = substituter(rules)
+        map(x) do x_
+            Inequality(sub(x_.lhs; kw...), sub(x_.rhs; kw...), x_.relational_op)
+        end
+    end
+end
