@@ -275,9 +275,16 @@ function _linear_expansion(t, x)
         a₂, b₂, islinear = linear_expansion(args[2], x)
         (islinear && _iszero(a₂)) || return (0, 0, false)
         a₁, b₁, islinear = linear_expansion(args[1], x)
-        _isone(b₂) && (a₁, b₁, islinear)
+        _isone(b₂) && return (a₁, b₁, islinear)
         (islinear && _iszero(a₁)) || return (0, 0, false)
         return (0, b₁^b₂, islinear)
+    elseif op === (/)
+        # (a₁ x + b₁)/(a₂ x + b₂) is linear => a₂ = 0
+        a₂, b₂, islinear = linear_expansion(args[2], x)
+        (islinear && _iszero(a₂)) || return (0, 0, false)
+        a₁, b₁, islinear = linear_expansion(args[1], x)
+        # (a₁ x + b₁)/b₂
+        return islinear ? (a₁ / b₂, b₁ / b₂, islinear) : (0, 0, false)
     else
         for (i, arg) in enumerate(args)
             a, b, islinear = linear_expansion(arg, x)
