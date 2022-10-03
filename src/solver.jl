@@ -183,7 +183,7 @@ function replace(expr, dic::Dict)
 end
 
 function apply_ns_rule(becomes::Becomes, expr)
-    if similar(becomes.before, expr, false)
+    if expr_similar(becomes.before, expr, false)
         check = get_parts_list(becomes.before, expr)
         check == Nothing && return expr
 
@@ -199,7 +199,7 @@ function apply_ns_rule(becomes::Becomes, expr)
     return expr
 end
 
-function similar(ref_expr, expr, check_matches = true)
+function expr_similar(ref_expr, expr, check_matches = true)
 
     SymbolicUtils.issym(ref_expr) && return true
     SymbolicUtils.issym(expr) && istree(ref_expr) && return false
@@ -219,7 +219,7 @@ function similar(ref_expr, expr, check_matches = true)
             ref_arg = ref_args[i]
             arg = args[i]
 
-            !similar(ref_arg, arg, false) && return false
+            !expr_similar(ref_arg, arg, false) && return false
         end
 
         if check_matches
@@ -238,8 +238,8 @@ function similar(ref_expr, expr, check_matches = true)
             !verify_matches(ref_parts, expr_parts) && return false
         end
 
-        return similar(ref_expr.lhs, expr.lhs, false) &&
-               similar(ref_expr.rhs, expr.rhs, false) &&
+        return expr_similar(ref_expr.lhs, expr.lhs, false) &&
+               expr_similar(ref_expr.rhs, expr.rhs, false) &&
                return true
     else
         return isequal(ref_expr, expr)
