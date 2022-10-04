@@ -157,14 +157,14 @@ function create_eq_pairs(a, b)
     return out
 end
 
-function replace(expr, dic::Dict)
+function replace_term(expr, dic::Dict)
     if SymbolicUtils.issym(expr) && haskey(dic, expr)
         return dic[expr]
     elseif istree(expr)
         args = Any[]
 
         for arg in arguments(expr)
-            push!(args, replace(arg, dic))
+            push!(args, replace_term(arg, dic))
         end
 
         op = operation(expr)
@@ -176,7 +176,7 @@ function replace(expr, dic::Dict)
             return op(args...)
         end
     elseif expr isa Equation
-        return replace(expr.lhs, dic) ~ replace(expr.rhs, dic)
+        return replace_term(expr.lhs, dic) ~ replace_term(expr.rhs, dic)
     else
         return expr
     end
@@ -193,7 +193,7 @@ function apply_ns_rule(becomes::Becomes, expr)
 
         eq_list = create_eq_pairs(becomes_parts, expr_parts)
 
-        return replace(becomes.after, eq_list)
+        return replace_term(becomes.after, eq_list)
 
     end
     return expr
