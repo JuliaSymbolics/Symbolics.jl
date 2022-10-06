@@ -253,6 +253,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        linenumbers = false,
                        outputidxs=nothing,
                        skipzeros = false,
+                       force_SA = false,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
@@ -264,7 +265,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
-    similarto = i === nothing ? Array : dargs[i].name
+    similarto = force_SA ? SArray : i === nothing ? Array : dargs[i].name
     oop_expr = Func(dargs, [],
                     postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse)))
 
