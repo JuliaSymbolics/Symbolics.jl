@@ -19,6 +19,6 @@ function infimum(d::AbstractInterval{T}) where T <: Num
     leftendpoint(d)
 end
 
-function supremum(d::AbstractInterval{Num}) where T <: Num
+function supremum(d::AbstractInterval{T}) where T <: Num
     rightendpoint(d)
 end
