@@ -276,7 +276,7 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     islinear || return nothing
     # a * x + b = 0
     if eq isa AbstractArray && var isa AbstractArray
-        x = _solve(a, -b, simplify, var)
+        x = _solve(a, -b, var, simplify)
     else
         x = a \ -b
     end
@@ -292,7 +292,7 @@ solve_for(eq::T, var::Num; x...) where {T<:AbstractArray} = first(solve_for(eq,[
 
 const ℝ = (identity)((Symbolics.wrap)((SymbolicUtils.setmetadata)((SymbolicUtils.Sym){Real}(:ℝ), Symbolics.VariableSource, (:variables, :ℝ))))
 
-function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify, vars)
+function _solve(A::AbstractMatrix, b::AbstractArray, vars, do_simplify)
     A = Num.(SymbolicUtils.quick_cancel.(A))
     b = Num.(SymbolicUtils.quick_cancel.(b))
     m, n = size(A)

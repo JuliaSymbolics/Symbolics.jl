@@ -48,7 +48,7 @@ F = lu(X)
 R = simplify_fractions.(F.L * F.U - X[F.p, :])
 @test iszero(R)
 @test simplify_fractions.(F \ X) == I
-@test Symbolics._solve(X, X, true) == I
+@test Symbolics._solve(X, X, vars, true) == I
 inv(X)
 qr(X)
 
