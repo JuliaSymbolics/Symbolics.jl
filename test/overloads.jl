@@ -55,7 +55,7 @@ qr(X)
 X2 = [0 b c; 0 0 0; 0 h 0]
 @test_throws SingularException lu(X2)
 F2 = lu(X2, check=false)
-@test F2.info == 1
+@test F2.info == 2 # F2.info == rank(X2)
 
 # test operations with sparse arrays
 # note `isequal` instead of `==` because `==` would give another symbolic type
@@ -167,7 +167,7 @@ z2 = c + d * im
 @test sign(Num(1)) isa Num
 @test isequal(sign(Num(1)), Num(1))
 @test isequal(sign(Num(-1)), Num(-1))
-                    
+
 @test isequal(ℯ^a, exp(a))
 
 using IfElse: ifelse

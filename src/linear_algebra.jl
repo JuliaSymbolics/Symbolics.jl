@@ -17,14 +17,14 @@ function _sym_lu(A)
     lead = 1
     leads = zeros(Int, minmn)
     rank = 0
-    for k = 1:m
+    for k = 1:minmn
         kp = k # pivot index
 
         # search for the expression different from zero with the least terms
         amin = SINGULAR
         for j = lead:n
             for i = k:m # search first by columns
-                absi = Symbolics._iszero(F[i, j]) ? SINGULAR : Symbolics.nterms(F[i, j])
+                absi = _iszero(F[i, j]) ? SINGULAR : nterms(F[i, j])
                 if absi < amin
                     kp = i
                     amin = absi
@@ -42,8 +42,8 @@ function _sym_lu(A)
 
         # break from function as the reduced echelon form has been
         # reached, but fill `p`
-        if amin == SINGULAR && !(amin isa Symbolics.Symbolic) && (amin isa Number) && iszero(rank)
-            for i = k+1:m
+        if amin == SINGULAR && !(amin isa Symbolic) && (amin isa Number)
+            for i = k+1:minmn
                 p[i] = i
             end
             break
@@ -57,21 +57,24 @@ function _sym_lu(A)
             end
         end
 
-        # normalize the lead column
+        # set values for L matrix
         c = F[k, lead]
-        for i = lead+1:m
-            F[i, k] = F[i, k] / c
+        for i = k+1:m
+            F[i, k] = F[i, lead] / c
+            if lead != k
+                F[i, lead] = zero(Num)
+            end
         end
 
-        # substract the row form every other, traverse first by colums
+        # substract the row from every other, traverse first by colums
         # we start from lead+1 to avoid chaing the leading value on the column
         for j = lead+1:n
-            for i = lead+1:m
+            for i = k+1:m
                 # this line occupies most of the time, distributed in the
                 # following methods
                 #   - `*(::Num, ::Num)` dynamic dispatch
                 #   - `-(::Num, ::Num)` dynamic dispatch
-                F[i, j] = F[i, j] - F[i, lead] * F[k, j]
+                F[i, j] = F[i, j] - F[i, k] * F[k, j]
             end
         end
 
@@ -98,18 +101,13 @@ function sym_rref(A, b)
     leads = zeros(Int, minmn)
     rank = 0
     for k = 1:m
-        # if there is no more reduction to do
-        if lead > n
-            break
-        end
-
         kp = k # pivot index
 
         # search for the expression different from zero with the least terms
         amin = SINGULAR
         for j = lead:n
             for i = k:m # search first by columns
-                absi = Symbolics._iszero(F[i, j]) ? SINGULAR : Symbolics.nterms(F[i, j])
+                absi = _iszero(F[i, j]) ? SINGULAR : nterms(F[i, j])
                 if absi < amin
                     kp = i
                     amin = absi
@@ -126,9 +124,8 @@ function sym_rref(A, b)
         # normally, here we would save the permutation in an array
         # but this is not needed as we have the extended matrix
 
-        # save to check for consistency
         # break from function as the reduced echelon form has been reached
-        if amin == SINGULAR && !(amin isa Symbolics.Symbolic) && (amin isa Number) && iszero(rank)
+        if amin == SINGULAR && !(amin isa Symbolic) && (amin isa Number)
             break
         end
         rank = k
@@ -168,7 +165,7 @@ function sym_rref(A, b)
         # zero the lead column
         for i = 1:m
             if i != k
-                F[i, lead] = zero(eltype(F))
+                F[i, lead] = zero(Num)
             end
         end
 
