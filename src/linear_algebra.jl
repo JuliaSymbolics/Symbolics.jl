@@ -16,7 +16,7 @@ function _sym_lu(A)
     p = Vector{LinearAlgebra.BlasInt}(undef, minmn)
     lead = 1
     leads = zeros(Int, minmn)
-    info = 0
+    rank = 0
     for k = 1:m
         kp = k # pivot index
 
@@ -40,13 +40,15 @@ function _sym_lu(A)
 
         p[k] = kp
 
-        # save to check for consistency
-        # don't break from function as the reduced echelon form has been
-        # reached, but continue till `p` is fully filled
-        if amin == SINGULAR && !(amin isa Symbolics.Symbolic) && (amin isa Number) && iszero(info)
-            info = k
-            continue
+        # break from function as the reduced echelon form has been
+        # reached, but fill `p`
+        if amin == SINGULAR && !(amin isa Symbolics.Symbolic) && (amin isa Number) && iszero(rank)
+            for i = k+1:m
+                p[i] = i
+            end
+            break
         end
+        rank = k
 
         # swap rows
         if k != kp
@@ -76,10 +78,11 @@ function _sym_lu(A)
         # advance the lead by one
         lead = lead + 1
     end
-    return F, p, filter!(!iszero, leads), info
+    return F, p, filter!(!iszero, leads), rank
 end
 function sym_lu(A; check=true)
-    F, p, leads, info = _sym_lu(A)
+    F, p, leads, rank = _sym_lu(A)
+    info = rank == minimum(size(A)) ? 0 : rank
     check && LinearAlgebra.checknonsingular(info)
     LU(F, p, convert(LinearAlgebra.BlasInt, info))
 end
@@ -93,7 +96,7 @@ function sym_rref(A, b)
     minmn = min(m, n)
     lead = 1
     leads = zeros(Int, minmn)
-    info = 0
+    rank = 0
     for k = 1:m
         # if there is no more reduction to do
         if lead > n
@@ -125,10 +128,10 @@ function sym_rref(A, b)
 
         # save to check for consistency
         # break from function as the reduced echelon form has been reached
-        if amin == SINGULAR && !(amin isa Symbolics.Symbolic) && (amin isa Number) && iszero(info)
-            info = k
+        if amin == SINGULAR && !(amin isa Symbolics.Symbolic) && (amin isa Number) && iszero(rank)
             break
         end
+        rank = k
 
         # swap rows, only needed to swap lead:end
         if k != kp
@@ -142,6 +145,7 @@ function sym_rref(A, b)
         for j = lead:n
             F[k, j] = F[k, j] / c
         end
+        b[k] = b[k] / c
 
         # substract the row form every other, traverse first by colums
         for j = lead+1:n
@@ -155,6 +159,12 @@ function sym_rref(A, b)
                 end
             end
         end
+        # substract the row in the extended part of the matrix
+        for i = 1:m
+            if i != k
+                b[i] = b[i] - F[i, lead] * b[k]
+            end
+        end
         # zero the lead column
         for i = 1:m
             if i != k
@@ -165,7 +175,7 @@ function sym_rref(A, b)
         # advance the lead by one
         lead = lead + 1
     end
-    return F, b, filter!(!iszero, leads), info
+    return F, b, filter!(!iszero, leads), rank
 end
 
 # convert an upper extended matrix to rref using leads
@@ -207,11 +217,11 @@ end
 function _factorize(A, b)
     m, n = size(A)
     if m <= n
-        F, p, leads, info = _sym_lu(A)
-        return F, b, p, leads, info
+        F, p, leads, rank = _sym_lu(A)
+        return F, b, p, leads, rank
     else
-        F, b, leads, info = sym_rref(A, b)
-        return F, b, Int[], leads, info
+        F, b, leads, rank = sym_rref(A, b)
+        return F, b, Int[], leads, rank
     end
 end
 
@@ -286,41 +296,41 @@ function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify, vars)
     A = Num.(SymbolicUtils.quick_cancel.(A))
     b = Num.(SymbolicUtils.quick_cancel.(b))
     m, n = size(A)
-    F, b, ipiv, leads, info = _factorize(A, b)
-    if m == n && info == 0
+    minmn = min(m, n)
+    F, b, ipiv, leads, rank = _factorize(A, b)
+    if m == n && rank == minmn
+        info = 0
         sol = value.(LU(F, ipiv, convert(LinearAlgebra.BlasInt, info)) \ b)
     else
         # check for consistency
-        if !iszero(info)
-            for i ∈ info:m
-                if !iszero(b[i])
-                    throw(ArgumentError("Inconsistent linear system"))
-                end
+        for i ∈ rank+1:m
+            if !iszero(b[i])
+                throw(ArgumentError("Inconsistent linear system"))
             end
         end
         _sol = Vector{Num}(undef, n)
         if m <= n
             # system is of the form Ax = (LU)x = L(Ux) = Lx' = b[p]
-            # with L being square UnitLowerTriangular
+            # with L being square `UnitLowerTriangular`
 
-            # first solve Lx' = b[p],--------------------------------+
-            p = LinearAlgebra.ipiv2perm(ipiv, m)                   # |
-            L = UnitLowerTriangular(F[1:m, 1:m])                   # |
-            _x = symsub!(L, b[p])                                  # |
-                                                                   # |
-            # then solve Ux = x', first converting [U|x'] to rref, <-+
-            U = triu!(F)                                           # |
-            F, b = _sym_urref!(U, _x, leads)                       # |
-        else                                                       # |
-        end                                                        # |
-        # and later filling the values for all the variables       <-+
+            # first solve Lx' = b[p], -----------------------------------+
+            p = LinearAlgebra.ipiv2perm(ipiv, m)                       # |
+            L = UnitLowerTriangular(F[1:m, 1:m])                       # |
+            _x = symsub!(L, b[p])                                      # |
+                                                                       # |
+            # then solve Ux = x', first converting [U|x'] to rref, <-----+
+            U = triu!(F)                                               # |
+            F, b = _sym_urref!(U, _x, leads)                           # |
+        else                                                           # |
+        end                                                            # |
+        # and later filling the values for all the variables <-----------+
         freeidx = setdiff(1:n, leads) # indices for free variables
         for i in freeidx
             _sol[i] = ℝ
         end
         F[CartesianIndex.(1:length(leads), leads)] .= 0
         for (i, v) ∈ enumerate(leads)
-            _sol[v] = - b[i] - view(F, i, :) ⋅ vars
+            _sol[v] = b[i] - view(F, i, :) ⋅ vars
         end
 
         sol = value.(_sol)
