@@ -584,13 +584,6 @@ end
 
 isidx(x) = x isa TermCombination
 
-"""
-    hessian_sparsity(op, vars::AbstractVector)
-
-Return the sparsity pattern of the Hessian of an expression with respect to
-an array of variable expressions.
-"""
-function hessian_sparsity end
 basic_simterm(t, g, args; kws...) = Term{Any}(g, args)
 
 let
@@ -623,34 +616,68 @@ let
 
     global hessian_sparsity
 
-    function hessian_sparsity(f, u)
-        @assert !(f isa AbstractArray)
-        f = value(f)
-        u = map(value, u)
+    @doc """
+    $(TYPEDSIGNATURES)
+
+    Return the sparsity pattern of the Hessian of an expression with respect to
+    an array of variable expressions.
+
+    # Arguments
+    - `expr`: a symbolic expression.
+    - `vars`: a vector of symbolic variables.
+
+    # Examples
+    ```jldoctest
+    julia> using Symbolics
+
+    julia> vars = @variables x₁ x₂;
+
+    julia> expr = 3x₁^2 + 4x₁ * x₂;
+
+    julia> Symbolics.hessian_sparsity(expr, vars)
+    2×2 SparseArrays.SparseMatrixCSC{Bool, Int64} with 3 stored entries:
+     1  1
+     1  ⋅
+    ```
+    """
+    function hessian_sparsity(expr, vars::AbstractVector)
+        @assert !(expr isa AbstractArray)
+        expr = value(expr)
+        u = map(value, vars)
         idx(i) = TermCombination(Set([Dict(i=>1)]))
         dict = Dict(u .=> idx.(1:length(u)))
-        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(f)
+        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(expr)
         lp = linearity_propagator(f)
         _sparse(lp, length(u))
     end
 end
-
 """
-```julia
-hessian_sparsity(f,input::AbstractVector{T}, args...;kwargs...) where T<:Number
+$(TYPEDSIGNATURES)
+
+Return the sparsity pattern of the Hessian of the given function `f`.
+
+# Arguments
+- `f`: an out-of-place function `f(input, args...; kwargs...)`.
+- `input`: a vector of input values whose [eltype](https://docs.julialang.org/en/v1/base/collections/#Base.eltype) can be either symbolic or [primitive](https://docs.julialang.org/en/v1/manual/types/#Primitive-Types).
+
+# Examples
+```jldoctest
+julia> using Symbolics
+
+julia> f(x) = 4x[1] * x[2] - 5x[2]^2;
+
+julia> input = Vector{Float64}(undef, 2);
+
+julia> Symbolics.hessian_sparsity(f, input)
+2×2 SparseArrays.SparseMatrixCSC{Bool, Int64} with 3 stored entries:
+ ⋅  1
+ 1  1
 ```
-
-Return the sparsity pattern of the Hessian of the function `f(input,args...;kwargs...)`.
 """
-function hessian_sparsity(
-    f::Function,
-    input::AbstractVector{T},
-    args...;
-    kwargs...,
-) where {T<:Number}
-    vars = ArrayInterfaceCore.restructure(input, [variable(i) for i in eachindex(input)])
-    eq = f(vars, args...; kwargs...)
-    hessian_sparsity(eq, vars)
+function hessian_sparsity(f::Function, input::AbstractVector, args...; kwargs...)
+    vars = ArrayInterfaceCore.restructure(input, map(variable, eachindex(input)))
+    expr = f(vars, args...; kwargs...)
+    hessian_sparsity(expr, vars)
 end
 
 """
