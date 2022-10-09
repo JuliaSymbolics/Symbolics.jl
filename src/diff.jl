@@ -530,17 +530,23 @@ end
 
 """
 ```julia
-jacobian_sparsity(op!,output::Array{T},input::Array{T}) where T<:Number
+jacobian_sparsity(f!,output::AbstractVector{T},input::AbstractVector{T}, args...;kwargs...) where T<:Number
 ```
 
-Return the sparsity pattern of the Jacobian of the mutating function `op!(output,input,args...)`.
+Return the sparsity pattern of the Jacobian of the mutating function `f!(output,input,args...;kwargs...)`.
 """
-function jacobian_sparsity(op!,output::Array{T},input::Array{T}, args...) where T<:Number
-    eqs=similar(output,Num)
-    fill!(eqs,false)
-    vars=ArrayInterfaceCore.restructure(input,[variable(i) for i in eachindex(input)])
-    op!(eqs,vars, args...)
-    jacobian_sparsity(eqs,vars)
+function jacobian_sparsity(
+    f!::Function,
+    output::Array{T},
+    input::Array{T},
+    args...;
+    kwargs...,
+) where {T<:Number}
+    eqs = similar(output, Num)
+    fill!(eqs, false)
+    vars = ArrayInterfaceCore.restructure(input, [variable(i) for i in eachindex(input)])
+    f!(eqs, vars, args...; kwargs...)
+    jacobian_sparsity(eqs, vars)
 end
 
 
@@ -627,6 +633,24 @@ let
         lp = linearity_propagator(f)
         _sparse(lp, length(u))
     end
+end
+
+"""
+```julia
+hessian_sparsity(f,input::AbstractVector{T}, args...;kwargs...) where T<:Number
+```
+
+Return the sparsity pattern of the Hessian of the function `f(input,args...;kwargs...)`.
+"""
+function hessian_sparsity(
+    f::Function,
+    input::AbstractVector{T},
+    args...;
+    kwargs...,
+) where {T<:Number}
+    vars = ArrayInterfaceCore.restructure(input, [variable(i) for i in eachindex(input)])
+    eq = f(vars, args...; kwargs...)
+    hessian_sparsity(eq, vars)
 end
 
 """
