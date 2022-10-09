@@ -30,6 +30,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Coeff Test" begin include("coeff.jl") end
     @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
     @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
+    @safetestset "Algebraic Solver Test" begin include("solver.jl") end
     @safetestset "Groebner Bases Test" begin include("groebner_basis.jl") end
     @safetestset "Overloading Test" begin include("overloads.jl") end
     @safetestset "Build Function Test" begin include("build_function.jl") end

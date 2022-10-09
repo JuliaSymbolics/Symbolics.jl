@@ -1,6 +1,6 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 
@@ -27,6 +27,12 @@ using SymbolicUtils: Sym, term, operation
     @test isequal(get_variables(0 ~ x[1]), [x[1]])
     @test Set(get_variables(2x)) == Set(collect(x)) # both array elements are present
     @test isequal(get_variables(2x[1]), [x[1]])
+end
+
+@testset "getname" begin
+    @variables t x(t)[1:4]
+    v = Symbolics.lower_varname(unwrap(x[2]), unwrap(t), 2)
+    @test getname(v) == Symbol("x(t)[2]ˍtt")
 end
 
 @testset "getindex" begin

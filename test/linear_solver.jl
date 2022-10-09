@@ -51,3 +51,4 @@ eqs = [
 @test isequal(Symbolics.solve_for(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x), 1//7*y - 2//7*z)
 @test isequal(Symbolics.solve_for(x + y ~ 0, x), Symbolics.solve_for([x + y ~ 0], x))
 @test isequal(Symbolics.solve_for([x + y ~ 0], [x]), Symbolics.solve_for(x + y ~ 0, [x]))
+@test isequal(Symbolics.solve_for(2x/z + sin(z), x), sin(z) / (-2 / z))

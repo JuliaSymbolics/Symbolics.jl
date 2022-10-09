@@ -243,6 +243,10 @@ function degree(p, sym=nothing)
     throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end
 
+function degree(p::SymbolicUtils.Div, sym=nothing)
+    return degree(p.num,sym)
+end
+
 coeff(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
 coeff(p::Pow, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
 function coeff(p::Add, sym=nothing)
