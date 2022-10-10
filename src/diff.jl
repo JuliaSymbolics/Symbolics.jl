@@ -537,8 +537,8 @@ Return the sparsity pattern of the Jacobian of the mutating function `f!(output,
 """
 function jacobian_sparsity(
     f!::Function,
-    output::Array{T},
-    input::Array{T},
+    output::AbstractArray{T},
+    input::AbstractArray{T},
     args...;
     kwargs...,
 ) where {T<:Number}
