@@ -490,13 +490,13 @@ end
 
 """
 ```julia
-jacobian_sparsity(ops::AbstractVector, vars::AbstractVector)
+jacobian_sparsity(ops::AbstractArray, vars::AbstractArray)
 ```
 
 Return the sparsity pattern of the Jacobian of an array of expressions with respect to
 an array of variable expressions.
 """
-function jacobian_sparsity(du, u)
+function jacobian_sparsity(du::AbstractArray, u::AbstractArray)
     du = map(value, du)
     u = map(value, u)
     dict = Dict(zip(u, 1:length(u)))
@@ -530,7 +530,7 @@ end
 
 """
 ```julia
-jacobian_sparsity(f!,output::AbstractVector{T},input::AbstractVector{T}, args...;kwargs...) where T<:Number
+jacobian_sparsity(f!::Function,output::AbstractVector{T},input::AbstractVector{T}, args...;kwargs...) where T<:Number
 ```
 
 Return the sparsity pattern of the Jacobian of the mutating function `f!(output,input,args...;kwargs...)`.
@@ -584,12 +584,6 @@ end
 
 isidx(x) = x isa TermCombination
 
-"""
-    hessian_sparsity(op, vars::AbstractVector)
-
-Return the sparsity pattern of the Hessian of an expression with respect to
-an array of variable expressions.
-"""
 function hessian_sparsity end
 basic_simterm(t, g, args; kws...) = Term{Any}(g, args)
 
@@ -623,7 +617,15 @@ let
 
     global hessian_sparsity
 
-    function hessian_sparsity(f, u)
+    """
+    ```julia
+    hessian_sparsity(op, vars::AbstractVector)
+    ```
+
+    Return the sparsity pattern of the Hessian of an expression with respect to
+    an array of variable expressions.
+    """
+    function hessian_sparsity(f, u::AbstractVector)
         @assert !(f isa AbstractArray)
         f = value(f)
         u = map(value, u)
@@ -633,24 +635,26 @@ let
         lp = linearity_propagator(f)
         _sparse(lp, length(u))
     end
-end
 
-"""
-```julia
-hessian_sparsity(f,input::AbstractVector{T}, args...;kwargs...) where T<:Number
-```
+    global hessian_sparsity
 
-Return the sparsity pattern of the Hessian of the function `f(input,args...;kwargs...)`.
-"""
-function hessian_sparsity(
-    f::Function,
-    input::AbstractVector{T},
-    args...;
-    kwargs...,
-) where {T<:Number}
-    vars = ArrayInterfaceCore.restructure(input, [variable(i) for i in eachindex(input)])
-    eq = f(vars, args...; kwargs...)
-    hessian_sparsity(eq, vars)
+    """
+    ```julia
+    hessian_sparsity(f::Function,input::AbstractVector{T}, args...;kwargs...) where T<:Number
+    ```
+
+    Return the sparsity pattern of the Hessian of the function `f(input,args...;kwargs...)`.
+    """
+    function hessian_sparsity(
+        f::Function,
+        input::AbstractVector{T},
+        args...;
+        kwargs...,
+    ) where {T<:Number}
+        vars = ArrayInterfaceCore.restructure(input, [variable(i) for i in eachindex(input)])
+        eq = f(vars, args...; kwargs...)
+        hessian_sparsity(eq, vars)
+    end
 end
 
 """
