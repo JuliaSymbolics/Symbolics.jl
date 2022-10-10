@@ -39,6 +39,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Latexify Test" begin include("latexify.jl") end
     @safetestset "Domain Test" begin include("domains.jl") end
     @safetestset "SymPy Test" begin include("sympy.jl") end
+    @safetestset "Inequality Test" begin include("inequality.jl") end
 end
 
 if GROUP == "Downstream"
