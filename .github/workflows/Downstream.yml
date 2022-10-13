@@ -22,6 +22,7 @@ jobs:
           - {user: SciML, repo: CellMLToolkit.jl, group: All}
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
           - {user: SciML, repo: DataDrivenDiffEq.jl, group: Standard}
+          - {user: SciML, repo: ModelOrderReduction.jl, group: All}
 
     steps:
       - uses: actions/checkout@v2
