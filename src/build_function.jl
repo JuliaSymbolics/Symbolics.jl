@@ -29,6 +29,10 @@ const MultithreadedForm = ShardedForm{true}
 
 MultithreadedForm() = MultithreadedForm(nothing, 2*nthreads())
 
+function throw_missing_specialization(n)
+    throw(ArgumentError("Missing specialization for $n arguments. Check `iip_config`."))
+end
+
 """
 `build_function`
 
@@ -112,7 +116,7 @@ function _build_function(target::JuliaTarget, op, args...;
         toexpr(fun, states)
     else
         fun = Func(dargs, [], op)
-        (wrap_code !== nothing) && (fun = wrap_code(fun))        
+        (wrap_code !== nothing) && (fun = wrap_code(fun))
         toexpr(fun, states)
     end
 
@@ -256,6 +260,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
+                       iip_config = (true, true),
                        parallel=nothing, cse = false, kwargs...)
 
   if parallel == nothing && _nnz(rhss) >= 1000
@@ -265,23 +270,33 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
     similarto = i === nothing ? Array : dargs[i].name
-    oop_expr = Func(dargs, [],
-                    postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse)))
+
+    oop, iip = iip_config
+    oop_body = if oop
+        postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse))
+    else
+        term(throw_missing_specialization, length(dargs))
+    end
+    oop_expr = Func(dargs, [], oop_body)
 
     if !isnothing(wrap_code[1])
         oop_expr = wrap_code[1](oop_expr)
     end
 
     out = Sym{Any}(:ˍ₋out)
-    ip_expr = Func([out, dargs...], [],
-                   postprocess_fbody(set_array(parallel,
-                                               dargs,
-                                               out,
-                                               outputidxs,
-                                               rhss,
-                                               checkbounds,
-                                               skipzeros,
-                                               cse,)))
+    ip_body = if iip
+        postprocess_fbody(set_array(parallel,
+                                    dargs,
+                                    out,
+                                    outputidxs,
+                                    rhss,
+                                    checkbounds,
+                                    skipzeros,
+                                    cse,))
+    else
+        term(throw_missing_specialization, length(dargs) + 1)
+    end
+    ip_expr = Func([out, dargs...], [], ip_body)
 
     if !isnothing(wrap_code[2])
         ip_expr = wrap_code[2](ip_expr)
