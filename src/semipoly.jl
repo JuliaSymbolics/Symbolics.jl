@@ -149,6 +149,7 @@ function mark_and_exponentiate(expr, vars)
              @rule (~a::isop(+))^(~b::isreal) => expand(Pow((~a), real(~b)))
              @rule *(~~xs::(xs -> all(issemimonomial, xs))) => *(~~xs...)
              @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
+             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, unsorted_arguments(~a))...)
              @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
     expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
 end
