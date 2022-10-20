@@ -243,9 +243,6 @@ function degree(p, sym=nothing)
     if isequal(p, sym)
         return 1
     end
-    if p isa Symbolic
-        return degree(p, sym)
-    end
     if isterm(p)
         if sym === nothing
             return 1
@@ -267,21 +264,6 @@ function degree(p, sym=nothing)
     end
 end
 
-coeff(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
-coeff(p::Pow, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
-function coeff(p::Add, sym=nothing)
-    if sym === nothing
-        p.coeff
-    else
-        sum(coeff(k, sym) * v for (k, v) in p.dict)
-    end
-end
-function coeff(p::Mul, sym=nothing)
-    args = unsorted_arguments(p)
-    I = findall(a -> !isequal(a, sym), args)
-    length(I) == length(args) ? 0 : prod(args[I])
-end
-
 """
     coeff(p, sym=nothing)
 
@@ -290,7 +272,27 @@ Note that `p` might need to be expanded and/or simplified with `expand` and/or `
 """
 function coeff(p, sym=nothing)
     p, sym = value(p), value(sym)
-    p isa Number && return sym === nothing ? p : 0
-    p isa Symbolic && return coeff(p, sym)
-    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
+    if issym(p) || isterm(p)
+        sym === nothing ? 0 : Int(isequal(p, sym))
+    elseif ispow(p)
+        sym === nothing ? 0 : Int(isequal(p, sym))
+    elseif isadd(p)
+        if sym===nothing
+            p.coeff
+        else
+            sum(coeff(k, sym) * v for (k, v) in p.dict)
+        end
+    elseif ismul(p)
+        args = unsorted_arguments(p)
+        coeffs = map(a->coeff(a, sym), args)
+        if all(iszero, coeffs)
+            return 0
+        else
+            @views prod(Iterators.flatten((coeffs[findall(!iszero, coeffs)], args[findall(iszero, coeffs)])))
+        end
+    else
+        p isa Number && return sym === nothing ? p : 0
+        p isa Symbolic && return coeff(p, sym)
+        throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
+    end
 end
