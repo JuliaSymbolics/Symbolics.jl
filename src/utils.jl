@@ -166,24 +166,20 @@ function tosymbol(t; states=nothing, escape=true)
             args = arguments(t)
         elseif operation(t) isa Differential
             term = diff2term(t)
-            op = Symbol(operation(term))
-            args = arguments(term)
+            if issym(term)
+                return nameof(term)
+            else
+                op = Symbol(operation(term))
+                args = arguments(term)
+            end
         else
             op = Symbol(repr(operation(t)))
             args = arguments(t)
         end
-        op = nameof(operation(t))
-        args = arguments(t)
-    elseif operation(t) isa Differential
-        term = diff2term(t)
-        if issym(term)
-            return nameof(term)
-        end
-        op = Symbol(operation(term))
-        args = arguments(term)
 
+        return escape ? Symbol(op, "(", join(args, ", "), ")") : op
     else
-        x
+        return t
     end
 end
 
