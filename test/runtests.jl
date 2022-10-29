@@ -40,6 +40,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Domain Test" begin include("domains.jl") end
     @safetestset "SymPy Test" begin include("sympy.jl") end
     @safetestset "Inequality Test" begin include("inequality.jl") end
+    @safetestset "Integral Test" begin include("integral.jl") end
 end
 
 if GROUP == "Downstream"
