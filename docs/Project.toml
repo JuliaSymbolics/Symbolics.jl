@@ -1,7 +1,9 @@
 [deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+Latexify = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 
 [compat]
-Documenter = "0.24.2"
+Documenter = "0.27"
