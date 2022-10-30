@@ -8,7 +8,8 @@ variables as inputs into existing Julia code. For example, the following
 uses the standard Julia function for the Lorenz equations to generate
 the symbolic expression for the Lorenz equations:
 
-```julia
+```@example registration
+using Symbolics
 function lorenz(du,u,p,t)
  du[1] = 10.0(u[2]-u[1])
  du[2] = u[1]*(28.0-u[3]) - u[2]
@@ -19,30 +20,15 @@ du = Array{Any}(undef, 3)
 lorenz(du,u,p,t)
 du
 ```
-
-```julia
-3-element Vector{Any}:
-                      10.0(u(t))[2] - 10.0(u(t))[1]
-                     (28.0 - (u(t))[3])*(u(t))[1] - (u(t))[2]
- (u(t))[1]*(u(t))[2] - 2.6666666666666665(u(t))[3]
-```
-
 Or similarly:
 
-```julia
+```@example registration
 @variables t x(t) y(t) z(t) dx(t) dy(t) dz(t) σ ρ β
 du = [dx,dy,dz]
 u = [x,y,z]
 p = [σ,ρ,β]
 lorenz(du,u,p,t)
 du
-```
-
-```julia
-3-element Vector{Num}:
-            10.0y(t) - 10.0x(t)
-           (28.0 - z(t))*x(t) - y(t)
- x(t)*y(t) - 2.6666666666666665z(t)
 ```
 
 ## Registering Functions

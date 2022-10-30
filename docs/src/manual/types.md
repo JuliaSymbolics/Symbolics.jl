@@ -22,28 +22,23 @@ These types are
 
 Use the syntax `@variables x::T` to create a symbol named `x` of symbolic type `T`. If `T` is a subtype of any of the above listed types which support a wrapper, the resulting variable will be wrapped in that type. As seen in the examples below, x,z,X,Z all have a suitable wrapper type, hence their types are shown. However, `s` being of symbolic type `String` does not have a corresponding wrapper supported by Symbolics. Hence it returns a `Sym{String}` object. This is the trivial expression tree of a single variable without a wrapper, and is not a subtype of String or AbstractString.
 
-```julia
-julia> @variables x::Real z::Complex{Real} (X::Real)[1:10, 1:10] (Z::Complex{Real})[1:10] s::String
-4-element Vector{Any}:
- x
- z
-  X[1:10,1:10]
-  Z[1:10]
-  s
-
-julia> typeof(x)
-Num
-
-julia> typeof(z)
-Complex{Num}
-
-julia> typeof(X)
-Symbolics.Arr{Num, 2}
-
-julia> typeof(Z)
-Symbolics.Arr{Complex{Num}, 1}
-
-julia> typeof(s)
-SymbolicUtils.Sym{String, Nothing}
+```@example types
+using Symbolics
+@variables x::Real z::Complex{Real} (X::Real)[1:10, 1:10] (Z::Complex{Real})[1:10] s::String
+```
+```@example types
+typeof(x)
+```
+```@example types
+typeof(z)
+```
+```@example types
+typeof(X)
+```
+```@example types
+typeof(Z)
+```
+```@example types
+typeof(s)
 ```
 

@@ -5,7 +5,7 @@ Symbolics expressions out to files. For example, here we will
 generate an in-place version of `f` and save the anonymous function to
 a `.jl` file:
 
-```julia
+```@example io
 using Symbolics
 @variables u[1:3]
 function f(u)
@@ -17,8 +17,8 @@ write("function.jl", string(ex2))
 
 Now we can do something like:
 
-```julia
-f = include("function.jl")
+```@example io
+g = include("function.jl")
 ```
 
 and that will load the function back in. Note that this can be done
