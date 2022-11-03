@@ -1,7 +1,8 @@
 # Symbolics.jl
 
 [![Github Action CI](https://github.com/JuliaSymbolics/Symbolics.jl/workflows/CI/badge.svg)](https://github.com/JuliaSymbolics/Symbolics.jl/actions)
-[![Coverage Status](https://coveralls.io/repos/github/JuliaSymbolics/ModelingToolkit.jl/badge.svg?branch=master)](https://coveralls.io/github/JuliaSymbolics/Symbolics.jl?branch=master)
+[![codecov](https://codecov.io/gh/JuliaSymbolics/Symbolics.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaSymbolics/Symbolics.jl)
+[![Build Status](https://github.com/JuliaSymbolics/Symbolics.jl/workflows/CI/badge.svg)](https://github.com/JuliaSymbolics/Symbolics.jl/actions?query=workflow%3ACI)
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://symbolics.juliasymbolics.org/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://symbolics.juliasymbolics.org/dev/)
 

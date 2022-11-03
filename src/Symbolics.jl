@@ -73,6 +73,9 @@ substitute
 export Equation, ConstrainedEquation
 include("equations.jl")
 
+export Inequality, ≲, ≳
+include("inequality.jl")
+
 include("utils.jl")
 
 using ConstructionBase
@@ -121,6 +124,7 @@ import Distributions
 include("extra_functions.jl")
 
 using Latexify
+using LaTeXStrings
 include("latexify_recipes.jl")
 
 using RecipesBase
@@ -132,6 +136,11 @@ export symbolics_to_sympy
 include("init.jl")
 
 include("semipoly.jl")
+
+include("solver.jl")
+export solve_single_eq
+export solve_system_eq
+export lambertw
 
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}

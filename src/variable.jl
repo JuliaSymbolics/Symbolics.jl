@@ -390,6 +390,7 @@ const _fail = Dict()
 _getname(x, _) = nameof(x)
 _getname(x::Symbol, _) = x
 function _getname(x::Symbolic, val)
+    issym(x) && return nameof(x)
     if istree(x) && issym(operation(x))
         return nameof(operation(x))
     end

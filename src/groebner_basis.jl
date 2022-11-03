@@ -20,7 +20,7 @@ function symbol_to_poly(sympolys::AbstractArray)
     sort!(stdsympolys, lt=(<ₑ))
 
     pvar2sym  = Bijections.Bijection{Any,Any}()
-    sym2term  = Dict{Sym,Any}()
+    sym2term  = Dict{BasicSymbolic,Any}()
     polyforms = map(f -> PolyForm(f, pvar2sym, sym2term), stdsympolys)
 
     # Discover common coefficient type

@@ -15,7 +15,7 @@ using Test
 @test isequal(degree(x, y), 0)
 
 @test isequal(degree(x/2, x), 1)
-@test_broken isequal(degree(x/y, x), 1)  # FIXME: `StackOverflowError`
+@test isequal(degree(x/y, x), 1)
 
 @test isequal(degree(x*y, y), 1)
 @test isequal(degree(x*y, x), 1)

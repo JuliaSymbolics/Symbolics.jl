@@ -466,25 +466,57 @@ function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=fals
     sp = jacobian_sparsity(ops, vars)
     I,J,_ = findnz(sp)
 
+    exprs = sparsejacobian_vals(ops, vars, I, J, simplify=simplify)
+
+    sparse(I, J, exprs, length(ops), length(vars))
+end
+
+"""
+$(SIGNATURES)
+
+A helper function for computing the values of the sparse Jacobian of an array of expressions with respect to
+an array of variable expressions given the sparsity structure.
+"""
+function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify=false)
+    ops = Symbolics.scalarize(ops)
+    vars = Symbolics.scalarize(vars)
+
     exprs = Num[]
 
     for (i,j) in zip(I, J)
         push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify)))
     end
-    sparse(I, J, exprs, length(ops), length(vars))
+    exprs
 end
 
 """
-```julia
-jacobian_sparsity(ops::AbstractVector, vars::AbstractVector)
-```
+$(TYPEDSIGNATURES)
 
 Return the sparsity pattern of the Jacobian of an array of expressions with respect to
 an array of variable expressions.
+
+# Arguments
+- `exprs`: an array of symbolic expressions.
+- `vars`: an array of symbolic variables.
+
+# Examples
+```jldoctest
+julia> using Symbolics
+
+julia> vars = @variables x₁ x₂;
+
+julia> exprs = [2x₁, 3x₂, 4x₁ * x₂];
+
+julia> Symbolics.jacobian_sparsity(exprs, vars)
+3×2 SparseArrays.SparseMatrixCSC{Bool, Int64} with 4 stored entries:
+ 1  ⋅
+ ⋅  1
+ 1  1
+```
 """
-function jacobian_sparsity(du, u)
-    du = map(value, du)
-    u = map(value, u)
+function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
+    du = map(value, exprs)
+    u = map(value, vars)
     dict = Dict(zip(u, 1:length(u)))
 
     i = Ref(1)
@@ -512,25 +544,45 @@ function jacobian_sparsity(du, u)
 
     sparse(I, J, true, length(du), length(u))
 end
-
-
 """
-```julia
-jacobian_sparsity(op!,output::Array{T},input::Array{T}) where T<:Number
+$(TYPEDSIGNATURES)
+
+Return the sparsity pattern of the Jacobian of the mutating function `f!`.
+
+# Arguments
+- `f!`: an in-place function `f!(output, input, args...; kwargs...)`.
+- `output`: output array.
+- `input`: input array.
+
+The [eltype](https://docs.julialang.org/en/v1/base/collections/#Base.eltype)
+of `output` and `input` can be either symbolic or
+[primitive](https://docs.julialang.org/en/v1/manual/types/#Primitive-Types).
+
+# Examples
+```jldoctest
+julia> using Symbolics
+
+julia> f!(y, x) = y .= [x[2], 2x[1], 3x[1] * x[2]];
+
+julia> output = Vector{Float64}(undef, 3);
+
+julia> input = Vector{Float64}(undef, 2);
+
+julia> Symbolics.jacobian_sparsity(f!, output, input)
+3×2 SparseArrays.SparseMatrixCSC{Bool, Int64} with 4 stored entries:
+ ⋅  1
+ 1  ⋅
+ 1  1
 ```
-
-Return the sparsity pattern of the Jacobian of the mutating function `op!(output,input,args...)`.
 """
-function jacobian_sparsity(op!,output::Array{T},input::Array{T}, args...) where T<:Number
-    eqs=similar(output,Num)
-    fill!(eqs,false)
-    vars=ArrayInterfaceCore.restructure(input,[variable(i) for i in eachindex(input)])
-    op!(eqs,vars, args...)
-    jacobian_sparsity(eqs,vars)
+function jacobian_sparsity(f!::Function, output::AbstractArray, input::AbstractArray,
+                           args...; kwargs...)
+    exprs = similar(output, Num)
+    fill!(exprs, false)
+    vars = ArrayInterfaceCore.restructure(input, map(variable, eachindex(input)))
+    f!(exprs, vars, args...; kwargs...)
+    jacobian_sparsity(exprs, vars)
 end
-
-
-
 
 """
     exprs_occur_in(exprs::Vector, expr)
@@ -564,13 +616,6 @@ end
 
 isidx(x) = x isa TermCombination
 
-"""
-    hessian_sparsity(ops::AbstractVector, vars::AbstractVector)
-
-Return the sparsity pattern of the Hessian of an array of expressions with respect to
-an array of variable expressions.
-"""
-function hessian_sparsity end
 basic_simterm(t, g, args; kws...) = Term{Any}(g, args)
 
 let
@@ -603,16 +648,68 @@ let
 
     global hessian_sparsity
 
-    function hessian_sparsity(f, u)
-        @assert !(f isa AbstractArray)
-        f = value(f)
-        u = map(value, u)
+    @doc """
+    $(TYPEDSIGNATURES)
+
+    Return the sparsity pattern of the Hessian of an expression with respect to
+    an array of variable expressions.
+
+    # Arguments
+    - `expr`: a symbolic expression.
+    - `vars`: a vector of symbolic variables.
+
+    # Examples
+    ```jldoctest
+    julia> using Symbolics
+
+    julia> vars = @variables x₁ x₂;
+
+    julia> expr = 3x₁^2 + 4x₁ * x₂;
+
+    julia> Symbolics.hessian_sparsity(expr, vars)
+    2×2 SparseArrays.SparseMatrixCSC{Bool, Int64} with 3 stored entries:
+     1  1
+     1  ⋅
+    ```
+    """
+    function hessian_sparsity(expr, vars::AbstractVector)
+        @assert !(expr isa AbstractArray)
+        expr = value(expr)
+        u = map(value, vars)
         idx(i) = TermCombination(Set([Dict(i=>1)]))
         dict = Dict(u .=> idx.(1:length(u)))
-        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(f)
+        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(expr)
         lp = linearity_propagator(f)
         _sparse(lp, length(u))
     end
+end
+"""
+$(TYPEDSIGNATURES)
+
+Return the sparsity pattern of the Hessian of the given function `f`.
+
+# Arguments
+- `f`: an out-of-place function `f(input, args...; kwargs...)`.
+- `input`: a vector of input values whose [eltype](https://docs.julialang.org/en/v1/base/collections/#Base.eltype) can be either symbolic or [primitive](https://docs.julialang.org/en/v1/manual/types/#Primitive-Types).
+
+# Examples
+```jldoctest
+julia> using Symbolics
+
+julia> f(x) = 4x[1] * x[2] - 5x[2]^2;
+
+julia> input = Vector{Float64}(undef, 2);
+
+julia> Symbolics.hessian_sparsity(f, input)
+2×2 SparseArrays.SparseMatrixCSC{Bool, Int64} with 3 stored entries:
+ ⋅  1
+ 1  1
+```
+"""
+function hessian_sparsity(f::Function, input::AbstractVector, args...; kwargs...)
+    vars = ArrayInterfaceCore.restructure(input, map(variable, eachindex(input)))
+    expr = f(vars, args...; kwargs...)
+    hessian_sparsity(expr, vars)
 end
 
 """

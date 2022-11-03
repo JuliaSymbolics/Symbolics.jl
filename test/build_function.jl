@@ -22,6 +22,8 @@ h_str2 = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g])
 
 h_oop = eval(h_str[1])
 h_str_par = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], parallel=Symbolics.MultithreadedForm())
+h_str_3 = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], iip_config = (false, true))
+h_str_4 = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], iip_config = (true, false))
 
 @test contains(repr(h_str_par[1]), "schedule")
 @test contains(repr(h_str_par[2]), "schedule")
@@ -30,6 +32,10 @@ h_par_rgf = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], p
 h_ip! = eval(h_str[2])
 h_ip_skip! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true, fillzeros=false)[2])
 h_ip_skip_par! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true, parallel=Symbolics.MultithreadedForm(), fillzeros=false)[2])
+h3_oop = eval(h_str_3[1])
+h3_ip = eval(h_str_3[2])
+h4_oop = eval(h_str_4[1])
+h4_ip = eval(h_str_4[2])
 inputs = ([1], [2], [3, 4, 5], [6], [7], [8])
 
 @test h_oop(inputs...) == h_julia(inputs...)
@@ -39,7 +45,12 @@ out_1 = similar(h, Int)
 out_2 = similar(out_1)
 h_ip!(out_1, inputs...)
 h_julia!(out_2, inputs...)
+@test_throws ArgumentError h3_oop(inputs...)
 @test out_1 == out_2
+h3_ip(out_1, inputs...)
+@test out_1 == out_2
+@test_throws ArgumentError h4_ip(out_1, inputs...)
+@test h4_oop(inputs...) == h_julia(inputs...)
 out_1 = similar(h, Int)
 h_par_rgf[2](out_1, inputs...)
 @test out_1 == out_2

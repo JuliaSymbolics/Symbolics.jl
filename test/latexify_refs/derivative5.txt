@@ -1,0 +1,3 @@
+\begin{equation}
+\frac{\mathrm{d}^{3}}{\mathrm{d}y\mathrm{d}x^{2}} y
+\end{equation}
