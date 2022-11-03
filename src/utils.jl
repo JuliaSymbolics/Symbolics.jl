@@ -255,6 +255,8 @@ function degree(p, sym=nothing)
         return maximum(degree(key, sym) for key in keys(p.dict))
     elseif ispow(p)
         return p.exp * degree(p.base, sym)
+    elseif isdiv(p)
+        return degree(p.num, sym) - degree(p.den, sym)
     elseif issym(p)
         if sym === nothing
             return 1
@@ -262,6 +264,7 @@ function degree(p, sym=nothing)
             return Int(isequal(p, sym))
         end
     end
+    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end
 
 """
