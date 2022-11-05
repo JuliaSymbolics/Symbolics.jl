@@ -6,8 +6,8 @@ representations of the function by simply inputting the symbolic values into
 the function and using what is returned. For example, let's take [the following
 numerical PDE discretization](https://www.stochasticlifestyle.com/solving-systems-stochastic-pdes-using-gpus-julia/):
 
-```julia
-using Symbolics, LinearAlgebra, SparseArrays
+```@example auto_parallel
+using Symbolics, LinearAlgebra, SparseArrays, Plots
 
 # Define the constants for the PDE
 const α₂ = 1.0
@@ -51,25 +51,30 @@ end
 We can build the Symbolics version of this model by tracing the
 model function:
 
-```julia
+```@example auto_parallel
 # Define the initial condition as normal arrays
 @variables u[1:N, 1:N, 1:3]
 du = simplify.(f(collect(u), nothing, 0.0))
+vec(du)[1:10]
 ```
 
 The output, here the in-place modified `du`, is a symbolic representation of
 each output of the function. We can then utilize this in the Symbolics
 functionality. For example, let's build a parallel version of `f` first:
 
-```julia
+```@example auto_parallel
 fastf = eval(Symbolics.build_function(du,u,
             parallel=Symbolics.MultithreadedForm())[2])
 ```
 
 Now let's compute the sparse Jacobian function and compile a fast multithreaded version:
 
-```julia
+```@example auto_parallel
 jac = Symbolics.sparsejacobian(vec(du), vec(u))
+row,col,val = findnz(jac)
+scatter(row,col,legend=false,ms=1,c=:black)
+```
+```@example auto_parallel
 fjac = eval(Symbolics.build_function(jac,u,
             parallel=Symbolics.MultithreadedForm())[2])
 ```
@@ -79,7 +84,7 @@ Now let's setup the parabolic PDE to be solved by DifferentialEquations.jl.
 We will setup the vanilla version and the sparse multithreaded
 version:
 
-```julia
+```@example auto_parallel
 using OrdinaryDiffEq
 u0 = zeros(N, N, 3)
 MyA = zeros(N, N);
@@ -94,10 +99,11 @@ fastprob = ODEProblem(ODEFunction((du, u, p, t) -> fastf(du, u),
 
 Let's see the timing difference:
 
-```julia
+```@example auto_parallel
 using BenchmarkTools
-@btime solve(prob, TRBDF2()) # 33.073 s (895404 allocations: 23.87 GiB)
-@btime solve(fastprob, TRBDF2()) # 209.670 ms (8208 allocations: 109.25 MiB)
+#@btime solve(prob, TRBDF2()); # 33.073 s (895404 allocations: 23.87 GiB)
+#warning the following solve takes a long time to compile, but afterwards is very fast.
+#@btime solve(fastprob, TRBDF2()); # 209.670 ms (8208 allocations: 109.25 MiB)
 ```
 
 Boom, an automatic 157x acceleration that grows as the size of the problem
