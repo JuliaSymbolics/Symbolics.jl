@@ -5,7 +5,7 @@ compiled via `build_function` to C, this gives us a nifty way to automatically
 generate C functions from Julia code! To see this in action, let's start with
 [the Lotka-Volterra equations](https://en.wikipedia.org/wiki/Lotka%E2%80%93Volterra_equations):
 
-```julia
+```@example converting_to_C
 using Symbolics
 function lotka_volterra!(du, u, p, t)
   x, y = u
@@ -17,38 +17,27 @@ end
 
 Now we trace this into Symbolics:
 
-```julia
+```@example converting_to_C
 @variables t du[1:2] u[1:2] p[1:4]
 du = collect(du)
 lotka_volterra!(du, u, p, t)
+du
 ```
-
-which gives:
-
-```julia
-du = Num[p₁ * u₁ - (p₂ * u₁) * u₂, -p₃ * u₂ + (p₄ * u₁) * u₂]
-```
-
 and then we build the function:
 
-```julia
+```@example converting_to_C
 build_function(du, u, p, t, target=Symbolics.CTarget())
-
-void diffeqf(double* du, double* RHS1, double* RHS2, double RHS3) {
-  du[0] = RHS2[0] * RHS1[0] - (RHS2[1] * RHS1[0]) * RHS1[1];
-  du[1] = -(RHS2[2]) * RHS1[1] + (RHS2[3] * RHS1[0]) * RHS1[1];
-}
 ```
 
 If we want to compile this, we do `expression=Val{false}`:
 
-```julia
+```@example converting_to_C
 f = build_function(du, u, p, t, target=Symbolics.CTarget(), expression=Val{false})
 ```
 
 now we check it computes the same thing:
 
-```julia
+```@example converting_to_C
 du = rand(2); du2 = rand(2)
 u = rand(2)
 p = rand(4)
