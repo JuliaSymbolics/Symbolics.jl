@@ -14,8 +14,9 @@ const IndexMap = Dict{Char,Char}(
             '8' => '₈',
             '9' => '₉')
 
-struct VariableDefaultValue end
-struct VariableSource end
+abstract type AbstractVariableMetadata end
+struct VariableDefaultValue <: AbstractVariableMetadata end
+struct VariableSource <: AbstractVariableMetadata end
 
 function recurse_and_apply(f, x)
     if symtype(x) <: AbstractArray
