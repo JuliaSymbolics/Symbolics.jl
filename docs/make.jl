@@ -1,5 +1,19 @@
 using Documenter, Symbolics, SymbolicUtils
 
+# Make sure that plots don't throw a bunch of warnings / errors!
+ENV["GKSwstype"] = "100"
+using Plots
+
+mathengine = MathJax3(Dict(:loader => Dict("load" => ["[tex]/require", "[tex]/mathtools"]),
+                           :tex => Dict("inlineMath" => [["\$", "\$"], ["\\(", "\\)"]],
+                                        "packages" => [
+                                            "base",
+                                            "ams",
+                                            "autoload",
+                                            "mathtools",
+                                            "require",
+                                        ])))
+
 makedocs(
     sitename="Symbolics.jl",
     authors="Chris Rackauckas",
@@ -15,6 +29,7 @@ makedocs(
     ],
     format = Documenter.HTML(#analytics = "UA-90474609-3",
                              assets = ["assets/favicon.ico"]),
+                             mathengine = mathengine,
                              #canonical="https://mtk.sciml.ai/stable/"),
     pages=[
         "Home" => "index.md",
