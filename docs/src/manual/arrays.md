@@ -4,89 +4,81 @@ Symbolic array-valued expressions (symbolic arrays) are supported by Symbolics. 
 
 You can create a symbolic array variable with the following syntax:
 
-```julia
+```@example arrays
+using Symbolics
 @variables A[1:5, 1:3] b[1:3]
 ```
 
 Here `A` is a symbolic matrix of size `(5, 3)` and `b` is a symbolic vector of length 3.
 
-```julia
-julia> size(A)
-(5, 3)
-
-julia> size(b)
-(3,)
-
-julia> ndims(A)
-2
-
-julia> ndims(b)
-1
-
-julia> eltype(A)
-Real
-
-julia> eltype(b)
-Real
+```@example arrays
+size(A)
+```
+```@example arrays
+size(b)
+```
+```@example arrays
+ndims(A)
+```
+```@example arrays
+ndims(b)
+```
+```@example arrays
+eltype(A)
+```
+```@example arrays
+eltype(b)
 ```
 
 ## Array operations
 
 Operations on symbolic arrays return symbolic array expressions:
 
-```julia
-julia> c = A * b
-(A*b)[1:5]
-
-julia> size(c)
-(5,)
-
-julia> eltype(c)
-Real
+```@example arrays
+c = A * b
+```
+```@example arrays
+size(c)
+```
+```@example arrays
+eltype(c)
 ```
 
 Adjoints, matrix-matrix, and matrix-vector multiplications are supported. Dot product returns a scalar-valued expression:
 
-```julia
-julia> b'b
-adjoint(b)*b
-
-julia> size(b'b)
-()
+```@example arrays
+b'b
+```
+```@example arrays
+size(b'b)
 ```
 
 Outer product returns a matrix:
 
-```julia
-julia> b * b'
-(b*adjoint(b))[1:3,1:3]
-
-julia> size(b*b')
-(3, 3)
+```@example arrays
+b * b'
+```
+```@example arrays
+size(b*b')
 ```
 
 ### Broadcast, map and reduce
 
 
-```julia
-julia> A .* b'
-(broadcast(*, A, adjoint(b)))[1:5,1:3]
+```@example arrays
+A .* b'
 ```
-
-```julia
-julia> map(asin, (A*b))
-(map(asin, A*b))[1:5]
+```@example arrays
+map(asin, (A*b))
 ```
-
-```julia
-julia> sum(A)
-...
-
-julia> typeof(sum(A))
-Num # it's a scalar!
-
-julia> typeof(sum(A, dims=2))
-Arr{Real, 2} # it's a vector
+```@example arrays
+#sum(A) #latexify not working
+```
+```@example arrays
+typeof(sum(A))
+```
+```@example arrays
+typeof(sum(A, dims=2))
 ```
 
 ### Indexing and delayed computation
@@ -95,34 +87,28 @@ Indexing array expressions is fairly flexible in Symbolics. Let's go through all
 
 #### Scalar indexing and scalarization
 
-```julia
-julia> AAt = A*A'
-(A*adjoint(A))[1:5,1:5]
-
-julia> AAt[2,3]
-(A*adjoint(A))[2,3]
+```@example arrays
+AAt = A*A'
+```
+```@example arrays
+AAt[2,3]
 ```
 
 Here we indexed for the element (2,3), but we got back a symbolic indexing expression. You may want to force the element to be computed in terms of the elements of A. This can be done, using `scalarize` function.
 
-```julia
-julia> Symbolics.scalarize(AAt[2,3])
-A[2, 1]*A[3, 1] + A[2, 2]*A[3, 2] + A[2, 3]*A[3, 3]
-
-julia> @syms i::Int j::Int
-(i, j)
-
-julia> Symbolics.scalarize(AAt[i,j])
-A[i, 1]*A[j, 1] + A[i, 2]*A[j, 2] + A[i, 3]*A[j, 3]
+```@example arrays
+Symbolics.scalarize(AAt[2,3])
+```
+```@example arrays
+@syms i::Int j::Int
+Symbolics.scalarize(AAt[i,j])
 ```
 
 In general any scalar expression which is derived from array expressions can be scalarized.
 
-```julia
-julia> sum(A[:,1]) + sum(A[2,:])
-Symbolics._mapreduce(identity, +, A[Colon(), 1], Colon(), (:init => false,)) + Symbolics._mapreduce(identity, +, A[2, Colon()], Colon(), (:init => false,))
-
-julia> Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
-A[1, 1] + A[2, 2] + A[2, 3] + A[4, 1] + A[5, 1] + 2A[2, 1] + A[3, 1]
-
+```@example arrays
+#sum(A[:,1]) + sum(A[2,:])#latexify not working
+```
+```@example arrays
+Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
 ```

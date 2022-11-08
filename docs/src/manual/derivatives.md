@@ -34,7 +34,9 @@ Symbolics.sparsehessian
 There is a large amount of derivatives pre-defined by
 [DiffRules.jl](https://github.com/JuliaDiff/DiffRules.jl).
 
-```julia
+```@example derivatives
+using Symbolics
+@variables x y z
 f(x,y,z) = x^2 + sin(x+y) - z
 ```
 
@@ -59,6 +61,6 @@ You should return an `Term` for the derivative of your function.
 
 For example, `sin(t)`'s derivative (by `t`) is given by the following:
 
-```julia
+```@example derivatives
 Symbolics.derivative(::typeof(sin), args::NTuple{1,Any}, ::Val{1}) = cos(args[1])
 ```
