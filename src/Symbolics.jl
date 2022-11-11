@@ -85,7 +85,7 @@ export @register, @register_symbolic
 include("register.jl")
 
 using TreeViews
-export @variables, Variable
+export @variables, @arrayvariables, Variable
 include("variable.jl")
 
 include("linearity.jl")
