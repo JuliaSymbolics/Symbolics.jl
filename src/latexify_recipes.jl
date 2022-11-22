@@ -1,3 +1,4 @@
+haskey(Latexify.get_default(), :fmt) || Latexify.set_default(; fmt = FancyNumberFormatter(5))
 prettify_expr(expr) = expr
 prettify_expr(f::Function) = nameof(f)
 prettify_expr(expr::Expr) = Expr(expr.head, prettify_expr.(expr.args)...)
