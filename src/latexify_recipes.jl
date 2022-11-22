@@ -40,7 +40,6 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 
 @latexrecipe function f(n::Num)
     env --> :equation
-    cdot --> false
 
     return recipe(n)
 end
