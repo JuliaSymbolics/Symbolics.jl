@@ -38,8 +38,8 @@ end
 """
 $(TYPEDSIGNATURES)
 
-Create an [`Inequality`](@ref) out of two [`Num`](@ref) instances, or an
-`Num` and a `Number`.
+Create an [`Inequality`](@ref) out of two [`Num`](@ref) instances, or an `Num` and a `Number`.
+Unicode `≲` can be typed by writing `\\lesssim` then pressing tab in the Julia REPL, and in many editors.
 
 # Examples
 
@@ -70,8 +70,8 @@ end
 """
 $(TYPEDSIGNATURES)
 
-Create an [`Inequality`](@ref) out of two [`Num`](@ref) instances, or an
-`Num` and a `Number`.
+Create an [`Inequality`](@ref) out of two [`Num`](@ref) instances, or an `Num` and a `Number`.
+Unicode `≲` can be typed by writing `\\gtrsim` then pressing tab in the Julia REPL, and in many editors.
 
 # Examples
 
