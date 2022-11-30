@@ -6,8 +6,9 @@ struct VarDomainPairing
   domain::Domain
 end
 
-Base.:∈(variable::Union{Sym,Term,Num},domain::Domain) = VarDomainPairing(value(variable),domain)
-Base.:∈(variable::Union{Sym,Term,Num},domain::Interval) = VarDomainPairing(value(variable),domain)
+for D in [:Domain, :Interval, :AbstractInterval]
+    @eval Base.:∈(variable::Union{Sym,Term,Num},domain::$D) = VarDomainPairing(value(variable),domain)
+end
 
 # Construct Interval domain from a Tuple
 Base.:∈(variable::Union{Sym,Term,Num},domain::NTuple{2,Real}) = VarDomainPairing(variable,Interval(domain...))
