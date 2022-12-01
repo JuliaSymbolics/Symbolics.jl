@@ -1,4 +1,5 @@
-import DomainSets: Domain, Interval, AbstractInterval
+import IntervalSets: Interval, AbstractInterval, TypedEndpointsInterval
+import DomainSets: Domain
 import Symbolics: value, Sym, Term, Num
 
 struct VarDomainPairing
@@ -6,7 +7,7 @@ struct VarDomainPairing
   domain::Domain
 end
 
-for D in [:Domain, :Interval, :AbstractInterval]
+for D in [:Domain, :Interval, :TypedEndpointsInterval]
     @eval Base.:∈(variable::Union{Sym,Term,Num},domain::$D) = VarDomainPairing(value(variable),domain)
 end
 
