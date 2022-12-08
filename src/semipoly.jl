@@ -3,6 +3,8 @@ using DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
+import SymbolicUtils: unsorted_arguments
+
 """
 $(TYPEDEF)
 
@@ -127,7 +129,7 @@ end
 
 symtype(m::SemiMonomial) = symtype(m.p)
 
-TermInterface.issym(::SemiMonomial) = true
+issym(::SemiMonomial) = true
 
 Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.p, m.coeff)
 

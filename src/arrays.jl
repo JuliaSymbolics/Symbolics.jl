@@ -752,9 +752,9 @@ function arraymaker(T, shape, views, seq...)
     ArrayMaker{T}(shape, [(views .=> seq)...], nothing)
 end
 
-TermInterface.istree(x::ArrayMaker) = true
-TermInterface.operation(x::ArrayMaker) = arraymaker
-TermInterface.arguments(x::ArrayMaker) = [eltype(x), shape(x), map(first, x.sequence), map(last, x.sequence)...]
+istree(x::ArrayMaker) = true
+operation(x::ArrayMaker) = arraymaker
+arguments(x::ArrayMaker) = [eltype(x), shape(x), map(first, x.sequence), map(last, x.sequence)...]
 
 shape(am::ArrayMaker) = am.shape
 
