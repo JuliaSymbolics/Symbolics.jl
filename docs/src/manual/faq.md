@@ -18,7 +18,7 @@ know how many iterations to do and throws an error.
 
 This shows up in adaptive algorithms, for example:
 
-```julia
+```@example faq
 function factorial(x)
   out = x
   while x > 1
@@ -34,9 +34,14 @@ The number of iterations this algorithm runs for is dependent on the value of
 then it's `out = x*(x-1)*(x-2)*(x-3)*(x-4)`, while if `x` is 3 then it's
 `out = x*(x-1)*(x-2)`. Thus it should be no surprise that:
 
-```julia
+```@example faq
+using Symbolics
 @variables x
-factorial(x)
+try
+    factorial(x)
+catch e
+    e
+end
 ```
 
 fails. It's not that there is anything wrong with this code, but it's not going
@@ -62,13 +67,17 @@ done by doing `@register_symbolic f(x)`. If you need to define things like deriv
 Comparing symbols with `==` produces a symbolic equality, not a `Bool`. To produce a `Bool`, call `isequal`.
 
 To test if a symbol is part of a collection of symbols, i.e., a vector, either create a `Set` and use `in`, e.g.
-```julia
-@variables x
-x in [x] # error
-x in Set([x]) # true
+```@example faq
+try 
+    x in [x]
+catch e
+    e
+end
 ```
-or use
-```julia
-any(isequal(x), collection)
+```@example faq
+x in Set([x])
+```
+```@example faq
+any(isequal(x), [x])
 ```
 

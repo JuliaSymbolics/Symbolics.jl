@@ -35,19 +35,16 @@ as symbolic expressions and forwards those to the values it wraps. You can use
 By default, the `@variables` macros return Num-wrapped objects so as to allow
 calling functions which are restricted to `Number` or `Real`.
 
-```julia
-julia> @variables t x y z(t);
-
-julia> Symbolics.operation(Symbolics.value(x + y))
-+ (generic function with 377 methods)
-
-julia> Symbolics.operation(Symbolics.value(z))
-z(::Any)::Real
-
-julia> Symbolics.arguments(Symbolics.value(x + y))
-2-element Vector{Sym{Real}}:
- x
- y
+```@example variables
+using Symbolics
+@variables t x y z(t);
+Symbolics.operation(Symbolics.value(x + y))
+```
+```@example variables
+Symbolics.operation(Symbolics.value(z))
+```
+```@example variables
+Symbolics.arguments(Symbolics.value(x + y))
 ```
 
 Note that Julia converts irrationals — like `π` and `ℯ` — to `Float64`
@@ -58,12 +55,13 @@ so an expression like `2π * x` will leave the symbolic `x` multiplied by a
 also, which can be achieved with `Num(π)`.  For generic programming, it may be
 helpful to simply redefine the variable `π` to be of the same type as some
 other argument, as in
-```julia
+```@example variables
 function f(x)
     let π=oftype(x, π)
         1 + (2//3 + 4π/5) * x
     end
 end
+f(t)
 ```
 This will work for any floating-point input, as well as symbolic input.
 
