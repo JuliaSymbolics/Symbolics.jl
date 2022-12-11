@@ -33,7 +33,7 @@ makedocs(
                              #canonical="https://mtk.sciml.ai/stable/"),
     pages=[
         "Home" => "index.md",
-        "tutorials/symbolic_functions.md",
+        "getting_started.md",
         "Tutorials" => Any[
             "tutorials/auto_parallel.md",
             "tutorials/converting_to_C.md"
