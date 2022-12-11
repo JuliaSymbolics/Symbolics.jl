@@ -41,51 +41,45 @@ Let's go back to our quintic. We can define a Symbolics variable as `@variables 
 
 We introduce a tuning parameter $\epsilon$ into our equation: $x^5 + \epsilon x = 1$. If $\epsilon = 1$, we get our original problem. For $\epsilon = 0$, the problem transforms to an easy one: $x^5 = 1$ which has an exact real solution $x = 1$ (and four complex solutions which we ignore here). We expand $x$ as a power series on $\epsilon$:
 
-$$
+```math
   x(\epsilon) = a_0 + a_1 \epsilon + a_2 \epsilon^2 + O(\epsilon^3)
-  \,.
-$$
+```
 
 $a_0$ is the solution of the easy equation, therefore $a_0 = 1$. Substituting into the original problem,
 
-$$
+```math
   (a_0 + a_1 \epsilon + a_2 \epsilon^2)^5 + \epsilon (a_0 + a_1 \epsilon + a_2 \epsilon^2) - 1 = 0
-  \,.
-$$
+```
 
 Expanding the equations, we get
-$$
+
+```math
   \epsilon (1 + 5 a_1) + \epsilon^2 (a_1 + 5 a_2 + 10 a1_2) + 𝑂(\epsilon^3) = 0
-  \,.
-$$
+```
 
 This equation should hold for each power of $\epsilon$. Therefore,
 
-$$
+```math
   1 + 5 a_1 = 0
-  \,,
-$$
+```
 
 and
 
-$$
+```math
   a_1 + 5 a_2 + 10 a_1^2 = 0
-  \,.
-$$
+```
 
 This system of equations does not initially seem to be linear because of the presence of terms like $10 a_1^2$, but upon closer inspection is found to be in fact linear (this is a feature of the perturbation methods). In addition, the system is in a triangular form, meaning the first equation depends only on $a_1$, the second one on $a_1$ and $a_2$, such that we can replace the result of $a_1$ from the first one into the second equation and remove the non-linear term. We solve the first equation to get $a_1 = -\frac{1}{5}$. Substituting in the second one and solve for $a_2$:
 
-$$
+```math
   a_2 = \frac{(-\frac{1}{5} + 10(-(\frac{1}{5})²)}{5}  = -\frac{1}{25}
-  \,.
-$$
+```
 
 Finally,
 
-$$
+```math
   x(\epsilon) = 1 - \frac{\epsilon}{5} - \frac{\epsilon^2}{25} + O(\epsilon^3)
-  \,.
-$$
+```
 
 Solving the original problem, $x(1) = 0.76$, compared to 0.7548 calculated numerically. We can improve the accuracy by including more terms in the expansion of $x$. However, the calculations, while straightforward, become messy and intractable to do manually very quickly. This is why a CAS is very helpful to solve perturbation problems.
 
@@ -195,10 +189,9 @@ Remember the numerical value is 0.7549. The two functions `collect_powers` and `
 
 Historically, the perturbation methods were first invented to solve orbital calculations of the Moon and the planets. In homage to this history, our second example has a celestial theme. Our goal is solve the Kepler's equation:
 
-$$
+```math
   E - e\sin(E) = M
-  \,.
-$$
+```
 
 where $e$ is the *eccentricity* of the elliptical orbit, $M$ is the *mean anomaly*, and $E$ (unknown) is the *eccentric anomaly* (the angle between the position of a planet in an elliptical orbit and the point of periapsis). This equation is central to solving two-body Keplerian orbits.
 
@@ -270,10 +263,10 @@ The result is 1.5876, compared to the numerical value of 1.5875. It is customary
 
 Comparing the formula to the one for 𝐸 in the [Wikipedia article on the Kepler's equation](https://en.wikipedia.org/wiki/Kepler%27s_equation):
 
-$$
+```math
   E = \frac{1}{1-\epsilon}M
     -\frac{\epsilon}{(1-\epsilon)^4} \frac{M^3}{3!} + \frac{(9\epsilon^2
     + \epsilon)}{(1-\epsilon)^7}\frac{M^5}{5!}\cdots
-$$
+```
 
 The first deviation is in the coefficient of $\epsilon^3 M^5$.
