@@ -1,6 +1,17 @@
-# Symbolic Calculations and Building Callable Functions
+# Getting Started with Symbolics.jl
 
-Symbolics.jl is a symbolic modeling language.
+Symbolics.jl is a symbolic modeling language. In this tutorial we will walk you through
+the process of getting Symbolics.jl up and running, and start doing our first symbolic
+calculations.
+
+## Installing Symbolics.jl
+
+Installing Symbolics.jl is as simple as using the Julia package manager. This is done via
+the command `]add Symbolics`. After precompilation is complete, do `using Symbolics`
+in the terminal (REPL) and when that command is completed, you're ready to start!
+
+## Building Symbolic Expressions
+
 The way to define symbolic variables is via the `@variables` macro:
 
 ```@example symbolic_basics
@@ -347,11 +358,11 @@ sparse structure of the original function, as demonstrated below.
 using Symbolics, SparseArrays, LinearAlgebra
 
 N = 10
-_S = sprand(N, N, 0.1) 
+_S = sprand(N, N, 0.1)
 _Q = sprand(N, N, 0.1)
 
 F(z) = [ # some complicated sparse amenable function
-    _S * z 
+    _S * z
     _Q * z.^2
 ]
 
