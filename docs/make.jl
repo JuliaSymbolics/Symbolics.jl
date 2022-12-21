@@ -49,6 +49,7 @@ makedocs(
             "manual/arrays.md",
             "manual/build_function.md",
             "manual/functions.md",
+            "manual/parsing.md",
             "manual/io.md",
             "manual/sparsity_detection.md",
             "manual/types.md",

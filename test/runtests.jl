@@ -28,6 +28,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Difference Test" begin include("difference.jl") end
     @safetestset "Degree Test" begin include("degree.jl") end
     @safetestset "Coeff Test" begin include("coeff.jl") end
+    @safetestset "Parsing Test" begin include("parsing.jl") end
     @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
     @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
     @safetestset "Algebraic Solver Test" begin include("solver.jl") end
