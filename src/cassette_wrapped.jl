@@ -1,6 +1,5 @@
 # define a context type and export it
 Cassette.@context SymbolicContext
-export SymbolicContext
 
 # this is a near copy of `wrap_func_expr` in file "wrapper_types.jl"
 # Instead of overloading `fname`, however, we specialize 
