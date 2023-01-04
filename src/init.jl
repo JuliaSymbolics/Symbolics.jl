@@ -23,4 +23,6 @@ function __init__()
         end
 
     end # SymPy
+
+    @require Cassette="7057c7e9-c182-5462-911a-8362d720325c" include("cassette_wrapped.jl")
 end
