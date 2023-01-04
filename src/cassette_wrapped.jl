@@ -58,7 +58,6 @@ function ctx_wrap_func_expr(mod, expr)
     types = map(type_options, args)
 
     impl = :(function $impl_name($(names...))
-        println("dubbed")
         $body
     end)
     # TODO: maybe don't drop first lol
