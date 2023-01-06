@@ -300,7 +300,47 @@ function _map(f, x, xs...)
             Term{Any}(map, [f, x, xs...]))
 end
 
+function SymbolicUtils.promote_symtype(::typeof(_map), F, XS...)
+    # like `propagate_atype` but without filtering out non-symbolic
+    # arrays:
+    As = [atype(symtype(T)) for T in XS]
+    Atype = if length(As) <= 1
+        _propagate_atype(As...)
+    else
+        foldl(_propagate_atype, As)
+    end
+    
+    T = if Base.issingletontype(F)
+        mapreduce(Base.Fix1(promote_symtype, F.instance), promote_type, eltype.(XS))
+    else
+        promote_type(Real,mapreduce(eltype, promote_type, XS))
+    end
+    return Atype{T}
+    # TODO: check consistency with result from calling `map`, 
+    # i.e., return result should correspond to type-parameter
+    # of ArrayOp.
+    # Difficulty: We only have the type `F` of the mapped function
+    # and can not easily call it or pass it to `promote_symtype` 
+    # as the first argument.
+    # See also comments in `promote_symtype(::typeof(_mapreduce))`.
+end
+
 @inline _mapreduce(f, g, x, dims, kw) = mapreduce(f, g, x; dims=dims, kw...)
+
+function SymbolicUtils.promote_symtype(
+    ::typeof(_mapreduce), F, OP, X, D, K
+)
+    A = promote_symtype(_map, F, X)
+    if Base.issingletontype(OP)
+        return promote_symtype(OP.instance, eltype(A), eltype(A))
+    else
+        return promote_type(Real, eltype(A))    
+    end
+    # NOTE it would be easier and more precise to define 
+    # `_promote_symtype` with the actual arguments instead of 
+    # their types. Alternatively, it would be convient to be able 
+    # to call `promote_symtype` with the operator type `OP`.
+end
 
 function scalarize_op(::typeof(_mapreduce), t)
     f,g,x,dims,kw = arguments(t)
