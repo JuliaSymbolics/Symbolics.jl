@@ -22,11 +22,11 @@ istree(a::ComplexTerm) = true
 operation(a::ComplexTerm{T}) where T = Complex{T}
 arguments(a::ComplexTerm) = [a.re, a.im]
 
-function similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing, exprhead=exprhead(t))
+function similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing)
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        similarterm(first(args), f, args, symtype; metadata=metadata, exprhead=exprhead)
+        similarterm(first(args), f, args, symtype; metadata=metadata)
     end
 end
 

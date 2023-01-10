@@ -3,15 +3,15 @@ prettify_expr(f::Function) = nameof(f)
 prettify_expr(expr::Expr) = Expr(expr.head, prettify_expr.(expr.args)...)
 
 function cleanup_exprs(ex)
-    return postwalk(x -> x isa Expr && length(arguments(x)) == 0 ? operation(x) : x, ex)
+    return postwalk(x -> istree(x) && length(arguments(x)) == 0 ? operation(x) : x, ex)
 end
 
 function latexify_derivatives(ex)
     return postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
-        if operation(x) == :_derivative
-            num, den, deg = arguments(x)
-            if num isa Expr && length(arguments(num)) == 1
+        if x.args[1] == :_derivative
+            num, den, deg = x.args[2:end]
+            if num isa Expr && length(num.args) == 2
                 return Expr(:call, :/,
                             Expr(:call, :*,
                                  "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")", num
@@ -27,7 +27,7 @@ function latexify_derivatives(ex)
                             num
                            )
             end
-        elseif operation(x) === :_textbf
+        elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(arguments(x)[1])).s
             return "\\textbf{" * strip(ls, '\$') * "}"
         else

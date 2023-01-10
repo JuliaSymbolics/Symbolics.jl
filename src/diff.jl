@@ -444,7 +444,7 @@ function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false, sca
     Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 
-function jacobian(ops, vars; simplify=false) where T
+function jacobian(ops, vars; simplify=false)
     ops = vec(scalarize(ops))
     vars = vec(scalarize(vars)) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
     jacobian(ops, vars; simplify=simplify, scalarize=false)
