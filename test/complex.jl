@@ -26,3 +26,9 @@ end
     @test repr(z) == "z"
     @test repr(a + b*im) == "a + b*im"
 end
+
+@testset "metadata" begin
+    @test_nowarn substitute(z+1.0im, z=>1.0im)
+    @test metadata(z) == z.im.metadata
+    @test metadata(z) == z.re.metadata
+end
