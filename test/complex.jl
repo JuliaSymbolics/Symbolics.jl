@@ -28,7 +28,8 @@ end
 end
 
 @testset "metadata" begin
-    @test_nowarn substitute(z+1.0im, z=>1.0im)
-    @test metadata(z) == z.im.metadata
-    @test metadata(z) == z.re.metadata
+    z1 = z+1.0
+    @test_nowarn substitute(z1, z=>1.0im)
+    @test metadata(z1) == z1.im.metadata
+    @test metadata(z1) == z1.re.metadata
 end
