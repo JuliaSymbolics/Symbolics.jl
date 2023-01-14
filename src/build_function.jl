@@ -111,7 +111,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          cse = false, kwargs...)
   dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = if cse
-        fun = Func(dargs, [], Code.cse(op))
+        fun = Func(dargs, [], Code.cse(unwrap(op)))
         (wrap_code !== nothing) && (fun = wrap_code(fun))
         toexpr(fun, states)
     else
@@ -142,7 +142,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
 
     expr = if cse
-        toexpr(Func(dargs, [], Code.cse(op)), states)
+        toexpr(Func(dargs, [], Code.cse(unwrap(op))), states)
     else
         toexpr(Func(dargs, [], op), states)
     end
@@ -429,7 +429,7 @@ function _make_array(rhss::AbstractArray, similarto, cse)
     if _issparse(arr)
         _make_sparse_array(arr, similarto, cse)
     elseif cse
-        Code.cse(MakeArray(arr, similarto))
+        Code.cse(MakeArray(unwrap.(arr), similarto))
     else
         MakeArray(arr, similarto)
     end
@@ -558,7 +558,7 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
                        states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
-    if (O isa Sym || isa(operation(O), Sym)) || (istree(O) && operation(O) == getindex)
+    if (issym(O) || issym(operation(O))) || (istree(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
         if !isnothing(j)
             return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
@@ -572,7 +572,7 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
             Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
                                                              rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
         end
-    elseif O isa Sym
+    elseif issym(O)
         tosymbol(O, escape=false)
     else
         O
@@ -584,7 +584,7 @@ function numbered_expr(de::Equation,varnumbercache,args...;varordering = args[1]
 
     varordering = value.(args[1])
     var = var_from_nested_derivative(de.lhs)[1]
-    i = findfirst(x->isequal(tosymbol(x isa Sym ? x : operation(x), escape=false), tosymbol(var, escape=false)),varordering)
+    i = findfirst(x->isequal(tosymbol(issym(x) ? x : operation(x), escape=false), tosymbol(var, escape=false)),varordering)
     :($lhsname[$(i+offset)] = $(numbered_expr(de.rhs,varnumbercache,args...;offset=offset,
                                               varordering = varordering,
                                               lhsname = lhsname,

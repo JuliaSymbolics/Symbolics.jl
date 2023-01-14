@@ -20,7 +20,7 @@ function build_expr(head::Symbol, args)
 end
 
 """
-    get_variables(O) -> Vector{Union{Sym, Term}}
+    get_variables(O) -> Vector{BasicSymbolic}
 
 Returns the variables in the expression. Note that the returned variables are
 not wrapped in the `Num` type.
@@ -48,15 +48,16 @@ get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
 get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
-function is_singleton(e::Term)
-    op = operation(e)
-    op === getindex && return true
-    op isa Term && return is_singleton(op) # recurse to reach getindex for array element variables
-    op isa Sym
+function is_singleton(e)
+    if istree(e)
+        op = operation(e)
+        op === getindex && return true
+        istree(op) && return is_singleton(op) # recurse to reach getindex for array element variables
+        return issym(op)
+    else
+        return issym(e)
+    end
 end
-
-is_singleton(e::Sym) = true
-is_singleton(e) = false
 
 get_variables!(vars, e::Number, varlist=nothing) = vars
 
@@ -79,13 +80,10 @@ get_variables(e, varlist=nothing) = get_variables!([], e, varlist)
 
 # Sym / Term --> Symbol
 Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
-tosymbol(x; kwargs...) = x
-tosymbol(x::Sym; kwargs...) = nameof(x)
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x::Term) -> Symbolic
-    diff2term(x) -> x
+    diff2term(x) -> Symbolic
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
@@ -117,10 +115,9 @@ function diff2term(O)
         return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
     else
         oldop = operation(O)
-        if oldop isa Sym
+        if issym(oldop)
             opname = string(nameof(oldop))
-            args = arguments(O)
-        elseif oldop isa Term && operation(oldop) === getindex
+        elseif istree(oldop) && operation(oldop) === getindex
             opname = string(nameof(arguments(oldop)[1]))
             args = arguments(O)
         elseif oldop == getindex
@@ -157,26 +154,33 @@ julia>  Symbolics.tosymbol(z; escape=false)
 :z
 ```
 """
-function tosymbol(t::Term; states=nothing, escape=true)
-    if operation(t) isa Sym
-        if states !== nothing && !(t in states)
-            return nameof(operation(t))
+function tosymbol(t; states=nothing, escape=true)
+    if issym(t)
+        return nameof(t)
+    elseif istree(t)
+        if issym(operation(t))
+            if states !== nothing && !(t in states)
+                return nameof(operation(t))
+            end
+            op = nameof(operation(t))
+            args = arguments(t)
+        elseif operation(t) isa Differential
+            term = diff2term(t)
+            if issym(term)
+                return nameof(term)
+            else
+                op = Symbol(operation(term))
+                args = arguments(term)
+            end
+        else
+            op = Symbol(repr(operation(t)))
+            args = arguments(t)
         end
-        op = nameof(operation(t))
-        args = arguments(t)
-    elseif operation(t) isa Differential
-        term = diff2term(t)
-        if issym(term)
-            return nameof(term)
-        end
-        op = Symbol(operation(term))
-        args = arguments(term)
-    else
-        op = Symbol(repr(operation(t)))
-        args = arguments(t)
-    end
 
-    return escape ? Symbol(op, "(", join(args, ", "), ")") : op
+        return escape ? Symbol(op, "(", join(args, ", "), ")") : op
+    else
+        return t
+    end
 end
 
 function lower_varname(var::Symbolic, idv, order)
@@ -225,41 +229,42 @@ function var_from_nested_derivative(x,i=0)
     end
 end
 
-degree(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 1 : Int(isequal(p, sym))
-degree(p::Add, sym=nothing) = maximum(degree.(keys(p.dict), sym))
-degree(p::Mul, sym=nothing) = sum(degree(k, sym) * v for (k, v) in p.dict)
-degree(p::Pow, sym=nothing) = p.exp * degree(p.base, sym)
-
 """
     degree(p, sym=nothing)
 
 Extract the degree of `p` with respect to `sym`.
 """
 function degree(p, sym=nothing)
-    p, sym = value(p), value(sym)
-    p isa Number && return 0
-    isequal(p, sym) && return 1
-    p isa Symbolic && return degree(p, sym)
-    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
-end
-
-function degree(p::SymbolicUtils.Div, sym=nothing)
-    return degree(p.num,sym)
-end
-
-coeff(p::Union{Term,Sym}, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
-coeff(p::Pow, sym=nothing) = sym === nothing ? 0 : Int(isequal(p, sym))
-function coeff(p::Add, sym=nothing)
-    if sym === nothing
-        p.coeff
-    else
-        sum(coeff(k, sym) * v for (k, v) in p.dict)
+    p = value(p)
+    sym = value(sym)
+    if p isa Number
+        return 0
     end
-end
-function coeff(p::Mul, sym=nothing)
-    args = unsorted_arguments(p)
-    I = findall(a -> !isequal(a, sym), args)
-    length(I) == length(args) ? 0 : prod(args[I])
+    if isequal(p, sym)
+        return 1
+    end
+    if isterm(p)
+        if sym === nothing
+            return 1
+        else
+            return Int(isequal(p, sym))
+        end
+    elseif ismul(p)
+        return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
+    elseif isadd(p)
+        return maximum(degree(key, sym) for key in keys(p.dict))
+    elseif ispow(p)
+        return p.exp * degree(p.base, sym)
+    elseif isdiv(p)
+        return degree(p.num, sym) - degree(p.den, sym)
+    elseif issym(p)
+        if sym === nothing
+            return 1
+        else
+            return Int(isequal(p, sym))
+        end
+    end
+    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
 end
 
 """
@@ -270,7 +275,27 @@ Note that `p` might need to be expanded and/or simplified with `expand` and/or `
 """
 function coeff(p, sym=nothing)
     p, sym = value(p), value(sym)
-    p isa Number && return sym === nothing ? p : 0
-    p isa Symbolic && return coeff(p, sym)
-    throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
+    if issym(p) || isterm(p)
+        sym === nothing ? 0 : Int(isequal(p, sym))
+    elseif ispow(p)
+        sym === nothing ? 0 : Int(isequal(p, sym))
+    elseif isadd(p)
+        if sym===nothing
+            p.coeff
+        else
+            sum(coeff(k, sym) * v for (k, v) in p.dict)
+        end
+    elseif ismul(p)
+        args = unsorted_arguments(p)
+        coeffs = map(a->coeff(a, sym), args)
+        if all(iszero, coeffs)
+            return 0
+        else
+            @views prod(Iterators.flatten((coeffs[findall(!iszero, coeffs)], args[findall(iszero, coeffs)])))
+        end
+    else
+        p isa Number && return sym === nothing ? p : 0
+        p isa Symbolic && return coeff(p, sym)
+        throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
+    end
 end

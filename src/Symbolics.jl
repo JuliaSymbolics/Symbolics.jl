@@ -3,10 +3,6 @@ $(DocStringExtensions.README)
 """
 module Symbolics
 
-using TermInterface
-
-using Metatheory
-
 using DocStringExtensions, Markdown
 
 using LinearAlgebra
@@ -20,15 +16,15 @@ using Setfield
 import DomainSets: Domain
 @reexport using SymbolicUtils
 
-import TermInterface: similarterm, istree, operation, arguments, symtype
+import SymbolicUtils: similarterm, istree, operation, arguments, symtype
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div,
+import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
                       FnType, @rule, Rewriters, substitute,
-                      promote_symtype
+                      promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
 
 using SymbolicUtils.Code
 
-import Metatheory.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
+import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 import SymbolicUtils.Code: toexpr
 
