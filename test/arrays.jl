@@ -1,6 +1,6 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname, simplify
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 
@@ -79,6 +79,14 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     # #417
     @test isequal(Symbolics.scalarize(x', (1,1)), x[1])
 
+    # #814
+    @test isa(simplify(sum(b .* 1) ), Num)
+    @test isa(simplify(prod(x .+ 2.0) ), Num)
+    @test isa(simplify(mapreduce(x -> (x+1)/(0.1 + abs(x)), ^, u)), Num) # exponent(s) must not be Int until #455 is fixed
+    @test Symbolics.symtype(simplify(sum(b .* 1))) <: Real
+    @test Symbolics.symtype(simplify(prod(x .+ 2.0))) <: Real
+    @test Symbolics.symtype(simplify(mapreduce(x -> (x+1)/(0.1 + abs(x)), ^, u))) <: Real
+    
     # #483
     # examples by @gronniger
     @variables A[1:2, 1:2]
