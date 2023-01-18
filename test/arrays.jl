@@ -348,3 +348,10 @@ end
 
     @test substitute(A[1,2,1], Dict(A[1,2,1] => 9)) === Num(9)
 end
+
+@testset "Hashes" begin
+    @variables u[1:7]
+    a, b, c = u[1:5], u[2:6], u[3:7]
+    @test !isequal(a, b) && !isequal(b, c) && !isequal(a, c)
+    @test hash(a) != hash(b) && hash(b) != hash(c) && hash(a) != hash(c)
+end
