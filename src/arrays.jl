@@ -94,15 +94,16 @@ end
 
 function Base.isequal(a::ArrayOp, b::ArrayOp)
     a === b && return true
-    isequal(operation(a), operation(b)) &&
+    isequal(a.shape, b.shape) &&
+    isequal(a.ranges, b.ranges) &&
     isequal(a.output_idx, b.output_idx) &&
-    isequal(a.expr, b.expr) &&
     isequal(a.reduce, b.reduce) &&
-    isequal(a.shape, b.shape)
+    isequal(operation(a), operation(b)) &&
+    isequal(a.expr, b.expr)
 end
 
 function Base.hash(a::ArrayOp, u::UInt)
-    hash(a.shape, hash(a.expr, hash(a.expr, hash(a.output_idx, hash(operation(a), u)))))
+    hash(a.shape, hash(a.ranges, hash(a.expr, hash(a.output_idx, hash(operation(a), u)))))
 end
 
 macro arrayop(output_idx, expr, options...)
