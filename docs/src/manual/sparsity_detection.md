@@ -1,8 +1,8 @@
 # Structure and Sparsity Detection
 
 Using the tracing system provided by Symbolics.jl expressions, Symbolics.jl
-can automatically detect the sparsity patterns of Julia functions in an efficient
-way. This functionality is described in more detail in the paper:
+can automatically detect the sparsity patterns of Julia functions efficiently.
+This functionality is described in more detail in the paper:
 
 ```
 @article{gowda2019sparsity,
