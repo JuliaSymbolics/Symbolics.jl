@@ -24,9 +24,9 @@ using Symbolics: Arr
 
     @test isequal(2I, CartesianIndex(2i, 2j, 2k))
 
-    A = rand(2, 3, 4)
+    A = rand(2, 4, 6)
 
-    @test isequal(substitute(Arr(A)[I], Dict(i=>1, j=>2, k=>3)), A[1, 2, 3])
+    @test substitute(Arr(A)[J], Dict(i=>1, j=>2, k=>3)) == A[2, 4, 6]
 
     II = substitute(I, Dict(i=>1, j=>2, k=>3))
 
