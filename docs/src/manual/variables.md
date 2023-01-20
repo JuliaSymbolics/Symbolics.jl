@@ -12,7 +12,7 @@ written as `op1 ~ op2`, defines the symbolic equality between two operations.
 
 `Sym`, `Term`, and `FnType` are from [SymbolicUtils.jl](https://juliasymbolics.github.io/SymbolicUtils.jl/api/). Note that in
 Symbolics, we always use `Sym{Real}`, `Term{Real}`, and
-`FnType{Tuple{Any}, Real}`. To get the arguments of a `istree` object use
+`FnType{Tuple{Any}, Real}`. To get the arguments of an `istree` object, use
 `arguments(t::Term)`, and to get the operation, use `operation(t::Term)`.
 However, note that one should never dispatch on `Term` or test `isa Term`.
 Instead, one needs to use `SymbolicUtils.istree` to check if `arguments` and
@@ -32,7 +32,7 @@ either a Sym or a Term or any other object, defines the same set of operations
 as symbolic expressions and forwards those to the values it wraps. You can use
 `Symbolics.value` function to unwrap a `Num`.
 
-By default, the `@variables` macros return Num-wrapped objects so as to allow
+By default, the `@variables` macros return Num-wrapped objects to allow
 calling functions which are restricted to `Number` or `Real`.
 
 ```@example variables

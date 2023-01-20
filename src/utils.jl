@@ -136,7 +136,7 @@ setname(v, name) = setmetadata(v, Symbolics.VariableSource, (:variables, name))
     tosymbol(x::Union{Num,Symbolic}; states=nothing, escape=true) -> Symbol
 
 Convert `x` to a symbol. `states` are the states of a system, and `escape`
-means if the target has escapes like `val"y(t)"`. If `escape` is false then
+means if the target has escapes like `val"y(t)"`. If `escape` is false, then
 it will only output `y` instead of `y(t)`.
 
 # Examples

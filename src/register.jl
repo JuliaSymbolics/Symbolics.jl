@@ -12,7 +12,7 @@ SymbolicUtils.promote_symtype(::typeof(f_registered), args...) = Real # or the a
 is defined for the register function. Note that when defining multiple register
 overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
-overwritting.
+overwriting.
 
 # Examples
 ```julia
