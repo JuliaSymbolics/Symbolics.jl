@@ -37,8 +37,7 @@ end
 (D::Differential)(x::Num) = Num(D(value(x)))
 SymbolicUtils.promote_symtype(::Differential, x) = x
 
-is_derivative(x::Term) = operation(x) isa Differential
-is_derivative(x) = false
+is_derivative(x) = istree(x) ? operation(x) isa Differential : false
 
 Base.:*(D1, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
@@ -51,7 +50,7 @@ Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
 Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 
 _isfalse(occ::Bool) = occ === false
-_isfalse(occ::Term) = _isfalse(operation(occ))
+_isfalse(occ::Symbolic) = istree(occ) && _isfalse(operation(occ))
 
 function occursin_info(x, expr, fail = true)
     if symtype(expr) <: AbstractArray
@@ -85,7 +84,7 @@ function occursin_info(x, expr, fail = true)
         return false
     end
 
-    !istree(expr) && return false
+    !istree(expr) && return isequal(x, expr)
     if isequal(x, expr)
         true
     else
@@ -128,11 +127,11 @@ function recursive_hasoperator(op, O)
     if operation(O) isa op
         return true
     else
-        if O isa Union{Add, Mul}
+        if isadd(O) || ismul(O)
             any(recursive_hasoperator(op), keys(O.dict))
-        elseif O isa Pow
+        elseif ispow(O)
             recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
-        elseif O isa SymbolicUtils.Div
+        elseif isdiv(O)
             recursive_hasoperator(op)(O.num) || recursive_hasoperator(op)(O.den)
         else
             any(recursive_hasoperator(op), arguments(O))
@@ -176,7 +175,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
 
         if !istree(arg)
             return D(arg) # Cannot expand
-        elseif (op = operation(arg); isa(op, Sym))
+        elseif (op = operation(arg); issym(op))
             inner_args = arguments(arg)
             if any(isequal(D.x), inner_args)
                 return D(arg) # base case if any argument is directly equal to the i.v.
@@ -437,16 +436,18 @@ $(SIGNATURES)
 A helper function for computing the Jacobian of an array of expressions with respect to
 an array of variable expressions.
 """
-function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
-    ops = Symbolics.scalarize(ops)
-    vars = Symbolics.scalarize(vars)
+function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false, scalarize=true)
+    if scalarize
+        ops = Symbolics.scalarize(ops)
+        vars = Symbolics.scalarize(vars)
+    end
     Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 
-function jacobian(ops::ArrayLike{T, 1}, vars::ArrayLike{T, 1}; simplify=false) where T
-    ops = scalarize(ops)
-    vars = scalarize(vars) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
-    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
+function jacobian(ops, vars; simplify=false)
+    ops = vec(scalarize(ops))
+    vars = vec(scalarize(vars)) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
+    jacobian(ops, vars; simplify=simplify, scalarize=false)
 end
 
 """
@@ -642,7 +643,7 @@ let
                   error("Function of unknown linearity used: ", ~f)
               end
           end
-          @rule ~x::(x->x isa Sym) => 0]
+          @rule ~x::issym => 0]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=basic_simterm))
 
     global hessian_sparsity

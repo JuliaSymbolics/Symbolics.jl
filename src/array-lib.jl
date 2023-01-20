@@ -47,7 +47,7 @@ function Base.getindex(x::SymArray, idx...)
     else
         input_idx = []
         output_idx = []
-        ranges = Dict{Sym, AbstractRange}()
+        ranges = Dict{BasicSymbolic, AbstractRange}()
         subscripts = makesubscripts(length(idx))
         for (j, i) in enumerate(idx)
             if symtype(i) <: Integer
@@ -98,7 +98,7 @@ end
 
 import Base: +, -
 tup(c::CartesianIndex) = Tuple(c)
-tup(c::Term{CartesianIndex}) = arguments(c)
+tup(c::Symbolic{CartesianIndex}) = istree(c) ? arguments(c) : error("Cartesian index not found")
 @wrapped function -(x::CartesianIndex, y::CartesianIndex)
     CartesianIndex((tup(x) .- tup(y))...)
 end
@@ -224,14 +224,16 @@ isdot(A, b) = isadjointvec(A) && ndims(b) == 1
 isadjointvec(A::Adjoint) = ndims(parent(A)) == 1
 isadjointvec(A::Transpose) = ndims(parent(A)) == 1
 
-function isadjointvec(A::Term)
-    (operation(A) === (adjoint) ||
-     operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
+function isadjointvec(A)
+    if istree(A)
+        (operation(A) === (adjoint) ||
+         operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
+    else
+        false
+    end
 end
 
 isadjointvec(A::ArrayOp) = isadjointvec(A.term)
-
-isadjointvec(A) = false
 
 # TODO: add more such methods
 function getindex(A::AbstractArray, i::Symbolic{<:Integer}, ii::Symbolic{<:Integer}...)

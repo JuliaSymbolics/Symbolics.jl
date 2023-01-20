@@ -4,7 +4,7 @@ At any time, callable functions can be generated from Symbolics IR by
 using `Symbolics.toexpr`. This performs some cleaning to return an
 expression without extraneous pieces that commonly matches expressions one
 would write in functions like those for differential equation solvers and
-optimization libraries. These functions can be automatically parallelize and
+optimization libraries. These functions can be automatically parallelized and
 specialize on Julia types like static arrays and sparse matrices.
 
 The core compilation process of Symbolics IR is `build_function`.
