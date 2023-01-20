@@ -26,7 +26,7 @@ using Symbolics: Arr
 
     A = rand(2, 4, 6)
 
-    @test substitute(Arr(A)[J], Dict(i=>1, j=>2, k=>3)) == A[2, 4, 6]
+    @test substitute(A[J], Dict(i=>1, j=>2, k=>3)) == A[2, 4, 6]
 
     II = substitute(I, Dict(i=>1, j=>2, k=>3))
 

@@ -96,6 +96,10 @@ function Base.getindex(x::Arr, I::Symbolic{CartesianIndex})
 end
 Base.getindex(I::Symbolic{CartesianIndex}, i::Integer) = tup(I)[i]
 
+function Base.getindex(A::AbstractArray{T}, I::Symbolic{CartesianIndex}) where {T}
+    term(getindex, A, tup(I)..., type=T)
+end
+
 function Base.CartesianIndex(x::Symbolic{<:Integer}, xs::Symbolic{<:Integer}...)
     term(CartesianIndex, x, xs..., type=CartesianIndex)
 end
