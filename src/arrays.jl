@@ -908,7 +908,6 @@ function scalarize(x::ArrayMaker)
 end
 
 function scalarize(x::ArrayMaker, idx)
-    @show x
     for (vw, arr) in reverse(x.sequence) # last one wins
         if any(x->issym(x) || istree(x), idx)
             return term(getindex, x, idx...)
