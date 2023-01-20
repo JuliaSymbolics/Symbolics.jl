@@ -41,6 +41,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "SymPy Test" begin include("sympy.jl") end
     @safetestset "Inequality Test" begin include("inequality.jl") end
     @safetestset "Integral Test" begin include("integral.jl") end
+    @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
 end
 
 if GROUP == "Downstream"
