@@ -85,26 +85,35 @@ function Base.getindex(x::SymArray, idx...)
 end
 
 # Wrapped array should wrap the elements too
-function Base.getindex(x::Arr, idx...)
-    wrap(unwrap(x)[idx...])
-end
-function Base.getindex(x::Arr, idx::Symbolic{<:Integer}...)
-    wrap(unwrap(x)[idx...])
-end
+Base.getindex(I::Term{CartesianIndex}, i::Integer) = tup(I)[i]
 
 function Base.CartesianIndex(x::Symbolic{<:Integer}, xs::Symbolic{<:Integer}...)
     term(CartesianIndex, x, xs..., type=CartesianIndex)
 end
 
-import Base: +, -
+
+import Base: +, -, *
 tup(c::CartesianIndex) = Tuple(c)
-tup(c::Symbolic{CartesianIndex}) = istree(c) ? arguments(c) : error("Cartesian index not found")
+tup(c::Term{CartesianIndex}) = arguments(c)
 @wrapped function -(x::CartesianIndex, y::CartesianIndex)
     CartesianIndex((tup(x) .- tup(y))...)
 end
 @wrapped function +(x::CartesianIndex, y::CartesianIndex)
     CartesianIndex((tup(x) .+ tup(y))...)
 end
+
+@wrapped function *(x::CartesianIndex, y::CartesianIndex)
+    CartesianIndex((tup(x) .* tup(y))...)
+end
+
+@wrapped function *(a::Integer, x::CartesianIndex)
+    CartesianIndex((a * tup(x))...)
+end
+
+@wrapped function *(x::CartesianIndex, b::Integer)
+    CartesianIndex((tup(x) * b)...)
+end
+
 
 function propagate_ndims(::typeof(getindex), x, idx...)
     ndims(x) - count(x->symtype(x) <: Integer, idx)
