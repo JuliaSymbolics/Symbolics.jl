@@ -103,7 +103,8 @@ end
 
 import Base: +, -, *
 tup(c::CartesianIndex) = Tuple(c)
-tup(c::Term{CartesianIndex}) = arguments(c)
+tup(c::Symbolic{CartesianIndex}) = istree(c) ? arguments(c) : error("Cartesian index not found")
+
 @wrapped function -(x::CartesianIndex, y::CartesianIndex)
     CartesianIndex((tup(x) .- tup(y))...)
 end
