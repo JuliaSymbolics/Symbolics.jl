@@ -80,6 +80,7 @@ include("utils.jl")
 
 using ConstructionBase
 include("arrays.jl")
+include("indexes.jl")
 
 export @register, @register_symbolic
 include("register.jl")
