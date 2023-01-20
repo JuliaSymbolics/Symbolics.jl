@@ -94,7 +94,7 @@ end
 function Base.getindex(x::Arr, I::Symbolic{CartesianIndex})
     wrap(unwrap(x)[tup(I)...])
 end
-Base.getindex(I::Term{CartesianIndex}, i::Integer) = tup(I)[i]
+Base.getindex(I::Symbolic{CartesianIndex}, i::Integer) = tup(I)[i]
 
 function Base.CartesianIndex(x::Symbolic{<:Integer}, xs::Symbolic{<:Integer}...)
     term(CartesianIndex, x, xs..., type=CartesianIndex)
