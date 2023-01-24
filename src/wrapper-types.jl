@@ -48,7 +48,7 @@ unwrap(x) = x
 function wrap(x)
     T = SymbolicUtils.symtype(x)
     Symbolics.has_symwrapper(T) ?
-        Symbolics.wrapper_type(T)(x) : x
+    Symbolics.wrapper_type(T)(x) : x
 end
 
 function wrapper_type end
@@ -59,8 +59,8 @@ is_wrapper_type(::Type) = false
 
 function wrap_func_expr(mod, expr)
     @assert expr.head == :function || (expr.head == :(=) &&
-                                       expr.args[1] isa Expr &&
-                                       expr.args[1].head == :call)
+             expr.args[1] isa Expr &&
+             expr.args[1].head == :call)
 
     def = splitdef(expr)
 
@@ -71,7 +71,7 @@ function wrap_func_expr(mod, expr)
     args = get(def, :args, [])
     kwargs = get(def, :kwargs, [])
 
-    impl_name = Symbol(fname,"_", hash(string(args)*string(kwargs)))
+    impl_name = Symbol(fname, "_", hash(string(args) * string(kwargs)))
 
     function kwargname(kwarg)
         if kwarg isa Expr && kwarg.head == :kw
@@ -99,10 +99,10 @@ function wrap_func_expr(mod, expr)
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
             has_symwrapper(T) ? (T, :(SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
-                                (T,:(SymbolicUtils.Symbolic{<:$T}))
+            (T, :(SymbolicUtils.Symbolic{<:$T}))
         elseif arg isa Expr && arg.head == :(...)
             Ts = type_options(arg.args[1])
-            map(x->Vararg{x},Ts)
+            map(x -> Vararg{x}, Ts)
         else
             (Any,)
         end
@@ -111,8 +111,8 @@ function wrap_func_expr(mod, expr)
     types = map(type_options, args)
 
     impl = :(function $impl_name($(names...))
-        $body
-    end)
+                 $body
+             end)
     # TODO: maybe don't drop first lol
     methods = map(Iterators.drop(Iterators.product(types...), 1)) do Ts
         method_args = map(names, Ts) do n, T

@@ -19,25 +19,21 @@ end
 
 function Base.getindex(x::SymArray, idx...)
     idx = unwrap.(idx)
-    if shape(x) !== Unknown() && all(i->i isa Integer, idx)
+    if shape(x) !== Unknown() && all(i -> i isa Integer, idx)
         II = CartesianIndices(axes(x))
-        @boundscheck begin
-            if !checkbounds(Bool, II, idx...)
-                throw(BoundsError(x, idx))
-            end
-        end
+        @boundscheck begin if !checkbounds(Bool, II, idx...)
+            throw(BoundsError(x, idx))
+        end end
         ii = II[idx...]
         res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...])
-    elseif all(i->symtype(i) <: Integer, idx)
-        shape(x) !== Unknown() && @boundscheck begin
-            if length(idx) > 1
-                for (a, i) in zip(axes(x), idx)
-                    if i isa Integer && !(i in a)
-                        throw(BoundsError(x, idx))
-                    end
+    elseif all(i -> symtype(i) <: Integer, idx)
+        shape(x) !== Unknown() && @boundscheck begin if length(idx) > 1
+            for (a, i) in zip(axes(x), idx)
+                if i isa Integer && !(i in a)
+                    throw(BoundsError(x, idx))
                 end
             end
-        end
+        end end
         res = Term{eltype(symtype(x))}(getindex, [x, idx...])
     elseif length(idx) == 1 && symtype(first(idx)) <: CartesianIndex
         i = first(idx)
@@ -67,8 +63,8 @@ function Base.getindex(x::SymArray, idx...)
 
         term = Term{Any}(getindex, [x, idx...])
         T = eltype(symtype(x))
-        N = ndims(x) - count(i->symtype(i) <: Integer, idx)
-        res = ArrayOp(atype(symtype(x)){T,N},
+        N = ndims(x) - count(i -> symtype(i) <: Integer, idx)
+        res = ArrayOp(atype(symtype(x)){T, N},
                       (output_idx...,),
                       x[input_idx...],
                       +,
@@ -93,12 +89,14 @@ function Base.getindex(x::Arr, idx::Symbolic{<:Integer}...)
 end
 
 function Base.CartesianIndex(x::Symbolic{<:Integer}, xs::Symbolic{<:Integer}...)
-    term(CartesianIndex, x, xs..., type=CartesianIndex)
+    term(CartesianIndex, x, xs..., type = CartesianIndex)
 end
 
 import Base: +, -
 tup(c::CartesianIndex) = Tuple(c)
-tup(c::Symbolic{CartesianIndex}) = istree(c) ? arguments(c) : error("Cartesian index not found")
+function tup(c::Symbolic{CartesianIndex})
+    istree(c) ? arguments(c) : error("Cartesian index not found")
+end
 @wrapped function -(x::CartesianIndex, y::CartesianIndex)
     CartesianIndex((tup(x) .- tup(y))...)
 end
@@ -107,7 +105,7 @@ end
 end
 
 function propagate_ndims(::typeof(getindex), x, idx...)
-    ndims(x) - count(x->symtype(x) <: Integer, idx)
+    ndims(x) - count(x -> symtype(x) <: Integer, idx)
 end
 
 function propagate_shape(::typeof(getindex), x, idx...)
@@ -120,11 +118,10 @@ end
 propagate_eltype(::typeof(getindex), x, idx...) = geteltype(x)
 
 function SymbolicUtils.promote_symtype(::typeof(getindex), X, ii...)
-    @assert all(i-> i <:Integer, ii) "user arrterm to create arr term."
+    @assert all(i -> i <: Integer, ii) "user arrterm to create arr term."
 
     eltype(X)
 end
-
 
 #### Broadcast ####
 #
@@ -141,23 +138,23 @@ isonedim(x, i) = shape(x) == Unknown() ? false : isone(size(x, i))
 
 function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
     # Do the thing here
-    ndim = mapfoldl(ndims, max, bc.args, init=0)
+    ndim = mapfoldl(ndims, max, bc.args, init = 0)
     subscripts = makesubscripts(ndim)
 
     onedim_count = mapreduce(+, bc.args) do x
         if ndims(x) != 0
-            map(i-> isonedim(x, i) ? 1 : 0, 1:ndim)
+            map(i -> isonedim(x, i) ? 1 : 0, 1:ndim)
         else
-            map(i-> 1, 1:ndim)
+            map(i -> 1, 1:ndim)
         end
     end
 
-    extruded = map(x->x < length(bc.args), onedim_count)
+    extruded = map(x -> x < length(bc.args), onedim_count)
 
     expr_args′ = map(bc.args) do x
         if ndims(x) != 0
-            subs = map(i-> extruded[i] && isonedim(x, i) ?
-                       1 : subscripts[i], 1:ndims(x))
+            subs = map(i -> extruded[i] && isonedim(x, i) ?
+                            1 : subscripts[i], 1:ndims(x))
             x[subs...]
         elseif x isa Base.RefValue
             x[]
@@ -166,10 +163,10 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
         end
     end
     expr = term(bc.f, expr_args′...) # Imagine x .=> y -- if you don't have a term
-                                     # then you get pairs, and index matcher cannot
-                                     # recurse into pairs
+    # then you get pairs, and index matcher cannot
+    # recurse into pairs
     Atype = propagate_atype(broadcast, bc.f, bc.args...)
-    args = map(x->x isa Base.RefValue ? Term{Any}(Ref, [x[]]) : x, bc.args)
+    args = map(x -> x isa Base.RefValue ? Term{Any}(Ref, [x[]]) : x, bc.args)
     ArrayOp(Atype{symtype(expr), ndim},
             (subscripts...,),
             expr,
@@ -186,10 +183,12 @@ Broadcast.BroadcastStyle(::Type{<:Arr}) = SymWrapBroadcast()
 
 Broadcast.result_style(::SymWrapBroadcast) = SymWrapBroadcast()
 
-Broadcast.BroadcastStyle(::SymWrapBroadcast,
-                         ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
+function Broadcast.BroadcastStyle(::SymWrapBroadcast,
+                                  ::Broadcast.BroadcastStyle)
+    SymWrapBroadcast()
+end
 Broadcast.BroadcastStyle(::SymBroadcast,
-                         ::SymWrapBroadcast) = Broadcast.Unknown()
+::SymWrapBroadcast) = Broadcast.Unknown()
 
 function Broadcast.materialize(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     args = map(bc.args) do arg
@@ -201,7 +200,6 @@ function Broadcast.materialize(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     end
     wrap(broadcast(bc.f, map(unwrap, args)...))
 end
-
 
 #################### TRANSPOSE ################
 #
@@ -249,34 +247,34 @@ function getindex(A::AbstractArray, j::Symbolic{<:Integer}, i::Int)
 end
 
 function getindex(A::Arr, i::Int, j::Symbolic{<:Integer})
-    wrap(unwrap(A)[i,j])
+    wrap(unwrap(A)[i, j])
 end
 
 function getindex(A::Arr, j::Symbolic{<:Integer}, i::Int)
-    wrap(unwrap(A)[j,i])
+    wrap(unwrap(A)[j, i])
 end
 
-function _matmul(A,B)
+function _matmul(A, B)
     @syms i::Int j::Int k::Int
     if isadjointvec(A)
         op = operation(A.term)
         return op(op(B) * first(arguments(A.term)))
     end
-    return @arrayop (i, j) A[i, k] * B[k, j] term=(A*B)
+    return @arrayop (i, j) A[i, k]*B[k, j] term=(A * B)
 end
 
 @wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B)
 @wrapped (*)(A::AbstractVector, B::AbstractMatrix) = _matmul(A, B)
 
-function _matvec(A,b)
+function _matvec(A, b)
     @syms i::Int k::Int
     if isdot(A, b)
         make_shape((i,), A[i, k] * b[k]) # This is a dimension check
         T = SymbolicUtils.promote_symtype(*, eltype(A), eltype(b))
-        S = SymbolicUtils.promote_symtype(+, T,T)
+        S = SymbolicUtils.promote_symtype(+, T, T)
         return Term{S}(*, [A, b])
     end
-    @arrayop (i,) A[i, k] * b[k] term=(A*b)
+    @arrayop (i,) A[i, k]*b[k] term=(A * b)
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
 
@@ -292,7 +290,7 @@ function _map(f, x, xs...)
     N = ndims(x)
     idx = makesubscripts(N)
 
-    expr = f(map(a->a[idx...], [x, xs...])...)
+    expr = f(map(a -> a[idx...], [x, xs...])...)
 
     Atype = propagate_atype(map, f, x, xs...)
     ArrayOp(Atype{symtype(expr), N},
@@ -302,18 +300,18 @@ function _map(f, x, xs...)
             Term{Any}(map, [f, x, xs...]))
 end
 
-@inline _mapreduce(f, g, x, dims, kw) = mapreduce(f, g, x; dims=dims, kw...)
+@inline _mapreduce(f, g, x, dims, kw) = mapreduce(f, g, x; dims = dims, kw...)
 
 function scalarize_op(::typeof(_mapreduce), t)
-    f,g,x,dims,kw = arguments(t)
+    f, g, x, dims, kw = arguments(t)
     # we wrap and unwrap to make things work smoothly.
     # we need the result unwrapped to allow recursive scalarize to work.
     unwrap(_mapreduce(f, g, collect(wrap(x)), dims, kw))
 end
 
-@wrapped function Base.mapreduce(f, g, x::AbstractArray; dims=:, kw...)
+@wrapped function Base.mapreduce(f, g, x::AbstractArray; dims = :, kw...)
     idx = makesubscripts(ndims(x))
-    out_idx = [dims == (:) || i in dims ? 1 : idx[i] for i = 1:ndims(x)]
+    out_idx = [dims == (:) || i in dims ? 1 : idx[i] for i in 1:ndims(x)]
     expr = f(x[idx...])
     T = symtype(g(expr, expr))
     if dims === (:)
@@ -329,17 +327,16 @@ end
 end
 
 for (ff, opts) in [sum => (identity, +, false),
-                  prod => (identity, *, true),
-                  any => (identity, (|), false),
-                  all => (identity, (&), true)]
-
+    prod => (identity, *, true),
+    any => (identity, (|), false),
+    all => (identity, (&), true)]
     f, g, init = opts
     @eval @wrapped function (::$(typeof(ff)))(x::AbstractArray;
-                                     dims=:, init=$init)
-        mapreduce($f, $g, x, dims=dims, init=init)
+                                              dims = :, init = $init)
+        mapreduce($f, $g, x, dims = dims, init = init)
     end
     @eval @wrapped function (::$(typeof(ff)))(f::Function, x::AbstractArray;
-                                     dims=:, init=$init)
-        mapreduce(f, $g, x, dims=dims, init=init)
+                                              dims = :, init = $init)
+        mapreduce(f, $g, x, dims = dims, init = init)
     end
 end

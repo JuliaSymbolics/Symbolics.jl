@@ -5,4 +5,6 @@
 # surface plot: `surface(xs, ys, ex2)`
 # contourplot: `contour(xs, ys, ex2)`.
 # not plot([ex1, ex1′], a, b); use plot(ex1, a, b); plot!(ex1′)
-@recipe f(::Type{T}, v::T) where {T<:Num} = build_function(v, Symbolics.get_variables(v)...; expression=Val{false})
+@recipe function f(::Type{T}, v::T) where {T <: Num}
+    build_function(v, Symbolics.get_variables(v)...; expression = Val{false})
+end

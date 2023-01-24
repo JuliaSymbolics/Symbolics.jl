@@ -7,7 +7,7 @@ script = tempname() * ".jl"
 benchpath = joinpath(pkgpath, "benchmark", "benchmarks.jl")
 cp(benchpath, script)
 
-j = judge(pkgpath, "master", retune=true, script=script)
+j = judge(pkgpath, "master", retune = true, script = script)
 
 println("MASTER BRANCH")
 println(j.baseline_results)
@@ -19,4 +19,4 @@ println("DIFFGROUP")
 println(j.benchmarkgroup)
 
 println("MARKDOWN")
-export_markdown(stdout, j, export_invariants=true)
+export_markdown(stdout, j, export_invariants = true)

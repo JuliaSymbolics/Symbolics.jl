@@ -1,9 +1,8 @@
 using SpecialFunctions
 import Base.Broadcast
 
-
-const linearity_known_1 = IdDict{Function,Bool}()
-const linearity_known_2 = IdDict{Function,Bool}()
+const linearity_known_1 = IdDict{Function, Bool}()
+const linearity_known_2 = IdDict{Function, Bool}()
 
 const linearity_map_1 = IdDict{Function, Bool}()
 const linearity_map_2 = IdDict{Function, Tuple{Bool, Bool, Bool}}()
@@ -12,7 +11,79 @@ const linearity_map_2 = IdDict{Function, Tuple{Bool, Bool, Bool}}()
 
 const monadic_linear = [deg2rad, +, rad2deg, transpose, -, conj]
 
-const monadic_nonlinear = [asind, log1p, acsch, erfc, digamma, acos, asec, acosh, airybiprime, acsc, cscd, log, tand, log10, csch, asinh, airyai, abs2, gamma, lgamma, erfcx, bessely0, cosh, sin, cos, atan, cospi, cbrt, acosd, bessely1, acoth, erfcinv, erf, dawson, inv, acotd, airyaiprime, erfinv, trigamma, asecd, besselj1, exp, acot, sqrt, sind, sinpi, asech, log2, tan, invdigamma, airybi, exp10, sech, erfi, coth, asin, cotd, cosd, sinh, abs, besselj0, csc, tanh, secd, atand, sec, acscd, cot, exp2, expm1, atanh]
+const monadic_nonlinear = [
+    asind,
+    log1p,
+    acsch,
+    erfc,
+    digamma,
+    acos,
+    asec,
+    acosh,
+    airybiprime,
+    acsc,
+    cscd,
+    log,
+    tand,
+    log10,
+    csch,
+    asinh,
+    airyai,
+    abs2,
+    gamma,
+    lgamma,
+    erfcx,
+    bessely0,
+    cosh,
+    sin,
+    cos,
+    atan,
+    cospi,
+    cbrt,
+    acosd,
+    bessely1,
+    acoth,
+    erfcinv,
+    erf,
+    dawson,
+    inv,
+    acotd,
+    airyaiprime,
+    erfinv,
+    trigamma,
+    asecd,
+    besselj1,
+    exp,
+    acot,
+    sqrt,
+    sind,
+    sinpi,
+    asech,
+    log2,
+    tan,
+    invdigamma,
+    airybi,
+    exp10,
+    sech,
+    erfi,
+    coth,
+    asin,
+    cotd,
+    cosd,
+    sinh,
+    abs,
+    besselj0,
+    csc,
+    tanh,
+    secd,
+    atand,
+    sec,
+    acscd,
+    cot,
+    exp2,
+    expm1,
+    atanh,
+]
 
 # We store 3 bools even for 1-arg functions for type stability
 const three_trues = (true, true, true)
@@ -63,8 +134,8 @@ struct TermCombination
     terms::Set{Dict{Int, Int}} # idx => pow
 end
 
-@eval Base.one(::Type{TermCombination}) = $(TermCombination(Set([Dict{Int,Int}()])))
-@eval Base.zero(::Type{TermCombination}) = $(TermCombination(Set{Dict{Int,Int}}()))
+@eval Base.one(::Type{TermCombination}) = $(TermCombination(Set([Dict{Int, Int}()])))
+@eval Base.zero(::Type{TermCombination}) = $(TermCombination(Set{Dict{Int, Int}}()))
 
 #=
 function Base.:(==)(comb1::TermCombination, comb2::TermCombination)
@@ -83,7 +154,7 @@ Base.:*(::Number, comb::TermCombination) = comb
 function Base.:^(comb::TermCombination, ::Number)
     isone(comb) && return comb
     iszero(comb) && return _scalar
-    return comb *  comb
+    return comb * comb
 end
 
 function Base.:+(comb1::TermCombination, comb2::TermCombination)
@@ -118,8 +189,7 @@ function Base.:*(comb1::TermCombination, comb2::TermCombination)
         # a^2*b^2
         # and a^2 + b^2 + ab
         # have the same hessian sparsity
-        t = Dict(k=>2 for (k,_) in
-                 Iterators.flatten(terms))
+        t = Dict(k => 2 for (k, _) in Iterators.flatten(terms))
         TermCombination(Set([t]))
         #=
         # square each term
@@ -137,7 +207,7 @@ function Base.:*(comb1::TermCombination, comb2::TermCombination)
     else
         Set([_merge(dict1, dict2)
              for dict1 in comb1.terms,
-             dict2 in comb2.terms]) |> TermCombination
+                 dict2 in comb2.terms]) |> TermCombination
     end
 end
 Base.:*(comb1::TermCombination) = comb1
@@ -151,11 +221,11 @@ function _sparse(t::TermCombination, n)
         kv = collect(pairs(dict))
         for i in 1:length(kv)
             k, v = kv[i]
-            if v>=2
+            if v >= 2
                 push!(I, k)
                 push!(J, k)
             end
-            for j in i+1:length(kv)
+            for j in (i + 1):length(kv)
                 if v >= 1 && kv[j][2] >= 1
                     push!(I, k)
                     push!(J, kv[j][1])
@@ -163,18 +233,17 @@ function _sparse(t::TermCombination, n)
             end
         end
     end
-    s1 = sparse(I,J,fill!(BitVector(undef, length(I)), true),n,n)
+    s1 = sparse(I, J, fill!(BitVector(undef, length(I)), true), n, n)
     s1 .| s1'
 end
 
-_sparse(x::Number, n) = sparse(Int[],Int[],Int[],n,n)
+_sparse(x::Number, n) = sparse(Int[], Int[], Int[], n, n)
 
 # 1-arg functions
 combine_terms_1(lin, term) = lin ? term : term * term
 
 # 2-arg functions
 function combine_terms_2(linearity, term1, term2)
-
     linear11, linear22, linear12 = linearity
     term = zero(TermCombination)
     if linear11

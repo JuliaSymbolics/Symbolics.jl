@@ -6,15 +6,18 @@ using SymbolicUtils: Symbolic
 Overload appropriate methods so that Symbolics can stop tracing into the
 registered function. If `define_promotion` is true, then a promotion method in
 the form of
+
 ```julia
 SymbolicUtils.promote_symtype(::typeof(f_registered), args...) = Real # or the annotated return type
 ```
+
 is defined for the register function. Note that when defining multiple register
 overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
 overwriting.
 
 # Examples
+
 ```julia
 @register_symbolic foo(x, y)
 @register_symbolic foo(x, y::Bool) false # do not overload a duplicate promotion rule
@@ -41,17 +44,17 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
         elseif Meta.isexpr(x, :(::))
             T = x.args[2]
             :($has_symwrapper($T) ?
-              ($T, $Symbolic{<:$T}, $wrapper_type($T),) :
+              ($T, $Symbolic{<:$T}, $wrapper_type($T)) :
               ($T, $Symbolic{<:$T}))
         else
             error("Invalid argument format $x")
         end
     end
 
-    eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
+    eval_method = :(@eval function $f($(Expr(:$, :(s...))))
                         args = [$(Expr(:$, :(s_syms...)))]
                         unwrapped_args = map($unwrap, args)
-                        res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
+                        res = if !any(x -> $issym(x) || $istree(x), unwrapped_args)
                             $f(unwrapped_args...)
                         else
                             $Term{$ret_type}($f, unwrapped_args)
@@ -66,16 +69,18 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
     mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
     Ts = Symbol("##__Ts")
     quote
-        $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
-                if any(x->x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
+        $Ts = [Tuple{x...}
+               for x in Iterators.product($(types...))
+               if any(x -> x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
         if $verbose
             println("Candidates")
             map(println, $Ts)
         end
 
         for sig in $Ts
-            s = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
-            s_syms = map(x->x.args[1], s)
+            s = map(((i, T),) -> Expr(:(::), Symbol("arg", i), T),
+                    enumerate(sig.parameters))
+            s_syms = map(x -> x.args[1], s)
             $eval_method
         end
         if $define_promotion
@@ -94,7 +99,7 @@ Base.@deprecate_binding var"@register" var"@register_symbolic"
 # way GeneralizedGenerated builds a function (adding "ModelingToolkit" to every
 # function call).
 # ---
-const registered_external_functions = Dict{Symbol,Module}()
+const registered_external_functions = Dict{Symbol, Module}()
 function inject_registered_module_functions(expr)
     MacroTools.postwalk(expr) do x
         # Find all function calls in the expression and extract the function

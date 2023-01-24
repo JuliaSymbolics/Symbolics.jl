@@ -212,12 +212,13 @@ end
     d, r = semipolynomial_form(expr, [x], 2)
 
     @test isequal(d, Dict(1 => 1, x => 15, x^2 => 93))
-    @test isequal(r, 317x^3 + 681x^4 + 1014x^5 + 1095x^6 + 876x^7 + 519x^8 + 223x^9
-                     + 66x^10 + 12x^11 + x^12)
+    @test isequal(r,
+                  317x^3 + 681x^4 + 1014x^5 + 1095x^6 + 876x^7 + 519x^8 + 223x^9
+                  + 66x^10 + 12x^11 + x^12)
 end
 
 @testset "rational exponent" begin
-    expr = y^(1//1)
+    expr = y^(1 // 1)
 
     d, r = semipolynomial_form(expr, [x], 0)
     @test isequal(d, Dict(1 => y))
@@ -235,81 +236,84 @@ end
     @test isequal(d, Dict(y => 1))
     @test iszero(r)
 
-    expr = (x^(4//3) + y^(5//2))^3
+    expr = (x^(4 // 3) + y^(5 // 2))^3
 
     d, r = semipolynomial_form(expr, [x, y], 0)
     @test isempty(d)
-    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, x^4 + 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [x, y], 1)
     @test isempty(d)
-    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, x^4 + 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [x, y], 2)
     @test isempty(d)
-    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, x^4 + 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [x, y], 3)
     @test isempty(d)
-    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, x^4 + 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [x, y], 4)
     @test isequal(d, Dict(x^4 => 1))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [x, y], 5)
     @test isequal(d, Dict(x^4 => 1))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [x, y], 6)
     @test isequal(d, Dict(x^4 => 1))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [y], 3)
     @test isequal(d, Dict(1 => x^4))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [y], 4)
     @test isequal(d, Dict(1 => x^4))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [y], 5)
-    @test isequal(d, Dict(1 => x^4, y^5 => 3x^(4//3)))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + y^(15//2))
+    @test isequal(d, Dict(1 => x^4, y^5 => 3x^(4 // 3)))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [y], 6)
-    @test isequal(d, Dict(1 => x^4, y^5 => 3x^(4//3)))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + y^(15//2))
+    @test isequal(d, Dict(1 => x^4, y^5 => 3x^(4 // 3)))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + y^(15 // 2))
 
     d, r = semipolynomial_form(expr, [x], 3)
-    @test isequal(d, Dict(1 => y^(15//2)))
-    @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
+    @test isequal(d, Dict(1 => y^(15 // 2)))
+    @test isequal(r, x^4 + 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5)
 
     d, r = semipolynomial_form(expr, [x], 4)
-    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
+    @test isequal(d, Dict(1 => y^(15 // 2), x^4 => 1))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5)
 
     d, r = semipolynomial_form(expr, [x], 5)
-    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
+    @test isequal(d, Dict(1 => y^(15 // 2), x^4 => 1))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5)
 
     d, r = semipolynomial_form(expr, [x], 6)
-    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
-    @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
+    @test isequal(d, Dict(1 => y^(15 // 2), x^4 => 1))
+    @test isequal(r, 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5)
 
     d, r = semipolynomial_form(expr, [], 0)
-    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test isequal(d,
+                  Dict(1 => x^4 + 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2)))
     @test iszero(r)
 
     d, r = semipolynomial_form(expr, [], 1)
-    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test isequal(d,
+                  Dict(1 => x^4 + 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2)))
     @test iszero(r)
 
     d, r = semipolynomial_form(expr, [], 2)
-    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test isequal(d,
+                  Dict(1 => x^4 + 3x^(8 // 3) * y^(5 // 2) + 3x^(4 // 3) * y^5 + y^(15 // 2)))
     @test iszero(r)
 
-    expr = (x + y)^(1//2)
+    expr = (x + y)^(1 // 2)
 
     d, r = semipolynomial_form(expr, [x, y], 2)
     @test isempty(d)
@@ -336,10 +340,10 @@ end
     @test isequal(r, 2x^0.5 * y)
 
     # 680
-    expr = (x^(1//2) + y^0.5)^2
+    expr = (x^(1 // 2) + y^0.5)^2
     d, r = semipolynomial_form(expr, [x, y], 4)
     @test isequal(d, Dict(x => 1, y => 1))
-    @test isequal(r, 2x^(1//2) * y^(1//2))
+    @test isequal(r, 2x^(1 // 2) * y^(1 // 2))
 
     expr = (3x^4 + y)^0.5
 
@@ -365,9 +369,9 @@ end
     @test iszero(semilinear_form([x * cos(x) + x^2 * 3sin(x) + 4exp(x)], [x])[1])
 
     exprs = [3x + tan(z),
-             y / z + 5z,
-             x * y + y * z / x]
-    A , c = semilinear_form(exprs, [x, y, z])
+        y / z + 5z,
+        x * y + y * z / x]
+    A, c = semilinear_form(exprs, [x, y, z])
     @test A[1, 1] == 3
     @test A[1, 2] == 0
     @test A[1, 3] == 0
@@ -385,7 +389,7 @@ end
     @test isempty(d)
     @test iszero(r)
 
-    d, r = semipolynomial_form(0//1, [], Inf)
+    d, r = semipolynomial_form(0 // 1, [], Inf)
     @test isempty(d)
     @test iszero(r)
 
@@ -399,7 +403,7 @@ end
 
     d, r = semipolynomial_form(expr, [x], Inf)
     @test isempty(d)
-    @test isequal(r, x^(1//2))
+    @test isequal(r, x^(1 // 2))
 
     expr = sqrt(x)^2
 
@@ -411,24 +415,24 @@ end
 
     d, r = semipolynomial_form(expr, [x, y], Inf)
     @test isequal(d, Dict(x => 1, y => 1))
-    @test isequal(r, 2x^(1//2) * y^(1//2))
+    @test isequal(r, 2x^(1 // 2) * y^(1 // 2))
 
     d, r = semipolynomial_form(expr, [x], Inf)
     @test isequal(d, Dict(x => 1, 1 => y))
-    @test isequal(r, 2x^(1//2) * y^(1//2))
+    @test isequal(r, 2x^(1 // 2) * y^(1 // 2))
 
     d, r = semipolynomial_form(expr, [], Inf)
-    @test isequal(d, Dict(1 => x + y + 2x^(1//2) * y^(1//2)))
+    @test isequal(d, Dict(1 => x + y + 2x^(1 // 2) * y^(1 // 2)))
     @test iszero(r)
 end
 
 @syms a b c
 
-const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
+const components = [2, a, b, c, x, y, z, (1 + x), (1 + y)^2, z * y, z * x]
 
 function verify(t, d, wrt, nl)
     try
-        iszero(t - (isempty(d) ? nl : sum(k*v for (k, v) in d) + nl))
+        iszero(t - (isempty(d) ? nl : sum(k * v for (k, v) in d) + nl))
     catch err
         println("""Error verifying semi-pf result for $t
                  wrt = $wrt
@@ -442,30 +446,30 @@ seed = 0
 
 function trial()
     global seed += 1
-    Random.seed!(666+seed)
-    n = rand(2:length(components)-1)
-    l, r = rand(components, n), vcat(rand(components, n), [1, 0, 1//2, 1.5])
+    Random.seed!(666 + seed)
+    n = rand(2:(length(components) - 1))
+    l, r = rand(components, n), vcat(rand(components, n), [1, 0, 1 // 2, 1.5])
 
     t = *(map(1:rand(1:3)) do _
-        pow = rand([1,1,1,1,1,1,1,1,2,3])
-        nterms = rand(2:5)
-        sum(rand(l, nterms) .* rand(r, nterms)) ^ pow
-    end...)
+              pow = rand([1, 1, 1, 1, 1, 1, 1, 1, 2, 3])
+              nterms = rand(2:5)
+              sum(rand(l, nterms) .* rand(r, nterms))^pow
+          end...)
 
     @show t
 
-    for _ = 1:4
-        wrt = unique(rand([a,b,c,x,y,z], rand(1:6)))
-        for deg=Any[1,2,3,4,Inf]
+    for _ in 1:4
+        wrt = unique(rand([a, b, c, x, y, z], rand(1:6)))
+        for deg in Any[1, 2, 3, 4, Inf]
             if deg == 1
                 A, c = semilinear_form([t], wrt)
-                res = iszero(A*wrt + c - [t])
+                res = iszero(A * wrt + c - [t])
                 if !res
                     println("Semi-linear form is wrong: [$t]  w.r.t   $wrt ")
                     @show A c
                 end
             elseif deg == 2
-                A,B,v2, c = semiquadratic_form([t], wrt)
+                A, B, v2, c = semiquadratic_form([t], wrt)
                 res = iszero(A * wrt + B * v2 + c - [t])
                 if !res
                     println("Semi-quadratic form is wrong: $t  w.r.t   $wrt")
@@ -474,10 +478,10 @@ function trial()
             else
                 if isfinite(deg)
                     d, nl = semipolynomial_form(t, wrt, deg)
-                    @test all(x->Symbolics.pdegree(x) <= deg, keys(d))
+                    @test all(x -> Symbolics.pdegree(x) <= deg, keys(d))
                     for x in wrt
                         d2, enl = semipolynomial_form(expand(nl), wrt, Inf)
-                        elim = all(x->Symbolics.pdegree(x)>deg, keys(d2))
+                        elim = all(x -> Symbolics.pdegree(x) > deg, keys(d2))
                         if !elim
                             println("Imperfect elimination:")
                             @show t wrt deg nl expand(nl)
@@ -500,8 +504,6 @@ function trial()
     end
 end
 
-for i=1:20
-    @testset "fuzz semi-polynomial-form ($i/20)" begin
-        trial()
-    end
+for i in 1:20
+    @testset "fuzz semi-polynomial-form ($i/20)" begin trial() end
 end

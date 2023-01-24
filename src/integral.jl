@@ -12,4 +12,6 @@ function Base.show(io::IO, I::Integral)
     print(io, "Integral(", I.domain.variables, ", ", I.domain.domain, ")")
 end
 
-Base.:(==)(I1::Integral, I2::Integral) = convert(Bool, simplify(isequal(I1.domain, I2.domain)))
+function Base.:(==)(I1::Integral, I2::Integral)
+    convert(Bool, simplify(isequal(I1.domain, I2.domain)))
+end

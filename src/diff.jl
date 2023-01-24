@@ -30,7 +30,7 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 """
 struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
-    x
+    x::Any
     Differential(x) = new(value(x))
 end
 (D::Differential)(x) = Term{symtype(x)}(D, [x])
@@ -64,19 +64,19 @@ function occursin_info(x, expr, fail = true)
     # Allow scalarized expressions
     function is_scalar_indexed(ex)
         (istree(ex) && operation(ex) == getindex && !(symtype(ex) <: AbstractArray)) ||
-        (istree(ex) && (issym(operation(ex)) || istree(operation(ex))) &&
-         is_scalar_indexed(operation(ex)))
+            (istree(ex) && (issym(operation(ex)) || istree(operation(ex))) &&
+             is_scalar_indexed(operation(ex)))
     end
 
     # x[1] == x[1] but not x[2]
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
-        isequal(first(arguments(x)), first(arguments(expr)))
+       isequal(first(arguments(x)), first(arguments(expr)))
         return isequal(operation(x), operation(expr)) &&
                isequal(arguments(x), arguments(expr))
     end
 
     if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
-        !occursin(first(arguments(x)), first(arguments(expr)))
+       !occursin(first(arguments(x)), first(arguments(expr)))
         return false
     end
 
@@ -88,7 +88,7 @@ function occursin_info(x, expr, fail = true)
     if isequal(x, expr)
         true
     else
-        args = map(a->occursin_info(x, a, operation(expr) !== getindex), arguments(expr))
+        args = map(a -> occursin_info(x, a, operation(expr) !== getindex), arguments(expr))
         if all(_isfalse, args)
             return false
         end
@@ -98,7 +98,7 @@ end
 
 function occursin_info(x, expr::Sym, fail)
     if symtype(expr) <: AbstractArray && fail
-            error("Differentiation of expressions involving arrays and array variables is not yet supported.")
+        error("Differentiation of expressions involving arrays and array variables is not yet supported.")
     end
     isequal(x, expr)
 end
@@ -110,11 +110,11 @@ Returns true if the expression or equation `O` contains [`Differential`](@ref) t
 """
 hasderiv(O) = recursive_hasoperator(Differential, O)
 
-
-recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
+function recursive_hasoperator(op, eq::Equation)
+    recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
+end
 recursive_hasoperator(op) = O -> recursive_hasoperator(op, O) # curry version
-recursive_hasoperator(::Type{T}, ::T) where T = true
-
+recursive_hasoperator(::Type{T}, ::T) where {T} = true
 
 """
     recursive_hasoperator(op, O)
@@ -159,7 +159,7 @@ julia> dfx=expand_derivatives(Dx(f))
 (k*((2abs(x - y)) / y - 2z)*IfElse.ifelse(signbit(x - y), -1, 1)) / y
 ```
 """
-function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
+function expand_derivatives(O::Symbolic, simplify = false; occurances = nothing)
     if istree(O) && isa(operation(O), Differential)
         arg = only(arguments(O))
         arg = expand_derivatives(arg, false)
@@ -180,7 +180,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
             if any(isequal(D.x), inner_args)
                 return D(arg) # base case if any argument is directly equal to the i.v.
             else
-                return sum(inner_args, init=0) do a
+                return sum(inner_args, init = 0) do a
                     return expand_derivatives(Differential(a)(arg)) *
                            expand_derivatives(D(a))
                 end
@@ -212,14 +212,16 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
                 c = 0
                 inner_function = expand_derivatives(arguments(arg)[1])
                 if istree(value(a))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(a)))
+                    t1 = SymbolicUtils.substitute(inner_function,
+                                                  Dict(op.domain.variables => value(a)))
                     t2 = D(a)
-                    c -= t1*t2
+                    c -= t1 * t2
                 end
                 if istree(value(b))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(b)))
+                    t1 = SymbolicUtils.substitute(inner_function,
+                                                  Dict(op.domain.variables => value(b)))
                     t2 = D(b)
-                    c += t1*t2
+                    c += t1 * t2
                 end
                 inner = expand_derivatives(D(arguments(arg)[1]))
                 c += op(inner)
@@ -233,7 +235,8 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
         c = 0
 
         for i in 1:l
-            t2 = expand_derivatives(D(inner_args[i]),false, occurances=arguments(occurances)[i])
+            t2 = expand_derivatives(D(inner_args[i]), false,
+                                    occurances = arguments(occurances)[i])
 
             x = if _iszero(t2)
                 t2
@@ -269,20 +272,20 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
     elseif !hasderiv(O)
         return O
     else
-        args = map(a->expand_derivatives(a, false), arguments(O))
+        args = map(a -> expand_derivatives(a, false), arguments(O))
         O1 = operation(O)(args...)
         return simplify ? SymbolicUtils.simplify(O1) : O1
     end
 end
 
-function expand_derivatives(n::Num, simplify=false; occurances=nothing)
-    Num(expand_derivatives(value(n), simplify; occurances=occurances))
+function expand_derivatives(n::Num, simplify = false; occurances = nothing)
+    Num(expand_derivatives(value(n), simplify; occurances = occurances))
 end
 
 _iszero(x) = false
 _isone(x) = false
 
-expand_derivatives(x, simplify=false;occurances=nothing) = x
+expand_derivatives(x, simplify = false; occurances = nothing) = x
 
 # Don't specialize on the function here
 """
@@ -331,48 +334,53 @@ derivative(f, args, v) = NoDeriv()
 
 # Pre-defined derivatives
 import DiffRules
-for (modu, fun, arity) ∈ DiffRules.diffrules(; filter_modules=(:Base, :SpecialFunctions, :NaNMath))
+for (modu, fun, arity) in DiffRules.diffrules(;
+                                              filter_modules = (:Base, :SpecialFunctions,
+                                                                :NaNMath))
     fun in [:*, :+, :abs, :mod, :rem, :max, :min] && continue # special
-    for i ∈ 1:arity
-
+    for i in 1:arity
         expr = if arity == 1
             DiffRules.diffrule(modu, fun, :(args[1]))
         else
-            DiffRules.diffrule(modu, fun, ntuple(k->:(args[$k]), arity)...)[i]
+            DiffRules.diffrule(modu, fun, ntuple(k -> :(args[$k]), arity)...)[i]
         end
-        @eval derivative(::typeof($modu.$fun), args::NTuple{$arity,Any}, ::Val{$i}) = $expr
+        @eval derivative(::typeof($modu.$fun), args::NTuple{$arity, Any}, ::Val{$i}) = $expr
     end
 end
 
-derivative(::typeof(+), args::NTuple{N,Any}, ::Val) where {N} = 1
-derivative(::typeof(*), args::NTuple{N,Any}, ::Val{i}) where {N,i} = *(deleteat!(collect(args), i)...)
+derivative(::typeof(+), args::NTuple{N, Any}, ::Val) where {N} = 1
+function derivative(::typeof(*), args::NTuple{N, Any}, ::Val{i}) where {N, i}
+    *(deleteat!(collect(args), i)...)
+end
 derivative(::typeof(one), args::Tuple{<:Any}, ::Val) = 0
 
 function count_order(x)
     @assert !(x isa Symbol) "The variable $x must have an order of differentiation that is greater or equal to 1!"
     n = 1
     while !(x.args[1] isa Symbol)
-        n = n+1
+        n = n + 1
         x = x.args[1]
     end
     n, x.args[1]
 end
 
-_repeat_apply(f, n) = n == 1 ? f : ComposedFunction{Any,Any}(f, _repeat_apply(f, n-1))
+_repeat_apply(f, n) = n == 1 ? f : ComposedFunction{Any, Any}(f, _repeat_apply(f, n - 1))
 function _differential_macro(x)
     ex = Expr(:block)
-    push!(ex.args,  :(Base.depwarn("`@derivatives D'''~x` is deprecated. Use `Differential(x)^3` instead.", Symbol("@derivatives"), force=true)))
+    push!(ex.args,
+          :(Base.depwarn("`@derivatives D'''~x` is deprecated. Use `Differential(x)^3` instead.",
+                         Symbol("@derivatives"), force = true)))
     lhss = Symbol[]
     x = x isa Tuple && first(x).head == :tuple ? first(x).args : x # tuple handling
     x = flatten_expr!(x)
     for di in x
-        @assert di isa Expr && di.args[1] == :~ "@derivatives expects a form that looks like `@derivatives D''~t E'~t` or `@derivatives (D''~t), (E'~t)`"
+        @assert di isa Expr&&di.args[1] == :~ "@derivatives expects a form that looks like `@derivatives D''~t E'~t` or `@derivatives (D''~t), (E'~t)`"
         lhs = di.args[2]
         rhs = di.args[3]
         order, lhs = count_order(lhs)
         push!(lhss, lhs)
         expr = :($lhs = $_repeat_apply(Differential($value($rhs)), $order))
-        push!(ex.args,  expr)
+        push!(ex.args, expr)
     end
     push!(ex.args, Expr(:tuple, lhss...))
     ex
@@ -403,7 +411,6 @@ macro derivatives(x...)
     esc(_differential_macro(x))
 end
 
-
 ### Jacobians & Hessians
 
 """
@@ -412,7 +419,7 @@ $(SIGNATURES)
 A helper function for computing the derivative of an expression with respect to
 `var`.
 """
-function derivative(O, v; simplify=false)
+function derivative(O, v; simplify = false)
     if O isa AbstractArray
         Num[Num(expand_derivatives(Differential(v)(value(o)), simplify)) for o in O]
     else
@@ -426,8 +433,8 @@ $(SIGNATURES)
 A helper function for computing the gradient of an expression with respect to
 an array of variable expressions.
 """
-function gradient(O, vars::AbstractVector; simplify=false)
-    Num[Num(expand_derivatives(Differential(v)(value(O)),simplify)) for v in vars]
+function gradient(O, vars::AbstractVector; simplify = false)
+    Num[Num(expand_derivatives(Differential(v)(value(O)), simplify)) for v in vars]
 end
 
 """
@@ -436,18 +443,20 @@ $(SIGNATURES)
 A helper function for computing the Jacobian of an array of expressions with respect to
 an array of variable expressions.
 """
-function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false, scalarize=true)
+function jacobian(ops::AbstractVector, vars::AbstractVector; simplify = false,
+                  scalarize = true)
     if scalarize
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
-    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
+    Num[Num(expand_derivatives(Differential(value(v))(value(O)), simplify))
+        for O in ops, v in vars]
 end
 
-function jacobian(ops, vars; simplify=false)
+function jacobian(ops, vars; simplify = false)
     ops = vec(scalarize(ops))
     vars = vec(scalarize(vars)) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
-    jacobian(ops, vars; simplify=simplify, scalarize=false)
+    jacobian(ops, vars; simplify = simplify, scalarize = false)
 end
 
 """
@@ -456,7 +465,7 @@ $(SIGNATURES)
 A helper function for computing the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions.
 """
-function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
+function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify = false)
     I = Int[]
     J = Int[]
     du = Num[]
@@ -464,9 +473,9 @@ function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=fals
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
     sp = jacobian_sparsity(ops, vars)
-    I,J,_ = findnz(sp)
+    I, J, _ = findnz(sp)
 
-    exprs = sparsejacobian_vals(ops, vars, I, J, simplify=simplify)
+    exprs = sparsejacobian_vals(ops, vars, I, J, simplify = simplify)
 
     sparse(I, J, exprs, length(ops), length(vars))
 end
@@ -477,13 +486,14 @@ $(SIGNATURES)
 A helper function for computing the values of the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions given the sparsity structure.
 """
-function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify=false)
+function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector,
+                             J::AbstractVector; simplify = false)
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
 
     exprs = Num[]
 
-    for (i,j) in zip(I, J)
+    for (i, j) in zip(I, J)
         push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify)))
     end
     exprs
@@ -523,21 +533,20 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     I = Int[]
     J = Int[]
 
-
     simterm(x, f, args; kw...) = similarterm(x, f, args, symtype(x); kw...)
 
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
 
-    r = @rule ~x::(x->haskey(dict, x)) => begin
+    r = @rule ~x::(x -> haskey(dict, x)) => begin
         push!(I, i[])
         push!(J, dict[~x])
         nothing
     end
 
-    r =  Rewriters.Postwalk(r, similarterm=simterm)
+    r = Rewriters.Postwalk(r, similarterm = simterm)
 
-    for ii = 1:length(du)
+    for ii in 1:length(du)
         i[] = ii
         r(du[ii])
     end
@@ -600,14 +609,14 @@ $(SIGNATURES)
 A helper function for computing the Hessian of an expression with respect to
 an array of variable expressions.
 """
-function hessian(O, vars::AbstractVector; simplify=false)
+function hessian(O, vars::AbstractVector; simplify = false)
     vars = map(value, vars)
-    first_derivs = map(value, vec(jacobian([values(O)], vars, simplify=simplify)))
+    first_derivs = map(value, vec(jacobian([values(O)], vars, simplify = simplify)))
     n = length(vars)
-    H = Array{Num, 2}(undef,(n, n))
+    H = Array{Num, 2}(undef, (n, n))
     fill!(H, 0)
-    for i=1:n
-        for j=1:i
+    for i in 1:n
+        for j in 1:i
             H[j, i] = H[i, j] = expand_derivatives(Differential(vars[i])(first_derivs[j]))
         end
     end
@@ -623,28 +632,26 @@ let
 
     _scalar = one(TermCombination)
 
-    linearity_rules = [
-          @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
-          @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
-          @rule (~f)(~x::(!isidx)) => _scalar
-
-          @rule (~f)(~x::isidx) => if haslinearity_1(~f)
-              combine_terms_1(linearity_1(~f), ~x)
-          else
-              error("Function of unknown linearity used: ", ~f)
-          end
-          @rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)
-          @rule (~f)(~x, ~y) => begin
-              if haslinearity_2(~f)
-                  a = isidx(~x) ? ~x : _scalar
-                  b = isidx(~y) ? ~y : _scalar
-                  combine_terms_2(linearity_2(~f), a, b)
-              else
-                  error("Function of unknown linearity used: ", ~f)
-              end
-          end
-          @rule ~x::issym => 0]
-    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=basic_simterm))
+    linearity_rules = [@rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init = _scalar)
+                       @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init = _scalar)
+                       @rule (~f)(~x::(!isidx)) => _scalar
+                       @rule (~f)(~x::isidx) => if haslinearity_1(~f)
+                           combine_terms_1(linearity_1(~f), ~x)
+                       else
+                           error("Function of unknown linearity used: ", ~f)
+                       end
+                       @rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x :
+                                                   (~x) * (~x)
+                       @rule (~f)(~x, ~y) => begin if haslinearity_2(~f)
+                           a = isidx(~x) ? ~x : _scalar
+                           b = isidx(~y) ? ~y : _scalar
+                           combine_terms_2(linearity_2(~f), a, b)
+                       else
+                           error("Function of unknown linearity used: ", ~f)
+                       end end
+                       @rule ~x::issym => 0]
+    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules);
+                                             similarterm = basic_simterm))
 
     global hessian_sparsity
 
@@ -676,9 +683,10 @@ let
         @assert !(expr isa AbstractArray)
         expr = value(expr)
         u = map(value, vars)
-        idx(i) = TermCombination(Set([Dict(i=>1)]))
+        idx(i) = TermCombination(Set([Dict(i => 1)]))
         dict = Dict(u .=> idx.(1:length(u)))
-        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(expr)
+        f = Rewriters.Prewalk(x -> haskey(dict, x) ? dict[x] : x;
+                              similarterm = basic_simterm)(expr)
         lp = linearity_propagator(f)
         _sparse(lp, length(u))
     end
@@ -736,7 +744,7 @@ $(SIGNATURES)
 A helper function for computing the sparse Hessian of an expression with respect to
 an array of variable expressions.
 """
-function sparsehessian(O, vars::AbstractVector; simplify=false)
+function sparsehessian(O, vars::AbstractVector; simplify = false)
     O = value(O)
     vars = map(value, vars)
     S = hessian_sparsity(O, vars)

@@ -8,7 +8,6 @@ export @arrayop, ArrayMaker, @makearray, @setview, @setview!
 ### Store Shape as a metadata in Term{<:AbstractArray} objects
 struct ArrayShapeCtx end
 
-
 #=
  There are 2 types of array terms:
    `ArrayOp{T<:AbstractArray}` and `Term{<:AbstractArray}`
@@ -37,19 +36,20 @@ A tensor expression where `output_idx` are the output indices
 `expr`, is the tensor expression and `reduce` is the function
 used to reduce over contracted dimensions.
 """
-struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
-    output_idx # output indices
-    expr       # Used in pattern matching
-               # Useful to infer eltype
-    reduce
-    term
-    shape
+struct ArrayOp{T <: AbstractArray} <: Symbolic{T}
+    output_idx::Any # output indices
+    expr::Any       # Used in pattern matching
+    # Useful to infer eltype
+    reduce::Any
+    term::Any
+    shape::Any
     ranges::Dict{BasicSymbolic, AbstractRange} # index range each index symbol can take,
-                                     # optional for each symbol
-    metadata
+    # optional for each symbol
+    metadata::Any
 end
 
-function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges=Dict(); metadata=nothing)
+function ArrayOp(T::Type, output_idx, expr, reduce, term, ranges = Dict();
+                 metadata = nothing)
     sh = make_shape(output_idx, unwrap(expr), ranges)
     ArrayOp{T}(output_idx, unwrap(expr), reduce, term, sh, ranges, metadata)
 end
@@ -87,19 +87,20 @@ function operation(a::ArrayOp)
     isnothing(a.term) ? typeof(a) : operation(a.term)
 end
 function arguments(a::ArrayOp)
-    isnothing(a.term) ? [a.output_idx, a.expr, a.reduce,
-                         a.term, a.shape, a.ranges, a.metadata] :
+    isnothing(a.term) ?
+    [a.output_idx, a.expr, a.reduce,
+        a.term, a.shape, a.ranges, a.metadata] :
     arguments(a.term)
 end
 
 function Base.isequal(a::ArrayOp, b::ArrayOp)
     a === b && return true
     isequal(a.shape, b.shape) &&
-    isequal(a.ranges, b.ranges) &&
-    isequal(a.output_idx, b.output_idx) &&
-    isequal(a.reduce, b.reduce) &&
-    isequal(operation(a), operation(b)) &&
-    isequal(a.expr, b.expr)
+        isequal(a.ranges, b.ranges) &&
+        isequal(a.output_idx, b.output_idx) &&
+        isequal(a.reduce, b.reduce) &&
+        isequal(operation(a), operation(b)) &&
+        isequal(a.expr, b.expr)
 end
 
 function Base.hash(a::ArrayOp, u::UInt)
@@ -131,15 +132,15 @@ macro arrayop(output_idx, expr, options...)
     end
     @assert output_idx.head == :tuple
 
-    oidxs = filter(x->x isa Symbol, output_idx.args)
+    oidxs = filter(x -> x isa Symbol, output_idx.args)
     iidxs = find_indices(expr)
-    idxs  = union(oidxs, iidxs)
+    idxs = union(oidxs, iidxs)
     fbody = call2term(deepcopy(expr))
-    oftype(x,T) = :($x::$T)
+    oftype(x, T) = :($x::$T)
     aop = gensym("aop")
     quote
         let
-            @syms $(map(x->oftype(x, Int), idxs)...)
+            @syms $(map(x -> oftype(x, Int), idxs)...)
 
             expr = $fbody
             #TODO: proper Atype
@@ -150,7 +151,6 @@ macro arrayop(output_idx, expr, options...)
                      $reduce,
                      $(call2term(call)),
                      Dict($(rs...)))
-
         end
     end |> esc
 end
@@ -163,15 +163,14 @@ const SymVec = Union{ArrayOp{<:AbstractVector}, Symbolic{<:AbstractVector}}
 #
 ## Shape ##
 
-
 function axis_in(a, b)
     first(a) >= first(b) && last(a) <= last(b)
 end
 
-function make_shape(output_idx, expr, ranges=Dict())
+function make_shape(output_idx, expr, ranges = Dict())
     matches = idx_to_axes(expr)
     for (sym, ms) in matches
-        to_check = filter(m->!(shape(m.A) isa Unknown), ms)
+        to_check = filter(m -> !(shape(m.A) isa Unknown), ms)
         # Only check known dimensions. It may be "known symbolically"
         isempty(to_check) && continue
         restricted = false
@@ -184,7 +183,7 @@ function make_shape(output_idx, expr, ranges=Dict())
         reference = ref_axis
         for i in (restricted ? 1 : 2):length(ms)
             m = ms[i]
-            s=shape(m.A)
+            s = shape(m.A)
             if s !== Unknown()
                 if restricted
                     if !axis_in(ref_axis, axes(m.A, m.dim))
@@ -214,13 +213,12 @@ function make_shape(output_idx, expr, ranges=Dict())
         end
     end
     # TODO: maybe we can remove this restriction?
-    if any(x->x isa Unknown, sz)
+    if any(x -> x isa Unknown, sz)
         Unknown()
     else
         sz
     end
 end
-
 
 function ranges(a::ArrayOp)
     rs = Dict{BasicSymbolic, Any}()
@@ -244,13 +242,11 @@ function ndims(aop::ArrayOp)
     length(aop.output_idx)
 end
 
-
 ### Utils ###
-
 
 # turn `f(x...)` into `term(f, x...)`
 #
-function call2term(expr, arrs=[])
+function call2term(expr, arrs = [])
     !(expr isa Expr) && return :($unwrap($expr))
     if expr.head == :call
         if expr.args[1] == :(:)
@@ -267,22 +263,22 @@ function call2term(expr, arrs=[])
 end
 
 # Find all symbolic indices in expr
-function find_indices(expr, idxs=[])
+function find_indices(expr, idxs = [])
     !(expr isa Expr) && return idxs
     if expr.head == :ref
-        return append!(idxs, filter(x->x isa Symbol, expr.args[2:end]))
+        return append!(idxs, filter(x -> x isa Symbol, expr.args[2:end]))
     elseif expr.head == :call && expr.args[1] == :getindex || expr.args[1] == getindex
-        return append!(idxs, filter(x->x isa Symbol, expr.args[3:end]))
+        return append!(idxs, filter(x -> x isa Symbol, expr.args[3:end]))
     else
-        foreach(x->find_indices(x, idxs), expr.args)
+        foreach(x -> find_indices(x, idxs), expr.args)
         return idxs
     end
 end
 
 struct AxisOf
-    A
-    dim
-    boundary
+    A::Any
+    dim::Any
+    boundary::Any
 end
 
 function Base.get(a::AxisOf)
@@ -291,17 +287,17 @@ function Base.get(a::AxisOf)
 end
 
 function get_extents(xs)
-    boundaries = map(x->x.boundary, xs)
-    if all(iszero∘wrap, boundaries)
+    boundaries = map(x -> x.boundary, xs)
+    if all(iszero ∘ wrap, boundaries)
         get(first(xs))
     else
-        ii = findfirst(x->issym(x) || istree(x), boundaries)
+        ii = findfirst(x -> issym(x) || istree(x), boundaries)
         if !isnothing(ii)
             error("Could not find the boundary from symbolic index $(xs[ii]). Please manually specify the range of indices.")
         end
         extent = get(first(xs))
-        start_offset = -reduce(min, filter(x->x<0, boundaries), init=0)
-        end_offset = reduce(max, filter(x->x>0, boundaries), init=0)
+        start_offset = -reduce(min, filter(x -> x < 0, boundaries), init = 0)
+        end_offset = reduce(max, filter(x -> x > 0, boundaries), init = 0)
 
         (first(extent) + start_offset):(last(extent) - end_offset)
     end
@@ -317,7 +313,7 @@ get_extents(x::AbstractRange) = x
 # dim: The dimension of the array indexed
 # boundary: how much padding is this indexing requiring, for example
 #   boundary is 2 for x[i + 2], and boundary = -2 for x[i - 2]
-function idx_to_axes(expr, dict=Dict{Any, Vector}(), ranges=Dict())
+function idx_to_axes(expr, dict = Dict{Any, Vector}(), ranges = Dict())
     if istree(expr)
         if operation(expr) === (getindex)
             args = arguments(expr)
@@ -332,12 +328,11 @@ function idx_to_axes(expr, dict=Dict{Any, Vector}(), ranges=Dict())
             end
         else
             idx_to_axes(operation(expr), dict)
-            foreach(ex->idx_to_axes(ex, dict), arguments(expr))
+            foreach(ex -> idx_to_axes(ex, dict), arguments(expr))
         end
     end
     dict
 end
-
 
 #### Term{<:AbstractArray}
 #
@@ -348,14 +343,14 @@ end
 Create a term of `Term{<: AbstractArray}` which
 is the representation of `f(args...)`.
 
-- Calls `propagate_atype(f, args...)` to determine the
-  container type, i.e. `Array` or `StaticArray` etc.
-- Calls `propagate_eltype(f, args...)` to determine the
-  output element type.
-- Calls `propagate_ndims(f, args...)` to determine the
-  output dimension.
-- Calls `propagate_shape(f, args...)` to determine the
-  output array shape.
+  - Calls `propagate_atype(f, args...)` to determine the
+    container type, i.e. `Array` or `StaticArray` etc.
+  - Calls `propagate_eltype(f, args...)` to determine the
+    output element type.
+  - Calls `propagate_ndims(f, args...)` to determine the
+    output dimension.
+  - Calls `propagate_shape(f, args...)` to determine the
+    output array shape.
 
 `propagate_shape`, `propagate_atype`, `propagate_eltype` may
 return `Unknown()` to say that the output cannot be determined
@@ -365,14 +360,14 @@ But `propagate_ndims` must work and return a non-negative integer.
 function arrterm(f, args...)
     atype = propagate_atype(f, args...)
     etype = propagate_eltype(f, args...)
-    nd    = propagate_ndims(f, args...)
+    nd = propagate_ndims(f, args...)
 
     S = if etype === Unknown() && nd === Unknown()
         atype
     elseif etype === Unknown()
-        atype{T, nd} where T
+        atype{T, nd} where {T}
     elseif nd === Unknown()
-        atype{etype, N} where N
+        atype{etype, N} where {N}
     else
         atype{etype, nd}
     end
@@ -419,7 +414,7 @@ _propagate_atype() = AbstractArray
 
 function propagate_atype(f, args...)
     As = [atype(symtype(T))
-          for T in Iterators.filter(x->x <: Symbolic{<:AbstractArray}, typeof.(args))]
+          for T in Iterators.filter(x -> x <: Symbolic{<:AbstractArray}, typeof.(args))]
     if length(As) <= 1
         _propagate_atype(As...)
     else
@@ -429,7 +424,7 @@ end
 
 function propagate_eltype(f, args...)
     As = [eltype(symtype(T))
-          for T in Iterators.filter(x->symtype(x) <: AbstractArray, args)]
+          for T in Iterators.filter(x -> symtype(x) <: AbstractArray, args)]
     promote_type(As...)
 end
 
@@ -443,8 +438,8 @@ end
 
 ### Wrapper type for dispatch
 
-@symbolic_wrap struct Arr{T,N} <: AbstractArray{T, N}
-    value
+@symbolic_wrap struct Arr{T, N} <: AbstractArray{T, N}
+    value::Any
 end
 
 Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
@@ -458,12 +453,12 @@ function Arr(x)
     Arr{maybewrap(eltype(A)), ndims(A)}(x)
 end
 
-const ArrayLike{T,N} = Union{
-    ArrayOp{AbstractArray{T,N}},
-    Symbolic{AbstractArray{T,N}},
-    Arr{T,N},
-    SymbolicUtils.Term{AbstractArray{T, N}}
-} # Like SymArray but includes Arr and Term{Arr}
+const ArrayLike{T, N} = Union{
+                              ArrayOp{AbstractArray{T, N}},
+                              Symbolic{AbstractArray{T, N}},
+                              Arr{T, N},
+                              SymbolicUtils.Term{AbstractArray{T, N}}
+                              } # Like SymArray but includes Arr and Term{Arr}
 
 unwrap(x::Arr) = x.value
 
@@ -498,7 +493,7 @@ geteltype(::Type{<:AbstractArray{T}}) where {T} = T
 geteltype(::Type{<:AbstractArray}) = Unknown()
 
 ndims(s::SymArray) = ndims(symtype(s))
-ndims(::Type{<:Arr{<:Any, N}}) where N = N
+ndims(::Type{<:Arr{<:Any, N}}) where {N} = N
 
 function eltype(A::Union{Arr, SymArray})
     T = geteltype(unwrap(A))
@@ -519,16 +514,15 @@ function size(A::Union{Arr, SymArray})
 end
 
 function size(A::SymArray, i::Integer)
-    @assert(i > 0)
+    @assert(i>0)
     i > ndims(A) ? 1 : size(A)[i]
 end
 
 function axes(A::Union{Arr, SymArray})
     s = shape(unwrap(A))
     s === Unknown() && error("axes of $A not known")
-    return map(x->1:length(x), s)
+    return map(x -> 1:length(x), s)
 end
-
 
 function axes(A::SymArray, i)
     s = shape(A)
@@ -542,36 +536,32 @@ function eachindex(A::Union{Arr, SymArray})
     return CartesianIndices(s)
 end
 
-function get_variables!(vars, e::Arr, varlist=nothing)
+function get_variables!(vars, e::Arr, varlist = nothing)
     foreach(x -> get_variables!(vars, x, varlist), collect(e))
     vars
 end
-
 
 ### Scalarize
 
 scalarize(a::Array) = map(scalarize, a)
 scalarize(term::Symbolic{<:AbstractArray}, idx) = term[idx...]
-val2num(::Val{n}) where n = n
+val2num(::Val{n}) where {n} = n
 
 function replace_by_scalarizing(ex, dict)
-    rule = @rule(getindex(~x, ~~i) =>
-                 scalarize(~x, (map(j->substitute(j, dict), ~~i)...,)))
+    rule = @rule(getindex(~x, ~~i)=>scalarize(~x, (map(j -> substitute(j, dict), ~~i)...,)))
 
-    simterm = (x, f, args; kws...) -> begin
-        if metadata(x) !== nothing
-            similarterm(x, f, args; metadata=metadata(x))
-        else
-            f(args...)
-        end
-    end
+    simterm = (x, f, args; kws...) -> begin if metadata(x) !== nothing
+        similarterm(x, f, args; metadata = metadata(x))
+    else
+        f(args...)
+    end end
 
     function rewrite_operation(x)
         if istree(x) && istree(operation(x))
             f = operation(x)
             ff = replace_by_scalarizing(f, dict)
             if metadata(x) !== nothing
-                similarterm(x, ff, arguments(x); metadata=metadata(x))
+                similarterm(x, ff, arguments(x); metadata = metadata(x))
             else
                 ff(arguments(x)...)
             end
@@ -580,21 +570,20 @@ function replace_by_scalarizing(ex, dict)
         end
     end
 
-    prewalk_if(x->!(x isa ArrayOp || x isa ArrayMaker),
+    prewalk_if(x -> !(x isa ArrayOp || x isa ArrayMaker),
                Rewriters.PassThrough(Chain([rewrite_operation, rule])),
-              ex, simterm)
+               ex, simterm)
 end
 
 function prewalk_if(cond, f, t, similarterm)
     t′ = cond(t) ? f(t) : return t
     if istree(t′)
         return similarterm(t′, operation(t′),
-                           map(x->prewalk_if(cond, f, x, similarterm), arguments(t′)))
+                           map(x -> prewalk_if(cond, f, x, similarterm), arguments(t′)))
     else
         return t′
     end
 end
-
 
 function scalarize(arr::AbstractArray, idx)
     arr[idx...]
@@ -644,16 +633,15 @@ end
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
 end
 
-_det(x, lp) = det(x, laplace=lp)
+_det(x, lp) = det(x, laplace = lp)
 
 function scalarize_op(f::typeof(_det), arr)
-    unwrap(det(map(wrap, collect(arguments(arr)[1])), laplace=arguments(arr)[2]))
+    unwrap(det(map(wrap, collect(arguments(arr)[1])), laplace = arguments(arr)[2]))
 end
 
-@wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace=true)
+@wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace = true)
     Term{eltype(x)}(_det, [x, laplace])
 end
-
 
 # A * x = b
 # A ∈ R^(m x n) x ∈ R^(n, k) = b ∈ R^(m, k)
@@ -664,15 +652,15 @@ propagate_ndims(::typeof(inv), A) = ndims(A)
 # A(m,k) \ C(m,n)  = B(k,n)
 function propagate_shape(::typeof(\), A, b)
     if ndims(b) == 1
-        (axes(A,2),)
+        (axes(A, 2),)
     else
-        (axes(A,2), axes(b, 2))
+        (axes(A, 2), axes(b, 2))
     end
 end
 
 function propagate_shape(::typeof(inv), A)
     @oops shp = shape(A)
-    @assert ndims(A) == 2 && reverse(shp) == shp "Inv called on a non-square matrix"
+    @assert ndims(A) == 2&&reverse(shp) == shp "Inv called on a non-square matrix"
     shp
 end
 
@@ -702,7 +690,6 @@ end
 scalarize(arr::Arr, idx) = wrap(scalarize(unwrap(arr),
                                           unwrap.(idx)))
 
-
 eval_array_term(op, arr) = arr
 eval_array_term(op::typeof(inv), arr) = inv(scalarize(wrap(arguments(arr)[1]))) #issue 653
 eval_array_term(op::Arr) = wrap(eval_array_term(unwrap(op)))
@@ -722,30 +709,34 @@ function scalarize(arr)
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
     elseif istree(arr) && symtype(arr) <: Number
-        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=arr.metadata)
+        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr),
+                        metadata = arr.metadata)
         istree(t) ? scalarize_op(operation(t), t) : t
     else
         arr
     end
 end
 
-@wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x))
+@wrapped function Base.isempty(x::AbstractArray)
+    shape(unwrap(x)) !== Unknown() && _iszero(length(x))
+end
 Base.collect(x::Arr) = scalarize(x)
 Base.collect(x::SymArray) = scalarize(x)
-isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
+function isarraysymbolic(x)
+    unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
+end
 
 Base.convert(::Type{<:Array{<:Any, N}}, arr::Arr{<:Any, N}) where {N} = scalarize(arr)
 
-
 ### Stencils
 
-struct ArrayMaker{T, AT<:AbstractArray} <: Symbolic{AT}
-    shape
-    sequence
-    metadata
+struct ArrayMaker{T, AT <: AbstractArray} <: Symbolic{AT}
+    shape::Any
+    sequence::Any
+    metadata::Any
 end
 
-function ArrayMaker(a::ArrayLike; eltype=eltype(a))
+function ArrayMaker(a::ArrayLike; eltype = eltype(a))
     ArrayMaker{eltype}(size(a), Any[axes(a) => a])
 end
 
@@ -755,15 +746,20 @@ end
 
 istree(x::ArrayMaker) = true
 operation(x::ArrayMaker) = arraymaker
-arguments(x::ArrayMaker) = [eltype(x), shape(x), map(first, x.sequence), map(last, x.sequence)...]
+function arguments(x::ArrayMaker)
+    [eltype(x), shape(x), map(first, x.sequence), map(last, x.sequence)...]
+end
 
 shape(am::ArrayMaker) = am.shape
 
-function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array=[]; atype=Array, metadata=nothing) where {N,T}
-    ArrayMaker{T, atype{T, N}}(map(x->1:x, sz), seq, metadata)
+function ArrayMaker{T}(sz::NTuple{N, Integer}, seq::Array = []; atype = Array,
+                       metadata = nothing) where {N, T}
+    ArrayMaker{T, atype{T, N}}(map(x -> 1:x, sz), seq, metadata)
 end
 
-(::Type{ArrayMaker{T}})(i::Int...; atype=Array) where {T} = ArrayMaker{T}(i, atype=atype)
+function (::Type{ArrayMaker{T}})(i::Int...; atype = Array) where {T}
+    ArrayMaker{T}(i, atype = atype)
+end
 
 function Base.show(io::IO, ac::ArrayMaker)
     print(io, Expr(:call, :ArrayMaker, ac.shape,
@@ -773,7 +769,8 @@ end
 function get_indexers(ex)
     @assert ex.head == :ref
     arr = ex.args[1]
-    args = map(((i,x),)->x == Symbol(":") ? :(1:lastindex($arr, $i)) : x, enumerate(ex.args[2:end]))
+    args = map(((i, x),) -> x == Symbol(":") ? :(1:lastindex($arr, $i)) : x,
+               enumerate(ex.args[2:end]))
     replace_ends(arr, args)
 end
 
@@ -781,8 +778,8 @@ function search_and_replace(expr, key, val)
     isequal(expr, key) && return val
 
     expr isa Expr ?
-        Expr(expr.head, map(x->search_and_replace(x, key,val), expr.args)...) :
-        expr
+    Expr(expr.head, map(x -> search_and_replace(x, key, val), expr.args)...) :
+    expr
 end
 
 function replace_ends(arr, idx)
@@ -806,11 +803,12 @@ function setview(definition, arrayop, inplace)
     output_ref = definition.args[1]
 
     function check_assignment(vw, op)
-        try Base.Broadcast.broadcast_shape(map(length, vw), size(op))
+        try
+            Base.Broadcast.broadcast_shape(map(length, vw), size(op))
         catch err
             if err isa DimensionMismatch
                 throw(DimensionMismatch("setview did not work while assigning indices " *
-                                        "$vw to $op. LHS has size $(map(length, vw)) "*
+                                        "$vw to $op. LHS has size $(map(length, vw)) " *
                                         "and RHS has size $(size(op)) " *
                                         "-- they need to be broadcastable."))
             else
@@ -850,7 +848,7 @@ macro makearray(definition, sequence)
     output_shape = get_indexers(definition)
     output_name = definition.args[1]
 
-    seq = map(filter(x->!(x isa LineNumberNode), sequence.args)) do pair
+    seq = map(filter(x -> !(x isa LineNumberNode), sequence.args)) do pair
         @assert pair.head == :call && pair.args[1] == :(=>)
         # TODO: make sure the same symbol is used for the lhs array
         :(@setview! $(pair.args[2]) $(pair.args[3]))
@@ -871,13 +869,13 @@ function _cat(x, xs...; dims)
     arrays = (x, xs...)
     if dims isa Integer
         sz = Base.cat_size_shape(Base.dims2cat(dims), arrays...)
-        T = reduce(promote_type, eltype.(xs), init=eltype(x))
-        newdim = cumsum(map(a->size(a, dims), arrays))
+        T = reduce(promote_type, eltype.(xs), init = eltype(x))
+        newdim = cumsum(map(a -> size(a, dims), arrays))
         start = 1
         A = ArrayMaker{T}(sz...)
         for (dim, array) in zip(newdim, arrays)
-            idx = CartesianIndices(ntuple(n -> n==dims ?
-                                          (start:dim) : (1:sz[n]), length(sz)))
+            idx = CartesianIndices(ntuple(n -> n == dims ?
+                                               (start:dim) : (1:sz[n]), length(sz)))
             start = dim + 1
 
             @setview! A[idx] array
@@ -903,7 +901,7 @@ function scalarize(x::ArrayMaker)
     T = eltype(x)
     A = Array{wrapper_type(T)}(undef, size(x))
     for (vw, arr) in x.sequence
-        if any(x->x isa AbstractArray, vw)
+        if any(x -> x isa AbstractArray, vw)
             A[vw...] .= scalarize(arr)
         else
             A[vw...] = scalarize(arr)
@@ -914,7 +912,7 @@ end
 
 function scalarize(x::ArrayMaker, idx)
     for (vw, arr) in reverse(x.sequence) # last one wins
-        if any(x->issym(x) || istree(x), idx)
+        if any(x -> issym(x) || istree(x), idx)
             return term(getindex, x, idx...)
         end
         if all(in.(idx, vw))
@@ -928,13 +926,12 @@ function scalarize(x::ArrayMaker, idx)
             end
         end
     end
-    if !any(x->issym(x) || istree(x), idx) && all(in.(idx, axes(x)))
+    if !any(x -> issym(x) || istree(x), idx) && all(in.(idx, axes(x)))
         throw(UndefRefError())
     end
 
     throw(BoundsError(x, idx))
 end
-
 
 ### Codegen
 
@@ -960,13 +957,13 @@ function _array_toexpr(x, st)
     outsym = Symbol("_out")
     N = length(shape(x))
     ex = :(let $outsym = zeros(Float64, map(length, ($(shape(x)...),)))
-          $(inplace_expr(x, outsym))
-          $outsym
-      end) |> LiteralExpr
+               $(inplace_expr(x, outsym))
+               $outsym
+           end) |> LiteralExpr
     toexpr(ex, st)
 end
 
-function inplace_expr(x, out_array, dict=nothing)
+function inplace_expr(x, out_array, dict = nothing)
     x = unwrap(x)
     if symtype(x) <: Number
         :($out_array .= $x)
@@ -975,7 +972,7 @@ function inplace_expr(x, out_array, dict=nothing)
     end
 end
 
-function inplace_expr(x::ArrayMaker, out, dict=Dict())
+function inplace_expr(x::ArrayMaker, out, dict = Dict())
     ex = []
 
     intermediates = Dict()
@@ -985,18 +982,17 @@ function inplace_expr(x::ArrayMaker, out, dict=Dict())
         push!(ex, inplace_expr(unwrap(op), out′, intermediates))
     end
 
-    Expr(:block, (:($sym = $ex) for (ex, sym) in  intermediates)..., ex...)
+    Expr(:block, (:($sym = $ex) for (ex, sym) in intermediates)..., ex...)
 end
 
-function inplace_expr(x::AbstractArray, out, intermediates=Dict())
+function inplace_expr(x::AbstractArray, out, intermediates = Dict())
     # TODO: extract more intermediates
-    :(begin
-          $([:($out[$(Tuple(idx)...)] = $(substitute(x, intermediates)[Tuple(idx)...])) for idx in eachindex(x)]...)
-      end)
+    :(begin $([:($out[$(Tuple(idx)...)] = $(substitute(x, intermediates)[Tuple(idx)...]))
+               for idx in eachindex(x)]...) end)
 end
 
 function inplace_builtin(term, outsym)
-    isarr(n) = x->symtype(x) <: AbstractArray{<:Any, n}
+    isarr(n) = x -> symtype(x) <: AbstractArray{<:Any, n}
     if istree(term) && operation(term) == (*) && length(arguments(term)) == 2
         A, B = arguments(term)
         isarr(2)(A) && (isarr(1)(B) || isarr(2)(B)) && return :($mul!($outsym, $A, $B))
@@ -1062,8 +1058,7 @@ function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
     out_idxs = map(reset_sym, x.output_idx)
     inner_expr = :($outsym[$(out_idxs...)] = $(x.reduce)($outsym[$(out_idxs...)], $(expr)))
 
-
-    loops = foldl(reverse(loops), init=inner_expr) do acc, k
+    loops = foldl(reverse(loops), init = inner_expr) do acc, k
         if any(isequal(k), x.output_idx)
             :(for ($k, $(reset_sym(k))) in zip($(get_extents(rs[k])),
                                                reset_to_one($(get_extents(rs[k]))))
@@ -1078,13 +1073,12 @@ function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
 
     if intermediates === nothing
         # output the intermediate generation
-        :($(map(x->:($(x[2]) = $(x[1])), intermediate_exprs)...);
+        :($(map(x -> :($(x[2]) = $(x[1])), intermediate_exprs)...);
           $loops) |> SymbolicUtils.Code.LiteralExpr
     else
         SymbolicUtils.Code.LiteralExpr(loops)
     end
 end
-
 
 #=
 """

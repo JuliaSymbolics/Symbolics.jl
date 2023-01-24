@@ -40,9 +40,11 @@ using Symbolics
 @variables t x y z(t);
 Symbolics.operation(Symbolics.value(x + y))
 ```
+
 ```@example variables
 Symbolics.operation(Symbolics.value(z))
 ```
+
 ```@example variables
 Symbolics.arguments(Symbolics.value(x + y))
 ```
@@ -55,24 +57,25 @@ so an expression like `2π * x` will leave the symbolic `x` multiplied by a
 also, which can be achieved with `Num(π)`.  For generic programming, it may be
 helpful to simply redefine the variable `π` to be of the same type as some
 other argument, as in
+
 ```@example variables
 function f(x)
-    let π=oftype(x, π)
-        1 + (2//3 + 4π/5) * x
+    let π = oftype(x, π)
+        1 + (2 // 3 + 4π / 5) * x
     end
 end
 f(t)
 ```
-This will work for any floating-point input, as well as symbolic input.
 
+This will work for any floating-point input, as well as symbolic input.
 
 ## Symbolic Control Flow
 
 Control flow can be expressed in Symbolics.jl in the following ways:
 
-- `IfElse.ifelse(cond,x,y)`: this is a dispatch-able version of the `ifelse`
-  function provided by `IfElse.jl` which allows for encoding conditionals in
-  the symbolic branches.
+  - `IfElse.ifelse(cond,x,y)`: this is a dispatch-able version of the `ifelse`
+    function provided by `IfElse.jl` which allows for encoding conditionals in
+    the symbolic branches.
 
 ## Inspection Functions
 

@@ -1,6 +1,5 @@
 function __init__()
     @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
-
         using Symbolics
         using Symbolics: value
         using SymbolicUtils: istree, operation, arguments, symtype,
@@ -21,6 +20,5 @@ function __init__()
                 return symtype(expr) <: FnType ? SymPy.SymFunction(name) : SymPy.Sym(name)
             end
         end
-
     end # SymPy
 end

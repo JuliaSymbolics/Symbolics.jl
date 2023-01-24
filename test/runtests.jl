@@ -5,7 +5,7 @@ const GROUP = get(ENV, "GROUP", "All")
 
 function activate_downstream_env()
     Pkg.activate("downstream")
-    Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+    Pkg.develop(PackageSpec(path = dirname(@__DIR__)))
     Pkg.instantiate()
 end
 

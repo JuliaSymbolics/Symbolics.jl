@@ -1,6 +1,6 @@
 function nterms(t)
     if istree(t)
-        return reduce(+, map(nterms, arguments(t)), init=0)
+        return reduce(+, map(nterms, arguments(t)), init = 0)
     else
         return 1
     end
@@ -8,18 +8,18 @@ end
 
 # Soft pivoted
 # Note: we call this function with a matrix of Union{SymbolicUtils.Symbolic, Any}
-function sym_lu(A; check=true)
+function sym_lu(A; check = true)
     SINGULAR = typemax(Int)
     m, n = size(A)
-    F = map(x->x isa Num ? x : Num(x), A)
+    F = map(x -> x isa Num ? x : Num(x), A)
     minmn = min(m, n)
     p = Vector{LinearAlgebra.BlasInt}(undef, minmn)
     info = 0
-    for k = 1:minmn
+    for k in 1:minmn
         kp = k
         amin = SINGULAR
         for i in k:m
-            absi = _iszero(F[i, k]) ? SINGULAR : nterms(F[i,k])
+            absi = _iszero(F[i, k]) ? SINGULAR : nterms(F[i, k])
             if absi < amin
                 kp = i
                 amin = absi
@@ -37,11 +37,11 @@ function sym_lu(A; check=true)
             F[k, j], F[kp, j] = F[kp, j], F[k, j]
         end
 
-        for i in k+1:m
+        for i in (k + 1):m
             F[i, k] = F[i, k] / F[k, k]
         end
-        for j = k+1:n
-            for i in k+1:m
+        for j in (k + 1):n
+            for i in (k + 1):m
                 F[i, j] = F[i, j] - F[i, k] * F[k, j]
             end
         end
@@ -93,7 +93,7 @@ julia> Symbolics.solve_for([x + y ~ 0, x - y ~ 2], [x, y])
  -1.0
 ```
 """
-function solve_for(eq, var; simplify=false, check=true) # scalar case
+function solve_for(eq, var; simplify = false, check = true) # scalar case
     # simplify defaults for `false` as canonicalization should handle most of
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
@@ -112,8 +112,12 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
         SymbolicUtils.simplify(simplify_fractions(x))
     end
 end
-solve_for(eq::Equation, var::T; x...) where {T<:AbstractArray} = solve_for([eq],var, x...)
-solve_for(eq::T, var::Num; x...) where {T<:AbstractArray} = first(solve_for(eq,[var], x...))
+function solve_for(eq::Equation, var::T; x...) where {T <: AbstractArray}
+    solve_for([eq], var, x...)
+end
+function solve_for(eq::T, var::Num; x...) where {T <: AbstractArray}
+    first(solve_for(eq, [var], x...))
+end
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     A = Num.(SymbolicUtils.quick_cancel.(A))
@@ -122,7 +126,11 @@ function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
 
-LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{Symbolic,Num}}, b::AbstractVector{<:Union{Symbolic,Num}}, x::AbstractVector{<:Union{Symbolic,Num}} = b) = symsub!(A, b, x)
+function LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{Symbolic, Num}},
+                             b::AbstractVector{<:Union{Symbolic, Num}},
+                             x::AbstractVector{<:Union{Symbolic, Num}} = b)
+    symsub!(A, b, x)
+end
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     LinearAlgebra.require_one_based_indexing(A, b, x)
     n = size(A, 2)
@@ -130,10 +138,10 @@ function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
     end
     @inbounds for j in n:-1:1
-        _iszero(A.data[j,j]) && throw(SingularException(j))
-        xj = x[j] = b[j] / A.data[j,j]
-        for i in j-1:-1:1
-            sub = _isone(xj) ? A.data[i,j] : A.data[i,j] * xj
+        _iszero(A.data[j, j]) && throw(SingularException(j))
+        xj = x[j] = b[j] / A.data[j, j]
+        for i in (j - 1):-1:1
+            sub = _isone(xj) ? A.data[i, j] : A.data[i, j] * xj
             if !_iszero(sub)
                 b[i] -= sub
             end
@@ -142,7 +150,11 @@ function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     x
 end
 
-LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{Symbolic,Num}}, b::AbstractVector{<:Union{Symbolic,Num}}, x::AbstractVector{<:Union{Symbolic,Num}} = b) = symsub!(A, b, x)
+function LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{Symbolic, Num}},
+                             b::AbstractVector{<:Union{Symbolic, Num}},
+                             x::AbstractVector{<:Union{Symbolic, Num}} = b)
+    symsub!(A, b, x)
+end
 function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = b)
     LinearAlgebra.require_one_based_indexing(A, b, x)
     n = size(A, 2)
@@ -151,8 +163,8 @@ function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = 
     end
     @inbounds for j in 1:n
         xj = x[j] = b[j]
-        for i in j+1:n
-            sub = _isone(xj) ? A.data[i,j] : A.data[i,j] * xj
+        for i in (j + 1):n
+            sub = _isone(xj) ? A.data[i, j] : A.data[i, j] * xj
             if !_iszero(sub)
                 b[i] -= sub
             end
@@ -161,8 +173,8 @@ function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = 
     x
 end
 
-minor(B, j) = B[2:end, 1:size(B,2) .!= j]
-function LinearAlgebra.det(A::AbstractMatrix{<:Num}; laplace=true)
+minor(B, j) = B[2:end, 1:size(B, 2) .!= j]
+function LinearAlgebra.det(A::AbstractMatrix{<:Num}; laplace = true)
     if laplace
         n = LinearAlgebra.checksquare(A)
         if n == 1
@@ -170,8 +182,8 @@ function LinearAlgebra.det(A::AbstractMatrix{<:Num}; laplace=true)
         elseif n == 2
             return A[1, 1] * A[2, 2] - A[1, 2] * A[2, 1]
         else
-            return sum((-1)^(1+j) * A[1,j] * det(minor(A,j), laplace=true)
-                       for j in axes(A,2))
+            return sum((-1)^(1 + j) * A[1, j] * det(minor(A, j), laplace = true)
+                       for j in axes(A, 2))
         end
     else
         if istriu(A) || istril(A)
@@ -181,17 +193,17 @@ function LinearAlgebra.det(A::AbstractMatrix{<:Num}; laplace=true)
     end
 end
 
-function LinearAlgebra.norm(x::AbstractArray{Num}, p::Real=2)
+function LinearAlgebra.norm(x::AbstractArray{Num}, p::Real = 2)
     p = value(p)
     issym = p isa Symbolic
     if !issym && p == 2
-        sqrt(sum(x->abs2(x), x))
+        sqrt(sum(x -> abs2(x), x))
     elseif !issym && isone(p)
         sum(abs, x)
     elseif !issym && isinf(p)
         mapreduce(abs, max, x)
     else
-        sum(x->abs(x)^p, x)^inv(p)
+        sum(x -> abs(x)^p, x)^inv(p)
     end
 end
 
@@ -232,7 +244,10 @@ end
 trival_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
 
 is_expansion_leaf(t) = !istree(t) || (operation(t) isa Differential)
-@noinline expansion_check(op) = op isa Differential && error("The operation is a Differential. This should never happen.")
+@noinline function expansion_check(op)
+    op isa Differential &&
+        error("The operation is a Differential. This should never happen.")
+end
 function _linear_expansion(t, x)
     t = value(t)
     t isa Symbolic || return (0, t, true)
@@ -299,7 +314,9 @@ end
 ###
 
 # Pretty much just copy-pasted from stdlib
-SparseArrays.SparseMatrixCSC{Tv,Ti}(M::StridedMatrix) where {Tv<:Num,Ti} = _sparse(Tv,  Ti, M)
+function SparseArrays.SparseMatrixCSC{Tv, Ti}(M::StridedMatrix) where {Tv <: Num, Ti}
+    _sparse(Tv, Ti, M)
+end
 function _sparse(::Type{Tv}, ::Type{Ti}, M) where {Tv, Ti}
     nz = count(!_iszero, M)
     colptr = zeros(Ti, size(M, 2) + 1)
@@ -316,7 +333,7 @@ function _sparse(::Type{Tv}, ::Type{Ti}, M) where {Tv, Ti}
                 cnt += 1
             end
         end
-        colptr[j+1] = cnt
+        colptr[j + 1] = cnt
     end
     return SparseMatrixCSC(size(M, 1), size(M, 2), colptr, rowval, nzval)
 end

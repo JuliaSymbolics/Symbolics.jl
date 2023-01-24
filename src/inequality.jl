@@ -8,17 +8,23 @@ $(FIELDS)
 """
 struct Inequality
     """The expression on the left-hand side of the inequality."""
-    lhs
+    lhs::Any
     """The expression on the right-hand side of the inequality."""
-    rhs
+    rhs::Any
     """The relational operator of the inequality."""
-    relational_op
+    relational_op::Any
     function Inequality(lhs, rhs, relational_op)
         new(Symbolics.value(lhs), Symbolics.value(rhs), relational_op)
     end
 end
 
-Base.:(==)(a::Inequality, b::Inequality) = all([isequal(a.lhs, b.lhs), isequal(a.rhs, b.rhs), isequal(a.relational_op, b.relational_op)])
+function Base.:(==)(a::Inequality, b::Inequality)
+    all([
+            isequal(a.lhs, b.lhs),
+            isequal(a.rhs, b.rhs),
+            isequal(a.relational_op, b.relational_op),
+        ])
+end
 Base.hash(a::Inequality, salt::UInt) = hash(a.lhs, hash(a.rhs, hash(a.relational_op, salt)))
 
 @enum RelationalOperator leq geq # strict less than or strict greater than are not supported by any solver
@@ -55,7 +61,7 @@ julia> x - y ≲ 0
 x - y ≲ 0
 ```
 """
-function ≲(lhs, rhs) 
+function ≲(lhs, rhs)
     if isarraysymbolic(lhs) || isarraysymbolic(rhs)
         if isarraysymbolic(lhs) && isarraysymbolic(rhs)
             lhs .≲ rhs
@@ -95,11 +101,11 @@ function ≳(lhs, rhs)
             throw(ArgumentError("Cannot relate an array with a scalar. Please use broadcast `.≳`."))
         end
     else
-    Inequality(lhs, rhs, geq)
+        Inequality(lhs, rhs, geq)
     end
 end
 
-function canonical_form(cs::Inequality; form=leq)
+function canonical_form(cs::Inequality; form = leq)
     # do we need to flip the operator?
     if cs.relational_op == form
         Inequality(cs.lhs - cs.rhs, 0, cs.relational_op)
@@ -108,10 +114,13 @@ function canonical_form(cs::Inequality; form=leq)
     end
 end
 
-get_variables(ineq::Inequality) = unique(vcat(get_variables(ineq.lhs), get_variables(ineq.rhs)))
+function get_variables(ineq::Inequality)
+    unique(vcat(get_variables(ineq.lhs), get_variables(ineq.rhs)))
+end
 
-SymbolicUtils.simplify(cs::Inequality; kw...) = 
+function SymbolicUtils.simplify(cs::Inequality; kw...)
     Inequality(simplify(cs.lhs; kw...), simplify(cs.rhs; kw...), cs.relational_op)
+end
 
 # ambiguity
 for T in [:Pair, :Any]

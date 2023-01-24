@@ -37,19 +37,19 @@ of functionality available in Symbolics.jl.
 
 A general list of the features is:
 
-- Symbolic arithmetic with type information and multiple dispatch
-- Symbolic polynomials and trigonometric functions
-- Pattern matching, simplification and substitution
-- Differentiation
-- Symbolic linear algebra (factorizations, inversion, determinants, eigencomputations, etc.)
-- Discrete math (representations of summations, products, binomial coefficients, etc.)
-- Logical and Boolean expressions
-- Symbolic equation solving and conversion to arbitrary precision
-- Support for non-standard algebras (non-commutative symbols and customizable rulesets)
-- Special functions (list provided by [SpecialFunctions.jl](https://github.com/JuliaMath/SpecialFunctions.jl))
-- Automatic conversion of Julia code to symbolic code
-- Generation of (high performance and parallel) functions from symbolic expressions
-- Fast automated sparsity detection and generation of sparse Jacobians and Hessians
+  - Symbolic arithmetic with type information and multiple dispatch
+  - Symbolic polynomials and trigonometric functions
+  - Pattern matching, simplification and substitution
+  - Differentiation
+  - Symbolic linear algebra (factorizations, inversion, determinants, eigencomputations, etc.)
+  - Discrete math (representations of summations, products, binomial coefficients, etc.)
+  - Logical and Boolean expressions
+  - Symbolic equation solving and conversion to arbitrary precision
+  - Support for non-standard algebras (non-commutative symbols and customizable rulesets)
+  - Special functions (list provided by [SpecialFunctions.jl](https://github.com/JuliaMath/SpecialFunctions.jl))
+  - Automatic conversion of Julia code to symbolic code
+  - Generation of (high performance and parallel) functions from symbolic expressions
+  - Fast automated sparsity detection and generation of sparse Jacobians and Hessians
 
 and much more.
 
@@ -58,25 +58,31 @@ and much more.
 Below is a list of known extension packages. If you would like your package
 to be listed here, feel free to open a pull request!
 
-- [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl): Symbolic representations of common numerical systems
-    - Ordinary differential equations
-    - Stochastic differential equations
-    - Partial differential equations
-    - Nonlinear systems
-    - Optimization problems
-    - Optimal Control
-    - Causal and acausal modeling (Simulink/Modelica)
-    - Automated model transformation, simplification, and composition
-- [Catalyst.jl](https://github.com/SciML/Catalyst.jl): Symbolic representations of chemical reactions
-    - Symbolically build and represent large systems of chemical reactions
-    - Generate code for ODEs, SDEs, continuous-time Markov Chains, and more
-    - Simulate the models using the SciML ecosystem with O(1) Gillespie methods
-- [DataDrivenDiffEq.jl](https://github.com/SciML/DataDrivenDiffEq.jl): Automatic identification of equations from data
-    - Automated construction of ODEs and DAEs from data
-    - Representations of Koopman operators and Dynamic Mode Decomposition (DMD)
-- [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl): Distributed High-Performance symbolic regression
-    - Parallelized generic algorithms for finding equations from data
-    - Pareto frontier-based scoring
-- [ReversePropagation.jl](https://github.com/dpsanders/ReversePropagation.jl): Source-to-source reverse mode automatic differentiation
-    - Automated tracing of code and construction of backpropagation equations
-    - Composes with symbolic transformation and simplification functionality
+  - [ModelingToolkit.jl](https://github.com/SciML/ModelingToolkit.jl): Symbolic representations of common numerical systems
+    
+      + Ordinary differential equations
+      + Stochastic differential equations
+      + Partial differential equations
+      + Nonlinear systems
+      + Optimization problems
+      + Optimal Control
+      + Causal and acausal modeling (Simulink/Modelica)
+      + Automated model transformation, simplification, and composition
+
+  - [Catalyst.jl](https://github.com/SciML/Catalyst.jl): Symbolic representations of chemical reactions
+    
+      + Symbolically build and represent large systems of chemical reactions
+      + Generate code for ODEs, SDEs, continuous-time Markov Chains, and more
+      + Simulate the models using the SciML ecosystem with O(1) Gillespie methods
+  - [DataDrivenDiffEq.jl](https://github.com/SciML/DataDrivenDiffEq.jl): Automatic identification of equations from data
+    
+      + Automated construction of ODEs and DAEs from data
+      + Representations of Koopman operators and Dynamic Mode Decomposition (DMD)
+  - [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl): Distributed High-Performance symbolic regression
+    
+      + Parallelized generic algorithms for finding equations from data
+      + Pareto frontier-based scoring
+  - [ReversePropagation.jl](https://github.com/dpsanders/ReversePropagation.jl): Source-to-source reverse mode automatic differentiation
+    
+      + Automated tracing of code and construction of backpropagation equations
+      + Composes with symbolic transformation and simplification functionality

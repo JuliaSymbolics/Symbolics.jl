@@ -9,7 +9,7 @@ eqs = parse_expr_to_symbolic.(ex, (Main,))
 ex = [y ~ x
       y ~ -2x + 3 / z
       z ~ 2]
-@test all(isequal.(eqs,ex))
+@test all(isequal.(eqs, ex))
 
 ex = [:(b(t) ~ a(t))
       :(b(t) ~ -2a(t) + 3 / c(t))
@@ -19,4 +19,4 @@ eqs = parse_expr_to_symbolic.(ex, (Main,))
 ex = [b ~ a
       b ~ -2a + 3 / c
       c ~ 2]
-@test_broken all(isequal.(eqs,ex))
+@test_broken all(isequal.(eqs, ex))

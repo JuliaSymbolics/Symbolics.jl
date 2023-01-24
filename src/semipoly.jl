@@ -71,7 +71,7 @@ function pdegrees(x)
         degrees = map(degree -> degree * x.exp, values(dict))
         Dict(keys(dict) .=> degrees)
     elseif issym(x) || istree(x)
-        return Dict(x=>1)
+        return Dict(x => 1)
     elseif x isa Number
         return Dict()
     else
@@ -151,7 +151,8 @@ function mark_and_exponentiate(expr, vars)
              @rule (~a::isop(+))^(~b::isreal) => expand(Pow((~a), real(~b)))
              @rule *(~~xs::(xs -> all(issemimonomial, xs))) => *(~~xs...)
              @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
-             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, unsorted_arguments(~a))...)
+             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x -> x / ~b,
+                                                                 unsorted_arguments(~a))...)
              @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
     expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
 end
@@ -204,7 +205,7 @@ function mark_vars(expr, vars)
         return Term{symtype(expr)}(op, map(mark_vars(vars), args))
     elseif length(args) == 1
         if op == sqrt
-            return mark_vars(args[1]^(1//2), vars)
+            return mark_vars(args[1]^(1 // 2), vars)
         elseif linearity_1(op)
             return Term{symtype(expr)}(op, mark_vars(args[1], vars))
         end
@@ -309,7 +310,7 @@ Returns a tuple of a sparse matrix `A`, and a residual vector `c` such that,
 function semilinear_form(exprs::AbstractArray, vars)
     ds, nls = semipolynomial_form(exprs, vars, 1; consts = false)
 
-    idxmap = Dict(v=>i for (i, v) in enumerate(vars))
+    idxmap = Dict(v => i for (i, v) in enumerate(vars))
 
     I = Int[]
     J = Int[]
@@ -323,7 +324,7 @@ function semilinear_form(exprs::AbstractArray, vars)
         end
     end
 
-    sparse(I,J,V, length(exprs), length(vars)), wrap.(nls)
+    sparse(I, J, V, length(exprs), length(vars)), wrap.(nls)
 end
 
 """
@@ -344,7 +345,7 @@ The result is arranged such that, `A * vars + B * v2 + c` is the same as `exprs`
 function semiquadratic_form(exprs, vars)
     ds, nls = semipolynomial_form(exprs, vars, 2; consts = false)
 
-    idxmap = Dict(v=>i for (i, v) in enumerate(vars))
+    idxmap = Dict(v => i for (i, v) in enumerate(vars))
 
     m, n = length(exprs), length(vars)
     I1 = Int[]
@@ -370,14 +371,14 @@ function semiquadratic_form(exprs, vars)
                     b, e = arguments(k)
                     @assert e == 2
                     q = idxmap[b]
-                    j = div(q*(q+1), 2)
+                    j = div(q * (q + 1), 2)
                     push!(J2, j) # or div(q*(q-1), 2) + q
                     push!(V2, v)
                 else
                     @assert isop(k, *)
                     a, b = unsorted_arguments(k)
                     p, q = extrema((idxmap[a], idxmap[b]))
-                    j = div(q*(q-1), 2) + p
+                    j = div(q * (q - 1), 2) + p
                     push!(J2, j)
                     push!(V2, v)
                 end
@@ -389,21 +390,23 @@ function semiquadratic_form(exprs, vars)
         end
     end
 
-
     #v2 = SparseVector(div(n * (n + 1), 2), v2_I, v2_V) # When it works in the future
     # until then
     v2 = zeros(Num, div(n * (n + 1), 2))
     v2[v2_I] .= v2_V
 
-    tuple(sparse(I1,J1,V1, m, n),
-          sparse(I2,J2,V2, m, div(n * (n + 1), 2)),
+    tuple(sparse(I1, J1, V1, m, n),
+          sparse(I2, J2, V2, m, div(n * (n + 1), 2)),
           v2,
           wrap.(nls))
 end
 
 ## Utilities
 
-all_terms(x) = istree(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
+function all_terms(x)
+    istree(x) && operation(x) == (+) ?
+    collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
+end
 
 function unwrap_sp(m::SemiMonomial)
     degree_dict = pdegrees(m.p)

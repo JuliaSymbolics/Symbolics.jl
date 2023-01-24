@@ -8,20 +8,18 @@ returns solution/s to the equation in terms of the variable
 
 single_solution sets weather it returns only one solution or a set
 =#
-function solve_single_eq(
-    eq::Equation,
-    var,
-    single_solution = false,
-    verify = true,
-)
+function solve_single_eq(eq::Equation,
+                         var,
+                         single_solution = false,
+                         verify = true)
     unchecked_solutions = solve_single_eq_unchecked(eq, var, single_solution)
 
     unchecked_solutions == nothing && return nothing
 
     !verify && return unchecked_solutions
 
-    unchecked_solutions =
-        !(unchecked_solutions isa Vector) ? [unchecked_solutions] : unchecked_solutions
+    unchecked_solutions = !(unchecked_solutions isa Vector) ? [unchecked_solutions] :
+                          unchecked_solutions
     try
         float_solutions = convert_solutions_to_floats(unchecked_solutions)
 
@@ -29,14 +27,12 @@ function solve_single_eq(
             to_be_removed = falses(0)
 
             for float_solution in float_solutions
-                left_side_fval =
-                    convert(Float64, substitute(eq.lhs, [var => float_solution]))
-                right_side_fval =
-                    convert(Float64, substitute(eq.rhs, [var => float_solution]))
-                push!(
-                    to_be_removed,
-                    !(abs(left_side_fval - right_side_fval) <= 1.0 / 2.0^20.0),
-                )
+                left_side_fval = convert(Float64,
+                                         substitute(eq.lhs, [var => float_solution]))
+                right_side_fval = convert(Float64,
+                                          substitute(eq.rhs, [var => float_solution]))
+                push!(to_be_removed,
+                      !(abs(left_side_fval - right_side_fval) <= 1.0 / 2.0^20.0))
             end
 
             deleteat!(unchecked_solutions, to_be_removed)
@@ -58,7 +54,7 @@ function solve_system_eq(equs::Vector{Equation}, vars)
 
     reduced = copy(equs)#the reducing set
 
-    for i = 1:length(vars)#go through each variable and remove
+    for i in 1:length(vars)#go through each variable and remove
         remove_eq(reduced, vars[i], removed)
     end
 
@@ -67,7 +63,7 @@ function solve_system_eq(equs::Vector{Equation}, vars)
     solutions = Dict()
 
     #re subsititute the variables back in to find value
-    for i = length(removed):-1:1
+    for i in length(removed):-1:1
         current_eq = substitute(removed[i], solutions)
         solutions[current_eq.lhs] = current_eq.rhs
     end
@@ -87,7 +83,7 @@ function get_parts_list(a, b, a_list = Vector{Any}(), b_list = Vector{Any}())
 
         length(a_args) != length(b_args) && return Nothing
 
-        for i = 1:length(a_args)
+        for i in 1:length(a_args)
             check = get_parts_list(a_args[i], b_args[i], a_list, b_list)
             check == Nothing && return Nothing
         end
@@ -104,7 +100,7 @@ function find_matches(a)
     vars_seen = UInt[]
     matching = Vector{Int}[]
 
-    for i = 1:length(a)
+    for i in 1:length(a)
         match_set = Int[]
 
         push!(match_set, i)
@@ -112,7 +108,7 @@ function find_matches(a)
         current = a[i]
         (hash(current) in vars_seen) && continue
 
-        for j = i+1:length(a)
+        for j in (i + 1):length(a)
             other = a[j]
             if isequal(current, other)
                 push!(match_set, j)
@@ -123,7 +119,6 @@ function find_matches(a)
         if length(match_set) > 1
             push!(matching, match_set)
         end
-
     end
     return matching
 end
@@ -132,7 +127,7 @@ function verify_matches(a_parts, b_parts)
     a_matches = find_matches(a_parts)
     for match in a_matches
         to_compare = b_parts[match[1]]
-        for i = 2:length(match)
+        for i in 2:length(match)
             !isequal(to_compare, b_parts[match[i]]) && return false
         end
     end
@@ -145,9 +140,9 @@ struct Becomes
 end
 
 function create_eq_pairs(a, b)
-    out = Dict{BasicSymbolic,Any}()
+    out = Dict{BasicSymbolic, Any}()
 
-    for i = 1:length(a)
+    for i in 1:length(a)
         a_part = a[i]
         a_part in keys(out) && continue
 
@@ -194,13 +189,11 @@ function apply_ns_rule(becomes::Becomes, expr)
         eq_list = create_eq_pairs(becomes_parts, expr_parts)
 
         return replace_term(becomes.after, eq_list)
-
     end
     return expr
 end
 
 function expr_similar(ref_expr, expr, check_matches = true)
-
     SymbolicUtils.issym(ref_expr) && return true
     SymbolicUtils.issym(expr) && istree(ref_expr) && return false
 
@@ -215,7 +208,7 @@ function expr_similar(ref_expr, expr, check_matches = true)
 
         (!isequal(ref_op, op) || !isequal(ref_len, len)) && return false
 
-        for i = 1:ref_len
+        for i in 1:ref_len
             ref_arg = ref_args[i]
             arg = args[i]
 
@@ -229,7 +222,6 @@ function expr_similar(ref_expr, expr, check_matches = true)
 
         return true
     elseif ref_expr isa Equation && expr isa Equation
-
         if (check_matches)
             check = get_parts_list(ref_expr, expr)
             check == Nothing && return false
@@ -258,11 +250,9 @@ function get_exp(expr)
     return arguments(expr)[2]
 end
 
-function solve_single_eq_unchecked(
-    eq::Equation,
-    var,
-    single_solution = false,
-)
+function solve_single_eq_unchecked(eq::Equation,
+                                   var,
+                                   single_solution = false)
     eq = (SymbolicUtils.add_with_div(eq.lhs + -1 * eq.rhs) ~ 0)#move everything to the left side
 
     #eq = termify(eq)
@@ -271,7 +261,6 @@ function solve_single_eq_unchecked(
         oldState = eq
 
         if (istree(eq.lhs))
-
             potential_solution = solve_quadratic(eq, var, single_solution)
             if potential_solution isa Equation
                 eq = potential_solution
@@ -279,11 +268,9 @@ function solve_single_eq_unchecked(
                 return potential_solution
             end
 
-
             op = operation(eq.lhs)
 
             if (op in (+, *))#N argumented types
-
                 eq = move_to_other_side(eq, var)
                 eq = special_strategy(eq, var)
 
@@ -297,9 +284,7 @@ function solve_single_eq_unchecked(
             elseif (op == /)#reverse division
                 eq = eq.lhs.num - eq.lhs.den * eq.rhs ~ 0
             elseif (op == ^)#reverse powers
-
-                potential_solution =
-                    reverse_powers(eq::Equation, var, single_solution)
+                potential_solution = reverse_powers(eq::Equation, var, single_solution)
                 if potential_solution isa Equation
                     eq = potential_solution
                 else
@@ -309,12 +294,10 @@ function solve_single_eq_unchecked(
             else
                 eq = inverse_funcs(eq::Equation, var)
             end
-
         end
         if (isequal(eq.lhs, var))
             return eq#solved!
         end
-
 
         if (isequal(eq, oldState))
             @warn "unable to solve $(eq) in terms of $var"
@@ -342,7 +325,7 @@ end
 
 #reduce the system of equations by one equation according to the provided variable
 function remove_eq(equs::Vector{Equation}, var, removed::Vector{Equation})
-    for i = 1:length(equs)
+    for i in 1:length(equs)
         solution = solve_single_eq(equs[i], var, true)
         if (solution isa Vector)
             solution = solution[1]
@@ -352,7 +335,7 @@ function remove_eq(equs::Vector{Equation}, var, removed::Vector{Equation})
         push!(removed, solution)
         deleteat!(equs, i)
 
-        for j = 1:length(equs)
+        for j in 1:length(equs)
             equs[j] = substitute(equs[j], Dict(solution.lhs => solution.rhs))
         end
         return
@@ -365,7 +348,6 @@ example move_to_other_side(x+a~z,x) returns x~z-a
 
 =#
 function move_to_other_side(eq::Equation, var)
-
     !istree(eq.lhs) && return eq#make sure left side is tree form
 
     op = operation(eq.lhs)
@@ -375,7 +357,7 @@ function move_to_other_side(eq::Equation, var)
 
         stays = []#has variable
         move = []#does not have variable
-        for i = 1:length(elements)
+        for i in 1:length(elements)
             hasVar = SymbolicUtils._occursin(var, elements[i])
             if (hasVar)
                 push!(stays, elements[i])
@@ -385,13 +367,13 @@ function move_to_other_side(eq::Equation, var)
         end
 
         if (op == +)#reverse addition
-            eq =
-                (length(stays) == 0 ? 0 : +(stays...)) ~
-                    -(length(move) == 0 ? 0 : +(move...)) + eq.rhs
+            eq = (length(stays) == 0 ? 0 : +(stays...)) ~ -(length(move) == 0 ? 0 :
+                                                            +(move...)) + eq.rhs
         elseif (op == *)#reverse multiplication
-            eq =
-                (length(stays) == 0 ? 1 : *(stays...)) ~
-                    SymbolicUtils.Div(eq.rhs, (length(move) == 0 ? 1 : *(move...)))
+            eq = (length(stays) == 0 ? 1 : *(stays...)) ~ SymbolicUtils.Div(eq.rhs,
+                                                                            (length(move) ==
+                                                                             0 ? 1 :
+                                                                             *(move...)))
         end
     end
     return eq
@@ -399,27 +381,20 @@ end
 
 #more rare solving strategies
 function special_strategy(eq::Equation, var)
-
     @syms a b c x y z
     rules = [
-        Becomes(
-            sin(x) + cos(x) ~ y,
-            x ~ acos(y / term(sqrt, 2)) + SymbolicUtils.Div(pi, 4),
-        ),
-        Becomes(
-            x * a^x ~ y,
-            x ~ SymbolicUtils.Div(term(lambertw, y * term(log, a)), term(log, a)),
-        ),
+        Becomes(sin(x) + cos(x) ~ y,
+                x ~ acos(y / term(sqrt, 2)) + SymbolicUtils.Div(pi, 4)),
+        Becomes(x * a^x ~ y,
+                x ~ SymbolicUtils.Div(term(lambertw, y * term(log, a)), term(log, a))),
         Becomes(x * log(x) ~ y, x ~ SymbolicUtils.Div(y, term(lambertw, y))),
         Becomes(x * exp(x) ~ y, x ~ term(lambertw, y)),
         Becomes(a + sqrt(b) ~ c, b - a^2 + 2 * a * c - c^2 ~ 0),
     ]
 
-
     for rule in rules
         eq = apply_ns_rule(rule, eq)
     end
-
 
     !istree(eq.lhs) && return eq#make sure left side is tree form
 
@@ -429,18 +404,16 @@ function special_strategy(eq::Equation, var)
     if (op == +) &&
        length(elements) == 2 &&
        sum(istree.(elements)) == length(elements) &&
-       isequal(operation.(elements), [sqrt for el = 1:length(elements)]) #check for sqrt(a)+sqrt(b)=c form , to solve this sqrt(a)+sqrt(b)=c -> 4*a*b-full_expand((c^2-b-a)^2)=0 then solve using quadratics
+       isequal(operation.(elements), [sqrt for el in 1:length(elements)]) #check for sqrt(a)+sqrt(b)=c form , to solve this sqrt(a)+sqrt(b)=c -> 4*a*b-full_expand((c^2-b-a)^2)=0 then solve using quadratics
 
         #grab values
         a = (elements[1]).arguments[1]
         b = (elements[2]).arguments[1]
         c = eq.rhs
 
-
-        eq =
-            expand(2 * b * a) - expand(a^2) - expand(b^2) - expand(c^4) +
-            expand(2 * a * c^2) +
-            expand(2 * b * c^2) ~ 0
+        eq = expand(2 * b * a) - expand(a^2) - expand(b^2) - expand(c^4) +
+        expand(2 * a * c^2) +
+        expand(2 * b * c^2) ~ 0
 
     elseif (op == +) &&
            isequal(eq.rhs, 0) &&
@@ -450,7 +423,6 @@ function special_strategy(eq::Equation, var)
            isequal(arguments(elements[1])[1], -1) &&
            istree(arguments(elements[1])[2]) &&
            operation(elements[2]) == operation(arguments(elements[1])[2])#-f(y)+f(x)=0 -> x-y=0
-
         x = arguments(elements[2])[1]
         y = arguments(arguments(elements[1])[2])[1]
 
@@ -468,7 +440,6 @@ reduce_root(term(sqrt,32)) = 4*sqrt(2)
 =#
 
 function reduce_root(a)
-
     if SymbolicUtils.ispow(a) && a.exp isa Rational
         a = term(^, a.base, a.exp)
     end
@@ -509,7 +480,6 @@ function reduce_root(a)
                        outer_val * term(^, value, 1 // root)
             end
         end
-
     end
 
     return a
@@ -530,11 +500,9 @@ end
 if in quadratic form returns solutions
 =#
 function solve_quadratic(eq::Equation, var, single_solution)
-
     !istree(eq.lhs) && return eq#make sure left side is tree form
 
     op = operation(eq.lhs)
-
 
     if (op == +) && isequal(degree(eq.lhs, var), 2)
         coeffs = polynomial_coeffs(eq.lhs, [var])
@@ -542,35 +510,28 @@ function solve_quadratic(eq::Equation, var, single_solution)
         b = haskey(coeffs[1], var) ? coeffs[1][var] : 0
         c = coeffs[2] + coeffs[1][1] - eq.rhs
 
-        if !(
-            SymbolicUtils._occursin(var, a) ||
-            SymbolicUtils._occursin(var, b) ||
-            SymbolicUtils._occursin(var, c) ||
-            isequal(b, 0)
-        )#make sure variable in not in a b or c and that b is not zero
-
-
+        if !(SymbolicUtils._occursin(var, a) ||
+             SymbolicUtils._occursin(var, b) ||
+             SymbolicUtils._occursin(var, c) ||
+             isequal(b, 0))#make sure variable in not in a b or c and that b is not zero
             sqrtPortion = reduce_root(term(sqrt, b^2 - 4 * a * c))
 
             if (single_solution)
-                out =
-                    var ~
-                        SymbolicUtils.Div(sqrtPortion, 2 * a) + SymbolicUtils.Div(-b, 2 * a)
+                out = var ~ SymbolicUtils.Div(sqrtPortion, 2 * a) +
+                            SymbolicUtils.Div(-b, 2 * a)
                 return demote_rational(out)
             else
-                out1::Any =
-                    SymbolicUtils.Div(sqrtPortion, 2 * a) + SymbolicUtils.Div(-b, 2 * a)
-                out2::Any =
-                    -SymbolicUtils.Div(sqrtPortion, 2 * a) + SymbolicUtils.Div(-b, 2 * a)
+                out1::Any = SymbolicUtils.Div(sqrtPortion, 2 * a) +
+                            SymbolicUtils.Div(-b, 2 * a)
+                out2::Any = -SymbolicUtils.Div(sqrtPortion, 2 * a) +
+                            SymbolicUtils.Div(-b, 2 * a)
 
                 out1 = demote_rational(out1)
                 out2 = demote_rational(out2)
 
                 return [var ~ out1, var ~ out2]
-
             end
         end
-
     end
 
     return eq
@@ -578,21 +539,18 @@ end
 
 #reverse certain functions
 function inverse_funcs(eq::Equation, var)
-
     !istree(eq.lhs) && return eq#make sure left side is tree form
     op = operation(eq.lhs)
 
     #reverse functions
-    inverseOps = Dict(
-        sin => asin,
-        cos => acos,
-        tan => atan,
-        asin => sin,
-        acos => cos,
-        atan => tan,
-        exp => log,
-        log => exp,
-    )
+    inverseOps = Dict(sin => asin,
+                      cos => acos,
+                      tan => atan,
+                      asin => sin,
+                      acos => cos,
+                      atan => tan,
+                      exp => log,
+                      log => exp)
 
     if haskey(inverseOps, op)
         inverseOp = inverseOps[op]
@@ -626,35 +584,29 @@ function reverse_powers(eq::Equation, var, single_solution)
         if (baseHasVar && !expoHasVar)#x^a
             twoSolutions = !single_solution && isequal(pow_exp % 2, zero(pow_exp))
             if (twoSolutions)
-                eq1 = solve_single_eq(
-                    pow_base ~
-                        reduce_root(term(^, eq.rhs, (SymbolicUtils.Div(1, pow_exp)))),
-                    var,
-                )
-                eq2 = solve_single_eq(
-                    pow_base ~
-                        -reduce_root(term(^, eq.rhs, (SymbolicUtils.Div(1, pow_exp)))),
-                    var,
-                )
+                eq1 = solve_single_eq(pow_base ~ reduce_root(term(^, eq.rhs,
+                                                                  (SymbolicUtils.Div(1,
+                                                                                     pow_exp)))),
+                                      var)
+                eq2 = solve_single_eq(pow_base ~ -reduce_root(term(^, eq.rhs,
+                                                                   (SymbolicUtils.Div(1,
+                                                                                      pow_exp)))),
+                                      var)
                 return [eq1, eq2]
             else
-                eq =
-                    pow_base ~ reduce_root(term(^, eq.rhs, (SymbolicUtils.Div(1, pow_exp))))
+                eq = pow_base ~ reduce_root(term(^, eq.rhs,
+                                                 (SymbolicUtils.Div(1, pow_exp))))
             end
         elseif (!baseHasVar && expoHasVar)#a^x
             eq = pow_exp ~ SymbolicUtils.Div(term(log, eq.rhs), term(log, pow_base))
         elseif (baseHasVar && expoHasVar)
             if isequal(pow_exp, pow_base)#lambert w strategy
-                eq =
-                    pow_exp ~ SymbolicUtils.Div(
-                        term(log, eq.rhs),
-                        term(lambertw, term(log, eq.rhs)),
-                    )
+                eq = pow_exp ~ SymbolicUtils.Div(term(log, eq.rhs),
+                                                 term(lambertw, term(log, eq.rhs)))
             else#just log both sides
                 eq = pow.exp * term(log, pow_base) ~ term(log, eq.rhs)
             end
         end
-
     end
     return eq
 end

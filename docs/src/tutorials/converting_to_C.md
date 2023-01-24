@@ -8,10 +8,10 @@ generate C functions from Julia code! To see this in action, let's start with
 ```@example converting_to_C
 using Symbolics
 function lotka_volterra!(du, u, p, t)
-  x, y = u
-  α, β, δ, γ = p
-  du[1] = dx = α*x - β*x*y
-  du[2] = dy = -δ*y + γ*x*y
+    x, y = u
+    α, β, δ, γ = p
+    du[1] = dx = α * x - β * x * y
+    du[2] = dy = -δ * y + γ * x * y
 end
 ```
 
@@ -23,22 +23,24 @@ du = collect(du)
 lotka_volterra!(du, u, p, t)
 du
 ```
+
 and then we build the function:
 
 ```@example converting_to_C
-build_function(du, u, p, t, target=Symbolics.CTarget())
+build_function(du, u, p, t, target = Symbolics.CTarget())
 ```
 
 If we want to compile this, we do `expression=Val{false}`:
 
 ```@example converting_to_C
-f = build_function(du, u, p, t, target=Symbolics.CTarget(), expression=Val{false})
+f = build_function(du, u, p, t, target = Symbolics.CTarget(), expression = Val{false})
 ```
 
 now we check it computes the same thing:
 
 ```@example converting_to_C
-du = rand(2); du2 = rand(2)
+du = rand(2);
+du2 = rand(2);
 u = rand(2)
 p = rand(4)
 t = rand()

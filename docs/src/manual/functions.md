@@ -10,24 +10,25 @@ the symbolic expression for the Lorenz equations:
 
 ```@example registration
 using Symbolics
-function lorenz(du,u,p,t)
- du[1] = 10.0(u[2]-u[1])
- du[2] = u[1]*(28.0-u[3]) - u[2]
- du[3] = u[1]*u[2] - (8/3)*u[3]
+function lorenz(du, u, p, t)
+    du[1] = 10.0(u[2] - u[1])
+    du[2] = u[1] * (28.0 - u[3]) - u[2]
+    du[3] = u[1] * u[2] - (8 / 3) * u[3]
 end
 @variables t p[1:3] u(t)[1:3]
 du = Array{Any}(undef, 3)
-lorenz(du,u,p,t)
+lorenz(du, u, p, t)
 du
 ```
+
 Or similarly:
 
 ```@example registration
 @variables t x(t) y(t) z(t) dx(t) dy(t) dz(t) σ ρ β
-du = [dx,dy,dz]
-u = [x,y,z]
-p = [σ,ρ,β]
-lorenz(du,u,p,t)
+du = [dx, dy, dz]
+u = [x, y, z]
+p = [σ, ρ, β]
+lorenz(du, u, p, t)
 du
 ```
 

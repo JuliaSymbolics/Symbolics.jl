@@ -9,20 +9,24 @@ using LinearAlgebra
 stype(T::Type{<:Number}) = Float64
 stype(T::Type{<:Complex}) = Complex{Float64}
 
-AA = rand(2,3); BB = rand(3,2); xx = rand(2); yy = rand(3)
+AA = rand(2, 3);
+BB = rand(3, 2);
+xx = rand(2);
+yy = rand(3);
 
 adjmul_leaf_nodes = (A, B, C, x, y, z, AA, BB, xx, yy)
 
 function adjmul_rand_leaf()
     a = rand(adjmul_leaf_nodes)
-    rand(Bool) ?  a' : a
+    rand(Bool) ? a' : a
 end
-isadjvec(x::Symbolics.ArrayOp) = x.term.f == adjoint && ndims(Symbolics.arguments(x.term)[1]) == 1
+function isadjvec(x::Symbolics.ArrayOp)
+    x.term.f == adjoint && ndims(Symbolics.arguments(x.term)[1]) == 1
+end
 isadjvec(x) = false
 
-function rand_mul_expr(a=adjmul_rand_leaf(),
-                       b=adjmul_rand_leaf())
-
+function rand_mul_expr(a = adjmul_rand_leaf(),
+                       b = adjmul_rand_leaf())
     try
         a * b
     catch err1
@@ -36,7 +40,11 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
             end
         end
     end
-    sz = try size(a * b) catch err; nothing end
+    sz = try
+        size(a * b)
+    catch err
+        nothing
+    end
 
     if sz !== nothing
         try
@@ -49,11 +57,11 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
         @label test_size
 
         if (isadjvec(Symbolics.unwrap(a)) && ndims(b) == 1) || Symbolics.isdot(a, b)
-            if size(a*b) != ()
+            if size(a * b) != ()
                 println("a * b is wrong:")
                 @show a b
                 @show typeof(a) typeof(b)
-                return @test size(a*b) == ()
+                return @test size(a * b) == ()
             else
                 return @test true
             end
@@ -62,7 +70,8 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
         ab_sample = rand(stype(eltype(a)), size(a)...) * rand(stype(eltype(b)), size(b)...)
         if size(a * b) == size(ab_sample)
             @test true
-            @test (eltype(a*b) <: Real && eltype(ab_sample) <: Real) || (eltype(ab_sample) <: Complex && eltype(a*b) <: Complex)
+            @test (eltype(a * b) <: Real && eltype(ab_sample) <: Real) ||
+                  (eltype(ab_sample) <: Complex && eltype(a * b) <: Complex)
         else
             println("a * b is wrong:")
             @show a b
@@ -72,37 +81,37 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
     end
 end
 
-
-@testset "fuzz ' and *" begin
-    for i=1:1000
-        rand_mul_expr()
-    end
-end
+@testset "fuzz ' and *" begin for i in 1:1000
+    rand_mul_expr()
+end end
 
 ## Mapreduce
 #
 
-AA = rand(2,3); BB = rand(3,2); xx = rand(2); yy = rand(3)
-CC = rand(2,3,4)
+AA = rand(2, 3);
+BB = rand(3, 2);
+xx = rand(2);
+yy = rand(3);
+CC = rand(2, 3, 4)
 
 mapreduce_leaf_nodes = [A, B, x, y, AA, BB, CC, xx, yy]
 
 function mapreduce_rand_leaf()
     a = rand(adjmul_leaf_nodes)
-    rand(Bool) ?  a' : a
+    rand(Bool) ? a' : a
 end
 
-function rand_map_reduce(x=mapreduce_rand_leaf())
+function rand_map_reduce(x = mapreduce_rand_leaf())
     n = ndims(x)
 
-    reducedims = rand(1:n+1, rand(0:n))
+    reducedims = rand(1:(n + 1), rand(0:n))
 
-    init=rand([nothing, rand(stype(eltype(x)))])
+    init = rand([nothing, rand(stype(eltype(x)))])
     function test_run(x)
-        if init==nothing
-            sum(x, dims=reducedims)
+        if init == nothing
+            sum(x, dims = reducedims)
         else
-            sum(x, dims=reducedims, init=init)
+            sum(x, dims = reducedims, init = init)
         end
     end
 

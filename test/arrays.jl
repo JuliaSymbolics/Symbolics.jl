@@ -1,6 +1,7 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables,
+                 value, get_variables, @arrayop, getname
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 
@@ -12,7 +13,7 @@ using SymbolicUtils: Sym, term, operation
     @test shape(Y) == Slice.((1:5, 1:5))
 
     A = Y[2, :]
-    @test typeof(A) <: Arr{Num,1}
+    @test typeof(A) <: Arr{Num, 1}
     @test axes(A) == (1:5,)
 
     B = A[3:5]
@@ -43,7 +44,8 @@ end
     XX = unwrap(X)
     @test isequal(unwrap(X[1, :]), Symbolics.@arrayop((j,), XX[1, j], term=XX[1, :]))
     @test isequal(unwrap(X[:, 2]), Symbolics.@arrayop((i,), XX[i, 2], term=XX[:, 2]))
-    @test isequal(unwrap(X[:, 2:3]), Symbolics.@arrayop((i, j), XX[i, j], (j in 2:3), term=XX[:, 2:3]))
+    @test isequal(unwrap(X[:, 2:3]),
+                  Symbolics.@arrayop((i, j), XX[i, j], (j in 2:3), term=XX[:, 2:3]))
 
     @variables t x(t)[1:4]
     @syms i::Int
@@ -52,7 +54,7 @@ end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
-    @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x(t)[1:4] u[1:1]
+    @variables A[1:5, 1:3]=42 b[1:3]=[2, 3, 5] t x(t)[1:4] u[1:1]
     AA = Symbolics.scalarize(A)
     bb = Symbolics.scalarize(b)
     @test all(isequal(42), getdef.(AA))
@@ -62,22 +64,22 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     c = A * b
 
     @test isequal(collect(sin.(x)),
-        sin.([x[i] for i in 1:4]))
+                  sin.([x[i] for i in 1:4]))
 
     @test isequal(Symbolics.scalarize(sin.(A .* c)[1, 1]),
-        sin(A[1, 1] * (b[1] * A[1, 1] +
-                       b[2] * A[1, 2] +
-                       b[3] * A[1, 3])))
+                  sin(A[1, 1] * (b[1] * A[1, 1] +
+                                 b[2] * A[1, 2] +
+                                 b[3] * A[1, 3])))
 
     D = Differential(t)
     @test isequal(collect(D.(x) ~ x), map(i -> D(x[i]) ~ x[i], eachindex(x)))
-    @test_throws ArgumentError A ~ t
+    @test_throws ArgumentError A~t
 
     # #448
     @test isequal(Symbolics.scalarize(u + u), [2u[1]])
 
     # #417
-    @test isequal(Symbolics.scalarize(x', (1,1)), x[1])
+    @test isequal(Symbolics.scalarize(x', (1, 1)), x[1])
 
     # #483
     # examples by @gronniger
@@ -95,30 +97,30 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     @syms i::Int j::Int k::Int l::Int m::Int n::Int
 
     A_ = unwrap(A)
-    A3_ = wrap(@arrayop (i, j) A_[i, k] * A_[k, l] * A_[l, j])
-    A4_ = wrap(@arrayop (i, j) A_[i, k] * A_[k, l] * A_[l, m] * A_[m, j])
-    A5_ = wrap(@arrayop (i, j) A_[i, k] * A_[k, l] * A_[l, m] * A_[m, n] * A_[n, j])
+    A3_ = wrap(@arrayop (i, j) A_[i, k]*A_[k, l]*A_[l, j])
+    A4_ = wrap(@arrayop (i, j) A_[i, k]*A_[k, l]*A_[l, m]*A_[m, j])
+    A5_ = wrap(@arrayop (i, j) A_[i, k]*A_[k, l]*A_[l, m]*A_[m, n]*A_[n, j])
 
-    @test isequal(Symbolics.scalarize((A*A)[k,k]), A[k, 1]*A[1, k] + A[2, k]*A[k, 2])
+    @test isequal(Symbolics.scalarize((A * A)[k, k]), A[k, 1] * A[1, k] + A[2, k] * A[k, 2])
 
     # basic tests:
-    @test iszero((Symbolics.scalarize(A^2) * Symbolics.scalarize(A))[1,1] -
-                  Symbolics.scalarize(A^3)[1,1])
+    @test iszero((Symbolics.scalarize(A^2) * Symbolics.scalarize(A))[1, 1] -
+                 Symbolics.scalarize(A^3)[1, 1])
     @testset "nested scalarize" begin
-        @test isequal(substitute(Symbolics.scalarize(A2 ), repl_dict), test_mat^2)
+        @test isequal(substitute(Symbolics.scalarize(A2), repl_dict), test_mat^2)
         @test isequal(substitute(Symbolics.scalarize(A3_), repl_dict), test_mat^3)
-        @test isequal(substitute(Symbolics.scalarize(A3 ), repl_dict), test_mat^3)
+        @test isequal(substitute(Symbolics.scalarize(A3), repl_dict), test_mat^3)
         @test isequal(substitute(Symbolics.scalarize(A4_), repl_dict), test_mat^4)
-        @test isequal(substitute(Symbolics.scalarize(A4 ), repl_dict), test_mat^4)
+        @test isequal(substitute(Symbolics.scalarize(A4), repl_dict), test_mat^4)
         @test isequal(substitute(Symbolics.scalarize(A5_), repl_dict), test_mat^5)
-        @test isequal(substitute(Symbolics.scalarize(A5 ), repl_dict), test_mat^5)
-        @test isequal(substitute(Symbolics.scalarize(A6 ), repl_dict), test_mat^6)
-        @test isequal(substitute(Symbolics.scalarize(A7 ), repl_dict), test_mat^7)
+        @test isequal(substitute(Symbolics.scalarize(A5), repl_dict), test_mat^5)
+        @test isequal(substitute(Symbolics.scalarize(A6), repl_dict), test_mat^6)
+        @test isequal(substitute(Symbolics.scalarize(A7), repl_dict), test_mat^7)
     end
     @test isequal(Symbolics.scalarize(x', (1, 1)), x[1])
 
     ##653
-    Symbolics.scalarize(inv(A)[1,1])
+    Symbolics.scalarize(inv(A)[1, 1])
 
     # ModelingToolkit.jl#1736
     #
@@ -149,7 +151,7 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
     @variables x[1:n]
 
     function symbolic_call(x)
-        @syms foo(x::Symbolics.Arr{Num,1})::Symbolics.Arr{Num,1} # symbolic foo can not be created in global scope due to conflict with function foo
+        @syms foo(x::Symbolics.Arr{Num, 1})::Symbolics.Arr{Num, 1} # symbolic foo can not be created in global scope due to conflict with function foo
         foo(x) # return a symbolic call to foo
     end
 
@@ -157,26 +159,24 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
     @test foo(x0) == A * x0
     ex = symbolic_call(x)
 
-    fun_genf = build_function(ex, x, expression=Val{false})
+    fun_genf = build_function(ex, x, expression = Val{false})
     @test_broken fun_genf(x0) == A * x0# UndefVarError: foo not defined
 
     # Generate an expression instead and eval it manually
-    fun_ex = build_function(ex, x, expression=Val{true})
+    fun_ex = build_function(ex, x, expression = Val{true})
     fun_eval = eval(fun_ex)
     @test fun_eval(x0) == foo(x0)
 
     # Try to provide the hidden argument `expression_module` to solve the scoping issue
     @test_skip begin
-        fun_genf = build_function(ex, x, expression=Val{false}, expression_module=Main) # UndefVarError: #_RGF_ModTag not defined
+        fun_genf = build_function(ex, x, expression = Val{false}, expression_module = Main) # UndefVarError: #_RGF_ModTag not defined
         fun_genf(x0) == A * x0
     end
 
     ## Jacobians
     @test_broken Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
-    @test_throws ErrorException Symbolics.value.(Symbolics.jacobian(ex , x))
-
+    @test_throws ErrorException Symbolics.value.(Symbolics.jacobian(ex, x))
 end
-
 
 @testset "Functions and Jacobians using manual @wrapped" begin
     @variables x[1:n]
@@ -187,24 +187,23 @@ end
 
     @test shape(ex) == shape(x)
 
-    fun_iip, fun_genf = build_function(ex, x, expression=Val{false})
+    fun_iip, fun_genf = build_function(ex, x, expression = Val{false})
     @test fun_genf(x0) == A * x0
 
     # Generate an expression instead and eval it manually
-    fun_ex_ip, fun_ex_oop = build_function(ex, x, expression=Val{true})
+    fun_ex_ip, fun_ex_oop = build_function(ex, x, expression = Val{true})
     fun_eval = eval(fun_ex_oop)
     @test fun_eval(x0) == foo(x0)
 
     ## Jacobians
     @test_broken value.(jacobian(foo(x), x)) == A
-    @test_broken value.(jacobian(ex , x)) == A
-
+    @test_broken value.(jacobian(ex, x)) == A
 end
 
 @testset "Rules" begin
     @variables X[1:10, 1:5] Y[1:5, 1:10] b[1:10]
-   #r = @rule ((~A * ~B) * ~C) => (~A * (~B * ~C)) where (size(~A, 1) * size(~B, 2) >size(~B, 1)  * size(~C, 2))
-   #@test isequal(r(unwrap((X * Y) * b)), unwrap(X * (Y * b)))
+    #r = @rule ((~A * ~B) * ~C) => (~A * (~B * ~C)) where (size(~A, 1) * size(~B, 2) >size(~B, 1)  * size(~C, 2))
+    #@test isequal(r(unwrap((X * Y) * b)), unwrap(X * (Y * b)))
 end
 
 @testset "2D Diffusion Composed With Stencil Interface" begin
@@ -213,7 +212,8 @@ end
     @variables u[1:n, 1:n]
     @makearray v[1:n, 1:n] begin
         #interior
-        v[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] + u[i, j-1] + u[i, j+1] - 4 * u[i, j]
+        v[2:(end - 1), 2:(end - 1)] => @arrayop (i, j) u[i - 1, j] + u[i + 1, j] +
+                                                       u[i, j - 1] + u[i, j + 1]-4 * u[i, j]
         #BCs
         v[1, 1:end] => 0.0
         v[n, 1:end] => 0.0
@@ -224,12 +224,14 @@ end
     #2D Diffusion composed
     @makearray ucx[1:n, 1:n] begin
         ucx[1:end, 1:end] => 0.0 # fill zeros
-        ucx[2:end-1, 2:end-1] => @arrayop (i, j) u[i-1, j] + u[i+1, j] - 2 * u[i, j] (j in 2:n-1)
+        ucx[2:(end - 1), 2:(end - 1)] => @arrayop (i, j) u[i - 1, j] +
+                                                         u[i + 1, j]-2 * u[i, j] (j in 2:(n - 1))
     end
 
     @makearray ucy[1:n, 1:n] begin
         ucy[1:end, 1:end] => 0.0 # fill zeros
-        ucy[2:end-1, 2:end-1] => @arrayop (i, j) u[i, j-1] + u[i, j+1] - 2 * u[i, j] (i in 2:n-1)
+        ucy[2:(end - 1), 2:(end - 1)] => @arrayop (i, j) u[i, j - 1] +
+                                                         u[i, j + 1]-2 * u[i, j] (i in 2:(n - 1))
     end
 
     uc = ucx .+ ucy
@@ -246,7 +248,7 @@ end
     @variables t u(t)[fill(1:n, N)...]
 
     Igrid = CartesianIndices((fill(1:n, N)...,))
-    Iinterior = CartesianIndices((fill(2:n-1, N)...,))
+    Iinterior = CartesianIndices((fill(2:(n - 1), N)...,))
 
     function unitindices(N::Int) #create unit CartesianIndex for each dimension
         null = zeros(Int, N)
@@ -264,11 +266,11 @@ end
         ē = unitindices(N) # for i.e N = 3 => ē = [CartesianIndex((1,0,0)),CartesianIndex((0,1,0)),CartesianIndex((0,0,1))]
 
         Dss = map(1:N) do d
-            ranges = CartesianIndices((map(i->d == i ? (2:n-1) : (1:n), 1:N)...,))
+            ranges = CartesianIndices((map(i -> d == i ? (2:(n - 1)) : (1:n), 1:N)...,))
             @makearray x[1:n, 1:n] begin
                 x[1:n, 1:n] => 0
-                x[ranges] => @arrayop (i, j) u[CartesianIndex(i, j)-ē[d]] +
-                                                u[CartesianIndex(i, j)+ē[d]] - 2 * u[i, j]
+                x[ranges] => @arrayop (i, j) u[CartesianIndex(i, j) - ē[d]] +
+                                             u[CartesianIndex(i, j) + ē[d]]-2 * u[i, j]
             end
         end
 
@@ -279,12 +281,12 @@ end
 
     @makearray Dxxu[1:n, 1:n] begin
         Dxxu[1:n, 1:n] => 0
-        Dxxu[2:end-1, 1:end] => @arrayop (i, j) u[i-1, j] + u[i+1, j] - 2 * u[i, j]
+        Dxxu[2:(end - 1), 1:end] => @arrayop (i, j) u[i - 1, j] + u[i + 1, j]-2 * u[i, j]
     end
 
     @makearray Dyyu[1:n, 1:n] begin
         Dyyu[1:n, 1:n] => 0
-        Dyyu[1:end, 2:end-1] => @arrayop (i, j) u[i, j-1] + u[i, j+1] - 2 * u[i, j]
+        Dyyu[1:end, 2:(end - 1)] => @arrayop (i, j) u[i, j - 1] + u[i, j + 1]-2 * u[i, j]
     end
 
     @test isequal(collect(D), collect(Dxxu .+ Dyyu))
@@ -296,7 +298,7 @@ end
 
     brusselator_f(x, y, t) = (((x - 0.3)^2 + (y - 0.6)^2) <= 0.1^2) * (t >= 1.1) * 5.0
 
-    x = y = range(0, stop=1, length=n)
+    x = y = range(0, stop = 1, length = n)
     dx = step(x)
 
     A = 3.4
@@ -304,27 +306,28 @@ end
 
     limit = Main.limit
     dtu = @arrayop (i, j) alpha * (u[limit(i - 1, n), j] +
-                                   u[limit(i + 1, n), j] +
-                                   u[i, limit(j + 1, n)] +
-                                   u[i, limit(j - 1, n)] -
-                                   4u[i, j]) +
-                          1.0 + u[i, j]^2 * v[i, j] - (A + 1) *
-                            u[i, j] + brusselator_f(x[i], y[j], t) i in 1:n j in 1:n
+                           u[limit(i + 1, n), j] +
+                           u[i, limit(j + 1, n)] +
+                           u[i, limit(j - 1, n)] -
+                           4u[i, j]) +
+                          1.0 + u[i, j]^2 * v[i, j] -
+                          (A + 1) *
+                          u[i, j]+brusselator_f(x[i], y[j], t) i in 1:n j in 1:n
     dtv = @arrayop (i, j) alpha * (v[limit(i - 1, n), j] +
-                                   v[limit(i + 1, n), j] +
-                                   v[i, limit(j + 1, n)] +
-                                   v[i, limit(j - 1, n)] -
-                                   4v[i, j]) -
-                          u[i, j]^2 * v[i, j] + A * u[i, j] i in 1:n j in 1:n
+                           v[limit(i + 1, n), j] +
+                           v[i, limit(j + 1, n)] +
+                           v[i, limit(j - 1, n)] -
+                           4v[i, j]) -
+                          u[i, j]^2 * v[i, j]+A * u[i, j] i in 1:n j in 1:n
     lapu = @arrayop (i, j) (u[limit(i - 1, n), j] +
                             u[limit(i + 1, n), j] +
                             u[i, limit(j + 1, n)] +
-                            u[i, limit(j - 1, n)] -
+                            u[i, limit(j - 1, n)]-
                             4u[i, j]) i in 1:n j in 1:n
     lapv = @arrayop (i, j) (v[limit(i - 1, n), j] +
                             v[limit(i + 1, n), j] +
                             v[i, limit(j + 1, n)] +
-                            v[i, limit(j - 1, n)] -
+                            v[i, limit(j - 1, n)]-
                             4v[i, j]) i in 1:n j in 1:n
     s = brusselator_f.(x, y', t)
 
@@ -333,22 +336,23 @@ end
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
-    f, g = build_function(dtu, u, v, t, expression=Val{false})
+    f, g = build_function(dtu, u, v, t, expression = Val{false})
     du = zeros(Num, 8, 8)
-    f(du, u,v,t)
+    f(du, u, v, t)
     @test isequal(collect(du), collect(dtu))
 
-    @test isequal(collect(dtu), collect(1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s))
-    @test isequal(collect(dtv), collect(A .* u .- u.^2 .* v .+ alpha .* lapv))
+    @test isequal(collect(dtu),
+                  collect(1 .+ v .* u .^ 2 .- (A + 1) .* u .+ alpha .* lapu .+ s))
+    @test isequal(collect(dtv), collect(A .* u .- u .^ 2 .* v .+ alpha .* lapv))
 end
 
 @testset "Partial array substitution" begin
     @variables x[1:3] A[1:2, 1:2, 1:2]
 
     @test substitute(x[1], Dict(x => [1, 2, 3])) === Num(1)
-    @test substitute(A[1,2,1], Dict(A => reshape(1:8, 2, 2, 2))) === Num(3)
+    @test substitute(A[1, 2, 1], Dict(A => reshape(1:8, 2, 2, 2))) === Num(3)
 
-    @test substitute(A[1,2,1], Dict(A[1,2,1] => 9)) === Num(9)
+    @test substitute(A[1, 2, 1], Dict(A[1, 2, 1] => 9)) === Num(9)
 end
 
 @testset "Hashes" begin

@@ -1,7 +1,7 @@
 const NAMESPACE_SEPARATOR = '₊'
 
 struct Connection
-    systems
+    systems::Any
 end
 Connection() = Connection(nothing)
 
@@ -32,9 +32,9 @@ $(FIELDS)
 """
 struct Equation
     """The expression on the left-hand side of the equation."""
-    lhs
+    lhs::Any
     """The expression on the right-hand side of the equation."""
-    rhs
+    rhs::Any
     function Equation(lhs, rhs)
         new(value(lhs), value(rhs))
     end
@@ -67,8 +67,8 @@ end
 
 SymbolicUtils.substitute(nums::Array{Num}, rules; kw...) = substituter(rules).(nums; kw...)
 
-lhss(xs) = map(x->x.lhs, xs)
-rhss(xs) = map(x->x.rhs, xs)
+lhss(xs) = map(x -> x.lhs, xs)
+rhss(xs) = map(x -> x.rhs, xs)
 
 """
 $(TYPEDSIGNATURES)
@@ -111,17 +111,20 @@ function Base.:~(lhs, rhs)
 end
 for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
     (T != :Complex && S != :Complex) && continue
-    @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
-                                      ai = value(imag(a)), bi = value(imag(b))
-        if ar isa Number && br isa Number && ai isa Number && bi isa Number
-            error("Equation $a ~ $b does not contain any symbols")
-        elseif ar isa Number && br isa Number
-            ai ~ bi
-        elseif ai isa Number && bi isa Number
-            ar ~ br
-        else
-            [ar ~ br
-            ai ~ bi]
+    @eval function Base.:~(a::$T, b::$S)
+        let ar = value(real(a)), br = value(real(b)),
+            ai = value(imag(a)), bi = value(imag(b))
+
+            if ar isa Number && br isa Number && ai isa Number && bi isa Number
+                error("Equation $a ~ $b does not contain any symbols")
+            elseif ar isa Number && br isa Number
+                ai ~ bi
+            elseif ai isa Number && bi isa Number
+                ar ~ br
+            else
+                [ar ~ br
+                 ai ~ bi]
+            end
         end
     end
 end
@@ -131,10 +134,11 @@ canonical_form(eq::Equation) = eq.lhs - eq.rhs ~ 0
 get_variables(eq::Equation) = unique(vcat(get_variables(eq.lhs), get_variables(eq.rhs)))
 
 struct ConstrainedEquation
-  constraints
-  eq
+    constraints::Any
+    eq::Any
 end
 
-function expand_derivatives(eq::Equation, simplify=false)
-    return Equation(expand_derivatives(eq.lhs, simplify), expand_derivatives(eq.rhs, simplify))
+function expand_derivatives(eq::Equation, simplify = false)
+    return Equation(expand_derivatives(eq.lhs, simplify),
+                    expand_derivatives(eq.rhs, simplify))
 end

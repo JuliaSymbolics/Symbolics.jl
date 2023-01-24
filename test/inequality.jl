@@ -9,10 +9,18 @@ using Test
 @test (a * x ≲ b / z) == Inequality(a * x, b / z, Symbolics.leq)
 @test (a ≲ u) == Inequality(a, u, Symbolics.leq)
 @test (a ≲ sin(u)) == Inequality(a, sin(u), Symbolics.leq)
-@test Symbolics.scalarize(v .≲ u) == [Inequality(v[1], u, Symbolics.leq), Inequality(v[2], u, Symbolics.leq), Inequality(v[3], u, Symbolics.leq)]
-@test Symbolics.scalarize(v .≲ w .+ 3) == [Inequality(v[1], w[1] + 3, Symbolics.leq), Inequality(v[2], w[2] + 3, Symbolics.leq), Inequality(v[3], w[3] + 3, Symbolics.leq)]
+@test Symbolics.scalarize(v .≲ u) == [
+    Inequality(v[1], u, Symbolics.leq),
+    Inequality(v[2], u, Symbolics.leq),
+    Inequality(v[3], u, Symbolics.leq),
+]
+@test Symbolics.scalarize(v .≲ w .+ 3) == [
+    Inequality(v[1], w[1] + 3, Symbolics.leq),
+    Inequality(v[2], w[2] + 3, Symbolics.leq),
+    Inequality(v[3], w[3] + 3, Symbolics.leq),
+]
 
-@test Symbolics.canonical_form(a + b *c ≲ x + 2 * x) == (a + b*c - 3x ≲ 0)
+@test Symbolics.canonical_form(a + b * c ≲ x + 2 * x) == (a + b * c - 3x ≲ 0)
 
 @test Symbolics.substitute(a ≲ 2, a => 1) == (1 ≲ 2)
 
@@ -20,9 +28,17 @@ using Test
 @test (a * x ≳ b / z) == Inequality(a * x, b / z, Symbolics.geq)
 @test (a ≳ u) == Inequality(a, u, Symbolics.geq)
 @test (a ≳ sin(u)) == Inequality(a, sin(u), Symbolics.geq)
-@test Symbolics.scalarize(v .≳ u) == [Inequality(v[1], u, Symbolics.geq), Inequality(v[2], u, Symbolics.geq), Inequality(v[3], u, Symbolics.geq)]
-@test Symbolics.scalarize(v .≳ w .+ 3) == [Inequality(v[1], w[1] + 3, Symbolics.geq), Inequality(v[2], w[2] + 3, Symbolics.geq), Inequality(v[3], w[3] + 3, Symbolics.geq)]
+@test Symbolics.scalarize(v .≳ u) == [
+    Inequality(v[1], u, Symbolics.geq),
+    Inequality(v[2], u, Symbolics.geq),
+    Inequality(v[3], u, Symbolics.geq),
+]
+@test Symbolics.scalarize(v .≳ w .+ 3) == [
+    Inequality(v[1], w[1] + 3, Symbolics.geq),
+    Inequality(v[2], w[2] + 3, Symbolics.geq),
+    Inequality(v[3], w[3] + 3, Symbolics.geq),
+]
 
-@test Symbolics.canonical_form(a + b *c ≳ x + 2 * x) == (3x - a - b*c ≲ 0)
+@test Symbolics.canonical_form(a + b * c ≳ x + 2 * x) == (3x - a - b * c ≲ 0)
 
 @test Symbolics.substitute(a ≳ 2, a => 1) == (1 ≳ 2)

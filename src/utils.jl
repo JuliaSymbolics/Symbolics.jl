@@ -26,6 +26,7 @@ Returns the variables in the expression. Note that the returned variables are
 not wrapped in the `Num` type.
 
 # Examples
+
 ```julia
 julia> @variables t x y z(t)
 4-element Vector{Num}:
@@ -44,9 +45,9 @@ julia> Symbolics.get_variables(ex)
  z(t)
 ```
 """
-get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
-get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
-get_variables!(vars, e, varlist=nothing) = vars
+get_variables(e::Num, varlist = nothing) = get_variables(value(e), varlist)
+get_variables!(vars, e::Num, varlist = nothing) = get_variables!(vars, value(e), varlist)
+get_variables!(vars, e, varlist = nothing) = vars
 
 function is_singleton(e)
     if istree(e)
@@ -59,9 +60,9 @@ function is_singleton(e)
     end
 end
 
-get_variables!(vars, e::Number, varlist=nothing) = vars
+get_variables!(vars, e::Number, varlist = nothing) = vars
 
-function get_variables!(vars, e::Symbolic, varlist=nothing)
+function get_variables!(vars, e::Symbolic, varlist = nothing)
     if is_singleton(e)
         if isnothing(varlist) || any(isequal(e), varlist)
             push!(vars, e)
@@ -72,14 +73,14 @@ function get_variables!(vars, e::Symbolic, varlist=nothing)
     return (vars isa AbstractVector) ? unique!(vars) : vars
 end
 
-function get_variables!(vars, e::Equation, varlist=nothing)
-  get_variables!(vars, e.rhs, varlist)
+function get_variables!(vars, e::Equation, varlist = nothing)
+    get_variables!(vars, e.rhs, varlist)
 end
 
-get_variables(e, varlist=nothing) = get_variables!([], e, varlist)
+get_variables(e, varlist = nothing) = get_variables!([], e, varlist)
 
 # Sym / Term --> Symbol
-Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
+Base.Symbol(x::Union{Num, Symbolic}) = tosymbol(x)
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
@@ -89,7 +90,9 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```julia
-julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
+julia> @variables x t u(x, t) z(t)[1:2];
+       Dt = Differential(t);
+       Dx = Differential(x);
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
 uˍtx(x, t)
@@ -112,7 +115,8 @@ function diff2term(O)
     d_separator = 'ˍ'
 
     if ds === nothing
-        return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
+        return similarterm(O, operation(O), map(diff2term, arguments(O)),
+                           metadata = metadata(O))
     else
         oldop = operation(O)
         if issym(oldop)
@@ -125,8 +129,10 @@ function diff2term(O)
             opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
             return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
         end
-        newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
+        newname = occursin(d_separator, opname) ? Symbol(opname, ds) :
+                  Symbol(opname, d_separator, ds)
+        return setname(similarterm(O, rename(oldop, newname), arguments(O),
+                                   metadata = metadata(O)), newname)
     end
 end
 
@@ -150,11 +156,11 @@ julia> @variables t z(t)
 julia> Symbolics.tosymbol(z)
 Symbol("z(t)")
 
-julia>  Symbolics.tosymbol(z; escape=false)
+julia> Symbolics.tosymbol(z; escape = false)
 :z
 ```
 """
-function tosymbol(t; states=nothing, escape=true)
+function tosymbol(t; states = nothing, escape = true)
     if issym(t)
         return nameof(t)
     elseif istree(t)
@@ -212,18 +218,18 @@ function makesubscripts(n)
     m = length(set)
     map(1:n) do i
         repeats = ceil(Int, i / m)
-        c = set[(i-1) % m + 1]
+        c = set[(i - 1) % m + 1]
         Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
     end
 end
 
-function var_from_nested_derivative(x,i=0)
+function var_from_nested_derivative(x, i = 0)
     x = unwrap(x)
     if issym(x)
         (x, i)
     elseif istree(x)
         operation(x) isa Differential ?
-            var_from_nested_derivative(first(arguments(x)), i + 1) : (x, i)
+        var_from_nested_derivative(first(arguments(x)), i + 1) : (x, i)
     else
         error("Not a well formed derivative expression $x")
     end
@@ -234,7 +240,7 @@ end
 
 Extract the degree of `p` with respect to `sym`.
 """
-function degree(p, sym=nothing)
+function degree(p, sym = nothing)
     p = value(p)
     sym = value(sym)
     if p isa Number
@@ -273,25 +279,26 @@ end
 Extract the coefficient of `p` with respect to `sym`.
 Note that `p` might need to be expanded and/or simplified with `expand` and/or `simplify`.
 """
-function coeff(p, sym=nothing)
+function coeff(p, sym = nothing)
     p, sym = value(p), value(sym)
     if issym(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif ispow(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif isadd(p)
-        if sym===nothing
+        if sym === nothing
             p.coeff
         else
             sum(coeff(k, sym) * v for (k, v) in p.dict)
         end
     elseif ismul(p)
         args = unsorted_arguments(p)
-        coeffs = map(a->coeff(a, sym), args)
+        coeffs = map(a -> coeff(a, sym), args)
         if all(iszero, coeffs)
             return 0
         else
-            @views prod(Iterators.flatten((coeffs[findall(!iszero, coeffs)], args[findall(iszero, coeffs)])))
+            @views prod(Iterators.flatten((coeffs[findall(!iszero, coeffs)],
+                                           args[findall(iszero, coeffs)])))
         end
     else
         p isa Number && return sym === nothing ? p : 0

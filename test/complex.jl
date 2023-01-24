@@ -7,7 +7,7 @@ using Symbolics, Test
     @test b isa Num
     @test eltype(Z) <: Complex{Real}
 
-    for x in [z, Z[1], z+a, z*a, z^2, z/z] # z/z is sus
+    for x in [z, Z[1], z + a, z * a, z^2, z / z] # z/z is sus
         @test x isa Complex{Num}
         @test real(x) isa Num
         @test imag(x) isa Num
@@ -15,8 +15,8 @@ using Symbolics, Test
     end
 
     # issue #314
-    bi = a+a*im
-    bs = substitute(bi, (Dict(a=>1.0))) # returns 1.0 + im
+    bi = a + a * im
+    bs = substitute(bi, (Dict(a => 1.0))) # returns 1.0 + im
     typeof(bs) # Complex{Num}
     bv = Symbolics.value.(bs)
     @test typeof(bv) == ComplexF64
@@ -24,5 +24,5 @@ end
 
 @testset "repr" begin
     @test repr(z) == "z"
-    @test repr(a + b*im) == "a + b*im"
+    @test repr(a + b * im) == "a + b*im"
 end

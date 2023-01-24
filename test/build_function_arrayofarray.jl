@@ -2,7 +2,9 @@ using Symbolics, Test, SparseArrays
 @variables a b c
 
 # Auxiliary Functions
-get_sparsity_pattern(h::Union{SparseVector{Num}, SparseMatrixCSC{Num,Int}}) = get_sparsity_pattern(Array(h))
+function get_sparsity_pattern(h::Union{SparseVector{Num}, SparseMatrixCSC{Num, Int}})
+    get_sparsity_pattern(Array(h))
+end
 get_sparsity_pattern(h::Array{Num}) = sparse(Int.(.!isequal.(h, 0)))
 
 input = [1, 2, 3]
@@ -18,13 +20,15 @@ function h_dense_arraymat_julia!(out, x)
 end
 
 h_dense_arraymat_ip! = eval(Symbolics.build_function(h_dense_arraymat, [a, b, c])[2])
-h_dense_arraymat_ip_skip! = eval(Symbolics.build_function(h_dense_arraymat, [a, b, c], skipzeros=true, fillzeros=false)[2])
+h_dense_arraymat_ip_skip! = eval(Symbolics.build_function(h_dense_arraymat, [a, b, c],
+                                                          skipzeros = true,
+                                                          fillzeros = false)[2])
 out_1_arraymat = [fill(42, 2, 2) for i in 1:3]
 out_2_arraymat = deepcopy(out_1_arraymat)
 h_dense_arraymat_julia!(out_1_arraymat, input)
 h_dense_arraymat_ip_skip!(out_2_arraymat, input)
 @test all(isequal(42), out_2_arraymat[2])
-foreach(mat->fill!(mat, 0), out_2_arraymat)
+foreach(mat -> fill!(mat, 0), out_2_arraymat)
 h_dense_arraymat_ip_skip!(out_2_arraymat, input)
 @test out_1_arraymat == out_2_arraymat
 h_dense_arraymat_ip!(out_2_arraymat, input)
@@ -35,12 +39,14 @@ test_exp = [exp(a) * exp(b), a]
 h_dense_arraymat_het = [Symbolics.hessian(t, [a, b]) for t in test_exp]
 function h_dense_arraymat_het_julia!(out, x)
     a, b, c = x
-    out[1] .= [exp(a[1]) * exp(b[1]) exp(a[1]) * exp(b[1]); exp(a[1]) * exp(b[1]) exp(a[1]) * exp(b[1])]
+    out[1] .= [exp(a[1])*exp(b[1]) exp(a[1])*exp(b[1]);
+               exp(a[1])*exp(b[1]) exp(a[1])*exp(b[1])]
     out[2] .= [0 0; 0 0]
 end
 
 h_dense_arraymat_het_str = Symbolics.build_function(h_dense_arraymat_het, [a, b, c])
-h_dense_arraymat_het_cse_str = Symbolics.build_function(h_dense_arraymat_het, [a, b, c], cse=true)
+h_dense_arraymat_het_cse_str = Symbolics.build_function(h_dense_arraymat_het, [a, b, c],
+                                                        cse = true)
 h_dense_arraymat_het_ip! = eval(h_dense_arraymat_het_str[2])
 h_dense_arraymat_het_cse_ip! = eval(h_dense_arraymat_het_cse_str[2])
 out_1_arraymat_het = [Array{Float64}(undef, 2, 2) for i in 1:2]
@@ -80,26 +86,43 @@ end
 
 h_dense_arrayNestedMat_str = Symbolics.build_function(h_dense_arrayNestedMat, [a, b, c])
 h_dense_arrayNestedMat_ip! = eval(h_dense_arrayNestedMat_str[2])
-out_1_arrayNestedMat = [[rand(Int64, 2, 2), rand(Int64, 2, 2)], [rand(Int64, 2, 2), rand(Int64, 2, 2)]] # avoid undef broadcasting issue
-out_2_arrayNestedMat = [[rand(Int64, 2, 2), rand(Int64, 2, 2)], [rand(Int64, 2, 2), rand(Int64, 2, 2)]]
+out_1_arrayNestedMat = [
+    [rand(Int64, 2, 2), rand(Int64, 2, 2)],
+    [rand(Int64, 2, 2), rand(Int64, 2, 2)],
+] # avoid undef broadcasting issue
+out_2_arrayNestedMat = [
+    [rand(Int64, 2, 2), rand(Int64, 2, 2)],
+    [rand(Int64, 2, 2), rand(Int64, 2, 2)],
+]
 h_dense_arrayNestedMat_julia!(out_1_arrayNestedMat, input)
 h_dense_arrayNestedMat_ip!(out_2_arrayNestedMat, input)
 @test out_1_arrayNestedMat == out_2_arrayNestedMat
 
 # Arrays of Arrays of Matrices, Heterogeneous element types
 test_exp = [exp(a) * exp(b), a]
-h_dense_arrayNestedMat_het = [[Symbolics.hessian(t, [a, b]) for t in test_exp], [Num[0 0; 0 0], Num[0 0; 0 0]]]
+h_dense_arrayNestedMat_het = [
+    [Symbolics.hessian(t, [a, b]) for t in test_exp],
+    [Num[0 0; 0 0], Num[0 0; 0 0]],
+]
 function h_dense_arrayNestedMat_het_julia!(out, x)
     a, b, c = x
-    out[1][1] .= [exp(a[1]) * exp(b[1]) exp(a[1]) * exp(b[1]); exp(a[1]) * exp(b[1]) exp(a[1]) * exp(b[1])]
+    out[1][1] .= [exp(a[1])*exp(b[1]) exp(a[1])*exp(b[1]);
+                  exp(a[1])*exp(b[1]) exp(a[1])*exp(b[1])]
     out[1][2] .= [0 0; 0 0]
     out[2][1] .= [0 0; 0 0]
     out[2][2] .= [0 0; 0 0]
 end
-h_dense_arrayNestedMat_het_str = Symbolics.build_function(h_dense_arrayNestedMat_het, [a, b, c])
+h_dense_arrayNestedMat_het_str = Symbolics.build_function(h_dense_arrayNestedMat_het,
+                                                          [a, b, c])
 h_dense_arrayNestedMat_het_ip! = eval(h_dense_arrayNestedMat_het_str[2])
-out_1_arrayNestedMat_het = [[rand(Int64, 2, 2), rand(Int64, 2, 2)], [rand(Int64, 2, 2), rand(Int64, 2, 2)]] # avoid undef broadcasting issue
-out_2_arrayNestedMat_het = [[rand(Int64, 2, 2), rand(Int64, 2, 2)], [rand(Int64, 2, 2), rand(Int64, 2, 2)]]
+out_1_arrayNestedMat_het = [
+    [rand(Int64, 2, 2), rand(Int64, 2, 2)],
+    [rand(Int64, 2, 2), rand(Int64, 2, 2)],
+] # avoid undef broadcasting issue
+out_2_arrayNestedMat_het = [
+    [rand(Int64, 2, 2), rand(Int64, 2, 2)],
+    [rand(Int64, 2, 2), rand(Int64, 2, 2)],
+]
 h_dense_arrayNestedMat_julia!(out_1_arrayNestedMat_het, input)
 h_dense_arrayNestedMat_ip!(out_2_arrayNestedMat_het, input)
 @test out_1_arrayNestedMat_het == out_2_arrayNestedMat_het
@@ -149,7 +172,10 @@ h_sparse_arrayvec_ip!(out_2_arrayvec, input)
 @test out_1_arrayvec == out_2_arrayvec
 
 # Arrays of Arrays of Matrices
-h_sparse_arrayNestedMat = [sparse.([[a 1; b 0], [0 0; 0 0]]), sparse.([[b 1; a 0], [b c; 0 1]])]
+h_sparse_arrayNestedMat = [
+    sparse.([[a 1; b 0], [0 0; 0 0]]),
+    sparse.([[b 1; a 0], [b c; 0 1]]),
+]
 function h_sparse_arrayNestedMat_julia!(out, x)
     a, b, c = x
     out[1][1][1, 1] = a[1]
@@ -166,9 +192,12 @@ end
 
 h_sparse_arrayNestedMat_str = Symbolics.build_function(h_sparse_arrayNestedMat, [a, b, c])
 h_sparse_arrayNestedMat_ip! = eval(h_sparse_arrayNestedMat_str[2])
-h_sparse_arrayNestedMat_sparsity_patterns = [map(get_sparsity_pattern, h) for h in h_sparse_arrayNestedMat]
-out_1_arrayNestedMat = [[similar(h_sub) for h_sub in h] for h in h_sparse_arrayNestedMat_sparsity_patterns]
-out_2_arrayNestedMat = [[similar(h_sub) for h_sub in h] for h in h_sparse_arrayNestedMat_sparsity_patterns]
+h_sparse_arrayNestedMat_sparsity_patterns = [map(get_sparsity_pattern, h)
+                                             for h in h_sparse_arrayNestedMat]
+out_1_arrayNestedMat = [[similar(h_sub) for h_sub in h]
+                        for h in h_sparse_arrayNestedMat_sparsity_patterns]
+out_2_arrayNestedMat = [[similar(h_sub) for h_sub in h]
+                        for h in h_sparse_arrayNestedMat_sparsity_patterns]
 h_sparse_arrayNestedMat_julia!(out_1_arrayNestedMat, input)
 h_sparse_arrayNestedMat_ip!(out_2_arrayNestedMat, input)
 @test out_1_arrayNestedMat == out_2_arrayNestedMat
@@ -176,14 +205,14 @@ h_sparse_arrayNestedMat_ip!(out_2_arrayNestedMat, input)
 # Additional Tests
 # Returning 0-element structures (corresponding to empty Jacobians)
 # Arrays of Matrices
-h_empty = [[a b; c 0], Array{Num,2}(undef, 0,0)]
+h_empty = [[a b; c 0], Array{Num, 2}(undef, 0, 0)]
 h_empty_str = Symbolics.build_function(h_empty, [a, b, c])
 h_empty_ip! = eval(h_empty_str[2])
 out = [Matrix{Int64}(undef, 2, 2), Matrix{Int64}(undef, 0, 0)]
 h_empty_ip!(out, input) # should just not fail
 
 # Array of Vectors
-h_empty_vec = [[a, b, c, 0], Vector{Num}(undef,0)]
+h_empty_vec = [[a, b, c, 0], Vector{Num}(undef, 0)]
 h_empty_vec_str = Symbolics.build_function(h_empty_vec, [a, b, c])
 h_empty_vec_ip! = eval(h_empty_vec_str[2])
 out = [Vector{Int64}(undef, 4), Vector{Int64}(undef, 0)]
@@ -193,5 +222,5 @@ h_empty_vec_ip!(out, input) # should just not fail
 h_emptyNested = [[[a b; c 0]], Array{Array{Num, 2}}(undef, 0)] # emptyNested array of arrays
 h_emptyNested_str = Symbolics.build_function(h_emptyNested, [a, b, c])
 h_emptyNested_ip! = eval(h_emptyNested_str[2])
-out = [[[1 2;3 4]], Array{Array{Int64,2},1}(undef, 0)]
+out = [[[1 2; 3 4]], Array{Array{Int64, 2}, 1}(undef, 0)]
 h_emptyNested_ip!(out, input) # should just not fail

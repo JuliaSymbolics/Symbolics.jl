@@ -9,14 +9,14 @@ caller.
 
 ## Arguments
 
-* `ex`: the expression to parse
-* `mod`: the module to apply the parsing in. See the limitations section for details.
+  - `ex`: the expression to parse
+  - `mod`: the module to apply the parsing in. See the limitations section for details.
 
 ## Example
 
 ```julia
 ex = :(y(t) ~ x(t))
-parse_expr_to_symbolic(ex,Main) # gives the symbolic expression `y(t) ~ x(t)` in empty Main
+parse_expr_to_symbolic(ex, Main) # gives the symbolic expression `y(t) ~ x(t)` in empty Main
 
 # Now do a whole system
 
@@ -29,8 +29,9 @@ eqs = parse_expr_to_symbolic.(ex, (Main,))
 ex = [y ~ x
       y ~ -2x + 3 / z
       z ~ 2]
-all(isequal.(eqs,ex)) # true
+all(isequal.(eqs, ex)) # true
 ```
+
 ## Limitations
 
 ### Symbolic-ness Tied to Environment Definitions
@@ -47,9 +48,9 @@ depending on the environment that it is applied.
 For example:
 
 ```julia
-parse_expr_to_symbolic(:(x - y),@__MODULE__) # x - y
+parse_expr_to_symbolic(:(x - y), @__MODULE__) # x - y
 x = 2.0
-parse_expr_to_symbolic(:(x - y),@__MODULE__) # 2.0 - y
+parse_expr_to_symbolic(:(x - y), @__MODULE__) # 2.0 - y
 ```
 
 This is required to detect that standard functions like `-` are functions instead of
@@ -68,20 +69,21 @@ function parse_expr_to_symbolic end
 
 parse_expr_to_symbolic(x::Number, mod::Module) = x
 function parse_expr_to_symbolic(x::Symbol, mod::Module)
-  if isdefined(mod, x)
-    getfield(mod, x)
-  else
-    (@variables $x)[1]
-  end
+    if isdefined(mod, x)
+        getfield(mod, x)
+    else
+        (@variables $x)[1]
+    end
 end
 function parse_expr_to_symbolic(ex, mod::Module)
     if ex.head == :call
         if isdefined(mod, ex.args[1])
-            return getfield(mod,ex.args[1])(parse_expr_to_symbolic.(ex.args[2:end],(mod,))...)
+            return getfield(mod, ex.args[1])(parse_expr_to_symbolic.(ex.args[2:end],
+                                                                     (mod,))...)
         else
             x = parse_expr_to_symbolic(ex.args[1], mod)
-            ys = parse_expr_to_symbolic.(ex.args[2:end],(mod,))
-            return Term{Real}(x,[ys...])
+            ys = parse_expr_to_symbolic.(ex.args[2:end], (mod,))
+            return Term{Real}(x, [ys...])
         end
     end
 end
@@ -97,7 +99,7 @@ caller.
 
 ## Arguments
 
-* `ex`: the expression to parse
+  - `ex`: the expression to parse
 
 ## Example
 

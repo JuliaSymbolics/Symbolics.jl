@@ -24,27 +24,28 @@ const γ₃ = 0.1
 const N = 32
 const X = reshape([i for i in 1:N for j in 1:N], N, N)
 const Y = reshape([j for i in 1:N for j in 1:N], N, N)
-const α₁ = 1.0 .* (X .>= 4*N/5)
+const α₁ = 1.0 .* (X .>= 4 * N / 5)
 
-const Mx = Array(Tridiagonal([1.0 for i in 1:N-1], [-2.0 for i in 1:N], [1.0 for i in 1:N-1]))
+const Mx = Array(Tridiagonal([1.0 for i in 1:(N - 1)], [-2.0 for i in 1:N],
+                             [1.0 for i in 1:(N - 1)]))
 const My = copy(Mx)
 Mx[2, 1] = 2.0
-Mx[end-1,end] = 2.0
+Mx[end - 1, end] = 2.0
 My[1, 2] = 2.0
-My[end,end-1] = 2.0
+My[end, end - 1] = 2.0
 
 # Define the discretized PDE as an ODE function
 function f(u, p, t)
-    A = u[:,:,1]
-    B = u[:,:,2]
-    C = u[:,:,3]
-    MyA = My*A
-    AMx = A*Mx
-    DA = @. _DD*(MyA + AMx)
-    dA = @. DA + α₁ - β₁*A - r₁*A*B + r₂*C
-    dB = @. α₂ - β₂*B - r₁*A*B + r₂*C
-    dC = @. α₃ - β₃*C + r₁*A*B - r₂*C
-    cat(dA, dB, dC, dims=3)
+    A = u[:, :, 1]
+    B = u[:, :, 2]
+    C = u[:, :, 3]
+    MyA = My * A
+    AMx = A * Mx
+    DA = @. _DD * (MyA + AMx)
+    dA = @. DA + α₁ - β₁ * A - r₁ * A * B + r₂ * C
+    dB = @. α₂ - β₂ * B - r₁ * A * B + r₂ * C
+    dC = @. α₃ - β₃ * C + r₁ * A * B - r₂ * C
+    cat(dA, dB, dC, dims = 3)
 end
 ```
 
@@ -63,20 +64,21 @@ each output of the function. We can then utilize this in the Symbolics
 functionality. For example, let's build a parallel version of `f` first:
 
 ```@example auto_parallel
-fastf = eval(Symbolics.build_function(du,u,
-            parallel=Symbolics.MultithreadedForm())[2])
+fastf = eval(Symbolics.build_function(du, u,
+                                      parallel = Symbolics.MultithreadedForm())[2])
 ```
 
 Now let's compute the sparse Jacobian function and compile a fast multithreaded version:
 
 ```@example auto_parallel
 jac = Symbolics.sparsejacobian(vec(du), vec(u))
-row,col,val = findnz(jac)
-scatter(row,col,legend=false,ms=1,c=:black)
+row, col, val = findnz(jac)
+scatter(row, col, legend = false, ms = 1, c = :black)
 ```
+
 ```@example auto_parallel
-fjac = eval(Symbolics.build_function(jac,u,
-            parallel=Symbolics.MultithreadedForm())[2])
+fjac = eval(Symbolics.build_function(jac, u,
+                                     parallel = Symbolics.MultithreadedForm())[2])
 ```
 
 It takes awhile for this to generate, but the results will be worth it!
@@ -92,9 +94,9 @@ AMx = zeros(N, N);
 DA = zeros(N, N);
 prob = ODEProblem(f, u0, (0.0, 10.0))
 fastprob = ODEProblem(ODEFunction((du, u, p, t) -> fastf(du, u),
-                                   jac = (du, u, p, t) -> fjac(du, u),
-                                   jac_prototype = similar(jac, Float64)),
-                                   u0, (0.0, 10.0))
+                                  jac = (du, u, p, t) -> fjac(du, u),
+                                  jac_prototype = similar(jac, Float64)),
+                      u0, (0.0, 10.0))
 ```
 
 Let's see the timing difference:

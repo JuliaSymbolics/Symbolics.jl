@@ -14,18 +14,14 @@ function latexify_derivatives(ex)
             if num isa Expr && length(num.args) == 2
                 return Expr(:call, :/,
                             Expr(:call, :*,
-                                 "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")", num
-                                ),
-                            diffdenom(den)
-                           )
+                                 "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")", num),
+                            diffdenom(den))
             else
                 return Expr(:call, :*,
                             Expr(:call, :/,
                                  "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")",
-                                 diffdenom(den)
-                                ),
-                            num
-                           )
+                                 diffdenom(den)),
+                            num)
             end
         elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(arguments(x)[1])).s
@@ -66,7 +62,6 @@ end
     return nameof(n)
 end
 
-
 @latexrecipe function f(n::Arr)
     env --> :equation
     cdot --> false
@@ -82,10 +77,10 @@ end
 end
 
 @latexrecipe function f(eqs::Vector{Equation})
-    has_connections = any(x->x.lhs isa Connection, eqs)
+    has_connections = any(x -> x.lhs isa Connection, eqs)
     if has_connections
         env --> :equation
-        return map(first∘first∘Latexify.apply_recipe, eqs)
+        return map(first ∘ first ∘ Latexify.apply_recipe, eqs)
     else
         env --> :align
         return Num.(getfield.(eqs, :lhs)), Num.(getfield.(eqs, :rhs))
@@ -107,10 +102,18 @@ end
 end
 
 Base.show(io::IO, ::MIME"text/latex", x::Num) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num}) = print(io, "\$\$ " * latexify(x) * " \$\$")
+function Base.show(io::IO, ::MIME"text/latex", x::Symbolic)
+    print(io, "\$\$ " * latexify(x) * " \$\$")
+end
+function Base.show(io::IO, ::MIME"text/latex", x::Equation)
+    print(io, "\$\$ " * latexify(x) * " \$\$")
+end
+function Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation})
+    print(io, "\$\$ " * latexify(x) * " \$\$")
+end
+function Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num})
+    print(io, "\$\$ " * latexify(x) * " \$\$")
+end
 
 _toexpr(O::ArrayOp) = _toexpr(O.term)
 
@@ -130,8 +133,9 @@ function _toexpr(O)
             end
 
             base = term.base
-            pow  = term.exp
-            isneg = (pow isa Number && pow < 0) || (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
+            pow = term.exp
+            isneg = (pow isa Number && pow < 0) ||
+                    (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
             if !isneg
                 if _isone(pow)
                     pushfirst!(numer, _toexpr(base))
@@ -139,7 +143,7 @@ function _toexpr(O)
                     pushfirst!(numer, Expr(:call, :^, _toexpr(base), _toexpr(pow)))
                 end
             else
-                newpow = -1*pow
+                newpow = -1 * pow
                 if _isone(newpow)
                     pushfirst!(denom, _toexpr(base))
                 else
@@ -173,7 +177,7 @@ function _toexpr(O)
     op = operation(O)
     args = arguments(O)
 
-    if (op===(*)) && (args[1] === -1)
+    if (op === (*)) && (args[1] === -1)
         arg_mul = Expr(:call, :(*), _toexpr(args[2:end])...)
         return Expr(:call, :(-), arg_mul)
     end
@@ -207,11 +211,12 @@ function _toexpr(eq::Equation)
     Expr(:(=), _toexpr(eq.lhs), _toexpr(eq.rhs))
 end
 
-_toexpr(eqs::AbstractArray) = map(eq->_toexpr(eq), eqs)
+_toexpr(eqs::AbstractArray) = map(eq -> _toexpr(eq), eqs)
 _toexpr(x::Num) = _toexpr(value(x))
 
 function getindex_to_symbol(t)
-    @assert istree(t) && operation(t) === getindex && symtype(arguments(t)[1]) <: AbstractArray
+    @assert istree(t) && operation(t) === getindex &&
+            symtype(arguments(t)[1]) <: AbstractArray
     args = arguments(t)
     idxs = args[2:end]
     try
@@ -226,9 +231,6 @@ diffdenom(e) = e
 diffdenom(e::Sym) = LaTeXString("\\mathrm{d}$e")
 diffdenom(e::Pow) = LaTeXString("\\mathrm{d}$(e.base)$(isone(e.exp) ? "" : "^{$(e.exp)}")")
 function diffdenom(e::Mul)
-    return LaTeXString(prod(
-                "\\mathrm{d}$(k)$(isone(v) ? "" : "^{$v}")"
-                for (k, v) in e.dict
-               ))
+    return LaTeXString(prod("\\mathrm{d}$(k)$(isone(v) ? "" : "^{$v}")"
+                            for (k, v) in e.dict))
 end
-

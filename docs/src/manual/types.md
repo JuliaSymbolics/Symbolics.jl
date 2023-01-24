@@ -14,9 +14,9 @@ Due to it requiring such wrappers, we only fully support a limited number of typ
 
 These types are
 
-- Real numbers (wrapped using `Num`)
-- complex numbers (stored as `Complex{Num}` where `Complex` is from Base Julia)
-- arrays of Real and complex numbers (wrapped using `Arr`, so `Arr{Num}` or `Arr{Complex{Num}}`)
+  - Real numbers (wrapped using `Num`)
+  - complex numbers (stored as `Complex{Num}` where `Complex` is from Base Julia)
+  - arrays of Real and complex numbers (wrapped using `Arr`, so `Arr{Num}` or `Arr{Complex{Num}}`)
 
 ## `@variables` and types
 
@@ -26,19 +26,23 @@ Use the syntax `@variables x::T` to create a symbol named `x` of symbolic type `
 using Symbolics
 @variables x::Real z::Complex{Real} (X::Real)[1:10, 1:10] (Z::Complex{Real})[1:10] s::String
 ```
+
 ```@example types
 typeof(x)
 ```
+
 ```@example types
 typeof(z)
 ```
+
 ```@example types
 typeof(X)
 ```
+
 ```@example types
 typeof(Z)
 ```
+
 ```@example types
 typeof(s)
 ```
-

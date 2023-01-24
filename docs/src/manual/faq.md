@@ -20,12 +20,12 @@ This shows up in adaptive algorithms, for example:
 
 ```@example faq
 function factorial(x)
-  out = x
-  while x > 1
-    x -= 1
-    out *= x
-  end
-  out
+    out = x
+    while x > 1
+        x -= 1
+        out *= x
+    end
+    out
 end
 ```
 
@@ -64,20 +64,23 @@ done by doing `@register_symbolic f(x)`. If you have to define things like deriv
 `f`, then [the function registration documentation](@ref function_registration).
 
 ## Equality and set membership tests
+
 Comparing symbols with `==` produces a symbolic equality, not a `Bool`. To produce a `Bool`, call `isequal`.
 
 To test if a symbol is part of a collection of symbols, i.e., a vector, either create a `Set` and use `in`, e.g.
+
 ```@example faq
-try 
+try
     x in [x]
 catch e
     e
 end
 ```
+
 ```@example faq
 x in Set([x])
 ```
+
 ```@example faq
 any(isequal(x), [x])
 ```
-

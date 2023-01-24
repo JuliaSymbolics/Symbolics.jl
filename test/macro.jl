@@ -9,9 +9,9 @@ Symbolics.@register_symbolic fff(t)
 
 ## @variables
 
-many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5 p(..)[1:4]
+many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4]=1:4 z(t)[1:4]=2:5 p(..)[1:4]
 
-@test all(t->getsource(t)[1] === :variables, many_vars)
+@test all(t -> getsource(t)[1] === :variables, many_vars)
 @test getdefaultval(t) == 0
 @test getdefaultval(a) == 1
 @test_throws ErrorException getdefaultval(x)
@@ -21,15 +21,14 @@ many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5
 @test getdefaultval(w[4]) == 4
 @test getdefaultval(z[3]) == 4
 
-@test symtype(p) <: FnType{Tuple, Array{Real,1}}
+@test symtype(p) <: FnType{Tuple, Array{Real, 1}}
 @test p(t)[1] isa Symbolics.Num
-
 
 ## Wrapper types
 
 abstract type AbstractFoo{T} end
 
-struct Foo{T}<:AbstractFoo{T}
+struct Foo{T} <: AbstractFoo{T}
 end
 @symbolic_wrap struct FooWrap{T} <: AbstractFoo{T}
     val::Foo{T}
@@ -39,9 +38,9 @@ Symbolics.unwrap(r::FooWrap) = r.val
 
 @test Symbolics.wrapper_type(AbstractFoo) == FooWrap
 @test Symbolics.wrapper_type(AbstractFoo{Int}) == FooWrap # removes the type param.
-                                                          # If required,
-                                                          # a new method must be defined
-                                                          # by the user of @symbolic_wrap
+# If required,
+# a new method must be defined
+# by the user of @symbolic_wrap
 
 x = Foo{Int}()
 @test wrap(x) isa FooWrap{Int}
@@ -60,7 +59,6 @@ end
 @test foo(x, wrap(1)) isa Num
 @test foo(x, wrap(6)) isa String
 
-
 let
     vars = @variables t a b(a) c(..) x[1:2] y(t)[1:3] z(..)[1:2]
     vars2 = [Symbolics.rename(v, Symbol(Symbolics.getname(v), "_2")) for v in vars]
@@ -70,19 +68,17 @@ let
         @test Symbol(Symbolics.getname(v), "_2") == Symbolics.getname(v2)
     end
 
-
     @test Symbolics.getname(Symbolics.rename(y[2], :u)) === :u
 end
 
 let
     s = :y
-    x = (1:2,1:3)
+    x = (1:2, 1:3)
     t, y = @variables t $s(t)[x...]
 
     @test ndims(y) == 2
-    @test size(y) == (2,3)
+    @test size(y) == (2, 3)
 end
-
 
 # Edge case when no symbolic values are passed
 struct A end
