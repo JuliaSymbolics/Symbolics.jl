@@ -3,6 +3,7 @@ using SymbolicUtils, Test
 using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
+import LinearAlgebra: dot
 
 @testset "arrays" begin
     @variables X[1:5, 1:5] Y[1:5, 1:5]
@@ -119,6 +120,16 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     ##653
     Symbolics.scalarize(inv(A)[1,1])
+
+    # #831
+    @syms symT sym1(symT) sym2(symT)
+    symvec = [sym1(symT), sym2(symT)]
+    weights = rand(2)
+    @test isequal(symvec'weights, dot(symvec, weights))
+    @test isequal(weights'symvec, dot(weights, symvec))
+    @syms sym3(symT)::Real sym4(symT)::Real
+    symvec = [sym3(symT), sym4(symT)]
+    @test isequal(symvec'weights, weights'symvec)
 
     # ModelingToolkit.jl#1736
     #

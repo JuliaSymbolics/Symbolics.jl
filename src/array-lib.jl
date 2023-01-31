@@ -280,6 +280,10 @@ function _matvec(A,b)
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
 
+# specialize `dot` to dispatch on `Symbolic{<:Number}` to eventually work for 
+# arrays of (possibly unwrapped) Symbolic types, see issue #831
+@wrapped LinearAlgebra.dot(x::Number, y::Number) = conj(x) * y
+
 #################### MAP-REDUCE ################
 #
 
