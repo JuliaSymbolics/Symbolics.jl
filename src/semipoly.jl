@@ -3,6 +3,8 @@ using DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
+import SymbolicUtils: unsorted_arguments
+
 """
 $(TYPEDEF)
 
@@ -56,22 +58,28 @@ function Base.:^(base::SemiMonomial, exp::Real)
 end
 
 # return a dictionary of exponents with respect to variables
-pdegrees(::Number) = Dict()
-pdegrees(x::Union{Sym, Term}) = Dict(x => 1)
-pdegrees(x::Mul) = x.dict
-function pdegrees(x::Div)
-    num_dict = pdegrees(x.num)
-    den_dict = pdegrees(x.den)
-    inv_den_dict = Dict(keys(den_dict) .=> map(-, values(den_dict)))
-    mergewith(+, num_dict, inv_den_dict)
-end
-function pdegrees(x::Pow)
-    dict = pdegrees(x.base)
-    degrees = map(degree -> degree * x.exp, values(dict))
-    Dict(keys(dict) .=> degrees)
+function pdegrees(x)
+    if ismul(x)
+        return x.dict
+    elseif isdiv(x)
+        num_dict = pdegrees(x.num)
+        den_dict = pdegrees(x.den)
+        inv_den_dict = Dict(keys(den_dict) .=> map(-, values(den_dict)))
+        mergewith(+, num_dict, inv_den_dict)
+    elseif ispow(x)
+        dict = pdegrees(x.base)
+        degrees = map(degree -> degree * x.exp, values(dict))
+        Dict(keys(dict) .=> degrees)
+    elseif issym(x) || istree(x)
+        return Dict(x=>1)
+    elseif x isa Number
+        return Dict()
+    else
+        error("pdegrees for $x unknown")
+    end
 end
 
-pdegree(::Number) = 0
+pdegree(x::Number) = 0
 function pdegree(x::Symbolic)
     degree_dict = pdegrees(x)
     if isempty(degree_dict)
@@ -121,7 +129,7 @@ end
 
 symtype(m::SemiMonomial) = symtype(m.p)
 
-TermInterface.issym(::SemiMonomial) = true
+issym(::SemiMonomial) = true
 
 Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.p, m.coeff)
 
@@ -143,6 +151,7 @@ function mark_and_exponentiate(expr, vars)
              @rule (~a::isop(+))^(~b::isreal) => expand(Pow((~a), real(~b)))
              @rule *(~~xs::(xs -> all(issemimonomial, xs))) => *(~~xs...)
              @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
+             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, unsorted_arguments(~a))...)
              @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
     expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
 end

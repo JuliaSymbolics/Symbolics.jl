@@ -10,7 +10,7 @@ single_solution sets weather it returns only one solution or a set
 =#
 function solve_single_eq(
     eq::Equation,
-    var::SymbolicUtils.Sym,
+    var,
     single_solution = false,
     verify = true,
 )
@@ -145,7 +145,7 @@ struct Becomes
 end
 
 function create_eq_pairs(a, b)
-    out = Dict{SymbolicUtils.Sym,Any}()
+    out = Dict{BasicSymbolic,Any}()
 
     for i = 1:length(a)
         a_part = a[i]
@@ -260,7 +260,7 @@ end
 
 function solve_single_eq_unchecked(
     eq::Equation,
-    var::SymbolicUtils.Sym,
+    var,
     single_solution = false,
 )
     eq = (SymbolicUtils.add_with_div(eq.lhs + -1 * eq.rhs) ~ 0)#move everything to the left side
@@ -299,7 +299,7 @@ function solve_single_eq_unchecked(
             elseif (op == ^)#reverse powers
 
                 potential_solution =
-                    reverse_powers(eq::Equation, var::SymbolicUtils.Sym, single_solution)
+                    reverse_powers(eq::Equation, var, single_solution)
                 if potential_solution isa Equation
                     eq = potential_solution
                 else
@@ -307,7 +307,7 @@ function solve_single_eq_unchecked(
                 end
 
             else
-                eq = inverse_funcs(eq::Equation, var::SymbolicUtils.Sym)
+                eq = inverse_funcs(eq::Equation, var)
             end
 
         end
@@ -323,7 +323,7 @@ function solve_single_eq_unchecked(
     end
 end
 
-function left_prod_right_zero(eq::Equation, var::SymbolicUtils.Sym, single_solution)
+function left_prod_right_zero(eq::Equation, var, single_solution)
     if SymbolicUtils.ismul(eq.lhs) && isequal(0, eq.rhs)
         if (single_solution)
             eq = arguments(eq.lhs)[1] ~ 0
@@ -364,7 +364,7 @@ moves non variable components to the other side of the equation
 example move_to_other_side(x+a~z,x) returns x~z-a
 
 =#
-function move_to_other_side(eq::Equation, var::SymbolicUtils.Sym)
+function move_to_other_side(eq::Equation, var)
 
     !istree(eq.lhs) && return eq#make sure left side is tree form
 
@@ -398,7 +398,7 @@ function move_to_other_side(eq::Equation, var::SymbolicUtils.Sym)
 end
 
 #more rare solving strategies
-function special_strategy(eq::Equation, var::SymbolicUtils.Sym)
+function special_strategy(eq::Equation, var)
 
     @syms a b c x y z
     rules = [
@@ -529,7 +529,7 @@ end
 #=
 if in quadratic form returns solutions
 =#
-function solve_quadratic(eq::Equation, var::SymbolicUtils.Sym, single_solution)
+function solve_quadratic(eq::Equation, var, single_solution)
 
     !istree(eq.lhs) && return eq#make sure left side is tree form
 
@@ -577,7 +577,7 @@ function solve_quadratic(eq::Equation, var::SymbolicUtils.Sym, single_solution)
 end
 
 #reverse certain functions
-function inverse_funcs(eq::Equation, var::SymbolicUtils.Sym)
+function inverse_funcs(eq::Equation, var)
 
     !istree(eq.lhs) && return eq#make sure left side is tree form
     op = operation(eq.lhs)
@@ -610,7 +610,7 @@ function inverse_funcs(eq::Equation, var::SymbolicUtils.Sym)
 end
 
 #solves for powers
-function reverse_powers(eq::Equation, var::SymbolicUtils.Sym, single_solution)
+function reverse_powers(eq::Equation, var, single_solution)
     !istree(eq.lhs) && return eq#make sure left side is tree form
     op = operation(eq.lhs)
 
