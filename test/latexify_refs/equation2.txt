@@ -1,3 +1,3 @@
 \begin{equation}
-x = \frac{\mathrm{d}}{x} \left( y + z \right)
+x = \frac{\mathrm{d}}{\mathrm{d}x} \left( y + z \right)
 \end{equation}
