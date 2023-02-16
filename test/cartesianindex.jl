@@ -32,3 +32,9 @@ using Symbolics: Arr
 
     @test A[II] == A[1, 2, 3]
 end
+
+@testset "Num Index" begin
+    a = rand(5)
+    i = Num(1)
+    a[i]
+end
