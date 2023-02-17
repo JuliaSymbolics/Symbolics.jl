@@ -30,6 +30,15 @@ function specialize_methods(func, abstract_arg_types, inner_func, mods=nothing)
     end#of `for m in ms`
 end
 
+"""
+    specialize_methods(mods=nothing)
+
+Define specialized methods accepting symbolic types for the following functions and 
+signatures found in modules `mods` via `methods(...)`:
+
+* `Base.:(*)` for arguments of `(AbstractMatrix, AbstractVector)` to redirect to `_matvec`.
+* `Base.:(*)` for arguments of `(AbstractMatrix, AbstractMetrax)` to redirect to `_matmul`.
+"""
 function specialize_methods(mods=nothing)
     specialize_methods(Base.:(*), (AbstractMatrix, AbstractVector), _matvec, mods)
     specialize_methods(Base.:(*), (AbstractMatrix, AbstractMatrix), _matmul, mods)

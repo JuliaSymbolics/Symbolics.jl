@@ -24,5 +24,5 @@ function __init__()
 
     end # SymPy
 
-    specialize_methods()
+    specialize_methods((LinearAlgebra,))
 end
