@@ -1,5 +1,6 @@
-using Symbolics, Test
-import Symbolics: degree
+using Symbolics
+using Symbolics: degree
+using Test
 
 @variables x, y, z
 

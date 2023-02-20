@@ -17,16 +17,16 @@ function wrapper_type(::Type{Complex{T}}) where T
     Symbolics.has_symwrapper(T) ? Complex{wrapper_type(T)} : Complex{T}
 end
 
-TermInterface.symtype(a::ComplexTerm{T}) where T = Complex{T}
-TermInterface.istree(a::ComplexTerm) = true
-TermInterface.operation(a::ComplexTerm{T}) where T = Complex{T}
-TermInterface.arguments(a::ComplexTerm) = [a.re, a.im]
+symtype(a::ComplexTerm{T}) where T = Complex{T}
+istree(a::ComplexTerm) = true
+operation(a::ComplexTerm{T}) where T = Complex{T}
+arguments(a::ComplexTerm) = [a.re, a.im]
 
-function TermInterface.similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing, exprhead=exprhead(t))
+function similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing)
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        similarterm(first(args), f, args, symtype; metadata=metadata, exprhead=exprhead)
+        similarterm(first(args), f, args, symtype; metadata=metadata)
     end
 end
 

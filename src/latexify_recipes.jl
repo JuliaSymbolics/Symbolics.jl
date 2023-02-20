@@ -3,15 +3,15 @@ prettify_expr(f::Function) = nameof(f)
 prettify_expr(expr::Expr) = Expr(expr.head, prettify_expr.(expr.args)...)
 
 function cleanup_exprs(ex)
-    return postwalk(x -> x isa Expr && length(arguments(x)) == 0 ? operation(x) : x, ex)
+    return postwalk(x -> istree(x) && length(arguments(x)) == 0 ? operation(x) : x, ex)
 end
 
 function latexify_derivatives(ex)
     return postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
-        if operation(x) == :_derivative
-            num, den, deg = arguments(x)
-            if num isa Expr && length(arguments(num)) == 1
+        if x.args[1] == :_derivative
+            num, den, deg = x.args[2:end]
+            if num isa Expr && length(num.args) == 2
                 return Expr(:call, :/,
                             Expr(:call, :*,
                                  "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")", num
@@ -27,7 +27,7 @@ function latexify_derivatives(ex)
                             num
                            )
             end
-        elseif operation(x) === :_textbf
+        elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(arguments(x)[1])).s
             return "\\textbf{" * strip(ls, '\$') * "}"
         else
@@ -116,6 +116,58 @@ _toexpr(O::ArrayOp) = _toexpr(O.term)
 
 # `_toexpr` is only used for latexify
 function _toexpr(O)
+    if ismul(O)
+        m = O
+        numer = Any[]
+        denom = Any[]
+
+        # We need to iterate over each term in m, ignoring the numeric coefficient.
+        # This iteration needs to be stable, so we can't iterate over m.dict.
+        for term in Iterators.drop(arguments(m), isone(m.coeff) ? 0 : 1)
+            if !ispow(term)
+                push!(numer, _toexpr(term))
+                continue
+            end
+
+            base = term.base
+            pow  = term.exp
+            isneg = (pow isa Number && pow < 0) || (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
+            if !isneg
+                if _isone(pow)
+                    pushfirst!(numer, _toexpr(base))
+                else
+                    pushfirst!(numer, Expr(:call, :^, _toexpr(base), _toexpr(pow)))
+                end
+            else
+                newpow = -1*pow
+                if _isone(newpow)
+                    pushfirst!(denom, _toexpr(base))
+                else
+                    pushfirst!(denom, Expr(:call, :^, _toexpr(base), _toexpr(newpow)))
+                end
+            end
+        end
+
+        if isempty(numer) || !isone(abs(m.coeff))
+            numer_expr = Expr(:call, :*, abs(m.coeff), numer...)
+        else
+            numer_expr = length(numer) > 1 ? Expr(:call, :*, numer...) : numer[1]
+        end
+
+        if isempty(denom)
+            frac_expr = numer_expr
+        else
+            denom_expr = length(denom) > 1 ? Expr(:call, :*, denom...) : denom[1]
+            frac_expr = Expr(:call, :/, numer_expr, denom_expr)
+        end
+
+        if m.coeff < 0
+            return Expr(:call, :-, frac_expr)
+        else
+            return frac_expr
+        end
+    end
+    issym(O) && return nameof(O)
     !istree(O) && return O
 
     op = operation(O)
@@ -143,62 +195,11 @@ function _toexpr(O)
         return getindex_to_symbol(O)
     elseif op === (\)
         return :(solve($(_toexpr(args[1])), $(_toexpr(args[2]))))
-    elseif op isa Sym && symtype(op) <: AbstractArray
+    elseif issym(op) && symtype(op) <: AbstractArray
         return :(_textbf($(nameof(op))))
     end
     return Expr(:call, Symbol(op), _toexpr(args)...)
 end
-function _toexpr(m::Mul{<:Number})
-    numer = Any[]
-    denom = Any[]
-
-    # We need to iterate over each term in m, ignoring the numeric coefficient.
-    # This iteration needs to be stable, so we can't iterate over m.dict.
-    for term in Iterators.drop(arguments(m), isone(m.coeff) ? 0 : 1)
-        if !(term isa Pow)
-            push!(numer, _toexpr(term))
-            continue
-        end
-
-        base = term.base
-        pow  = term.exp
-        isneg = (pow isa Number && pow < 0) || (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
-        if !isneg
-            if _isone(pow)
-                pushfirst!(numer, _toexpr(base))
-            else
-                pushfirst!(numer, Expr(:call, :^, _toexpr(base), _toexpr(pow)))
-            end
-        else
-            newpow = -1*pow
-            if _isone(newpow)
-                pushfirst!(denom, _toexpr(base))
-            else
-                pushfirst!(denom, Expr(:call, :^, _toexpr(base), _toexpr(newpow)))
-            end
-        end
-    end
-
-    if isempty(numer) || !isone(abs(m.coeff))
-        numer_expr = Expr(:call, :*, abs(m.coeff), numer...)
-    else
-        numer_expr = length(numer) > 1 ? Expr(:call, :*, numer...) : numer[1]
-    end
-
-    if isempty(denom)
-        frac_expr = numer_expr
-    else
-        denom_expr = length(denom) > 1 ? Expr(:call, :*, denom...) : denom[1]
-        frac_expr = Expr(:call, :/, numer_expr, denom_expr)
-    end
-
-    if m.coeff < 0
-        return Expr(:call, :-, frac_expr)
-    else
-        return frac_expr
-    end
-end
-_toexpr(s::Sym) = nameof(s)
 _toexpr(x::Integer) = x
 _toexpr(x::AbstractFloat) = x
 
@@ -221,13 +222,18 @@ function getindex_to_symbol(t)
     end
 end
 
-diffdenom(e) = e
-diffdenom(e::Sym) = LaTeXString("\\mathrm{d}$e")
-diffdenom(e::Pow) = LaTeXString("\\mathrm{d}$(e.base)$(isone(e.exp) ? "" : "^{$(e.exp)}")")
-function diffdenom(e::Mul)
-    return LaTeXString(prod(
+function diffdenom(e)
+    if issym(e)
+        LaTeXString("\\mathrm{d}$e")
+    elseif ispow(e)
+        LaTeXString("\\mathrm{d}$(e.base)$(isone(e.exp) ? "" : "^{$(e.exp)}")")
+    elseif ismul(e)
+        LaTeXString(prod(
                 "\\mathrm{d}$(k)$(isone(v) ? "" : "^{$v}")"
                 for (k, v) in e.dict
                ))
+    else
+        e
+    end
 end
 
