@@ -579,7 +579,7 @@ function jacobian_sparsity(f!::Function, output::AbstractArray, input::AbstractA
                            args...; kwargs...)
     exprs = similar(output, Num)
     fill!(exprs, false)
-    vars = ArrayInterfaceCore.restructure(input, map(variable, eachindex(input)))
+    vars = ArrayInterface.restructure(input, map(variable, eachindex(input)))
     f!(exprs, vars, args...; kwargs...)
     jacobian_sparsity(exprs, vars)
 end
@@ -707,7 +707,7 @@ julia> Symbolics.hessian_sparsity(f, input)
 ```
 """
 function hessian_sparsity(f::Function, input::AbstractVector, args...; kwargs...)
-    vars = ArrayInterfaceCore.restructure(input, map(variable, eachindex(input)))
+    vars = ArrayInterface.restructure(input, map(variable, eachindex(input)))
     expr = f(vars, args...; kwargs...)
     hessian_sparsity(expr, vars)
 end

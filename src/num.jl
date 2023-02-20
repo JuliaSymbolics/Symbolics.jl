@@ -140,7 +140,7 @@ end
 # Boolean operations
 for (f, Domain) in [:(==) => :((AbstractFloat, Number)), :(!=) => :((AbstractFloat, Number)),
                     :(<=) => :((Real,)),   :(>=) => :((Real,)),
-                    :(isless) => :((Real,)),
+                    :(isless) => :((Real, AbstractFloat)),
                     :(<) => :((Real,)),   :(> ) => :((Real,)),
                     :(& )=> :((Bool,)),  :(| ) => :((Bool,)),
                     :xor => :((Bool,))]

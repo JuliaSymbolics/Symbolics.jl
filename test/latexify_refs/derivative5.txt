@@ -1,3 +1,3 @@
 \begin{equation}
-\frac{\mathrm{d}}{x} \frac{\mathrm{d}}{y} \frac{\mathrm{d}}{x} y
+\frac{\mathrm{d}}{\mathrm{d}x} \frac{\mathrm{d}}{\mathrm{d}y} \frac{\mathrm{d}}{\mathrm{d}x} y
 \end{equation}

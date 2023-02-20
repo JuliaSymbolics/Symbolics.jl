@@ -19,6 +19,7 @@ end
 
 function Base.getindex(x::SymArray, idx...)
     idx = unwrap.(idx)
+    meta = metadata(unwrap(x))
     if shape(x) !== Unknown() && all(i->i isa Integer, idx)
         II = CartesianIndices(axes(x))
         @boundscheck begin
@@ -27,7 +28,7 @@ function Base.getindex(x::SymArray, idx...)
             end
         end
         ii = II[idx...]
-        res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...])
+        res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...]; metadata = meta)
     elseif all(i->symtype(i) <: Integer, idx)
         shape(x) !== Unknown() && @boundscheck begin
             if length(idx) > 1
@@ -38,7 +39,7 @@ function Base.getindex(x::SymArray, idx...)
                 end
             end
         end
-        res = Term{eltype(symtype(x))}(getindex, [x, idx...])
+        res = Term{eltype(symtype(x))}(getindex, [x, idx...]; metadata = meta)
     elseif length(idx) == 1 && symtype(first(idx)) <: CartesianIndex
         i = first(idx)
         ii = i isa CartesianIndex ? Tuple(i) : arguments(i)
@@ -65,7 +66,7 @@ function Base.getindex(x::SymArray, idx...)
             end
         end
 
-        term = Term{Any}(getindex, [x, idx...])
+        term = Term{Any}(getindex, [x, idx...]; metadata = meta)
         T = eltype(symtype(x))
         N = ndims(x) - count(i->symtype(i) <: Integer, idx)
         res = ArrayOp(atype(symtype(x)){T,N},
