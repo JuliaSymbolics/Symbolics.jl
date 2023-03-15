@@ -456,11 +456,7 @@ $(SIGNATURES)
 A helper function for computing the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions.
 """
-function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
-    I = Int[]
-    J = Int[]
-    du = Num[]
-
+function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify::Bool=false)
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
     sp = jacobian_sparsity(ops, vars)
@@ -477,7 +473,7 @@ $(SIGNATURES)
 A helper function for computing the values of the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions given the sparsity structure.
 """
-function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify=false)
+function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false)
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
 
@@ -672,7 +668,7 @@ let
      1  ⋅
     ```
     """
-    function hessian_sparsity(expr, vars::AbstractVector)
+    function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true)
         @assert !(expr isa AbstractArray)
         expr = value(expr)
         u = map(value, vars)
@@ -680,7 +676,8 @@ let
         dict = Dict(u .=> idx.(1:length(u)))
         f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(expr)
         lp = linearity_propagator(f)
-        _sparse(lp, length(u))
+        S = _sparse(lp, length(u))
+        S = full ? S : tril(S)
     end
 end
 """
@@ -706,10 +703,10 @@ julia> Symbolics.hessian_sparsity(f, input)
  1  1
 ```
 """
-function hessian_sparsity(f::Function, input::AbstractVector, args...; kwargs...)
+function hessian_sparsity(f::Function, input::AbstractVector, args...; full::Bool=true, kwargs...)
     vars = ArrayInterface.restructure(input, map(variable, eachindex(input)))
     expr = f(vars, args...; kwargs...)
-    hessian_sparsity(expr, vars)
+    hessian_sparsity(expr, vars, full=full)
 end
 
 """
@@ -736,29 +733,47 @@ $(SIGNATURES)
 A helper function for computing the sparse Hessian of an expression with respect to
 an array of variable expressions.
 """
-function sparsehessian(O, vars::AbstractVector; simplify=false)
-    O = value(O)
+function sparsehessian(op, vars::AbstractVector; simplify::Bool=false, full::Bool=true)
+    op = value(op)
     vars = map(value, vars)
-    S = hessian_sparsity(O, vars)
-    I, J, _ = findnz(S)
+    S = hessian_sparsity(op, vars, full=full)
+
+    exprs = sparsehessian_vals(op, vars, I, J, simplify=simplify)
+
+    H = sparse(I, J, exprs, length(vars), length(vars))
+
+    if full
+        for (i, j) in zip(I, J)
+            j > i && (H[i, j] = H[j, i])
+        end
+    end
+    return H
+end
+
+"""
+$(SIGNATURES)
+
+A helper function for computing the values of the sparse Hessian of an expression with respect to
+an array of variable expressions given the sparsity structure.
+"""
+function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false)
+    vars = Symbolics.scalarize(vars)
+
     exprs = Array{Num}(undef, length(I))
     fill!(exprs, 0)
+
     prev_j = 0
     d = nothing
     for (k, (i, j)) in enumerate(zip(I, J))
         j > i && continue
         if j != prev_j
-            d = expand_derivatives(Differential(vars[j])(O), false)
+            d = expand_derivatives(Differential(vars[j])(op), false)
         end
         expr = expand_derivatives(Differential(vars[i])(d), simplify)
         exprs[k] = expr
         prev_j = j
     end
-    H = sparse(I, J, exprs, length(vars), length(vars))
-    for (i, j) in zip(I, J)
-        j > i && (H[i, j] = H[j, i])
-    end
-    return H
+    exprs
 end
 
 function SymbolicUtils.substitute(op::Differential, dict; kwargs...)
