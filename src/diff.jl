@@ -737,6 +737,7 @@ function sparsehessian(op, vars::AbstractVector; simplify::Bool=false, full::Boo
     op = value(op)
     vars = map(value, vars)
     S = hessian_sparsity(op, vars, full=full)
+    I, J, _ = findnz(S)
 
     exprs = sparsehessian_vals(op, vars, I, J, simplify=simplify)
 
