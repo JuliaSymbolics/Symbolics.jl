@@ -271,13 +271,12 @@ end
 
 function _matvec(A,b)
     @syms i::Int k::Int
+    sym_res = @arrayop (i,) A[i, k] * b[k] term=(A*b)
     if isdot(A, b)
-        make_shape((i,), A[i, k] * b[k]) # This is a dimension check
-        T = SymbolicUtils.promote_symtype(*, eltype(A), eltype(b))
-        S = SymbolicUtils.promote_symtype(+, T,T)
-        return Term{S}(*, [A, b])
+        return sym_res[1]
+    else
+        return sym_res
     end
-    @arrayop (i,) A[i, k] * b[k] term=(A*b)
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
 
