@@ -1,6 +1,17 @@
-# Symbolic Calculations and Building Callable Functions
+# Getting Started with Symbolics.jl
 
-Symbolics.jl is a symbolic modeling language.
+Symbolics.jl is a symbolic modeling language. In this tutorial, we will walk you through
+the process of getting Symbolics.jl up and running, and start doing our first symbolic
+calculations.
+
+## Installing Symbolics.jl
+
+Installing Symbolics.jl is as simple as using the Julia package manager. This is done via
+the command `]add Symbolics`. After precompilation is complete, do `using Symbolics`
+in the terminal (REPL) and when that command is completed, you're ready to start!
+
+## Building Symbolic Expressions
+
 The way to define symbolic variables is via the `@variables` macro:
 
 ```@example symbolic_basics
@@ -15,7 +26,7 @@ After defining variables as symbolic, symbolic expressions, which we call a
 z = x^2 + y
 ```
 
-Here, `z` is an expression tree for "square `x` and add `y`". To make an array
+Here, `z` is an expression tree for “square `x` and add `y`”. To make an array
 of symbolic expressions, simply make an array of symbolic expressions:
 
 ```@example symbolic_basics
@@ -25,13 +36,13 @@ A = [x^2 + y 0 2x
 ```
 
 Note that by default, `@variables` returns `Sym` or `istree` objects wrapped in
-`Num` in order to make them behave like subtypes of `Real`. Any operation on
+`Num` to make them behave like subtypes of `Real`. Any operation on
 these `Num` objects will return a new `Num` object, wrapping the result of
 computing symbolically on the underlying values.
 
 If you are following this tutorial in the Julia REPL, `A` will not be shown with LaTeX equations.
 To get these equations, we can use [Latexify.jl](https://github.com/korsbo/Latexify.jl).
-Symbolics.jl comes with Latexify recipes so it works automatically:
+Symbolics.jl comes with Latexify recipes, so it works automatically:
 
 ```@example symbolic_basics
 using Latexify
@@ -87,8 +98,8 @@ D(z)
 ```
 
 Notice that this hasn't computed anything yet: `D` is a lazy operator
-because it lets us symbolically represent "The derivative of ``z`` with
-respect to ``t``", which is useful for example when representing our
+because it lets us symbolically represent “The derivative of ``z`` with
+respect to ``t``”, which is useful for example when representing our
 favorite thing in the world, differential equations. However, if we
 want to expand the derivative operators, we'd use `expand_derivatives`:
 
@@ -96,7 +107,7 @@ want to expand the derivative operators, we'd use `expand_derivatives`:
 expand_derivatives(D(z))
 ```
 
-To get the variable that you are taking the derivative with respect to is accessed with:
+The variable, that you are taking the derivative with respect to, is accessed with:
 
 ```@example symbolic_basics
 D.x
@@ -154,7 +165,7 @@ Symbolics.value.(V)
 Note that the macros are for the high-level case where you're doing symbolic
 computation on your own code. If you want to do symbolic computation on someone
 else's code, like in a macro, you may not want to do `@variables x` because you
-might want the name "x" to come from the user's code. For these cases, you can
+might want the name “x” to come from the user's code. For these cases, you can
 use the interpolation operator to interpolate the runtime value of `x`, i.e.
 `@variables $x`. Check the documentation of `@variables` for more details.
 
@@ -186,9 +197,9 @@ In the definition
 @variables t x(t) y(t)
 ```
 
-`t` is of type `Sym{Real}` but the name `x` refers to an object that represents the `Term` `x(t)`. The operation of this expression is itself the object `Sym{FnType{Tuple{Real}, Real}}(:x)`. The type `Sym{FnType{...}}` represents a callable object. In this case specifically it's a function that takes 1 Real argument (noted by `Tuple{Real}`) and returns a `Real` result. You can call such a callable `Sym` with either a number or a symbolic expression of a permissible type.
+`t` is of type `Sym{Real}`, but the name `x` refers to an object that represents the `Term` `x(t)`. The operation of this expression is itself the object `Sym{FnType{Tuple{Real}, Real}}(:x)`. The type `Sym{FnType{...}}` represents a callable object. In this case specifically, it's a function that takes 1 Real argument (noted by `Tuple{Real}`) and returns a `Real` result. You can call such a callable `Sym` with either a number or a symbolic expression of a permissible type.
 
-This expression also defines `t` as a independent variable while `x(t)` and `y(t)` are
+This expression also defines `t` as an independent variable, while `x(t)` and `y(t)` are
 dependent variables. This is accounted for in differentiation:
 
 ```@example symbolic_basics
@@ -197,7 +208,7 @@ expand_derivatives(D(z))
 ```
 
 Since `x` and `y` are time-dependent, they are not automatically eliminated
-from the expression and thus the `D(x)` and `D(y)` operations still
+from the expression, and thus the `D(x)` and `D(y)` operations still
 exist in the expanded derivatives for correctness.
 
 We can also define unrestricted functions:
@@ -206,7 +217,7 @@ We can also define unrestricted functions:
 @variables g(..)
 ```
 
-Here `g` is a variable that is a function of other variables. Any time
+Here, `g` is a variable that is a function of other variables. Any time
 that we reference `g` we have to utilize it as a function:
 
 ```@example symbolic_basics
@@ -227,13 +238,13 @@ h(x, y) = x^2 + y
 @register_symbolic h(x, y)
 ```
 
-Now when we use `h(x, y)`, it is a symbolic expression and doesn't expand:
+When we use `h(x, y)`, it is a symbolic expression and doesn't expand:
 
 ```@example symbolic_basics
 h(x, y) + y^2
 ```
 
-In order to use it with the differentiation system, we need to register
+To use it with the differentiation system, we need to register
 its derivatives. We would do it like this:
 
 ```@example symbolic_basics
@@ -278,7 +289,7 @@ myf(SA[2.0, 3.0])
 ```
 
 The second function is an in-place non-allocating mutating function
-which mutates its first value. Thus we'd use it like the following:
+which mutates its first value. Thus, we'd use it like the following:
 
 ```@example symbolic_basics
 myf! = eval(f_expr[2])
@@ -324,12 +335,12 @@ Now we call `build_function`:
 ```@example symbolic_basics
 Base.remove_linenums!(build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2])
 ```
-Let's unpack what that's doing. It's using `A.nzval` in order to linearly
+Let's unpack what that's doing. It's using `A.nzval` to linearly
 index through the sparse matrix, avoiding the `A[i,j]` form because that
 is a more expensive way to index a sparse matrix if you know exactly the
 order that the data is stored. Then, it's splitting up the calculation
-into Julia threads so they can be operated on in parallel. It synchronizes
-after spawning all of the tasks so the computation is ensured to be
+into Julia threads, so they can be operated on in parallel. It synchronizes
+after spawning all the tasks, so the computation is ensured to be
 complete before moving on. And it does this with all in-place operations
 to the original matrix instead of generating arrays. This is the fanciest
 way you could fill a sparse matrix, and Symbolics makes this
@@ -341,17 +352,17 @@ documentation for brevity. It will be the faster version if `N` is
 sufficiently large!)
 
 Importantly, when using the in-place functions generated by
-[`build_function](@ref), it is important that the mutating argument matches the
+[`build_function`](@ref), it is important that the mutating argument matches the
 sparse structure of the original function, as demonstrated below.
 ```@example symbolic_basics
 using Symbolics, SparseArrays, LinearAlgebra
 
 N = 10
-_S = sprand(N, N, 0.1) 
+_S = sprand(N, N, 0.1)
 _Q = sprand(N, N, 0.1)
 
 F(z) = [ # some complicated sparse amenable function
-    _S * z 
+    _S * z
     _Q * z.^2
 ]
 

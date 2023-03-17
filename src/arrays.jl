@@ -44,7 +44,7 @@ struct ArrayOp{T<:AbstractArray} <: Symbolic{T}
     reduce
     term
     shape
-    ranges::Dict{Sym, AbstractRange} # index range each index symbol can take,
+    ranges::Dict{BasicSymbolic, AbstractRange} # index range each index symbol can take,
                                      # optional for each symbol
     metadata
 end
@@ -94,15 +94,16 @@ end
 
 function Base.isequal(a::ArrayOp, b::ArrayOp)
     a === b && return true
-    isequal(operation(a), operation(b)) &&
+    isequal(a.shape, b.shape) &&
+    isequal(a.ranges, b.ranges) &&
     isequal(a.output_idx, b.output_idx) &&
-    isequal(a.expr, b.expr) &&
     isequal(a.reduce, b.reduce) &&
-    isequal(a.shape, b.shape)
+    isequal(operation(a), operation(b)) &&
+    isequal(a.expr, b.expr)
 end
 
 function Base.hash(a::ArrayOp, u::UInt)
-    hash(a.shape, hash(a.expr, hash(a.expr, hash(a.output_idx, hash(operation(a), u)))))
+    hash(a.shape, hash(a.ranges, hash(a.expr, hash(a.output_idx, hash(operation(a), u)))))
 end
 
 macro arrayop(output_idx, expr, options...)
@@ -197,7 +198,7 @@ function make_shape(output_idx, expr, ranges=Dict())
     end
 
     sz = map(output_idx) do i
-        if i isa Sym
+        if issym(i)
             if haskey(ranges, i)
                 return axes(ranges[i], 1)
             end
@@ -222,7 +223,7 @@ end
 
 
 function ranges(a::ArrayOp)
-    rs = Dict{Sym, Any}()
+    rs = Dict{BasicSymbolic, Any}()
     ax = idx_to_axes(a.expr)
     for i in keys(ax)
         if haskey(a.ranges, i)
@@ -316,7 +317,7 @@ get_extents(x::AbstractRange) = x
 # dim: The dimension of the array indexed
 # boundary: how much padding is this indexing requiring, for example
 #   boundary is 2 for x[i + 2], and boundary = -2 for x[i - 2]
-function idx_to_axes(expr, dict=Dict{Sym, Vector}(), ranges=Dict())
+function idx_to_axes(expr, dict=Dict{Any, Vector}(), ranges=Dict())
     if istree(expr)
         if operation(expr) === (getindex)
             args = arguments(expr)
@@ -376,7 +377,7 @@ function arrterm(f, args...)
         atype{etype, nd}
     end
 
-    setmetadata(Term{S}(f, args),
+    setmetadata(Term{S}(f, Any[args...]),
                 ArrayShapeCtx,
                 propagate_shape(f, args...))
 end
@@ -461,7 +462,7 @@ const ArrayLike{T,N} = Union{
     ArrayOp{AbstractArray{T,N}},
     Symbolic{AbstractArray{T,N}},
     Arr{T,N},
-    SymbolicUtils.Term{Arr{T, N}}
+    SymbolicUtils.Term{AbstractArray{T, N}}
 } # Like SymArray but includes Arr and Term{Arr}
 
 unwrap(x::Arr) = x.value
@@ -599,8 +600,12 @@ function scalarize(arr::AbstractArray, idx)
     arr[idx...]
 end
 
-function scalarize(arr::Term, idx)
-    scalarize_op(operation(arr), arr, idx)
+function scalarize(arr, idx)
+    if istree(arr)
+        scalarize_op(operation(arr), arr, idx)
+    else
+        error("scalarize is not defined for $arr at idx=$idx")
+    end
 end
 
 scalarize_op(f, arr) = arr
@@ -748,9 +753,9 @@ function arraymaker(T, shape, views, seq...)
     ArrayMaker{T}(shape, [(views .=> seq)...], nothing)
 end
 
-TermInterface.istree(x::ArrayMaker) = true
-TermInterface.operation(x::ArrayMaker) = arraymaker
-TermInterface.arguments(x::ArrayMaker) = [eltype(x), shape(x), map(first, x.sequence), map(last, x.sequence)...]
+istree(x::ArrayMaker) = true
+operation(x::ArrayMaker) = arraymaker
+arguments(x::ArrayMaker) = [eltype(x), shape(x), map(first, x.sequence), map(last, x.sequence)...]
 
 shape(am::ArrayMaker) = am.shape
 

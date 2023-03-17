@@ -37,8 +37,7 @@ end
 (D::Differential)(x::Num) = Num(D(value(x)))
 SymbolicUtils.promote_symtype(::Differential, x) = x
 
-is_derivative(x::Term) = operation(x) isa Differential
-is_derivative(x) = false
+is_derivative(x) = istree(x) ? operation(x) isa Differential : false
 
 Base.:*(D1, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
@@ -51,7 +50,7 @@ Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
 Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 
 _isfalse(occ::Bool) = occ === false
-_isfalse(occ::Term) = _isfalse(operation(occ))
+_isfalse(occ::Symbolic) = istree(occ) && _isfalse(operation(occ))
 
 function occursin_info(x, expr, fail = true)
     if symtype(expr) <: AbstractArray
@@ -85,7 +84,7 @@ function occursin_info(x, expr, fail = true)
         return false
     end
 
-    !istree(expr) && return false
+    !istree(expr) && return isequal(x, expr)
     if isequal(x, expr)
         true
     else
@@ -128,11 +127,11 @@ function recursive_hasoperator(op, O)
     if operation(O) isa op
         return true
     else
-        if O isa Union{Add, Mul}
+        if isadd(O) || ismul(O)
             any(recursive_hasoperator(op), keys(O.dict))
-        elseif O isa Pow
+        elseif ispow(O)
             recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
-        elseif O isa SymbolicUtils.Div
+        elseif isdiv(O)
             recursive_hasoperator(op)(O.num) || recursive_hasoperator(op)(O.den)
         else
             any(recursive_hasoperator(op), arguments(O))
@@ -176,7 +175,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurances=nothing)
 
         if !istree(arg)
             return D(arg) # Cannot expand
-        elseif (op = operation(arg); isa(op, Sym))
+        elseif (op = operation(arg); issym(op))
             inner_args = arguments(arg)
             if any(isequal(D.x), inner_args)
                 return D(arg) # base case if any argument is directly equal to the i.v.
@@ -437,16 +436,18 @@ $(SIGNATURES)
 A helper function for computing the Jacobian of an array of expressions with respect to
 an array of variable expressions.
 """
-function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
-    ops = Symbolics.scalarize(ops)
-    vars = Symbolics.scalarize(vars)
+function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false, scalarize=true)
+    if scalarize
+        ops = Symbolics.scalarize(ops)
+        vars = Symbolics.scalarize(vars)
+    end
     Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
 end
 
-function jacobian(ops::ArrayLike{T, 1}, vars::ArrayLike{T, 1}; simplify=false) where T
-    ops = scalarize(ops)
-    vars = scalarize(vars) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
-    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
+function jacobian(ops, vars; simplify=false)
+    ops = vec(scalarize(ops))
+    vars = vec(scalarize(vars)) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
+    jacobian(ops, vars; simplify=simplify, scalarize=false)
 end
 
 """
@@ -455,11 +456,7 @@ $(SIGNATURES)
 A helper function for computing the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions.
 """
-function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify=false)
-    I = Int[]
-    J = Int[]
-    du = Num[]
-
+function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify::Bool=false)
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
     sp = jacobian_sparsity(ops, vars)
@@ -476,7 +473,7 @@ $(SIGNATURES)
 A helper function for computing the values of the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions given the sparsity structure.
 """
-function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify=false)
+function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false)
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
 
@@ -578,7 +575,7 @@ function jacobian_sparsity(f!::Function, output::AbstractArray, input::AbstractA
                            args...; kwargs...)
     exprs = similar(output, Num)
     fill!(exprs, false)
-    vars = ArrayInterfaceCore.restructure(input, map(variable, eachindex(input)))
+    vars = ArrayInterface.restructure(input, map(variable, eachindex(input)))
     f!(exprs, vars, args...; kwargs...)
     jacobian_sparsity(exprs, vars)
 end
@@ -642,7 +639,7 @@ let
                   error("Function of unknown linearity used: ", ~f)
               end
           end
-          @rule ~x::(x->x isa Sym) => 0]
+          @rule ~x::issym => 0]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=basic_simterm))
 
     global hessian_sparsity
@@ -671,7 +668,7 @@ let
      1  ⋅
     ```
     """
-    function hessian_sparsity(expr, vars::AbstractVector)
+    function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true)
         @assert !(expr isa AbstractArray)
         expr = value(expr)
         u = map(value, vars)
@@ -679,7 +676,8 @@ let
         dict = Dict(u .=> idx.(1:length(u)))
         f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(expr)
         lp = linearity_propagator(f)
-        _sparse(lp, length(u))
+        S = _sparse(lp, length(u))
+        S = full ? S : tril(S)
     end
 end
 """
@@ -705,10 +703,10 @@ julia> Symbolics.hessian_sparsity(f, input)
  1  1
 ```
 """
-function hessian_sparsity(f::Function, input::AbstractVector, args...; kwargs...)
-    vars = ArrayInterfaceCore.restructure(input, map(variable, eachindex(input)))
+function hessian_sparsity(f::Function, input::AbstractVector, args...; full::Bool=true, kwargs...)
+    vars = ArrayInterface.restructure(input, map(variable, eachindex(input)))
     expr = f(vars, args...; kwargs...)
-    hessian_sparsity(expr, vars)
+    hessian_sparsity(expr, vars, full=full)
 end
 
 """
@@ -735,29 +733,48 @@ $(SIGNATURES)
 A helper function for computing the sparse Hessian of an expression with respect to
 an array of variable expressions.
 """
-function sparsehessian(O, vars::AbstractVector; simplify=false)
-    O = value(O)
+function sparsehessian(op, vars::AbstractVector; simplify::Bool=false, full::Bool=true)
+    op = value(op)
     vars = map(value, vars)
-    S = hessian_sparsity(O, vars)
+    S = hessian_sparsity(op, vars, full=full)
     I, J, _ = findnz(S)
+
+    exprs = sparsehessian_vals(op, vars, I, J, simplify=simplify)
+
+    H = sparse(I, J, exprs, length(vars), length(vars))
+
+    if full
+        for (i, j) in zip(I, J)
+            j > i && (H[i, j] = H[j, i])
+        end
+    end
+    return H
+end
+
+"""
+$(SIGNATURES)
+
+A helper function for computing the values of the sparse Hessian of an expression with respect to
+an array of variable expressions given the sparsity structure.
+"""
+function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false)
+    vars = Symbolics.scalarize(vars)
+
     exprs = Array{Num}(undef, length(I))
     fill!(exprs, 0)
+
     prev_j = 0
     d = nothing
     for (k, (i, j)) in enumerate(zip(I, J))
         j > i && continue
         if j != prev_j
-            d = expand_derivatives(Differential(vars[j])(O), false)
+            d = expand_derivatives(Differential(vars[j])(op), false)
         end
         expr = expand_derivatives(Differential(vars[i])(d), simplify)
         exprs[k] = expr
         prev_j = j
     end
-    H = sparse(I, J, exprs, length(vars), length(vars))
-    for (i, j) in zip(I, J)
-        j > i && (H[i, j] = H[j, i])
-    end
-    return H
+    exprs
 end
 
 function SymbolicUtils.substitute(op::Differential, dict; kwargs...)

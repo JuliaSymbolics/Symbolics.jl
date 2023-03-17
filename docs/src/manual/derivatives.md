@@ -7,15 +7,15 @@ other operations using its function call, so `D(x+y)` is `d(x+y)/dt`.
 
 By default, the derivatives are left unexpanded to capture the symbolic
 representation of the differential equation. If the user would like to expand
-out all of the differentials, the `expand_derivatives` function eliminates all
-of the differentials down to basic one-variable expressions.
+out all the differentials, the `expand_derivatives` function eliminates all
+the differentials down to basic one-variable expressions.
 
 ```@docs
 Differential
 expand_derivatives
 ```
 
-## High Level Differentiation Functions
+## High-Level Differentiation Functions
 
 The following functions are not exported and thus must be accessed in a namespaced
 way, i.e. `Symbolics.jacobian`.
@@ -24,30 +24,32 @@ way, i.e. `Symbolics.jacobian`.
 Symbolics.derivative
 Symbolics.jacobian
 Symbolics.sparsejacobian
+Symbolics.sparsejacobian_vals
 Symbolics.gradient
 Symbolics.hessian
 Symbolics.sparsehessian
+Symbolics.sparsehessian_vals
 ```
 
 ## Adding Analytical Derivatives
 
-There is a large amount of derivatives pre-defined by
+There are many derivatives pre-defined by
 [DiffRules.jl](https://github.com/JuliaDiff/DiffRules.jl).
-
+For example,
 ```@example derivatives
 using Symbolics
 @variables x y z
 f(x,y,z) = x^2 + sin(x+y) - z
 ```
 
-automatically has the derivatives defined via the tracing mechanism. It will do
-this by directly building the operation the internals of your function and
+`f` automatically has the derivatives defined via the tracing mechanism. It will do
+this by directly building the internals of your function and
 differentiating that.
 
-However, in many cases you may want to define your own derivatives so that way
+However, often you may want to define your own derivatives so that way
 automatic Jacobian etc. calculations can utilize this information. This can
-allow for more succinct versions of the derivatives to be calculated in order
-to better scale to larger systems. You can define derivatives for your own
+allow for more succinct versions of the derivatives to be calculated
+to scale to larger systems. You can define derivatives for your
 function via the dispatch:
 
 ```julia
