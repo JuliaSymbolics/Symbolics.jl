@@ -41,6 +41,7 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 @latexrecipe function f(n::Num)
     env --> :equation
     cdot --> false
+    fmt --> FancyNumberFormatter(5)
 
     return recipe(n)
 end
