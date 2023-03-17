@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Getting Started with Symbolics.jl · Symbolics.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img src="../assets/logo.png" alt="Symbolics.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">Symbolics.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Getting Started with Symbolics.jl</a><ul class="internal"><li><a class="tocitem" href="#Installing-Symbolics.jl"><span>Installing Symbolics.jl</span></a></li><li><a class="tocitem" href="#Building-Symbolic-Expressions"><span>Building Symbolic Expressions</span></a></li><li><a class="tocitem" href="#Derivatives"><span>Derivatives</span></a></li><li><a class="tocitem" href="#Simplification-and-Substitution"><span>Simplification and Substitution</span></a></li><li><a class="tocitem" href="#Non-Interactive-Development"><span>Non-Interactive Development</span></a></li><li><a class="tocitem" href="#Syms-and-callable-Syms"><span><code>Sym</code>s and callable <code>Sym</code>s</span></a></li><li><a class="tocitem" href="#Registering-Functions"><span>Registering Functions</span></a></li><li><a class="tocitem" href="#Building-Functions"><span>Building Functions</span></a></li><li><a class="tocitem" href="#Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices"><span>Building Non-Allocating Parallel Functions for Sparse Matrices</span></a></li></ul></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing</a></li><li><a class="tocitem" href="../tutorials/converting_to_C/">Automatic Conversion of Julia Code to C Functions</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../examples/perturbation/">Mixed Symbolic-Numeric Perturbation Theory</a></li></ul></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../manual/variables/">Variable and Equation Types</a></li><li><a class="tocitem" href="../manual/expression_manipulation/">Expression Manipulation</a></li><li><a class="tocitem" href="../manual/derivatives/">Derivatives and Differentials</a></li><li><a class="tocitem" href="../manual/groebner/">Groebner bases</a></li><li><a class="tocitem" href="../manual/arrays/">Symbolic arrays</a></li><li><a class="tocitem" href="../manual/build_function/">Function Building and Compilation (build_function)</a></li><li><a class="tocitem" href="../manual/functions/">Function Registration and Tracing</a></li><li><a class="tocitem" href="../manual/parsing/">Parsing Julia Expressions to Symbolic Expressions</a></li><li><a class="tocitem" href="../manual/io/">I/O, Saving, and Latex</a></li><li><a class="tocitem" href="../manual/sparsity_detection/">Structure and Sparsity Detection</a></li><li><a class="tocitem" href="../manual/types/">Supported types and dispatch in Symbolics</a></li><li><a class="tocitem" href="../manual/faq/">Frequently Asked Questions</a></li></ul></li><li><a class="tocitem" href="../comparison/">Comparison Against SymPy</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Getting Started with Symbolics.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Getting Started with Symbolics.jl</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/JuliaSymbolics/Symbolics.jl/blob/master/docs/src/getting_started.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Getting-Started-with-Symbolics.jl"><a class="docs-heading-anchor" href="#Getting-Started-with-Symbolics.jl">Getting Started with Symbolics.jl</a><a id="Getting-Started-with-Symbolics.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Getting-Started-with-Symbolics.jl" title="Permalink"></a></h1><p>Symbolics.jl is a symbolic modeling language. In this tutorial we will walk you through the process of getting Symbolics.jl up and running, and start doing our first symbolic calculations.</p><h2 id="Installing-Symbolics.jl"><a class="docs-heading-anchor" href="#Installing-Symbolics.jl">Installing Symbolics.jl</a><a id="Installing-Symbolics.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Installing-Symbolics.jl" title="Permalink"></a></h2><p>Installing Symbolics.jl is as simple as using the Julia package manager. This is done via the command <code>]add Symbolics</code>. After precompilation is complete, do <code>using Symbolics</code> in the terminal (REPL) and when that command is completed, you&#39;re ready to start!</p><h2 id="Building-Symbolic-Expressions"><a class="docs-heading-anchor" href="#Building-Symbolic-Expressions">Building Symbolic Expressions</a><a id="Building-Symbolic-Expressions-1"></a><a class="docs-heading-anchor-permalink" href="#Building-Symbolic-Expressions" title="Permalink"></a></h2><p>The way to define symbolic variables is via the <code>@variables</code> macro:</p><pre><code class="language-julia hljs">using Symbolics
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Getting Started with Symbolics.jl · Symbolics.jl</title><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img class="docs-light-only" src="../assets/logo.svg" alt="Symbolics.jl logo"/><img class="docs-dark-only" src="../assets/logo-dark.svg" alt="Symbolics.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">Symbolics.jl</a></span></div><form class="docs-search" action="../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Getting Started with Symbolics.jl</a><ul class="internal"><li><a class="tocitem" href="#Installing-Symbolics.jl"><span>Installing Symbolics.jl</span></a></li><li><a class="tocitem" href="#Building-Symbolic-Expressions"><span>Building Symbolic Expressions</span></a></li><li><a class="tocitem" href="#Derivatives"><span>Derivatives</span></a></li><li><a class="tocitem" href="#Simplification-and-Substitution"><span>Simplification and Substitution</span></a></li><li><a class="tocitem" href="#Non-Interactive-Development"><span>Non-Interactive Development</span></a></li><li><a class="tocitem" href="#Syms-and-callable-Syms"><span><code>Sym</code>s and callable <code>Sym</code>s</span></a></li><li><a class="tocitem" href="#Registering-Functions"><span>Registering Functions</span></a></li><li><a class="tocitem" href="#Building-Functions"><span>Building Functions</span></a></li><li><a class="tocitem" href="#Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices"><span>Building Non-Allocating Parallel Functions for Sparse Matrices</span></a></li></ul></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing</a></li><li><a class="tocitem" href="../tutorials/converting_to_C/">Automatic Conversion of Julia Code to C Functions</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../examples/perturbation/">Mixed Symbolic-Numeric Perturbation Theory</a></li></ul></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../manual/variables/">Variable and Equation Types</a></li><li><a class="tocitem" href="../manual/expression_manipulation/">Expression Manipulation</a></li><li><a class="tocitem" href="../manual/derivatives/">Derivatives and Differentials</a></li><li><a class="tocitem" href="../manual/groebner/">Groebner bases</a></li><li><a class="tocitem" href="../manual/arrays/">Symbolic arrays</a></li><li><a class="tocitem" href="../manual/build_function/">Function Building and Compilation (build_function)</a></li><li><a class="tocitem" href="../manual/functions/">Function Registration and Tracing</a></li><li><a class="tocitem" href="../manual/parsing/">Parsing Julia Expressions to Symbolic Expressions</a></li><li><a class="tocitem" href="../manual/io/">I/O, Saving, and Latex</a></li><li><a class="tocitem" href="../manual/sparsity_detection/">Structure and Sparsity Detection</a></li><li><a class="tocitem" href="../manual/types/">Supported types and dispatch in Symbolics</a></li><li><a class="tocitem" href="../manual/faq/">Frequently Asked Questions</a></li></ul></li><li><a class="tocitem" href="../comparison/">Comparison Against SymPy</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Getting Started with Symbolics.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Getting Started with Symbolics.jl</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/JuliaSymbolics/Symbolics.jl/blob/master/docs/src/getting_started.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Getting-Started-with-Symbolics.jl"><a class="docs-heading-anchor" href="#Getting-Started-with-Symbolics.jl">Getting Started with Symbolics.jl</a><a id="Getting-Started-with-Symbolics.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Getting-Started-with-Symbolics.jl" title="Permalink"></a></h1><p>Symbolics.jl is a symbolic modeling language. In this tutorial, we will walk you through the process of getting Symbolics.jl up and running, and start doing our first symbolic calculations.</p><h2 id="Installing-Symbolics.jl"><a class="docs-heading-anchor" href="#Installing-Symbolics.jl">Installing Symbolics.jl</a><a id="Installing-Symbolics.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Installing-Symbolics.jl" title="Permalink"></a></h2><p>Installing Symbolics.jl is as simple as using the Julia package manager. This is done via the command <code>]add Symbolics</code>. After precompilation is complete, do <code>using Symbolics</code> in the terminal (REPL) and when that command is completed, you&#39;re ready to start!</p><h2 id="Building-Symbolic-Expressions"><a class="docs-heading-anchor" href="#Building-Symbolic-Expressions">Building Symbolic Expressions</a><a id="Building-Symbolic-Expressions-1"></a><a class="docs-heading-anchor-permalink" href="#Building-Symbolic-Expressions" title="Permalink"></a></h2><p>The way to define symbolic variables is via the <code>@variables</code> macro:</p><pre><code class="language-julia hljs">using Symbolics
 @variables x y</code></pre><p class="math-container">\[ \begin{equation}
 \left[
 \begin{array}{c}
@@ -11,7 +11,7 @@ y \\
  \]</p><p>After defining variables as symbolic, symbolic expressions, which we call a <code>istree</code> object, can be generated by utilizing Julia expressions. For example:</p><pre><code class="language-julia hljs">z = x^2 + y</code></pre><p class="math-container">\[ \begin{equation}
 y + x^{2}
 \end{equation}
- \]</p><p>Here, <code>z</code> is an expression tree for &quot;square <code>x</code> and add <code>y</code>&quot;. To make an array of symbolic expressions, simply make an array of symbolic expressions:</p><pre><code class="language-julia hljs">A = [x^2 + y 0 2x
+ \]</p><p>Here, <code>z</code> is an expression tree for “square <code>x</code> and add <code>y</code>”. To make an array of symbolic expressions, simply make an array of symbolic expressions:</p><pre><code class="language-julia hljs">A = [x^2 + y 0 2x
      0       0 2y
      y^2 + x 0 0]</code></pre><p class="math-container">\[ \begin{equation}
 \left[
@@ -22,7 +22,7 @@ x + y^{2} &amp; 0 &amp; 0 \\
 \end{array}
 \right]
 \end{equation}
- \]</p><p>Note that by default, <code>@variables</code> returns <code>Sym</code> or <code>istree</code> objects wrapped in <code>Num</code> in order to make them behave like subtypes of <code>Real</code>. Any operation on these <code>Num</code> objects will return a new <code>Num</code> object, wrapping the result of computing symbolically on the underlying values.</p><p>If you are following this tutorial in the Julia REPL, <code>A</code> will not be shown with LaTeX equations. To get these equations, we can use <a href="https://github.com/korsbo/Latexify.jl">Latexify.jl</a>. Symbolics.jl comes with Latexify recipes so it works automatically:</p><pre><code class="language-julia hljs">using Latexify
+ \]</p><p>Note that by default, <code>@variables</code> returns <code>Sym</code> or <code>istree</code> objects wrapped in <code>Num</code> to make them behave like subtypes of <code>Real</code>. Any operation on these <code>Num</code> objects will return a new <code>Num</code> object, wrapping the result of computing symbolically on the underlying values.</p><p>If you are following this tutorial in the Julia REPL, <code>A</code> will not be shown with LaTeX equations. To get these equations, we can use <a href="https://github.com/korsbo/Latexify.jl">Latexify.jl</a>. Symbolics.jl comes with Latexify recipes, so it works automatically:</p><pre><code class="language-julia hljs">using Latexify
 latexify(A)</code></pre><p>\begin{equation} \left[ \begin{array}{ccc} y + x^{2} &amp; 0 &amp; 2 x \
 0 &amp; 0 &amp; 2 y \
 x + y^{2} &amp; 0 &amp; 0 \
@@ -58,10 +58,10 @@ D = Differential(t)</code></pre><pre class="documenter-example-output"><code cla
 D(z)</code></pre><p class="math-container">\[ \begin{equation}
 \frac{\mathrm{d}}{\mathrm{d}t} \left( t + t^{2} \right)
 \end{equation}
- \]</p><p>Notice that this hasn&#39;t computed anything yet: <code>D</code> is a lazy operator because it lets us symbolically represent &quot;The derivative of <span>$z$</span> with respect to <span>$t$</span>&quot;, which is useful for example when representing our favorite thing in the world, differential equations. However, if we want to expand the derivative operators, we&#39;d use <code>expand_derivatives</code>:</p><pre><code class="language-julia hljs">expand_derivatives(D(z))</code></pre><p class="math-container">\[ \begin{equation}
+ \]</p><p>Notice that this hasn&#39;t computed anything yet: <code>D</code> is a lazy operator because it lets us symbolically represent “The derivative of <span>$z$</span> with respect to <span>$t$</span>”, which is useful for example when representing our favorite thing in the world, differential equations. However, if we want to expand the derivative operators, we&#39;d use <code>expand_derivatives</code>:</p><pre><code class="language-julia hljs">expand_derivatives(D(z))</code></pre><p class="math-container">\[ \begin{equation}
 1 + 2 t
 \end{equation}
- \]</p><p>To get the variable that you are taking the derivative with respect to is accessed with:</p><pre><code class="language-julia hljs">D.x</code></pre><p class="math-container">\[ \begin{equation}
+ \]</p><p>The variable, that you are taking the derivative with respect to, is accessed with:</p><pre><code class="language-julia hljs">D.x</code></pre><p class="math-container">\[ \begin{equation}
 t
 \end{equation}
  \]</p><p>We can also have simplified functions for multivariable calculus. For example, we can compute the Jacobian of an array of expressions like:</p><pre><code class="language-julia hljs">Symbolics.jacobian([x + x*y, x^2 + y], [x, y])</code></pre><p class="math-container">\[ \begin{equation}
@@ -73,22 +73,22 @@ t
 \right]
 \end{equation}
  \]</p><p>and similarly we can do Hessians, gradients, and define whatever other derivatives you want.</p><h2 id="Simplification-and-Substitution"><a class="docs-heading-anchor" href="#Simplification-and-Substitution">Simplification and Substitution</a><a id="Simplification-and-Substitution-1"></a><a class="docs-heading-anchor-permalink" href="#Simplification-and-Substitution" title="Permalink"></a></h2><p>Symbolics interfaces with <a href="https://github.com/JuliaSymbolics/SymbolicUtils.jl">SymbolicUtils.jl</a> to allow for simplifying symbolic expressions. This is done simply through the <code>simplify</code> command:</p><pre><code class="language-julia hljs">simplify(2x + 2y)</code></pre><p class="math-container">\[ \begin{equation}
-2 x + 2 y
+2 \left( x + y \right)
 \end{equation}
  \]</p><p>This can be applied to arrays by using Julia&#39;s broadcast mechanism:</p><pre><code class="language-julia hljs">B = simplify.([t + t^2 + t + t^2  2t + 4t
                x + y + y + 2t     x^2 - x^2 + y^2])</code></pre><p class="math-container">\[ \begin{equation}
 \left[
 \begin{array}{cc}
-2 t + 2 t^{2} &amp; 6 t \\
-x + 2 t + 2 y &amp; y^{2} \\
+2 \left( t + t^{2} \right) &amp; 6 t \\
+x + 2 \left( t + y \right) &amp; y^{2} \\
 \end{array}
 \right]
 \end{equation}
  \]</p><p>We can then use <code>substitute</code> to change values of an expression around:</p><pre><code class="language-julia hljs">simplify.(substitute.(B, (Dict(x =&gt; y^2),)))</code></pre><p class="math-container">\[ \begin{equation}
 \left[
 \begin{array}{cc}
-2 t + 2 t^{2} &amp; 6 t \\
-2 t + y^{2} + 2 y &amp; y^{2} \\
+2 \left( t + t^{2} \right) &amp; 6 t \\
+y^{2} + 2 \left( t + y \right) &amp; y^{2} \\
 \end{array}
 \right]
 \end{equation}
@@ -102,7 +102,7 @@ x + 2 t + 2 y &amp; y^{2} \\
 \end{equation}
  \]</p><p>Where we can reference the values via:</p><pre><code class="language-julia hljs">Symbolics.value.(V)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2×2 Matrix{Float64}:
  40.0  24.0
- 16.0   9.0</code></pre><h2 id="Non-Interactive-Development"><a class="docs-heading-anchor" href="#Non-Interactive-Development">Non-Interactive Development</a><a id="Non-Interactive-Development-1"></a><a class="docs-heading-anchor-permalink" href="#Non-Interactive-Development" title="Permalink"></a></h2><p>Note that the macros are for the high-level case where you&#39;re doing symbolic computation on your own code. If you want to do symbolic computation on someone else&#39;s code, like in a macro, you may not want to do <code>@variables x</code> because you might want the name &quot;x&quot; to come from the user&#39;s code. For these cases, you can use the interpolation operator to interpolate the runtime value of <code>x</code>, i.e. <code>@variables $x</code>. Check the documentation of <code>@variables</code> for more details.</p><pre><code class="language-julia hljs">a, b, c = :runtime_symbol_value, :value_b, :value_c</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(:runtime_symbol_value, :value_b, :value_c)</code></pre><pre><code class="language-julia hljs">vars = @variables t $a $b(t) $c(t)[1:3]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Any}:
+ 16.0   9.0</code></pre><h2 id="Non-Interactive-Development"><a class="docs-heading-anchor" href="#Non-Interactive-Development">Non-Interactive Development</a><a id="Non-Interactive-Development-1"></a><a class="docs-heading-anchor-permalink" href="#Non-Interactive-Development" title="Permalink"></a></h2><p>Note that the macros are for the high-level case where you&#39;re doing symbolic computation on your own code. If you want to do symbolic computation on someone else&#39;s code, like in a macro, you may not want to do <code>@variables x</code> because you might want the name “x” to come from the user&#39;s code. For these cases, you can use the interpolation operator to interpolate the runtime value of <code>x</code>, i.e. <code>@variables $x</code>. Check the documentation of <code>@variables</code> for more details.</p><pre><code class="language-julia hljs">a, b, c = :runtime_symbol_value, :value_b, :value_c</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(:runtime_symbol_value, :value_b, :value_c)</code></pre><pre><code class="language-julia hljs">vars = @variables t $a $b(t) $c(t)[1:3]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Any}:
       t
  runtime_symbol_value
    value_b(t)
@@ -115,19 +115,19 @@ y\left( t \right) \\
 \end{array}
 \right]
 \end{equation}
- \]</p><p><code>t</code> is of type <code>Sym{Real}</code> but the name <code>x</code> refers to an object that represents the <code>Term</code> <code>x(t)</code>. The operation of this expression is itself the object <code>Sym{FnType{Tuple{Real}, Real}}(:x)</code>. The type <code>Sym{FnType{...}}</code> represents a callable object. In this case specifically it&#39;s a function that takes 1 Real argument (noted by <code>Tuple{Real}</code>) and returns a <code>Real</code> result. You can call such a callable <code>Sym</code> with either a number or a symbolic expression of a permissible type.</p><p>This expression also defines <code>t</code> as a independent variable while <code>x(t)</code> and <code>y(t)</code> are dependent variables. This is accounted for in differentiation:</p><pre><code class="language-julia hljs">z = x + y*t
+ \]</p><p><code>t</code> is of type <code>Sym{Real}</code>, but the name <code>x</code> refers to an object that represents the <code>Term</code> <code>x(t)</code>. The operation of this expression is itself the object <code>Sym{FnType{Tuple{Real}, Real}}(:x)</code>. The type <code>Sym{FnType{...}}</code> represents a callable object. In this case specifically, it&#39;s a function that takes 1 Real argument (noted by <code>Tuple{Real}</code>) and returns a <code>Real</code> result. You can call such a callable <code>Sym</code> with either a number or a symbolic expression of a permissible type.</p><p>This expression also defines <code>t</code> as an independent variable, while <code>x(t)</code> and <code>y(t)</code> are dependent variables. This is accounted for in differentiation:</p><pre><code class="language-julia hljs">z = x + y*t
 expand_derivatives(D(z))</code></pre><p class="math-container">\[ \begin{equation}
 t \frac{\mathrm{d} y\left( t \right)}{\mathrm{d}t} + y\left( t \right) + \frac{\mathrm{d} x\left( t \right)}{\mathrm{d}t}
 \end{equation}
- \]</p><p>Since <code>x</code> and <code>y</code> are time-dependent, they are not automatically eliminated from the expression and thus the <code>D(x)</code> and <code>D(y)</code> operations still exist in the expanded derivatives for correctness.</p><p>We can also define unrestricted functions:</p><pre><code class="language-julia hljs">@variables g(..)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1-element Vector{Symbolics.CallWithMetadata{SymbolicUtils.FnType{Tuple, Real}, Base.ImmutableDict{DataType, Any}}}:
- g⋆</code></pre><p>Here <code>g</code> is a variable that is a function of other variables. Any time that we reference <code>g</code> we have to utilize it as a function:</p><pre><code class="language-julia hljs">z = g(x) + g(y)</code></pre><p class="math-container">\[ \begin{equation}
+ \]</p><p>Since <code>x</code> and <code>y</code> are time-dependent, they are not automatically eliminated from the expression, and thus the <code>D(x)</code> and <code>D(y)</code> operations still exist in the expanded derivatives for correctness.</p><p>We can also define unrestricted functions:</p><pre><code class="language-julia hljs">@variables g(..)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1-element Vector{Symbolics.CallWithMetadata{SymbolicUtils.FnType{Tuple, Real}, Base.ImmutableDict{DataType, Any}}}:
+ g⋆</code></pre><p>Here, <code>g</code> is a variable that is a function of other variables. Any time that we reference <code>g</code> we have to utilize it as a function:</p><pre><code class="language-julia hljs">z = g(x) + g(y)</code></pre><p class="math-container">\[ \begin{equation}
 g\left( x\left( t \right) \right) + g\left( y\left( t \right) \right)
 \end{equation}
  \]</p><h2 id="Registering-Functions"><a class="docs-heading-anchor" href="#Registering-Functions">Registering Functions</a><a id="Registering-Functions-1"></a><a class="docs-heading-anchor-permalink" href="#Registering-Functions" title="Permalink"></a></h2><p>One of the benefits of a one-language Julia symbolic stack is that the primitives are all written in Julia, and therefore it&#39;s trivially extendible from Julia itself. By default, new functions are traced to the primitives and the symbolic expressions are written on the primitives. However, we can expand the allowed primitives by registering new functions. For example, let&#39;s register a new function <code>h</code>:</p><pre><code class="language-julia hljs">h(x, y) = x^2 + y
-@register_symbolic h(x, y)</code></pre><p>Now when we use <code>h(x, y)</code>, it is a symbolic expression and doesn&#39;t expand:</p><pre><code class="language-julia hljs">h(x, y) + y^2</code></pre><p class="math-container">\[ \begin{equation}
+@register_symbolic h(x, y)</code></pre><p>When we use <code>h(x, y)</code>, it is a symbolic expression and doesn&#39;t expand:</p><pre><code class="language-julia hljs">h(x, y) + y^2</code></pre><p class="math-container">\[ \begin{equation}
 \left( y\left( t \right) \right)^{2} + h\left( x\left( t \right), y\left( t \right) \right)
 \end{equation}
- \]</p><p>In order to use it with the differentiation system, we need to register its derivatives. We would do it like this:</p><pre><code class="language-julia hljs"># Derivative w.r.t. the first argument
+ \]</p><p>To use it with the differentiation system, we need to register its derivatives. We would do it like this:</p><pre><code class="language-julia hljs"># Derivative w.r.t. the first argument
 Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{1}) = 2args[1]
 # Derivative w.r.t. the second argument
 Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1</code></pre><p>and now it works with the rest of the system:</p><pre><code class="language-julia hljs">Symbolics.derivative(h(x, y) + y^2, x)</code></pre><p class="math-container">\[ \begin{equation}
@@ -141,15 +141,15 @@ f_expr = build_function(to_compute, [x, y])
 Base.remove_linenums!.(f_expr)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(:(function (ˍ₋arg1,)
       begin
           begin
-              (SymbolicUtils.Code.create_array)(typeof(ˍ₋arg1), nothing, Val{1}(), Val{(2,)}(), (+)((^)((getindex)(ˍ₋arg1, 1), 2), (getindex)(ˍ₋arg1, 2)), (+)((^)((getindex)(ˍ₋arg1, 2), 2), (getindex)(ˍ₋arg1, 1)))
+              (SymbolicUtils.Code.create_array)(typeof(ˍ₋arg1), nothing, Val{1}(), Val{(2,)}(), (+)((^)(ˍ₋arg1[1], 2), ˍ₋arg1[2]), (+)((^)(ˍ₋arg1[2], 2), ˍ₋arg1[1]))
           end
       end
   end), :(function (ˍ₋out, ˍ₋arg1)
       begin
           begin
-              #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                      ˍ₋out[1] = (+)((^)((getindex)(ˍ₋arg1, 1), 2), (getindex)(ˍ₋arg1, 2))
-                      ˍ₋out[2] = (+)((^)((getindex)(ˍ₋arg1, 2), 2), (getindex)(ˍ₋arg1, 1))
+              #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                      ˍ₋out[1] = (+)((^)(ˍ₋arg1[1], 2), ˍ₋arg1[2])
+                      ˍ₋out[2] = (+)((^)(ˍ₋arg1[2], 2), ˍ₋arg1[1])
                       nothing
                   end
           end
@@ -158,19 +158,19 @@ Base.remove_linenums!.(f_expr)</code></pre><pre class="documenter-example-output
 myf = eval(f_expr[1])
 myf(SA[2.0, 3.0])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element StaticArraysCore.SVector{2, Float64} with indices SOneTo(2):
   7.0
- 11.0</code></pre><p>The second function is an in-place non-allocating mutating function which mutates its first value. Thus we&#39;d use it like the following:</p><pre><code class="language-julia hljs">myf! = eval(f_expr[2])
+ 11.0</code></pre><p>The second function is an in-place non-allocating mutating function which mutates its first value. Thus, we&#39;d use it like the following:</p><pre><code class="language-julia hljs">myf! = eval(f_expr[2])
 out = zeros(2)
 myf!(out, [2.0, 3.0])
 out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
   7.0
- 11.0</code></pre><p>To save the symbolic calculations for later, we can take this expression and save it out to a file:</p><pre><code class="language-julia hljs">write(&quot;function.jl&quot;, string(f_expr[2]))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">421</code></pre><p>Note that if we need to avoid <code>eval</code>, for example to avoid world-age issues, one could do <code>expression = Val{false}</code>:</p><pre><code class="language-julia hljs">Base.remove_linenums!(build_function(to_compute, [x, y], expression=Val{false})[1])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">RuntimeGeneratedFunction(#=in Symbolics=#, #=using Symbolics=#, :((ˍ₋arg1,)-&gt;begin
-          #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-          #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-          #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+ 11.0</code></pre><p>To save the symbolic calculations for later, we can take this expression and save it out to a file:</p><pre><code class="language-julia hljs">write(&quot;function.jl&quot;, string(f_expr[2]))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">373</code></pre><p>Note that if we need to avoid <code>eval</code>, for example to avoid world-age issues, one could do <code>expression = Val{false}</code>:</p><pre><code class="language-julia hljs">Base.remove_linenums!(build_function(to_compute, [x, y], expression=Val{false})[1])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">RuntimeGeneratedFunction(#=in Symbolics=#, #=using Symbolics=#, :((ˍ₋arg1,)-&gt;begin
+          #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+          #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+          #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
           begin
               begin
-                  #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:444 =#
-                  (SymbolicUtils.Code.create_array)(typeof(ˍ₋arg1), nothing, Val{1}(), Val{(2,)}(), (+)((^)((getindex)(ˍ₋arg1, 1), 2), (getindex)(ˍ₋arg1, 2)), (+)((^)((getindex)(ˍ₋arg1, 2), 2), (getindex)(ˍ₋arg1, 1)))
+                  #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:445 =#
+                  (SymbolicUtils.Code.create_array)(typeof(ˍ₋arg1), nothing, Val{1}(), Val{(2,)}(), (+)((^)(ˍ₋arg1[1], 2), ˍ₋arg1[2]), (+)((^)(ˍ₋arg1[2], 2), ˍ₋arg1[1]))
               end
           end
       end))</code></pre><p>which will use <a href="https://github.com/SciML/RuntimeGeneratedFunctions.jl">RuntimeGeneratedFunctions.jl</a> to build Julia functions which avoid world-age issues.</p><h2 id="Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices"><a class="docs-heading-anchor" href="#Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices">Building Non-Allocating Parallel Functions for Sparse Matrices</a><a id="Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices-1"></a><a class="docs-heading-anchor-permalink" href="#Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices" title="Permalink"></a></h2><p>Now let&#39;s show off a little bit. <code>build_function</code> is kind of like if <a href="https://docs.sympy.org/latest/modules/utilities/lambdify.html"><code>lambdify</code></a> ate its spinach. To show this, <strong>let&#39;s build a non-allocating function that fills sparse matrices in a multithreaded manner</strong>. To do this, we just have to represent the operation that we&#39;re turning into a function via a sparse matrix. For example:</p><pre><code class="language-julia hljs">using LinearAlgebra
@@ -194,63 +194,63 @@ x\left( t \right) &amp; \left( y\left( t \right) \right)^{6} \left( x\left( t \r
           begin
               var&quot;##out#332&quot; = ˍ₋out.nzval
               begin
-                  (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+                  (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                                   let
-                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xb5496e84, 0x14841519, 0x583eac5d, 0xee9d8be3, 0x6f7be1f4)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x34bdc575, 0x3ef03f35, 0xf9107529, 0xca10725d, 0x7c455680)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xba4f501e, 0x5b1c9fb6, 0x15d2cd60, 0xb3943a24, 0x21f41b5f)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x227be2fa, 0xc9232f1e, 0x30ba0fef, 0xbf2e1551, 0xf3c60fdd)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x4f779baa, 0x87fdaf67, 0x66270e75, 0xdc4817ba, 0x0879054d)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xe56b09a5, 0x194db3da, 0x9a2b6c6b, 0xfec71fd8, 0x356e2e21)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xadf9b572, 0x481f4efa, 0xe4d9a46f, 0x7d80372c, 0x8f713a5a)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xc0b2d96e, 0xeb0e6705, 0x27c44e10, 0x912533a0, 0x4c1a9b85)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x5e88738e, 0x83992bf2, 0xd6c7403a, 0xb68f6e54, 0xe32c1b11)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x79b8bdb4, 0xa341ca5d, 0xc7ba0961, 0x2ccd9581, 0x675cddea)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[1] = (*)((^)((getindex)(ˍ₋arg1, 2), 7), (getindex)(ˍ₋arg1, 1))
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[1] = (*)((^)(ˍ₋arg1[2], 7), ˍ₋arg1[1])
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -267,55 +267,17 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x6d43a35a, 0xbfe561a7, 0x20443863, 0xd532fb45, 0xbedc2d61)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x461c4765, 0xfed42c43, 0x79576245, 0xd4e11e27, 0xc1033b34)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[2] = (getindex)(ˍ₋arg1, 1)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
-                    nothing
-                end
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end))...)
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end, begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xcdb04cf1, 0x4ac85300, 0xd1e3ef74, 0x933c4f13, 0x1ec508e6)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[3] = (getindex)(ˍ₋arg1, 2)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[2] = ˍ₋arg1[1]
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -343,66 +305,17 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x57af8d4a, 0x73f20cb0, 0x9a6d64a1, 0x6eecd4b1, 0xc2742d51)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xe06578cf, 0xb15c93a0, 0x7769e9d3, 0x3d5afe0a, 0xbf84600c)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x48d0a483, 0x15c9da95, 0xa7ecc683, 0xc27860cf, 0xe98506c8)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x6a88e387, 0xbf0a14ba, 0xb1ec3b8b, 0x8edbf4d8, 0xe423c802)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[4] = (*)((^)((getindex)(ˍ₋arg1, 1), 2), (^)((getindex)(ˍ₋arg1, 2), 6))
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
-                    nothing
-                end
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end, begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x9a427b5a, 0x22cfb38f, 0xd6e6a5f1, 0x94c3567f, 0x1f471b7c)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[5] = (^)((getindex)(ˍ₋arg1, 1), 2)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[3] = ˍ₋arg1[2]
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -430,17 +343,104 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x5a56f4c6, 0x4d6809b7, 0xb176c886, 0xee5f3288, 0x5cdaf20e)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x1ee6bdf9, 0x9135dddb, 0x92caee61, 0x24645588, 0x0adca1aa)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x439ec643, 0xb17e2106, 0x05ae0ac5, 0xca780644, 0x7255740e)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x01d269dd, 0x7969cba8, 0x3142e80e, 0xee397fda, 0x6cddf29c)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[6] = (^)((getindex)(ˍ₋arg1, 2), 2)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[4] = (*)((^)(ˍ₋arg1[1], 2), (^)(ˍ₋arg1[2], 6))
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
+                    nothing
+                end
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end, begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x2b61246a, 0x8e0f9b5b, 0x0dcb0266, 0x9456dab9, 0xd1a28dcc)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[5] = (^)(ˍ₋arg1[1], 2)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
+                    nothing
+                end
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end))...)
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end, begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x14bff78e, 0xb475e224, 0x1e2b0a2a, 0x6936e798, 0xfb8d5027)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[6] = (^)(ˍ₋arg1[2], 2)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -479,50 +479,50 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x394d904b, 0xe86a9d93, 0xcaa30cab, 0xaa72bbbc, 0x8944e4a1)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x8a01d3ca, 0x953eebfa, 0xae2f9937, 0x5698c4ab, 0xcd50adfa)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x2670c470, 0xea3453a1, 0x005c2c63, 0xa7bc9726, 0xeccab5be)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xbc4ce341, 0x5e3cc636, 0x8d619128, 0x1b5178ab, 0xce4a8b52)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x3dedaa58, 0xc2443aca, 0x89151aa4, 0x0913dea8, 0xc5485510)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x374535ce, 0x3204d181, 0x5e193f82, 0x276b08c4, 0x7fc2c8a9)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x2168dfce, 0xbc212e96, 0xaf2703a2, 0xc3050e53, 0x736bd59e)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x24322c21, 0x3299ce8f, 0x9a5ae4d0, 0xafe7735a, 0x1cd3af8d)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[7] = (*)((^)((getindex)(ˍ₋arg1, 1), 3), (^)((getindex)(ˍ₋arg1, 2), 5))
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[7] = (*)((^)(ˍ₋arg1[1], 3), (^)(ˍ₋arg1[2], 5))
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -539,55 +539,17 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x206f6531, 0x68b93680, 0x613857b4, 0x9a0a3e42, 0x44ed0d72)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x87ba1fc2, 0x1ba1f493, 0x4b883113, 0xf72f5428, 0x90a87e2a)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[8] = (^)((getindex)(ˍ₋arg1, 1), 3)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
-                    nothing
-                end
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end))...)
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end, begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x789c86d7, 0x792f39d3, 0xe1889b48, 0xa0fdd6d0, 0x37b142f6)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[9] = (^)((getindex)(ˍ₋arg1, 2), 3)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[8] = (^)(ˍ₋arg1[1], 3)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -615,28 +577,66 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xbd2f886e, 0xe099ee6d, 0x494cd2b9, 0xee4ef10e, 0xe27d9e27)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xdcb38a9c, 0xe9499821, 0x883d541a, 0x44e5f51e, 0x81042831)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x8c9074f0, 0x2aeae16a, 0xf8d91489, 0x8b47e4ff, 0x67133ce5)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[10] = (*)((^)((getindex)(ˍ₋arg1, 1), 4), (^)((getindex)(ˍ₋arg1, 2), 4))
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[9] = (^)(ˍ₋arg1[2], 3)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
+                    nothing
+                end
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end))...)
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end, begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xdbb2a6d9, 0xc6970370, 0xe09f8d02, 0xcd022351, 0x4fb63723)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x74df24cf, 0xb25f6928, 0x932bbeb9, 0x468300d4, 0x937761f1)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[10] = (*)((^)(ˍ₋arg1[1], 4), (^)(ˍ₋arg1[2], 4))
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -653,17 +653,17 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x82b67972, 0xe01dc1ce, 0xf9f0525a, 0xbd9816d4, 0x57320a04)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x9030a71c, 0x38c7080f, 0x5f9a714f, 0x119dca8e, 0x4ec85455)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[11] = (^)((getindex)(ˍ₋arg1, 1), 4)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[11] = (^)(ˍ₋arg1[1], 4)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -708,61 +708,61 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                                   end
                               end, begin
                                   let
-                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x8d00c452, 0x6f4a580a, 0xb0d254ce, 0x57927068, 0x29546069)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x793f1191, 0x45549762, 0xf9653f3f, 0x0a449e33, 0xbb892d56)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x4b289b07, 0x3790cde9, 0x07ce4fa7, 0x452d5e1a, 0xf4915c75)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x0742620c, 0x44300f62, 0x11f93f70, 0x1cc4b0d7, 0xecac1e12)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x61285118, 0xe2448619, 0xab1babf6, 0x3bf7f4d4, 0xc354430f)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xf5d755d1, 0x8b5f6c03, 0x546ccac5, 0x461f21cc, 0x84258d24)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x1bf0f317, 0xe43e1aa1, 0x4302621d, 0x39a7fff1, 0x9cc5d197)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xfa32bd97, 0x3afeb5c6, 0xa8597be8, 0x542c7974, 0xb3e70ade)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xd12bac34, 0x704fad43, 0xfc160b36, 0x57d32439, 0xab7545d5)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xc23cb8a5, 0x66748a8f, 0x1c1683a0, 0xc0efb18d, 0x02f574c6)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[12] = (^)((getindex)(ˍ₋arg1, 2), 4)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[12] = (^)(ˍ₋arg1[2], 4)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -779,55 +779,17 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xfc4a569b, 0x566b7886, 0x7cd01951, 0xdd8fbcb6, 0x898f6264)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xc235f674, 0x56fdf041, 0xf0b6ce94, 0x183df51b, 0xa16c870b)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[13] = (*)((^)((getindex)(ˍ₋arg1, 1), 5), (^)((getindex)(ˍ₋arg1, 2), 3))
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
-                    nothing
-                end
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end))...)
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end, begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xb6f49294, 0x925d4250, 0x9e2771db, 0x9bc9f931, 0xd1acd410)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[14] = (^)((getindex)(ˍ₋arg1, 1), 5)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[13] = (*)((^)(ˍ₋arg1[1], 5), (^)(ˍ₋arg1[2], 3))
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -855,66 +817,17 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x111a4a9d, 0x3b146311, 0x635686c3, 0x28d495a4, 0x5db36d1c)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x38dfd2dd, 0x506656c4, 0xbe299b28, 0xa6bb4536, 0x54756548)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x5a1fbe92, 0x0dece823, 0xbebcc09e, 0x7f7e85a5, 0x3212916a)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xa4dc14b5, 0xd3d94c4a, 0x104d8d74, 0x8374462c, 0xe3a3067d)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[15] = (^)((getindex)(ˍ₋arg1, 2), 5)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
-                    nothing
-                end
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end, begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xb5e5be16, 0xd11b58f0, 0xe40e3c40, 0x8590c1bb, 0x39f733c6)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[16] = (*)((^)((getindex)(ˍ₋arg1, 1), 6), (^)((getindex)(ˍ₋arg1, 2), 2))
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[14] = (^)(ˍ₋arg1[1], 5)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -942,17 +855,104 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xaf742940, 0xb799ab97, 0x5b3f3c94, 0x942fe2ba, 0x4b713dce)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x50fb7566, 0x6776ef76, 0x2900cf23, 0xa91e2ee9, 0xa4bbf51a)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x0d14dfc7, 0x59cfb5f4, 0x05dc69c0, 0x952d4297, 0x3b213f87)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xa41479bf, 0xc71d0813, 0x5723dad6, 0x34818983, 0x48e3fb0b)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[17] = (^)((getindex)(ˍ₋arg1, 1), 6)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[15] = (^)(ˍ₋arg1[2], 5)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
+                    nothing
+                end
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end, begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xb029bfa2, 0x72b74dd3, 0x6c1006ae, 0x0445b558, 0x66bf92a2)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[16] = (*)((^)(ˍ₋arg1[1], 6), (^)(ˍ₋arg1[2], 2))
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
+                    nothing
+                end
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end))...)
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end, begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x06175f35, 0xb615bcd0, 0xd8f66dc0, 0xa249ee87, 0xeadab955)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[17] = (^)(ˍ₋arg1[1], 6)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -991,50 +991,50 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x52891bde, 0x734fb79d, 0x47c61691, 0xf18b1b18, 0x18edc485)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x9d5f2e12, 0x27f5b6db, 0x342bdef5, 0x4e481eb1, 0xc4899449)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x556dc1af, 0x109f77fa, 0xf75a7f16, 0x92469ef2, 0xfff8a646)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xb966b639, 0x7781f639, 0xcb1e83e6, 0xdf9d6e1e, 0x6e5830c4)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xac2d0b90, 0xe3b27705, 0x4915e050, 0x870a10e4, 0x5d3b2dbc)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xf5094f3d, 0xdd277eb5, 0xade41387, 0x4233b584, 0xe0e0b716)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x81431ae2, 0x78341fcf, 0x57ff85cc, 0x470c231e, 0xf9edbdce)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x3559d8b7, 0xf0f07698, 0xe38305a6, 0xd198a6f1, 0xe48bb6d8)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[18] = (^)((getindex)(ˍ₋arg1, 2), 6)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[18] = (^)(ˍ₋arg1[2], 6)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -1051,55 +1051,17 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x89f8bd2b, 0x9b3378ec, 0x5202726c, 0xfdc505ba, 0xdcc8383f)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xde1355c7, 0x8e519bde, 0xa6b373bb, 0x69ec68cb, 0x69b5fa8d)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[19] = (*)((^)((getindex)(ˍ₋arg1, 1), 7), (getindex)(ˍ₋arg1, 2))
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
-                    nothing
-                end
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end))...)
-        end
-    end
-end), (var&quot;##out#332&quot;, ˍ₋arg1)))
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
-                                task.sticky = false
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
-                                Base.schedule(task)
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
-                                task
-                            end
-                        end, begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xf9836abe, 0xe9bc02f1, 0x8ea512d4, 0x8678a96e, 0x18eee6d3)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[20] = (^)((getindex)(ˍ₋arg1, 1), 7)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[19] = (*)((^)(ˍ₋arg1[1], 7), ˍ₋arg1[2])
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -1127,28 +1089,66 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x05cc43c3, 0xf64eb2ab, 0x777728a8, 0x605af879, 0x7bb8c974)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
-    begin
-        begin
-            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
-            (Symbolics.var&quot;#noop#382&quot;())(map(fetch, (begin
-                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
-                            let
-                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xfe71ea56, 0xd317bed7, 0x3d35dcca, 0x39bc107b, 0x6bb16a1f)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xfa81684a, 0x4d71bf58, 0xd9c1bb64, 0x7e4276ae, 0xaf331992)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[21] = (^)((getindex)(ˍ₋arg1, 2), 7)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[20] = (^)(ˍ₋arg1[1], 7)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
+                    nothing
+                end
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end))...)
+        end
+    end
+end), (var&quot;##out#332&quot;, ˍ₋arg1)))
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:365 =#
+                                task.sticky = false
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+                                Base.schedule(task)
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:367 =#
+                                task
+                            end
+                        end, begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x857a024c, 0x7ae346d1, 0xf6fc76da, 0xf1fd6a00, 0x43aa9dfe)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:372 =#
+            (Symbolics.var&quot;#noop#383&quot;())(map(fetch, (begin
+                            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
+                            let
+                                #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x0f83d7e4, 0x228f1426, 0xe7ab632f, 0xf2c9a05b, 0xa610e1b0)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
+    begin
+        begin
+            #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[21] = (^)(ˍ₋arg1[2], 7)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -1165,17 +1165,17 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
                             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:363 =#
                             let
                                 #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:364 =#
-                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x7b058481, 0x29dd345a, 0x86736455, 0xe8748f56, 0x7d4a0836)}(quote
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:349 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:350 =#
-    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:351 =#
+                                task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#332&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xedae2cde, 0xa97ca9c4, 0xece6fe84, 0x51b9876f, 0xd5956277)}(quote
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:350 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:351 =#
+    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:352 =#
     begin
         begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:520 =#
-            #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:398 =# @inbounds begin
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:394 =#
-                    var&quot;##out#332&quot;[22] = (^)((getindex)(ˍ₋arg1, 1), 8)
-                    #= /home/runner/.julia/packages/SymbolicUtils/qulQp/src/code.jl:396 =#
+            #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:399 =# @inbounds begin
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:395 =#
+                    var&quot;##out#332&quot;[22] = (^)(ˍ₋arg1[1], 8)
+                    #= /home/runner/.julia/packages/SymbolicUtils/1JRDc/src/code.jl:397 =#
                     nothing
                 end
         end
@@ -1222,7 +1222,7 @@ end), (var&quot;##out#332&quot;, ˍ₋arg1)))
               end
           end
       end
-  end)</code></pre><p>Let&#39;s unpack what that&#39;s doing. It&#39;s using <code>A.nzval</code> in order to linearly index through the sparse matrix, avoiding the <code>A[i,j]</code> form because that is a more expensive way to index a sparse matrix if you know exactly the order that the data is stored. Then, it&#39;s splitting up the calculation into Julia threads so they can be operated on in parallel. It synchronizes after spawning all of the tasks so the computation is ensured to be complete before moving on. And it does this with all in-place operations to the original matrix instead of generating arrays. This is the fanciest way you could fill a sparse matrix, and Symbolics makes this dead simple.</p><p>(Note: this example may be slower with multithreading due to the thread spawning overhead, but the full version was not included in the documentation for brevity. It will be the faster version if <code>N</code> is sufficiently large!)</p><p>Importantly, when using the in-place functions generated by <a href="../manual/build_function/#build_function">`build_function</a>, it is important that the mutating argument matches the sparse structure of the original function, as demonstrated below.</p><pre><code class="language-julia hljs">using Symbolics, SparseArrays, LinearAlgebra
+  end)</code></pre><p>Let&#39;s unpack what that&#39;s doing. It&#39;s using <code>A.nzval</code> to linearly index through the sparse matrix, avoiding the <code>A[i,j]</code> form because that is a more expensive way to index a sparse matrix if you know exactly the order that the data is stored. Then, it&#39;s splitting up the calculation into Julia threads, so they can be operated on in parallel. It synchronizes after spawning all the tasks, so the computation is ensured to be complete before moving on. And it does this with all in-place operations to the original matrix instead of generating arrays. This is the fanciest way you could fill a sparse matrix, and Symbolics makes this dead simple.</p><p>(Note: this example may be slower with multithreading due to the thread spawning overhead, but the full version was not included in the documentation for brevity. It will be the faster version if <code>N</code> is sufficiently large!)</p><p>Importantly, when using the in-place functions generated by <a href="../manual/build_function/#Symbolics.build_function"><code>build_function</code></a>, it is important that the mutating argument matches the sparse structure of the original function, as demonstrated below.</p><pre><code class="language-julia hljs">using Symbolics, SparseArrays, LinearAlgebra
 
 N = 10
 _S = sprand(N, N, 0.1)
@@ -1243,9 +1243,9 @@ rows, cols, _ = findnz(sj)
 out = sparse(rows, cols, zeros(length(cols)), size(sj)...) # pre-allocate, and correct structure
 myf = eval(last(f_expr))
 myf(out, rand(N)) # note that out matches the sparsity structure of sj
-out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 23 stored entries:
-⠄⠄⠒⢆⠐
-⠀⠀⣀⠀⠄
-⠀⠀⠀⠁⠀
-⠄⠐⠀⠀⠐
-⠉⠄⡐⣈⠀</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.23 on <span class="colophon-date" title="Thursday 22 December 2022 06:06">Thursday 22 December 2022</span>. Using Julia version 1.8.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 21 stored entries:
+⠀⠀⠈⠠⡀
+⠠⠁⠂⠀⡈
+⠀⠐⡀⠀⠂
+⠀⠈⠐⡀⠠
+⠐⠄⠁⠈⠅</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Friday 17 March 2023 20:57">Friday 17 March 2023</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
