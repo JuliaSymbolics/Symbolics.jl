@@ -1,6 +1,6 @@
 # Supported types and dispatch in Symbolics
 
-There is a tension between types as representation of expression trees and types that are subtype of types already present in Julia.
+There is a tension between types as a representation of expression trees and types that are a subtype of types already present in Julia.
 
 We want to be able to deal with expression trees in a unified way and not constrain expression trees themselves to be under an abstract type in Julia's type hierarchy. (For example, if we said that all expression trees are subtype of Real, then we couldn't represent array operations using the same expression tree.). But we also want to be able to pass in expression trees into places in existing code that accept `Real` values.
 
@@ -10,7 +10,7 @@ The methods on `Num` objects are forwarded to the wrapped expression tree. And c
 
 User-facing APIs in Symbolics always take wrapped objects like `Num`, they are then internally unwrapped for expression tree manipulation.
 
-Due to it requiring such wrappers, we only fully support limited number of types as both the types of expression trees and the type as Julia sees them.
+Due to it requiring such wrappers, we only fully support a limited number of types as both the types of expression trees and the type as Julia sees them.
 
 These types are
 
@@ -20,7 +20,7 @@ These types are
 
 ## `@variables` and types
 
-Use the syntax `@variables x::T` to create a symbol named `x` of symbolic type `T`. If `T` is a subtype of any of the above listed types which support a wrapper, the resulting variable will be wrapped in that type. As seen in the examples below, x,z,X,Z all have a suitable wrapper type, hence their types are shown. However, `s` being of symbolic type `String` does not have a corresponding wrapper supported by Symbolics. Hence it returns a `Sym{String}` object. This is the trivial expression tree of a single variable without a wrapper, and is not a subtype of String or AbstractString.
+Use the syntax `@variables x::T` to create a symbol named `x` of symbolic type `T`. If `T` is a subtype of any of the above listed types which support a wrapper, the resulting variable will be wrapped in that type. As seen in the examples below, x,z,X,Z all have a suitable wrapper type. Hence, their types are shown. However, `s` being of symbolic type `String` does not have a corresponding wrapper supported by Symbolics, and hence, it returns a `Sym{String}` object. This is the trivial expression tree of a single variable without a wrapper, and is not a subtype of String or AbstractString.
 
 ```@example types
 using Symbolics

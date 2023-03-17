@@ -2,6 +2,8 @@
     val
 end
 
+const RCNum = Union{Num, Complex{Num}}
+
 unwrap(x::Num) = x.val
 
 """
@@ -112,7 +114,7 @@ end
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
 
-Num(q::Irrational) = Num(Term(identity, [q]))
+Num(q::AbstractIrrational) = Num(Term(identity, [q]))
 
 for T in (Integer, Rational)
     @eval Base.:(^)(n::Num, i::$T) = Num(value(n)^i)
@@ -140,7 +142,7 @@ end
 # Boolean operations
 for (f, Domain) in [:(==) => :((AbstractFloat, Number)), :(!=) => :((AbstractFloat, Number)),
                     :(<=) => :((Real,)),   :(>=) => :((Real,)),
-                    :(isless) => :((Real,)),
+                    :(isless) => :((Real, AbstractFloat)),
                     :(<) => :((Real,)),   :(> ) => :((Real,)),
                     :(& )=> :((Bool,)),  :(| ) => :((Bool,)),
                     :xor => :((Bool,))]
@@ -162,7 +164,7 @@ Base.convert(::Type{<:Array{Num}}, x::AbstractArray) = map(Num, x)
 Base.convert(::Type{<:Array{Num}}, x::AbstractArray{Num}) = x
 Base.convert(::Type{Sym}, x::Num) = value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
 
-LinearAlgebra.lu(x::Union{Adjoint{<:Num},Transpose{<:Num},Array{<:Num}}; check=true, kw...) = sym_lu(x; check=check)
+LinearAlgebra.lu(x::Union{Adjoint{<:RCNum},Transpose{<:RCNum},Array{<:RCNum}}; check=true, kw...) = sym_lu(x; check=check)
 
 _iszero(x::Number) = iszero(x)
 _isone(x::Number) = isone(x)

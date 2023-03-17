@@ -80,8 +80,8 @@ fjac = eval(Symbolics.build_function(jac,u,
 ```
 
 It takes awhile for this to generate, but the results will be worth it!
-Now let's setup the parabolic PDE to be solved by DifferentialEquations.jl.
-We will setup the vanilla version and the sparse multithreaded
+Now let's set up the parabolic PDE to be solved by DifferentialEquations.jl.
+We will set up the vanilla version and the sparse multithreaded
 version:
 
 ```@example auto_parallel
