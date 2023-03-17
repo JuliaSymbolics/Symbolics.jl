@@ -113,7 +113,7 @@ using Symbolics
 ∂ₓ = Differential(x)
 L = .5 * ∂ₜ(x)^2 - .5 * x^2
 @test isequal(expand_derivatives(∂ₓ(L)), -1 * x)
-test_equal(expand_derivatives(Differential(x)(L) - ∂ₜ(Differential(∂ₜ(x))(L))), -1 * (∂ₜ(∂ₜ(x)) + x))
+@test isequal(expand_derivatives(Differential(x)(L) - ∂ₜ(Differential(∂ₜ(x))(L))), -1 * (∂ₜ(∂ₜ(x)) + x))
 @test isequal(expand_derivatives(Differential(x)(L) - ∂ₜ(Differential(∂ₜ(x))(L))), (-1 * x) - ∂ₜ(∂ₜ(x)))
 
 @variables x2(t)
@@ -256,7 +256,7 @@ expression2 = substitute(expression, Dict(collect(Differential(t).(x) .=> ẋ)))
 
 @test isequal(
     Symbolics.derivative(IfElse.ifelse(signbit(b), b^2, sqrt(b)), b),
-    IfElse.ifelse(signbit(b), 2b, (1//2)*(SymbolicUtils.unstable_pow(Symbolics.unwrap(sqrt(b)), -1)))
+    IfElse.ifelse(signbit(b), 2b,(SymbolicUtils.unstable_pow(2Symbolics.unwrap(sqrt(b)), -1)))
 )
 
 # Chain rule
