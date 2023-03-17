@@ -603,6 +603,11 @@ function coperators(expr)
             coperators(e)
         end
     end
+    for i in eachindex(expr.args)
+        if expr.args[i] isa Rational
+            expr.args[i] = float(expr.args[i]) # Evaluate rational numbers to floating-point
+        end
+    end
     # Introduce another factor 1 to prevent contraction of terms like "5 * t" to "5t" (not valid C code)
     if expr.head==:call && expr.args[1]==:* && length(expr.args)==3 && isa(expr.args[2], Real) && isa(expr.args[3], Symbol)
         push!(expr.args, 1)
