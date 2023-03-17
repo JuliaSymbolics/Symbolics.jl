@@ -150,7 +150,7 @@ julia> @variables t z(t)
 julia> Symbolics.tosymbol(z)
 Symbol("z(t)")
 
-julia>  Symbolics.tosymbol(z; escape=false)
+julia> Symbolics.tosymbol(z; escape=false)
 :z
 ```
 """
@@ -233,6 +233,21 @@ end
     degree(p, sym=nothing)
 
 Extract the degree of `p` with respect to `sym`.
+
+# Examples
+
+```julia
+julia> @variables x;
+
+julia> Symbolics.degree(x^0)
+0
+
+julia> Symbolics.degree(x)
+1
+
+julia> Symbolics.degree(x^2)
+2
+```
 """
 function degree(p, sym=nothing)
     p = value(p)
@@ -272,6 +287,21 @@ end
 
 Extract the coefficient of `p` with respect to `sym`.
 Note that `p` might need to be expanded and/or simplified with `expand` and/or `simplify`.
+
+# Examples
+
+```julia
+julia> @variables a x y;
+
+julia> Symbolics.coeff(2a, x)
+0
+
+julia> Symbolics.coeff(3x + 2y, y)
+2
+
+julia> Symbolics.coeff(x^2 + y, x^2)
+1
+```
 """
 function coeff(p, sym=nothing)
     p, sym = value(p), value(sym)

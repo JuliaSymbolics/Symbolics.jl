@@ -26,4 +26,6 @@ Symbolics.get_variables
 Symbolics.tosymbol
 Symbolics.diff2term
 Symbolics.solve_for
+Symbolics.degree
+Symbolics.coeff
 ```
