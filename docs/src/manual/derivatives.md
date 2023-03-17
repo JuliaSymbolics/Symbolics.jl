@@ -24,9 +24,11 @@ way, i.e. `Symbolics.jacobian`.
 Symbolics.derivative
 Symbolics.jacobian
 Symbolics.sparsejacobian
+Symbolics.sparsejacobian_vals
 Symbolics.gradient
 Symbolics.hessian
 Symbolics.sparsehessian
+Symbolics.sparsehessian_vals
 ```
 
 ## Adding Analytical Derivatives

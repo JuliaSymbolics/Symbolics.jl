@@ -58,7 +58,7 @@ end
 # Scalar CTarget test with scalar multiplication and powers
 let
     @variables x y a t
-    expression = x^2 + y^-1 + sin(a)^3.5 + 2t
+    expression = x^2 + y^-1 + sin(a)^3.5 + 2t + 1//1
     cfunc = build_function(expression, [x, y], [a], t; target = Symbolics.CTarget(), expression = Val{true})
 
     @test_reference "target_functions/scalar2.c" cfunc
