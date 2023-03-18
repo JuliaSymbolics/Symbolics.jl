@@ -111,3 +111,20 @@ end
 Symbolics.@register_symbolic oof(x::AbstractVector)
 Symbolics.@variables x[1:100]
 @test oof(x) isa Num
+
+# Register callable structs
+# 806
+struct B
+    x::Float64
+end
+(b::B)(x) = b.x * x
+
+Symbolics.@register_symbolic (b::B)(x)
+
+@test B(2.0)(2.0) == 4.0
+let
+    foo = B(2.0)
+    @variables x
+    @test foo(x) isa Num
+    @test foo(unwrap(x)) isa BasicSymbolic
+end
