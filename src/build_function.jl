@@ -66,7 +66,7 @@ Keyword Arguments:
 - `parallel`: The kind of parallelism to use in the generated function. Defaults
   to `SerialForm()`, i.e. no parallelism, if `ex` is a single expression or an
   array containing <= 1500 non-zero expressions. If `ex` is an array of > 1500
-  non-zero expressions then `ShardedForm(80, 4)` is used. See below for more on
+  non-zero expressions, then `ShardedForm(80, 4)` is used. See below for more on
   `ShardedForm`.
   Note that the parallel forms are not exported and thus need to be chosen like
   `Symbolics.SerialForm()`.
@@ -210,16 +210,16 @@ function _build_function(target::JuliaTarget, rhss, args...;
 
 Generates a Julia function which can then be utilized for further evaluations.
 If expression=Val{false}, the return is a Julia function which utilizes
-RuntimeGeneratedFunctions.jl in order to be free of world-age issues.
+RuntimeGeneratedFunctions.jl to be free of world-age issues.
 
 If the `rhss` is a scalar, the generated function is a function
-with a scalar output, otherwise if it's an `AbstractArray`, the output
+with a scalar output. Otherwise, if it's an `AbstractArray`, the output
 is two functions, one for out-of-place AbstractArray output and a second which
 is a mutating function. The outputted functions match the given argument order,
 i.e., f(u,p,args...) for the out-of-place and scalar functions and
 `f!(du,u,p,args..)` for the in-place version.
 
-Special Keyword Argumnets:
+Special Keyword Arguments:
 
 - `parallel`: The kind of parallelism to use in the generated function. Defaults
   to `SerialForm()`, i.e. no parallelism. Note that the parallel forms are not
@@ -231,9 +231,9 @@ Special Keyword Argumnets:
      are called by the top-level function that _build_function returns.
   - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
     splitting the number of expressions per thread.
-- `conv`: The conversion function of symbolic types to Expr. By default this uses
+- `conv`: The conversion function of symbolic types to Expr. By default, this uses
   the `toexpr` function.
-- `checkbounds`: For whether to enable bounds checking inside of the generated
+- `checkbounds`: For whether to enable bounds checking inside the generated
   function. Defaults to false, meaning that `@inbounds` is applied.
 - `linenumbers`: Determines whether the generated function expression retains
   the line numbers. Defaults to true.
@@ -603,6 +603,11 @@ function coperators(expr)
             coperators(e)
         end
     end
+    for i in eachindex(expr.args)
+        if expr.args[i] isa Rational
+            expr.args[i] = float(expr.args[i]) # Evaluate rational numbers to floating-point
+        end
+    end
     # Introduce another factor 1 to prevent contraction of terms like "5 * t" to "5t" (not valid C code)
     if expr.head==:call && expr.args[1]==:* && length(expr.args)==3 && isa(expr.args[2], Real) && isa(expr.args[3], Symbol)
         push!(expr.args, 1)
@@ -785,7 +790,7 @@ function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
 ```
 
 This builds an in-place Stan function compatible with the Stan differential equation solvers.
-Unlike other build targets, this one requestions (vs, ps, iv) as the function arguments.
+Unlike other build targets, this one requires (vs, ps, iv) as the function arguments.
 Only allowed on arrays of equations.
 """
 function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
@@ -826,7 +831,7 @@ function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
 ```
 
 This builds an in-place Stan function compatible with the Stan differential equation solvers.
-Unlike other build targets, this one requestions (vs, ps, iv) as the function arguments.
+Unlike other build targets, this one requires (vs, ps, iv) as the function arguments.
 Only allowed on expressions, and arrays of expressions.
 """
 function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;

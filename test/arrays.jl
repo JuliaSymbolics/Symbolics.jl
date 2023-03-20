@@ -1,8 +1,12 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
+import LinearAlgebra: dot
+
+struct TestMetaT end
+Symbolics.option_to_metadata_type(::Val{:test_meta}) = TestMetaT
 
 @testset "arrays" begin
     @variables X[1:5, 1:5] Y[1:5, 1:5]
@@ -48,6 +52,21 @@ end
     @variables t x(t)[1:4]
     @syms i::Int
     @test isequal(x[i], operation(unwrap(x))(t)[i])
+
+    # https://github.com/JuliaSymbolics/Symbolics.jl/issues/842
+    # getindex should keep metadata
+    @variables tv v(tv)[1:2] [test_meta = 4]
+    @test !isnothing(metadata(unwrap(v)))
+    @test hasmetadata(unwrap(v), TestMetaT)
+    @test getmetadata(unwrap(v), TestMetaT) == 4
+    vs = scalarize(v)
+    vsw = unwrap.(vs)
+    @test !isnothing(metadata(vsw[1]))
+    @test hasmetadata(vsw[1], TestMetaT)
+    @test getmetadata(vsw[1], TestMetaT) == 4
+    @test !isnothing(metadata(unwrap(v[1])))
+    @test hasmetadata(unwrap(v[1]), TestMetaT)
+    @test getmetadata(unwrap(v[1]), TestMetaT) == 4
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
@@ -119,6 +138,16 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 
     ##653
     Symbolics.scalarize(inv(A)[1,1])
+
+    # #831
+    @syms symT sym1(symT) sym2(symT)
+    symvec = [sym1(symT), sym2(symT)]
+    weights = rand(2)
+    @test isequal(symvec'weights, dot(symvec, weights))
+    @test isequal(weights'symvec, dot(weights, symvec))
+    @syms sym3(symT)::Real sym4(symT)::Real
+    symvec = [sym3(symT), sym4(symT)]
+    @test isequal(symvec'weights, weights'symvec)
 
     # ModelingToolkit.jl#1736
     #
@@ -349,4 +378,11 @@ end
     @test substitute(A[1,2,1], Dict(A => reshape(1:8, 2, 2, 2))) === Num(3)
 
     @test substitute(A[1,2,1], Dict(A[1,2,1] => 9)) === Num(9)
+end
+
+@testset "Hashes" begin
+    @variables u[1:7]
+    a, b, c = u[1:5], u[2:6], u[3:7]
+    @test !isequal(a, b) && !isequal(b, c) && !isequal(a, c)
+    @test hash(a) != hash(b) && hash(b) != hash(c) && hash(a) != hash(c)
 end

@@ -230,3 +230,8 @@ d = Base.Docs.getdoc(x)
 stringcontent = string(d.content)
 @test occursin("Metadata", stringcontent)
 @test occursin("(:variables, :x)", stringcontent)
+
+@variables t
+for f in [<, <=, >, >=, isless]
+    @test_nowarn f(t, 1.0)
+end

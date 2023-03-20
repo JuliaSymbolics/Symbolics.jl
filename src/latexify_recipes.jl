@@ -41,6 +41,7 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 @latexrecipe function f(n::Num)
     env --> :equation
     cdot --> false
+    fmt --> FancyNumberFormatter(5)
 
     return recipe(n)
 end
@@ -222,13 +223,18 @@ function getindex_to_symbol(t)
     end
 end
 
-diffdenom(e) = e
-diffdenom(e::Sym) = LaTeXString("\\mathrm{d}$e")
-diffdenom(e::Pow) = LaTeXString("\\mathrm{d}$(e.base)$(isone(e.exp) ? "" : "^{$(e.exp)}")")
-function diffdenom(e::Mul)
-    return LaTeXString(prod(
+function diffdenom(e)
+    if issym(e)
+        LaTeXString("\\mathrm{d}$e")
+    elseif ispow(e)
+        LaTeXString("\\mathrm{d}$(e.base)$(isone(e.exp) ? "" : "^{$(e.exp)}")")
+    elseif ismul(e)
+        LaTeXString(prod(
                 "\\mathrm{d}$(k)$(isone(v) ? "" : "^{$v}")"
                 for (k, v) in e.dict
                ))
+    else
+        e
+    end
 end
 

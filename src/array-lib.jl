@@ -19,6 +19,7 @@ end
 
 function Base.getindex(x::SymArray, idx...)
     idx = unwrap.(idx)
+    meta = metadata(unwrap(x))
     if shape(x) !== Unknown() && all(i->i isa Integer, idx)
         II = CartesianIndices(axes(x))
         @boundscheck begin
@@ -27,7 +28,7 @@ function Base.getindex(x::SymArray, idx...)
             end
         end
         ii = II[idx...]
-        res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...])
+        res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...]; metadata = meta)
     elseif all(i->symtype(i) <: Integer, idx)
         shape(x) !== Unknown() && @boundscheck begin
             if length(idx) > 1
@@ -38,7 +39,7 @@ function Base.getindex(x::SymArray, idx...)
                 end
             end
         end
-        res = Term{eltype(symtype(x))}(getindex, [x, idx...])
+        res = Term{eltype(symtype(x))}(getindex, [x, idx...]; metadata = meta)
     elseif length(idx) == 1 && symtype(first(idx)) <: CartesianIndex
         i = first(idx)
         ii = i isa CartesianIndex ? Tuple(i) : arguments(i)
@@ -65,7 +66,7 @@ function Base.getindex(x::SymArray, idx...)
             end
         end
 
-        term = Term{Any}(getindex, [x, idx...])
+        term = Term{Any}(getindex, [x, idx...]; metadata = meta)
         T = eltype(symtype(x))
         N = ndims(x) - count(i->symtype(i) <: Integer, idx)
         res = ArrayOp(atype(symtype(x)){T,N},
@@ -270,15 +271,18 @@ end
 
 function _matvec(A,b)
     @syms i::Int k::Int
+    sym_res = @arrayop (i,) A[i, k] * b[k] term=(A*b)
     if isdot(A, b)
-        make_shape((i,), A[i, k] * b[k]) # This is a dimension check
-        T = SymbolicUtils.promote_symtype(*, eltype(A), eltype(b))
-        S = SymbolicUtils.promote_symtype(+, T,T)
-        return Term{S}(*, [A, b])
+        return sym_res[1]
+    else
+        return sym_res
     end
-    @arrayop (i,) A[i, k] * b[k] term=(A*b)
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
+
+# specialize `dot` to dispatch on `Symbolic{<:Number}` to eventually work for 
+# arrays of (possibly unwrapped) Symbolic types, see issue #831
+@wrapped LinearAlgebra.dot(x::Number, y::Number) = conj(x) * y
 
 #################### MAP-REDUCE ################
 #

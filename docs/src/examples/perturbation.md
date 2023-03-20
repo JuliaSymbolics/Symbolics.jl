@@ -2,19 +2,19 @@
 
 ## Background
 
-[**Symbolics.jl**](https://github.com/JuliaSymbolics/Symbolics.jl) is a fast and modern Computer Algebra System (CAS) written in the Julia Programming Language. It is an integral part of the [SciML](https://sciml.ai/) ecosystem of differential equation solvers and scientific machine learning packages. While **Symbolics.jl** is primarily designed for modern scientific computing (e.g., auto-differentiation, machine learning), it is a powerful CAS and can also be useful for *classic* scientific computing. One such application is using the *perturbation* theory to solve algebraic and differential equations.
+[**Symbolics.jl**](https://github.com/JuliaSymbolics/Symbolics.jl) is a fast and modern Computer Algebra System (CAS) written in the Julia Programming Language. It is an integral part of the [SciML](https://sciml.ai/) ecosystem of differential equation solvers and scientific machine learning packages. While **Symbolics.jl** is primarily designed for modern scientific computing (e.g., auto-differentiation, machine learning), it is a powerful CAS that can also be useful for *classic* scientific computing. One such application is using the *perturbation* theory to solve algebraic and differential equations.
 
 Perturbation methods are a collection of techniques to solve intractable problems that generally don't have a closed solution but depend on a tunable parameter and have closed or easy solutions for some values of the parameter. The main idea is to assume a solution as a power series in the tunable parameter (say $ϵ$), such that $ϵ = 0$ corresponds to an easy solution.
 
 We will discuss the general steps of the perturbation methods to solve algebraic (this tutorial) and [differential equations](@ref perturb_diff)
 
-The hallmark of the perturbation method is the generation of long and convoluted intermediate equations, which are subjected to algorithmic and mechanical manipulations. Therefore, these problems are well suited for CAS. In fact, CAS softwares have been used to help with the perturbation calculations since the early 1970s.
+The hallmark of the perturbation method is the generation of long and convoluted intermediate equations, which are subjected to algorithmic and mechanical manipulations. Therefore, these problems are well suited for CAS. In fact, CAS software packages have been used to help with the perturbation calculations since the early 1970s.
 
-In this tutorial our goal is to show how to use a mix of symbolic manipulations (**Symbolics.jl**) and numerical methods to solve simple perturbation problems.
+In this tutorial, our goal is to show how to use a mix of symbolic manipulations (**Symbolics.jl**) and numerical methods to solve simple perturbation problems.
 
 ## Solving the Quintic
 
-We start with the "hello world!" analog of the perturbation problems, solving the quintic (fifth-order) equations. We want to find a real valued $x$ such that $x^5 + x = 1$. According to the Abel's theorem, a general quintic equation does not have a closed form solution. Of course, we can easily solve this equation numerically; for example, by using the Newton's method. We use the following implementation of the Newton's method:
+We start with the “hello world!” analog of the perturbation problems, solving the quintic (fifth-order) equations. We want to find a real valued $x$ such that $x^5 + x = 1$. According to the Abel's theorem, a general quintic equation does not have a closed form solution. Of course, we can easily solve this equation numerically; for example, by using the Newton's method. We use the following implementation of the Newton's method:
 
 ```@example perturb
 using Symbolics, SymbolicUtils
@@ -35,7 +35,7 @@ function solve_newton(f, x, x₀; abstol=1e-8, maxiter=50)
 end
 ```
 
-In this code, `Symbolics.derivative(eq, x)` does exactly what it names implies: it calculates the symbolic derivative of `eq` (a **Symbolics.jl** expression) with respect to `x` (a **Symbolics.jl** variable). We use `Symbolics.substitute(eq, D)` to evaluate the update formula by substituting variables or sub-expressions (defined in a dictionary `D`) in `eq`. It should be noted that `substitute` is the workhorse of our code and will be used multiple times in the rest of these tutorials. `solve_newton` is written with simplicity and clarity, and not performance, in mind but suffices for our purpose.
+In this code, `Symbolics.derivative(eq, x)` does exactly what it names implies: it calculates the symbolic derivative of `eq` (a **Symbolics.jl** expression) with respect to `x` (a **Symbolics.jl** variable). We use `Symbolics.substitute(eq, D)` to evaluate the update formula by substituting variables or sub-expressions (defined in a dictionary `D`) in `eq`. It should be noted that `substitute` is the workhorse of our code and will be used multiple times in the rest of these tutorials. `solve_newton` is written with simplicity and clarity in mind, and not performance.
 
 Let's go back to our quintic. We can define a Symbolics variable as `@variables x` and then solve the equation `solve_newton(x^5 + x - 1, x, 1.0)` (here, `x₀ = 0` is our first guess). The answer is 0.7549. Now, let's see how we can solve the same problem using the perturbation methods.
 
@@ -69,7 +69,7 @@ and
   a_1 + 5 a_2 + 10 a_1^2 = 0
 ```
 
-This system of equations does not initially seem to be linear because of the presence of terms like $10 a_1^2$, but upon closer inspection is found to be in fact linear (this is a feature of the perturbation methods). In addition, the system is in a triangular form, meaning the first equation depends only on $a_1$, the second one on $a_1$ and $a_2$, such that we can replace the result of $a_1$ from the first one into the second equation and remove the non-linear term. We solve the first equation to get $a_1 = -\frac{1}{5}$. Substituting in the second one and solve for $a_2$:
+This system of equations does not initially seem to be linear because of the presence of terms like $10 a_1^2$, but upon closer inspection is found to be linear (this is a feature of the perturbation methods). In addition, the system is in a triangular form, meaning the first equation depends only on $a_1$, the second one on $a_1$ and $a_2$, such that we can replace the result of $a_1$ from the first one into the second equation and remove the non-linear term. We solve the first equation to get $a_1 = -\frac{1}{5}$. Substituting in the second one and solve for $a_2$:
 
 ```math
   a_2 = \frac{(-\frac{1}{5} + 10(-(\frac{1}{5})²)}{5}  = -\frac{1}{25}
@@ -144,7 +144,7 @@ substitute(expand(eq), Dict(
 )
 ```
 
-Back to our problem. Having the coefficients of the powers of `ϵ`, we can set each equation in `eqs` to 0 (remember, we rearrange the problem such that `eq` is 0) and solve the system of linear equations to find the numerical values of the coefficients. **Symbolics.jl** has a function `Symbolics.solve_for` that can solve systems of linear equations. However, the presence of higher order terms in `eqs` prevents `Symbolics.solve_for(eqs .~ 0, a)` from workings properly. Instead, we can exploit the fact that our system is in a triangular form and start by solving `eqs[1]` for `a₁` and then substitute this in `eqs[2]` and solve for `a₂` (as continue the same process for higher order terms).  This *cascading* process is done by function `solve_coef(eqs, ps)`:
+Back to our problem. Having the coefficients of the powers of `ϵ`, we can set each equation in `eqs` to 0 (remember, we rearrange the problem such that `eq` is 0) and solve the system of linear equations to find the numerical values of the coefficients. **Symbolics.jl** has a function `Symbolics.solve_for` that can solve systems of linear equations. However, the presence of higher-order terms in `eqs` prevents `Symbolics.solve_for(eqs .~ 0, a)` from workings properly. Instead, we can exploit the fact that our system is in a triangular form and start by solving `eqs[1]` for `a₁` and then substitute this in `eqs[2]` and solve for `a₂`, and so on.  This *cascading* process is done by function `solve_coef(eqs, ps)`:
 
 ```@example perturb
 function solve_coef(eqs, ps)
@@ -183,11 +183,11 @@ Therefore, the solution to our original problem becomes `X(1)`, which is equal t
 |7  |0.7548|
 |8  |0.7550|
 
-Remember the numerical value is 0.7549. The two functions `collect_powers` and `solve_coef(eqs, a)` are used in all the examples in this and the next tutorial.
+Remember, the numerical value is 0.7549. The two functions `collect_powers` and `solve_coef(eqs, a)` are used in all the examples in this and the next tutorial.
 
 ## Solving the Kepler's Equation
 
-Historically, the perturbation methods were first invented to solve orbital calculations of the Moon and the planets. In homage to this history, our second example has a celestial theme. Our goal is solve the Kepler's equation:
+Historically, the perturbation methods were first invented to solve orbital calculations of the Moon and the planets. In homage to this history, our second example has a celestial theme. Our goal is solving the Kepler's equation:
 
 ```math
   E - e\sin(E) = M
@@ -199,7 +199,7 @@ Similar to the first example, it is easy to solve this problem using the Newton'
 
 For $e = 0$, we get $E = M$. Therefore, we can use $e$ as our perturbation parameter. For consistency with other problems, we also rename $e$ to $\epsilon$ and $E$ to $x$.
 
-From here on, we use the helper function `def_taylor` to define Taylor's series by calling it as `x = def_taylor(ϵ, a, 1)`, where the arguments are, respectively, the perturbation variable, an array of coefficients (starting from the coefficient of $\epsilon^1$), and an optional constant term.
+From here on, we use the helper function `def_taylor` to define Taylor's series by calling it as `x = def_taylor(ϵ, a, 1)`, where the arguments are, respectively, the perturbation variable, which is an array of coefficients (starting from the coefficient of $\epsilon^1$), and an optional constant term.
 
 ```@example perturb
 def_taylor(x, ps) = sum([a*x^i for (i,a) in enumerate(ps)])

@@ -11,9 +11,9 @@ ERROR: TypeError: non-boolean (Num) used in boolean context
 ```
 
 this is likely coming from an algorithm which cannot be traced into a purely
-symbolic algorithm. Many numerical solvers for instance have this property. It
+symbolic algorithm. Many numerical solvers, for instance, have this property. It
 shows up when you're doing something like if `x < tol`. If x is a number, then
-this is true or false. If x is symbol, then it's `x < tol`, so Julia just cannot
+this is true or false. If x is a symbol, then it's `x < tol`, so Julia just cannot
 know how many iterations to do and throws an error.
 
 This shows up in adaptive algorithms, for example:
@@ -31,8 +31,8 @@ end
 
 The number of iterations this algorithm runs for is dependent on the value of
 `x`, and so there is no static representation of the algorithm. If `x` is 5,
-then it's `out = x*(x-1)*(x-2)*(x-3)*(x-4)`, while if `x` is 3 then it's
-`out = x*(x-1)*(x-2)`. Thus it should be no surprise that:
+then it's `out = x*(x-1)*(x-2)*(x-3)*(x-4)`, while if `x` is 3, then it's
+`out = x*(x-1)*(x-2)`. It should thus be no surprise that:
 
 ```@example faq
 using Symbolics
@@ -59,8 +59,8 @@ generating a flat representation of the algorithm.
 If you need to represent this function `f` symbolically, then you'll need to make
 sure it's not traced and instead is directly represented in the underlying
 computational graph. Just like how `sqrt(x)` symbolically does not try to
-represent the underlying algorithm, this needs to be done to your `f`. This is
-done by doing `@register_symbolic f(x)`. If you need to define things like derivatives to
+represent the underlying algorithm, this must be done to your `f`. This is
+done by doing `@register_symbolic f(x)`. If you have to define things like derivatives to
 `f`, then [the function registration documentation](@ref function_registration).
 
 ## Equality and set membership tests

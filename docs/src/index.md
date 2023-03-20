@@ -31,7 +31,7 @@ If you use Symbolics.jl, please [cite this paper](https://arxiv.org/abs/2105.039
 Because Symbolics.jl is built into the Julia language and works
 with its dispatches, generic functions in Base Julia will work with symbolic
 expressions! Make matrices of symbolic expressions and multiply them: it will
-just work. Take the LU-factorization. Etc. Thus see
+just work. Take the LU-factorization. Etc. Thus, see
 [the Julia Documentation](https://docs.julialang.org/en/v1/) for a large list
 of functionality available in Symbolics.jl.
 
@@ -49,7 +49,7 @@ A general list of the features is:
 - Special functions (list provided by [SpecialFunctions.jl](https://github.com/JuliaMath/SpecialFunctions.jl))
 - Automatic conversion of Julia code to symbolic code
 - Generation of (high performance and parallel) functions from symbolic expressions
-- Fast automated sparsity detection and generation of sparse Jacobian and Hessians
+- Fast automated sparsity detection and generation of sparse Jacobians and Hessians
 
 and much more.
 
@@ -76,7 +76,7 @@ to be listed here, feel free to open a pull request!
     - Representations of Koopman operators and Dynamic Mode Decomposition (DMD)
 - [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl): Distributed High-Performance symbolic regression
     - Parallelized generic algorithms for finding equations from data
-    - Pareto frontier based scoring
+    - Pareto frontier-based scoring
 - [ReversePropagation.jl](https://github.com/dpsanders/ReversePropagation.jl): Source-to-source reverse mode automatic differentiation
     - Automated tracing of code and construction of backpropagation equations
     - Composes with symbolic transformation and simplification functionality

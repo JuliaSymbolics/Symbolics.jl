@@ -12,7 +12,7 @@ SymbolicUtils.promote_symtype(::typeof(f_registered), args...) = Real # or the a
 is defined for the register function. Note that when defining multiple register
 overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
-overwritting.
+overwriting.
 
 # Examples
 ```julia
@@ -34,6 +34,10 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
 
     f = expr.args[1]
     args = expr.args[2:end]
+
+    if f isa Expr && f.head == :(::)
+        @assert length(f.args) == 2
+    end
 
     types = map(args) do x
         if x isa Symbol
@@ -65,6 +69,11 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
     verbose = false
     mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
     Ts = Symbol("##__Ts")
+    ftype = if f isa Expr && f.head == :(::)
+        f.args[end]
+    else
+        :($typeof($f))
+    end
     quote
         $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
                 if any(x->x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
@@ -79,7 +88,7 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
             $eval_method
         end
         if $define_promotion
-            (::$typeof($promote_symtype))(::$typeof($f), args...) = $ret_type
+            (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type
         end
     end |> esc
 end

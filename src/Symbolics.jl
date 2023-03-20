@@ -28,7 +28,7 @@ import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 import SymbolicUtils.Code: toexpr
 
-import ArrayInterfaceCore
+import ArrayInterface
 
 using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)

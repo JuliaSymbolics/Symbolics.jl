@@ -9,7 +9,7 @@ using Symbolics
 @variables A[1:5, 1:3] b[1:3]
 ```
 
-Here `A` is a symbolic matrix of size `(5, 3)` and `b` is a symbolic vector of length 3.
+Here, `A` is a symbolic matrix of size `(5, 3)` and `b` is a symbolic vector of length 3.
 
 ```@example arrays
 size(A)
@@ -94,7 +94,7 @@ AAt = A*A'
 AAt[2,3]
 ```
 
-Here we indexed for the element (2,3), but we got back a symbolic indexing expression. You may want to force the element to be computed in terms of the elements of A. This can be done, using `scalarize` function.
+Here we indexed for the element (2,3), but we got back a symbolic indexing expression. You may want to force the element to be computed in terms of the elements of A. This can be done, using the `scalarize` function.
 
 ```@example arrays
 Symbolics.scalarize(AAt[2,3])
@@ -104,7 +104,7 @@ Symbolics.scalarize(AAt[2,3])
 Symbolics.scalarize(AAt[i,j])
 ```
 
-In general any scalar expression which is derived from array expressions can be scalarized.
+In general, any scalar expression which is derived from array expressions can be scalarized.
 
 ```@example arrays
 #sum(A[:,1]) + sum(A[2,:])#latexify not working
