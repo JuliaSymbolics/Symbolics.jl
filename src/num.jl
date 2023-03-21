@@ -154,6 +154,8 @@ for f in [:!, :~]
 end
 @num_method Base.isequal isequal(value(a), value(b)) (AbstractFloat, Number, Symbolic)
 
+Base.to_index(x::Num) = Base.to_index(value(x))
+
 Base.hash(x::Num, h::UInt) = hash(value(x), h)
 
 Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
@@ -176,7 +178,7 @@ _isone(x::Num) = _isone(value(x))
 Code.cse(x::Num) = Code.cse(unwrap(x))
 
 ## Documentation
-# This method makes the docstring show all entries in the metadata dict associated with an instance of Num 
+# This method makes the docstring show all entries in the metadata dict associated with an instance of Num
 function Base.Docs.getdoc(x::Num)
     x = unwrap(x)
     strings =
