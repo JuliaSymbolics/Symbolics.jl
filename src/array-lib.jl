@@ -293,20 +293,44 @@ end
 @wrapped Base.map(f, x, y, z::AbstractArray, w...) = _map(f, x, y, z, w...)
 
 function _map(f, x, xs...)
+    return ArrayOp(
+        SymbolicUtils._promote_symtype(_map, (x,xs)),
+        (idx...,),
+        expr,
+        +,
+        Term{Any}(map, [f, x, xs...])
+    )
+end
+
+function SymbolicUtils._promote_symtype(::typeof(_map), args)
+    f, x, xs... = args
+    
     N = ndims(x)
     idx = makesubscripts(N)
-
+    
     expr = f(map(a->a[idx...], [x, xs...])...)
 
     Atype = propagate_atype(map, f, x, xs...)
-    ArrayOp(Atype{symtype(expr), N},
-            (idx...,),
-            expr,
-            +,
-            Term{Any}(map, [f, x, xs...]))
+
+    return Atype{symtype(expr), N}
 end
 
 @inline _mapreduce(f, g, x, dims, kw) = mapreduce(f, g, x; dims=dims, kw...)
+
+function SymbolicUtils._promote_symtype(::typeof(_mapreduce), args)
+    @assert length(args) == 5
+    f, op, x, dims, kw = args
+    
+    N = ndims(x)
+    idx = makesubscripts(N)
+    expr = f(x[idx...])
+    T = symtype(op(expr, expr))
+    if dims === (:)
+        return T
+    end
+    Atype = propagate_atype(_mapreduce, f, op, x, dims, (kw...,))
+    return Atype{T, N}
+end
 
 function scalarize_op(::typeof(_mapreduce), t)
     f,g,x,dims,kw = arguments(t)
@@ -316,20 +340,19 @@ function scalarize_op(::typeof(_mapreduce), t)
 end
 
 @wrapped function Base.mapreduce(f, g, x::AbstractArray; dims=:, kw...)
+    Stype = SymbolicUtils._promote_symtype(_mapreduce, (f,g,x,dims,kw))
+    if dims === (:)
+        return Term{Stype}(_mapreduce, [f, g, x, dims, (kw...,)])
+    end
     idx = makesubscripts(ndims(x))
     out_idx = [dims == (:) || i in dims ? 1 : idx[i] for i = 1:ndims(x)]
-    expr = f(x[idx...])
-    T = symtype(g(expr, expr))
-    if dims === (:)
-        return Term{T}(_mapreduce, [f, g, x, dims, (kw...,)])
-    end
-
-    Atype = propagate_atype(_mapreduce, f, g, x, dims, (kw...,))
-    ArrayOp(Atype{T, ndims(x)},
-            (out_idx...,),
-            expr,
-            g,
-            Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)]))
+    return ArrayOp(
+        Stype,
+        (out_idx...,),
+        expr,
+        g,
+        Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)])
+    )
 end
 
 for (ff, opts) in [sum => (identity, +, false),
