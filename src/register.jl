@@ -52,8 +52,8 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
         end
     end
 
-    eval_method = :(@eval function $f($(Expr(:$, :(s...))),)
-                        args = [$(Expr(:$, :(s_syms...)))]
+    eval_method = :(@eval function $f($(Expr(:$, :(var"##_register_macro_s"...))),)
+                        args = [$(Expr(:$, :(var"##_register_macro_s_syms"...)))]
                         unwrapped_args = map($unwrap, args)
                         res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
                             $f(unwrapped_args...)
@@ -83,8 +83,8 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
         end
 
         for sig in $Ts
-            s = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
-            s_syms = map(x->x.args[1], s)
+            var"##_register_macro_s" = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
+            var"##_register_macro_s_syms" = map(x->x.args[1], var"##_register_macro_s")
             $eval_method
         end
         if $define_promotion
