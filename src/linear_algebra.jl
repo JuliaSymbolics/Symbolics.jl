@@ -161,7 +161,8 @@ function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = 
     x
 end
 
-minor(B, j) = B[2:end, 1:size(B,2) .!= j]
+minor(B, j) = @view B[2:end, 1:size(B,2) .!= j]
+minor(B, i, j) = @view B[1:size(B,1) .!= i, 1:size(B,2) .!= j]
 function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
     if laplace
         n = LinearAlgebra.checksquare(A)
@@ -178,6 +179,22 @@ function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
             return det(UpperTriangular(A))
         end
         return det(lu(A; check = false))
+    end
+end
+
+function LinearAlgebra.inv(A::AbstractMatrix{<:RCNum}; laplace=true)
+    if laplace
+        @assert size(A,1) == size(A,2)
+        A⁻¹ = similar(A)
+        idet = 1/det(A; laplace=true)
+        for i=1:size(A,1)
+            for j = 1:size(A,1)
+                A⁻¹[i,j] = (-1)^(i+j)*det(minor(A, j, i); laplace=true)*idet
+            end
+        end
+        return A⁻¹
+    else
+        return inv(A)
     end
 end
 
