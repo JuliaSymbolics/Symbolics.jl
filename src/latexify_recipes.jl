@@ -49,7 +49,8 @@ end
 @latexrecipe function f(z::Complex{Num})
     env --> :equation
     cdot --> false
-
+    
+    iszero(z.im) && return :($(recipe(z.re)))
     iszero(z.re) && return :($(recipe(z.im)) * $im)
     return :($(recipe(z.re)) + $(recipe(z.im)) * $im)
 end
@@ -107,11 +108,11 @@ end
     return Expr(:call, :connect, map(nameof, c.systems)...)
 end
 
-Base.show(io::IO, ::MIME"text/latex", x::Num) = print(io, "\$\$ " * latexify(x) * " \$\$")
+Base.show(io::IO, ::MIME"text/latex", x::RCNum) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num}) = print(io, "\$\$ " * latexify(x) * " \$\$")
+Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 
 _toexpr(O::ArrayOp) = _toexpr(O.term)
 
