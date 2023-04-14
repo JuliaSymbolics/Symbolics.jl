@@ -107,11 +107,11 @@ end
     return Expr(:call, :connect, map(nameof, c.systems)...)
 end
 
-Base.show(io::IO, ::MIME"text/latex", x::Num) = print(io, "\$\$ " * latexify(x) * " \$\$")
+Base.show(io::IO, ::MIME"text/latex", x::RCNum) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{Num}) = print(io, "\$\$ " * latexify(x) * " \$\$")
+Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 
 _toexpr(O::ArrayOp) = _toexpr(O.term)
 
