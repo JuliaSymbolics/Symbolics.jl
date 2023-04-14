@@ -49,7 +49,8 @@ end
 @latexrecipe function f(z::Complex{Num})
     env --> :equation
     cdot --> false
-
+    
+    iszero(z.im) && return :($(recipe(z.re)))
     iszero(z.re) && return :($(recipe(z.im)) * $im)
     return :($(recipe(z.re)) + $(recipe(z.im)) * $im)
 end
