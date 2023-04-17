@@ -639,6 +639,11 @@ end
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
 end
 
+@wrapped function Base.:(/)(b::AbstractVecOrMat, A::AbstractMatrix)
+    t = arrterm(/, b, A)
+    setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
+end
+
 @wrapped function Base.inv(A::AbstractMatrix)
     t = arrterm(inv, A)
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
@@ -659,6 +664,8 @@ end
 # A ∈ R^(m x n) x ∈ R^(n, k) = b ∈ R^(m, k)
 propagate_ndims(::typeof(\), A, b) = ndims(b)
 propagate_ndims(::typeof(inv), A) = ndims(A)
+# b/A is conceptually b*inv(A)
+propagate_ndims(::typeof(/), b, A) = ndims(A)
 
 # A(m,k) * B(k,n) = C(m,n)
 # A(m,k) \ C(m,n)  = B(k,n)
@@ -667,6 +674,16 @@ function propagate_shape(::typeof(\), A, b)
         (axes(A,2),)
     else
         (axes(A,2), axes(b, 2))
+    end
+end
+
+# C(m,n) * A(n,k) = B(m,k)
+# B(m,k) / A(n,k) = C(m,n)
+function propagate_shape(::typeof(/), b, A)
+    if ndims(b) == 1
+        (axes(A,2),)
+    else
+        (axes(b,1), axes(A,1))
     end
 end
 
