@@ -182,7 +182,10 @@ function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
     end
 end
 
-function LinearAlgebra.inv(A::AbstractMatrix{<:RCNum}; laplace=true)
+LinearAlgebra.inv(A::AbstractMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+LinearAlgebra.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+
+function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
     if laplace
         @assert size(A,1) == size(A,2)
         A⁻¹ = similar(A)
