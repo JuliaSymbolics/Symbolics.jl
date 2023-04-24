@@ -23,4 +23,6 @@ function __init__()
         end
 
     end # SymPy
+
+    specialize_methods((LinearAlgebra,))
 end

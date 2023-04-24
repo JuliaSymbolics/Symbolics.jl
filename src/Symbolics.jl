@@ -43,6 +43,10 @@ using MacroTools
 import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
 
+import ExprTools
+export specialize_methods
+include("specialize_methods.jl")
+
 include("num.jl")
 include("complex.jl")
 

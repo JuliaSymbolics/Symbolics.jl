@@ -57,58 +57,82 @@ function wraps_type end
 has_symwrapper(::Type) = false
 is_wrapper_type(::Type) = false
 
+# helper function to extract keyword argument names from expressions
+function expr_kwargname(kwarg)
+    if kwarg isa Expr && kwarg.head == :kw
+        kwarg.args[1]
+    elseif kwarg isa Expr && kwarg.head == :(...)
+        kwarg.args[1]
+    else
+        kwarg
+    end
+end
+
+# helper function to extract argument names from expressions
+function expr_argname(arg)
+    if arg isa Expr && (arg.head == :(::) || arg.head == :(...))
+        arg.args[1]
+    elseif arg isa Expr
+        error("$arg not supported as an argument")
+    else
+        arg
+    end
+end
+
 function wrap_func_expr(mod, expr)
     @assert expr.head == :function || (expr.head == :(=) &&
                                        expr.args[1] isa Expr &&
                                        expr.args[1].head == :call)
 
     def = splitdef(expr)
-
-    sig = expr.args[1]
     body = def[:body]
-
     fname = def[:name]
     args = get(def, :args, [])
     kwargs = get(def, :kwargs, [])
+    args_names = expr_argname.(args)
+    kwargs_names = expr_kwargname.(kwargs)
+    
+    wrap_func_expr(mod, fname, args, kwargs, args_names, kwargs_names, Symbol[], body)
+end
 
-    impl_name = Symbol(fname,"_", hash(string(args)*string(kwargs)))
-
-    function kwargname(kwarg)
-        if kwarg isa Expr && kwarg.head == :kw
-            kwarg.args[1]
-        elseif kwarg isa Expr && kwarg.head == :(...)
-            kwarg.args[1]
-        else
-            kwarg
-        end
-    end
-
-    function argname(arg)
-        if arg isa Expr && (arg.head == :(::) || arg.head == :(...))
-            arg.args[1]
-        elseif arg isa Expr
-            error("$arg not supported as an argument")
-        else
-            arg
-        end
-    end
-
-    names = vcat(argname.(args), kwargname.(kwargs))
-
-    function type_options(arg)
+function wrap_func_expr(
+    mod, fname, args, kwargs, args_names, kwargs_names, whereparams, body;
+    abstract_arg_types=nothing
+)
+    names = vcat(args_names, kwargs_names)
+    
+    function type_options(wparams, arg, arg_ind)
+        pmod = parentmodule(mod)
+        atype = isnothing(abstract_arg_types) ? Any : abstract_arg_types[arg_ind]
         if arg isa Expr && arg.head == :(::)
-            T = Base.eval(mod, arg.args[2])
+            T = Base.eval(mod, quote
+                let $(Symbol(pmod)) = $(pmod); # make name of parent module available in eval scope   
+                    #=
+                    NOTE
+                    `typeintersect` is important here for consecutive calls to `specialize_methods` 
+                    with conceptually different super types. 
+                    E.g.: Consider we first specialize `*(::AbstractMatrix, ::AbstractVector)` to 
+                    redirect to `_matvec`, and then `*(::AbstractMatrix, ::AbstractMatrix)` to 
+                    redirect to `_matmul`. If we encounter some existing method for `*` which accepts
+                    an `AbstractMatrix` and an `VecOrMat` (type union), then we accidentally redirect 
+                    a matrix-vector-product to `_matmul` without `typeintersect`.
+                    =#
+                    typeintersect($(atype), $(arg.args[2]) where {$(wparams...)})
+                end
+            end)
             has_symwrapper(T) ? (T, :(SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
-                                (T,:(SymbolicUtils.Symbolic{<:$T}))
+                                (T, :(SymbolicUtils.Symbolic{<:$T}))
         elseif arg isa Expr && arg.head == :(...)
-            Ts = type_options(arg.args[1])
+            Ts = type_options(wparams, arg.args[1], arg_ind)
             map(x->Vararg{x},Ts)
         else
             (Any,)
         end
     end
 
-    types = map(type_options, args)
+    types = [type_options(whereparams, arg, arg_ind) for (arg_ind, arg)=enumerate(args)]
+
+    impl_name = Symbol(fname,"_", hash(string(args)*string(kwargs)*string(types)))
 
     impl = :(function $impl_name($(names...))
         $body
@@ -139,9 +163,9 @@ function wrap_func_expr(mod, expr)
     quote
         $impl
         $(methods...)
-    end |> esc
+    end
 end
 
 macro wrapped(expr)
-    wrap_func_expr(__module__, expr)
+    esc(wrap_func_expr(__module__, expr))
 end
