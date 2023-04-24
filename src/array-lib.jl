@@ -163,7 +163,7 @@ Broadcast.BroadcastStyle(::SymBroadcast, ::Broadcast.BroadcastStyle) = SymBroadc
 
 isonedim(x, i) = shape(x) == Unknown() ? false : isone(size(x, i))
 
-function Broadcast.materialize(bc::Broadcast.Broadcasted{SymBroadcast})
+function Broadcast.copy(bc::Broadcast.Broadcasted{SymBroadcast})
     # Do the thing here
     ndim = mapfoldl(ndims, max, bc.args, init=0)
     subscripts = makesubscripts(ndim)
@@ -215,10 +215,10 @@ Broadcast.BroadcastStyle(::SymWrapBroadcast,
 Broadcast.BroadcastStyle(::SymBroadcast,
     ::SymWrapBroadcast) = Broadcast.Unknown()
 
-function Broadcast.materialize(bc::Broadcast.Broadcasted{SymWrapBroadcast})
+function Broadcast.copy(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     args = map(bc.args) do arg
         if arg isa Broadcast.Broadcasted
-            return Broadcast.materialize(arg)
+            return Broadcast.copy(arg)
         else
             return arg
         end
