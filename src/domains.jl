@@ -1,4 +1,5 @@
-import DomainSets: Domain, Interval, AbstractInterval
+import IntervalSets: Interval, AbstractInterval, TypedEndpointsInterval
+import DomainSets: Domain
 import Symbolics: value, Sym, Term, Num
 
 struct VarDomainPairing
@@ -10,6 +11,7 @@ const DomainedVar = Union{Symbolic{<:Number}, Num}
 
 Base.:∈(variable::DomainedVar,domain::Domain) = VarDomainPairing(value(variable),domain)
 Base.:∈(variable::DomainedVar,domain::Interval) = VarDomainPairing(value(variable),domain)
+Base.:∈(variable::DomainedVar,domain::TypedEndpointsInterval) = VarDomainPairing(value(variable),domain)
 
 # Construct Interval domain from a Tuple
 Base.:∈(variable::DomainedVar,domain::NTuple{2,Real}) = VarDomainPairing(variable,Interval(domain...))
