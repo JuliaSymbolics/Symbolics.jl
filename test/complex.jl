@@ -1,4 +1,5 @@
 using Symbolics, Test
+using SymbolicUtils: metadata
 
 @variables a b::Real z::Complex (Z::Complex)[1:10]
 
