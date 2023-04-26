@@ -104,10 +104,16 @@ M \ reshape(b,2,1)
 M = [1 1; 0 2]
 M \ reshape(b,2,1)
 
-
 M = [1 a; 0 2]
 M \ b
 M \ [1, 2]
+
+# Tests for b/A
+@variables A[1:2,1:3] b[1:3]
+b1 = randn(1,3)
+M1 = randn(2,3)
+b/M
+Symbolics.substitute(reshape(b,1,3)/M1, Dict(b=>b1)) - b1/M1
 
 # test det
 @variables X[1:4,1:4]
