@@ -191,8 +191,8 @@ function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
         A⁻¹ = similar(A)
         idet = 1/det(A; laplace=true)
 	if n==1
-	A⁻¹[1,1] = idet
-	return A⁻¹
+	    A⁻¹[1,1] = idet
+	    return A⁻¹
 	end
         for i=1:size(A,1)
             for j = 1:size(A,1)
