@@ -29,8 +29,10 @@ function latexify_derivatives(ex)
             end
 	elseif x.args[1] === :_integral
 		lower, upper, var_of_int, integrand = x.args[2:end]
+		lower_s = strip(latexify(lower).s, '\$')
+		upper_s = strip(latexify(upper).s, '\$')
 		return Expr(:call, :*,
-			    "\\int_{$lower}^{$upper}",
+			    "\\int_{$lower_s}^{$upper_s)}",
 			    var_of_int,
 			    integrand
 			)    
