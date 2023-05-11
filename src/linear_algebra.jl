@@ -249,7 +249,7 @@ function _linear_expansion(t::Equation, x)
     # t.rhs - t.lhs = 0
     return (a₂ - a₁, b₂ - b₁, islinear)
 end
-trival_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
+trivial_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
 
 is_expansion_leaf(t) = !istree(t) || (operation(t) isa Differential)
 @noinline expansion_check(op) = op isa Differential && error("The operation is a Differential. This should never happen.")
@@ -257,7 +257,7 @@ function _linear_expansion(t, x)
     t = value(t)
     t isa Symbolic || return (0, t, true)
     x = value(x)
-    is_expansion_leaf(t) && return trival_linear_expansion(t, x)
+    is_expansion_leaf(t) && return trivial_linear_expansion(t, x)
     isequal(t, x) && return (1, 0, true)
 
     op, args = operation(t), arguments(t)
