@@ -41,7 +41,7 @@ A general list of the features is:
 - Symbolic polynomials and trigonometric functions
 - Pattern matching, simplification and substitution
 - Differentiation
-- Symbolic linear algebra (factorizations, inversion, determinants, eigencomputations, etc.)
+- Symbolic linear algebra (factorizations, inversion, determinants, etc.)
 - Discrete math (representations of summations, products, binomial coefficients, etc.)
 - Logical and Boolean expressions
 - Symbolic equation solving and conversion to arbitrary precision
