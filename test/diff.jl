@@ -339,3 +339,12 @@ let
     @variables x(t)[1:3]
     @test iszero(Symbolics.derivative(x[1], x[2]))
 end
+
+#908
+#
+let
+    using Symbolics
+    @variables t
+    @test isequal(expand_derivatives(Differential(t)(im*t)), im)
+    @test isequal(expand_derivatives(Differential(t)(t^2 + im*t)), 2t + im)
+end
