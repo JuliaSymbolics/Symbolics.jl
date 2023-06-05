@@ -27,6 +27,15 @@ function latexify_derivatives(ex)
                             num
                            )
             end
+    elseif x.args[1] === :_integral
+        lower, upper, var_of_int, integrand = x.args[2:end]
+        lower_s = strip(latexify(lower).s, '\$')
+        upper_s = strip(latexify(upper).s, '\$')
+        return Expr(:call, :*,
+                "\\int_{$lower_s}^{$upper_s)}",
+                var_of_int,
+                integrand
+            )
         elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(arguments(x)[1])).s
             return "\\textbf{" * strip(ls, '\$') * "}"
@@ -190,6 +199,17 @@ function _toexpr(O)
             num = num.arguments[1]
         end
         return :(_derivative($(_toexpr(num)), $den, $deg))
+    elseif op isa Integral
+        lower = op.domain.domain.left
+        upper = op.domain.domain.right
+        vars = op.domain.variables
+        integrand = args[1]
+        var = if vars isa Tuple
+            Expr(:call, :(*), _toexpr(vars...))
+        else
+                _toexpr(vars)
+        end
+        return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), vars, _toexpr(integrand))
     elseif symtype(op) <: FnType
         isempty(args) && return nameof(op)
         return Expr(:call, _toexpr(op), _toexpr(args)...)
