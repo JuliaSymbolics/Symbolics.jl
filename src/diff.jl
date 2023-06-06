@@ -35,6 +35,7 @@ struct Differential <: Operator
 end
 (D::Differential)(x) = Term{symtype(x)}(D, [x])
 (D::Differential)(x::Num) = Num(D(value(x)))
+(D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, x) = x
 
 is_derivative(x) = istree(x) ? operation(x) isa Differential : false
@@ -276,9 +277,13 @@ function expand_derivatives(O::Symbolic, simplify=false; occurrences=nothing)
 end
 
 function expand_derivatives(n::Num, simplify=false; occurrences=nothing)
-    Num(expand_derivatives(value(n), simplify; occurrences=occurrences))
+    wrap(expand_derivatives(value(n), simplify; occurrences=occurrences))
 end
 
+function expand_derivatives(n::Complex{Num}, simplify=false; occurrences=nothing)
+    wrap(ComplexTerm{Real}(expand_derivatives(real(n), simplify; occurrences=occurrences),
+                           expand_derivatives(imag(n), simplify; occurrences=occurrences)))
+end
 _iszero(x) = false
 _isone(x) = false
 
