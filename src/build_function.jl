@@ -264,9 +264,8 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        iip_config = (true, true),
                        parallel=nothing, cse = false, kwargs...)
 
-  if parallel == nothing && _nnz(rhss) >= 1000
-        parallel = ShardedForm() # by default switch for arrays longer than 1000 exprs
-    end
+    # We cannot switch to ShardedForm because it deadlocks with
+    # RuntimeGeneratedFunctions
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
