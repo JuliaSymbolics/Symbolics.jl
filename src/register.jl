@@ -44,7 +44,7 @@ macro register_symbolic(expr, define_promotion = true, Ts = [], permissive = fal
     types = map(args) do x
         if x isa Symbol
             if permissive
-                :(($Any, $Symbolic{<:$Real}))
+                :(($Any, $wrapper_type($Real), $Symbolic{<:$Real}))
             else
                 :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
             end
