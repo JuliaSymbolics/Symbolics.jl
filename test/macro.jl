@@ -112,6 +112,9 @@ Symbolics.@register_symbolic oof(x::AbstractVector)
 Symbolics.@variables x[1:100]
 @test oof(x) isa Num
 
+Symbolics.@register_symbolic(boof(x, t), true, [], true)
+@test boof([1, 2, 3], t) isa Num
+
 # Register callable structs
 # 806
 struct B
