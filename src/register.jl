@@ -14,6 +14,8 @@ overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
 overwriting.
 
+The `permissive` keyword argument allows Any type to be passed in as an argument and the registration will still occur. This is useful for registering functions that have a fallback method that can handle any type.
+
 # Examples
 ```julia
 @register_symbolic foo(x, y)
@@ -22,7 +24,7 @@ overwriting.
 @register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
 """
-macro register_symbolic(expr, define_promotion = true, Ts = [])
+macro register_symbolic(expr, define_promotion = true, Ts = [], permissive = false)
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
@@ -41,7 +43,11 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
 
     types = map(args) do x
         if x isa Symbol
-            :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
+            if permissive
+                :(($Any, $Symbolic{<:$Real}))
+            else
+                :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
+            end
         elseif Meta.isexpr(x, :(::))
             T = x.args[2]
             :($has_symwrapper($T) ?
