@@ -14,7 +14,7 @@ overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
 overwriting.
 
-The `permissive` keyword argument allows objects of Any type to be passed in as an argument tracing will still stop as long as there is a symbolic input. This is useful for registering functions that have a fallback method that can handle any type. Allows using symbolics as placeholder variables for diverse types such as Neural Nets and whole unsized arrays, easing general metaprogramming with symbolics.
+The `permissive` keyword argument allows objects of Any type to be passed in as an argument, tracing will still stop as long as there is a symbolic input. This is useful for registering functions that have a fallback method that can handle any type. Allows using symbolics as placeholder variables for diverse types such as Neural Nets and whole unsized arrays, easing general metaprogramming with symbolics.
 
 # Examples
 ```julia
