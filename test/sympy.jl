@@ -22,3 +22,12 @@ sexpr = symbolics_to_sympy(expr)
 sp = symbolics_to_sympy(p)
 
 @test SymPy.simplify(symbolics_to_sympy(Symbolics.solve_for(expr, p))) == SymPy.solve(sexpr, sp)[1]
+
+@variables k
+sk = symbols("k", positive = True)
+@test symbolics_to_sympy(k) !== sk
+@test symbolics_to_sympy(k, Dict()) != sk
+@test symbolics_to_sympy(k, Dict("k"=>sk)) == sk
+@test symbolics_to_sympy(k, Dict("x"=>sk)) != sk
+@test symbolics_to_sympy(k, [sk]) == sk
+@test symbolics_to_sympy(k, (sk,)) == sk

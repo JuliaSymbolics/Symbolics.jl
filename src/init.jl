@@ -5,12 +5,12 @@ function __init__()
         using Symbolics: value
         using SymbolicUtils: istree, operation, arguments, symtype,
                              FnType, Symbolic
-        function symbolics_to_sympy(expr)
+        function symbolics_to_sympy(expr, symbols::Dict=Dict())
             expr = value(expr)
             expr isa Symbolic || return expr
             if istree(expr)
-                sop = symbolics_to_sympy(operation(expr))
-                sargs = map(symbolics_to_sympy, arguments(expr))
+                sop = symbolics_to_sympy(operation(expr), symbols)
+                sargs = map(a->symbolics_to_sympy(a, symbols), arguments(expr))
                 if sop === (^) && length(sargs) == 2 && sargs[2] isa Number
                     return Base.literal_pow(^, sargs[1], Val(sargs[2]))
                 else
@@ -18,8 +18,13 @@ function __init__()
                 end
             else # isa Symbolics.Sym
                 name = string(nameof(expr))
-                return symtype(expr) <: FnType ? SymPy.SymFunction(name) : SymPy.Sym(name)
+                return symtype(expr) <: FnType ? SymPy.SymFunction(name) : get(symbols, name, SymPy.Sym(name))
             end
+        end 
+
+        function symbolics_to_sympy(expr, symbols) 
+            d = Dict(string(symbol) => symbol for symbol in symbols)
+            return symbolics_to_sympy(expr,d)
         end
 
     end # SymPy
