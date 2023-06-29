@@ -166,10 +166,15 @@ end
 function symbolics_to_sympy end
 export symbolics_to_sympy
 
-if !isdefined(Base,:get_extension)
+if !isdefined(Base, :get_extension)
     using Requires
+end
+
+@static if !isdefined(Base,:get_extension)
     function __init__()
-        @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" include("../ext/SymbolicsSymPyExt.jl")
+        @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
+            include("../ext/SymbolicsSymPyExt.jl")
+        end
     end
 end
 
