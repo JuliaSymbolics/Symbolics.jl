@@ -166,7 +166,7 @@ end
 function symbolics_to_sympy end
 export symbolics_to_sympy
 
-if !isdefined(Base, :get_extension)
+@static if !isdefined(Base, :get_extension)
     using Requires
 end
 
