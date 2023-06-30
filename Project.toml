@@ -33,6 +33,12 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
+[weakdeps]
+SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+
+[extensions]
+SymbolicsSymPyExt = "SymPy"
+
 [compat]
 ArrayInterface = "6, 7"
 ConstructionBase = "1.1, 1.2"
