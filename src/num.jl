@@ -152,7 +152,15 @@ end
 for f in [:!, :~]
     @eval Base.$f(x::Num) = (val = $f(value(x)); val isa Bool ? val : Num(val))
 end
-@num_method Base.isequal isequal(value(a), value(b))::Bool (AbstractFloat, Number, Symbolic)
+@num_method Base.isequal begin
+  va = value(a)
+  vb = value(b)
+  if va isa SymbolicUtils.BasicSymbolic{Real} && vb isa SymbolicUtils.BasicSymbolic{Real}
+    isequal(va, vb)::Bool
+  else
+    isequal(va, vb)::Bool
+  end
+end (AbstractFloat, Number, Symbolic)
 
 Base.to_index(x::Num) = Base.to_index(value(x))
 
