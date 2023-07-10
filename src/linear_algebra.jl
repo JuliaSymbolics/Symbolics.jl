@@ -187,9 +187,13 @@ LinearAlgebra.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=la
 
 function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
     if laplace
-        @assert size(A,1) == size(A,2)
+		n = LinearAlgebra.checksquare(A)
         A⁻¹ = similar(A)
         idet = 1/det(A; laplace=true)
+	if n==1
+	    A⁻¹[1,1] = idet
+	    return A⁻¹
+	end
         for i=1:size(A,1)
             for j = 1:size(A,1)
                 A⁻¹[i,j] = (-1)^(i+j)*det(minor(A, j, i); laplace=true)*idet
@@ -197,7 +201,10 @@ function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
         end
         return A⁻¹
     else
-        return inv(A)
+        if istriu(A) || istril(A)
+            return inv(UpperTriangular(A))
+        end
+        return inv(lu(A; check = false))
     end
 end
 
