@@ -156,7 +156,7 @@ end
 
 Base.to_index(x::Num) = Base.to_index(value(x))
 
-Base.hash(x::Num, h::UInt) = hash(value(x), h)
+Base.hash(x::Num, h::UInt) = hash(value(x), h)::UInt
 
 Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
 Base.convert(::Type{Num}, x::Number) = Num(x)
@@ -172,8 +172,8 @@ _iszero(x::Number) = iszero(x)
 _isone(x::Number) = isone(x)
 _iszero(::Symbolic) = false
 _isone(::Symbolic) = false
-_iszero(x::Num) = _iszero(value(x))
-_isone(x::Num) = _isone(value(x))
+_iszero(x::Num) = _iszero(value(x))::Bool
+_isone(x::Num) = _isone(value(x))::Bool
 
 Code.cse(x::Num) = Code.cse(unwrap(x))
 
