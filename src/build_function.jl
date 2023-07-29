@@ -255,6 +255,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        checkbounds = false,
                        postprocess_fbody=ex -> ex,
                        linenumbers = false,
+                       preface = [],
                        outputidxs=nothing,
                        skipzeros = false,
                        force_SA = false,
@@ -272,8 +273,11 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     similarto = force_SA ? SArray : i === nothing ? Array : dargs[i].name
 
     oop, iip = iip_config
+    closed_args = unique!(vcat(dargs, [a.lhs for a in preface]))
+    prepend_preface(x) = Let(preface, x, false)
+    postprocess = postprocess_fbody ∘ prepend_preface
     oop_body = if oop
-        postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse))
+        postprocess(make_array(parallel, closed_args, preface, rhss, similarto, cse))
     else
         term(throw_missing_specialization, length(dargs))
     end
@@ -285,14 +289,15 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     out = Sym{Any}(:ˍ₋out)
     ip_body = if iip
-        postprocess_fbody(set_array(parallel,
-                                    dargs,
-                                    out,
-                                    outputidxs,
-                                    rhss,
-                                    checkbounds,
-                                    skipzeros,
-                                    cse,))
+        postprocess(set_array(parallel,
+                              closed_args,
+                              preface,
+                              out,
+                              outputidxs,
+                              rhss,
+                              checkbounds,
+                              skipzeros,
+                              cse,))
     else
         term(throw_missing_specialization, length(dargs) + 1)
     end
