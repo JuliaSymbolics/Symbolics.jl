@@ -277,7 +277,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     prepend_preface(x) = Let(preface, x, false)
     postprocess = postprocess_fbody ∘ prepend_preface
     oop_body = if oop
-        postprocess(make_array(parallel, closed_args, preface, rhss, similarto, cse))
+        postprocess(make_array(parallel, closed_args, rhss, similarto, cse))
     else
         term(throw_missing_specialization, length(dargs))
     end
@@ -291,7 +291,6 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     ip_body = if iip
         postprocess(set_array(parallel,
                               closed_args,
-                              preface,
                               out,
                               outputidxs,
                               rhss,
