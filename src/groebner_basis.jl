@@ -3,9 +3,9 @@ DP = SymbolicUtils.DynamicPolynomials
 Bijections = SymbolicUtils.Bijections
 
 # extracting underlying polynomial and coefficient type from Polyforms
-underlyingpoly(x::Number)    = x
+underlyingpoly(x::Number) = x
 underlyingpoly(pf::PolyForm) = pf.p
-coefftype(x::Number)    = typeof(x)
+coefftype(x::Number) = typeof(x)
 coefftype(pf::PolyForm) = DP.coefficienttype(underlyingpoly(pf))
 
 #=
@@ -19,8 +19,8 @@ function symbol_to_poly(sympolys::AbstractArray)
     stdsympolys = map(unwrap, sympolys)
     sort!(stdsympolys, lt=(<ₑ))
 
-    pvar2sym  = Bijections.Bijection{Any,Any}()
-    sym2term  = Dict{BasicSymbolic,Any}()
+    pvar2sym = Bijections.Bijection{Any,Any}()
+    sym2term = Dict{BasicSymbolic,Any}()
     polyforms = map(f -> PolyForm(f, pvar2sym, sym2term), stdsympolys)
 
     # Discover common coefficient type
@@ -72,7 +72,7 @@ The algorithm is randomized, so the basis will be correct with high probability.
 function groebner_basis(polynomials)
     polynoms, pvar2sym, sym2term = symbol_to_poly(polynomials)
 
-    basis = groebner(polynoms, reduced=true)
+    basis = groebner(polynoms)
 
     # polynomials is nonemtpy
     T = symtype(first(polynomials))
