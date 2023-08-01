@@ -3,6 +3,11 @@ using ReferenceTests
 using Symbolics: value
 using SymbolicUtils.Code: DestructuredArgs, Func
 @variables a b c1 c2 c3 d e g
+oop, iip = Symbolics.build_function([sqrt(a), sin(b)], [a, b], nanmath = true)
+@test all(isnan, eval(oop)([-1, Inf]))
+out = [0, 0.0]
+eval(iip)(out, [-1, Inf])
+@test all(isnan, out)
 
 # Multiple argument matrix
 h = [a + b + c1 + c2,

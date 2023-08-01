@@ -108,7 +108,13 @@ function _build_function(target::JuliaTarget, op, args...;
                          states = LazyState(),
                          linenumbers = true,
                          wrap_code = nothing,
-                         cse = false, kwargs...)
+                         cse = false,
+                         nanmath = false,
+                         kwargs...)
+  if nanmath
+    states.rewrites[:nanmath] = true
+  end
+
   dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = if cse
         fun = Func(dargs, [], Code.cse(unwrap(op)))
@@ -136,11 +142,16 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          checkbounds = false,
                          states = LazyState(),
                          linenumbers = true,
-                         cse = false, kwargs...)
+                         cse = false,
+                         nanmath = false,
+                         kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
 
+    if nanmath
+        states.rewrites[:nanmath] = true
+    end
     expr = if cse
         conv(Func(dargs, [], Code.cse(unwrap(op))), states)
     else
@@ -280,8 +291,12 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
                        iip_config = (true, true),
+                       nanmath = false,
                        parallel=nothing, cse = false, kwargs...)
 
+    if nanmath
+        states.rewrites[:nanmath] = true
+    end
     # We cannot switch to ShardedForm because it deadlocks with
     # RuntimeGeneratedFunctions
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
