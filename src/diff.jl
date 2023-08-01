@@ -873,19 +873,11 @@ end
 
 SymbolicUtils.promote_symtype(::Nabla, x) = x
 
-is_derivative(x) = istree(x) ? operation(x) isa Differential : false
-
-Base.:*(D1, D2::Differential) = D1 ∘ D2
-Base.:*(D1::Differential, D2) = D1 ∘ D2
-Base.:*(D1::Differential, D2::Differential) = D1 ∘ D2
-Base.:^(D::Differential, n::Integer) = _repeat_apply(D, n)
+is_derivative(x) = istree(x) ? operation(x) isa ArrayDifferentialOperator : false
 
 Base.show(io::IO, D::ArrayDifferentialOperator) = print(io, "(D.name)(", scalarize(D.vars), ")")
 
 function Base.:(==)(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator) 
     @variables x[1:length(D1.vars)]
     all(scalarize(isequal.(D1.vars, D2.vars))) && all(scalarize(isequal.(D1(x), D2(x))))
-
-
-_isfalse(occ::Bool) = occ === false
-_isfalse(occ::Symbolic) = istree(occ) && _isfalse(operation(occ))
+end
