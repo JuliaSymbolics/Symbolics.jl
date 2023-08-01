@@ -111,10 +111,8 @@ function _build_function(target::JuliaTarget, op, args...;
                          cse = false,
                          nanmath = false,
                          kwargs...)
-  if nanmath
-    states.rewrites[:nanmath] = true
-  end
 
+  states.rewrites[:nanmath] = nanmath
   dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     expr = if cse
         fun = Func(dargs, [], Code.cse(unwrap(op)))
@@ -149,9 +147,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
 
-    if nanmath
-        states.rewrites[:nanmath] = true
-    end
+    states.rewrites[:nanmath] = nanmath
     expr = if cse
         conv(Func(dargs, [], Code.cse(unwrap(op))), states)
     else
@@ -294,9 +290,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        nanmath = false,
                        parallel=nothing, cse = false, kwargs...)
 
-    if nanmath
-        states.rewrites[:nanmath] = true
-    end
+    states.rewrites[:nanmath] = nanmath
     # We cannot switch to ShardedForm because it deadlocks with
     # RuntimeGeneratedFunctions
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
