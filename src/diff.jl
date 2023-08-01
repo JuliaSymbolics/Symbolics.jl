@@ -822,13 +822,14 @@ end
 
 function LinearAlgebra.dot(D::ArrayDifferentialOperator, x::SymVec)
     @assert length(D.vars) == length(x) "Vector must be same length as vars in Operator $(D.name)."
+    _call(d, x) = d(x)
     sum(_call, zip(D.differentials, x))
 end 
 LinearAlgebra.dot(D::ArrayDifferentialOperator, x::Arr) = Arr(D ⋅ value(x))
 
 function LinearAlgebra.dot(x::SymVec, D::ArrayDifferentialOperator)
     @assert length(D.vars) == length(x) "Vector must be same length as vars in Operator $(D.name)."
-    (x) -> sum((X, D) -> X*D(x), zip(x, D.differentials))
+    (y) -> sum((X, D) -> X*D(y), zip(x, D.differentials))
 end
 LinearAlgebra.dot(x::Arr, D::ArrayDifferentialOperator) = value(x) ⋅ D
 
