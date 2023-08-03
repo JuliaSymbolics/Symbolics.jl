@@ -179,7 +179,7 @@ function _build_and_inject_function(mod::Module, ex)
     # XXX: Workaround to specify the module as both the cache module AND context module.
     # Currently, the @RuntimeGeneratedFunction macro only sets the context module.
     module_tag = getproperty(mod, RuntimeGeneratedFunctions._tagname)
-    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=false)
+    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=true)
 end
 
 toexpr(n::Num, st) = toexpr(value(n), st)
@@ -356,7 +356,7 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false))),
+        ex = :($Funcall($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), true))),
                        ($(toexpr.(a, (st,))...),)))
         quote
             let
@@ -376,7 +376,7 @@ function toexpr(p::SpawnFetch{ShardedForm{false}}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        :($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false)))($(toexpr.(a, (st,))...),))
+        :($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), true)))($(toexpr.(a, (st,))...),))
     end
     quote
         $(toexpr(p.combine, st))($(spawns...))
