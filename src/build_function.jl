@@ -273,7 +273,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     oop, iip = iip_config
     oop_body = if oop
-        postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse))
+        postprocess_fbody(make_array(parallel, rhss, similarto, cse))
     else
         term(throw_missing_specialization, length(dargs))
     end
@@ -286,7 +286,6 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     out = Sym{Any}(:ˍ₋out)
     ip_body = if iip
         postprocess_fbody(set_array(parallel,
-                                    dargs,
                                     out,
                                     outputidxs,
                                     rhss,
@@ -314,16 +313,16 @@ _nnz(x::AbstractArray) = length(x)
 _nnz(x::AbstractSparseArray) = nnz(x)
 _nnz(x::Union{Base.ReshapedArray, LinearAlgebra.Transpose}) = _nnz(parent(x))
 
-function make_array(s, dargs, arr, similarto, cse)
+function make_array(s, arr, similarto, cse)
     s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
     _make_array(arr, similarto, cse)
 end
 
-function make_array(s::SerialForm, dargs, arr, similarto, cse)
+function make_array(s::SerialForm, arr, similarto, cse)
     _make_array(arr, similarto, cse)
 end
 
-function make_array(s::ShardedForm, closed_args, arr, similarto, cse)
+function make_array(s::ShardedForm, arr, similarto, cse)
     if arr isa AbstractSparseArray
 
         return LiteralExpr(quote
@@ -332,32 +331,21 @@ function make_array(s::ShardedForm, closed_args, arr, similarto, cse)
                                                copy($(arr.colptr)),
                                                copy($(arr.rowval)),
                                                $(make_array(s,
-                                                            closed_args,
                                                             arr.nzval,
                                                             Vector,cse)))
                            end)
     end
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
-    arrays = map(slices) do slice
-        Func(closed_args, [], _make_array(slice, similarto, cse)), closed_args
+    funcs = map(slices) do slice
+        Func([], [], _make_array(slice, similarto, cse))
     end
-    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
+    SpawnFetch{typeof(s)}(funcs, nothing, vcat)
 end
-
-struct Funcall{F, T}
-    f::F
-    args::T
-end
-
-(f::Funcall)() = f.f(f.args...)
 
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
-    args = isnothing(p.args) ?
-              Iterators.repeated((), length(p.exprs)) : p.args
-    spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), true))),
-                       ($(toexpr.(a, (st,))...),)))
+    spawns = map(p.exprs) do thunk
+        ex = :(()->$(toexpr(thunk, st)))
         quote
             let
                 task = Base.Task($ex)
@@ -373,10 +361,9 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
 end
 
 function toexpr(p::SpawnFetch{ShardedForm{false}}, st)
-    args = isnothing(p.args) ?
-              Iterators.repeated((), length(p.exprs)) : p.args
-    spawns = map(p.exprs, args) do thunk, a
-        :($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), true)))($(toexpr.(a, (st,))...),))
+    spawns = map(p.exprs) do thunk
+        @show thunk
+        ex = :(($(toexpr(thunk, st)))())
     end
     quote
         $(toexpr(p.combine, st))($(spawns...))
@@ -438,12 +425,12 @@ _make_array(x, similarto, cse) = x
 
 ## In-place version
 
-function set_array(p, closed_vars, args...)
+function set_array(p, args...)
     p !== nothing && Base.@warn("Parallel form of $(typeof(p)) not implemented")
     _set_array(args...)
 end
 
-function set_array(s::SerialForm, closed_vars, args...)
+function set_array(s::SerialForm, args...)
     _set_array(args...)
 end
 
@@ -464,10 +451,9 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
     end
 end
 
-function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros, cse)
+function set_array(s::ShardedForm, out, outputidxs, rhss, checkbounds, skipzeros, cse)
     if rhss isa AbstractSparseArray
         return set_array(s,
-                         closed_args,
                          LiteralExpr(:($out.nzval)),
                          nothing,
                          rhss.nzval,
@@ -481,9 +467,9 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
-    all_args = [outvar, closed_args...]
+    all_args = [outvar]
     ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
-        Func(all_args, [],
+        Func([], [],
              _set_array(outvar, idxs, xs, checkbounds, skipzeros, cse),
              [])
     end.body
