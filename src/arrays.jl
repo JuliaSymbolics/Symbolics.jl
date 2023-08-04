@@ -251,6 +251,7 @@ end
 # turn `f(x...)` into `term(f, x...)`
 #
 function call2term(expr, arrs=[])
+    (expr isa QuoteNode) && return expr
     !(expr isa Expr) && return :($unwrap($expr))
     if expr.head == :call
         if expr.args[1] == :(:)
