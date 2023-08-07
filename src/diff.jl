@@ -809,7 +809,7 @@ Laplacian(vars) = Nabla(vars) ⋅ Nabla(vars)
 
 function (D::ArrayDifferentialOperator)(x::SymVec)
     @assert length(D.vars) == length(x) "Vector must be same length as vars in Operator $(D.name)."
-    @arrayop (i,) unwrap((D.differentials)[i](x[i])) term=D(y) reduce=+
+    @arrayop (i,) (D.differentials)[i](x[i]) term=D(y) 
 end
 (D::ArrayDifferentialOperator)(x::Arr) = Arr(D(value(x)))
 
@@ -821,9 +821,10 @@ end
 
 function LinearAlgebra.dot(D::ArrayDifferentialOperator, x::SymVec)
     @assert length(D.vars) == length(x) "Vector must be same length as vars in Operator $(D.name)."
-    sum(D(x))
+    @show D(x), scalarize(D(x))
+    sum(scalarize(D(x)))
 end 
-LinearAlgebra.dot(D::ArrayDifferentialOperator, x::Arr) = D ⋅ value(x)
+LinearAlgebra.dot(D::ArrayDifferentialOperator, x::Arr) = Num(D ⋅ value(x))
 
 function LinearAlgebra.dot(x::SymVec, D::ArrayDifferentialOperator)
     @assert length(D.vars) == length(x) "Vector must be same length as vars in Operator $(D.name)."
@@ -835,16 +836,6 @@ function LinearAlgebra.dot(D1::ArrayDifferentialOperator, D2::ArrayDifferentialO
     @assert all(scalarize(isequal.(D1.vars, D2.vars))) "Operators have different variables and cannot be composed."
     lap = x -> sum((D1.differentials[i] ∘ D2.differentials[i])(x) for i in 1:length(D1.vars))
     (x) -> @arrayop (i,) lap(x[i]) term=(D1⋅D2)(x) reduce=+
-end
-
-function εijk_cond(i, j, k)
-    if (i, j, k) in [(1, 2, 3), (2, 3, 1), (3, 1, 2)]
-        1
-    elseif (i == j) || (j == k) || (k == i)
-        0
-    else 
-        -1
-    end
 end
 
 function crosscompose(a, b)

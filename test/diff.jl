@@ -348,3 +348,41 @@ let
     @test isequal(expand_derivatives(Differential(t)(im*t)), im)
     @test isequal(expand_derivatives(Differential(t)(t^2 + im*t)), 2t + im)
 end
+
+## Vector Calculus
+
+
+@variables x[1:3] y[1:3]
+
+∇ = Nabla(x)
+
+out = ∇(y)
+@test all(isequal.(scalarize(out), [Differential(x[1])(y[1]), Differential(x[2])(y[2]), Differential(x[3])(y[3])]))
+
+
+out = ∇ ⋅ y
+@test isequal(out, Div(x)(y))
+@test isequal(out, Differential(x[1])(y[1]) + Differential(x[2])(y[2]) + Differential(x[3])(y[3]))
+
+out = ∇ × y
+@test isequal(out, Curl(x)(y))
+@test all(isequal.(scalarize(out), [Differential(x[2])(y[3]) - Differential(x[3])(y[2]),
+                    Differential(x[3])(y[1]) - Differential(x[1])(y[3]),
+                    Differential(x[1])(y[2]) - Differential(x[2])(y[1])]))
+
+
+
+out = (∇ ⋅ ∇)(y)
+@test isequal(out, Laplacian(x)(y))
+@test all(isequal.(scalarize(out), [Differential(x[1])(Differential(x[1])(y[1])) + Differential(x[2])(Differential(x[2])(y[1])) + Differential(x[3])(Differential(x[3])(y[1])), 
+                         Differential(x[1])(Differential(x[1])(y[2])) + Differential(x[2])(Differential(x[2])(y[2])) + Differential(x[3])(Differential(x[3])(y[2])), 
+                         Differential(x[1])(Differential(x[1])(y[3])) + Differential(x[2])(Differential(x[2])(y[3])) + Differential(x[3])(Differential(x[3])(y[3]))]))
+
+
+out = (∇ × ∇)(y)
+
+@test isequal(out, Curl(x)(Curl(x)(y)))
+@test all(isequal.(scalarize(out), [Differential(x[2])(Differential(x[3])(y[1])) - Differential(x[3])(Differential(x[2])(y[1])), 
+                         Differential(x[3])(Differential(x[1])(y[2])) - Differential(x[1])(Differential(x[3])(y[2])), 
+                         Differential(x[1])(Differential(x[2])(y[3])) - Differential(x[2])(Differential(x[1])(y[3]))]))
+
