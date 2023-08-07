@@ -876,3 +876,5 @@ function Base.:(==)(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator
     @variables x[1:length(D1.vars)]
     all(scalarize(isequal.(D1.vars, D2.vars))) && all(scalarize(isequal.(D1(x), D2(x))))
 end
+
+# TODO: Add simplification rules for dot and cross products to remove 0 terms and simplify
