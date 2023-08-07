@@ -1,7 +1,7 @@
 using Symbolics
 using Test
 using IfElse
-using Symbolics: value
+using Symbolics: value, scalarize
 
 # Derivatives
 @variables t σ ρ β
