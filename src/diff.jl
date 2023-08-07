@@ -867,8 +867,6 @@ end
 
 SymbolicUtils.promote_symtype(::ArrayDifferentialOperator, x) = x
 
-is_derivative(x) = istree(x) ? operation(x) isa ArrayDifferentialOperator : false
-
 Base.show(io::IO, D::ArrayDifferentialOperator) = print(io, D.name)
 Base.nameof(D::ArrayDifferentialOperator) = Symbol(D.name)
 
