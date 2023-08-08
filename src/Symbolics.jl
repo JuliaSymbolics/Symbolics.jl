@@ -2,45 +2,39 @@
 $(DocStringExtensions.README)
 """
 module Symbolics
+using PrecompileTools
 
-using DocStringExtensions, Markdown
-
-using LinearAlgebra
-
-using Reexport
-
-using DomainSets
-
-using Setfield
-
-import DomainSets: Domain
+@recompile_invalidations begin
+    using DocStringExtensions, Markdown
+    using LinearAlgebra
+    using Reexport
+    using DomainSets
+    using Setfield
+    import DomainSets: Domain
+    
+    import SymbolicUtils: similarterm, istree, operation, arguments, symtype
+    
+    import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
+    FnType, @rule, Rewriters, substitute,
+    promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+    
+    using MacroTools
+    import MacroTools: splitdef, combinedef, postwalk, striplines
+    using SymbolicUtils.Code
+    import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
+    import SymbolicUtils.Code: toexpr
+    import ArrayInterface
+    using RuntimeGeneratedFunctions
+    using SciMLBase, IfElse
+end
 @reexport using SymbolicUtils
 
-import SymbolicUtils: similarterm, istree, operation, arguments, symtype
-
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-                      FnType, @rule, Rewriters, substitute,
-                      promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
-
-using SymbolicUtils.Code
-
-import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
-
-import SymbolicUtils.Code: toexpr
-
-import ArrayInterface
-
-using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
-
 # re-export
 
 export simplify, substitute
 
-using SciMLBase, IfElse
 export Num
-using MacroTools
-import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
 
 include("num.jl")
