@@ -801,6 +801,7 @@ struct ArrayDifferentialOperator <: ArrayOperator
     ArrayDifferentialOperator(vars, differentials, name) = new(vars, differentials, name)
 end
 Nabla(vars) = ArrayDifferentialOperator(value.(vars), map(Differential, scalarize(value.(vars))), "∇")
+const Grad = Nabla
 Div(vars) = (x) -> Nabla(vars) ⋅ x
 Curl(vars) = (x) -> Nabla(vars) × x
 Laplacian(vars) = Nabla(vars) ⋅ Nabla(vars)
@@ -809,7 +810,7 @@ Laplacian(vars) = Nabla(vars) ⋅ Nabla(vars)
 
 function (D::ArrayDifferentialOperator)(x::SymVec)
     @assert length(D.vars) == length(x) "Vector must be same length as vars in Operator $(D.name)."
-    @arrayop (i,) (D.differentials)[i](x[i]) term=D(y) 
+    @arrayop (i,) (D.differentials)[i](x[i]) term=D(x) 
 end
 (D::ArrayDifferentialOperator)(x::Arr) = Arr(D(value(x)))
 
@@ -854,7 +855,7 @@ end
 function LinearAlgebra.cross(D::ArrayDifferentialOperator, x::SymVec)
     @assert length(D.vars) == length(x) == 3 "Cross product is only defined in 3 dimensions."
     curl = crosscall(D.differentials, x)
-    @arrayop (i,) curl[i] term=D×y 
+    @arrayop (i,) curl[i] term=D×x 
 end
 LinearAlgebra.cross(D::ArrayDifferentialOperator, x::Arr) = Arr(D × value(x))
 
