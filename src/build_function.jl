@@ -91,7 +91,7 @@ end
 
 unwrap_nometa(x) = unwrap(x)
 unwrap_nometa(x::CallWithMetadata) = unwrap(x.f)
-function destructure_arg(arg::Union{AbstractArray, Tuple}, inbounds, name)
+function destructure_arg(arg::Union{AbstractArray, Tuple,NamedTuple}, inbounds, name)
     if !(arg isa Arr)
         DestructuredArgs(map(unwrap_nometa, arg), name, inbounds=inbounds, create_bindings=false)
     else

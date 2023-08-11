@@ -152,11 +152,19 @@ end
 for f in [:!, :~]
     @eval Base.$f(x::Num) = (val = $f(value(x)); val isa Bool ? val : Num(val))
 end
-@num_method Base.isequal isequal(value(a), value(b)) (AbstractFloat, Number, Symbolic)
+@num_method Base.isequal begin
+  va = value(a)
+  vb = value(b)
+  if va isa SymbolicUtils.BasicSymbolic{Real} && vb isa SymbolicUtils.BasicSymbolic{Real}
+    isequal(va, vb)::Bool
+  else
+    isequal(va, vb)::Bool
+  end
+end (AbstractFloat, Number, Symbolic)
 
 Base.to_index(x::Num) = Base.to_index(value(x))
 
-Base.hash(x::Num, h::UInt) = hash(value(x), h)
+Base.hash(x::Num, h::UInt) = hash(value(x), h)::UInt
 
 Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
 Base.convert(::Type{Num}, x::Number) = Num(x)
@@ -172,8 +180,8 @@ _iszero(x::Number) = iszero(x)
 _isone(x::Number) = isone(x)
 _iszero(::Symbolic) = false
 _isone(::Symbolic) = false
-_iszero(x::Num) = _iszero(value(x))
-_isone(x::Num) = _isone(value(x))
+_iszero(x::Num) = _iszero(value(x))::Bool
+_isone(x::Num) = _isone(value(x))::Bool
 
 Code.cse(x::Num) = Code.cse(unwrap(x))
 

@@ -139,6 +139,9 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     ##653
     Symbolics.scalarize(inv(A)[1,1])
 
+    ##895
+    @test inv(Num.(reshape([1],1,1)))==Num.(reshape([1],1,1))
+
     # #831
     @syms symT sym1(symT) sym2(symT)
     symvec = [sym1(symT), sym2(symT)]

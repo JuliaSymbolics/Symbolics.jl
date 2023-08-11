@@ -126,11 +126,6 @@ include("latexify_recipes.jl")
 using RecipesBase
 include("plot_recipes.jl")
 
-using Requires
-
-export symbolics_to_sympy
-include("init.jl")
-
 include("semipoly.jl")
 
 include("solver.jl")
@@ -165,6 +160,21 @@ for T in [Num, Complex{Num}]
     end
     for S in [:(Symbolic{<:FnType}), :CallWithMetadata]
         @eval (f::$S)(x::$T, y...) = wrap(f(unwrap(x), unwrap.(y)...))
+    end
+end
+
+function symbolics_to_sympy end
+export symbolics_to_sympy
+
+@static if !isdefined(Base, :get_extension)
+    using Requires
+end
+
+@static if !isdefined(Base,:get_extension)
+    function __init__()
+        @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
+            include("../ext/SymbolicsSymPyExt.jl")
+        end
     end
 end
 
