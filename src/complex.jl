@@ -21,6 +21,7 @@ symtype(a::ComplexTerm{T}) where T = Complex{T}
 istree(a::ComplexTerm) = true
 operation(a::ComplexTerm{T}) where T = Complex{T}
 arguments(a::ComplexTerm) = [a.re, a.im]
+metadata(a::ComplexTerm) = a.re.metadata
 
 function similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing)
     if f <: Complex
