@@ -344,7 +344,7 @@ function make_array(s::ShardedForm, arr, similarto, cse)
     funcs = map(slices) do slice
         Func([], [], _make_array(slice, similarto, cse))
     end
-    SpawnFetch{typeof(s)}(funcs, nothing, vcat)
+    SpawnFetch{typeof(s)}(funcs, vcat)
 end
 
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
@@ -456,9 +456,7 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
             recursive_split(leaf_f, s, out, args, first.(slice), last.(slice))
         end
         return Func(args, [],
-                    SpawnFetch{typeof(s)}(fs,
-                                          (@inline noop(x...) = nothing)),
-                    [])
+                    SpawnFetch{typeof(s)}(fs, (@inline noop(x...) = nothing)), [])
     end
 end
 
@@ -478,8 +476,7 @@ function set_array(s::ShardedForm, out, outputidxs, rhss, checkbounds, skipzeros
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
-    all_args = [outvar]
-    ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
+    ex = recursive_split(s, outvar, [], outputidxs, rhss) do idxs, xs
         Func([], [],
              _set_array(outvar, idxs, xs, checkbounds, skipzeros, cse),
              [])

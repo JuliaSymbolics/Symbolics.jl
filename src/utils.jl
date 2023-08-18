@@ -323,6 +323,8 @@ function coeff(p, sym=nothing)
         else
             @views prod(Iterators.flatten((coeffs[findall(!iszero, coeffs)], args[findall(iszero, coeffs)])))
         end
+    elseif isdiv(p)
+        throw(DomainError(p, "coeff on expressions with division is not yet implemented."))
     else
         p isa Number && return sym === nothing ? p : 0
         p isa Symbolic && return coeff(p, sym)

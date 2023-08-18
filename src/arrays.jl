@@ -88,7 +88,7 @@ function operation(a::ArrayOp)
 end
 function arguments(a::ArrayOp)
     isnothing(a.term) ? [a.output_idx, a.expr, a.reduce,
-                         a.term, a.shape, a.ranges, a.metadata] :
+                         a.term, a.shape, a.ranges, metadata(a)] :
     arguments(a.term)
 end
 
@@ -722,7 +722,7 @@ function scalarize(arr)
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
     elseif istree(arr) && symtype(arr) <: Number
-        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=arr.metadata)
+        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=metadata(arr))
         istree(t) ? scalarize_op(operation(t), t) : t
     else
         arr
