@@ -345,7 +345,7 @@ end
 
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     spawns = map(p.exprs) do thunk
-        ex = :(()->$(toexpr(thunk, st)))
+        ex = :(()->$(toexpr(thunk, st))($(map(x->toexpr(x, st), p.args))...))
         quote
             let
                 task = Base.Task($ex)
@@ -362,8 +362,7 @@ end
 
 function toexpr(p::SpawnFetch{ShardedForm{false}}, st)
     spawns = map(p.exprs) do thunk
-        @show thunk
-        ex = :(($(toexpr(thunk, st)))())
+        ex = :($(toexpr(thunk, st))($(map(x->toexpr(x, st), p.args))...))
     end
     quote
         $(toexpr(p.combine, st))($(spawns...))
