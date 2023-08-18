@@ -138,6 +138,10 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          linenumbers = true,
                          cse = false, kwargs...)
 
+    if parallel == nothing && _nnz(rhss) >= 1000
+        parallel = ShardedForm() # by default switch for arrays longer than 1000 exprs
+    end
+
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
 
