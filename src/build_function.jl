@@ -27,7 +27,7 @@ ShardedForm() = ShardedForm(80, 4)
 
 const MultithreadedForm = ShardedForm{true}
 
-MultithreadedForm() = MultithreadedForm(nothing, 2*nthreads())
+MultithreadedForm() = MultithreadedForm(80, 2*nthreads())
 
 function throw_missing_specialization(n)
     throw(ArgumentError("Missing specialization for $n arguments. Check `iip_config`."))
@@ -446,8 +446,7 @@ function set_array(s::SerialForm, args...)
 end
 
 function recursive_split(leaf_f, s, out, args, outputidxs, xs)
-    cutoff = isnothing(s.cutoff) ? ceil(Int, length(xs) / (2*s.ncalls)) : s.cutoff
-    if length(xs) <= cutoff
+    if length(xs) <= s.cutoff
         return leaf_f(outputidxs, xs)
     else
         per_part = ceil(Int, length(xs) / s.ncalls)
