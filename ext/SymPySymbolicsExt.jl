@@ -71,11 +71,10 @@ function pyconvert_rule_sympy_function(::Type{Symbolics.Num}, x::Py)
     if !pyisinstance(x,sp.Function)
         return PythonCall.pyconvert_unconverted()
     end
-    name = pyconvert(String,x.name)
+    name = pyconvert(Symbol,x.name)
     args = pyconvert.(Symbolics.Num,x.args)
-    symbolexpr = Expr(:call,Symbol(name),args...)
-    symbolicexpr = Num(parse_expr_to_symbolic(symbolexpr,Main))
-    return PythonCall.pyconvert_return(symbolicexpr)
+    func = @variables $name(..)
+    return PythonCall.pyconvert_return(first(func)(args...))
 end
 
 # added rules
