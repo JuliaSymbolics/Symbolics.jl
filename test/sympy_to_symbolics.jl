@@ -1,46 +1,33 @@
 using Test
-using SymPy
+using PythonCall
 using Symbolics
 
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t"))
+CondaPkg.add("sympy")
 
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t**t"))
+sp = pyimport("sympy")
 
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t + z + d"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("t"))) == Symbol("t")
 
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t*z*9"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("t**t"))) == Symbol("^(t, t)")
 
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("5*t*z + 3*d + h/(b*5)"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("t + z + d"))) == Symbol("+(d, t, z)")
 
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t * n/z * t**4 * h**z + l*h - j"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("t*z*9"))) == Symbol("*(9, t, z)")
 
-PythonCall.pyconvert(Symbolics.Equation, sp.sympify("Eq(2,5, evaluate = False)"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("5*t*z + 3*d + h/(b*5)"))) == Symbol("+(3d, ((1//5)*h) / b, 5t*z)")
 
-PythonCall.pyconvert(Symbolics.Equation, sp.sympify("Eq(t*x + 5**x + 20/t, 90/t + t**4 - t*z)"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("t * n/z * t**4 * h**z + l*h - j"))) == Symbol("+(-j, h*l, (n*(h^z)*(t^5)) / z)")
 
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("Function('f')(x)"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("Eq(2,5, evaluate = False)")))
 
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("f(x,y)"))
+@test Symbol(sympy_to_symbolics(sp.sympify("Eq(t*x + 5**x + 20/t, 90/t + t**4 - t*z)"))) == Symbol("t^4 + 90 / t - t*z ~ 20 / t + t*x + 5^x")
 
-PythonCall.pyconvert(Symbolics.Equation, sp.sympify("Eq(f(x), 2*x +1)"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("Function('f')(x)"))) == Symbol("f(x)")
 
-PythonCall.pyconvert(Symbolics.Num,sp.sympify("Derivative(f(x),x)"))
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("f(x,y)"))) == Symbol("f(x, y)")
 
-PythonCall.pyconvert(Symbolics.Num,sp.sympify("Eq(Derivative(f(x),x), x"))
+@test Symbol((sympy_to_symbolics(sp.sympify("Eq(f(x), 2*x +1)")))) == Symbol("1 + 2x ~ f(x)")
 
-fol = sp.sympify("Eq(Derivative(x(t),t), (1 - x(t))/3.0)")
-convertedsystem = PythonCall.pyconvert(Symbolics.Equation,fol)
+@test Symbolics.tosymbol(sympy_to_symbolics(sp.sympify("Derivative(f(x),x)"))) == Symbol("fˍx(x)")
 
-@named odesys = ODESystem(convertedsystem,t)
-
-sys = structural_simplify(odesys)
-
-prob = ODEProblem(sys, [0.0],(0.0,10.0))
-
-using DifferentialEquations: solve
-sol = solve(prob)
-
-using Plots
-
-plot(sol)
-
+@test Symbol(sympy_to_symbolics(sp.sympify("Eq(Derivative(f(x),x), x)"))) == Symbol("x ~ Differential(x)(f(x))")

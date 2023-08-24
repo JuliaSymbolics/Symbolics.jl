@@ -9,10 +9,6 @@ else
     using ..CondaPkg
 end
 
-CondaPkg.add("sympy")
-
-sp = pyimport("sympy")
-
 # rule functions
 function pyconvert_rule_sympy_symbol(::Type{Symbolics.Num}, x::Py)
     if !pyisinstance(x,sp.Symbol)

@@ -35,9 +35,11 @@ TreeViews = "a2a6695c-b41b-5b7d-aed9-dbfdeacea5d7"
 
 [weakdeps]
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+PythonCall = "6099a3de-0909-46bc-b1f4-468b9a2dfc0d"
 
 [extensions]
 SymbolicsSymPyExt = "SymPy"
+SymPySymbolicsExt = "PythonCall"
 
 [compat]
 ArrayInterface = "6, 7"
