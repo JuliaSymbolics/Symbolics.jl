@@ -41,6 +41,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Latexify Test" begin include("latexify.jl") end
     @safetestset "Domain Test" begin include("domains.jl") end
     @safetestset "SymPy Test" begin include("sympy.jl") end
+    @safetestset "SymPy to Symbolics Test" begin include("sympy_to_symbolics.jl")
     @safetestset "Inequality Test" begin include("inequality.jl") end
     @safetestset "Integral Test" begin include("integral.jl") end
     @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
