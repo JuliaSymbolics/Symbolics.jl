@@ -66,7 +66,6 @@ function pyconvert_rule_sympy_derivative(::Type{Symbolics.Num}, x::Py)
     return PythonCall.pyconvert_return(derivatives(expr))
 end
 
-
 function pyconvert_rule_sympy_function(::Type{Symbolics.Num}, x::Py)
     if !pyisinstance(x,sp.Function)
         return PythonCall.pyconvert_unconverted()
@@ -92,31 +91,11 @@ PythonCall.pyconvert_add_rule("sympy.core.function:Derivative",Symbolics.Num, py
 
 PythonCall.pyconvert_add_rule("sympy.core.function:Function",Symbolics.Num, pyconvert_rule_sympy_function)
 
-# little tests
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t"))
-
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t**t"))
-
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t + z + d"))
-
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t*z*9"))
-
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("5*t*z + 3*d + h/(b*5)"))
-
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("t * n/z * t**4 * h**z + l*h - j"))
-
-PythonCall.pyconvert(Symbolics.Equation, sp.sympify("Eq(2,5, evaluate = False)"))
-
-PythonCall.pyconvert(Symbolics.Equation, sp.sympify("Eq(t*x + 5**x + 20/t, 90/t + t**4 - t*z)"))
-
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("Function('f')(x)"))
-
-PythonCall.pyconvert(Symbolics.Num, sp.sympify("f(x,y)"))
-
-PythonCall.pyconvert(Symbolics.Equation, sp.sympify("Eq(f(x), 2*x +1)"))
-
-PythonCall.pyconvert(Symbolics.Num,sp.sympify("Derivative(f(x),x)"))
-
-PythonCall.pyconvert(Symbolics.Num,sp.sympify("Eq(Derivative(f(x),x), x"))
+function sympy_to_symbolics(expr::Py)
+    if pyconvert(Bool,pytype(expr) == sp.core.relational.Equality)
+        return pyconvert(Symbolics.Equation,expr)
+    end
+    return pyconvert(Symbolics.Num,expr)
+end
 
 end
