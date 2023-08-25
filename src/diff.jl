@@ -1,5 +1,4 @@
-abstract type AbstractOperator <: Function end
-abstract type Operator <: AbstractOperator end
+abstract type Operator <: Function end
 
 """
 $(TYPEDEF)
@@ -791,12 +790,13 @@ end
 #######################################################################################################################
 # Vector Calculus
 #######################################################################################################################
-abstract type ArrayOperator end
 
-struct ArrayDifferentialOperator <: ArrayOperator
-    """The variables to differentiate with resp≈ect to."""
+struct ArrayDifferentialOperator 
+    """The variables to differentiate with respect to."""
     vars
+    """The differentials, can be other fucntions if composite"""
     differentials
+    """name"""
     name
     ArrayDifferentialOperator(vars, differentials, name) = new(vars, differentials, name)
 end
