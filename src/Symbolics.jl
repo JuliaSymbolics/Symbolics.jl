@@ -12,18 +12,20 @@ using PrecompileTools
     using Setfield
     import DomainSets: Domain
     
-    import SymbolicUtils: similarterm, istree, operation, arguments, symtype
-    
+    import SymbolicUtils: similarterm, istree, operation, arguments, symtype, metadata
+
     import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-    FnType, @rule, Rewriters, substitute,
-    promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
-    
-    using MacroTools
-    import MacroTools: splitdef, combinedef, postwalk, striplines
+                          FnType, @rule, Rewriters, substitute,
+                          promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+
     using SymbolicUtils.Code
+
     import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
+
     import SymbolicUtils.Code: toexpr
+
     import ArrayInterface
+
     using RuntimeGeneratedFunctions
     using SciMLBase, IfElse
 end

@@ -1,4 +1,6 @@
 using Symbolics, Test
+using SymbolicUtils: metadata
+using Symbolics: unwrap
 
 @variables a b::Real z::Complex (Z::Complex)[1:10]
 
@@ -25,4 +27,11 @@ end
 @testset "repr" begin
     @test repr(z) == "z"
     @test repr(a + b*im) == "a + b*im"
+end
+
+@testset "metadata" begin
+    z1 = z+1.0
+    @test_nowarn substitute(z1, z=>1.0im)
+    @test metadata(z1) == unwrap(z1.im).metadata
+    @test metadata(z1) == unwrap(z1.re).metadata
 end
