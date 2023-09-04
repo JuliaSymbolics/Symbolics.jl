@@ -791,10 +791,10 @@ end
 # Vector Calculus
 #######################################################################################################################
 
-struct ArrayDifferentialOperator 
+struct ArrayDifferentialOperator <: Operator
     """The variables to differentiate with respect to."""
     vars
-    """The differentials, can be other fucntions if composite"""
+    """The differentials, can be other functions if composite"""
     differentials
     """name"""
     name
