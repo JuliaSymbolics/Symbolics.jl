@@ -71,6 +71,11 @@ function wrap_func_expr(mod, expr)
     args = get(def, :args, [])
     kwargs = get(def, :kwargs, [])
 
+    if fname isa Expr && fname.head == :(::) && length(fname.args) > 1
+        self = fname.args[1]
+    else
+        self = :nothing # LOL -- in this case the argument named nothing is passed nothing
+    end
     impl_name = Symbol(fname,"_", hash(string(args)*string(kwargs)))
 
     function kwargname(kwarg)
@@ -118,7 +123,7 @@ function wrap_func_expr(mod, expr)
 
     types = map(type_options, args)
 
-    impl = :(function $impl_name($(names...))
+    impl = :(function $impl_name($self, $(names...))
         $body
     end)
     # TODO: maybe don't drop first lol
@@ -128,9 +133,9 @@ function wrap_func_expr(mod, expr)
         end
 
         fbody = :(if any($iswrapped, ($(names...),))
-                      $wrap($impl_name($([:($unwrap($arg)) for arg in names]...)))
+                      $wrap($impl_name($self, $([:($unwrap($arg)) for arg in names]...)))
                   else
-                      $impl_name($(names...))
+                      $impl_name($self, $(names...))
                   end)
 
         if isempty(kwargs)
