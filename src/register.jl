@@ -39,16 +39,6 @@ macro register_symbolic(expr, define_promotion = true)
     argnames = map(a -> a isa Symbol ? a : a.args[1], args)
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
 
-    # @register_symbolic f(x::T1, y::T2)
-    #
-    # `types`: for every argument find the types that
-    # could be taken as arguments. These are:
-    #
-    # 1) T 2) wrapper_type(T) 3) Symbolic{T}
-    #
-    # However later while emiting methods we omit the ones
-    # that are all 1) since those are expected to be defined
-    # outside Symbolics
 
     ftype = if f isa Expr && f.head == :(::)
         @assert length(f.args) == 2

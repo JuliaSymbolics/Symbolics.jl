@@ -96,6 +96,14 @@ function wrap_func_expr(mod, expr)
     names = vcat(argname.(args), kwargname.(kwargs))
 
     function type_options(arg)
+        # for every argument find the types that
+        # should be allowed as argument. These are:
+        #
+        # (1) T    (2) wrapper_type(T)    (3) Symbolic{T}
+        #
+        # However later while emiting methods we omit the one
+        # method where all arguments are (1) since those are
+        # expected to be defined outside Symbolics
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
             has_symwrapper(T) ? (T, :(SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
