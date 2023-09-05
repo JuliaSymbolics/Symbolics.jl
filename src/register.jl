@@ -56,7 +56,20 @@ macro register_symbolic(expr, define_promotion = true)
     else
         :($typeof($f))
     end
-    fexpr = :(@wrapped $f($(args′...)) = $Term{$ret_type}($f, [$(argnames...)]))
+    fexpr = :(@wrapped function $f($(args′...))
+                  args = [$(argnames...),]
+                  unwrapped_args = map($unwrap, args)
+                  res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
+                      $f(unwrapped_args...) # partial-eval if all args are unwrapped
+                  else
+                      $Term{$ret_type}($f, unwrapped_args)
+                  end
+                  if typeof.(args) == typeof.(unwrapped_args)
+                      return res
+                  else
+                      return $wrap(res)
+                  end
+              end)
 
     if define_promotion
         fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
