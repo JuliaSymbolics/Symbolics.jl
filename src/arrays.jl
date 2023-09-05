@@ -385,7 +385,7 @@ end
 """
     shape(s::Any)
 
-Returns `axes(s)` or throws.
+Returns `axes(s)` or Unknown().
 """
 shape(s) = axes(s)
 

@@ -1,7 +1,7 @@
 using SymbolicUtils: Symbolic
 
 """
-    @register_symbolic(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
+    @register_symbolic(expr, define_promotion = true)
 
 Overload appropriate methods so that Symbolics can stop tracing into the
 registered function. If `define_promotion` is true, then a promotion method in
@@ -22,75 +22,46 @@ overwriting.
 @register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
 """
-macro register_symbolic(expr, define_promotion = true, Ts = [])
+macro register_symbolic(expr, define_promotion = true)
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
     else
         ret_type = Real
     end
-
     @assert expr.head === :call
 
     f = expr.args[1]
     args = expr.args[2:end]
 
-    if f isa Expr && f.head == :(::)
-        @assert length(f.args) == 2
-    end
+    # Default arg types to Real
+    Ts = map(a -> a isa Symbol ? Real : (@assert(a.head == :(::)); a.args[2]), args)
+    argnames = map(a -> a isa Symbol ? a : a.args[1], args)
+    args′ = map((a, T) -> :($a::$T), argnames, Ts)
 
-    types = map(args) do x
-        if x isa Symbol
-            :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
-        elseif Meta.isexpr(x, :(::))
-            T = x.args[2]
-            :($has_symwrapper($T) ?
-              ($T, $Symbolic{<:$T}, $wrapper_type($T),) :
-              ($T, $Symbolic{<:$T}))
-        else
-            error("Invalid argument format $x")
-        end
-    end
+    # @register_symbolic f(x::T1, y::T2)
+    #
+    # `types`: for every argument find the types that
+    # could be taken as arguments. These are:
+    #
+    # 1) T 2) wrapper_type(T) 3) Symbolic{T}
+    #
+    # However later while emiting methods we omit the ones
+    # that are all 1) since those are expected to be defined
+    # outside Symbolics
 
-    eval_method = :(@eval function $f($(Expr(:$, :(var"##_register_macro_s"...))),)
-                        args = [$(Expr(:$, :(var"##_register_macro_s_syms"...)))]
-                        unwrapped_args = map($unwrap, args)
-                        res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
-                            $f(unwrapped_args...)
-                        else
-                            $Term{$ret_type}($f, unwrapped_args)
-                        end
-                        if typeof.(args) == typeof.(unwrapped_args)
-                            return res
-                        else
-                            return $wrap(res)
-                        end
-                    end)
-    verbose = false
-    mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
-    Ts = Symbol("##__Ts")
     ftype = if f isa Expr && f.head == :(::)
+        @assert length(f.args) == 2
         f.args[end]
     else
         :($typeof($f))
     end
-    quote
-        $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
-                if any(x->x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
-        if $verbose
-            println("Candidates")
-            map(println, $Ts)
-        end
+    fexpr = :(@wrapped $f($(args′...)) = $Term{$ret_type}($f, [$(argnames...)]))
 
-        for sig in $Ts
-            var"##_register_macro_s" = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
-            var"##_register_macro_s_syms" = map(x->x.args[1], var"##_register_macro_s")
-            $eval_method
-        end
-        if $define_promotion
-            (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type
-        end
-    end |> esc
+    if define_promotion
+        fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
+    end
+    esc(fexpr)
 end
 
 Base.@deprecate_binding var"@register" var"@register_symbolic"

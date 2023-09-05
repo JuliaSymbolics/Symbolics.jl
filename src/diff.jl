@@ -36,7 +36,7 @@ end
 (D::Differential)(x) = Term{symtype(x)}(D, [x])
 (D::Differential)(x::Num) = Num(D(value(x)))
 (D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
-SymbolicUtils.promote_symtype(::Differential, x) = x
+SymbolicUtils.promote_symtype(::Differential, T) = T
 
 is_derivative(x) = istree(x) ? operation(x) isa Differential : false
 
