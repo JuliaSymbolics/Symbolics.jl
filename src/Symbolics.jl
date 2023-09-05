@@ -16,7 +16,7 @@ using Setfield
 import DomainSets: Domain
 @reexport using SymbolicUtils
 
-import SymbolicUtils: similarterm, istree, operation, arguments, symtype
+import SymbolicUtils: similarterm, istree, operation, arguments, symtype, metadata
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
                       FnType, @rule, Rewriters, substitute,
