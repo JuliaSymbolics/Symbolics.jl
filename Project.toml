@@ -43,6 +43,7 @@ SymbolicsSymPyExt = "SymPy"
 
 [compat]
 ArrayInterface = "6, 7"
+Bijections = "0.1"
 ConstructionBase = "1.1, 1.2"
 DataStructures = "0.18"
 DiffRules = "1.4"
