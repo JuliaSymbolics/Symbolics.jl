@@ -1,6 +1,5 @@
-
-DP = SymbolicUtils.DynamicPolynomials
-Bijections = SymbolicUtils.Bijections
+using DynamicPolynomials
+using Bijections
 
 # extracting underlying polynomial and coefficient type from Polyforms
 underlyingpoly(x::Number) = x
