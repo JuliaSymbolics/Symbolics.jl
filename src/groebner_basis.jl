@@ -1,4 +1,4 @@
-using DynamicPolynomials
+import DynamicPolynomials
 using Bijections
 
 const DP = DynamicPolynomials
@@ -30,7 +30,7 @@ function symbol_to_poly(sympolys::AbstractArray)
     # Convert all to DP.Polynomial, so that coefficients are of same type,
     # and constants are treated as polynomials
     # We also need this because Groebner does not support abstract types as input
-    polynoms = Vector{DP.Polynomial{DP.Commutative{DP.CreationOrder}, Graded{LexOrder}, commontype}}(undef, length(sympolys))
+    polynoms = Vector{DP.Polynomial{DP.Commutative{DP.CreationOrder}, DP.Graded{DP.LexOrder}, commontype}}(undef, length(sympolys))
     for (i, pf) in enumerate(polyforms)
         polynoms[i] = underlyingpoly(pf)
     end
