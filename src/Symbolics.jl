@@ -3,43 +3,47 @@ $(DocStringExtensions.README)
 """
 module Symbolics
 
-using DocStringExtensions, Markdown
+using PrecompileTools
 
-using LinearAlgebra
+@recompile_invalidations begin
 
-using Reexport
+    using DocStringExtensions, Markdown
 
-using DomainSets
+    using LinearAlgebra
 
-using Setfield
+    using Reexport
 
-import DomainSets: Domain
+    using DomainSets
+
+    using Setfield
+
+    import DomainSets: Domain
+    
+    import SymbolicUtils: similarterm, istree, operation, arguments, symtype, metadata
+    
+    import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
+    FnType, @rule, Rewriters, substitute,
+    promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+    
+    using SymbolicUtils.Code
+    
+    import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
+    
+    import SymbolicUtils.Code: toexpr
+    
+    import ArrayInterface
+    using RuntimeGeneratedFunctions
+    using SciMLBase, IfElse
+    using MacroTools
+end
 @reexport using SymbolicUtils
-
-import SymbolicUtils: similarterm, istree, operation, arguments, symtype, metadata
-
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-                      FnType, @rule, Rewriters, substitute,
-                      promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
-
-using SymbolicUtils.Code
-
-import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
-
-import SymbolicUtils.Code: toexpr
-
-import ArrayInterface
-
-using RuntimeGeneratedFunctions
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 # re-export
 
 export simplify, substitute
 
-using SciMLBase, IfElse
 export Num
-using MacroTools
 import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
 
