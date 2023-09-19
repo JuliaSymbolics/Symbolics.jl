@@ -362,24 +362,30 @@ return `Unknown()` to say that the output cannot be determined
 
 But `propagate_ndims` must work and return a non-negative integer.
 """
-function arrterm(f, args...)
-    atype = propagate_atype(f, args...)
-    etype = propagate_eltype(f, args...)
-    nd    = propagate_ndims(f, args...)
+function arrterm(f, args...;
+        atype = propagate_atype(f, args...),
+        eltype = propagate_eltype(f, args...),
+        ndims = propagate_ndims(f, args...),
+        shape = propagate_shape(f, args...))
 
-    S = if etype === Unknown() && nd === Unknown()
-        atype
-    elseif etype === Unknown()
-        atype{T, nd} where T
-    elseif nd === Unknown()
-        atype{etype, N} where N
-    else
-        atype{etype, nd}
+    if atype == Unknown()
+        # There's always a fallback for this
+        atype = propagate_atype(f, args...)
     end
 
-    setmetadata(Term{S}(f, Any[args...]),
-                ArrayShapeCtx,
-                propagate_shape(f, args...))
+    if eltype == Unknown()
+        eltype = Base.propagate_eltype(atype)
+    end
+
+    if ndims == Unknown()
+        ndims = if shape == Unknown()
+            Any
+        else
+            length(shape)
+        end
+    end
+    S = atype{eltype, ndims}
+    setmetadata(Term{S}(f, Any[args...]), ArrayShapeCtx, shape)
 end
 
 """
@@ -434,7 +440,11 @@ function propagate_eltype(f, args...)
 end
 
 function propagate_ndims(f, args...)
-    error("Could not determine the output dimension of $f$args")
+    if propagate_shape(f, args...) == Unknown()
+        error("Could not determine the output dimension of $f$args")
+    else
+        length(propagate_shape(f, args...))
+    end
 end
 
 function propagate_shape(f, args...)
