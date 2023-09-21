@@ -21,6 +21,7 @@ overwriting.
 @register_symbolic goo(x, y::Int) # `y` is not overloaded to take symbolic objects
 @register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
+See `@register_array_symbolic` to register functions which return arrays.
 """
 macro register_symbolic(expr, defs = true, flags...)
     if expr.head === :(::)
@@ -81,23 +82,6 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         ex.args[1] => ex.args[2]
     end |> Dict
 
-    if haskey(defs, :size)
-        # we don't store size, instead we store extents of indices "shape"
-        # or axes -- but it can also be Unknown()
-        shape = quote
-            Tuple(map(x->1:x, Symbolics.@oops $(defs[:size])))
-        end
-    elseif haskey(defs, :shape)
-        shape = defs[:shape]
-    else
-        shape = Unknown()
-    end
-
-    eltype = get(defs, :eltype, Unknown())
-
-    ndims = get(defs, :ndims, Unknown())
-
-    atype = get(defs, :container_type, Unknown())
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
     quote
@@ -107,7 +91,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
                 $f(unwrapped_args...) # partial-eval if all args are unwrapped
             elseif $ret_type == nothing || ($ret_type <: AbstractArray)
-                $arrterm($f, unwrapped_args...; atype=$atype, eltype=$eltype, ndims=$ndims, shape=$shape)
+                $array_term($(Expr(:parameters, [Expr(:kw, k, v) for (k, v) in defs]...)), $f, unwrapped_args...)
             else
                 $Term{$ret_type}($f, unwrapped_args)
             end
@@ -119,6 +103,22 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             end
         end
     end |> esc
+end
+
+"""
+    @register_array_symbolic(expr)
+
+Example:
+
+```julia
+# Let's say vandermonde takes an n-vector and returns an n x n matrix
+@register_array_symbolic vandermonde(x::AbstractVector) begin
+    size=(length(x), length(x))
+    eltype=eltype(x) # optional, will default to the promoted eltypes of x
+end
+"""
+macro register_array_symbolic(expr, block)
+    :(@register_symbolic $expr $block array) |> esc
 end
 
 Base.@deprecate_binding var"@register" var"@register_symbolic"

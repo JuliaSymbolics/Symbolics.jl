@@ -343,7 +343,7 @@ end
 #
 
 """
-    arrterm(f, args...; arrayop=nothing)
+    array_term(f, args...; arrayop=nothing)
 
 Create a term of `Term{<: AbstractArray}` which
 is the representation of `f(args...)`.
@@ -362,19 +362,20 @@ return `Unknown()` to say that the output cannot be determined
 
 But `propagate_ndims` must work and return a non-negative integer.
 """
-function arrterm(f, args...;
-        atype = propagate_atype(f, args...),
+function array_term(f, args...;
+        container_type = propagate_atype(f, args...),
         eltype = propagate_eltype(f, args...),
-        ndims = propagate_ndims(f, args...),
-        shape = propagate_shape(f, args...))
+        size = Unknown(),
+        ndims = size !== Unknown() ? length(size) : propagate_ndims(f, args...),
+        shape = size !== Unknown() ? Tuple(map(x->1:x, size)) : propagate_shape(f, args...))
 
-    if atype == Unknown()
+    if container_type == Unknown()
         # There's always a fallback for this
-        atype = propagate_atype(f, args...)
+        container_type = propagate_atype(f, args...)
     end
 
     if eltype == Unknown()
-        eltype = Base.propagate_eltype(atype)
+        eltype = Base.propagate_eltype(container_type)
     end
 
     if ndims == Unknown()
@@ -384,7 +385,7 @@ function arrterm(f, args...;
             length(shape)
         end
     end
-    S = atype{eltype, ndims}
+    S = container_type{eltype, ndims}
     setmetadata(Term{S}(f, Any[args...]), ArrayShapeCtx, shape)
 end
 
@@ -410,7 +411,7 @@ function shape(s::Symbolic{<:AbstractArray})
 end
 
 ## `propagate_` interface:
-#  used in the `arrterm` construction.
+#  used in the `array_term` construction.
 
 atype(::Type{<:Array}) = Array
 atype(::Type{<:SArray}) = SArray
@@ -645,12 +646,12 @@ function scalarize_op(f, arr, idx)
 end
 
 @wrapped function Base.:(\)(A::AbstractMatrix, b::AbstractVecOrMat)
-    t = arrterm(\, A, b)
+    t = array_term(\, A, b)
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
 end
 
 @wrapped function Base.inv(A::AbstractMatrix)
-    t = arrterm(inv, A)
+    t = array_term(inv, A)
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
 end
 

@@ -144,8 +144,7 @@ end
 propagate_eltype(::typeof(getindex), x, idx...) = geteltype(x)
 
 function SymbolicUtils.promote_symtype(::typeof(getindex), X, ii...)
-    @assert all(i -> i <: Integer, ii) "user arrterm to create arr term."
-
+    @assert all(i -> i <: Integer, ii)
     eltype(X)
 end
 
