@@ -42,3 +42,38 @@ typeof(Z)
 typeof(s)
 ```
 
+## Canonicalization, and avoiding it
+
+By default, Symbolics will simplify expressions to an internal canonical form upon construction:
+
+```@example types
+@variables x y
+(x + y, y + x) # assumes commutativity of +
+```
+```@examples types
+x + y + y + x # assumes associativity also
+```
+```@examples types
+x^2 * y * x # same goes for *
+```
+```@examples types
+x/(x*y) # assumes x!=0
+```
+
+These assumptions are made so that the obvious simplifications are done as soon as someone writes them. If you want to ask Symbolics to not make these assumptions, you can annotate them with the `::LiteralReal` type when declaring them with `@variables`. By default, variables are implicitly annotated by `::Real`, `::LiteralReal` is an internal type which is a subtype of `Real` which is used to create expressions with the property that they are not auto-simplified.
+
+```@examples types
+@variables a::LiteralReal b::LiteralReal
+
+(a + b,
+ b + a,
+ a + b + b + a,
+ a^2 * b * a,
+ a/(a*b))
+
+You can later force expressions to be simplified by using the `simplify` function.
+
+
+```@examples types
+simplify(a + b + b + a)
+```
