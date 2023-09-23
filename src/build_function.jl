@@ -127,7 +127,7 @@ function _build_function(target::JuliaTarget, op, args...;
     end
 end
 
-SymbolicUtils.Code.get_symbolify(x::Arr) = SymbolicUtils.Code.get_symbolify(unwrap(x))
+SymbolicUtils.Code.get_rewrites(x::Arr) = SymbolicUtils.Code.get_rewrites(unwrap(x))
 
 function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          conv = toexpr,
