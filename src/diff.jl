@@ -1,5 +1,7 @@
 abstract type Operator <: Function end
 
+export ∂
+
 """
 $(TYPEDEF)
 
@@ -333,6 +335,30 @@ end
 struct NoDeriv
 end
 derivative(f, args, v) = NoDeriv()
+
+struct ∂{T}
+    x::T
+end
+
+Base.nameof(p::∂) = Symbol("∂(", p.x, ")")
+istree(::∂) = true
+operation(::∂) = ∂
+arguments(p::∂) = (p.x,)
+symtype(p::∂) = FnType{Tuple, Any}
+
+function (p::∂)(y; lazy=false)
+    x, y = unwrap(p.x), unwrap(y)
+    t = term(∂(unwrap(p.x)), unwrap(y))
+    if !lazy && symtype(x) <: Real && symtype(y) <: Real
+        return expand_derivatives(Differential(x)(y))
+    elseif typeof(x) <: AbstractVector && symtype(y) <: Real
+        return gradient(y, collect(x))'
+    elseif typeof(x) <: AbstractVector && symtype(y) <: AbstractVector
+        return jacobian(collect(y), collect(x))
+    else
+        t
+    end
+end
 
 # Pre-defined derivatives
 import DiffRules

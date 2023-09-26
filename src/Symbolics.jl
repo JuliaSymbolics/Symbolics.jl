@@ -13,8 +13,6 @@ using PrecompileTools
 
     using Reexport
 
-    using DomainSets
-
     using Setfield
 
     import DomainSets: Domain
