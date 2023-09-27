@@ -69,7 +69,7 @@ SciMLBase = "1.8, 2"
 Setfield = "0.7, 0.8, 1"
 SpecialFunctions = "0.7, 0.8, 0.9, 0.10, 1.0, 2"
 StaticArrays = "1.1"
-SymbolicUtils = "1.0.1"
+SymbolicUtils = "1.4"
 TreeViews = "0.3"
 julia = "1.6"
 

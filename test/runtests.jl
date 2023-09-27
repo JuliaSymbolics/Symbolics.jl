@@ -20,7 +20,7 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 if GROUP == "All" || GROUP == "Core"
     @safetestset "Macro Test" begin include("macro.jl") end
     @safetestset "Arrays" begin include("arrays.jl") end
-    @safetestset "Arrays" begin include("stencils.jl") end
+    @safetestset "View-setting" begin include("stencils.jl") end
     @safetestset "Complex" begin include("complex.jl") end
     @safetestset "Semi-polynomial" begin include("semipoly.jl") end
     @safetestset "Fuzz Arrays" begin include("fuzz-arrays.jl") end
