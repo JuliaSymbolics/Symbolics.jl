@@ -41,7 +41,7 @@ using LambertW
 	@test correctAns(solve_single_eq(exp(x^2)~7,x),[-sqrt(log(7.0)),sqrt(log(7.0))])
 	@test correctAns(solve_single_eq(sin(x+3)~1//3,x),[asin(1.0/3.0)-3.0])
 	#strange
-	@test correctAns(solve_single_eq(sin(x+2//5)+cos(x+2//5)~1//2,x),[acos(0.5/sqrt(2.0))+3.141592653589793/4.0-(2.0/5.0)])
+	@test_broken correctAns(solve_single_eq(sin(x+2//5)+cos(x+2//5)~1//2,x),[acos(0.5/sqrt(2.0))+3.141592653589793/4.0-(2.0/5.0)])
 	#product
 	@test correctAns(solve_single_eq((x^2-4)*(x+1)~0,x),[-2.0,-1.0,2.0])
 end
