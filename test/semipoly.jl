@@ -22,7 +22,7 @@ using Random
     @test isequal(d, Dict(1 => 1 << 12, x => (1 << 11) * 12))
 end
 
-@testset "maintein SymbolicUtils.Symbolic subtype" begin
+@testset "maintain SymbolicUtils.Symbolic subtype" begin
     pow_expr = 7^(3y + sin(y))
     @test SymbolicUtils.ispow(Symbolics.unwrap(pow_expr))
     dict, nl = semipolynomial_form(pow_expr, [y], Inf)
