@@ -55,7 +55,7 @@ end
     end
 
     @test iszero(scalarize(y[1,1]))
-    test_funcs("stencil-extents", y, x, broken=broken)
+    test_funcs("stencil-extents", y, x)
 
     @variables u[1:5, 1:5]
     n = 5
