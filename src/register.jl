@@ -1,7 +1,7 @@
 using SymbolicUtils: Symbolic
 
 """
-    @register_symbolic(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
+    @register_symbolic(expr, define_promotion = true, Ts = [Real])
 
 Overload appropriate methods so that Symbolics can stop tracing into the
 registered function. If `define_promotion` is true, then a promotion method in
@@ -22,7 +22,7 @@ overwriting.
 @register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
 """
-macro register_symbolic(expr, define_promotion = true, Ts = [])
+macro register_symbolic(expr, define_promotion = true, Ts = :([]))
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
@@ -31,6 +31,8 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
     end
 
     @assert expr.head === :call
+    @assert Ts.head === :vect
+    Ts = Ts.args
 
     f = expr.args[1]
     args = expr.args[2:end]
@@ -41,7 +43,10 @@ macro register_symbolic(expr, define_promotion = true, Ts = [])
 
     types = map(args) do x
         if x isa Symbol
-            :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
+            if isempty(Ts)
+                Ts = [Real]
+            end
+            :(($(Ts...), $wrapper_type($Real), $Symbolic{<:$Real}))
         elseif Meta.isexpr(x, :(::))
             T = x.args[2]
             :($has_symwrapper($T) ?
