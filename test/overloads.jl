@@ -235,3 +235,5 @@ stringcontent = string(d.content)
 for f in [<, <=, >, >=, isless]
     @test_nowarn f(t, 1.0)
 end
+
+@test_nowarn binomial(t, 1)
