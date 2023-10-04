@@ -30,7 +30,7 @@ end
 
 function set_scalar_metadata(x, V, val)
     if symtype(x) <: AbstractArray
-        if val isa AbstractArray
+        x = if val isa AbstractArray
             getindex_posthook(x) do r,x,i...
                 set_scalar_metadata(r, V, val[i...])
             end
@@ -39,9 +39,8 @@ function set_scalar_metadata(x, V, val)
                 set_scalar_metadata(r, V, val)
             end
         end
-    else
-        setmetadata(x, V, val)
     end
+    setmetadata(x, V, val)
 end
 setdefaultval(x, val) = set_scalar_metadata(x, VariableDefaultValue, val)
 
@@ -225,7 +224,7 @@ function setprops_expr(expr, props, macroname, varname)
         lhs, rhs = opt.args
 
         @assert lhs isa Symbol "the lhs of an option must be a symbol"
-        expr = :($setmetadata($expr,
+        expr = :($set_scalar_metadata($expr,
                               $(option_to_metadata_type(Val{lhs}())),
                        $rhs))
     end

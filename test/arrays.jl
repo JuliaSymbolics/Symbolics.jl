@@ -55,15 +55,19 @@ end
 
     # https://github.com/JuliaSymbolics/Symbolics.jl/issues/842
     # getindex should keep metadata
-    @variables tv v(tv)[1:2] [test_meta = 4]
+    @variables tv v(tv)[1:2] [test_meta = 4] v2(tv)[1:3] [test_meta=[1, 2, 3]]
     @test !isnothing(metadata(unwrap(v)))
     @test hasmetadata(unwrap(v), TestMetaT)
     @test getmetadata(unwrap(v), TestMetaT) == 4
+    @test getmetadata(unwrap(v2), TestMetaT) == [1, 2, 3]
     vs = scalarize(v)
     vsw = unwrap.(vs)
+    vs2 = scalarize(v2)
+    vsw2 = unwrap.(vs2)
     @test !isnothing(metadata(vsw[1]))
     @test hasmetadata(vsw[1], TestMetaT)
     @test getmetadata(vsw[1], TestMetaT) == 4
+    @test getmetadata.(vsw2, TestMetaT) == [1, 2, 3]
     @test !isnothing(metadata(unwrap(v[1])))
     @test hasmetadata(unwrap(v[1]), TestMetaT)
     @test getmetadata(unwrap(v[1]), TestMetaT) == 4
