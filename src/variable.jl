@@ -28,23 +28,22 @@ function recurse_and_apply(f, x)
     end
 end
 
-function setdefaultval(x, val)
+function set_scalar_metadata(x, V, val)
     if symtype(x) <: AbstractArray
         if val isa AbstractArray
             getindex_posthook(x) do r,x,i...
-                setdefaultval(r, val[i...])
+                set_scalar_metadata(r, V, val[i...])
             end
         else
             getindex_posthook(x) do r,x,i...
-                setdefaultval(r, val)
+                set_scalar_metadata(r, V, val)
             end
         end
     else
-        setmetadata(x,
-                    VariableDefaultValue,
-                    val)
+        setmetadata(x, V, val)
     end
 end
+setdefaultval(x, val) = set_scalar_metadata(x, VariableDefaultValue, val)
 
 struct GetindexParent end
 
