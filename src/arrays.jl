@@ -99,6 +99,14 @@ function arguments(a::ArrayOp)
     arguments(a.term)
 end
 
+function similarterm(a::ArrayOp, f, args, type; metadata=nothing)
+    res = f(args...)
+    if res isa Symbolic && metadata !== nothing
+        res = SymbolicUtils.metadata(res, metadata)
+    end
+    res
+end
+
 function Base.isequal(a::ArrayOp, b::ArrayOp)
     a === b && return true
     isequal(a.shape, b.shape) &&
