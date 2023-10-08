@@ -81,6 +81,13 @@ function Base.show(io::IO, aop::ArrayOp)
     end
 end
 
+Base.summary(io::IO, aop::ArrayOp) = Base.array_summary(io, aop, shape(aop))
+function Base.showarg(io::IO, aop::ArrayOp, toplevel)
+    show(io, aop)
+    toplevel && print(io, "::", typeof(aop))
+    return nothing
+end
+
 symtype(a::ArrayOp{T}) where {T} = T
 istree(a::ArrayOp) = true
 function operation(a::ArrayOp)
@@ -208,7 +215,7 @@ function make_shape(output_idx, expr, ranges=Dict())
             end
             mi = matches[i]
             @assert !isempty(mi)
-            return get_extents(mi)
+            return Base.OneTo(length(get_extents(mi)))
         elseif i isa Integer
             return Base.OneTo(1)
         end
