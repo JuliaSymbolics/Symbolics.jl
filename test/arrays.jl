@@ -393,3 +393,19 @@ end
     @test !isequal(a, b) && !isequal(b, c) && !isequal(a, c)
     @test hash(a) != hash(b) && hash(b) != hash(c) && hash(a) != hash(c)
 end
+
+@testset "Offset Indices" begin
+    @variables k[0:3]
+
+    @testset "i = $i" for i in 0:3
+        sym = unwrap(k[i])
+        @test operation(sym) === getindex
+        args = arguments(sym)
+        @test length(args) == 2
+        @test args[1] === unwrap(k)
+        @test args[2] === i
+    end
+
+    @test_throws BoundsError k[-1]
+    @test_throws BoundsError k[4]
+end

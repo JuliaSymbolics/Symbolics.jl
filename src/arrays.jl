@@ -526,7 +526,7 @@ end
 function axes(A::Union{Arr, SymArray})
     s = shape(unwrap(A))
     s === Unknown() && error("axes of $A not known")
-    return map(x->1:length(x), s)
+    return s
 end
 
 
