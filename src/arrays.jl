@@ -215,7 +215,9 @@ function make_shape(output_idx, expr, ranges=Dict())
             end
             mi = matches[i]
             @assert !isempty(mi)
-            return Base.OneTo(length(get_extents(mi)))
+            ext = get_extents(mi)
+            ext isa Unknown && return Unknown()
+            return Base.OneTo(length(ext))
         elseif i isa Integer
             return Base.OneTo(1)
         end
