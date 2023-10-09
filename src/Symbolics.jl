@@ -110,6 +110,9 @@ include("integral.jl")
 
 include("array-lib.jl")
 
+using LogExpFunctions
+include("logexpfunctions-lib.jl")
+
 include("linear_algebra.jl")
 
 using Groebner
