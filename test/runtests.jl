@@ -44,6 +44,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Inequality Test" begin include("inequality.jl") end
     @safetestset "Integral Test" begin include("integral.jl") end
     @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
+    @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
 end
 
 if GROUP == "Downstream"
