@@ -197,3 +197,6 @@ function Base.Docs.getdoc(x::Num)
     end
     Markdown.parse(join(strings, "\n\n  "))
 end
+
+using RecursiveArrayTools
+RecursiveArrayTools.issymbollike(::Union{BasicSymbolic,Num}) = true
