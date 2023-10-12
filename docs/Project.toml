@@ -10,7 +10,7 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 
 [compat]
 BenchmarkTools = "1.3"
-Documenter = "0.27"
+Documenter = "0.27, 1"
 Latexify = "0.15, 0.16"
 OrdinaryDiffEq = "6.31"
 Plots = "1.36"
