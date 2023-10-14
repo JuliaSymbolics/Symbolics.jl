@@ -167,7 +167,7 @@ z2 = c + d * im
 @test sign(Num(1)) isa Num
 @test isequal(sign(Num(1)), Num(1))
 @test isequal(sign(Num(-1)), Num(-1))
-                    
+
 @test isequal(ℯ^a, exp(a))
 
 using IfElse: ifelse
@@ -237,3 +237,6 @@ for f in [<, <=, >, >=, isless]
 end
 
 @test_nowarn binomial(t, 1)
+
+using RecursiveArrayTools
+@test RecursiveArrayTools.issymbollike(t)
