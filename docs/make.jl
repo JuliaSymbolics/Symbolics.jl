@@ -5,6 +5,7 @@ cp("./docs/Project.toml", "./docs/src/assets/Project.toml", force = true)
 
 # Make sure that plots don't throw a bunch of warnings / errors!
 ENV["GKSwstype"] = "100"
+ENV["JULIA_DEBUG"] = "Documenter"
 using Plots
 
 mathengine = MathJax3(Dict(:loader => Dict("load" => ["[tex]/require", "[tex]/mathtools"]),
