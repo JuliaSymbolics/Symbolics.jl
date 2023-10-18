@@ -328,6 +328,7 @@ a function via a sparse matrix. For example:
 using LinearAlgebra
 N = 8
 A = sparse(Tridiagonal([x^i for i in 1:N-1], [x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
+show(A)
 ```
 
 Now we call `build_function`:
