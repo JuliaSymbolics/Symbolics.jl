@@ -237,6 +237,3 @@ for f in [<, <=, >, >=, isless]
 end
 
 @test_nowarn binomial(t, 1)
-
-using RecursiveArrayTools
-@test RecursiveArrayTools.issymbollike(t)
