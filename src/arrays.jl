@@ -727,7 +727,12 @@ function scalarize(arr)
         end
     elseif istree(arr) && operation(arr) == getindex
         args = arguments(arr)
-        scalarize(args[1], (args[2:end]...,))
+        scalarized = scalarize(args[1], (args[2:end]...,))
+        if isnothing(metadata(arr))
+            scalarized
+        else
+            metadata(scalarized, metadata(arr))
+        end
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
     elseif istree(arr) && symtype(arr) <: Number
