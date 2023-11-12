@@ -161,6 +161,11 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     @variables t F(t)[1:1]
 
     @test isequal(collect(F ./ t), [F[1] / t])
+
+    @variables a[1:2]
+    x = setmetadata(a[1], TestMetaT, 5)
+    @test getmetadata(x, TestMetaT) == 5
+    @test getmetadata(scalarize(x), TestMetaT) == 5
 end
 
 n = 2
