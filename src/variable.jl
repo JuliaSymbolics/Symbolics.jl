@@ -406,7 +406,10 @@ end
 
 getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
-getname(x, val=_fail) = _getname(unwrap(x), val)
+SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Num}) = ScalarSymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Arr}) = ArraySymbolic()
+
+SymbolicIndexingInterface.getname(x, val=_fail) = _getname(unwrap(x), val)
 
 function getparent(x, val=_fail)
     maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
