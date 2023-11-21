@@ -409,6 +409,12 @@ getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Num}) = ScalarSymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Arr}) = ArraySymbolic()
 
+SymbolicIndexingInterface.hasname(x::Union{Num,Arr}) = hasname(unwrap(x))
+
+function SymbolicIndexingInterface.hasname(x::Symbolic)
+    issym(x) || !istree(x) || istree(x) && (issym(operation(x)) || operation(x) == getindex)
+end
+
 SymbolicIndexingInterface.getname(x, val=_fail) = _getname(unwrap(x), val)
 
 function getparent(x, val=_fail)
