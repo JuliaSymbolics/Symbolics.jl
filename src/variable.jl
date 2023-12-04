@@ -377,13 +377,6 @@ macro variables(xs...)
     esc(_parse_vars(:variables, Real, xs))
 end
 
-TreeViews.hastreeview(x::Symbolic) = issym(x)
-
-function TreeViews.treelabel(io::IO,x::Symbolic,
-                             mime::MIME"text/plain" = MIME"text/plain"())
-    show(io,mime,Text(getname(x)))
-end
-
 const _fail = Dict()
 
 _getname(x, _) = nameof(x)
