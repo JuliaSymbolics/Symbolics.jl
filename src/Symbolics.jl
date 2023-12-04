@@ -84,7 +84,6 @@ include("arrays.jl")
 export @register, @register_symbolic
 include("register.jl")
 
-using TreeViews
 export @variables, Variable
 include("variable.jl")
 
