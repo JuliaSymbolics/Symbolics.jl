@@ -8,7 +8,7 @@ import SymbolicUtils: unsorted_arguments
 """
 $(TYPEDEF)
 
-# Attrtibutes
+# Attributes
 $(TYPEDFIELDS)
 """
 struct SemiMonomial

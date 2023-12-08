@@ -66,7 +66,7 @@ function solve_system_eq(equs::Vector{Equation}, vars)
 
     solutions = Dict()
 
-    #re subsititute the variables back in to find value
+    #re substitute the variables back in to find value
     for i = length(removed):-1:1
         current_eq = substitute(removed[i], solutions)
         solutions[current_eq.lhs] = current_eq.rhs

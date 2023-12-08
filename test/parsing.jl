@@ -3,7 +3,7 @@ using Symbolics, Test
 ex = [:(y ~ x)
       :(y ~ -2x + 3 / z)
       :(z ~ 2)]
-eqs = parse_expr_to_symbolic.(ex, (Main,))
+eqs = parse_expr_to_symbolic.(ex, (@__MODULE__,))
 
 @variables x y z
 ex = [y ~ x
@@ -14,7 +14,7 @@ ex = [y ~ x
 ex = [:(b(t) ~ a(t))
       :(b(t) ~ -2a(t) + 3 / c(t))
       :(c(t) ~ 2)]
-eqs = parse_expr_to_symbolic.(ex, (Main,))
+eqs = parse_expr_to_symbolic.(ex, (@__MODULE__,))
 @variables t a(t) b(t) c(t)
 ex = [b ~ a
       b ~ -2a + 3 / c

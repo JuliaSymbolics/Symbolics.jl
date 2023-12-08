@@ -22,12 +22,12 @@ function Base.getindex(x::SymArray, idx...)
     meta = metadata(unwrap(x))
     if shape(x) !== Unknown() && all(i -> i isa Integer, idx)
         II = CartesianIndices(axes(x))
+        ii = CartesianIndex(idx)
         @boundscheck begin
-            if !checkbounds(Bool, II, idx...)
+            if !in(ii, II)
                 throw(BoundsError(x, idx))
             end
         end
-        ii = II[idx...]
         res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...]; metadata = meta)
     elseif all(i -> symtype(i) <: Integer, idx)
         shape(x) !== Unknown() && @boundscheck begin

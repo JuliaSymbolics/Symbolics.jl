@@ -28,23 +28,21 @@ function recurse_and_apply(f, x)
     end
 end
 
-function setdefaultval(x, val)
+function set_scalar_metadata(x, V, val)
     if symtype(x) <: AbstractArray
-        if val isa AbstractArray
+        x = if val isa AbstractArray
             getindex_posthook(x) do r,x,i...
-                setdefaultval(r, val[i...])
+                set_scalar_metadata(r, V, val[i...])
             end
         else
             getindex_posthook(x) do r,x,i...
-                setdefaultval(r, val)
+                set_scalar_metadata(r, V, val)
             end
         end
-    else
-        setmetadata(x,
-                    VariableDefaultValue,
-                    val)
     end
+    setmetadata(x, V, val)
 end
+setdefaultval(x, val) = set_scalar_metadata(x, VariableDefaultValue, val)
 
 struct GetindexParent end
 
@@ -226,7 +224,7 @@ function setprops_expr(expr, props, macroname, varname)
         lhs, rhs = opt.args
 
         @assert lhs isa Symbol "the lhs of an option must be a symbol"
-        expr = :($setmetadata($expr,
+        expr = :($set_scalar_metadata($expr,
                               $(option_to_metadata_type(Val{lhs}())),
                        $rhs))
     end
@@ -377,13 +375,6 @@ julia> (t, a, b, c)
 """
 macro variables(xs...)
     esc(_parse_vars(:variables, Real, xs))
-end
-
-TreeViews.hastreeview(x::Symbolic) = issym(x)
-
-function TreeViews.treelabel(io::IO,x::Symbolic,
-                             mime::MIME"text/plain" = MIME"text/plain"())
-    show(io,mime,Text(getname(x)))
 end
 
 const _fail = Dict()

@@ -81,3 +81,10 @@ x in Set([x])
 any(isequal(x), [x])
 ```
 
+If `==` is used instead, you will receive `TypeError: non-boolean (Num) used in boolean context`. What this error 
+is telling you is that the symbolic `x == y` expression is being used where a `Bool` is required, such as
+`if x == y`, and since the symbolic expression is held lazily this will error because the appropriate branch cannot
+be selected (since `x == y` is unknown for arbitrary symbolic values!). This is why the check `isequal(x,y)` is
+required, since this is a non-lazy check of whether the symbol `x` is always equal to the symbol `y`, rather than
+an expression of whether `x` and `y` currently have the same value.
+

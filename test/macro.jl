@@ -14,7 +14,7 @@ many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5
 @test all(t->getsource(t)[1] === :variables, many_vars)
 @test getdefaultval(t) == 0
 @test getdefaultval(a) == 1
-@test_throws ErrorException getdefaultval(x)
+@test getdefaultval(x) == 2
 @test getdefaultval(x[1]) == 2
 @test getdefaultval(y[2]) == 3
 @test getdefaultval(w[2]) == 2

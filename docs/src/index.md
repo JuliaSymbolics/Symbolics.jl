@@ -2,7 +2,8 @@
 
 Symbolics.jl is a fast and modern Computer Algebra System (CAS) for a fast and modern
 programming language (Julia). The goal is to have a high-performance and parallelized
-symbolic algebra system that is directly extendable in the same language as the user's.
+symbolic algebra system that is directly extendable in the same language as that of the
+users.
 
 ## Installation
 
@@ -80,3 +81,61 @@ to be listed here, feel free to open a pull request!
 - [ReversePropagation.jl](https://github.com/dpsanders/ReversePropagation.jl): Source-to-source reverse mode automatic differentiation
     - Automated tracing of code and construction of backpropagation equations
     - Composes with symbolic transformation and simplification functionality
+
+## Reproducibility
+
+```@raw html
+<details><summary>The documentation of this SciML package was built using these direct dependencies,</summary>
+```
+
+```@example
+using Pkg # hide
+Pkg.status() # hide
+```
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details><summary>and using this machine and Julia version.</summary>
+```
+
+```@example
+using InteractiveUtils # hide
+versioninfo() # hide
+```
+
+```@raw html
+</details>
+```
+
+```@raw html
+<details><summary>A more complete overview of all dependencies and their versions is also provided.</summary>
+```
+
+```@example
+using Pkg # hide
+Pkg.status(; mode = PKGMODE_MANIFEST) # hide
+```
+
+```@raw html
+</details>
+```
+
+```@eval
+using TOML
+using Markdown
+version = TOML.parse(read("../../Project.toml", String))["version"]
+name = TOML.parse(read("../../Project.toml", String))["name"]
+link_manifest = "https://github.com/SciML/" * name * ".jl/tree/gh-pages/v" * version *
+                "/assets/Manifest.toml"
+link_project = "https://github.com/SciML/" * name * ".jl/tree/gh-pages/v" * version *
+               "/assets/Project.toml"
+Markdown.parse("""You can also download the
+[manifest]($link_manifest)
+file and the
+[project]($link_project)
+file.
+""")
+```

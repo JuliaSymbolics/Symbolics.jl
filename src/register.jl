@@ -1,7 +1,7 @@
 using SymbolicUtils: Symbolic
 
 """
-    @register_symbolic(expr, define_promotion = true)
+    @register_symbolic(expr, define_promotion = true, Ts = [Real])
 
 Overload appropriate methods so that Symbolics can stop tracing into the
 registered function. If `define_promotion` is true, then a promotion method in
@@ -23,33 +23,8 @@ overwriting.
 ```
 See `@register_array_symbolic` to register functions which return arrays.
 """
-macro register_symbolic(expr, defs = true, flags...)
-    if expr.head === :(::)
-        ret_type = expr.args[2]
-        expr = expr.args[1]
-    else
-        ret_type = nothing
-    end
-    @assert expr.head === :call
-
-    f = expr.args[1]
-    args = expr.args[2:end]
-
-    # Default arg types to Real
-    Ts = map(a -> a isa Symbol ? Real : (@assert(a.head == :(::)); a.args[2]), args)
-    argnames = map(a -> a isa Symbol ? a : a.args[1], args)
-
-
-    ftype = if f isa Expr && f.head == :(::)
-        @assert length(f.args) == 2
-        f.args[end]
-    else
-        :($typeof($f))
-    end
-
-    if :array in flags
-        return register_array_symbolic(f, ftype, argnames, Ts, ret_type, defs)
-    end
+macro register_symbolic(expr, define_promotion = true, Ts = :([]))
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, Ts)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
     ret_type = isnothing(ret_type) ? Real : ret_type
@@ -69,11 +44,39 @@ macro register_symbolic(expr, defs = true, flags...)
                   end
               end)
 
-    if defs
+    if define_promotion
         fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
     end
     esc(fexpr)
 end
+
+function destructure_registration_expr(expr, Ts)
+    if expr.head === :(::)
+        ret_type = expr.args[2]
+        expr = expr.args[1]
+    else
+        ret_type = nothing
+    end
+    @assert expr.head === :call
+    @assert Ts.head === :vect
+    Ts = Ts.args
+
+    f = expr.args[1]
+    args = expr.args[2:end]
+
+    # Default arg types to Real
+    Ts = map(a -> a isa Symbol ? Real : (@assert(a.head == :(::)); a.args[2]), args)
+    argnames = map(a -> a isa Symbol ? a : a.args[1], args)
+
+    ftype = if f isa Expr && f.head == :(::)
+        @assert length(f.args) == 2
+        f.args[end]
+    else
+        :($typeof($f))
+    end
+    f, ftype, argnames, Ts, ret_type
+end
+
 
 function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :())
     def_assignments = MacroTools.rmlines(partial_defs).args
@@ -118,7 +121,8 @@ Example:
 end
 """
 macro register_array_symbolic(expr, block)
-    :(@register_symbolic $expr $block array) |> esc
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, Ts)
+    return register_array_symbolic(f, ftype, argnames, Ts, ret_type, block)
 end
 
 Base.@deprecate_binding var"@register" var"@register_symbolic"

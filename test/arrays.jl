@@ -55,15 +55,19 @@ end
 
     # https://github.com/JuliaSymbolics/Symbolics.jl/issues/842
     # getindex should keep metadata
-    @variables tv v(tv)[1:2] [test_meta = 4]
+    @variables tv v(tv)[1:2] [test_meta = 4] v2(tv)[1:3] [test_meta=[1, 2, 3]]
     @test !isnothing(metadata(unwrap(v)))
     @test hasmetadata(unwrap(v), TestMetaT)
     @test getmetadata(unwrap(v), TestMetaT) == 4
+    @test getmetadata(unwrap(v2), TestMetaT) == [1, 2, 3]
     vs = scalarize(v)
     vsw = unwrap.(vs)
+    vs2 = scalarize(v2)
+    vsw2 = unwrap.(vs2)
     @test !isnothing(metadata(vsw[1]))
     @test hasmetadata(vsw[1], TestMetaT)
     @test getmetadata(vsw[1], TestMetaT) == 4
+    @test getmetadata.(vsw2, TestMetaT) == [1, 2, 3]
     @test !isnothing(metadata(unwrap(v[1])))
     @test hasmetadata(unwrap(v[1]), TestMetaT)
     @test getmetadata(unwrap(v[1]), TestMetaT) == 4
@@ -388,4 +392,20 @@ end
     a, b, c = u[1:5], u[2:6], u[3:7]
     @test !isequal(a, b) && !isequal(b, c) && !isequal(a, c)
     @test hash(a) != hash(b) && hash(b) != hash(c) && hash(a) != hash(c)
+end
+
+@testset "Offset Indices" begin
+    @variables k[0:3]
+
+    @testset "i = $i" for i in 0:3
+        sym = unwrap(k[i])
+        @test operation(sym) === getindex
+        args = arguments(sym)
+        @test length(args) == 2
+        @test args[1] === unwrap(k)
+        @test args[2] === i
+    end
+
+    @test_throws BoundsError k[-1]
+    @test_throws BoundsError k[4]
 end
