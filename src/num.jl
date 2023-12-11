@@ -19,9 +19,6 @@ Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value,args)...))
 value(x) = unwrap(x)
 
-SciMLBase.issymbollike(::Num) = true
-SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
-
 SymbolicUtils.@number_methods(
                               Num,
                               Num(f(value(a))),
@@ -197,6 +194,3 @@ function Base.Docs.getdoc(x::Num)
     end
     Markdown.parse(join(strings, "\n\n  "))
 end
-
-using RecursiveArrayTools
-RecursiveArrayTools.issymbollike(::Union{BasicSymbolic,Num}) = true

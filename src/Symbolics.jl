@@ -35,6 +35,8 @@ using PrecompileTools
     using RuntimeGeneratedFunctions
     using SciMLBase, IfElse
     using MacroTools
+
+    using SymbolicIndexingInterface
 end
 @reexport using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)

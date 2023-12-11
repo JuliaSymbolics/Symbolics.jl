@@ -17,9 +17,9 @@ function set_where(subt, supert)
     Expr(:where, supert, Ts...)
 end
 
-getname(x::Symbol) = x
+SymbolicIndexingInterface.getname(x::Symbol) = x
 
-function getname(x::Expr)
+function SymbolicIndexingInterface.getname(x::Expr)
     @assert x.head == :curly
     return x.args[1]
 end
