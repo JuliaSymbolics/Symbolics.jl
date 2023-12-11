@@ -47,6 +47,15 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
 end
 
+if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
+    @safetestset "SymbolicIndexingInterface Trait Test" begin
+        include("symbolic_indexing_interface_trait.jl")
+    end
+    @safetestset "SymbolicIndexingInterface Parameter Indexing Test" begin
+        include("symbolic_indexing_interface_parameter_indexing.jl")
+    end
+end
+
 if GROUP == "Downstream"
     activate_downstream_env()
     #@time @safetestset "ParameterizedFunctions MATLABDiffEq Regression Test" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
