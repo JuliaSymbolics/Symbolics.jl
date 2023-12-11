@@ -69,6 +69,9 @@ function destructure_registration_expr(expr, Ts)
     argnames = map(a -> a isa Symbol ? a : a.args[1], args)
 
     ftype = if f isa Expr && f.head == :(::)
+        if length(f.args) == 1
+            error("please name the callable object, i.e. use (f::$(f.args[end])) instead of $f")
+        end
         @assert length(f.args) == 2
         f.args[end]
     else
@@ -121,7 +124,7 @@ Example:
 end
 """
 macro register_array_symbolic(expr, block)
-    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, Ts)
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, :([]))
     return register_array_symbolic(f, ftype, argnames, Ts, ret_type, block)
 end
 
