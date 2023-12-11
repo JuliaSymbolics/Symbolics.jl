@@ -1,15 +1,45 @@
 using Symbolics
 import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
 import SymbolicUtils: Term, symtype, FnType, BasicSymbolic
+using LinearAlgebra
 using Test
 
 @variables t
 Symbolics.@register_symbolic fff(t)
 @test isequal(fff(t), Symbolics.Num(Symbolics.Term{Real}(fff, [Symbolics.value(t)])))
 
+const SymMatrix{T,N} =  Symmetric{T, AbstractArray{T, N}}
+@register_array_symbolic ggg(x::AbstractVector) begin
+    container_type=SymMatrix
+    size=(length(x) * 2, length(x) * 2)
+    eltype=eltype(x)
+end
+
 ## @variables
 
 many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5 p(..)[1:4]
+
+
+gg = ggg(x)
+
+@test ndims(gg) == 2
+@test size(gg) == (8,8)
+@test eltype(gg) == Real
+@test symtype(unwrap(gg)) == SymMatrix{Real, 2}
+
+struct CanCallWithArray{T}
+    params::T
+end
+
+@register_array_symbolic (c::CanCallWithArray)(x::AbstractArray, b::AbstractVector) begin
+    size=(size(x, 1), length(b), c.params.length)
+    eltype=Real
+end
+
+hh = CanCallWithArray((length=10,))(gg, x)
+@test size(hh) == (8,4,10)
+@test eltype(hh) == Real
+@test isequal(arguments(unwrap(hh)), unwrap.([gg, x]))
 
 @test all(t->getsource(t)[1] === :variables, many_vars)
 @test getdefaultval(t) == 0

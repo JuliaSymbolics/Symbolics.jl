@@ -21,15 +21,42 @@ overwriting.
 @register_symbolic goo(x, y::Int) # `y` is not overloaded to take symbolic objects
 @register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
+See `@register_array_symbolic` to register functions which return arrays.
 """
 macro register_symbolic(expr, define_promotion = true, Ts = :([]))
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, Ts)
+
+    args′ = map((a, T) -> :($a::$T), argnames, Ts)
+    ret_type = isnothing(ret_type) ? Real : ret_type
+
+    fexpr = :(@wrapped function $f($(args′...))
+                  args = [$(argnames...),]
+                  unwrapped_args = map($unwrap, args)
+                  res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
+                      $f(unwrapped_args...) # partial-eval if all args are unwrapped
+                  else
+                      $Term{$ret_type}($f, unwrapped_args)
+                  end
+                  if typeof.(args) == typeof.(unwrapped_args)
+                      return res
+                  else
+                      return $wrap(res)
+                  end
+              end)
+
+    if define_promotion
+        fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
+    end
+    esc(fexpr)
+end
+
+function destructure_registration_expr(expr, Ts)
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
     else
-        ret_type = Real
+        ret_type = nothing
     end
-
     @assert expr.head === :call
     @assert Ts.head === :vect
     Ts = Ts.args
@@ -37,95 +64,78 @@ macro register_symbolic(expr, define_promotion = true, Ts = :([]))
     f = expr.args[1]
     args = expr.args[2:end]
 
-    if f isa Expr && f.head == :(::)
-        @assert length(f.args) == 2
-    end
+    # Default arg types to Real
+    Ts = map(a -> a isa Symbol ? Real : (@assert(a.head == :(::)); a.args[2]), args)
+    argnames = map(a -> a isa Symbol ? a : a.args[1], args)
 
-    types = map(args) do x
-        if x isa Symbol
-            if isempty(Ts)
-                Ts = [Real]
-            end
-            :(($(Ts...), $wrapper_type($Real), $Symbolic{<:$Real}))
-        elseif Meta.isexpr(x, :(::))
-            T = x.args[2]
-            :($has_symwrapper($T) ?
-              ($T, $Symbolic{<:$T}, $wrapper_type($T),) :
-              ($T, $Symbolic{<:$T}))
-        else
-            error("Invalid argument format $x")
-        end
-    end
-
-    eval_method = :(@eval function $f($(Expr(:$, :(var"##_register_macro_s"...))),)
-                        args = [$(Expr(:$, :(var"##_register_macro_s_syms"...)))]
-                        unwrapped_args = map($unwrap, args)
-                        res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
-                            $f(unwrapped_args...)
-                        else
-                            $Term{$ret_type}($f, unwrapped_args)
-                        end
-                        if typeof.(args) == typeof.(unwrapped_args)
-                            return res
-                        else
-                            return $wrap(res)
-                        end
-                    end)
-    verbose = false
-    mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
-    Ts = Symbol("##__Ts")
     ftype = if f isa Expr && f.head == :(::)
+        if length(f.args) == 1
+            error("please name the callable object, i.e. use (f::$(f.args[end])) instead of $f")
+        end
+        @assert length(f.args) == 2
         f.args[end]
     else
         :($typeof($f))
     end
-    quote
-        $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
-                if any(x->x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
-        if $verbose
-            println("Candidates")
-            map(println, $Ts)
-        end
+    f, ftype, argnames, Ts, ret_type
+end
 
-        for sig in $Ts
-            var"##_register_macro_s" = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
-            var"##_register_macro_s_syms" = map(x->x.args[1], var"##_register_macro_s")
-            $eval_method
-        end
-        if $define_promotion
-            (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type
+
+function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :())
+    def_assignments = MacroTools.rmlines(partial_defs).args
+    defs = map(def_assignments) do ex
+        @assert ex.head == :(=)
+        ex.args[1] => ex.args[2]
+    end |> Dict
+
+
+    args′ = map((a, T) -> :($a::$T), argnames, Ts)
+    quote
+        @wrapped function $f($(args′...))
+            args = [$(argnames...),]
+            unwrapped_args = map($unwrap, args)
+            res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
+                $f(unwrapped_args...) # partial-eval if all args are unwrapped
+            elseif $ret_type == nothing || ($ret_type <: AbstractArray)
+                $array_term($(Expr(:parameters, [Expr(:kw, k, v) for (k, v) in defs]...)), $f, unwrapped_args...)
+            else
+                $Term{$ret_type}($f, unwrapped_args)
+            end
+
+            if typeof.(args) == typeof.(unwrapped_args)
+                return res
+            else
+                return $wrap(res)
+            end
         end
     end |> esc
 end
 
-Base.@deprecate_binding var"@register" var"@register_symbolic"
+"""
+    @register_array_symbolic(expr)
 
-# Ensure that Num that get @registered from outside the ModelingToolkit
-# module can work without having to bring in the associated function into the
-# ModelingToolkit namespace. We basically store information about functions
-# registered at runtime in a ModelingToolkit variable,
-# `registered_external_functions`. It's not pretty, but we are limited by the
-# way GeneralizedGenerated builds a function (adding "ModelingToolkit" to every
-# function call).
-# ---
-const registered_external_functions = Dict{Symbol,Module}()
-function inject_registered_module_functions(expr)
-    MacroTools.postwalk(expr) do x
-        # Find all function calls in the expression and extract the function
-        # name and calling module.
-        MacroTools.@capture(x, f_module_.f_name_(xs__))
-        if isnothing(f_module)
-            MacroTools.@capture(x, f_name_(xs__))
-        end
+Example:
 
-        if !isnothing(f_name)
-            # Set the calling module to the module that registered it.
-            mod = get(registered_external_functions, f_name, f_module)
-            if !isnothing(mod) && mod != Base
-                x.args[1] = :($mod.$f_name)
-            end
-        end
-
-        return x
-    end
+```julia
+# Let's say vandermonde takes an n-vector and returns an n x n matrix
+@register_array_symbolic vandermonde(x::AbstractVector) begin
+    size=(length(x), length(x))
+    eltype=eltype(x) # optional, will default to the promoted eltypes of x
 end
+```
+
+You can also register calls on callable structs:
+
+```julia
+@register_array_symbolic (c::Conv)(x::AbstractMatrix) begin
+    size=size(x) .- size(c.kernel) .+ 1
+    eltype=promote_type(eltype(x), eltype(c))
+end
+```
+"""
+macro register_array_symbolic(expr, block)
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, :([]))
+    return register_array_symbolic(f, ftype, argnames, Ts, ret_type, block)
+end
+
+Base.@deprecate_binding var"@register" var"@register_symbolic"

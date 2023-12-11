@@ -1,6 +1,6 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, array_term, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 import LinearAlgebra: dot
@@ -173,7 +173,7 @@ function Symbolics.propagate_shape(::typeof(foo), x)
     shape(x)
 end
 @wrapped function foo(x::AbstractVector)
-    t = arrterm(foo, x)
+    t = array_term(foo, x)
     setmetadata(t, Symbolics.ScalarizeCache, Ref{Any}(nothing))
 end
 
