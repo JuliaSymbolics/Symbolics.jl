@@ -122,6 +122,16 @@ Example:
     size=(length(x), length(x))
     eltype=eltype(x) # optional, will default to the promoted eltypes of x
 end
+```
+
+You can also register calls on callable structs:
+
+```julia
+@register_array_symbolic (c::Conv)(x::AbstractMatrix) begin
+    size=size(x) .- size(c.kernel) .+ 1
+    eltype=promote_type(eltype(x), eltype(c))
+end
+```
 """
 macro register_array_symbolic(expr, block)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, :([]))
