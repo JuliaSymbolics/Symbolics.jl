@@ -352,24 +352,25 @@ end
 #
 
 """
-    array_term(f, args...; arrayop=nothing)
+    array_term(f, args...;
+        container_type = propagate_atype(f, args...),
+        eltype = propagate_eltype(f, args...),
+        size = map(length, propagate_shape(f, args...)),
+        ndims = propagate_ndims(f, args...))
 
 Create a term of `Term{<: AbstractArray}` which
 is the representation of `f(args...)`.
 
-- Calls `propagate_atype(f, args...)` to determine the
-  container type, i.e. `Array` or `StaticArray` etc.
-- Calls `propagate_eltype(f, args...)` to determine the
-  output element type.
-- Calls `propagate_ndims(f, args...)` to determine the
-  output dimension.
-- Calls `propagate_shape(f, args...)` to determine the
-  output array shape.
+Default arguments:
+- `container_type=propagate_atype(f, args...)` - the container type,
+    i.e. `Array` or `StaticArray` etc.
+- `eltype=propagate_eltype(f, args...)` - the output element type.
+- `size=map(length, propagate_shape(f, args...))` -  the
+  output array size. `propagate_shape` returns a tuple of index ranges.
+- `ndims=propagate_ndims(f, args...)` the output dimension.
 
 `propagate_shape`, `propagate_atype`, `propagate_eltype` may
 return `Unknown()` to say that the output cannot be determined
-
-But `propagate_ndims` must work and return a non-negative integer.
 """
 function array_term(f, args...;
         container_type = propagate_atype(f, args...),
