@@ -1,4 +1,4 @@
-# Implement a few of the LogExpFuncitons methods when those rely on boolean workflows.
+# Implement a few of the LogExpFunctions methods when those rely on boolean workflows.
 
 LogExpFunctions.log1mexp(x::RCNum) = log(1 - exp(x))
 LogExpFunctions.log1pexp(x::RCNum) = log(1 + exp(x))

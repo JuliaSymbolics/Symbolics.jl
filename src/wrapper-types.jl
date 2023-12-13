@@ -106,7 +106,7 @@ function wrap_func_expr(mod, expr)
         #
         # (1) T    (2) wrapper_type(T)    (3) Symbolic{T}
         #
-        # However later while emiting methods we omit the one
+        # However later while emitting methods we omit the one
         # method where all arguments are (1) since those are
         # expected to be defined outside Symbolics
         if arg isa Expr && arg.head == :(::)

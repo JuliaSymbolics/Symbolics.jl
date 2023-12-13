@@ -1,6 +1,6 @@
 const FLOAT_NUM_CONVERSION_ERROR = """
 
-An implict conversion of symbolic Num into a Float64 was encountered. Common causes for this error include:
+An implicit conversion of symbolic Num into a Float64 was encountered. Common causes for this error include:
 
 1. A substitution resulted in numerical values, but is not automatically converted to numerical values. For example:
 
