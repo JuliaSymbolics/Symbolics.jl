@@ -18,6 +18,7 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 @register_symbolic limit(a, N)::Integer
 
 if GROUP == "All" || GROUP == "Core"
+    @safetestset "Quality Assurance" begin include("qa.jl") end
     @safetestset "Macro Test" begin include("macro.jl") end
     @safetestset "Arrays" begin include("arrays.jl") end
     @safetestset "View-setting" begin include("stencils.jl") end
