@@ -1,5 +1,5 @@
 # Symbolics.jl
-
+ 
 [![Github Action CI](https://github.com/JuliaSymbolics/Symbolics.jl/workflows/CI/badge.svg)](https://github.com/JuliaSymbolics/Symbolics.jl/actions)
 [![codecov](https://codecov.io/gh/JuliaSymbolics/Symbolics.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaSymbolics/Symbolics.jl)
 [![Build Status](https://github.com/JuliaSymbolics/Symbolics.jl/workflows/CI/badge.svg)](https://github.com/JuliaSymbolics/Symbolics.jl/actions?query=workflow%3ACI)
