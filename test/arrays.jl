@@ -413,3 +413,8 @@ end
     @test_throws BoundsError k[-1]
     @test_throws BoundsError k[4]
 end
+
+@testset "similar term #991" begin
+    @variables x[1:3]
+    @test substitute(x[1:2] .* x[3], Dict(x => [1, 2, 3])) == [3, 6]
+end
