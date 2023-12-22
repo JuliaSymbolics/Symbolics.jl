@@ -50,6 +50,7 @@ import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
 
 include("num.jl")
+include("rewrite-helpers.jl")
 include("complex.jl")
 
 """
