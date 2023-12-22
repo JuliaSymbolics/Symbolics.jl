@@ -34,7 +34,17 @@ function Base.replace(expr::Symbolic, r, rules...)
     _replace(expr, r, rules)
 end
 
+"""
+    occursin(x, y)
+Checks whether `x` occurs in `y`. Parses `y`, returning `true` on any occurrence of x.
 
+Example:
+```julia
+@syms x y z
+occursin(x, y + z*(3+x)) # returns `true`.
+occursin(x, log(y) + 10*(z-y) # returns `false`.
+```
+"""
 Base.occursin(x::Num, y::Num) = occursin(unwrap(x), unwrap(y))
 @wrapped function Base.occursin(r::Any, y::Real)
     y = unwrap(y)

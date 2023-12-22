@@ -39,6 +39,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Build Function Test" begin include("build_function.jl") end
     @safetestset "Build Function Array Test" begin include("build_function_arrayofarray.jl") end
     @safetestset "Build Function Array Test Named Tuples" begin include("build_function_arrayofarray_named_tuples.jl") end
+    @safetestset "Rewrite Helper Function Test" begin include("rewrite_helpers.jl") end
     VERSION >= v"1.9" && @safetestset "Build Targets Test" begin include("build_targets.jl") end
     @safetestset "Latexify Test" begin include("latexify.jl") end
     @safetestset "Domain Test" begin include("domains.jl") end
