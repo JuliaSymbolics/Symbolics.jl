@@ -111,8 +111,8 @@ function wrap_func_expr(mod, expr)
         # expected to be defined outside Symbolics
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
-            has_symwrapper(T) ? (T, :(SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
-                                (T,:(SymbolicUtils.Symbolic{<:$T}))
+            has_symwrapper(T) ? (T, :(Symbolics.SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
+                                (T,:(Symbolics.SymbolicUtils.Symbolic{<:$T}))
         elseif arg isa Expr && arg.head == :(...)
             Ts = type_options(arg.args[1])
             map(x->Vararg{x},Ts)
