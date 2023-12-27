@@ -29,7 +29,7 @@ macro register_symbolic(expr, define_promotion = true, Ts = :([]))
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
     ret_type = isnothing(ret_type) ? Real : ret_type
 
-    fexpr = :(@wrapped function $f($(args′...))
+    fexpr = :(Symbolics.@wrapped function $f($(args′...))
                   args = [$(argnames...),]
                   unwrapped_args = map($unwrap, args)
                   res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
