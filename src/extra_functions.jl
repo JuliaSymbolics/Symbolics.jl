@@ -1,4 +1,4 @@
-@register_symbolic Base.binomial(n, k::Integer)::Int true
+@register_symbolic Base.binomial(n, k)::Int true [Integer, Real]
 
 @register_symbolic Base.sign(x)::Int
 derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0

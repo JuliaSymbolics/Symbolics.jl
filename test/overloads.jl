@@ -237,3 +237,18 @@ for f in [<, <=, >, >=, isless]
 end
 
 @test_nowarn binomial(t, 1)
+
+# test for https://github.com/JuliaSymbolics/Symbolics.jl/issues/1028
+let
+    @variables t A(t) B
+    @test try binomial(A, 2*B^2)
+        true
+    catch
+        false
+    end
+    @test try binomial(Symbolics.value(A), Symbolics.value(2*B^2))
+        true
+    catch
+        false
+    end
+end
