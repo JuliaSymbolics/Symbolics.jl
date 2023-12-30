@@ -1,4 +1,57 @@
-@register_symbolic Base.binomial(n, k)::Int true [Integer, Real]
+@register_symbolic Base.binomial(n, k)::Int true
+function var"Base.binomial_17156291908497421557"(nothing, n, k)
+    begin
+        args = [n, k]
+        unwrapped_args = map(Symbolics.unwrap, args)
+        res = if !(any((x->begin
+                                (SymbolicUtils.issym)(x) || (SymbolicUtils.istree)(x)
+                            end), unwrapped_args))
+                Base.binomial(unwrapped_args...)
+            else
+                (SymbolicUtils.Term){Int}(Base.binomial, unwrapped_args)
+            end
+        if typeof.(args) == typeof.(unwrapped_args)
+            return res
+        else
+            return (Symbolics.wrap)(res)
+        end
+    end
+end
+function Base.binomial(n::Symbolics.SymbolicUtils.Symbolic{<:Real}, k::Int64)
+    if any(Symbolics.iswrapped, (n, k))
+        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
+    else
+        var"Base.binomial_17156291908497421557"(nothing, n, k)
+    end
+end
+function Base.binomial(n::Num, k::Int64)
+    if any(Symbolics.iswrapped, (n, k))
+        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
+    else
+        var"Base.binomial_17156291908497421557"(nothing, n, k)
+    end
+end
+function Base.binomial(n::Real, k::Symbolics.SymbolicUtils.Symbolic{<:Int64})
+    if any(Symbolics.iswrapped, (n, k))
+        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
+    else
+        var"Base.binomial_17156291908497421557"(nothing, n, k)
+    end
+end
+function Base.binomial(n::Symbolics.SymbolicUtils.Symbolic{<:Real}, k::Symbolics.SymbolicUtils.Symbolic{<:Int64})
+    if any(Symbolics.iswrapped, (n, k))
+        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
+    else
+        var"Base.binomial_17156291908497421557"(nothing, n, k)
+    end
+end
+function Base.binomial(n::Num, k::Symbolics.SymbolicUtils.Symbolic{<:Int64})
+    if any(Symbolics.iswrapped, (n, k))
+        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
+    else
+        var"Base.binomial_17156291908497421557"(nothing, n, k)
+    end
+end
 
 @register_symbolic Base.sign(x)::Int
 derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
