@@ -38,9 +38,11 @@ SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
 [weakdeps]
+PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 
 [extensions]
+SymbolicsPreallocationToolsExt = "Symbolics"
 SymbolicsSymPyExt = "SymPy"
 
 [compat]
@@ -79,6 +81,7 @@ julia = "1.6"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PkgBenchmark = "32113eaa-f34f-5b0d-bd6c-c81e245fc73d"
+PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 ReferenceTests = "324d217c-45ce-50fc-942e-d289b448e8cf"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
@@ -86,4 +89,4 @@ SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "BenchmarkTools", "ReferenceTests", "SymPy", "Random"]
+test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "BenchmarkTools", "ReferenceTests", "SymPy", "Random"]
