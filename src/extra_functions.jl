@@ -22,7 +22,7 @@ for (T1, T2) in ((Symbolics.SymbolicUtils.Symbolic{<:Real}, Int64),
                  (Num, Int64),
                  (Real, Symbolics.SymbolicUtils.Symbolic{<:Int64}),
                  (Symbolics.SymbolicUtils.Symbolic{<:Real}, Symbolics.SymbolicUtils.Symbolic{<:Int64}),
-                 (Num, Symbolics.SymbolicUtils.Symbolic{<:Int64})
+                 (Num, Symbolics.SymbolicUtils.Symbolic{<:Int64}))
 
     @eval function Base.binomial(n::$T1, k::$T2)
         if any(Symbolics.iswrapped, (n, k))
