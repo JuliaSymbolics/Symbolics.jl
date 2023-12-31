@@ -1,55 +1,35 @@
 @register_symbolic Base.binomial(n, k)::Int true
-function var"Base.binomial_17156291908497421557"(nothing, n, k)
+function _binomial(nothing, n, k)
     begin
         args = [n, k]
         unwrapped_args = map(Symbolics.unwrap, args)
         res = if !(any((x->begin
-                                (SymbolicUtils.issym)(x) || (SymbolicUtils.istree)(x)
+                                SymbolicUtils.issym(x) || SymbolicUtils.istree(x)
                             end), unwrapped_args))
                 Base.binomial(unwrapped_args...)
             else
-                (SymbolicUtils.Term){Int}(Base.binomial, unwrapped_args)
+                SymbolicUtils.Term{Int}(Base.binomial, unwrapped_args)
             end
         if typeof.(args) == typeof.(unwrapped_args)
             return res
         else
-            return (Symbolics.wrap)(res)
+            return Symbolics.wrap(res)
         end
     end
 end
-function Base.binomial(n::Symbolics.SymbolicUtils.Symbolic{<:Real}, k::Int64)
-    if any(Symbolics.iswrapped, (n, k))
-        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
-    else
-        var"Base.binomial_17156291908497421557"(nothing, n, k)
-    end
-end
-function Base.binomial(n::Num, k::Int64)
-    if any(Symbolics.iswrapped, (n, k))
-        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
-    else
-        var"Base.binomial_17156291908497421557"(nothing, n, k)
-    end
-end
-function Base.binomial(n::Real, k::Symbolics.SymbolicUtils.Symbolic{<:Int64})
-    if any(Symbolics.iswrapped, (n, k))
-        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
-    else
-        var"Base.binomial_17156291908497421557"(nothing, n, k)
-    end
-end
-function Base.binomial(n::Symbolics.SymbolicUtils.Symbolic{<:Real}, k::Symbolics.SymbolicUtils.Symbolic{<:Int64})
-    if any(Symbolics.iswrapped, (n, k))
-        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
-    else
-        var"Base.binomial_17156291908497421557"(nothing, n, k)
-    end
-end
-function Base.binomial(n::Num, k::Symbolics.SymbolicUtils.Symbolic{<:Int64})
-    if any(Symbolics.iswrapped, (n, k))
-        (Symbolics.wrap)(var"Base.binomial_17156291908497421557"(nothing, (Symbolics.unwrap)(n), (Symbolics.unwrap)(k)))
-    else
-        var"Base.binomial_17156291908497421557"(nothing, n, k)
+
+for (T1, T2) in ((Symbolics.SymbolicUtils.Symbolic{<:Real}, Int64),
+                 (Num, Int64),
+                 (Real, Symbolics.SymbolicUtils.Symbolic{<:Int64}),
+                 (Symbolics.SymbolicUtils.Symbolic{<:Real}, Symbolics.SymbolicUtils.Symbolic{<:Int64}),
+                 (Num, Symbolics.SymbolicUtils.Symbolic{<:Int64})
+
+    @eval function Base.binomial(n::$T1, k::$T2)
+        if any(Symbolics.iswrapped, (n, k))
+            Symbolics.wrap(_binomial(nothing, Symbolics.unwrap(n), Symbolics.unwrap(k)))
+        else
+            _binomial(nothing, n, k)
+        end
     end
 end
 
