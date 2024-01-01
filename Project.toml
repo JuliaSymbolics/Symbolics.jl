@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 authors = ["Shashi Gowda <gowda@mit.edu>"]
-version = "5.15.0"
+version = "5.15.1"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -38,11 +38,12 @@ SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
 [weakdeps]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 
 [extensions]
-SymbolicsPreallocationToolsExt = "PreallocationTools"
+SymbolicsPreallocationToolsExt = ["ForwardDiff", "PreallocationTools"]
 SymbolicsSymPyExt = "SymPy"
 
 [compat]

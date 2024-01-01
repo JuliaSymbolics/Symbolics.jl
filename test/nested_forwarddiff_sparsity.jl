@@ -1,4 +1,4 @@
-using ForwardDiff, SparseArrays, Symbolics, PreallocationTools
+using ForwardDiff, SparseArrays, Symbolics, PreallocationTools, Test
 # Test Nesting https://discourse.julialang.org/t/preallocationtools-jl-with-nested-forwarddiff-and-sparsity-pattern-detection-errors/107897
 
 function foo(x, cache)
