@@ -1,4 +1,4 @@
-module PreallocationToolsSymbolicsExt
+module SymbolicsPreallocationToolsExt
 
 using PreallocationTools
 import PreallocationTools: _restructure, get_tmp
