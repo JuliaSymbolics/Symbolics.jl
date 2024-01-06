@@ -78,8 +78,7 @@ include("equations.jl")
 export Inequality, ≲, ≳
 include("inequality.jl")
 
-using Bijections
-import DynamicPolynomials
+import Bijections, DynamicPolynomials
 include("utils.jl")
 
 using ConstructionBase
