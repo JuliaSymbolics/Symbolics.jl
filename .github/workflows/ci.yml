@@ -19,6 +19,7 @@ jobs:
         group:
           - Core
           - Downstream
+          - GroebnerExt
         version:
           - '1'
     steps:
