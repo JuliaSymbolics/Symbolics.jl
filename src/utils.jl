@@ -331,3 +331,50 @@ function coeff(p, sym=nothing)
         throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
     end
 end
+
+### Nums <--> Polys
+
+const DP = DynamicPolynomials
+# extracting underlying polynomial and coefficient type from Polyforms
+underlyingpoly(x::Number) = x
+underlyingpoly(pf::PolyForm) = pf.p
+coefftype(x::Number) = typeof(x)
+coefftype(pf::PolyForm) = DP.coefficient_type(underlyingpoly(pf))
+
+#=
+Converts an array of symbolic polynomials
+into an array of DynamicPolynomials.Polynomials
+=#
+function symbol_to_poly(sympolys::AbstractArray)
+    @assert !isempty(sympolys) "Empty input."
+
+    # standardize input
+    stdsympolys = map(unwrap, sympolys)
+    sort!(stdsympolys, lt=(<ₑ))
+
+    pvar2sym = Bijections.Bijection{Any,Any}()
+    sym2term = Dict{BasicSymbolic,Any}()
+    polyforms = map(f -> PolyForm(f, pvar2sym, sym2term), stdsympolys)
+
+    # Discover common coefficient type
+    commontype = mapreduce(coefftype, promote_type, polyforms, init=Int)
+    @assert commontype <: Union{Integer,Rational} "Only integer and rational coefficients are supported as input."
+
+    # Convert all to DP.Polynomial, so that coefficients are of same type,
+    # and constants are treated as polynomials
+    # We also need this because Groebner does not support abstract types as input
+    polynoms = Vector{DP.Polynomial{DP.Commutative{DP.CreationOrder},DP.Graded{DP.LexOrder},commontype}}(undef, length(sympolys))
+    for (i, pf) in enumerate(polyforms)
+        polynoms[i] = underlyingpoly(pf)
+    end
+
+    polynoms, pvar2sym, sym2term
+end
+
+#=
+Converts an array of AbstractPolynomialLike`s into an array of
+symbolic expressions mapping variables w.r.t pvar2sym
+=#
+function poly_to_symbol(polys, pvar2sym, sym2term, ::Type{T}) where {T}
+    map(f -> PolyForm{T}(f, pvar2sym, sym2term), polys)
+end

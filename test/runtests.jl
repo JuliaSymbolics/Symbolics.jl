@@ -32,7 +32,6 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
     @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
     @safetestset "Algebraic Solver Test" begin include("solver.jl") end
-    @safetestset "Groebner Bases Test" begin include("groebner_basis.jl") end
     @safetestset "Overloading Test" begin include("overloads.jl") end
     @safetestset "Nested ForwardDiff Sparsity Test" begin include("nested_forwarddiff_sparsity.jl") end
     @safetestset "Build Function Test" begin include("build_function.jl") end
@@ -47,6 +46,10 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
     @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
     @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
+end
+
+if GROUP == "All" || GROUP == "GroebnerExt"
+    @safetestset "Groebner extension Test" begin include("extensions/groebner.jl") end
 end
 
 if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
