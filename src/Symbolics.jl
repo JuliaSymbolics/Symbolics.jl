@@ -78,6 +78,8 @@ include("equations.jl")
 export Inequality, ≲, ≳
 include("inequality.jl")
 
+using Bijections
+import DynamicPolynomials
 include("utils.jl")
 
 using ConstructionBase
@@ -116,9 +118,8 @@ include("logexpfunctions-lib.jl")
 
 include("linear_algebra.jl")
 
-using Groebner
 include("groebner_basis.jl")
-export groebner_basis
+export groebner_basis, is_groebner_basis
 
 import Libdl
 include("build_function.jl")
@@ -182,6 +183,9 @@ end
 
 @static if !isdefined(Base,:get_extension)
     function __init__()
+        @require Groebner="0b43b601-686d-58a3-8a1c-6623616c7cd4" begin
+            include("../ext/SymbolicsGroebnerExt.jl")
+        end
         @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
             include("../ext/SymbolicsSymPyExt.jl")
         end
