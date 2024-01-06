@@ -50,7 +50,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Groebner extension Test" begin include("extensions/groebner.jl") end
 end
 
-if GROUP == "GroebnerExt"
+if GROUP == "All" || GROUP == "GroebnerExt"
     @safetestset "Groebner extension Test" begin include("extensions/groebner.jl") end
 end
 
