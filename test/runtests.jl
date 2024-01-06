@@ -46,8 +46,6 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
     @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
     @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
-
-    @safetestset "Groebner extension Test" begin include("extensions/groebner.jl") end
 end
 
 if GROUP == "All" || GROUP == "GroebnerExt"
