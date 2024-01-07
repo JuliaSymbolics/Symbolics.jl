@@ -6,6 +6,9 @@ using ForwardDiff.DiffRules
 using ForwardDiff: value, Dual, partials
 using Symbolics
 
+# The method generation in this file have been adapted from
+# https://github.com/JuliaDiff/ForwardDiff.jl/blob/v0.10.36/src/dual.jl
+
 const AMBIGUOUS_TYPES = (Num,)
 
 ####################################
