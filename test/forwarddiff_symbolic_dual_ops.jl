@@ -25,7 +25,7 @@ for f ∈ SymbolicUtils.monadic
     # The polygamma and trigamma functions seem to be missing rules in ForwardDiff.
     # The abs rule uses conditionals and cannot be used with Symbolics.Num.
     # acsc, asech, NanMath.log2 and NaNMath.log10 are tested separately
-    if f ∈ (abs, SF.polygamma, SF.trigamma, acsc, asech, NaNMath.log2, NaNMath.log10)
+    if f ∈ (abs, SF.polygamma, SF.trigamma, acsc, acsch, asech, NaNMath.log2, NaNMath.log10)
         continue
     end
 
