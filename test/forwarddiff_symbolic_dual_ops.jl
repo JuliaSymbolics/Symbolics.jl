@@ -73,7 +73,7 @@ for f ∈ SymbolicUtils.diadic
     @test isequal(fd, sym)
 end
 
-for f ∈ (atanh,)
+for f ∈ (NaNMath.atanh,)
     fun = eval(:(ξ ->($f)(ξ)))
 
     fd = ForwardDiff.derivative(fun, x)
