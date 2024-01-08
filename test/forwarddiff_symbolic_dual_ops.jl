@@ -37,6 +37,7 @@ for f ∈ SymbolicUtils.monadic
     @test isequal(fd, sym)
 end
 
+# These are evaluated numerically. For some reason isequal evaluates to false for the symbolic expressions.
 for f ∈ (acsc, asech, NaNMath.log2, NaNMath.log10)
     fun = eval(:(ξ ->($f)(ξ)))
 
@@ -88,16 +89,6 @@ for f ∈ (besselj, bessely, besseli, besselk)
     sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
 
     @test isequal(fd, sym)
-end
-
-# These are evaluated numerically. For some reason isequal evaluates to false for the symbolic expressions.
-for f ∈ (acsc, asech, NaNMath.log2, NaNMath.log10)
-    fun = eval(:(ξ ->($f)(ξ)))
-
-    fd = ForwardDiff.derivative(fun, 1.0)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
-
-    @test isequal(fd, substitute(sym, Dict(x => 1.0)))
 end
 
 # Additionally test these definitions from ForwardDiff #
