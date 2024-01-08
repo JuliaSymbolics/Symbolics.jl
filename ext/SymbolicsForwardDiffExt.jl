@@ -236,23 +236,6 @@ end
     )
 end
 
-# fma #
-#-----#
-
-@eval begin
-    @define_ternary_dual_op(
-        Base.fma,
-        calc_fma_xyz(x, y, z),                         # xyz_body
-        calc_fma_xy(x, y, z),                          # xy_body
-        calc_fma_xz(x, y, z),                          # xz_body
-        Base.fma(y, x, z),                             # yz_body
-        Dual{Tx}(fma(value(x), y, z), partials(x) * y), # x_body
-        Base.fma(y, x, z),                              # y_body
-        Dual{Tz}(fma(x, y, value(z)), partials(z)),     # z_body
-        $AMBIGUOUS_TYPES
-    )
-end
-
 # muladd #
 #--------#
 
