@@ -46,6 +46,7 @@ SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 [extensions]
 SymbolicsGroebnerExt = "Groebner"
 SymbolicsPreallocationToolsExt = ["ForwardDiff", "PreallocationTools"]
+SymbolicsForwardDiffExt = "ForwardDiff"
 SymbolicsSymPyExt = "SymPy"
 
 [compat]

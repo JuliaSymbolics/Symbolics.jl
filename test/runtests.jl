@@ -33,6 +33,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
     @safetestset "Algebraic Solver Test" begin include("solver.jl") end
     @safetestset "Overloading Test" begin include("overloads.jl") end
+    @safetestset "ForwardDiff Extension Test" begin include("forwarddiff_symbolic_dual_ops.jl") end
     @safetestset "Nested ForwardDiff Sparsity Test" begin include("nested_forwarddiff_sparsity.jl") end
     @safetestset "Build Function Test" begin include("build_function.jl") end
     @safetestset "Build Function Array Test" begin include("build_function_arrayofarray.jl") end
