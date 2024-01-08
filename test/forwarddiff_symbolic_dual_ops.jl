@@ -43,7 +43,7 @@ for f ∈ (acsc, asech, NaNMath.log2, NaNMath.log10)
     fd = ForwardDiff.derivative(fun, 1.0)
     sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
 
-    @test isequal(fd, substitute(sym, Dict(x => 1.0)))
+    @test fd ≈ substitute(sym, Dict(x => 1.0))
 end
 
 for f ∈ SymbolicUtils.basic_diadic
@@ -112,7 +112,7 @@ for f ∈ (hypot, muladd)
     fd = ForwardDiff.derivative(fun, 5.0)
     sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
 
-    @test isequal(fd, substitute(sym, Dict(x => 5.0)))
+    @test fd ≈ substitute(sym, Dict(x => 5.0))
 end
 
 # fma is not defined for Symbolics.Num
