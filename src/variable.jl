@@ -471,11 +471,11 @@ Also see `variables`.
 """
 function variable(name, idx...; T=Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
+    v = Sym{T}(name_ij)
     if T <: FnType
-        first(@variables $name_ij(..))
-    else
-        first(@variables $name_ij::T)
+        v = CallWithMetadata(v)
     end
+    Num(setmetadata(v, VariableSource, (:variables, name_ij)))
 end
 
 ##### Renaming #####

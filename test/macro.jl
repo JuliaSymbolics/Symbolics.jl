@@ -158,3 +158,10 @@ let
     @test foo(x) isa Num
     @test foo(unwrap(x)) isa BasicSymbolic
 end
+
+@variables t y(t)
+yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple{Any}, Real})
+yyy = yy(Symbolics.value(t))
+@test isequal(yyy, y)
+@test yyy isa Num
+@test y isa Num
