@@ -161,7 +161,12 @@ end
 
 @variables t y(t)
 yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple{Any}, Real})
-yyy = yy(Symbolics.value(t))
+yyy = yy(t)
 @test isequal(yyy, y)
 @test yyy isa Num
 @test y isa Num
+yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple, Real})
+yyy = yy(t)
+@test !isequal(yyy, y)
+@variables y(..)
+@test isequal(yyy, y(t))
