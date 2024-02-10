@@ -44,9 +44,9 @@ PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 
 [extensions]
+SymbolicsForwardDiffExt = "ForwardDiff"
 SymbolicsGroebnerExt = "Groebner"
 SymbolicsPreallocationToolsExt = ["ForwardDiff", "PreallocationTools"]
-SymbolicsForwardDiffExt = "ForwardDiff"
 SymbolicsSymPyExt = "SymPy"
 
 [compat]
@@ -59,7 +59,7 @@ Distributions = "0.25"
 DocStringExtensions = "0.9"
 DomainSets = "0.6"
 DynamicPolynomials = "0.5"
-Groebner = "0.5, 0.6"
+Groebner = "0.5, 0.6, 0.7"
 IfElse = "0.1"
 LaTeXStrings = "1.3"
 LambertW = "0.4.5"
