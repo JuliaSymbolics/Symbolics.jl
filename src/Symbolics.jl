@@ -178,7 +178,7 @@ function symbolics_to_sympy end
 export symbolics_to_sympy
 
 include("../ext/SymbolicsForwardDiffExt.jl")
-using SymbolicsForwardDiffExt
+using ..SymbolicsForwardDiffExt
 
 @static if !isdefined(Base, :get_extension)
     using Requires
