@@ -13,6 +13,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 DomainSets = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"
 DynamicPolynomials = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
 IfElse = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
@@ -38,15 +39,13 @@ SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
 [weakdeps]
-ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
 PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 
 [extensions]
-SymbolicsForwardDiffExt = "ForwardDiff"
 SymbolicsGroebnerExt = "Groebner"
-SymbolicsPreallocationToolsExt = ["ForwardDiff", "PreallocationTools"]
+SymbolicsPreallocationToolsExt = "PreallocationTools"
 SymbolicsSymPyExt = "SymPy"
 
 [compat]

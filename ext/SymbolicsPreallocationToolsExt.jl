@@ -2,7 +2,7 @@ module SymbolicsPreallocationToolsExt
 
 using PreallocationTools
 import PreallocationTools: _restructure, get_tmp
-using Symbolics, ForwardDiff
+using Symbolics, PreallocationTools.ForwardDiff
 
 function get_tmp(dc::DiffCache, u::Type{X}) where {T,N, X<: ForwardDiff.Dual{T, Num, N}}
     if length(dc.du) > length(dc.any_du)
