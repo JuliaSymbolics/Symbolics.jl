@@ -146,6 +146,7 @@ export parse_expr_to_symbolic
 
 include("error_hints.jl")
 include("struct.jl")
+include("operators.jl")
 
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
