@@ -1,9 +1,15 @@
 const NAMESPACE_SEPARATOR = '₊'
 
+hide_lhs(_) = false
+
+###
+### Connection
+###
 struct Connection
     systems
 end
 Connection() = Connection(nothing)
+hide_lhs(_::Connection) = true
 
 function connect(sys1, sys2, syss...)
     syss = (sys1, sys2, syss...)
@@ -20,6 +26,57 @@ function Base.show(io::IO, c::Connection)
         i != n && print(io, ", ")
     end
     print(io, ")")
+end
+
+###
+### State machine
+###
+_nameof(s) = nameof(s)
+_nameof(s::Union{Int, Symbol}) = s
+abstract type StateMachineOperator end
+hide_lhs(_::StateMachineOperator) = true
+struct InitialState <: StateMachineOperator
+    s
+end
+Base.show(io::IO, s::InitialState) = print(io, "initial_state(", _nameof(s.s), ")")
+initial_state(s) = Equation(InitialState(nothing), InitialState(s))
+
+Base.@kwdef struct Transition{A, B, C} <: StateMachineOperator
+    from::A = nothing
+    to::B = nothing
+    cond::C = nothing
+    immediate::Bool = true
+    reset::Bool = true
+    synchronize::Bool = false
+    priority::Int = 1
+    function Transition(from, to, cond, immediate, reset, synchronize, priority)
+        cond = unwrap(cond)
+        new{typeof(from), typeof(to), typeof(cond)}(from, to, cond, immediate,
+                                                    reset, synchronize,
+                                                    priority)
+    end
+end
+function Base.:(==)(transtion1::Transition, transition2::Transition)
+    transition1.from == transition2.from &&
+    transition1.to == transition2.to &&
+    isequal(transition1.cond, transition2.cond) &&
+    transition1.immediate == transition2.immediate &&
+    transition1.reset == transition2.reset &&
+    transition1.synchronize == transition2.synchronize &&
+    transition1.priority == transition2.priority
+end
+function transition(from, to, cond;
+        immediate::Bool = true, reset::Bool = true, synchronize::Bool = false,
+        priority::Int = 1)
+    Equation(Transition(), Transition(; from, to, cond, immediate, reset,
+                                      synchronize, priority))
+end
+function Base.show(io::IO, s::Transition)
+    print(io, _nameof(s.from), " → ", _nameof(s.to), " [")
+    print(io, "immediate: ", s.immediate, ", ")
+    print(io, "reset: ", s.reset, ", ")
+    print(io, "synchronize: ", s.synchronize, ", ")
+    print(io, "priority: ", s.priority, "]")
 end
 
 """
@@ -43,7 +100,7 @@ Base.:(==)(a::Equation, b::Equation) = all(isequal.((a.lhs, a.rhs), (b.lhs, b.rh
 Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 
 function Base.show(io::IO, eq::Equation)
-    if eq.lhs isa Connection
+    if hide_lhs(eq.lhs)
         show(io, eq.rhs)
     else
         print(io, eq.lhs, " ~ ", eq.rhs)
