@@ -50,7 +50,7 @@ function Base.show(io::IO, eq::Equation)
     end
 end
 
-scalarize(eq::Equation) = scalarize(eq.lhs) ~ scalarize(eq.rhs)
+scalarize(eq::Equation) = scalarize(eq.lhs) .~ scalarize(eq.rhs)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
 # ambiguity
 for T in [:Pair, :Any]
@@ -99,12 +99,8 @@ julia> A .~ 3x
 ```
 """
 function Base.:~(lhs, rhs)
-    if isarraysymbolic(lhs) || isarraysymbolic(rhs)
-        if isarraysymbolic(lhs) && isarraysymbolic(rhs)
-            lhs .~ rhs
-        else
-            throw(ArgumentError("Cannot equate an array with a scalar. Please use broadcast `.~`."))
-        end
+    if (isarraysymbolic(lhs) || isarraysymbolic(rhs)) && ((sl = size(lhs)) != (sr = size(rhs)))
+        throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
     else
         Equation(lhs, rhs)
     end

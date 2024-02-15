@@ -1,4 +1,5 @@
 abstract type Operator <: Function end
+propagate_shape(::Operator, x) = axes(x)
 
 """
 $(TYPEDEF)
@@ -33,7 +34,14 @@ struct Differential <: Operator
     x
     Differential(x) = new(value(x))
 end
-(D::Differential)(x) = Term{symtype(x)}(D, [x])
+function (D::Differential)(x)
+    x = unwrap(x)
+    if isarraysymbolic(x)
+        wrap(array_term(D, x))
+    else
+        wrap(term(D, x))
+    end
+end
 (D::Differential)(x::Num) = Num(D(value(x)))
 (D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, T) = T
