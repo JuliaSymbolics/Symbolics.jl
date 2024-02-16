@@ -1,5 +1,5 @@
 using Test, Symbolics
-using Symbolics: StructElement, Struct, operation, arguments
+using Symbolics: StructElement, Struct, operation, arguments, symstruct
 
 handledtypes = [Int8,
     Int16,
@@ -17,9 +17,13 @@ for t in handledtypes
 end
 
 @variables t x(t)
+struct Fisk
+    a::Int8
+    b::Int
+end
 a = StructElement(Int8, :a)
 b = StructElement(Int, :b)
-s = Struct([a, b])
+s = Struct(Fisk, [a, b])
 sa = s.a
 sb = s.b
 @test operation(sa) === getfield
@@ -28,6 +32,8 @@ sb = s.b
 @test operation(sb) === getfield
 @test arguments(sb) == Any[s, 2]
 @test arguments(sb) isa Any
+@test juliatype(s) == Fisk
+@test symstruct(Fisk) == s
 
 sa1 = (setproperty!(s, :a, UInt8(1)))
 @test operation(sa1) === setfield!
@@ -38,3 +44,12 @@ sb1 = (setproperty!(s, :b, "hi"))
 @test operation(sb1) === setfield!
 @test arguments(sb1) == Any[s, 2, "hi"]
 @test arguments(sb1) isa Any
+
+struct Jörgen
+    a::Int
+    b::Float64
+end
+
+ss = symstruct(Jörgen)
+
+@test getfield(ss, :v) == [StructElement(Int, :a), StructElement(Float64, :b)]
