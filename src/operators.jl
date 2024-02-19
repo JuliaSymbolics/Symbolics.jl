@@ -15,7 +15,8 @@ for (s, T) in [(:timeInState, :Real),
             if isempty(args)
                 print(io, $s, "()")
             else
-                print(io, $s, "(", nameof(only(args)), ")")
+                arg = only(args)
+                print(io, $s, "(", arg isa Number ? arg : nameof(arg), ")")
             end
         end
     end
