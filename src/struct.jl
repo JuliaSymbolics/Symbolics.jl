@@ -68,8 +68,30 @@ function decodetyp(typ::TypeT)
 end
 
 struct Struct
+    juliatype::DataType
     v::Vector{StructElement}
 end
+
+
+"""
+    symstruct(T)
+
+Create a symbolic struct from a given type `T`.
+"""
+function symstruct(T)
+    elems = map(fieldnames(T)) do fieldname
+        StructElement(fieldtype(T, fieldname), fieldname)
+    end |> collect
+    Struct(T, elems)
+end
+
+"""
+    juliatype(s::Struct)
+
+Get the Julia type that `s` is representing.
+"""
+juliatype(s::Struct) = getfield(s, :juliatype)
+getelements(s::Struct) = getfield(s, :v)
 
 function Base.getproperty(s::Struct, name::Symbol)
     v = getfield(s, :v)
