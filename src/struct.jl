@@ -67,7 +67,7 @@ function decodetyp(typ::TypeT)
     end
 end
 
-struct Struct
+struct Struct <: Real
     juliatype::DataType
     v::Vector{StructElement}
 end
@@ -106,6 +106,13 @@ function Base.setproperty!(s::Struct, name::Symbol, x)
     idx === nothing && error("no field $name in struct")
     type = SymbolicUtils.symtype(x)
     SymbolicUtils.term(setfield!, s, idx, x; type)
+end
+
+function symbolic_getproperty(s, name::Symbol)
+    SymbolicUtils.term(getfield, s, name, type = Real)
+end
+function symbolic_getproperty(s::Union{Arr, Num}, name::Symbol)
+    wrap(symbolic_getproperty(unwrap(s), name))
 end
 
 # We cannot precisely derive the type after `getfield` due to SU limitations,
