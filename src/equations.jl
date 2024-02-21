@@ -72,11 +72,11 @@ function transition(from, to, cond;
                                       synchronize, priority))
 end
 function Base.show(io::IO, s::Transition)
-    print(io, _nameof(s.from), " → ", _nameof(s.to), " [")
-    print(io, "immediate: ", s.immediate, ", ")
-    print(io, "reset: ", s.reset, ", ")
-    print(io, "synchronize: ", s.synchronize, ", ")
-    print(io, "priority: ", s.priority, "]")
+    print(io, _nameof(s.from), " → ", _nameof(s.to), " if (", s.cond, ") [")
+    print(io, "immediate: ", Int(s.immediate), ", ")
+    print(io, "reset: ", Int(s.reset), ", ")
+    print(io, "sync: ", Int(s.synchronize), ", ")
+    print(io, "prio: ", s.priority, "]")
 end
 
 """
