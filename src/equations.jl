@@ -5,7 +5,7 @@ hide_lhs(_) = false
 ###
 ### Connection
 ###
-struct Connection
+struct Connection <: Real
     systems
 end
 Connection() = Connection(nothing)
