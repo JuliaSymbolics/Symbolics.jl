@@ -130,7 +130,7 @@ A .* b'
 ```@example arrays
 map(asin, (A*b))
 ```
-```@example arrays
+```julia
 #sum(A) #latexify not working
 ```
 ```@example arrays
