@@ -33,7 +33,7 @@ end
 ###
 _nameof(s) = nameof(s)
 _nameof(s::Union{Int, Symbol}) = s
-abstract type StateMachineOperator end
+abstract type StateMachineOperator <: Real end
 hide_lhs(_::StateMachineOperator) = true
 struct InitialState <: StateMachineOperator
     s
