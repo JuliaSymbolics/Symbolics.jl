@@ -169,5 +169,5 @@ In general, any scalar expression which is derived from array expressions can be
 #sum(A[:,1]) + sum(A[2,:])#latexify not working
 ```
 ```@example arrays
-Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
+#Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:])) #latexify not working
 ```
