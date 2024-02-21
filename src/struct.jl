@@ -72,6 +72,11 @@ struct Struct <: Real
     v::Vector{StructElement}
 end
 
+function Base.hash(x::Struct, seed::UInt)
+    h1 = hash(juliatype(x), seed)
+    h2 = foldr(hash, getelements(x), init = h1)
+    h2 ⊻ (0x0e39036b7de2101a % UInt)
+end
 
 """
     symstruct(T)
