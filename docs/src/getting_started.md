@@ -68,12 +68,19 @@ end
 f([x, y, z]) # Recall that z = x^2 + y
 ```
 
-Or we can build an array variable and use it to trace the function:
+Or we can build an array of variables and use it to trace the function:
 
 ```@example symbolic_basics
-@variables u[1:4]
+u = Symbolics.variables(:u, 1:5)
 f(u)
 ```
+
+!!! note
+    `Symbolics.variables(:u, 1:5)` creates a Julia array of symbolic variables. This uses
+    O(n) compute and memory but is a very general representation. Symbolics.jl also has the
+    ability to represent symbolic arrays which gives an O(1) representation but is more
+    limited in its functionality. For more information, see the
+    [Symbolic Arrays](@symbolic_arrays) page.
 
 ## Derivatives
 
@@ -262,6 +269,10 @@ Symbolics.derivative(h(x, y) + y^2, x)
 ```@example symbolic_basics
 Symbolics.derivative(h(x, y) + y^2, y)
 ```
+
+!!! note
+    `@register_symbolic` only allows for scalar outputs. If full array functions are needed,
+    then see `@register_array_symbolic` for registering functions of symbolic arrays.
 
 ## Building Functions
 

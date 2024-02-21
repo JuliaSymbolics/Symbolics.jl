@@ -41,6 +41,34 @@ and pre-defines their derivatives. However, the user can utilize the
 [`@register_symbolic`](@ref) macro to add their function to allowed functions
 of the computation graph.
 
+Additionally, [`@register_array_symbolic`](@ref) can be used to define array functions.
+For size propagation it's required that a computation of how the sizes are computed is
+also supplied.
+
+## Defining Derivatives of Registered Functions
+
+In order for symbolic differentiation to work, an overload of `Symbolics.derivative` is
+required. The syntax is `derivative(typeof(f), args::NTuple{i,Any}, ::Val{j})` where
+`i` is the number of arguments to the function and `j` is which argument is being
+differentiated. So for example:
+
+```julia
+function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{1})
+    x, y = args
+    IfElse.ifelse(x < y, one(x), zero(x))
+end
+```
+
+is the partial derivative of the Julia `min(x,y)` function with respect to `x`.
+
+!!! note
+    Downstream symbolic derivative functionality only work if every partial derivative that
+    is required in the derivative expression is defined. Note that you only need to define
+    the partial derivatives which are actually computed.
+
+## Registration API
+
 ```@docs
 @register_symbolic
+@register_array_symbolic
 ```
