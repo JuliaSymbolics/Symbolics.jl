@@ -93,8 +93,12 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
                        b[3] * A[1, 3])))
 
     D = Differential(t)
-    @test isequal(collect(D.(x) ~ x), map(i -> D(x[i]) ~ x[i], eachindex(x)))
+    @test isequal(collect(D.(x) .~ x), map(i -> D(x[i]) ~ x[i], eachindex(x)))
     @test_throws ArgumentError A ~ t
+    @test isequal(D(x[1]), D(x)[1])
+    a = Symbolics.unwrap(D(x)[1])
+    @test Symbolics.operation(a) == D
+    @test isequal(only(Symbolics.arguments(a)), Symbolics.unwrap(x[1]))
 
     # #448
     @test isequal(Symbolics.scalarize(u + u), [2u[1]])
