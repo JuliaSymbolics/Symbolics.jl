@@ -5,9 +5,10 @@ hide_lhs(_) = false
 ###
 ### Connection
 ###
-struct Connection <: Real
+struct Connection
     systems
 end
+Base.broadcastable(x::Connection) = Ref(x)
 Connection() = Connection(nothing)
 Base.hash(c::Connection, seed::UInt) = hash(c.systems, (0xc80093537bdc1311 % UInt) ⊻ seed)
 hide_lhs(_::Connection) = true
@@ -20,11 +21,13 @@ end
 
 function Base.show(io::IO, c::Connection)
     print(io, "connect(")
-    n = length(c.systems)
-    for (i, s) in enumerate(c.systems)
-        str = join(split(string(nameof(s)), NAMESPACE_SEPARATOR), '.')
-        print(io, str)
-        i != n && print(io, ", ")
+    if c.systems isa AbstractArray
+        n = length(c.systems)
+        for (i, s) in enumerate(c.systems)
+            str = join(split(string(nameof(s)), NAMESPACE_SEPARATOR), '.')
+            print(io, str)
+            i != n && print(io, ", ")
+        end
     end
     print(io, ")")
 end
@@ -34,7 +37,8 @@ end
 ###
 _nameof(s) = nameof(s)
 _nameof(s::Union{Int, Symbol}) = s
-abstract type StateMachineOperator <: Real end
+abstract type StateMachineOperator end
+Base.broadcastable(x::StateMachineOperator) = Ref(x)
 hide_lhs(_::StateMachineOperator) = true
 struct InitialState <: StateMachineOperator
     s
