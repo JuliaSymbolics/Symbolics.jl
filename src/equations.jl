@@ -9,6 +9,7 @@ struct Connection <: Real
     systems
 end
 Connection() = Connection(nothing)
+Base.hash(c::Connection, seed::UInt) = hash(c.systems, (0xc80093537bdc1311 % UInt) ⊻ seed)
 hide_lhs(_::Connection) = true
 
 function connect(sys1, sys2, syss...)
