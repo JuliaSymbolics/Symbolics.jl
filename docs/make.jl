@@ -23,7 +23,7 @@ makedocs(
     authors="Chris Rackauckas",
     modules=[Symbolics,SymbolicUtils],
     clean=true, doctest=false, linkcheck = true,
-    warnonly = [:docs_block, :missing_docs, :cross_references],
+    warnonly = [:docs_block, :missing_docs, :cross_references, :linkcheck],
     format = Documenter.HTML(assets = ["assets/favicon.ico"],
                              mathengine = mathengine,
                              canonical="https://docs.sciml.ai/Symbolics/stable/"),

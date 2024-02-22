@@ -61,7 +61,7 @@ Base.@kwdef struct Transition{A, B, C} <: StateMachineOperator
                                                     priority)
     end
 end
-function Base.:(==)(transtion1::Transition, transition2::Transition)
+function Base.:(==)(transition1::Transition, transition2::Transition)
     transition1.from == transition2.from &&
     transition1.to == transition2.to &&
     isequal(transition1.cond, transition2.cond) &&
