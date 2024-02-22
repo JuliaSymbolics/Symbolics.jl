@@ -44,25 +44,25 @@ function encodetyp(::Type{T}) where {T}
 end
 
 function decodetyp(typ::TypeT)
-    siz = TypeT(8) * (typ >> SIZE_OFFSET)
+    _size = TypeT(8) * (typ >> SIZE_OFFSET)
     if !iszero(typ & (TypeT(1) << ISINTEGER))
         if !iszero(typ & TypeT(1) << SIGNED_OFFSET)
-            siz == 8 ? Int8 :
-            siz == 16 ? Int16 :
-            siz == 32 ? Int32 :
-            siz == 64 ? Int64 :
+            _size == 8 ? Int8 :
+            _size == 16 ? Int16 :
+            _size == 32 ? Int32 :
+            _size == 64 ? Int64 :
             error("invalid type $(typ)!")
         else # unsigned
-            siz == 8 ? UInt8 :
-            siz == 16 ? UInt16 :
-            siz == 32 ? UInt32 :
-            siz == 64 ? UInt64 :
+            _size == 8 ? UInt8 :
+            _size == 16 ? UInt16 :
+            _size == 32 ? UInt32 :
+            _size == 64 ? UInt64 :
             error("invalid type $(typ)!")
         end
     else # float
-        siz == 16 ? Float16 :
-        siz == 32 ? Float32 :
-        siz == 64 ? Float64 :
+        _size == 16 ? Float16 :
+        _size == 32 ? Float32 :
+        _size == 64 ? Float64 :
         error("invalid type $(typ)!")
     end
 end
