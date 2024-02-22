@@ -158,16 +158,16 @@ Here we indexed for the element (2,3), but we got back a symbolic indexing expre
 ```@example arrays
 Symbolics.scalarize(AAt[2,3])
 ```
-```@example arrays
+```julia
 @syms i::Int j::Int
 Symbolics.scalarize(AAt[i,j])
 ```
 
 In general, any scalar expression which is derived from array expressions can be scalarized.
 
-```@example arrays
+```julia
 #sum(A[:,1]) + sum(A[2,:])#latexify not working
 ```
-```@example arrays
+```julia
 Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
 ```
