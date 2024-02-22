@@ -154,3 +154,20 @@ AAt[2,3]
 ```
 
 Here we indexed for the element (2,3), but we got back a symbolic indexing expression. You may want to force the element to be computed in terms of the elements of A. This can be done, using the `scalarize` function.
+
+```@example arrays
+Symbolics.scalarize(AAt[2,3])
+```
+```@example arrays
+@syms i::Int j::Int
+Symbolics.scalarize(AAt[i,j])
+```
+
+In general, any scalar expression which is derived from array expressions can be scalarized.
+
+```@example arrays
+#sum(A[:,1]) + sum(A[2,:])#latexify not working
+```
+```@example arrays
+Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
+```
