@@ -80,7 +80,7 @@ f(u)
     O(n) compute and memory but is a very general representation. Symbolics.jl also has the
     ability to represent symbolic arrays which gives an O(1) representation but is more
     limited in its functionality. For more information, see the
-    [Symbolic Arrays](@symbolic_arrays) page.
+    [Symbolic Arrays](@ref symbolic_arrays) page.
 
 ## Derivatives
 
