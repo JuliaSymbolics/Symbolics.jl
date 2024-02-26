@@ -422,21 +422,21 @@ end
 """
 $(SIGNATURES)
 
-A helper function for computing the derivative of an expression with respect to
+A helper function for computing the derivative of the expression `O` with respect to
 `var`.
 """
-function derivative(O, v; simplify=false)
+function derivative(O, var; simplify=false)
     if O isa AbstractArray
-        Num[Num(expand_derivatives(Differential(v)(value(o)), simplify)) for o in O]
+        Num[Num(expand_derivatives(Differential(var)(value(o)), simplify)) for o in O]
     else
-        Num(expand_derivatives(Differential(v)(value(O)), simplify))
+        Num(expand_derivatives(Differential(var)(value(O)), simplify))
     end
 end
 
 """
 $(SIGNATURES)
 
-A helper function for computing the gradient of an expression with respect to
+A helper function for computing the gradient of the expression `O` with respect to
 an array of variable expressions.
 """
 function gradient(O, vars::AbstractVector; simplify=false)
@@ -606,7 +606,7 @@ end
 """
 $(SIGNATURES)
 
-A helper function for computing the Hessian of an expression with respect to
+A helper function for computing the Hessian of the expression `O` with respect to
 an array of variable expressions.
 """
 function hessian(O, vars::AbstractVector; simplify=false)
