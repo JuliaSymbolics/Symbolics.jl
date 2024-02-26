@@ -114,7 +114,7 @@ function Base.setproperty!(s::Struct, name::Symbol, x)
 end
 
 function symbolic_getproperty(s, name::Symbol)
-    SymbolicUtils.term(getfield, s, name, type = Real)
+    SymbolicUtils.term(getfield, s, Meta.quot(name), type = Real)
 end
 function symbolic_getproperty(s::Union{Arr, Num}, name::Symbol)
     wrap(symbolic_getproperty(unwrap(s), name))
