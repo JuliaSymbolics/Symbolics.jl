@@ -31,7 +31,7 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 """
 struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
-    x
+    x::BasicSymbolic
     Differential(x) = new(value(x))
 end
 function (D::Differential)(x)
