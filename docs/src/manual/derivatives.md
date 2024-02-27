@@ -15,6 +15,11 @@ Differential
 expand_derivatives
 ```
 
+!!! note
+    For symbolic differentiation, all registered functions in the symbolic expression
+    need a registered derivative. For more information, see the
+    [function registration](@ref function_registration) page.
+
 ## High-Level Differentiation Functions
 
 The following functions are not exported and thus must be accessed in a namespaced

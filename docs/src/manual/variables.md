@@ -10,7 +10,8 @@ written as `op1 ~ op2`, defines the symbolic equality between two operations.
 
 ## Types
 
-`Sym`, `Term`, and `FnType` are from [SymbolicUtils.jl](https://juliasymbolics.github.io/SymbolicUtils.jl/api/). Note that in
+`Sym`, `Term`, and `FnType` are from
+[SymbolicUtils.jl](https://symbolicutils.juliasymbolics.org/api/). Note that in
 Symbolics, we always use `Sym{Real}`, `Term{Real}`, and
 `FnType{Tuple{Any}, Real}`. To get the arguments of an `istree` object, use
 `arguments(t::Term)`, and to get the operation, use `operation(t::Term)`.
@@ -20,6 +21,8 @@ Instead, one needs to use `SymbolicUtils.istree` to check if `arguments` and
 
 ```@docs
 @variables
+Symbolics.variable
+Symbolics.variables
 Equation
 Base.:~(::Num, ::Num)
 ```

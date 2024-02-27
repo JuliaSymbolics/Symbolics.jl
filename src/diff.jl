@@ -1,4 +1,5 @@
 abstract type Operator <: Function end
+propagate_shape(::Operator, x) = axes(x)
 
 """
 $(TYPEDEF)
@@ -33,8 +34,15 @@ struct Differential <: Operator
     x
     Differential(x) = new(value(x))
 end
-(D::Differential)(x) = Term{symtype(x)}(D, [x])
-(D::Differential)(x::Num) = Num(D(value(x)))
+function (D::Differential)(x)
+    x = unwrap(x)
+    if isarraysymbolic(x)
+        array_term(D, x)
+    else
+        term(D, x)
+    end
+end
+(D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
 (D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, T) = T
 
@@ -414,21 +422,21 @@ end
 """
 $(SIGNATURES)
 
-A helper function for computing the derivative of an expression with respect to
+A helper function for computing the derivative of the expression `O` with respect to
 `var`.
 """
-function derivative(O, v; simplify=false)
+function derivative(O, var; simplify=false)
     if O isa AbstractArray
-        Num[Num(expand_derivatives(Differential(v)(value(o)), simplify)) for o in O]
+        Num[Num(expand_derivatives(Differential(var)(value(o)), simplify)) for o in O]
     else
-        Num(expand_derivatives(Differential(v)(value(O)), simplify))
+        Num(expand_derivatives(Differential(var)(value(O)), simplify))
     end
 end
 
 """
 $(SIGNATURES)
 
-A helper function for computing the gradient of an expression with respect to
+A helper function for computing the gradient of the expression `O` with respect to
 an array of variable expressions.
 """
 function gradient(O, vars::AbstractVector; simplify=false)
@@ -598,7 +606,7 @@ end
 """
 $(SIGNATURES)
 
-A helper function for computing the Hessian of an expression with respect to
+A helper function for computing the Hessian of the expression `O` with respect to
 an array of variable expressions.
 """
 function hessian(O, vars::AbstractVector; simplify=false)

@@ -20,7 +20,10 @@ end
 function Base.getindex(x::SymArray, idx...)
     idx = unwrap.(idx)
     meta = metadata(unwrap(x))
-    if shape(x) !== Unknown() && all(i -> i isa Integer, idx)
+    if istree(x) && (op = operation(x)) isa Operator
+        args = arguments(x)
+        return op(only(args)[idx...])
+    elseif shape(x) !== Unknown() && all(i -> i isa Integer, idx)
         II = CartesianIndices(axes(x))
         ii = CartesianIndex(idx)
         @boundscheck begin

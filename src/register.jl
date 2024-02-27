@@ -137,5 +137,3 @@ macro register_array_symbolic(expr, block)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, :([]))
     return register_array_symbolic(f, ftype, argnames, Ts, ret_type, block)
 end
-
-Base.@deprecate_binding var"@register" var"@register_symbolic"

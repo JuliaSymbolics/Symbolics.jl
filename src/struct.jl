@@ -44,32 +44,59 @@ function encodetyp(::Type{T}) where {T}
 end
 
 function decodetyp(typ::TypeT)
-    siz = TypeT(8) * (typ >> SIZE_OFFSET)
+    _size = TypeT(8) * (typ >> SIZE_OFFSET)
     if !iszero(typ & (TypeT(1) << ISINTEGER))
         if !iszero(typ & TypeT(1) << SIGNED_OFFSET)
-            siz == 8 ? Int8 :
-            siz == 16 ? Int16 :
-            siz == 32 ? Int32 :
-            siz == 64 ? Int64 :
+            _size == 8 ? Int8 :
+            _size == 16 ? Int16 :
+            _size == 32 ? Int32 :
+            _size == 64 ? Int64 :
             error("invalid type $(typ)!")
         else # unsigned
-            siz == 8 ? UInt8 :
-            siz == 16 ? UInt16 :
-            siz == 32 ? UInt32 :
-            siz == 64 ? UInt64 :
+            _size == 8 ? UInt8 :
+            _size == 16 ? UInt16 :
+            _size == 32 ? UInt32 :
+            _size == 64 ? UInt64 :
             error("invalid type $(typ)!")
         end
     else # float
-        siz == 16 ? Float16 :
-        siz == 32 ? Float32 :
-        siz == 64 ? Float64 :
+        _size == 16 ? Float16 :
+        _size == 32 ? Float32 :
+        _size == 64 ? Float64 :
         error("invalid type $(typ)!")
     end
 end
 
-struct Struct
+struct Struct <: Real
+    juliatype::DataType
     v::Vector{StructElement}
 end
+
+function Base.hash(x::Struct, seed::UInt)
+    h1 = hash(juliatype(x), seed)
+    h2 = foldr(hash, getelements(x), init = h1)
+    h2 ⊻ (0x0e39036b7de2101a % UInt)
+end
+
+"""
+    symstruct(T)
+
+Create a symbolic struct from a given type `T`.
+"""
+function symstruct(T)
+    elems = map(fieldnames(T)) do fieldname
+        StructElement(fieldtype(T, fieldname), fieldname)
+    end |> collect
+    Struct(T, elems)
+end
+
+"""
+    juliatype(s::Struct)
+
+Get the Julia type that `s` is representing.
+"""
+juliatype(s::Struct) = getfield(s, :juliatype)
+getelements(s::Struct) = getfield(s, :v)
 
 function Base.getproperty(s::Struct, name::Symbol)
     v = getfield(s, :v)
@@ -84,6 +111,13 @@ function Base.setproperty!(s::Struct, name::Symbol, x)
     idx === nothing && error("no field $name in struct")
     type = SymbolicUtils.symtype(x)
     SymbolicUtils.term(setfield!, s, idx, x; type)
+end
+
+function symbolic_getproperty(s, name::Symbol)
+    SymbolicUtils.term(getfield, s, Meta.quot(name), type = Real)
+end
+function symbolic_getproperty(s::Union{Arr, Num}, name::Symbol)
+    wrap(symbolic_getproperty(unwrap(s), name))
 end
 
 # We cannot precisely derive the type after `getfield` due to SU limitations,
