@@ -357,4 +357,5 @@ let
     @test Symbolics.derivative(2x, x) == 2
     @test_throws ArgumentError Symbolics.derivative(x, 2x)
     @test_throws ArgumentError Symbolics.derivative(2x, 2x) # though arguably this should be 1
+    @test_throws ArgumentError Symbolics.derivative(x, 0)
 end
