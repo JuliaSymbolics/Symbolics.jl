@@ -32,7 +32,7 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x::BasicSymbolic
-    function Differential(x)
+    function Differential(x::BasicSymbolic)
         vx = value(x)
         SymbolicUtils.exprtype(vx) == SymbolicUtils.SYM || throw(ArgumentError("Must differentiate with respect to a symbol, got $vx"))
         new(vx)
