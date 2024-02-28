@@ -1,6 +1,40 @@
 using Symbolics, Test
 using ReferenceTests
 
+using SymbolicUtils
+
+@eval SymbolicUtils function Base.hash(s::BasicSymbolic, salt::UInt)::UInt
+    E = exprtype(s)
+    if E === SYM
+        h = hash(nameof(s))
+        s = salt ⊻ SYM_SALT
+        Base.hash_uint(3s - h)
+    elseif E === ADD || E === MUL
+        !iszero(salt) && return hash(hash(s, zero(UInt)), salt)
+        h = s.hash[]
+        !iszero(h) && return h
+        hashoffset = isadd(s) ? ADD_SALT : SUB_SALT
+        h′ = hash(hashoffset, hash(s.coeff, hash(s.dict, salt)))
+        s.hash[] = h′
+        return h′
+    elseif E === DIV
+        return hash(s.num, hash(s.den, salt ⊻ DIV_SALT))
+    elseif E === POW
+        hash(s.exp, hash(s.base, salt ⊻ POW_SALT))
+    elseif E === TERM
+        !iszero(salt) && return hash(hash(s, zero(UInt)), salt)
+        h = s.hash[]
+        !iszero(h) && return h
+        op = operation(s)
+        oph = op isa Function ? nameof(op) : op
+        h′ = hashvec(arguments(s), hash(oph, salt))
+        s.hash[] = h′
+        return h′
+    else
+        error_on_type()
+    end
+end
+
 @variables t a x(t) y(t)
 expr = [a*x - x*y,-3y + x*y]
 @test_reference "target_functions/1.stan" Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.StanTarget())
