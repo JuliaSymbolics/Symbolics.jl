@@ -47,6 +47,7 @@ if GROUP == "All" || GROUP == "Core"
     @safetestset "Integral Test" begin include("integral.jl") end
     @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
     @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
+    @safetestset "LuxCore extensions Test" begin include("extensions/lux.jl") end
     @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
 end
 
