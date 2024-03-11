@@ -258,8 +258,8 @@ function _linear_expansion(t::Equation, x)
 end
 trivial_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
 
-is_expansion_leaf(t) = !istree(t) || (operation(t) isa Differential)
-@noinline expansion_check(op) = op isa Differential && error("The operation is a Differential. This should never happen.")
+is_expansion_leaf(t) = !istree(t) || (operation(t) isa Operator)
+@noinline expansion_check(op) = op isa Operator && error("The operation is an Operator. This should never happen.")
 function _linear_expansion(t, x)
     t = value(t)
     t isa Symbolic || return (0, t, true)
