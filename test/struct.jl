@@ -1,57 +1,26 @@
 using Test, Symbolics
-using Symbolics: StructElement, Struct, operation, arguments, symstruct, juliatype
-
-handledtypes = [Int8,
-    Int16,
-    Int32,
-    Int64,
-    UInt8,
-    UInt16,
-    UInt32,
-    UInt64,
-    Float16,
-    Float32,
-    Float64]
-for t in handledtypes
-    @test Symbolics.decodetyp(Symbolics.encodetyp(t)) === t
-end
-
-@variables t x(t)
-struct Fisk
-    a::Int8
-    b::Int
-end
-a = StructElement(Int8, :a)
-b = StructElement(Int, :b)
-for s in [Struct(Fisk, [a, b]), symstruct(Fisk)]
-    sa = s.a
-    sb = s.b
-    @test operation(sa) === getfield
-    @test arguments(sa) == Any[s, 1]
-    @test arguments(sa) isa Any
-    @test operation(sb) === getfield
-    @test arguments(sb) == Any[s, 2]
-    @test arguments(sb) isa Any
-    @test juliatype(s) == Fisk
-end
-
-s = Struct(Fisk, [a, b])
-
-sa1 = (setproperty!(s, :a, UInt8(1)))
-@test operation(sa1) === setfield!
-@test arguments(sa1) == Any[s, 1, UInt8(1)]
-@test arguments(sa1) isa Any
-
-sb1 = (setproperty!(s, :b, "hi"))
-@test operation(sb1) === setfield!
-@test arguments(sb1) == Any[s, 2, "hi"]
-@test arguments(sb1) isa Any
+using Symbolics: symstruct, juliatype, symbolic_getproperty, symbolic_setproperty!, symbolic_constructor
 
 struct Jörgen
     a::Int
     b::Float64
 end
 
-ss = symstruct(Jörgen)
+S = symstruct(Jörgen)
+@variables x::S
+xa = Symbolics.unwrap(symbolic_getproperty(x, :a))
+@test Symbolics.symtype(xa) == Int
+@test Symbolics.operation(xa) == getfield
+@test isequal(Symbolics.arguments(xa), [Symbolics.unwrap(x), Meta.quot(:a)])
+xa = Symbolics.unwrap(symbolic_setproperty!(x, :a, 10))
+@test Symbolics.operation(xa) == setfield!
+@test isequal(Symbolics.arguments(xa), [Symbolics.unwrap(x), Meta.quot(:a), 10])
+@test Symbolics.symtype(xa) == Int
 
-@test getfield(ss, :v) == [StructElement(Int, :a), StructElement(Float64, :b)]
+xb = Symbolics.unwrap(symbolic_setproperty!(x, :b, 10))
+@test Symbolics.operation(xb) == setfield!
+@test isequal(Symbolics.arguments(xb), [Symbolics.unwrap(x), Meta.quot(:b), 10])
+@test Symbolics.symtype(xb) == Float64
+
+s = Symbolics.symbolic_constructor(S, 1, 1.0)
+@test Symbolics.symtype(s) == S
