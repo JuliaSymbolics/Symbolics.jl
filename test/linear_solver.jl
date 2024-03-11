@@ -52,3 +52,10 @@ eqs = [
 @test isequal(Symbolics.solve_for(x + y ~ 0, x), Symbolics.solve_for([x + y ~ 0], x))
 @test isequal(Symbolics.solve_for([x + y ~ 0], [x]), Symbolics.solve_for(x + y ~ 0, [x]))
 @test isequal(Symbolics.solve_for(2x/z + sin(z), x), sin(z) / (-2 / z))
+
+@variables t x
+D = Symbolics.Difference(t; dt=1)
+a, b, islinear = Symbolics.linear_expansion(D(x) - x, x)
+@test islinear
+@test isequal(a, -1)
+@test isequal(b, D(x))
