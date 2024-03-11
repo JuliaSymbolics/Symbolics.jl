@@ -6,7 +6,8 @@ end
 
 Create a symbolic wrapper for struct from a given struct `T`.
 """
-Struct(::Type{T}) where T = Struct{T}
+symstruct(::Type{T}) where T = Struct{T}
+Struct{T}(vals...) where T = T(vals...)
 
 function Base.hash(x::Struct{T}, seed::UInt) where T
     h1 = hash(T, seed)
@@ -44,7 +45,15 @@ function symbolic_setproperty!(s::Union{Arr, Num}, name::Symbol, val)
     wrap(symbolic_setproperty!(unwrap(s), name, val))
 end
 
+function symbolic_constructor(s::Type{<:Struct}, vals...)
+    N = length(getelements(s))
+    N′ = length(vals)
+    N′ == N || error("$(juliatype(s)) needs $N field. Got $N′ fields!")
+    SymbolicUtils.term(s, vals..., type = s)
+end
+
 # We cannot precisely derive the type after `getfield` due to SU limitations,
 # so give up and just say Real.
 SymbolicUtils.promote_symtype(::typeof(getfield), ::Type{<:Struct}, _...) = Real
 SymbolicUtils.promote_symtype(::typeof(setfield!), ::Type{<:Struct}, _, ::Type{T}) where T = T
+SymbolicUtils.promote_symtype(s::Type{<:Struct{T}}, _...) where T = s
