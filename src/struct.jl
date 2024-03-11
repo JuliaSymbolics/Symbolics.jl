@@ -1,123 +1,47 @@
-const TypeT = UInt32
-const ISINTEGER = TypeT(0)
-const SIGNED_OFFSET = TypeT(1)
-const SIZE_OFFSET = TypeT(2)
-
-const EMPTY_DIMS = Int[]
-
-struct StructElement
-    typ::TypeT
-    name::Symbol
-    size::Vector{Int}
-    function StructElement(::Type{T}, name, size = EMPTY_DIMS) where {T}
-        c = encodetyp(T)
-        c == typemax(TypeT) && error("Cannot handle type $T")
-        new(c, name, size)
-    end
-end
-
-_sizeofrepr(typ::TypeT) = typ >> SIZE_OFFSET
-sizeofrepr(s::StructElement) = _sizeofrepr(s.typ)
-Base.size(s::StructElement) = s.size
-Base.length(s::StructElement) = prod(size(s))
-Base.nameof(s::StructElement) = s.name
-function Base.show(io::IO, s::StructElement)
-    print(io, nameof(s), "::", decodetyp(s.typ))
-    if length(s) > 1
-        print(io, "::(", join(size(s), " × "), ")")
-    end
-end
-
-function encodetyp(::Type{T}) where {T}
-    typ = zero(UInt32)
-    if T <: Integer
-        typ |= TypeT(1) << ISINTEGER
-        if T <: Signed
-            typ |= TypeT(1) << SIGNED_OFFSET
-        elseif !(T <: Unsigned)
-            return typemax(TypeT)
-        end
-    elseif !(T <: AbstractFloat)
-        return typemax(TypeT)
-    end
-    typ |= TypeT(sizeof(T)) << SIZE_OFFSET
-end
-
-function decodetyp(typ::TypeT)
-    _size = TypeT(8) * (typ >> SIZE_OFFSET)
-    if !iszero(typ & (TypeT(1) << ISINTEGER))
-        if !iszero(typ & TypeT(1) << SIGNED_OFFSET)
-            _size == 8 ? Int8 :
-            _size == 16 ? Int16 :
-            _size == 32 ? Int32 :
-            _size == 64 ? Int64 :
-            error("invalid type $(typ)!")
-        else # unsigned
-            _size == 8 ? UInt8 :
-            _size == 16 ? UInt16 :
-            _size == 32 ? UInt32 :
-            _size == 64 ? UInt64 :
-            error("invalid type $(typ)!")
-        end
-    else # float
-        _size == 16 ? Float16 :
-        _size == 32 ? Float32 :
-        _size == 64 ? Float64 :
-        error("invalid type $(typ)!")
-    end
-end
-
-struct Struct <: Real
-    juliatype::DataType
-    v::Vector{StructElement}
-end
-
-function Base.hash(x::Struct, seed::UInt)
-    h1 = hash(juliatype(x), seed)
-    h2 = foldr(hash, getelements(x), init = h1)
-    h2 ⊻ (0x0e39036b7de2101a % UInt)
+struct Struct{T} <: Real
 end
 
 """
     symstruct(T)
 
-Create a symbolic struct from a given type `T`.
+Create a symbolic wrapper for struct from a given struct `T`.
 """
-function symstruct(T)
-    elems = map(fieldnames(T)) do fieldname
-        StructElement(fieldtype(T, fieldname), fieldname)
-    end |> collect
-    Struct(T, elems)
+Struct(::Type{T}) where T = Struct{T}
+
+function Base.hash(x::Struct{T}, seed::UInt) where T
+    h1 = hash(T, seed)
+    h2 ⊻ (0x0e39036b7de2101a % UInt)
 end
 
 """
-    juliatype(s::Struct)
+    juliatype(s::Type{<:Struct})
 
 Get the Julia type that `s` is representing.
 """
-juliatype(s::Struct) = getfield(s, :juliatype)
-getelements(s::Struct) = getfield(s, :v)
+juliatype(::Type{Struct{T}}) where T = T
+getelements(s::Type{<:Struct}) = fieldnames(juliatype(s))
+getelementtypes(s::Type{<:Struct}) = fieldtypes(juliatype(s))
 
-function Base.getproperty(s::Struct, name::Symbol)
-    v = getfield(s, :v)
-    idx = findfirst(x -> nameof(x) == name, v)
-    idx === nothing && error("no field $name in struct")
-    SymbolicUtils.term(getfield, s, idx, type = Real)
-end
-
-function Base.setproperty!(s::Struct, name::Symbol, x)
-    v = getfield(s, :v)
-    idx = findfirst(x -> nameof(x) == name, v)
-    idx === nothing && error("no field $name in struct")
-    type = SymbolicUtils.symtype(x)
-    SymbolicUtils.term(setfield!, s, idx, x; type)
-end
-
-function symbolic_getproperty(s, name::Symbol)
-    SymbolicUtils.term(getfield, s, Meta.quot(name), type = Real)
+function symbolic_getproperty(ss, name::Symbol)
+    s = symtype(ss)
+    idx = findfirst(isequal(name), getelements(s))
+    idx === nothing && error("$(juliatype(s)) doesn't have field $(name)!")
+    T = getelementtypes(s)[idx]
+    SymbolicUtils.term(getfield, ss, Meta.quot(name), type = T)
 end
 function symbolic_getproperty(s::Union{Arr, Num}, name::Symbol)
     wrap(symbolic_getproperty(unwrap(s), name))
+end
+
+function symbolic_setproperty!(ss, name::Symbol, val)
+    s = symtype(ss)
+    idx = findfirst(isequal(name), getelements(s))
+    idx === nothing && error("$(juliatype(s)) doesn't have field $(name)!")
+    T = getelementtypes(s)[idx]
+    SymbolicUtils.term(setfield!, ss, Meta.quot(name), val, type = T)
+end
+function symbolic_setproperty!(s::Union{Arr, Num}, name::Symbol, val)
+    wrap(symbolic_setproperty!(unwrap(s), name, val))
 end
 
 # We cannot precisely derive the type after `getfield` due to SU limitations,
