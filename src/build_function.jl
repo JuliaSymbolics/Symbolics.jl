@@ -109,7 +109,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          linenumbers = true,
                          wrap_code = nothing,
                          cse = false,
-                         nanmath = false,
+                         nanmath = true,
                          kwargs...)
 
   states.rewrites[:nanmath] = nanmath
@@ -141,7 +141,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          states = LazyState(),
                          linenumbers = true,
                          cse = false,
-                         nanmath = false,
+                         nanmath = true,
                          kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -287,7 +287,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
                        iip_config = (true, true),
-                       nanmath = false,
+                       nanmath = true,
                        parallel=nothing, cse = false, kwargs...)
 
     states.rewrites[:nanmath] = nanmath
