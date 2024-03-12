@@ -31,11 +31,10 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 """
 struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
-    x::BasicSymbolic
+    x
     function Differential(x)
         vx = value(x)
-        vx isa BasicSymbolic && SymbolicUtils.exprtype(vx) == SymbolicUtils.SYM || 
-            throw(ArgumentError("Must differentiate with respect to a symbol, got $vx"))
+        istree(vx) && throw(ArgumentError("Cannot differentiate with respect to $vx"))
         new(vx)
     end
 end
