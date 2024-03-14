@@ -470,6 +470,8 @@ end
 
 Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
 Base.isequal(a::Arr, b::Arr) = isequal(unwrap(a), unwrap(b))
+Base.isequal(a::Arr, b::Symbolic) = isequal(unwrap(a), b)
+Base.isequal(a::Symbolic, b::Arr) = isequal(b, a)
 
 ArrayOp(x::Arr) = unwrap(x)
 

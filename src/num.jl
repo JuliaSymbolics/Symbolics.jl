@@ -81,7 +81,7 @@ substitute(expr, s::Vector; kw...) = substituter(s)(expr; kw...)
 substituter(pair::Pair) = substituter((pair,))
 function substituter(pairs)
     dict = Dict(value(k) => value(v)  for (k, v) in pairs)
-    (expr; kw...) -> SymbolicUtils.substitute(expr, dict; kw...)
+    (expr; kw...) -> SymbolicUtils.substitute(value(expr), dict; kw...)
 end
 
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
