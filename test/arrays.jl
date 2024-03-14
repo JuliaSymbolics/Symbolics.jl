@@ -382,6 +382,27 @@ end
     @test isequal(collect(dtv), collect(A .* u .- u.^2 .* v .+ alpha .* lapv))
 end
 
+@testset "Unwrapped array equality" begin
+    @variables x[1:3]
+    ux = unwrap(x)
+    @test isequal(x, x)
+    @test isequal(x, ux)
+    @test isequal(ux, x)
+end
+
+@testset "Array expression substitution" begin
+    @variables x[1:3] p[1:3, 1:3]
+    bar(x, p) = p * x
+    @register_array_symbolic bar(x::AbstractVector, p::AbstractMatrix) begin
+        size = size(x)
+        eltype = promote_type(eltype(x), eltype(p))
+    end
+
+    @test isequal(substitute(bar(x, p), x => ones(3)), bar(ones(3), p))
+    @test isequal(substitute(bar(x, p), Dict(x => ones(3), p => ones(3, 3))), wrap(3ones(3)))
+    @test isequal(substitute(bar(x, p), [x => ones(3), p => ones(3, 3)]), wrap(3ones(3)))
+end
+
 @testset "Partial array substitution" begin
     @variables x[1:3] A[1:2, 1:2, 1:2]
 
