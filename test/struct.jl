@@ -10,8 +10,8 @@ S = symstruct(Jörgen)
 @variables x::S
 xa = Symbolics.unwrap(symbolic_getproperty(x, :a))
 @test Symbolics.symtype(xa) == Int
-@test Symbolics.operation(xa) == getfield
-@test isequal(Symbolics.arguments(xa), [Symbolics.unwrap(x), Meta.quot(:a)])
+@test Symbolics.operation(xa) == Symbolics.typed_getfield
+@test isequal(Symbolics.arguments(xa), [Symbolics.unwrap(x), Val{:a}()])
 xa = Symbolics.unwrap(symbolic_setproperty!(x, :a, 10))
 @test Symbolics.operation(xa) == setfield!
 @test isequal(Symbolics.arguments(xa), [Symbolics.unwrap(x), Meta.quot(:a), 10])
