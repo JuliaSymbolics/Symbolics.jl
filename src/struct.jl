@@ -67,8 +67,6 @@ function SymbolicUtils.promote_symtype(::typeof(typed_getfield), ::Type{<:Struct
     FT
 end
 
-
-SymbolicUtils.promote_symtype(::typeof(setfield!), ::Type{<:Struct}, _, ::Type{T}) where T = T
 function SymbolicUtils.promote_symtype(s::Type{<:Struct{T}}, _...) where T
     s
 end
