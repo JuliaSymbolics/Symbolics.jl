@@ -12,6 +12,23 @@ not the replacements.
 Set `fixpoint = true` to repeatedly apply rules until no
 change to the expression remains to be made.
 """
+function Base.replace(expr::Num, r::Pair, rules::Pair...)
+    _replace(unwrap(expr), r, rules...)
+end
+
+# Fix ambiguity
+function Base.replace(expr::Num, rules...)
+    _replace(unwrap(expr), rules...)
+end
+
+function Base.replace(expr::Symbolic, rules...)
+    _replace(unwrap(expr), rules...)
+end
+
+function Base.replace(expr::Symbolic, r::Pair, rules::Pair...)
+    _replace(expr, r, rules...)
+end
+
 function _replace(expr::Symbolic, rules...; fixpoint=false)
     rs = map(r -> r isa Pair ? (x -> isequal(x, r[1]) ? r[2] : nothing) : r, rules)
     R = Prewalk(Chain(rs))
@@ -20,18 +37,6 @@ function _replace(expr::Symbolic, rules...; fixpoint=false)
     else
         R(expr)
     end
-end
-# Fix ambiguity
-function Base.replace(expr::Num, r::Pair, rules::Pair...)
-    _replace(unwrap(expr), r, rules...)
-end
-
-function Base.replace(expr::Num, rules...)
-    _replace(unwrap(expr), rules...)
-end
-
-function Base.replace(expr::Symbolic, r, rules...)
-    _replace(expr, r, rules)
 end
 
 """
@@ -53,16 +58,16 @@ D = Differential(t)
 Symbolics.occursin(Symbolics.is_derivative, X + D(X) + D(X^2)) # returns `true`.
 ```
 """
-Base.occursin(x::Num, y::Num) = occursin(unwrap(x), unwrap(y))
-@wrapped function Base.occursin(r::Any, y::Real)
+function Base.occursin(r::Function, y::Union{Num, Symbolic})
     _occursin(r, y)
 end
 
+Base.occursin(r::Num, y::Num) = occursin(unwrap(r), unwrap(y))
+Base.occursin(r::Num, y::Symbolic) = occursin(unwrap(r), unwrap(y))
+
 function _occursin(r, y)
     y = unwrap(y)
-    if isequal(r, y)
-        return true
-    elseif r isa Function
+    if r isa Function
         if r(y)
             return true
         end
@@ -124,7 +129,6 @@ returns `[Differential(t)(X(t)^2), Differential(t)(X(t))]`
 filterchildren(r, y) = filterchildren!(r, y, [])
 
 module RewriteHelpers
-import Symbolics: is_derivative, filterchildren, unwrap
-export replace, occursin, is_derivative,
-       filterchildren, unwrap
+import Symbolics: filterchildren, unwrap
+export replace, occursin, filterchildren, unwrap
 end

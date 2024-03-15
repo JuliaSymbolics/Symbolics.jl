@@ -97,7 +97,7 @@ using DiffRules, SpecialFunctions, NaNMath
 
 using SparseArrays
 
-export Differential, expand_derivatives
+export Differential, expand_derivatives, is_derivative
 
 include("diff.jl")
 
