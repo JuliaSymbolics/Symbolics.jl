@@ -81,6 +81,28 @@ function _occursin(r, y)
     end
 end
 
+"""
+filterchildren(c, x)
+Returns all parts of `x` that fufills the condition given in c. c can be a function or an expression.
+If it is a function, returns everything for which the function is `true`. If c is an expression, returns
+all expressions that matches it.
+
+Examples:
+```julia
+@syms x
+Symbolics.filterchildren(x, log(x) + x + 1)
+```
+returns `[x, x]`
+
+```julia
+@variables t X(t)
+D = Differential(t)
+Symbolics.filterchildren(Symbolics.is_derivative, X + D(X) + D(X^2))
+```
+returns `[Differential(t)(X(t)^2), Differential(t)(X(t))]`
+"""
+filterchildren(r, y) = filterchildren!(r, y, [])
+
 function filterchildren!(r::Any, y, acc)
     y = unwrap(y)
     r = unwrap(r)
@@ -105,28 +127,6 @@ function filterchildren!(r::Any, y, acc)
         return acc
     end
 end
-
-"""
-filterchildren(c, x)
-Returns all parts of `x` that fufills the condition given in c. c can be a function or an expression.
-If it is a function, returns everything for which the function is `true`. If c is an expression, returns
-all expressions that matches it.
-
-Examples:
-```julia
-@syms x
-Symbolics.filterchildren(x, log(x) + x + 1)
-```
-returns `[x, x]`
-
-```julia
-@variables t X(t)
-D = Differential(t)
-Symbolics.filterchildren(Symbolics.is_derivative, X + D(X) + D(X^2))
-```
-returns `[Differential(t)(X(t)^2), Differential(t)(X(t))]`
-"""
-filterchildren(r, y) = filterchildren!(r, y, [])
 
 module RewriteHelpers
 import Symbolics: filterchildren, unwrap
