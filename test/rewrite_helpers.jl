@@ -8,6 +8,8 @@ using Test
 D = Differential(t)
 my_f(x, y) = x^3 + 2y
 
+occursin(x -> true, a+b)
+
 # Check replace function.
 let
     @test isequal(replace(X + X + X, X =>1), 3)
