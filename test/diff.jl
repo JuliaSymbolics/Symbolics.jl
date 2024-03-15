@@ -355,6 +355,7 @@ let
     @variables t X(t) Y(t)
     @syms a b
     D = Differential(t)
+    my_f(x, y) = x^3 + 2y
 
     # Single expressions.
     @test !Symbolics.is_derivative(Symbolics.unwrap(D))
