@@ -32,7 +32,11 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x
-    Differential(x) = new(value(x))
+    function Differential(x)
+        vx = value(x)
+        istree(vx) && throw(ArgumentError("Cannot differentiate with respect to $vx"))
+        new(vx)
+    end
 end
 function (D::Differential)(x)
     x = unwrap(x)

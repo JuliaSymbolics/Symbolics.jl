@@ -348,3 +348,14 @@ let
     @test isequal(expand_derivatives(Differential(t)(im*t)), im)
     @test isequal(expand_derivatives(Differential(t)(t^2 + im*t)), 2t + im)
 end
+
+#1077
+#
+let
+    using Symbolics
+    @variables x
+    @test Symbolics.derivative(2x, x) == 2
+    @test_throws ArgumentError Symbolics.derivative(x, 2x)
+    @test_throws ArgumentError Symbolics.derivative(2x, 2x) # though arguably this should be 1
+    @test_throws ArgumentError Symbolics.derivative(x, 0)
+end
