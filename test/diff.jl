@@ -348,3 +348,26 @@ let
     @test isequal(expand_derivatives(Differential(t)(im*t)), im)
     @test isequal(expand_derivatives(Differential(t)(t^2 + im*t)), 2t + im)
 end
+
+
+# Check `is_derivative` function
+let
+    @variables t X(t) Y(t)
+    @syms a b
+    D = Differential(t)
+    my_f(x, y) = x^3 + 2y
+
+    # Single expressions.
+    @test !Symbolics.is_derivative(Symbolics.unwrap(D))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(t))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(X))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(a))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(1))
+
+    # Composite expressions.
+    @test Symbolics.is_derivative(Symbolics.unwrap(D(X)))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(D(X) + 3))
+    @test Symbolics.is_derivative(Symbolics.unwrap(D(X + 2a*Y)))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(D(X) + D(Y)))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(my_f(X, D(Y))))
+end
