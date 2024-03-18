@@ -73,6 +73,15 @@ end
     @test getmetadata(unwrap(v[1]), TestMetaT) == 4
 end
 
+@testset "similarterm" begin
+    @variables A[1:5, 1:5] B[1:5, 1:5]
+
+    T = unwrap(3A)
+    @test isequal(T, similarterm(T, operation(T), arguments(T)))
+    T2 = unwrap(3B)
+    @test isequal(T2, similarterm(T, operation(T), [*, 3, unwrap(B)]))
+end
+
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
     @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x(t)[1:4] u[1:1]

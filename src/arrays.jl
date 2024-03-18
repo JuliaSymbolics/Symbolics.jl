@@ -62,6 +62,34 @@ end
 
 ConstructionBase.constructorof(s::Type{<:ArrayOp{T}}) where {T} = ArrayOp{T}
 
+function SymbolicUtils.similarterm(t::ArrayOp, f, args, _symtype = nothing; metadata = nothing)
+    oldargs = arguments(t)
+    if _symtype === nothing
+        _symtype = symtype(t)
+    end
+
+    if !all(isequal.(args, oldargs)) || !isequal(f, operation(t))
+        term = similarterm(t.term, f, args)
+        subs = Dict()
+        for (orig, new) in zip(oldargs, args)
+            isequal(orig, new) && continue
+            subs[orig] = new
+        end
+        if !isequal(f, operation(t))
+            subs[operation(t)] = f
+        end
+        expr = substitute(t.expr, subs)
+        expr = SymbolicUtils.term(operation(expr), arguments(expr)...)
+    else
+        term = t.term
+        expr = t.expr
+    end
+    if _symtype === nothing
+        _symtype = symtype(t)
+    end
+    return ArrayOp{_symtype}(t.output_idx, expr, t.reduce, term, t.shape, t.ranges, metadata)
+end
+
 shape(aop::ArrayOp) = aop.shape
 
 const show_arrayop = Ref{Bool}(false)
