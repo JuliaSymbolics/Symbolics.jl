@@ -37,6 +37,8 @@ using PrecompileTools
     using MacroTools
 
     using SymbolicIndexingInterface
+
+    import SymbolicLimits
 end
 @reexport using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
@@ -148,6 +150,9 @@ export parse_expr_to_symbolic
 include("error_hints.jl")
 include("struct.jl")
 include("operators.jl")
+
+include("limits.jl")
+export limit
 
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
