@@ -50,6 +50,7 @@ makedocs(
             "manual/sparsity_detection.md",
             "manual/types.md",
             "manual/faq.md"
+            "manual/limits.md"
         ],
         "Comparison Against SymPy" => "comparison.md",
     ]

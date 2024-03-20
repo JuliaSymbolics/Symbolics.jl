@@ -11,7 +11,7 @@ thrown. Side defaults to `:both` for finite `h`, `:left` for `h = Inf`, and `:ri
 `expr` must be compoesed of `log`, `exp`, constants, and the rational opperators `+`, `-`,
 `*`, and `/`. This limitation may eventually be relaxed.
 
-!!! Warning
+!!! warning
     Because symbolic limit computation is undecidable, this function necessarily employs
     heuristics and may occasionally return wrong answers. Nevertheless, please report wrong
     answers as issues as we aim to have heuristics that produce correct answers in all
