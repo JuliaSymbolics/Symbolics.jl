@@ -43,5 +43,5 @@ e = x*y^2 + 2x + y^3*x^3
 
 # issue #1098
 @test isequal(coeff(x^2 + 1, x^0), 1)
-@test isequal(coeff(e, x^0), 4)
-@test isequal(coeff(a, x^0), a)
+@test isequal(coeff(e, x^0), 0)
+@test isequal(coeff(a*x + 3, x^0), 3)
