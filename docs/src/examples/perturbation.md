@@ -37,7 +37,7 @@ end
 
 In this code, `Symbolics.derivative(eq, x)` does exactly what it names implies: it calculates the symbolic derivative of `eq` (a **Symbolics.jl** expression) with respect to `x` (a **Symbolics.jl** variable). We use `Symbolics.substitute(eq, D)` to evaluate the update formula by substituting variables or sub-expressions (defined in a dictionary `D`) in `eq`. It should be noted that `substitute` is the workhorse of our code and will be used multiple times in the rest of these tutorials. `solve_newton` is written with simplicity and clarity in mind, and not performance.
 
-Let's go back to our quintic. We can define a Symbolics variable as `@variables x` and then solve the equation `solve_newton(x^5 + x - 1, x, 1.0)` (here, `x₀ = 0` is our first guess). The answer is 0.7549. Now, let's see how we can solve the same problem using the perturbation methods.
+Let's go back to our quintic. We can define a Symbolics variable as `@variables x` and then solve the equation `solve_newton(x^5 + x - 1, x, 1.0)` (here, `x₀ = 1.0` is our first guess). The answer is 0.7549. Now, let's see how we can solve the same problem using the perturbation methods.
 
 We introduce a tuning parameter $\epsilon$ into our equation: $x^5 + \epsilon x = 1$. If $\epsilon = 1$, we get our original problem. For $\epsilon = 0$, the problem transforms to an easy one: $x^5 = 1$ which has an exact real solution $x = 1$ (and four complex solutions which we ignore here). We expand $x$ as a power series on $\epsilon$:
 
@@ -54,7 +54,7 @@ $a_0$ is the solution of the easy equation, therefore $a_0 = 1$. Substituting in
 Expanding the equations, we get
 
 ```math
-  \epsilon (1 + 5 a_1) + \epsilon^2 (a_1 + 5 a_2 + 10 a1_2) + 𝑂(\epsilon^3) = 0
+  \epsilon (1 + 5 a_1) + \epsilon^2 (a_1 + 5 a_2 + 10 a_1^2) + 𝑂(\epsilon^3) = 0
 ```
 
 This equation should hold for each power of $\epsilon$. Therefore,
@@ -161,13 +161,13 @@ end
 Here, `eqs` is an array of expressions (assumed to be equal to 0) and `ps` is an array of variables. The result is a dictionary of *variable* => *value* pairs. We apply `solve_coef` to `eqs` to get the numerical values of the parameters:
 
 ```@example perturb
-solve_coef(eqs, a)
+vals = solve_coef(eqs, a)
 ```
 
 Finally, we substitute back the values of `a` in the definition of `x` as a function of `𝜀`. Note that `𝜀` is a number (usually Float64), whereas `ϵ` is a symbolic variable.
 
 ```@example perturb
-X = 𝜀 -> 1 + a[1]*𝜀 + a[2]*𝜀^2
+X = 𝜀 -> 1 + vals[a[1]]*𝜀 + vals[a[2]]*𝜀^2
 ```
 
 Therefore, the solution to our original problem becomes `X(1)`, which is equal to 0.76. We can use larger values of `n` to improve the accuracy of estimations.
