@@ -306,7 +306,7 @@ julia> Symbolics.coeff(x^2 + y, x^2)
 function coeff(p, sym=nothing)
     p, sym = value(p), value(sym)
     
-    if sym == 1
+    if isequal(sym, 1)
         sym = nothing
     end
 
