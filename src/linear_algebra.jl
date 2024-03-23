@@ -98,6 +98,15 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
     check && @assert islinear
+
+    for eqᵢ in eq
+        islinear &= Symbolics.isaffine(eqᵢ.lhs-eqᵢ.rhs, var)
+    end
+
+    if !islinear 
+        throw("solve_for is currently unable to solve non-linear equations.")
+    end
+
     islinear || return nothing
     # a * x + b = 0
     if eq isa AbstractArray && var isa AbstractArray
