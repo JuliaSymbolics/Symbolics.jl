@@ -67,9 +67,9 @@ version = "7.9.0"
 
 [[deps.ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "2aeaeaff72cdedaa0b5f30dfb8c1f16aefdac65d"
+git-tree-sha1 = "6404a564c24a994814106c374bec893195e19bac"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "1.7.0"
+version = "1.8.0"
 weakdeps = ["SparseArrays"]
 
     [deps.ArrayLayouts.extensions]
@@ -552,9 +552,9 @@ version = "0.73.3+0"
 
 [[deps.GenericSchur]]
 deps = ["LinearAlgebra", "Printf"]
-git-tree-sha1 = "fb69b2a645fa69ba5f474af09221b9308b160ce6"
+git-tree-sha1 = "af49a0851f8113fcfae2ef5027c6d49d0acec39b"
 uuid = "c145ed77-6b09-5dd9-b285-bf645a82121e"
-version = "0.5.3"
+version = "0.5.4"
 
 [[deps.Gettext_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "XML2_jll"]
@@ -1042,9 +1042,9 @@ version = "1.2.0"
 
 [[deps.NonlinearSolve]]
 deps = ["ADTypes", "ArrayInterface", "ConcreteStructs", "DiffEqBase", "FastBroadcast", "FastClosures", "FiniteDiff", "ForwardDiff", "LazyArrays", "LineSearches", "LinearAlgebra", "LinearSolve", "MaybeInplace", "PrecompileTools", "Preferences", "Printf", "RecursiveArrayTools", "Reexport", "SciMLBase", "SimpleNonlinearSolve", "SparseArrays", "SparseDiffTools", "StaticArraysCore", "TimerOutputs"]
-git-tree-sha1 = "d52bac2b94358b4b960cbfb896d5193d67f3ff09"
+git-tree-sha1 = "13232c70f50a05f98c7206190ab33dd48fa39c5b"
 uuid = "8913a72c-1f9b-4ce2-8d82-65094dcecaec"
-version = "3.8.0"
+version = "3.8.1"
 
     [deps.NonlinearSolve.extensions]
     NonlinearSolveBandedMatricesExt = "BandedMatrices"
@@ -1373,9 +1373,9 @@ version = "0.6.42"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
-git-tree-sha1 = "48f724c6a3355f11dae5f762983073d367c8b934"
+git-tree-sha1 = "3daaea955c0905200943175637f184a968574a2d"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.30.1"
+version = "2.30.3"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -1680,9 +1680,9 @@ uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 version = "0.5.23"
 
 [[deps.TranscodingStreams]]
-git-tree-sha1 = "a09c933bebed12501890d8e92946bbab6a1690f1"
+git-tree-sha1 = "14389d51751169994b2e1317d5c72f7dc4f21045"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.10.5"
+version = "0.10.6"
 weakdeps = ["Random", "Test"]
 
     [deps.TranscodingStreams.extensions]
