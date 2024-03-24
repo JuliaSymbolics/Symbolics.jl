@@ -39,3 +39,9 @@ e = x*y^2 + 2x + y^3*x^3
 @test isequal(coeff(expand(((x + 1)^4 + x)^3), x^2), 93)
 @test isequal(coeff(simplify((x^2 - 1) / (x - 1)), x), 1)
 @test isequal(coeff(expand((x^(1//2) + y^0.5)^2), x), 1)
+
+
+# issue #1098
+@test isequal(coeff(x^2 + 1, x^0), 1)
+@test isequal(coeff(e, x^0), 0)
+@test isequal(coeff(a*x + 3, x^0), 3)

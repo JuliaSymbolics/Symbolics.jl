@@ -305,6 +305,11 @@ julia> Symbolics.coeff(x^2 + y, x^2)
 """
 function coeff(p, sym=nothing)
     p, sym = value(p), value(sym)
+    
+    if isequal(sym, 1)
+        sym = nothing
+    end
+
     if issym(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif ispow(p)
