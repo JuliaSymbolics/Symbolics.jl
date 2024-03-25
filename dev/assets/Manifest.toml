@@ -1601,9 +1601,9 @@ version = "7.2.1+1"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["ArrayInterface", "MacroTools", "RuntimeGeneratedFunctions", "StaticArraysCore"]
-git-tree-sha1 = "1abfc18e1d53612c403ffc0e7d61593e70a68a20"
+git-tree-sha1 = "dd94edee1542e9da422cb2f12494ef09ea823e48"
 uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-version = "0.3.12"
+version = "0.3.13"
 
 [[deps.SymbolicLimits]]
 deps = ["SymbolicUtils"]
@@ -1621,7 +1621,7 @@ version = "1.5.1"
 deps = ["ArrayInterface", "Bijections", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "ForwardDiff", "IfElse", "LaTeXStrings", "LambertW", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "PrecompileTools", "RecipesBase", "Reexport", "Requires", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils"]
 path = "/home/runner/work/Symbolics.jl/Symbolics.jl"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "5.25.2"
+version = "5.26.0"
 
     [deps.Symbolics.extensions]
     SymbolicsGroebnerExt = "Groebner"
