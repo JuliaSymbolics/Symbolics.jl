@@ -414,6 +414,17 @@ function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symboli
     fixpoint_sub(ex, d; kwargs...)
 end
 
+"""
+    fixpoint_sub(expr, dict; operator = Nothing)
+
+Given a symbolic expression, equation or inequality `expr` perform the substitutions in
+`dict` recursively until the expression does not change. Substitutions that depend on one
+another will thus be recursively expanded. For example,
+`fixpoint_sub(x, Dict(x => y, y => 3))` will return `3`. The `operator` keyword can be
+specified to prevent substitution of expressions inside operators of the given type.
+
+See also: [`fast_substitute`](@ref).
+"""
 function fixpoint_sub(x, dict; operator = Nothing)
     y = fast_substitute(x, dict; operator)
     while !isequal(x, y)
@@ -425,6 +436,16 @@ function fixpoint_sub(x, dict; operator = Nothing)
 end
 
 const Eq = Union{Equation, Inequality}
+"""
+    fast_substitute(expr, dict; operator = Nothing)
+
+Given a symbolic expression, equation or inequality `expr` perform the substitutions in
+`dict`. This only performs the substitutions once. For example,
+`fast_substitute(x, Dict(x => y, y => 3))` will return `y`. The `operator` keyword can be
+specified to prevent substitution of expressions inside operators of the given type.
+
+See also: [`fixpoint_sub`](@ref).
+"""
 function fast_substitute(eq::Eq, subs; operator = Nothing)
     if eq isa Inequality
         Inequality(fast_substitute(eq.lhs, subs; operator),
