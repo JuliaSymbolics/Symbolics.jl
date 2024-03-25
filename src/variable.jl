@@ -410,6 +410,119 @@ end
 
 SymbolicIndexingInterface.getname(x, val=_fail) = _getname(unwrap(x), val)
 
+function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symbolic, Equation, Inequality}, d::Dict; kwargs...)
+    fixpoint_sub(ex, d; kwargs...)
+end
+
+"""
+    fixpoint_sub(expr, dict; operator = Nothing)
+
+Given a symbolic expression, equation or inequality `expr` perform the substitutions in
+`dict` recursively until the expression does not change. Substitutions that depend on one
+another will thus be recursively expanded. For example,
+`fixpoint_sub(x, Dict(x => y, y => 3))` will return `3`. The `operator` keyword can be
+specified to prevent substitution of expressions inside operators of the given type.
+
+See also: [`fast_substitute`](@ref).
+"""
+function fixpoint_sub(x, dict; operator = Nothing)
+    y = fast_substitute(x, dict; operator)
+    while !isequal(x, y)
+        y = x
+        x = fast_substitute(y, dict; operator)
+    end
+
+    return x
+end
+
+const Eq = Union{Equation, Inequality}
+"""
+    fast_substitute(expr, dict; operator = Nothing)
+
+Given a symbolic expression, equation or inequality `expr` perform the substitutions in
+`dict`. This only performs the substitutions once. For example,
+`fast_substitute(x, Dict(x => y, y => 3))` will return `y`. The `operator` keyword can be
+specified to prevent substitution of expressions inside operators of the given type.
+
+See also: [`fixpoint_sub`](@ref).
+"""
+function fast_substitute(eq::Eq, subs; operator = Nothing)
+    if eq isa Inequality
+        Inequality(fast_substitute(eq.lhs, subs; operator),
+            fast_substitute(eq.rhs, subs; operator),
+            eq.relational_op)
+    else
+        Equation(fast_substitute(eq.lhs, subs; operator),
+            fast_substitute(eq.rhs, subs; operator))
+    end
+end
+function fast_substitute(eq::T, subs::Pair; operator = Nothing) where {T <: Eq}
+    T(fast_substitute(eq.lhs, subs; operator), fast_substitute(eq.rhs, subs; operator))
+end
+function fast_substitute(eqs::AbstractArray, subs; operator = Nothing)
+    fast_substitute.(eqs, (subs,); operator)
+end
+function fast_substitute(eqs::AbstractArray, subs::Pair; operator = Nothing)
+    fast_substitute.(eqs, (subs,); operator)
+end
+for (exprType, subsType) in Iterators.product((Num, Symbolics.Arr), (Any, Pair))
+    @eval function fast_substitute(expr::$exprType, subs::$subsType; operator = Nothing)
+        fast_substitute(value(expr), subs; operator)
+    end
+end
+function fast_substitute(expr, subs; operator = Nothing)
+    if (_val = get(subs, expr, nothing)) !== nothing
+        return _val
+    end
+    istree(expr) || return expr
+    op = fast_substitute(operation(expr), subs; operator)
+    args = SymbolicUtils.unsorted_arguments(expr)
+    if !(op isa operator)
+        canfold = Ref(!(op isa Symbolic))
+        args = let canfold = canfold
+            map(args) do x
+                x′ = fast_substitute(x, subs; operator)
+                canfold[] = canfold[] && !(x′ isa Symbolic)
+                x′
+            end
+        end
+        canfold[] && return op(args...)
+    end
+    similarterm(expr,
+        op,
+        args,
+        symtype(expr);
+        metadata = metadata(expr))
+end
+function fast_substitute(expr, pair::Pair; operator = Nothing)
+    a, b = pair
+    isequal(expr, a) && return b
+    if a isa AbstractArray
+        for (ai, bi) in zip(a, b)
+            expr = fast_substitute(expr, ai => bi; operator)
+        end
+    end
+    istree(expr) || return expr
+    op = fast_substitute(operation(expr), pair; operator)
+    args = SymbolicUtils.unsorted_arguments(expr)
+    if !(op isa operator)
+        canfold = Ref(!(op isa Symbolic))
+        args = let canfold = canfold
+            map(args) do x
+                x′ = fast_substitute(x, pair; operator)
+                canfold[] = canfold[] && !(x′ isa Symbolic)
+                x′
+            end
+        end
+        canfold[] && return op(args...)
+    end
+    similarterm(expr,
+        op,
+        args,
+        symtype(expr);
+        metadata = metadata(expr))
+end
+
 function getparent(x, val=_fail)
     maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
     if maybe_parent !== nothing

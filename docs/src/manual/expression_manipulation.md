@@ -31,4 +31,6 @@ Symbolics.coeff
 Symbolics.replace
 Symbolics.occursin
 Symbolics.filterchildren
+Symbolics.fixpoint_sub
+Symbolics.fast_substitute
 ```

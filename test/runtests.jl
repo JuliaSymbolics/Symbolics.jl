@@ -63,6 +63,9 @@ if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
     @safetestset "SymbolicIndexingInterface Parameter Indexing Test" begin
         include("symbolic_indexing_interface_parameter_indexing.jl")
     end
+    @safetestset "SymbolicIndexingInterface Symbolic Evaluate Test" begin
+        include("symbolic_indexing_interface_symbolic_evaluate.jl")
+    end
 end
 
 if GROUP == "Downstream"
