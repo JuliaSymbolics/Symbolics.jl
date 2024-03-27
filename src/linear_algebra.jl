@@ -107,10 +107,6 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
         islinear &= Symbolics.isaffine(eq.lhs-eq.rhs, [var])
     end
 
-    if !islinear 
-        throw("solve_for is currently unable to solve non-linear equations.")
-    end
-
     islinear || return nothing
     # a * x + b = 0
     if eq isa AbstractArray && var isa AbstractArray
