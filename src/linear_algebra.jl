@@ -101,13 +101,19 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
 
     if eq isa AbstractArray
         for eqᵢ in eq
-            islinear &= Symbolics.isaffine(eqᵢ.lhs-eqᵢ.rhs, var)
+            try
+                islinear &= Symbolics.isaffine(eqᵢ.lhs-eqᵢ.rhs, var)
+            catch e
+            end
         end
     else
-        islinear &= Symbolics.isaffine(eq.lhs-eq.rhs, [var])
+        try
+            islinear &= Symbolics.isaffine(eq.lhs-eq.rhs, [var])
+        catch e
+        end
     end
 
-    islinear || return nothing
+    if !islinear return nothing end
     # a * x + b = 0
     if eq isa AbstractArray && var isa AbstractArray
         x = _solve(a, -b, simplify)
