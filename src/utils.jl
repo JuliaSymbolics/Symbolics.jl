@@ -83,10 +83,11 @@ Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x) -> Symbolic
+    diff2term(x, x_metadata::Dict{Datatype, Any}) -> Symbolic
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
+Any upstream metadata can be passed via `x_metadata`
 
 ```julia
 julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
@@ -98,7 +99,7 @@ julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
 var"z(t)[1]ˍt"
 ```
 """
-function diff2term(O)
+function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothing)
     istree(O) || return O
     if is_derivative(O)
         ds = ""
@@ -112,7 +113,8 @@ function diff2term(O)
     d_separator = 'ˍ'
 
     if ds === nothing
-        return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata=metadata(O))
+        return similarterm(O, operation(O), map(diff2term, arguments(O)), metadata = O_metadata isa Nothing ?
+            metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...))
     else
         oldop = operation(O)
         if issym(oldop)
@@ -126,7 +128,8 @@ function diff2term(O)
             return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
         end
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata=metadata(O)), newname)
+        return setname(similarterm(O, rename(oldop, newname), arguments(O), metadata = O_metadata isa Nothing ?
+            metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...)), newname)
     end
 end
 
@@ -305,7 +308,7 @@ julia> Symbolics.coeff(x^2 + y, x^2)
 """
 function coeff(p, sym=nothing)
     p, sym = value(p), value(sym)
-    
+
     if isequal(sym, 1)
         sym = nothing
     end
