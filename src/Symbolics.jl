@@ -87,7 +87,7 @@ include("utils.jl")
 using ConstructionBase
 include("arrays.jl")
 
-export @register, @register_symbolic, @register_array_symbolic
+export @register_symbolic, @register_array_symbolic
 include("register.jl")
 
 export @variables, Variable
