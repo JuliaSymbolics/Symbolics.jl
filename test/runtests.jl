@@ -68,7 +68,8 @@ if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
     end
 end
 
-if GROUP == "Downstream"
+if GROUP == "All" || GROUP == "Downstream"
     activate_downstream_env()
     #@time @safetestset "ParameterizedFunctions MATLABDiffEq Regression Test" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
+    @safetestset "ModelingToolkit Variable Utils Test" begin include("downstream/modeling_toolkit_utils.jl") end
 end
