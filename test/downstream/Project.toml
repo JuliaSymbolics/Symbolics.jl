@@ -7,3 +7,4 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [compat]
 ModelingToolkit = "8.33, 9"
 ParameterizedFunctions = "5.15"
+Symbolics = "5"
