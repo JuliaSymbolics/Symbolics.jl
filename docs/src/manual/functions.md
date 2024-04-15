@@ -1,5 +1,22 @@
 # [Function Registration and Tracing](@id function_registration)
 
+Function registration is the ability to define new nodes in the symbolic
+graph. This is useful because symbolic computing is declarative, i.e.
+symbolic computations express *what* should be computed, not *how* it
+should be computed. However, at some level someone must describe
+how a given operation is computed. These are the primitive functions,
+and a symbolic expression is made up of primitive functions.
+
+Symbolics.jl comes pre-registered with a large set of standard mathematical
+functions, like `*` and `sin` to special functions like `erf`, and even
+deeper operations like DataInterpolations.jl's `AbstractInterpolation`.
+However, in many cases you may need to add your own function, i.e. you
+may want to give an imperative code and use this to define a new symbolic
+code. Symbolics.jl calls the declaration of new declarative primitives
+from an imperative function definition **registration**. This page
+describes both the registration process and its companion process,
+tracing, for interacting with code written in Julia.
+
 ## Direct Tracing
 
 Because Symbolics expressions respect Julia semantics, one way
@@ -31,6 +48,37 @@ lorenz(du,u,p,t)
 du
 ```
 
+Note that what has been done here is that the imperative Julia code
+for the function `lorenz` has been transformed into a declarative
+symbolic graph. Importantly, the code of `lorenz` is transformed
+into an expression consisting only of primitive registered fucntions,
+things like `*` and `-`, which come pre-registered with Symbolics.jl
+This then allows for symbolic manipulation of the expressions, 
+allowing things like simplification and operation
+reordering done on its generated expressions. 
+
+### Utility and Scope of Tracing
+
+This notably describes one limitation of tracing: tracing only 
+works if the expression being traced is composed of already 
+registered functions. If unregistered functions, such as calls
+to C code, are used, then the tracing process will error.
+
+However, we note that symbolic tracing by definition does not 
+guarantee that the exact choices. The symbolic expressions
+may re-distribute the arithmatic, simplify out expressions, or
+do other modifications. Thus if this function is function is
+sensitive to numerical details in its calculation, one would not
+want to trace the function and thus would instead register it
+as a new primitive function.
+
+For the symbolic system to be as powerful in its manipulations
+as possible, it is recommended that the registration of functions
+be minimized to the simplest possible set, and thus registration
+should only be used when necessary. This is because any code within
+a registered function is treated as a blackbox imperative code that
+cannot be manipulated, thus decreasing the potential for simplifications.
+
 ## Registering Functions
 
 The Symbolics graph only allows registered Julia functions within its type.
@@ -45,7 +93,7 @@ Additionally, [`@register_array_symbolic`](@ref) can be used to define array fun
 For size propagation it's required that a computation of how the sizes are computed is
 also supplied.
 
-## Defining Derivatives of Registered Functions
+### Defining Derivatives of Registered Functions
 
 In order for symbolic differentiation to work, an overload of `Symbolics.derivative` is
 required. The syntax is `derivative(typeof(f), args::NTuple{i,Any}, ::Val{j})` where
@@ -66,7 +114,7 @@ is the partial derivative of the Julia `min(x,y)` function with respect to `x`.
     is required in the derivative expression is defined. Note that you only need to define
     the partial derivatives which are actually computed.
 
-## Registration of Array Functions
+### Registration of Array Functions
 
 Similar to scalar functions, array functions can be registered to define new primitives for
 functions which either take in or return arrays. This is done by using the `@register_array_symbolic`
