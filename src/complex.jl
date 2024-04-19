@@ -7,7 +7,7 @@ struct ComplexTerm{T} <: AbstractComplexTerm{T}
 end
 
 Base.imag(c::Symbolic{Complex{T}}) where {T} = term(imag, c)
-SymbolicUtils.promote_type(::typeof(imag), ::Type{Complex{T}}) where {T} = T
+SymbolicUtils.promote_symtype(::typeof(imag), ::Type{Complex{T}}) where {T} = T
 Base.promote_rule(::Type{Complex{T}}, ::Type{S}) where {T<:Real, S<:Num} =  Complex{S} # 283
 
 has_symwrapper(::Type{<:Complex{T}}) where {T<:Real} = true
