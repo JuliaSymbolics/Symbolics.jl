@@ -257,6 +257,6 @@ using Symbolics: scalarize
 @variables X[1:3, 1:3] x
 sX = fill(x, 3, 3)
 sx = fill(x, 3)
-@test isequal(scalarize(X + XX), scalarize(X) + XX)
-@test isequal(scalarize(X * XX), scalarize(X) * XX)
+@test isequal(scalarize(X + sX), scalarize(X) + sX)
+@test isequal(scalarize(X * sX), scalarize(X) * sX)
 @test isequal(scalarize(X * sx), scalarize(X) * sx)
