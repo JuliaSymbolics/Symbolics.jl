@@ -151,11 +151,21 @@ end
 """
 $(SIGNATURES)
 
-TODO
+Expands derivatives within a symbolic expression `O`.
+
+This function recursively traverses a symbolic expression, applying the chain rule
+and other derivative rules to expand any derivatives it encounters. 
+
+# Arguments
+- `O::Symbolic`: The symbolic expression to expand.
+- `simplify::Bool=false`: Whether to simplify the resulting expression using 
+    [`SymbolicUtils.simplify`](@ref).
+- `occurrences=nothing`: Information about the occurrences of the independent 
+    variable in the argument of the derivative. This is used internally for 
+    optimization purposes.
 
 # Examples
 ```jldoctest
-
 julia> @variables x y z k;
 
 julia> f=k*(abs(x-y)/y-z)^2
@@ -283,19 +293,17 @@ function expand_derivatives(O::Symbolic, simplify=false; occurrences=nothing)
         return simplify ? SymbolicUtils.simplify(O1) : O1
     end
 end
-
 function expand_derivatives(n::Num, simplify=false; occurrences=nothing)
     wrap(expand_derivatives(value(n), simplify; occurrences=occurrences))
 end
-
 function expand_derivatives(n::Complex{Num}, simplify=false; occurrences=nothing)
     wrap(ComplexTerm{Real}(expand_derivatives(real(n), simplify; occurrences=occurrences),
                            expand_derivatives(imag(n), simplify; occurrences=occurrences)))
 end
+expand_derivatives(x, simplify=false; occurrences=nothing) = x
+
 _iszero(x) = false
 _isone(x) = false
-
-expand_derivatives(x, simplify=false;occurrences=nothing) = x
 
 # Don't specialize on the function here
 """
