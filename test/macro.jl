@@ -1,6 +1,6 @@
 using Symbolics
 import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
-import SymbolicUtils: Term, symtype, FnType, BasicSymbolic
+import SymbolicUtils: Term, symtype, FnType, BasicSymbolic, promote_symtype
 using LinearAlgebra
 using Test
 
@@ -9,34 +9,57 @@ Symbolics.@register_symbolic fff(t)
 @test isequal(fff(t), Symbolics.Num(Symbolics.Term{Real}(fff, [Symbolics.value(t)])))
 
 const SymMatrix{T,N} =  Symmetric{T, AbstractArray{T, N}}
+many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5 p(..)[1:4]
+
+let
+    @register_array_symbolic ggg(x::AbstractVector) begin
+        container_type=SymMatrix
+        size=(length(x) * 2, length(x) * 2)
+        eltype=eltype(x)
+    end false
+
+    ## @variables
+
+    gg = ggg(x)
+
+    @test ndims(gg) == 2
+    @test size(gg) == (8,8)
+    @test eltype(gg) == Real
+    @test symtype(unwrap(gg)) == SymMatrix{Real, 2}
+    @test promote_symtype(ggg, symtype(unwrap(x))) == Any # no promote_symtype defined
+end
+let
+    # redefine with promote_symtype
+    @register_array_symbolic ggg(x::AbstractVector) begin
+        container_type=SymMatrix
+        size=(length(x) * 2, length(x) * 2)
+        eltype=eltype(x)
+    end
+    @test promote_symtype(ggg, symtype(unwrap(x))) == SymMatrix{Real}
+end
+
+# ndims specified
 @register_array_symbolic ggg(x::AbstractVector) begin
     container_type=SymMatrix
     size=(length(x) * 2, length(x) * 2)
     eltype=eltype(x)
+    ndims = 2
 end
-
-## @variables
-
-many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5 p(..)[1:4]
-
+@test promote_symtype(ggg, symtype(unwrap(x))) == SymMatrix{Real, 2}
 
 gg = ggg(x)
-
-@test ndims(gg) == 2
-@test size(gg) == (8,8)
-@test eltype(gg) == Real
-@test symtype(unwrap(gg)) == SymMatrix{Real, 2}
 
 struct CanCallWithArray{T}
     params::T
 end
 
+ccwa = CanCallWithArray((length=10,))
 @register_array_symbolic (c::CanCallWithArray)(x::AbstractArray, b::AbstractVector) begin
     size=(size(x, 1), length(b), c.params.length)
     eltype=Real
-end
+end false # without promote_symtype
 
-hh = CanCallWithArray((length=10,))(gg, x)
+hh = ccwa(gg, x)
 @test size(hh) == (8,4,10)
 @test eltype(hh) == Real
 @test isequal(arguments(unwrap(hh)), unwrap.([gg, x]))
@@ -52,8 +75,33 @@ hh = CanCallWithArray((length=10,))(gg, x)
 @test getdefaultval(z[3]) == 4
 
 @test symtype(p) <: FnType{Tuple, Array{Real,1}}
+@test promote_symtype(ccwa, symtype(unwrap(gg)), symtype(unwrap(x))) == Any
 @test p(t)[1] isa Symbolics.Num
 
+
+struct CanCallWithArray2{T}
+    params::T
+end
+
+ccwa = CanCallWithArray2((length=10,))
+@register_array_symbolic (c::CanCallWithArray2)(x::AbstractArray, b::AbstractVector) begin
+    size=(size(x, 1), length(b), c.params.length)
+    eltype=Real
+end
+@test promote_symtype(ccwa, symtype(unwrap(gg)), symtype(unwrap(x))) == AbstractArray{Real}
+
+struct CanCallWithArray3{T}
+    params::T
+end
+
+ccwa = CanCallWithArray3((length=10,))
+# ndims specified
+@register_array_symbolic (c::CanCallWithArray3)(x::AbstractArray, b::AbstractVector) begin
+    size=(size(x, 1), length(b), c.params.length)
+    eltype=Real
+    ndims = 3
+end
+@test promote_symtype(ccwa, symtype(unwrap(gg)), symtype(unwrap(x))) == AbstractArray{Real, 3}
 
 ## Wrapper types
 
