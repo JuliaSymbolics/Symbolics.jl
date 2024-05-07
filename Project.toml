@@ -4,6 +4,7 @@ authors = ["Shashi Gowda <gowda@mit.edu>"]
 version = "5.28.1"
 
 [deps]
+ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
 Bijections = "e2ed5e7c-b2de-5872-ae92-c73ca462fb04"
 ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
@@ -52,6 +53,7 @@ SymbolicsPreallocationToolsExt = "PreallocationTools"
 SymbolicsSymPyExt = "SymPy"
 
 [compat]
+ADTypes = "1.0"
 ArrayInterface = "7"
 Bijections = "0.1"
 ConstructionBase = "1.2"

@@ -39,6 +39,8 @@ using PrecompileTools
     using SymbolicIndexingInterface
 
     import SymbolicLimits
+
+    using ADTypes: ADTypes
 end
 @reexport using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
@@ -102,6 +104,10 @@ using SparseArrays
 export Differential, expand_derivatives, is_derivative
 
 include("diff.jl")
+
+export SymbolicsSparsityDetector
+
+include("adtypes.jl")
 
 export Difference, DiscreteUpdate
 
