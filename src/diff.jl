@@ -661,7 +661,7 @@ let
               end
           end
           @rule ~x::issym => 0]
-    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=basic_simterm))
+    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules, true); similarterm=basic_simterm))
 
     global hessian_sparsity
 
