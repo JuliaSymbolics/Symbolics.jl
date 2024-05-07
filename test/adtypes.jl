@@ -3,6 +3,7 @@ using ADTypes: ADTypes
 using Test
 
 detector = SymbolicsSparsityDetector()
+@test detector isa ADTypes.AbstractSparsityDetector
 
 f(x) = reshape(vcat(x[1], diff(vec(x))), size(x))
 f!(y, x) = copyto!(vec(y), vec(f(x)))
