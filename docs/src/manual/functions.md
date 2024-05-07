@@ -51,7 +51,7 @@ du
 Note that what has been done here is that the imperative Julia code
 for the function `lorenz` has been transformed into a declarative
 symbolic graph. Importantly, the code of `lorenz` is transformed
-into an expression consisting only of primitive registered fucntions,
+into an expression consisting only of primitive registered functions,
 things like `*` and `-`, which come pre-registered with Symbolics.jl
 This then allows for symbolic manipulation of the expressions, 
 allowing things like simplification and operation
@@ -66,7 +66,7 @@ to C code, are used, then the tracing process will error.
 
 However, we note that symbolic tracing by definition does not 
 guarantee that the exact choices. The symbolic expressions
-may re-distribute the arithmatic, simplify out expressions, or
+may re-distribute the arithmetic, simplify out expressions, or
 do other modifications. Thus if this function is function is
 sensitive to numerical details in its calculation, one would not
 want to trace the function and thus would instead register it
