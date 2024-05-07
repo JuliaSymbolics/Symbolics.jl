@@ -1,4 +1,4 @@
-using Symbolics: Symbolics, SymbolicsSparsityDetector
+using Symbolics
 using ADTypes: ADTypes
 using Test
 
