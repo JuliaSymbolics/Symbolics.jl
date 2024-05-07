@@ -9,6 +9,11 @@ import Symbolics: coeff
 @test isequal(coeff(2a, x), 0)
 @test isequal(coeff(a*x, x), a)
 @test isequal(coeff(2x*a, x), 2a)
+# Symbolic powers:
+@test isequal(coeff(a*x^b, x^b), a)
+@test isequal(coeff(a*x^(b+1), x^(b+1)), a)
+# Irrational powers:
+@test isequal(coeff(a*x^sqrt(2), x^sqrt(2)), a)
 
 @test isequal(coeff(a + x, x), 1)
 @test isequal(coeff(2(a + x), x), 2)
