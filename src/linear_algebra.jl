@@ -271,7 +271,7 @@ function _linear_expansion(t, x)
     expansion_check(op)
 
     if op === (+)
-        a₁ = b₁ = 0
+        a₁ = b₁ = 0//1
         islinear = true
         # (a₁ x + b₁) + (a₂ x + b₂) = (a₁ + a₂) x + (b₁ + b₂)
         for (i, arg) in enumerate(args)
@@ -287,8 +287,8 @@ function _linear_expansion(t, x)
         return (-a, -b, islinear)
     elseif op === (*)
         # (a₁ x + b₁) (a₂ x + b₂) = a₁ a₂ x² + (a₁ b₂ + a₂ b₁) x + b₁ b₂
-        a₁ = 0
-        b₁ = 1
+        a₁ = 0//1
+        b₁ = 1//1
         islinear = true
         for (i, arg) in enumerate(args)
             a₂, b₂, islinear = linear_expansion(arg, x)
