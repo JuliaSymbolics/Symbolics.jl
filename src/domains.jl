@@ -21,6 +21,6 @@ function infimum(d::AbstractInterval{<:Num})
     leftendpoint(d)
 end
 
-function supremum(d::AbstractInterval)
+function supremum(d::AbstractInterval{<:Num})
     rightendpoint(d)
 end
