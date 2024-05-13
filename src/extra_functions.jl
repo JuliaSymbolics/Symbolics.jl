@@ -4,7 +4,7 @@ function _binomial(nothing, n, k)
         args = [n, k]
         unwrapped_args = map(Symbolics.unwrap, args)
         res = if !(any((x->begin
-                                SymbolicUtils.issym(x) || SymbolicUtils.istree(x)
+                                SymbolicUtils.issym(x) || SymbolicUtils.iscall(x)
                             end), unwrapped_args))
                 Base.binomial(unwrapped_args...)
             else

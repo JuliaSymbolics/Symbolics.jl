@@ -11,7 +11,7 @@ using LambertW
             return !isinteger(expr) && expr != float(pi) && expr != exp(1.0)
         elseif expr isa Equation
             return hasFloat(expr.lhs) || hasFloat(expr.rhs)
-        elseif istree(expr)
+        elseif iscall(expr)
             elements = arguments(expr)
             for element in elements
                 if hasFloat(element)

@@ -160,7 +160,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
 
     N = length(shape(op))
     op = unwrap(op)
-    if op isa ArrayOp && istree(op.term)
+    if op isa ArrayOp && iscall(op.term)
         op_body = op.term
     else
         op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
@@ -221,7 +221,7 @@ Build function target: `JuliaTarget`
 
 ```julia
 function _build_function(target::JuliaTarget, rhss, args...;
-                         conv = toexpr, 
+                         conv = toexpr,
                          expression = Val{true},
                          checkbounds = false,
                          linenumbers = false,
@@ -584,13 +584,13 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
                        states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
-    if (issym(O) || issym(operation(O))) || (istree(O) && operation(O) == getindex)
+    if (issym(O) || issym(operation(O))) || (iscall(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
         if !isnothing(j)
             return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
-    if istree(O)
+    if iscall(O)
         if operation(O) === getindex
             args = arguments(O)
             Expr(:ref, toexpr(args[1], states), toexpr.(args[2:end] .+ offset, (states,))...)

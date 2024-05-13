@@ -3,7 +3,7 @@ prettify_expr(f::Function) = nameof(f)
 prettify_expr(expr::Expr) = Expr(expr.head, prettify_expr.(expr.args)...)
 
 function cleanup_exprs(ex)
-    return postwalk(x -> istree(x) && length(arguments(x)) == 0 ? operation(x) : x, ex)
+    return postwalk(x -> iscall(x) && length(arguments(x)) == 0 ? operation(x) : x, ex)
 end
 
 function latexify_derivatives(ex)
@@ -58,7 +58,7 @@ end
 @latexrecipe function f(z::Complex{Num})
     env --> :equation
     cdot --> false
-    
+
     iszero(z.im) && return :($(recipe(z.re)))
     iszero(z.re) && return :($(recipe(z.im)) * $im)
     return :($(recipe(z.re)) + $(recipe(z.im)) * $im)
@@ -142,7 +142,7 @@ function _toexpr(O)
 
             base = term.base
             pow  = term.exp
-            isneg = (pow isa Number && pow < 0) || (istree(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
+            isneg = (pow isa Number && pow < 0) || (iscall(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
             if !isneg
                 if _isone(pow)
                     pushfirst!(numer, _toexpr(base))
@@ -179,7 +179,7 @@ function _toexpr(O)
         end
     end
     issym(O) && return nameof(O)
-    !istree(O) && return O
+    !iscall(O) && return O
 
     op = operation(O)
     args = arguments(O)
@@ -233,7 +233,7 @@ _toexpr(eqs::AbstractArray) = map(eq->_toexpr(eq), eqs)
 _toexpr(x::Num) = _toexpr(value(x))
 
 function getindex_to_symbol(t)
-    @assert istree(t) && operation(t) === getindex && symtype(arguments(t)[1]) <: AbstractArray
+    @assert iscall(t) && operation(t) === getindex && symtype(arguments(t)[1]) <: AbstractArray
     args = arguments(t)
     idxs = args[2:end]
     try
@@ -258,4 +258,3 @@ function diffdenom(e)
         e
     end
 end
-

@@ -49,10 +49,10 @@ get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), v
 get_variables!(vars, e, varlist=nothing) = vars
 
 function is_singleton(e)
-    if istree(e)
+    if iscall(e)
         op = operation(e)
         op === getindex && return true
-        istree(op) && return is_singleton(op) # recurse to reach getindex for array element variables
+        iscall(op) && return is_singleton(op) # recurse to reach getindex for array element variables
         return issym(op)
     else
         return issym(e)
@@ -100,7 +100,7 @@ var"z(t)[1]ˍt"
 ```
 """
 function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothing)
-    istree(O) || return O
+    iscall(O) || return O
     if is_derivative(O)
         ds = ""
         while is_derivative(O)
@@ -119,7 +119,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
         oldop = operation(O)
         if issym(oldop)
             opname = string(nameof(oldop))
-        elseif istree(oldop) && operation(oldop) === getindex
+        elseif iscall(oldop) && operation(oldop) === getindex
             opname = string(nameof(arguments(oldop)[1]))
             args = arguments(O)
         elseif oldop == getindex
@@ -160,7 +160,7 @@ julia> Symbolics.tosymbol(z; escape=false)
 function tosymbol(t; states=nothing, escape=true)
     if issym(t)
         return nameof(t)
-    elseif istree(t)
+    elseif iscall(t)
         if issym(operation(t))
             if states !== nothing && !(t in states)
                 return nameof(operation(t))
@@ -224,7 +224,7 @@ function var_from_nested_derivative(x,i=0)
     x = unwrap(x)
     if issym(x)
         (x, i)
-    elseif istree(x)
+    elseif iscall(x)
         operation(x) isa Differential ?
             var_from_nested_derivative(first(arguments(x)), i + 1) : (x, i)
     else

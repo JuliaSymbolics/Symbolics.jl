@@ -9,13 +9,13 @@ end
 
 using Symbolics: value
 using Symbolics.SymbolicUtils
-using SymbolicUtils: istree, operation, arguments, symtype,
+using SymbolicUtils: iscall, operation, arguments, symtype,
                         FnType, Symbolic
 
 function Symbolics.symbolics_to_sympy(expr)
     expr = value(expr)
     expr isa Symbolic || return expr
-    if istree(expr)
+    if iscall(expr)
         sop = symbolics_to_sympy(operation(expr))
         sargs = map(symbolics_to_sympy, arguments(expr))
         if sop === (^) && length(sargs) == 2 && sargs[2] isa Number
