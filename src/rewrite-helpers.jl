@@ -1,5 +1,5 @@
 """
-    replace(expr::Symbolic, rules...)
+replacenode(expr::Symbolic, rules...)
 Walk the expression and replace subexpressions according to `rules`. `rules`
 could be rules constructed with `@rule`, a function, or a pair where the
 left hand side is matched with equality (using `isequal`) and is replaced by the right hand side.
@@ -12,24 +12,24 @@ not the replacements.
 Set `fixpoint = true` to repeatedly apply rules until no
 change to the expression remains to be made.
 """
-function Base.replace(expr::Num, r::Pair, rules::Pair...)
-    _replace(unwrap(expr), r, rules...)
+function replacenode(expr::Num, r::Pair, rules::Pair...)
+    _replacenode(unwrap(expr), r, rules...)
 end
 
 # Fix ambiguity
-function Base.replace(expr::Num, rules...)
-    _replace(unwrap(expr), rules...)
+function replacenode(expr::Num, rules...)
+    _replacenode(unwrap(expr), rules...)
 end
 
-function Base.replace(expr::Symbolic, rules...)
-    _replace(unwrap(expr), rules...)
+function replacenode(expr::Symbolic, rules...)
+    _replacenode(unwrap(expr), rules...)
 end
 
-function Base.replace(expr::Symbolic, r::Pair, rules::Pair...)
-    _replace(expr, r, rules...)
+function replacenode(expr::Symbolic, r::Pair, rules::Pair...)
+    _replacenode(expr, r, rules...)
 end
 
-function _replace(expr::Symbolic, rules...; fixpoint=false)
+function _replacenode(expr::Symbolic, rules...; fixpoint=false)
     rs = map(r -> r isa Pair ? (x -> isequal(x, r[1]) ? r[2] : nothing) : r, rules)
     R = Prewalk(Chain(rs))
     if fixpoint
@@ -40,7 +40,7 @@ function _replace(expr::Symbolic, rules...; fixpoint=false)
 end
 
 """
-    occursin(c, x)
+    hasnode(c, x)
 Returns true if any part of `x` fufills the condition given in c. c can be a function or an expression.
 If it is a function, returns true if x is true for any part of x. If c is an expression, returns
 true if x contains c.
@@ -48,29 +48,23 @@ true if x contains c.
 Examples:
 ```julia
 @syms x y
-Symbolics.occursin(x, log(x) + x + 1) # returns `true`.
-Symbolics.occursin(x, log(y) + y + 1) # returns `false`.
+hasnode(x, log(x) + x + 1) # returns `true`.
+hasnode(x, log(y) + y + 1) # returns `false`.
 ```
 
 ```julia
 @variables t X(t)
 D = Differential(t)
-Symbolics.occursin(Symbolics.is_derivative, X + D(X) + D(X^2)) # returns `true`.
+hasnode(Symbolics.is_derivative, X + D(X) + D(X^2)) # returns `true`.
 ```
 """
-function Base.occursin(r::Function, y::Num)
-    Symbolics._occursin(r, y)
+function hasnode(r::Function, y::Union{Num, Symbolic})
+    _hasnode(r, y)
 end
-# Initially both these were created using `y::Union{Num, Symbolic}`. However, this produced
-# ambiguity error due to something in SymbolicsBase. Hence the dual declarations here.
-function Base.occursin(r::Function, y::Symbolics.Symbolic)
-    Symbolics._occursin(r, y)
-end
+hasnode(r::Num, y::Union{Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
+hasnode(r::Symbolic, y::Union{Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
 
-Base.occursin(r::Num, y::Num) = occursin(unwrap(r), unwrap(y))
-Base.occursin(r::Num, y::Symbolic) = occursin(unwrap(r), unwrap(y))
-
-function _occursin(r, y)
+function _hasnode(r, y)
     y = unwrap(y)
     if r isa Function
         if r(y)
@@ -80,7 +74,7 @@ function _occursin(r, y)
 
     if iscall(y)
         return r(operation(y)) ||
-                any(y->_occursin(r, y), arguments(y))
+                any(y->_hasnode(r, y), arguments(y))
     else
         return false
     end
@@ -134,6 +128,7 @@ function filterchildren!(r::Any, y, acc)
 end
 
 module RewriteHelpers
-import Symbolics: filterchildren, unwrap
-export replace, occursin, filterchildren, unwrap
+import Symbolics: replacenode, hasnode, filterchildren, unwrap
+export replacenode, hasnode, filterchildren, unwrap
+
 end
