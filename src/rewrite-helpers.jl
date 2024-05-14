@@ -58,8 +58,13 @@ D = Differential(t)
 Symbolics.occursin(Symbolics.is_derivative, X + D(X) + D(X^2)) # returns `true`.
 ```
 """
-function Base.occursin(r::Function, y::Union{Num, Symbolic})
-    _occursin(r, y)
+function Base.occursin(r::Function, y::Num)
+    Symbolics._occursin(r, y)
+end
+# Initially both these were created using `y::Union{Num, Symbolic}`. However, this produced
+# ambiguity error due to something in SymbolicsBase. Hence the dual declarations here.
+function Base.occursin(r::Function, y::Symbolics.Symbolic)
+    Symbolics._occursin(r, y)
 end
 
 Base.occursin(r::Num, y::Num) = occursin(unwrap(r), unwrap(y))
