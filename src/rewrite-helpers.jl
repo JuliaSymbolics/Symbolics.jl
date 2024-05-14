@@ -15,19 +15,10 @@ change to the expression remains to be made.
 function replacenode(expr::Num, r::Pair, rules::Pair...)
     _replacenode(unwrap(expr), r, rules...)
 end
-
 # Fix ambiguity
-function replacenode(expr::Num, rules...)
-    _replacenode(unwrap(expr), rules...)
-end
-
-function replacenode(expr::Symbolic, rules...)
-    _replacenode(unwrap(expr), rules...)
-end
-
-function replacenode(expr::Symbolic, r::Pair, rules::Pair...)
-    _replacenode(expr, r, rules...)
-end
+replacenode(expr::Num, rules...) = _replacenode(unwrap(expr), rules...)
+replacenode(expr::Symbolic, rules...) = _replacenode(unwrap(expr), rules...)
+replacenode(expr::Symbolic, r::Pair, rules::Pair...) = _replacenode(expr, r, rules...)
 
 function _replacenode(expr::Symbolic, rules...; fixpoint=false)
     rs = map(r -> r isa Pair ? (x -> isequal(x, r[1]) ? r[2] : nothing) : r, rules)
