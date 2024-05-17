@@ -18,7 +18,7 @@ function wrapper_type(::Type{Complex{T}}) where T
 end
 
 symtype(a::ComplexTerm{T}) where T = Complex{T}
-istree(a::ComplexTerm) = true
+iscall(a::ComplexTerm) = true
 operation(a::ComplexTerm{T}) where T = Complex{T}
 arguments(a::ComplexTerm) = [a.re, a.im]
 metadata(a::ComplexTerm) = metadata(a.re)
@@ -41,8 +41,8 @@ function Base.show(io::IO, a::Complex{Num})
     rr = unwrap(real(a))
     ii = unwrap(imag(a))
 
-    if istree(rr) && (operation(rr) === real) &&
-        istree(ii) && (operation(ii) === imag) &&
+    if iscall(rr) && (operation(rr) === real) &&
+        iscall(ii) && (operation(ii) === imag) &&
         isequal(arguments(rr)[1], arguments(ii)[1])
 
         return print(io, arguments(rr)[1])

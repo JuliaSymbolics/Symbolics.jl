@@ -32,7 +32,7 @@ macro register_symbolic(expr, define_promotion = true, Ts = :([]))
     fexpr = :(Symbolics.@wrapped function $f($(args′...))
                   args = [$(argnames...),]
                   unwrapped_args = map($unwrap, args)
-                  res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
+                  res = if !any(x->$issym(x) || $iscall(x), unwrapped_args)
                       $f(unwrapped_args...) # partial-eval if all args are unwrapped
                   else
                       $Term{$ret_type}($f, unwrapped_args)
@@ -94,7 +94,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         @wrapped function $f($(args′...))
             args = [$(argnames...),]
             unwrapped_args = map($unwrap, args)
-            res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
+            res = if !any(x->$issym(x) || $iscall(x), unwrapped_args)
                 $f(unwrapped_args...) # partial-eval if all args are unwrapped
             elseif $ret_type == nothing || ($ret_type <: AbstractArray)
                 $array_term($(Expr(:parameters, [Expr(:kw, k, v) for (k, v) in defs]...)), $f, unwrapped_args...)

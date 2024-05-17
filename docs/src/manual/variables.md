@@ -3,7 +3,7 @@
 Symbolics IR mirrors the Julia AST but allows for easy mathematical
 manipulation by itself following mathematical semantics. The base of the IR is
 the `Sym` type, which defines a symbolic variable. Registered (mathematical)
-functions on `Sym`s (or `istree` objects) return an expression that `istree`.
+functions on `Sym`s (or `iscall` objects) return an expression that `iscall`.
 For example, `op1 = x+y` is one symbolic object and `op2 = 2z` is another, and
 so `op1*op2` is another tree object. Then, at the top, an `Equation`, normally
 written as `op1 ~ op2`, defines the symbolic equality between two operations.
@@ -13,10 +13,10 @@ written as `op1 ~ op2`, defines the symbolic equality between two operations.
 `Sym`, `Term`, and `FnType` are from
 [SymbolicUtils.jl](https://symbolicutils.juliasymbolics.org/api/). Note that in
 Symbolics, we always use `Sym{Real}`, `Term{Real}`, and
-`FnType{Tuple{Any}, Real}`. To get the arguments of an `istree` object, use
+`FnType{Tuple{Any}, Real}`. To get the arguments of an `iscall` object, use
 `arguments(t::Term)`, and to get the operation, use `operation(t::Term)`.
 However, note that one should never dispatch on `Term` or test `isa Term`.
-Instead, one needs to use `SymbolicUtils.istree` to check if `arguments` and
+Instead, one needs to use `SymbolicUtils.iscall` to check if `arguments` and
 `operation` is defined.
 
 ```@docs
@@ -80,7 +80,7 @@ Control flow can be expressed in Symbolics.jl in the following ways:
 ## Inspection Functions
 
 ```@docs
-SymbolicUtils.istree
+SymbolicUtils.iscall
 SymbolicUtils.operation
 SymbolicUtils.arguments
 ```

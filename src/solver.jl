@@ -81,7 +81,7 @@ function get_parts_list(a, b, a_list = Vector{Any}(), b_list = Vector{Any}())
     if SymbolicUtils.issym(a)
         push!(a_list, a)
         push!(b_list, b)
-    elseif istree(a) && istree(b) && isequal(operation(a), operation(b))
+    elseif iscall(a) && iscall(b) && isequal(operation(a), operation(b))
         a_args = arguments(a)
         b_args = arguments(b)
 
@@ -160,7 +160,7 @@ end
 function replace_term(expr, dic::Dict)
     if SymbolicUtils.issym(expr) && haskey(dic, expr)
         return dic[expr]
-    elseif istree(expr)
+    elseif iscall(expr)
         args = Any[]
 
         for arg in arguments(expr)
@@ -202,9 +202,9 @@ end
 function expr_similar(ref_expr, expr, check_matches = true)
 
     SymbolicUtils.issym(ref_expr) && return true
-    SymbolicUtils.issym(expr) && istree(ref_expr) && return false
+    SymbolicUtils.issym(expr) && iscall(ref_expr) && return false
 
-    if istree(ref_expr)
+    if iscall(ref_expr)
         ref_args = arguments(ref_expr)
         ref_len = length(ref_args)
         ref_op = operation(ref_expr)
@@ -249,12 +249,12 @@ function expr_similar(ref_expr, expr, check_matches = true)
 end
 
 function get_base(expr)
-    (!istree(expr) || operation(expr) != (^)) && throw("not a power(^) -> $expr")
+    (!iscall(expr) || operation(expr) != (^)) && throw("not a power(^) -> $expr")
     return arguments(expr)[1]
 end
 
 function get_exp(expr)
-    (!istree(expr) || operation(expr) != (^)) && throw("not a power(^) -> $expr")
+    (!iscall(expr) || operation(expr) != (^)) && throw("not a power(^) -> $expr")
     return arguments(expr)[2]
 end
 
@@ -270,7 +270,7 @@ function solve_single_eq_unchecked(
     while (true)
         oldState = eq
 
-        if (istree(eq.lhs))
+        if (iscall(eq.lhs))
 
             potential_solution = solve_quadratic(eq, var, single_solution)
             if potential_solution isa Equation
@@ -366,7 +366,7 @@ example move_to_other_side(x+a~z,x) returns x~z-a
 =#
 function move_to_other_side(eq::Equation, var)
 
-    !istree(eq.lhs) && return eq#make sure left side is tree form
+    !iscall(eq.lhs) && return eq#make sure left side is tree form
 
     op = operation(eq.lhs)
 
@@ -421,14 +421,14 @@ function special_strategy(eq::Equation, var)
     end
 
 
-    !istree(eq.lhs) && return eq#make sure left side is tree form
+    !iscall(eq.lhs) && return eq#make sure left side is tree form
 
     op = operation(eq.lhs)
     elements = arguments(eq.lhs)
 
     if (op == +) &&
        length(elements) == 2 &&
-       sum(istree.(elements)) == length(elements) &&
+       sum(iscall.(elements)) == length(elements) &&
        isequal(operation.(elements), [sqrt for el = 1:length(elements)]) #check for sqrt(a)+sqrt(b)=c form , to solve this sqrt(a)+sqrt(b)=c -> 4*a*b-full_expand((c^2-b-a)^2)=0 then solve using quadratics
 
         #grab values
@@ -445,10 +445,10 @@ function special_strategy(eq::Equation, var)
     elseif (op == +) &&
            isequal(eq.rhs, 0) &&
            length(elements) == 2 &&
-           sum(istree.(elements)) == length(elements) &&
+           sum(iscall.(elements)) == length(elements) &&
            length(arguments(elements[1])) == 2 &&
            isequal(arguments(elements[1])[1], -1) &&
-           istree(arguments(elements[1])[2]) &&
+           iscall(arguments(elements[1])[2]) &&
            operation(elements[2]) == operation(arguments(elements[1])[2])#-f(y)+f(x)=0 -> x-y=0
 
         x = arguments(elements[2])[1]
@@ -473,16 +473,16 @@ function reduce_root(a)
         a = term(^, a.base, a.exp)
     end
 
-    if istree(a) && (operation(a) == sqrt)
+    if iscall(a) && (operation(a) == sqrt)
         a = SymbolicUtils.Pow(arguments(a)[1], 1 // 2)
-    elseif istree(a) &&
+    elseif iscall(a) &&
            (operation(a) == ^) &&
            isequal(arguments(a)[2], 1 // 2) &&
            !(arguments(a)[1] isa Number)
         a = term(sqrt, arguments(a)[1])
     end
 
-    if istree(a) &&
+    if iscall(a) &&
        (operation(a) == ^) &&
        arguments(a)[2] isa Rational &&
        isequal((arguments(a)[2]).num, 1)
@@ -531,7 +531,7 @@ if in quadratic form returns solutions
 =#
 function solve_quadratic(eq::Equation, var, single_solution)
 
-    !istree(eq.lhs) && return eq#make sure left side is tree form
+    !iscall(eq.lhs) && return eq#make sure left side is tree form
 
     op = operation(eq.lhs)
 
@@ -579,7 +579,7 @@ end
 #reverse certain functions
 function inverse_funcs(eq::Equation, var)
 
-    !istree(eq.lhs) && return eq#make sure left side is tree form
+    !iscall(eq.lhs) && return eq#make sure left side is tree form
     op = operation(eq.lhs)
 
     #reverse functions
@@ -611,7 +611,7 @@ end
 
 #solves for powers
 function reverse_powers(eq::Equation, var, single_solution)
-    !istree(eq.lhs) && return eq#make sure left side is tree form
+    !iscall(eq.lhs) && return eq#make sure left side is tree form
     op = operation(eq.lhs)
 
     if (op == ^)
