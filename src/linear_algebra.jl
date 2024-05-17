@@ -1,5 +1,5 @@
 function nterms(t)
-    if istree(t)
+    if iscall(t)
         return reduce(+, map(nterms, arguments(t)), init=0)
     else
         return 1
@@ -258,7 +258,7 @@ function _linear_expansion(t::Equation, x)
 end
 trivial_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
 
-is_expansion_leaf(t) = !istree(t) || (operation(t) isa Operator)
+is_expansion_leaf(t) = !iscall(t) || (operation(t) isa Operator)
 @noinline expansion_check(op) = op isa Operator && error("The operation is an Operator. This should never happen.")
 function _linear_expansion(t, x)
     t = value(t)

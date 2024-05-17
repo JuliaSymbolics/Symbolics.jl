@@ -34,4 +34,6 @@ end
     @test_nowarn substitute(z1, z=>1.0im)
     @test metadata(z1) == unwrap(z1.im).metadata
     @test metadata(z1) == unwrap(z1.re).metadata
+    z2 = 1.0 + z*im
+    @test isnothing(metadata(unwrap(z1.re)))
 end

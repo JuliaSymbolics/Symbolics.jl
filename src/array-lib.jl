@@ -20,7 +20,7 @@ end
 function Base.getindex(x::SymArray, idx...)
     idx = unwrap.(idx)
     meta = metadata(unwrap(x))
-    if istree(x) && (op = operation(x)) isa Operator
+    if iscall(x) && (op = operation(x)) isa Operator
         args = arguments(x)
         return op(only(args)[idx...])
     elseif shape(x) !== Unknown() && all(i -> i isa Integer, idx)
@@ -111,7 +111,7 @@ end
 
 import Base: +, -, *
 tup(c::CartesianIndex) = Tuple(c)
-tup(c::Symbolic{CartesianIndex}) = istree(c) ? arguments(c) : error("Cartesian index not found")
+tup(c::Symbolic{CartesianIndex}) = iscall(c) ? arguments(c) : error("Cartesian index not found")
 
 @wrapped function -(x::CartesianIndex, y::CartesianIndex)
     CartesianIndex((tup(x) .- tup(y))...)
@@ -251,7 +251,7 @@ isadjointvec(A::Adjoint) = ndims(parent(A)) == 1
 isadjointvec(A::Transpose) = ndims(parent(A)) == 1
 
 function isadjointvec(A)
-    if istree(A)
+    if iscall(A)
         (operation(A) === (adjoint) ||
          operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
     else
@@ -305,7 +305,7 @@ function _matvec(A, b)
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
 
-# specialize `dot` to dispatch on `Symbolic{<:Number}` to eventually work for 
+# specialize `dot` to dispatch on `Symbolic{<:Number}` to eventually work for
 # arrays of (possibly unwrapped) Symbolic types, see issue #831
 @wrapped LinearAlgebra.dot(x::Number, y::Number) = conj(x) * y
 

@@ -236,7 +236,7 @@ struct CallWithMetadata{T,M} <: Symbolic{T}
     metadata::M
 end
 
-for f in [:istree, :operation, :arguments]
+for f in [:iscall, :operation, :arguments]
     @eval SymbolicUtils.$f(x::CallWithMetadata) = $f(x.f)
 end
 
@@ -383,10 +383,10 @@ _getname(x, _) = nameof(x)
 _getname(x::Symbol, _) = x
 function _getname(x::Symbolic, val)
     issym(x) && return nameof(x)
-    if istree(x) && issym(operation(x))
+    if iscall(x) && issym(operation(x))
         return nameof(operation(x))
     end
-    if !hasmetadata(x, Symbolics.GetindexParent) && istree(x) && operation(x) == getindex
+    if !hasmetadata(x, Symbolics.GetindexParent) && iscall(x) && operation(x) == getindex
         return _getname(arguments(x)[1], val)
     end
     ss = getsource(x, nothing)
@@ -405,7 +405,7 @@ SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Arr}) = ArraySymbolic
 SymbolicIndexingInterface.hasname(x::Union{Num,Arr}) = hasname(unwrap(x))
 
 function SymbolicIndexingInterface.hasname(x::Symbolic)
-    issym(x) || !istree(x) || istree(x) && (issym(operation(x)) || operation(x) == getindex)
+    issym(x) || !iscall(x) || iscall(x) && (issym(operation(x)) || operation(x) == getindex)
 end
 
 SymbolicIndexingInterface.getname(x, val=_fail) = _getname(unwrap(x), val)
@@ -474,7 +474,7 @@ function fast_substitute(expr, subs; operator = Nothing)
     if (_val = get(subs, expr, nothing)) !== nothing
         return _val
     end
-    istree(expr) || return expr
+    iscall(expr) || return expr
     op = fast_substitute(operation(expr), subs; operator)
     args = SymbolicUtils.unsorted_arguments(expr)
     if !(op isa operator)
@@ -502,7 +502,7 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
             expr = fast_substitute(expr, ai => bi; operator)
         end
     end
-    istree(expr) || return expr
+    iscall(expr) || return expr
     op = fast_substitute(operation(expr), pair; operator)
     args = SymbolicUtils.unsorted_arguments(expr)
     if !(op isa operator)
@@ -528,7 +528,7 @@ function getparent(x, val=_fail)
     if maybe_parent !== nothing
         return maybe_parent
     else
-        if istree(x) && operation(x) === getindex
+        if iscall(x) && operation(x) === getindex
             return arguments(x)[1]
         end
     end
@@ -640,9 +640,9 @@ function rename(x::Symbolic, name)
         xx = @set! x.name = name
         xx = rename_metadata(x, xx, name)
         symtype(xx) <: AbstractArray ? rename_getindex_source(xx) : xx
-    elseif istree(x) && operation(x) === getindex
+    elseif iscall(x) && operation(x) === getindex
         rename(arguments(x)[1], name)[arguments(x)[2:end]...]
-    elseif istree(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
+    elseif iscall(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
         xx = @set x.f = rename(operation(x), name)
         @set! xx.hash = Ref{UInt}(0)
         return rename_metadata(x, xx, name)

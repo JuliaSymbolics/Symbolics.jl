@@ -73,7 +73,7 @@ function _occursin(r, y)
         end
     end
 
-    if istree(y)
+    if iscall(y)
         return r(operation(y)) ||
                 any(y->_occursin(r, y), arguments(y))
     else
@@ -116,7 +116,7 @@ function filterchildren!(r::Any, y, acc)
         end
     end
 
-    if istree(y)
+    if iscall(y)
         if isequal(r, operation(y))
             push!(acc, operation(y))
         elseif r isa Function && r(operation(y))

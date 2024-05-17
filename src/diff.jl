@@ -46,7 +46,7 @@ end
 (D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, T) = T
 
-is_derivative(x) = istree(x) ? operation(x) isa Differential : false
+is_derivative(x) = iscall(x) ? operation(x) isa Differential : false
 
 Base.:*(D1, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
@@ -59,7 +59,7 @@ Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
 Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 
 _isfalse(occ::Bool) = occ === false
-_isfalse(occ::Symbolic) = istree(occ) && _isfalse(operation(occ))
+_isfalse(occ::Symbolic) = iscall(occ) && _isfalse(operation(occ))
 
 function occursin_info(x, expr, fail = true)
     if symtype(expr) <: AbstractArray
@@ -72,8 +72,8 @@ function occursin_info(x, expr, fail = true)
 
     # Allow scalarized expressions
     function is_scalar_indexed(ex)
-        (istree(ex) && operation(ex) == getindex && !(symtype(ex) <: AbstractArray)) ||
-        (istree(ex) && (issym(operation(ex)) || istree(operation(ex))) &&
+        (iscall(ex) && operation(ex) == getindex && !(symtype(ex) <: AbstractArray)) ||
+        (iscall(ex) && (issym(operation(ex)) || iscall(operation(ex))) &&
          is_scalar_indexed(operation(ex)))
     end
 
@@ -93,7 +93,7 @@ function occursin_info(x, expr, fail = true)
         return false
     end
 
-    !istree(expr) && return isequal(x, expr)
+    !iscall(expr) && return isequal(x, expr)
     if isequal(x, expr)
         true
     else
@@ -132,7 +132,7 @@ An internal function that contains the logic for [`hasderiv`](@ref) and [`hasdif
 Return true if `O` contains a term with `Operator` `op`.
 """
 function recursive_hasoperator(op, O)
-    istree(O) || return false
+    iscall(O) || return false
     if operation(O) isa op
         return true
     else
@@ -154,14 +154,14 @@ $(SIGNATURES)
 Expands derivatives within a symbolic expression `O`.
 
 This function recursively traverses a symbolic expression, applying the chain rule
-and other derivative rules to expand any derivatives it encounters. 
+and other derivative rules to expand any derivatives it encounters.
 
 # Arguments
 - `O::Symbolic`: The symbolic expression to expand.
-- `simplify::Bool=false`: Whether to simplify the resulting expression using 
+- `simplify::Bool=false`: Whether to simplify the resulting expression using
     [`SymbolicUtils.simplify`](@ref).
-- `occurrences=nothing`: Information about the occurrences of the independent 
-    variable in the argument of the derivative. This is used internally for 
+- `occurrences=nothing`: Information about the occurrences of the independent
+    variable in the argument of the derivative. This is used internally for
     optimization purposes.
 
 # Examples
@@ -179,7 +179,7 @@ julia> dfx=expand_derivatives(Dx(f))
 ```
 """
 function expand_derivatives(O::Symbolic, simplify=false; occurrences=nothing)
-    if istree(O) && isa(operation(O), Differential)
+    if iscall(O) && isa(operation(O), Differential)
         arg = only(arguments(O))
         arg = expand_derivatives(arg, false)
 
@@ -192,7 +192,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurrences=nothing)
 
         D = operation(O)
 
-        if !istree(arg)
+        if !iscall(arg)
             return D(arg) # Cannot expand
         elseif (op = operation(arg); issym(op))
             inner_args = arguments(arg)
@@ -218,7 +218,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurrences=nothing)
             else
                 inner = expand_derivatives(D(arguments(arg)[1]), false)
                 # if the inner expression is not expandable either, return
-                if istree(inner) && operation(inner) isa Differential
+                if iscall(inner) && operation(inner) isa Differential
                     return D(arg)
                 else
                     return expand_derivatives(op(inner), simplify)
@@ -230,12 +230,12 @@ function expand_derivatives(O::Symbolic, simplify=false; occurrences=nothing)
                 a, b = DomainSets.endpoints(domain)
                 c = 0
                 inner_function = expand_derivatives(arguments(arg)[1])
-                if istree(value(a))
+                if iscall(value(a))
                     t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(a)))
                     t2 = D(a)
                     c -= t1*t2
                 end
-                if istree(value(b))
+                if iscall(value(b))
                     t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(b)))
                     t2 = D(b)
                     c += t1*t2
@@ -283,7 +283,7 @@ function expand_derivatives(O::Symbolic, simplify=false; occurrences=nothing)
             x = +((!_iszero(c) ? vcat(c, exprs) : exprs)...)
             return simplify ? SymbolicUtils.simplify(x) : x
         end
-    elseif istree(O) && isa(operation(O), Integral)
+    elseif iscall(O) && isa(operation(O), Integral)
         return operation(O)(expand_derivatives(arguments(O)[1]))
     elseif !hasderiv(O)
         return O
@@ -342,7 +342,7 @@ sin(x)
 """
 derivative_idx(O::Any, ::Any) = 0
 function derivative_idx(O::Symbolic, idx)
-    istree(O) ? derivative(operation(O), (arguments(O)...,), Val(idx)) : 0
+    iscall(O) ? derivative(operation(O), (arguments(O)...,), Val(idx)) : 0
 end
 
 # Indicate that no derivative is defined.

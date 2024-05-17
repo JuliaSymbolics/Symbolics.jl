@@ -94,7 +94,7 @@ shape(aop::ArrayOp) = aop.shape
 
 const show_arrayop = Ref{Bool}(false)
 function Base.show(io::IO, aop::ArrayOp)
-    if istree(aop.term) && !show_arrayop[]
+    if iscall(aop.term) && !show_arrayop[]
         show(io, aop.term)
     else
         print(io, "@arrayop")
@@ -117,7 +117,7 @@ function Base.showarg(io::IO, aop::ArrayOp, toplevel)
 end
 
 symtype(a::ArrayOp{T}) where {T} = T
-istree(a::ArrayOp) = true
+iscall(a::ArrayOp) = true
 function operation(a::ArrayOp)
     isnothing(a.term) ? typeof(a) : operation(a.term)
 end
@@ -332,7 +332,7 @@ function get_extents(xs)
     if all(iszero∘wrap, boundaries)
         get(first(xs))
     else
-        ii = findfirst(x->issym(x) || istree(x), boundaries)
+        ii = findfirst(x->issym(x) || iscall(x), boundaries)
         if !isnothing(ii)
             error("Could not find the boundary from symbolic index $(xs[ii]). Please manually specify the range of indices.")
         end
@@ -355,11 +355,11 @@ get_extents(x::AbstractRange) = x
 # boundary: how much padding is this indexing requiring, for example
 #   boundary is 2 for x[i + 2], and boundary = -2 for x[i - 2]
 function idx_to_axes(expr, dict=Dict{Any, Vector}(), ranges=Dict())
-    if istree(expr)
+    if iscall(expr)
         if operation(expr) === (getindex)
             args = arguments(expr)
             for (axis, idx_expr) in enumerate(@views args[2:end])
-                if issym(idx_expr) || istree(idx_expr)
+                if issym(idx_expr) || iscall(idx_expr)
                     vs = get_variables(idx_expr)
                     isempty(vs) && continue
                     sym = only(get_variables(idx_expr))
@@ -529,9 +529,9 @@ wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
 
 function Base.show(io::IO, arr::Arr)
     x = unwrap(arr)
-    istree(x) && print(io, "(")
+    iscall(x) && print(io, "(")
     print(io, unwrap(arr))
-    istree(x) && print(io, ")")
+    iscall(x) && print(io, ")")
     if !(shape(x) isa Unknown)
         print(io, "[", join(string.(axes(arr)), ","), "]")
     end
@@ -618,7 +618,7 @@ function replace_by_scalarizing(ex, dict)
     end
 
     function rewrite_operation(x)
-        if istree(x) && istree(operation(x))
+        if iscall(x) && iscall(operation(x))
             f = operation(x)
             ff = replace_by_scalarizing(f, dict)
             if metadata(x) !== nothing
@@ -638,7 +638,7 @@ end
 
 function prewalk_if(cond, f, t, similarterm)
     t′ = cond(t) ? f(t) : return t
-    if istree(t′)
+    if iscall(t′)
         return similarterm(t′, operation(t′),
                            map(x->prewalk_if(cond, f, x, similarterm), arguments(t′)))
     else
@@ -652,7 +652,7 @@ function scalarize(arr::AbstractArray, idx)
 end
 
 function scalarize(arr, idx)
-    if istree(arr)
+    if iscall(arr)
         scalarize_op(operation(arr), arr, idx)
     else
         error("scalarize is not defined for $arr at idx=$idx")
@@ -761,20 +761,20 @@ eval_array_term(op) = eval_array_term(operation(op), op)
 
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
-        if istree(arr)
+        if iscall(arr)
             arr = eval_array_term(arr)
         end
         map(Iterators.product(axes(arr)...)) do i
             scalarize(arr[i...]) # Use arr[i...] here to trigger any getindex hooks
         end
-    elseif istree(arr) && operation(arr) == getindex
+    elseif iscall(arr) && operation(arr) == getindex
         args = arguments(arr)
         scalarize(args[1], (args[2:end]...,))
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
-    elseif istree(arr) && symtype(arr) <: Number
+    elseif iscall(arr) && symtype(arr) <: Number
         t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=metadata(arr))
-        istree(t) ? scalarize_op(operation(t), t) : t
+        iscall(t) ? scalarize_op(operation(t), t) : t
     else
         arr
     end
@@ -804,7 +804,7 @@ function arraymaker(T, shape, views, seq...)
     ArrayMaker{T}(shape, [(views .=> seq)...], nothing)
 end
 
-istree(x::ArrayMaker) = true
+iscall(x::ArrayMaker) = true
 operation(x::ArrayMaker) = arraymaker
 arguments(x::ArrayMaker) = [eltype(x), shape(x), map(first, x.sequence), map(last, x.sequence)...]
 
@@ -965,7 +965,7 @@ end
 
 function scalarize(x::ArrayMaker, idx)
     for (vw, arr) in reverse(x.sequence) # last one wins
-        if any(x->issym(x) || istree(x), idx)
+        if any(x->issym(x) || iscall(x), idx)
             return term(getindex, x, idx...)
         end
         if all(in.(idx, vw))
@@ -979,7 +979,7 @@ function scalarize(x::ArrayMaker, idx)
             end
         end
     end
-    if !any(x->issym(x) || istree(x), idx) && all(in.(idx, axes(x)))
+    if !any(x->issym(x) || iscall(x), idx) && all(in.(idx, axes(x)))
         throw(UndefRefError())
     end
 
@@ -992,7 +992,7 @@ end
 function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
     haskey(st.symbolify, x) && return st.symbolify[x]
 
-    if istree(x.term)
+    if iscall(x.term)
         toexpr(x.term, st)
     else
         _array_toexpr(x, st)
@@ -1048,7 +1048,7 @@ end
 
 function inplace_builtin(term, outsym)
     isarr(n) = x->symtype(x) <: AbstractArray{<:Any, n}
-    if istree(term) && operation(term) == (*) && length(arguments(term)) == 2
+    if iscall(term) && operation(term) == (*) && length(arguments(term)) == 2
         A, B = arguments(term)
         isarr(2)(A) && (isarr(1)(B) || isarr(2)(B)) && return :($mul!($outsym, $A, $B))
     end
@@ -1058,7 +1058,7 @@ end
 function find_inter(acc, expr)
     if !issym(expr) && symtype(expr) <: AbstractArray
         push!(acc, expr)
-    elseif istree(expr)
+    elseif iscall(expr)
         foreach(x -> find_inter(acc, x), arguments(expr))
     end
     acc

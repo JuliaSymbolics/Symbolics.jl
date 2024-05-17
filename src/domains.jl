@@ -17,10 +17,10 @@ Base.:∈(variable::DomainedVar,domain::NTuple{2,Real}) = VarDomainPairing(varia
 # Multiple variables
 Base.:∈(variables::NTuple{N,DomainedVar},domain::Domain) where N = VarDomainPairing(value.(variables),domain)
 
-function infimum(d::AbstractInterval{T}) where T <: Num
+function infimum(d::AbstractInterval{<:Num})
     leftendpoint(d)
 end
 
-function supremum(d::AbstractInterval{T}) where T <: Num
+function supremum(d::AbstractInterval{<:Num})
     rightendpoint(d)
 end
