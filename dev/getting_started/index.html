@@ -179,18 +179,18 @@ A = sparse(Tridiagonal([x^i for i in 1:N-1], [x^i * y^(8-i) for i in 1:N], [y^i 
 show(A)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">sparse([1, 2, 1, 2, 3, 2, 3, 4, 3, 4, 5, 4, 5, 6, 5, 6, 7, 6, 7, 8, 7, 8], [1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8], Num[x(t)*(y(t)^7), x(t), y(t), (x(t)^2)*(y(t)^6), x(t)^2, y(t)^2, (x(t)^3)*(y(t)^5), x(t)^3, y(t)^3, (x(t)^4)*(y(t)^4), x(t)^4, y(t)^4, (x(t)^5)*(y(t)^3), x(t)^5, y(t)^5, (x(t)^6)*(y(t)^2), x(t)^6, y(t)^6, (x(t)^7)*y(t), x(t)^7, y(t)^7, x(t)^8], 8, 8)</code></pre><p>Now we call <code>build_function</code>:</p><pre><code class="language-julia hljs">Base.remove_linenums!(build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">:(function (ˍ₋out, ˍ₋arg1)
       begin
           begin
-              var&quot;##out#245&quot; = ˍ₋out.nzval
+              var&quot;##out#242&quot; = ˍ₋out.nzval
               begin
                   (Symbolics.var&quot;#noop#429&quot;())(map(fetch, (begin
                                   let
-                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#245&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x0372ee9c, 0x16a6b542, 0x1741f131, 0x8a535a6c, 0xc773c8df), Nothing}(nothing), (var&quot;##out#245&quot;, ˍ₋arg1)))
+                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#242&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xf55d6e63, 0x25d4310e, 0x20e6130b, 0x9e28c5fa, 0x64fe813d), Nothing}(nothing), (var&quot;##out#242&quot;, ˍ₋arg1)))
                                       task.sticky = false
                                       Base.schedule(task)
                                       task
                                   end
                               end, begin
                                   let
-                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#245&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x7eab1fcb, 0x9d61ef07, 0xe79d2823, 0x3966c067, 0x297cea3a), Nothing}(nothing), (var&quot;##out#245&quot;, ˍ₋arg1)))
+                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#242&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x22b73ad8, 0x179a79bd, 0x877e11ee, 0xa5bb723b, 0xc0936274), Nothing}(nothing), (var&quot;##out#242&quot;, ˍ₋arg1)))
                                       task.sticky = false
                                       Base.schedule(task)
                                       task
@@ -220,9 +220,9 @@ rows, cols, _ = findnz(sj)
 out = sparse(rows, cols, zeros(length(cols)), size(sj)...) # pre-allocate, and correct structure
 myf = eval(last(f_expr))
 myf(out, rand(N)) # note that out matches the sparsity structure of sj
-out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 18 stored entries:
-⎡⠈⠁⠁⠀⢀⎤
-⎢⠀⡁⠈⠈⠀⎥
-⎢⠀⠄⠀⢐⠀⎥
-⎢⠂⢀⠀⡂⠀⎥
-⎣⣀⡀⠀⠀⠀⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Saturday 25 May 2024 09:17">Saturday 25 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 14 stored entries:
+⎡⠁⠀⠀⠀⠀⎤
+⎢⠐⠀⠀⠀⠁⎥
+⎢⢀⢀⢌⠁⠠⎥
+⎢⠈⠀⠀⠀⠀⎥
+⎣⠄⠠⠀⢀⠀⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Saturday 25 May 2024 09:20">Saturday 25 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
