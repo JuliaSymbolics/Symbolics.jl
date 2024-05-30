@@ -611,7 +611,7 @@ function replace_by_scalarizing(ex, dict)
 
     simterm = (x, f, args; kws...) -> begin
         if metadata(x) !== nothing
-            maketerm(x, f, args; metadata=metadata(x))
+            maketerm(typeof(x), f, args, symtype(x), metadata(x))
         else
             f(args...)
         end
@@ -622,7 +622,7 @@ function replace_by_scalarizing(ex, dict)
             f = operation(x)
             ff = replace_by_scalarizing(f, dict)
             if metadata(x) !== nothing
-                maketerm(x, ff, arguments(x); metadata=metadata(x))
+                maketerm(typeof(x), ff, arguments(x), symtype(x),  metadata(x))
             else
                 ff(arguments(x)...)
             end
