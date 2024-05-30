@@ -153,7 +153,7 @@ function mark_and_exponentiate(expr, vars)
              @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
              @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, unsorted_arguments(~a))...)
              @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
-    expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
+    expr′ = Postwalk(RestartedChain(rules), maketerm = bareterm)(expr′)
 end
 
 function semipolyform_terms(expr, vars)
@@ -424,7 +424,7 @@ function unwrap_sp(m::SemiMonomial)
 end
 function unwrap_sp(x)
     x = unwrap(x)
-    iscall(x) ? similarterm(x, operation(x), map(unwrap_sp, unsorted_arguments(x))) : x
+    iscall(x) ? maketerm(x, operation(x), map(unwrap_sp, unsorted_arguments(x))) : x
 end
 
 function cautious_sum(nls)

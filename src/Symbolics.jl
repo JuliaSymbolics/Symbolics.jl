@@ -19,7 +19,7 @@ using PrecompileTools
 
     import DomainSets: Domain
 
-    import SymbolicUtils: similarterm, iscall, operation, arguments, symtype, metadata
+    import SymbolicUtils: maketerm, iscall, operation, arguments, symtype, metadata
 
     import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
     FnType, @rule, Rewriters, substitute,

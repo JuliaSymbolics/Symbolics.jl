@@ -62,14 +62,14 @@ end
 
 ConstructionBase.constructorof(s::Type{<:ArrayOp{T}}) where {T} = ArrayOp{T}
 
-function SymbolicUtils.similarterm(t::ArrayOp, f, args, _symtype = nothing; metadata = nothing)
+function SymbolicUtils.maketerm(t::ArrayOp, f, args, _symtype = nothing; metadata = nothing)
     oldargs = arguments(t)
     if _symtype === nothing
         _symtype = symtype(t)
     end
 
     if !all(isequal.(args, oldargs)) || !isequal(f, operation(t))
-        term = similarterm(t.term, f, args)
+        term = maketerm(t.term, f, args)
         subs = Dict()
         for (orig, new) in zip(oldargs, args)
             isequal(orig, new) && continue
@@ -611,7 +611,7 @@ function replace_by_scalarizing(ex, dict)
 
     simterm = (x, f, args; kws...) -> begin
         if metadata(x) !== nothing
-            similarterm(x, f, args; metadata=metadata(x))
+            maketerm(x, f, args; metadata=metadata(x))
         else
             f(args...)
         end
@@ -622,7 +622,7 @@ function replace_by_scalarizing(ex, dict)
             f = operation(x)
             ff = replace_by_scalarizing(f, dict)
             if metadata(x) !== nothing
-                similarterm(x, ff, arguments(x); metadata=metadata(x))
+                maketerm(x, ff, arguments(x); metadata=metadata(x))
             else
                 ff(arguments(x)...)
             end
@@ -636,11 +636,11 @@ function replace_by_scalarizing(ex, dict)
               ex, simterm)
 end
 
-function prewalk_if(cond, f, t, similarterm)
+function prewalk_if(cond, f, t, maketerm)
     t′ = cond(t) ? f(t) : return t
     if iscall(t′)
-        return similarterm(t′, operation(t′),
-                           map(x->prewalk_if(cond, f, x, similarterm), arguments(t′)))
+        return maketerm(t′, operation(t′),
+                           map(x->prewalk_if(cond, f, x, maketerm), arguments(t′)))
     else
         return t′
     end
@@ -773,7 +773,7 @@ function scalarize(arr)
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
     elseif iscall(arr) && symtype(arr) <: Number
-        t = similarterm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=metadata(arr))
+        t = maketerm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=metadata(arr))
         iscall(t) ? scalarize_op(operation(t), t) : t
     else
         arr
