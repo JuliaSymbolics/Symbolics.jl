@@ -69,7 +69,7 @@ function SymbolicUtils.maketerm(t::ArrayOp, f, args, _symtype = nothing; metadat
     end
 
     if !all(isequal.(args, oldargs)) || !isequal(f, operation(t))
-        term = maketerm(t.term, f, args)
+        term = Symbolics.maketerm(typeof(t.term), f, args, symtype(t.term), nothing)
         subs = Dict()
         for (orig, new) in zip(oldargs, args)
             isequal(orig, new) && continue
