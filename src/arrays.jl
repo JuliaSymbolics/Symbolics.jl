@@ -773,7 +773,7 @@ function scalarize(arr)
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
     elseif iscall(arr) && symtype(arr) <: Number
-        t = maketerm(arr, operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata=metadata(arr))
+        t = maketerm(typeof(arr), operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata(arr))
         iscall(t) ? scalarize_op(operation(t), t) : t
     else
         arr
