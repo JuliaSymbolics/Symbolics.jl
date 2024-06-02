@@ -27,7 +27,7 @@ function maketerm(t::ComplexTerm, f, args, symtype; metadata=nothing)
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        maketerm(first(args), f, args, symtype; metadata=metadata)
+        maketerm(first(args), f, args, symtype, metadata)
     end
 end
 
