@@ -491,8 +491,8 @@ function fast_substitute(expr, subs; operator = Nothing)
     maketerm(expr,
         op,
         args,
-        symtype(expr);
-        metadata = metadata(expr))
+        symtype(expr),
+        metadata(expr))
 end
 function fast_substitute(expr, pair::Pair; operator = Nothing)
     a, b = pair
@@ -519,8 +519,8 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
     maketerm(expr,
         op,
         args,
-        symtype(expr);
-        metadata = metadata(expr))
+        symtype(expr),
+        metadata(expr))
 end
 
 function getparent(x, val=_fail)
