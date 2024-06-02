@@ -541,7 +541,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     J = Int[]
 
 
-    simterm(x, f, args; metadata = nothing, kw...) = maketerm(x, f, args, symtype(x), metadata; kw...)
+    mkterm(x, f, args, _, m) = maketerm(x, f, args, symtype(x), m)
 
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
@@ -552,7 +552,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
         nothing
     end
 
-    r =  Rewriters.Postwalk(r, similarterm=simterm)
+    r =  Rewriters.Postwalk(r, maketerm=mkterm)
 
     for ii = 1:length(du)
         i[] = ii
@@ -633,7 +633,7 @@ end
 
 isidx(x) = x isa TermCombination
 
-basic_simterm(t, g, args; kws...) = Term{Any}(g, args)
+basic_mkterm(t, g, args, _, m) = metadata(Term{Any}(g, args), m)
 
 let
     # we do this in a let block so that Revise works on the list of rules
@@ -661,7 +661,7 @@ let
               end
           end
           @rule ~x::issym => 0]
-    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); similarterm=basic_simterm))
+    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 
     global hessian_sparsity
 
