@@ -541,7 +541,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     J = Int[]
 
 
-    simterm(x, f, args; kw...) = maketerm(x, f, args, symtype(x); kw...)
+    simterm(x, f, args; metadata = nothing, kw...) = maketerm(x, f, args, symtype(x), metadata; kw...)
 
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
