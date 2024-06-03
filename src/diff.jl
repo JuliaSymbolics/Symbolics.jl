@@ -541,8 +541,6 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     J = Int[]
 
 
-    mkterm(x, f, args, _, m) = maketerm(x, f, args, symtype(x), m)
-
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
 
@@ -552,7 +550,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
         nothing
     end
 
-    r =  Rewriters.Postwalk(r, maketerm=mkterm)
+    r =  Rewriters.Postwalk(r)
 
     for ii = 1:length(du)
         i[] = ii
@@ -695,7 +693,7 @@ let
         u = map(value, vars)
         idx(i) = TermCombination(Set([Dict(i=>1)]))
         dict = Dict(u .=> idx.(1:length(u)))
-        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; maketerm=basic_maketerm)(expr)
+        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; maketerm=basic_mkterm)(expr)
         lp = linearity_propagator(f)
         S = _sparse(lp, length(u))
         S = full ? S : tril(S)

@@ -113,7 +113,8 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
     d_separator = 'ˍ'
 
     if ds === nothing
-        return maketerm(O, operation(O), map(diff2term, arguments(O)), metadata = O_metadata isa Nothing ?
+        return maketerm(typeof(O), head(O), map(diff2term, children(O)),
+                        symtype(O),  O_metadata isa Nothing ?
             metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...))
     else
         oldop = operation(O)
@@ -128,7 +129,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
             return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
         end
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return setname(maketerm(O, rename(oldop, newname), arguments(O), metadata = O_metadata isa Nothing ?
+        return setname(maketerm(typeof(O), rename(oldop, newname), children(O), symtype(O), O_metadata isa Nothing ?
             metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...)), newname)
     end
 end
