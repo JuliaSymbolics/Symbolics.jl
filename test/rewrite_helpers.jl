@@ -11,10 +11,17 @@ my_f(x, y) = x^3 + 2y
 
 # Check `replace` function.
 let
-    @test isequal(replace(X + X + X, X =>1), 3)
-    @test isequal(replace(X + X + X, Y => 1), 3X)
-    @test isequal(replace(X + X + X, X => Y), 3Y)
-    @test isequal(replace(X + Y^2 - Z, Y^2 => Z), X)
+    # Simple replacements.
+    @test isequal(Symbolics.replace(X + X + X, X =>1), 3)
+    @test isequal(Symbolics.replace(X + X + X, Y => 1), 3X)
+    @test isequal(Symbolics.replace(X + X + X, X => Y), 3Y)
+    @test isequal(Symbolics.replace(X + Y^2 - Z, Y^2 => Z), X)
+
+    # When the rule is a function.
+    rep_func(expr) = Symbolics.is_derivative(expr) ? b : expr
+    @test isequal(Symbolics.replace(D(X + Y) - log(a*Z), rep_func), b - log(a*Z))
+    @test isequal(Symbolics.replace(D(Z^2) + D(X + Y) + Z, rep_func), 2b + Z)
+    @test isequal(Symbolics.replace(X + sin(Y + a) + a, rep_func), X + sin(Y + a) + a)
 end
 
 # Test `hasnode` function.
@@ -80,8 +87,7 @@ let
     @test isequal(filterchildren(Z, ex3), [])
     @test isequal(filterchildren(Z, ex4), [Z])
 
-    # Test for variables.
-
+    # Test for syms.
     @test isequal(filterchildren(a, ex1), [a])
     @test isequal(filterchildren(a, ex2), [a])
     @test isequal(filterchildren(a, ex3), [a])
