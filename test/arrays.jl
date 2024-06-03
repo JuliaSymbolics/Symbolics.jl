@@ -73,13 +73,13 @@ end
     @test getmetadata(unwrap(v[1]), TestMetaT) == 4
 end
 
-@testset "similarterm" begin
+@testset "maketerm" begin
     @variables A[1:5, 1:5] B[1:5, 1:5]
 
     T = unwrap(3A)
-    @test isequal(T, similarterm(T, operation(T), arguments(T)))
+    @test isequal(T, Symbolics.maketerm(typeof(T), operation(T), arguments(T), symtype(T), nothing))
     T2 = unwrap(3B)
-    @test isequal(T2, similarterm(T, operation(T), [*, 3, unwrap(B)]))
+    @test isequal(T2, Symbolics.maketerm(typeof(T), operation(T), [*, 3, unwrap(B)], symtype(T), nothing))
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)

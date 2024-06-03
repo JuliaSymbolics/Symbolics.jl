@@ -488,11 +488,11 @@ function fast_substitute(expr, subs; operator = Nothing)
         end
         canfold[] && return op(args...)
     end
-    similarterm(expr,
+    maketerm(typeof(expr),
         op,
         args,
-        symtype(expr);
-        metadata = metadata(expr))
+        symtype(expr),
+        metadata(expr))
 end
 function fast_substitute(expr, pair::Pair; operator = Nothing)
     a, b = pair
@@ -516,11 +516,11 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
         end
         canfold[] && return op(args...)
     end
-    similarterm(expr,
+    maketerm(typeof(expr),
         op,
         args,
-        symtype(expr);
-        metadata = metadata(expr))
+        symtype(expr),
+        metadata(expr))
 end
 
 function getparent(x, val=_fail)
