@@ -18,7 +18,7 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 @register_symbolic limit(a, N)::Integer
 
 if GROUP == "All" || GROUP == "Core"
-    @testset begin
+      @testset begin
         @safetestset "Struct Test" begin include("struct.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
@@ -27,6 +27,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Semi-polynomial" begin include("semipoly.jl") end
         @safetestset "Fuzz Arrays" begin include("fuzz-arrays.jl") end
         @safetestset "Differentiation Test" begin include("diff.jl") end
+        @safetestset "ADTypes Test" begin include("adtypes.jl") end
         @safetestset "Difference Test" begin include("difference.jl") end
         @safetestset "Degree Test" begin include("degree.jl") end
         @safetestset "Coeff Test" begin include("coeff.jl") end
