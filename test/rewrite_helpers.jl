@@ -9,15 +9,15 @@ using Test
 D = Differential(t)
 my_f(x, y) = x^3 + 2y
 
-# Check replacenode function.
+# Check `replace` function.
 let
-    @test isequal(replacenode(X + X + X, X =>1), 3)
-    @test isequal(replacenode(X + X + X, Y => 1), 3X)
-    @test isequal(replacenode(X + X + X, X => Y), 3Y)
-    @test isequal(replacenode(X + Y^2 - Z, Y^2 => Z), X)
+    @test isequal(replace(X + X + X, X =>1), 3)
+    @test isequal(replace(X + X + X, Y => 1), 3X)
+    @test isequal(replace(X + X + X, X => Y), 3Y)
+    @test isequal(replace(X + Y^2 - Z, Y^2 => Z), X)
 end
 
-# Test hasnode function.
+# Test `hasnode` function.
 let
     ex1 = 2X^a - log(b + my_f(Y,Y)) - 3
     ex2 = X^(Y^(Z-a)) +log(log(log(b)))
@@ -58,7 +58,7 @@ let
     @test hasnode(is_derivative, ex4)
 end
 
-# Check filterchildren function.
+# Check `filterchildren` function.
 let 
     ex1 = 2X^a - log(b + my_f(Y,Y)) - 3
     ex2 = X^(Y^(Z-a)) +log(log(log(b)))

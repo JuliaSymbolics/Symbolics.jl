@@ -1,5 +1,5 @@
 """
-replacenode(expr::Symbolic, rules...)
+replace(expr::Symbolic, rules...)
 Walk the expression and replace subexpressions according to `rules`. `rules`
 could be rules constructed with `@rule`, a function, or a pair where the
 left hand side is matched with equality (using `isequal`) and is replaced by the right hand side.
@@ -12,15 +12,15 @@ not the replacements.
 Set `fixpoint = true` to repeatedly apply rules until no
 change to the expression remains to be made.
 """
-function replacenode(expr::Num, r::Pair, rules::Pair...)
-    _replacenode(unwrap(expr), r, rules...)
+function replace(expr::Num, r::Pair, rules::Pair...; fixpoint = false)
+    _replace(unwrap(expr), r, rules...)
 end
 # Fix ambiguity
-replacenode(expr::Num, rules...) = _replacenode(unwrap(expr), rules...)
-replacenode(expr::Symbolic, rules...) = _replacenode(unwrap(expr), rules...)
-replacenode(expr::Symbolic, r::Pair, rules::Pair...) = _replacenode(expr, r, rules...)
+replace(expr::Num, rules...; fixpoint = false) = _replace(unwrap(expr), rules...; fixpoint)
+replace(expr::Symbolic, rules...; fixpoint = false) = _replace(unwrap(expr), rules...; fixpoint)
+replace(expr::Symbolic, r::Pair, rules::Pair...; fixpoint = false) = _replace(expr, r, rules...; fixpoint)
 
-function _replacenode(expr::Symbolic, rules...; fixpoint=false)
+function _replace(expr::Symbolic, rules...; fixpoint = false)
     rs = map(r -> r isa Pair ? (x -> isequal(x, r[1]) ? r[2] : nothing) : r, rules)
     R = Prewalk(Chain(rs))
     if fixpoint
@@ -119,7 +119,7 @@ function filterchildren!(r::Any, y, acc)
 end
 
 module RewriteHelpers
-import Symbolics: replacenode, hasnode, filterchildren, unwrap
-export replacenode, hasnode, filterchildren, unwrap
+import Symbolics: replace, hasnode, filterchildren, unwrap
+export replace, hasnode, filterchildren, unwrap
 
 end
