@@ -1,5 +1,5 @@
 import SymbolicUtils.Rewriters: RestartedChain
-using DataStructures
+import DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
@@ -236,7 +236,7 @@ function bifurcate_terms(terms, vars, degree::Real; consts = true)
 end
 
 function init_semipoly_vars(vars)
-    set = OrderedSet(unwrap.(vars))
+    set = DataStructures.OrderedSet(unwrap.(vars))
     @assert length(set) == length(vars) # vars passed to semi-polynomial form must be unique
     set
 end
