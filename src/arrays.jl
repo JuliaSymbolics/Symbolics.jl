@@ -62,32 +62,10 @@ end
 
 ConstructionBase.constructorof(s::Type{<:ArrayOp{T}}) where {T} = ArrayOp{T}
 
-function SymbolicUtils.maketerm(t::ArrayOp, f, args, _symtype = nothing; metadata = nothing)
-    oldargs = arguments(t)
-    if _symtype === nothing
-        _symtype = symtype(t)
-    end
-
-    if !all(isequal.(args, oldargs)) || !isequal(f, operation(t))
-        term = Symbolics.maketerm(typeof(t.term), f, args, symtype(t.term), nothing)
-        subs = Dict()
-        for (orig, new) in zip(oldargs, args)
-            isequal(orig, new) && continue
-            subs[orig] = new
-        end
-        if !isequal(f, operation(t))
-            subs[operation(t)] = f
-        end
-        expr = substitute(t.expr, subs)
-        expr = SymbolicUtils.term(operation(expr), arguments(expr)...)
-    else
-        term = t.term
-        expr = t.expr
-    end
-    if _symtype === nothing
-        _symtype = symtype(t)
-    end
-    return ArrayOp{_symtype}(t.output_idx, expr, t.reduce, term, t.shape, t.ranges, metadata)
+function SymbolicUtils.maketerm(::Type{<:ArrayOp}, f, args, _symtype, m)
+    t  = f(args...)
+    t isa Symbolic && !isnothing(metadata) ?
+        metadata(t, m) : t
 end
 
 shape(aop::ArrayOp) = aop.shape
@@ -640,8 +618,8 @@ end
 function prewalk_if(cond, f, t, maketerm)
     t′ = cond(t) ? f(t) : return t
     if iscall(t′)
-        return maketerm(t′, operation(t′),
-                           map(x->prewalk_if(cond, f, x, maketerm), arguments(t′)))
+        return maketerm(typeof(t′), TermInterface.head(t′),
+                           map(x->prewalk_if(cond, f, x, maketerm), children(t′)))
     else
         return t′
     end

@@ -488,7 +488,7 @@ function fast_substitute(expr, subs; operator = Nothing)
         end
         canfold[] && return op(args...)
     end
-    maketerm(expr,
+    maketerm(typeof(expr),
         op,
         args,
         symtype(expr),
@@ -516,7 +516,7 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
         end
         canfold[] && return op(args...)
     end
-    maketerm(expr,
+    maketerm(typeof(expr),
         op,
         args,
         symtype(expr),
