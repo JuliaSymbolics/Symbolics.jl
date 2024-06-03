@@ -136,7 +136,7 @@ Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.p, m.coeff)
 isop(x, op) = iscall(x) && operation(x) === op
 isop(op) = Base.Fix2(isop, op)
 
-bareterm(x, f, args; kw...) = Term{symtype(x)}(f, args)
+simpleterm(T, f, args, sT, m) = Term{sT}(f, args)
 
 function mark_and_exponentiate(expr, vars)
     # Step 1
@@ -153,7 +153,7 @@ function mark_and_exponentiate(expr, vars)
              @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
              @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, unsorted_arguments(~a))...)
              @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
-    expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
+    expr′ = Postwalk(RestartedChain(rules), maketerm = simpleterm)(expr′)
 end
 
 function semipolyform_terms(expr, vars)
@@ -424,7 +424,9 @@ function unwrap_sp(m::SemiMonomial)
 end
 function unwrap_sp(x)
     x = unwrap(x)
-    iscall(x) ? similarterm(x, operation(x), map(unwrap_sp, unsorted_arguments(x))) : x
+    iscall(x) ? maketerm(typeof(x),
+                         TermInterface.head(x), map(unwrap_sp,
+                                                    TermInterface.children(x))) : x
 end
 
 function cautious_sum(nls)

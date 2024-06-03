@@ -19,7 +19,8 @@ using PrecompileTools
 
     import DomainSets: Domain
 
-    import SymbolicUtils: similarterm, iscall, operation, arguments, symtype, metadata
+    using TermInterface
+    import TermInterface: maketerm, iscall, operation, arguments, symtype, metadata
 
     import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
     FnType, @rule, Rewriters, substitute,
@@ -34,7 +35,7 @@ using PrecompileTools
     import ArrayInterface
     using RuntimeGeneratedFunctions
     using SciMLBase, IfElse
-    using MacroTools
+    import MacroTools
 
     using SymbolicIndexingInterface
 
