@@ -695,7 +695,7 @@ let
         u = map(value, vars)
         idx(i) = TermCombination(Set([Dict(i=>1)]))
         dict = Dict(u .=> idx.(1:length(u)))
-        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; similarterm=basic_simterm)(expr)
+        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; maketerm=basic_maketerm)(expr)
         lp = linearity_propagator(f)
         S = _sparse(lp, length(u))
         S = full ? S : tril(S)

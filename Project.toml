@@ -38,6 +38,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SymbolicIndexingInterface = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
 SymbolicLimits = "19f23fe9-fdab-4a78-91af-e7b7767979c3"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
+TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 
 [weakdeps]
 Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"

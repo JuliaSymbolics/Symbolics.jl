@@ -147,6 +147,7 @@ macro arrayop(output_idx, expr, options...)
     call = nothing
 
     extra = []
+    isexpr = MacroTools.isexpr
     for o in options
         if isexpr(o, :call) && o.args[1] == :in
             push!(rs, :($(o.args[2]) => $(o.args[3])))
