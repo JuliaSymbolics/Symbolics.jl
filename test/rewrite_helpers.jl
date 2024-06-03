@@ -81,7 +81,6 @@ let
     @test isequal(filterchildren(Z, ex4), [Z])
 
     # Test for variables.
-
     @test isequal(filterchildren(a, ex1), [a])
     @test isequal(filterchildren(a, ex2), [a])
     @test isequal(filterchildren(a, ex3), [a])
