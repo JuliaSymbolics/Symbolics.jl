@@ -89,7 +89,7 @@ SymPy = "2"
 SymbolicIndexingInterface = "0.3.14"
 SymbolicLimits = "0.2.0"
 SymbolicUtils = "2.0.2"
-TermInterface = "0.4"
+TermInterface = "0.4, 1"
 julia = "1.10"
 
 [extras]
