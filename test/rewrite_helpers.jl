@@ -9,15 +9,26 @@ using Test
 D = Differential(t)
 my_f(x, y) = x^3 + 2y
 
-# Check replace function.
+# Check `replacenode` function.
 let
-    @test isequal(replace(X + X + X, X =>1), 3)
-    @test isequal(replace(X + X + X, Y => 1), 3X)
-    @test isequal(replace(X + X + X, X => Y), 3Y)
-    @test isequal(replace(X + Y^2 - Z, Y^2 => Z), X)
+    # Simple replacements.
+    @test isequal(replacenode(X + X + X, X =>1), 3)
+    @test isequal(replacenode(X + X + X, Y => 1), 3X)
+    @test isequal(replacenode(X + X + my_f(X, Z), X => Y), Y^3 + 2Y + 2Z)
+    @test isequal(replacenode(X + Y^2 - Z, Y^2 => Z), X)
+
+    # When the rule is a function.
+    rep_func(expr) = Symbolics.is_derivative(expr) ? b : expr
+    @test isequal(replacenode(D(X + Y) - log(a*Z), rep_func), b - log(a*Z))
+    @test isequal(replacenode(D(Z^2) + my_f(D(X), D(Y)) + Z, rep_func), b^3 + 3b + Z)
+    @test isequal(replacenode(X + sin(Y + a) + a, rep_func), X + sin(Y + a) + a)
+
+    # On non-symbolic inputs.
+    @test isequal(replacenode(1, X =>2.0), 1)
+    @test isequal(replacenode(1, rep_func), 1)
 end
 
-# Test occursin function.
+# Test `hasnode` function.
 let
     ex1 = 2X^a - log(b + my_f(Y,Y)) - 3
     ex2 = X^(Y^(Z-a)) +log(log(log(b)))
@@ -26,39 +37,44 @@ let
     ex5 = a + 5b^2
     
     # Test for variables.
-    @test occursin(X, ex1)
-    @test occursin(X, ex2)
-    @test occursin(X, ex3)
-    @test !occursin(X, ex4)
-    @test occursin(Y, ex1)
-    @test occursin(Y, ex2)
-    @test occursin(Y, ex3)
-    @test occursin(Y, ex4)
-    @test !occursin(Z, ex1)
-    @test occursin(Z, ex2)
-    @test !occursin(Z, ex3)
-    @test occursin(Z, ex4)
+    @test hasnode(X, ex1)
+    @test hasnode(X, ex2)
+    @test hasnode(X, ex3)
+    @test !hasnode(X, ex4)
+    @test hasnode(Y, ex1)
+    @test hasnode(Y, ex2)
+    @test hasnode(Y, ex3)
+    @test hasnode(Y, ex4)
+    @test !hasnode(Z, ex1)
+    @test hasnode(Z, ex2)
+    @test !hasnode(Z, ex3)
+    @test hasnode(Z, ex4)
     
     # Test for variables.
-    @test_broken occursin(a, ex1)
-    @test_broken occursin(a, ex2)
-    @test_broken occursin(a, ex3)
-    @test_broken occursin(a, ex4)
-    @test occursin(a, ex5)
-    @test_broken occursin(b, ex1)
-    @test_broken occursin(b, ex2)
-    @test !occursin(b, ex3)
-    @test !occursin(b, ex4)
-    @test occursin(b, ex5)
+    @test hasnode(a, ex1)
+    @test hasnode(a, ex2)
+    @test hasnode(a, ex3)
+    @test hasnode(a, ex4)
+    @test hasnode(a, ex5)
+    @test hasnode(b, ex1)
+    @test hasnode(b, ex2)
+    @test !hasnode(b, ex3)
+    @test !hasnode(b, ex4)
+    @test hasnode(b, ex5)
     
     # Test for function.
-    @test !occursin(is_derivative, ex1)
-    @test !occursin(is_derivative, ex2)
-    @test !occursin(is_derivative, ex3)
-    @test occursin(is_derivative, ex4)
+    @test !hasnode(is_derivative, ex1)
+    @test !hasnode(is_derivative, ex2)
+    @test !hasnode(is_derivative, ex3)
+    @test hasnode(is_derivative, ex4)
+
+    # On non symbolic inputs:
+    @test !hasnode(X, 1)
+    @test !hasnode(a, 1)
+    @test !hasnode(is_derivative, 1)
 end
 
-# Check filterchildren function.
+# Check `filterchildren` function.
 let 
     ex1 = 2X^a - log(b + my_f(Y,Y)) - 3
     ex2 = X^(Y^(Z-a)) +log(log(log(b)))
@@ -80,8 +96,7 @@ let
     @test isequal(filterchildren(Z, ex3), [])
     @test isequal(filterchildren(Z, ex4), [Z])
 
-    # Test for variables.
-
+    # Test for syms.
     @test isequal(filterchildren(a, ex1), [a])
     @test isequal(filterchildren(a, ex2), [a])
     @test isequal(filterchildren(a, ex3), [a])
