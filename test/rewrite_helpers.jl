@@ -9,19 +9,23 @@ using Test
 D = Differential(t)
 my_f(x, y) = x^3 + 2y
 
-# Check `replace` function.
+# Check `replacenode` function.
 let
     # Simple replacements.
-    @test isequal(Symbolics.replace(X + X + X, X =>1), 3)
-    @test isequal(Symbolics.replace(X + X + X, Y => 1), 3X)
-    @test isequal(Symbolics.replace(X + X + X, X => Y), 3Y)
-    @test isequal(Symbolics.replace(X + Y^2 - Z, Y^2 => Z), X)
+    @test isequal(replacenode(X + X + X, X =>1), 3)
+    @test isequal(replacenode(X + X + X, Y => 1), 3X)
+    @test isequal(replacenode(X + X + X, X => Y), 3Y)
+    @test isequal(replacenode(X + Y^2 - Z, Y^2 => Z), X)
 
     # When the rule is a function.
     rep_func(expr) = Symbolics.is_derivative(expr) ? b : expr
-    @test isequal(Symbolics.replace(D(X + Y) - log(a*Z), rep_func), b - log(a*Z))
-    @test isequal(Symbolics.replace(D(Z^2) + D(X + Y) + Z, rep_func), 2b + Z)
-    @test isequal(Symbolics.replace(X + sin(Y + a) + a, rep_func), X + sin(Y + a) + a)
+    @test isequal(replacenode(D(X + Y) - log(a*Z), rep_func), b - log(a*Z))
+    @test isequal(replacenode(D(Z^2) + D(X + Y) + Z, rep_func), 2b + Z)
+    @test isequal(replacenode(X + sin(Y + a) + a, rep_func), X + sin(Y + a) + a)
+
+    # On non-symbolic inputs.
+    @test isequal(replacenode(1, X =>2.0), 1)
+    @test isequal(replacenode(1, rep_func(expr)), 1)
 end
 
 # Test `hasnode` function.
@@ -63,6 +67,12 @@ let
     @test !hasnode(is_derivative, ex2)
     @test !hasnode(is_derivative, ex3)
     @test hasnode(is_derivative, ex4)
+
+    # On non symbolic inputs:
+    @test !hasnode(X, 1)
+    @test !hasnode(a, 1)
+    @test !hasnode(is_derivative, 1)
+
 end
 
 # Check `filterchildren` function.
