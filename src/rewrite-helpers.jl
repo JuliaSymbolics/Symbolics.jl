@@ -56,7 +56,7 @@ function hasnode(r::Function, y::Union{Num, Symbolic})
 end
 hasnode(r::Num, y::Union{Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
 hasnode(r::Symbolic, y::Union{Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
-hasnode(r::Number, y::Union{Num, Symbolic}) = false
+hasnode(r::Union{Num, Symbolic, Function}, y::Number) = false
 
 function _hasnode(r, y)
     y = unwrap(y)
