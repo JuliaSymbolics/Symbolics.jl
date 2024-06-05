@@ -59,7 +59,7 @@ vec(du)[1:10]</code></pre><p class="math-container">\[ \begin{equation}
  \]</p><p>The output, here the in-place modified <code>du</code>, is a symbolic representation of each output of the function. We can then utilize this in the Symbolics functionality. For example, let&#39;s build a parallel version of <code>f</code> first:</p><pre><code class="language-julia hljs">fastf = eval(Symbolics.build_function(du,u,
             parallel=Symbolics.MultithreadedForm())[2])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#13 (generic function with 1 method)</code></pre><p>Now let&#39;s compute the sparse Jacobian function and compile a fast multithreaded version:</p><pre><code class="language-julia hljs">jac = Symbolics.sparsejacobian(vec(du), vec(u))
 row,col,val = findnz(jac)
-scatter(row,col,legend=false,ms=1,c=:black)</code></pre><img src="b49a71b7.svg" alt="Example block output"/><pre><code class="language-julia hljs">fjac = eval(Symbolics.build_function(jac,u,
+scatter(row,col,legend=false,ms=1,c=:black)</code></pre><img src="0899a908.svg" alt="Example block output"/><pre><code class="language-julia hljs">fjac = eval(Symbolics.build_function(jac,u,
             parallel=Symbolics.MultithreadedForm())[2])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">#15 (generic function with 1 method)</code></pre><p>It takes awhile for this to generate, but the results will be worth it! Now let&#39;s set up the parabolic PDE to be solved by DifferentialEquations.jl. We will set up the vanilla version and the sparse multithreaded version:</p><pre><code class="language-julia hljs">using OrdinaryDiffEq
 u0 = zeros(N, N, 3)
 MyA = zeros(N, N);
