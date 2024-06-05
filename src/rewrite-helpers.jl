@@ -19,8 +19,6 @@ end
 replacenode(expr::Num, rules...; fixpoint = false) = _replacenode(unwrap(expr), rules...; fixpoint)
 replacenode(expr::Symbolic, rules...; fixpoint = false) = _replacenode(unwrap(expr), rules...; fixpoint)
 replacenode(expr::Symbolic, r::Pair, rules::Pair...; fixpoint = false) = _replacenode(expr, r, rules...; fixpoint)
-replacenode(expr::Number, rules...; fixpoint = false) = expr
-replacenode(expr::Number, r::Pair, rules::Pair...; fixpoint = false) = expr
 
 function _replacenode(expr::Symbolic, rules...; fixpoint = false)
     rs = map(r -> r isa Pair ? (x -> isequal(x, r[1]) ? r[2] : nothing) : r, rules)
@@ -84,7 +82,6 @@ end
 Base.@deprecate occursin(r::Function, y::Union{Num, Symbolic}) hasnode(r::Function, y::Union{Num, Symbolic})
 Base.@deprecate occursin(r::Num, y::Union{Num, Symbolic}) hasnode(r::Num, y::Union{Num, Symbolic})
 Base.@deprecate occursin(r::Symbolic, y::Union{Num, Symbolic}) hasnode(r::Symbolic, y::Union{Num, Symbolic})
-Base.@deprecate occursin(r::Union{Num, Symbolic, Function}, y::Number) hasnode(r::Union{Num, Symbolic, Function}, y::Number)
 
 """
 filterchildren(c, x)
