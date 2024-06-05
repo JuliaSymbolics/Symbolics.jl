@@ -64,7 +64,7 @@ ConstructionBase.constructorof(s::Type{<:ArrayOp{T}}) where {T} = ArrayOp{T}
 
 function SymbolicUtils.maketerm(::Type{<:ArrayOp}, f, args, _symtype, m)
     t  = f(args...)
-    t isa Symbolic && !isnothing(metadata) ?
+    t isa Symbolic && !isnothing(m) ?
         metadata(t, m) : t
 end
 
