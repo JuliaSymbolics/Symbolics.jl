@@ -32,6 +32,13 @@ function _replacenode(expr::Symbolic, rules...; fixpoint = false)
     end
 end
 
+Base.@deprecate replace(expr::Num, r::Pair, rules::Pair...; fixpoint = false) replacenode(expr, r, rules...)
+Base.@deprecate replace(expr::Num, rules...; fixpoint = false) replacenode(expr, rules...)
+Base.@deprecate replace(expr::Symbolic, rules...; fixpoint = false) replacenode(expr, rules...)
+Base.@deprecate replace(expr::Symbolic, r::Pair, rules::Pair...; fixpoint = false) replacenode(expr, r, rules...)
+Base.@deprecate replace(expr::Number, rules...; fixpoint = false) replacenode(expr, rules...)
+Base.@deprecate replace(expr::Number, r::Pair, rules::Pair...; fixpoint = false) replacenode(expr, r, rules...)
+
 """
     hasnode(c, x)
 Returns true if any part of `x` fufills the condition given in c. c can be a function or an expression.
@@ -73,6 +80,11 @@ function _hasnode(r, y)
         return false
     end
 end
+
+Base.@deprecate occursin(r::Function, y::Union{Num, Symbolic}) hasnode(r::Function, y::Union{Num, Symbolic})
+Base.@deprecate occursin(r::Num, y::Union{Num, Symbolic}) hasnode(r::Num, y::Union{Num, Symbolic})
+Base.@deprecate occursin(r::Symbolic, y::Union{Num, Symbolic}) hasnode(r::Symbolic, y::Union{Num, Symbolic})
+Base.@deprecate occursin(r::Union{Num, Symbolic, Function}, y::Number) hasnode(r::Union{Num, Symbolic, Function}, y::Number)
 
 """
 filterchildren(c, x)
