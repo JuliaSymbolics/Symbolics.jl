@@ -588,14 +588,6 @@ function replace_by_scalarizing(ex, dict)
     rule = @rule(getindex(~x, ~~i) =>
                  scalarize(~x, (map(j->substitute(j, dict), ~~i)...,)))
 
-    simterm = (x, f, args; kws...) -> begin
-        if metadata(x) !== nothing
-            maketerm(typeof(x), f, args, symtype(x), metadata(x))
-        else
-            f(args...)
-        end
-    end
-
     function rewrite_operation(x)
         if iscall(x) && iscall(operation(x))
             f = operation(x)
@@ -612,19 +604,22 @@ function replace_by_scalarizing(ex, dict)
 
     prewalk_if(x->!(x isa ArrayOp || x isa ArrayMaker),
                Rewriters.PassThrough(Chain([rewrite_operation, rule])),
-              ex, simterm)
+              ex)
 end
 
-function prewalk_if(cond, f, t, maketerm)
+function prewalk_if(cond, f, t)
     t′ = cond(t) ? f(t) : return t
     if iscall(t′)
-        return maketerm(typeof(t′), TermInterface.head(t′),
-                           map(x->prewalk_if(cond, f, x, maketerm), children(t′)))
+        if metadata(t′) !== nothing
+            return maketerm(typeof(t′), TermInterface.head(t′),
+                           map(x->prewalk_if(cond, f, x), children(t′)), symtype(t′), metadata(t′))
+        else
+            TermInterface.head(t′)(map(x->prewalk_if(cond, f, x), children(t′))...)
+        end
     else
         return t′
     end
 end
-
 
 function scalarize(arr::AbstractArray, idx)
     arr[idx...]
