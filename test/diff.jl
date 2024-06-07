@@ -377,5 +377,5 @@ let
     @variables t X(t) 
     Dt = Differential(t)^0
     @test isequal(Dt, identity)
-    @test test_equal(Dt(t + 2t^2), t + 2t^2)
+    test_equal(Dt(t + 2t^2), t + 2t^2)
 end
