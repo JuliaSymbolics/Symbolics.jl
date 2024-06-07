@@ -376,9 +376,6 @@ end
 let
     @variables t X(t) 
     Dt = Differential(t)^0
-    DXt = Differential(X)^0 
-    @test isequal(Dt, t)
-    @test isequal(DXt, X)
-    @test !Symbolics.is_derivative(Dt)
-    @test !Symbolics.is_derivative(DXt)
+    @test isequal(Dt, identity)
+    @test test_equal(Dt(t + 2t^2), t + 2t^2)
 end
