@@ -372,7 +372,7 @@ let
     @test !Symbolics.is_derivative(Symbolics.unwrap(my_f(X, D(Y))))
 end
 
-# Zeroth derivative
+# Zeroth derivative (#1163)
 let
     @variables t X(t) 
     Dt = Differential(t)^0
