@@ -371,3 +371,14 @@ let
     @test !Symbolics.is_derivative(Symbolics.unwrap(D(X) + D(Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(my_f(X, D(Y))))
 end
+
+# Zeroth derivative
+let
+    @variables t X(t) 
+    Dt = Differential(t)^0
+    DXt = Differential(X)^0 
+    @test isequal(Dt, t)
+    @test isequal(DXt, X)
+    @test !Symbolics.is_derivative(Dt)
+    @test !Symbolics.is_derivative(DXt)
+end
