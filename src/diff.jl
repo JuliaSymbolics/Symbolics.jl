@@ -51,7 +51,7 @@ is_derivative(x) = iscall(x) ? operation(x) isa Differential : false
 Base.:*(D1, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
 Base.:*(D1::Differential, D2::Differential) = D1 ∘ D2
-Base.:^(D::Differential, n::Integer) = _repeat_apply(D, n)
+Base.:^(D::Differential, n::Integer) = iszero(n) ? identity : _repeat_apply(D, n)
 
 Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ")")
 
