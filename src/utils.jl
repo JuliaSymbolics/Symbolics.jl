@@ -120,15 +120,16 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
         oldop = operation(O)
         opname = if issym(oldop)
             string(nameof(oldop))
-        elseif oldop isa Function
-            @show "here?"
-            return nothing
         elseif iscall(oldop) && operation(oldop) === getindex
             string(nameof(arguments(oldop)[1]))
         elseif oldop == getindex
             args = arguments(O)
             opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
             return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
+        elseif oldop isa Function
+            return nothing
+        else
+            error("diff2term case not handled: $oldop")
         end
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
         return setname(maketerm(typeof(O), rename(oldop, newname), children(O), symtype(O), O_metadata isa Nothing ?
