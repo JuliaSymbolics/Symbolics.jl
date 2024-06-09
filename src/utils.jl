@@ -111,6 +111,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
         ds = nothing
     end
     d_separator = 'ˍ'
+    local opname
 
     if ds === nothing
         return maketerm(typeof(O), head(O), map(diff2term, children(O)),
