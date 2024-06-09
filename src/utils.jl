@@ -111,7 +111,6 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
         ds = nothing
     end
     d_separator = 'ˍ'
-    local opname
 
     if ds === nothing
         return maketerm(typeof(O), head(O), map(diff2term, children(O)),
@@ -119,15 +118,18 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
             metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...))
     else
         oldop = operation(O)
-        if issym(oldop)
-            opname = string(nameof(oldop))
+        opname = if issym(oldop)
+            string(nameof(oldop))
         elseif iscall(oldop) && operation(oldop) === getindex
-            opname = string(nameof(arguments(oldop)[1]))
-            args = arguments(O)
+            string(nameof(arguments(oldop)[1]))
         elseif oldop == getindex
             args = arguments(O)
             opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
             return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
+        elseif oldop isa Function
+            return nothing
+        else
+            error("diff2term case not handled: $oldop")
         end
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
         return setname(maketerm(typeof(O), rename(oldop, newname), children(O), symtype(O), O_metadata isa Nothing ?
