@@ -26,3 +26,9 @@ D = Differential(t)
         )
     )
 )
+
+@variables x y t
+D = Differential(t)
+Symbolics.diff2term(D(x))
+Symbolics.diff2term(D(sqrt(sqrt(sqrt(+(x,y))))))
+Symbolics.diff2term(D(x+y))
