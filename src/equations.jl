@@ -1,4 +1,4 @@
-const NAMESPACE_SEPARATOR = '₊'
+const NAMESPACE_SEPARATOR = '.'
 
 hide_lhs(_) = false
 
