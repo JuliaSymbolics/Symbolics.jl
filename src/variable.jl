@@ -277,22 +277,29 @@ end
 
 function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
     # TODO: just use Sym here
-    ndim = :($length(($(indices...),)))
+    #
+    # convert to Base.OneTo if possible
+    normalize = quote
+        idxs = ($(indices...),)
+        _idxs = map(i -> $(Base.OneTo)($last(i)), idxs)
+        $(==)(idxs, _idxs) && (idxs = _idxs)
+    end
+    ndim = :($length(idxs))
 
     need_scalarize = false
     expr = if call_args === nothing
         ex = :($Sym{Array{$type, $ndim}}($var_name))
-        :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        :($setmetadata($ex, $ArrayShapeCtx, idxs))
     elseif !isempty(call_args) && call_args[end] == :..
         need_scalarize = true
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
-        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        ex = :($setmetadata($ex, $ArrayShapeCtx, idxs))
         :($map($CallWithMetadata, $ex))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
         ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
-        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        ex = :($setmetadata($ex, $ArrayShapeCtx, idxs))
         :($map($CallWith(($(call_args...),)), $ex))
     end
 
@@ -304,7 +311,7 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         expr = :($scalarize_getindex($expr))
     end
 
-    expr = :($wrap($expr))
+    expr = :($normalize; $wrap($expr))
 
     return expr
 end
