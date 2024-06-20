@@ -37,7 +37,7 @@ function latexify_derivatives(ex)
                 integrand
             )
         elseif x.args[1] === :_textbf
-            ls = latexify(latexify_derivatives(arguments(x)[1])).s
+            ls = latexify(latexify_derivatives(arguments(x; sort = true)[1])).s
             return "\\textbf{" * strip(ls, '\$') * "}"
         else
             return x
@@ -134,7 +134,7 @@ function _toexpr(O)
 
         # We need to iterate over each term in m, ignoring the numeric coefficient.
         # This iteration needs to be stable, so we can't iterate over m.dict.
-        for term in Iterators.drop(arguments(m), isone(m.coeff) ? 0 : 1)
+        for term in Iterators.drop(arguments(m; sort = true), isone(m.coeff) ? 0 : 1)
             if !ispow(term)
                 push!(numer, _toexpr(term))
                 continue
@@ -182,7 +182,7 @@ function _toexpr(O)
     !iscall(O) && return O
 
     op = operation(O)
-    args = arguments(O)
+    args = arguments(O; sort = true)
 
     if (op===(*)) && (args[1] === -1)
         arg_mul = Expr(:call, :(*), _toexpr(args[2:end])...)
@@ -233,8 +233,8 @@ _toexpr(eqs::AbstractArray) = map(eq->_toexpr(eq), eqs)
 _toexpr(x::Num) = _toexpr(value(x))
 
 function getindex_to_symbol(t)
-    @assert iscall(t) && operation(t) === getindex && symtype(arguments(t)[1]) <: AbstractArray
-    args = arguments(t)
+    @assert iscall(t) && operation(t) === getindex && symtype(arguments(t; sort = true)[1]) <: AbstractArray
+    args = arguments(t; sort = true)
     idxs = args[2:end]
     try
         sub = join(map(map_subscripts, idxs), "ˏ")
