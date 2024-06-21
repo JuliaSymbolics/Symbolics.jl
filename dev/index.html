@@ -9,7 +9,7 @@ Pkg.add(&quot;Symbolics&quot;)</code></pre><h2 id="Citation"><a class="docs-head
   [6e4b80f9] BenchmarkTools v1.5.0
   [e30172f5] Documenter v1.4.1
   [23fbe1c1] Latexify v0.16.3
-  [1dea7af3] OrdinaryDiffEq v6.82.0
+  [1dea7af3] OrdinaryDiffEq v6.84.0
   [91a5bcdd] Plots v1.40.4
   [90137ffa] StaticArrays v1.9.5
   [d1185830] SymbolicUtils v2.0.2
@@ -26,7 +26,7 @@ Platform Info:
 Threads: 1 default, 0 interactive, 1 GC (on 4 virtual cores)
 Environment:
   JULIA_DEBUG = Documenter</code></pre></details><details><summary>A more complete overview of all dependencies and their versions is also provided.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Status `~/work/Symbolics.jl/Symbolics.jl/docs/Manifest.toml`
-  [47edcb42] ADTypes v1.3.0
+  [47edcb42] ADTypes v1.4.0
   [a4c015fc] ANSIColoredPrinters v0.0.1
   [1520ce14] AbstractTrees v0.4.5
   [7d9f7c33] Accessors v0.1.36
@@ -34,10 +34,10 @@ Environment:
   [66dad0bd] AliasTables v1.1.3
   [ec485272] ArnoldiMethod v0.4.0
   [4fba245c] ArrayInterface v7.11.0
-  [4c555306] ArrayLayouts v1.9.3
+  [4c555306] ArrayLayouts v1.9.4
   [6e4b80f9] BenchmarkTools v1.5.0
   [e2ed5e7c] Bijections v0.1.6
-  [d1d4a3ce] BitFlags v0.1.8
+  [d1d4a3ce] BitFlags v0.1.9
   [62783981] BitTwiddlingConvenienceFunctions v0.1.5
   [2a0fbf3d] CPUSummary v0.2.5
   [49dc2e85] Calculus v0.5.1
@@ -63,7 +63,7 @@ Environment:
   [864edb3b] DataStructures v0.18.20
   [e2d170a0] DataValueInterfaces v1.0.0
   [8bb1440f] DelimitedFiles v1.9.1
-  [2b5f629d] DiffEqBase v6.151.2
+  [2b5f629d] DiffEqBase v6.151.4
   [163ba53b] DiffResults v1.1.0
   [b552c78f] DiffRules v1.15.1
   [a0c0ee7d] DifferentiationInterface v0.5.5
@@ -72,14 +72,14 @@ Environment:
   [e30172f5] Documenter v1.4.1
   [5b8099bc] DomainSets v0.7.14
   [fa6b7ba4] DualNumbers v0.6.8
-  [7c1d4256] DynamicPolynomials v0.5.7
+⌅ [7c1d4256] DynamicPolynomials v0.5.7
   [4e289a0a] EnumX v1.0.4
-  [f151be2c] EnzymeCore v0.7.4
+  [f151be2c] EnzymeCore v0.7.5
   [460bff9d] ExceptionUnwrapping v0.1.10
   [d4d017d3] ExponentialUtilities v1.26.1
   [e2ba6199] ExprTools v0.1.10
   [c87230d0] FFMPEG v0.4.1
-  [7034ab61] FastBroadcast v0.3.2
+  [7034ab61] FastBroadcast v0.3.3
   [9aa1b823] FastClosures v0.3.2
   [29a986be] FastLapackInterface v2.0.4
   [1a297f60] FillArrays v1.11.0
@@ -90,7 +90,7 @@ Environment:
   [069b7b12] FunctionWrappers v1.1.3
   [77dc65aa] FunctionWrappersWrappers v0.1.3
   [46192b85] GPUArraysCore v0.1.6
-  [28b8d3ca] GR v0.73.5
+  [28b8d3ca] GR v0.73.6
   [c145ed77] GenericSchur v0.5.4
   [d7ba0133] Git v1.3.1
   [86223c79] Graphs v1.11.1
@@ -98,7 +98,7 @@ Environment:
   [cd3eb016] HTTP v1.10.8
   [3e5b6fbb] HostCPUFeatures v0.1.16
   [34004b35] HypergeometricFunctions v0.3.23
-  [b5f81e59] IOCapture v0.2.4
+  [b5f81e59] IOCapture v0.2.5
   [615f187c] IfElse v0.1.1
   [d25df0c9] Inflate v0.1.5
   [8197267c] IntervalSets v0.7.10
@@ -130,15 +130,15 @@ Environment:
   [442fdcdd] Measures v0.3.2
   [e1d29d7a] Missings v1.2.0
   [46d2c3a1] MuladdMacro v0.2.4
-  [102ac46a] MultivariatePolynomials v0.5.5
-  [d8a4904e] MutableArithmetics v1.4.4
+  [102ac46a] MultivariatePolynomials v0.5.6
+  [d8a4904e] MutableArithmetics v1.4.5
   [d41bc354] NLSolversBase v7.8.3
   [77ba4419] NaNMath v1.0.2
-  [8913a72c] NonlinearSolve v3.12.4
+  [8913a72c] NonlinearSolve v3.13.0
   [6fe1bfb0] OffsetArrays v1.14.0
   [4d8831e6] OpenSSL v1.4.3
   [bac558e1] OrderedCollections v1.6.3
-  [1dea7af3] OrdinaryDiffEq v6.82.0
+  [1dea7af3] OrdinaryDiffEq v6.84.0
   [90014a1f] PDMats v0.11.31
   [65ce6f38] PackageExtensionCompat v1.0.2
   [d96e819e] Parameters v0.12.3
@@ -156,7 +156,7 @@ Environment:
   [1fd47b50] QuadGK v2.9.4
   [3cdcf5f2] RecipesBase v1.3.4
   [01d81517] RecipesPipeline v0.6.12
-  [731186ca] RecursiveArrayTools v3.23.0
+⌃ [731186ca] RecursiveArrayTools v3.23.1
   [f2c3362d] RecursiveFactorization v0.2.23
   [189a3867] Reexport v1.2.2
   [2792f1a3] RegistryInstances v0.1.0
@@ -166,9 +166,9 @@ Environment:
   [7e49a35a] RuntimeGeneratedFunctions v0.5.13
   [94e857df] SIMDTypes v0.1.0
   [476501e8] SLEEFPirates v0.6.42
-  [0bca4576] SciMLBase v2.40.0
+  [0bca4576] SciMLBase v2.41.3
   [c0aeaf25] SciMLOperators v0.3.8
-  [53ae85a6] SciMLStructures v1.2.0
+  [53ae85a6] SciMLStructures v1.3.0
   [6c6a2e73] Scratch v1.2.1
   [efcf1570] Setfield v1.1.1
   [992d4aef] Showoff v1.0.3
@@ -221,7 +221,7 @@ Environment:
   [d7e528f0] FreeType2_jll v2.13.2+0
   [559328eb] FriBidi_jll v1.0.14+0
   [0656b61e] GLFW_jll v3.3.9+0
-  [d2c73de3] GR_jll v0.73.5+0
+  [d2c73de3] GR_jll v0.73.6+0
   [78b55507] Gettext_jll v0.21.0+0
   [f8c6e375] Git_jll v2.44.0+2
   [7746bdde] Glib_jll v2.80.2+0
@@ -247,7 +247,7 @@ Environment:
   [efe28fd5] OpenSpecFun_jll v0.5.5+0
   [91d4177d] Opus_jll v1.3.2+0
   [30392449] Pixman_jll v0.43.4+0
-⌅ [c0090381] Qt6Base_jll v6.5.3+1
+  [c0090381] Qt6Base_jll v6.7.1+1
   [f50d1b31] Rmath_jll v0.4.2+0
   [a44049a8] Vulkan_Loader_jll v1.3.243+0
   [a2964d1f] Wayland_jll v1.21.0+1
@@ -344,4 +344,4 @@ Environment:
   [8e850b90] libblastrampoline_jll v5.8.0+1
   [8e850ede] nghttp2_jll v1.52.0+1
   [3f19e933] p7zip_jll v17.4.0+2
-Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v5.30.3/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v5.30.3/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Monday 10 June 2024 11:58">Monday 10 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Info Packages marked with ⌃ and ⌅ have new versions available. Those with ⌃ may be upgradable, but those with ⌅ are restricted by compatibility constraints from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v5.30.3/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v5.30.3/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Friday 21 June 2024 16:16">Friday 21 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
