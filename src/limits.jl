@@ -8,7 +8,7 @@ Compute the limit of `expr` as `var` approaches `h`.
 thrown. Side defaults to `:both` for finite `h`, `:left` for `h = Inf`, and `:right` for
 `h = -Inf`.
 
-`expr` must be compoesed of `log`, `exp`, constants, and the rational opperators `+`, `-`,
+`expr` must be composed of `log`, `exp`, constants, and the rational operators `+`, `-`,
 `*`, and `/`. This limitation may eventually be relaxed.
 
 !!! warning
