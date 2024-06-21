@@ -159,7 +159,7 @@ In some circumstances you may need to use the direct API in order to define
 registration on functions or types without using the macro. This is done
 by directly defining dispatches on symbolic objects.
 
-A good exmample of this is DataInterpolations.jl's interpolations object.
+A good example of this is DataInterpolations.jl's interpolations object.
 On an interpolation by a symbolic variable, we generate the symbolic
 function (the `term`) for the interpolation function. This looks like:
 
