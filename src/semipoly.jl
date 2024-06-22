@@ -3,7 +3,7 @@ using DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
-import SymbolicUtils: unsorted_arguments
+import SymbolicUtils: arguments
 
 """
 $(TYPEDEF)
@@ -24,7 +24,7 @@ function Base.:+(a::SemiMonomial, b::SemiMonomial)
 end
 function Base.:+(m::SemiMonomial, t)
     if iscall(t) && operation(t) == (+)
-        return Term(+, [unsorted_arguments(t); m])
+        return Term(+, [arguments(t); m])
     end
     Term(+, [m, t])
 end
@@ -42,7 +42,7 @@ function Base.:*(m::SemiMonomial, t::Symbolic)
             args = collect(all_terms(t))
             return Term(+, (m,) .* args)
         elseif op == (*)
-            return Term(*, [unsorted_arguments(t); m])
+            return Term(*, [arguments(t); m])
         end
     end
     Term(*, [t, m])
@@ -151,7 +151,7 @@ function mark_and_exponentiate(expr, vars)
              @rule (~a::isop(+))^(~b::isreal) => expand(Pow((~a), real(~b)))
              @rule *(~~xs::(xs -> all(issemimonomial, xs))) => *(~~xs...)
              @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
-             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, unsorted_arguments(~a))...)
+             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, arguments(~a))...)
              @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
     expr′ = Postwalk(RestartedChain(rules), maketerm = simpleterm)(expr′)
 end
@@ -178,7 +178,7 @@ function has_vars(expr, vars)::Bool
     if expr in vars
         return true
     elseif iscall(expr)
-        for arg in unsorted_arguments(expr)
+        for arg in arguments(expr)
             if has_vars(arg, vars)
                 return true
             end
@@ -199,7 +199,7 @@ function mark_vars(expr, vars)
         @assert length(args) == 2
         return Term{symtype(expr)}(op, map(mark_vars(vars), args))
     end
-    args = unsorted_arguments(expr)
+    args = arguments(expr)
     if op === (+) || op === (*)
         return Term{symtype(expr)}(op, map(mark_vars(vars), args))
     elseif length(args) == 1
@@ -375,7 +375,7 @@ function semiquadratic_form(exprs, vars)
                     push!(V2, v)
                 else
                     @assert isop(k, *)
-                    a, b = unsorted_arguments(k)
+                    a, b = arguments(k)
                     p, q = extrema((idxmap[a], idxmap[b]))
                     j = div(q*(q-1), 2) + p
                     push!(J2, j)
@@ -403,7 +403,7 @@ end
 
 ## Utilities
 
-all_terms(x) = iscall(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
+all_terms(x) = iscall(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, arguments(x)))) : (x,)
 
 function unwrap_sp(m::SemiMonomial)
     degree_dict = pdegrees(m.p)

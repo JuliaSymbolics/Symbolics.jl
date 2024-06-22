@@ -328,7 +328,7 @@ function coeff(p, sym=nothing)
             sum(coeff(k, sym) * v for (k, v) in p.dict)
         end
     elseif ismul(p)
-        args = unsorted_arguments(p)
+        args = arguments(p)
         coeffs = map(a->coeff(a, sym), args)
         if all(iszero, coeffs)
             return 0
