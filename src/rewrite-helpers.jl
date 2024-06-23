@@ -121,6 +121,8 @@ function filterchildren!(r::Any, y, acc)
     end
 end
 
+(f::SymbolicUtils.Rule)(x::Num) = wrap(f(unwrap(x)))
+
 module RewriteHelpers
 import Symbolics: replacenode, hasnode, filterchildren, unwrap
 export replacenode, hasnode, filterchildren, unwrap
