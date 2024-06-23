@@ -115,3 +115,9 @@ let
     @test isequal(filterchildren(is_derivative, ex4), [D(Y), D(my_f(1,Z))])
 end
 
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1175
+let
+    @variables w z α::Real β::Real;
+    r3 = @rule ~x * +(~~ys) => sum(map(y-> ~x * y, ~~ys));
+    @test r3(2 * (w+w+α+β)) isa Num
+end
