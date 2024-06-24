@@ -113,7 +113,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
     d_separator = 'ˍ'
 
     if ds === nothing
-        return maketerm(typeof(O), head(O), map(diff2term, children(O)),
+        return maketerm(typeof(O), TermInterface.head(O), map(diff2term, children(O)),
                         symtype(O),  O_metadata isa Nothing ?
             metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...))
     else
