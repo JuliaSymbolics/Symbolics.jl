@@ -82,8 +82,8 @@ function get_parts_list(a, b, a_list = Vector{Any}(), b_list = Vector{Any}())
         push!(a_list, a)
         push!(b_list, b)
     elseif iscall(a) && iscall(b) && isequal(operation(a), operation(b))
-        a_args = arguments(a)
-        b_args = arguments(b)
+        a_args = sorted_arguments(a)
+        b_args = sorted_arguments(b)
 
         length(a_args) != length(b_args) && return Nothing
 
@@ -163,7 +163,7 @@ function replace_term(expr, dic::Dict)
     elseif iscall(expr)
         args = Any[]
 
-        for arg in arguments(expr)
+        for arg in sorted_arguments(expr)
             push!(args, replace_term(arg, dic))
         end
 
@@ -205,11 +205,11 @@ function expr_similar(ref_expr, expr, check_matches = true)
     SymbolicUtils.issym(expr) && iscall(ref_expr) && return false
 
     if iscall(ref_expr)
-        ref_args = arguments(ref_expr)
+        ref_args = sorted_arguments(ref_expr)
         ref_len = length(ref_args)
         ref_op = operation(ref_expr)
 
-        args = arguments(expr)
+        args = sorted_arguments(expr)
         len = length(args)
         op = operation(expr)
 
@@ -250,12 +250,12 @@ end
 
 function get_base(expr)
     (!iscall(expr) || operation(expr) != (^)) && throw("not a power(^) -> $expr")
-    return arguments(expr)[1]
+    return sorted_arguments(expr)[1]
 end
 
 function get_exp(expr)
     (!iscall(expr) || operation(expr) != (^)) && throw("not a power(^) -> $expr")
-    return arguments(expr)[2]
+    return sorted_arguments(expr)[2]
 end
 
 function solve_single_eq_unchecked(
@@ -326,10 +326,10 @@ end
 function left_prod_right_zero(eq::Equation, var, single_solution)
     if SymbolicUtils.ismul(eq.lhs) && isequal(0, eq.rhs)
         if (single_solution)
-            eq = arguments(eq.lhs)[1] ~ 0
+            eq = sorted_arguments(eq.lhs)[1] ~ 0
         else
             solutions = Equation[]
-            for arg in arguments(eq.lhs)
+            for arg in sorted_arguments(eq.lhs)
                 temp = solve_single_eq(arg ~ 0, var)
                 temp = temp isa Equation ? [temp] : temp
                 push!(solutions, temp...)
@@ -371,7 +371,7 @@ function move_to_other_side(eq::Equation, var)
     op = operation(eq.lhs)
 
     if op in (+, *)
-        elements = arguments(eq.lhs)
+        elements = sorted_arguments(eq.lhs)
 
         stays = []#has variable
         move = []#does not have variable
@@ -424,7 +424,7 @@ function special_strategy(eq::Equation, var)
     !iscall(eq.lhs) && return eq#make sure left side is tree form
 
     op = operation(eq.lhs)
-    elements = arguments(eq.lhs)
+    elements = sorted_arguments(eq.lhs)
 
     if (op == +) &&
        length(elements) == 2 &&
@@ -446,13 +446,13 @@ function special_strategy(eq::Equation, var)
            isequal(eq.rhs, 0) &&
            length(elements) == 2 &&
            sum(iscall.(elements)) == length(elements) &&
-           length(arguments(elements[1])) == 2 &&
-           isequal(arguments(elements[1])[1], -1) &&
-           iscall(arguments(elements[1])[2]) &&
-           operation(elements[2]) == operation(arguments(elements[1])[2])#-f(y)+f(x)=0 -> x-y=0
+           length(sorted_arguments(elements[1])) == 2 &&
+           isequal(sorted_arguments(elements[1])[1], -1) &&
+           iscall(sorted_arguments(elements[1])[2]) &&
+           operation(elements[2]) == operation(sorted_arguments(elements[1])[2])#-f(y)+f(x)=0 -> x-y=0
 
-        x = arguments(elements[2])[1]
-        y = arguments(arguments(elements[1])[2])[1]
+        x = sorted_arguments(elements[2])[1]
+        y = sorted_arguments(sorted_arguments(elements[1])[2])[1]
 
         eq = x - y ~ 0
     end
@@ -474,20 +474,20 @@ function reduce_root(a)
     end
 
     if iscall(a) && (operation(a) == sqrt)
-        a = SymbolicUtils.Pow(arguments(a)[1], 1 // 2)
+        a = SymbolicUtils.Pow(sorted_arguments(a)[1], 1 // 2)
     elseif iscall(a) &&
            (operation(a) == ^) &&
-           isequal(arguments(a)[2], 1 // 2) &&
-           !(arguments(a)[1] isa Number)
-        a = term(sqrt, arguments(a)[1])
+           isequal(sorted_arguments(a)[2], 1 // 2) &&
+           !(sorted_arguments(a)[1] isa Number)
+        a = term(sqrt, sorted_arguments(a)[1])
     end
 
     if iscall(a) &&
        (operation(a) == ^) &&
-       arguments(a)[2] isa Rational &&
-       isequal((arguments(a)[2]).num, 1)
-        value = demote_rational(arguments(a)[1])
-        root = (arguments(a)[2]).den
+       sorted_arguments(a)[2] isa Rational &&
+       isequal((sorted_arguments(a)[2]).num, 1)
+        value = demote_rational(sorted_arguments(a)[1])
+        root = (sorted_arguments(a)[2]).den
 
         if value isa Integer && value > 0
             if isinteger(value^(1.0 / root))
@@ -596,13 +596,13 @@ function inverse_funcs(eq::Equation, var)
 
     if haskey(inverseOps, op)
         inverseOp = inverseOps[op]
-        inner = arguments(eq.lhs)[1]
+        inner = sorted_arguments(eq.lhs)[1]
         eq = inner ~ term(inverseOp, eq.rhs)
     elseif (op == sqrt)
-        inner = arguments(eq.lhs)[1]
+        inner = sorted_arguments(eq.lhs)[1]
         eq = inner ~ (eq.rhs)^2
     elseif (op == lambertw)
-        inner = arguments(eq.lhs)[1]
+        inner = sorted_arguments(eq.lhs)[1]
         eq = inner ~ eq.rhs * term(exp, eq.rhs)
     end
 
