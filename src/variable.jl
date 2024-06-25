@@ -476,7 +476,7 @@ function fast_substitute(expr, subs; operator = Nothing)
     end
     iscall(expr) || return expr
     op = fast_substitute(operation(expr), subs; operator)
-    args = SymbolicUtils.unsorted_arguments(expr)
+    args = SymbolicUtils.arguments(expr)
     if !(op isa operator)
         canfold = Ref(!(op isa Symbolic))
         args = let canfold = canfold
@@ -504,7 +504,7 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
     end
     iscall(expr) || return expr
     op = fast_substitute(operation(expr), pair; operator)
-    args = SymbolicUtils.unsorted_arguments(expr)
+    args = SymbolicUtils.arguments(expr)
     if !(op isa operator)
         canfold = Ref(!(op isa Symbolic))
         args = let canfold = canfold

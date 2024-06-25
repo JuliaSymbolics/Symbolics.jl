@@ -596,7 +596,7 @@ function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],
             Expr(:ref, toexpr(args[1], states), toexpr.(args[2:end] .+ offset, (states,))...)
         else
             Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
-                                                             rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+                                                             rhsnames=rhsnames,varordering=varordering) for x in sorted_arguments(O))...)
         end
     elseif issym(O)
         tosymbol(O, escape=false)
