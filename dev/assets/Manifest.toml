@@ -5,9 +5,9 @@ manifest_format = "2.0"
 project_hash = "5e803325a5424b2919bdb1e5af7e23565ad91898"
 
 [[deps.ADTypes]]
-git-tree-sha1 = "2314e58e823f0fd6ee02dbbecb997370f501dd4a"
+git-tree-sha1 = "3a6511b6e54550bcbc986c560921a8cd7761fcd8"
 uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
-version = "1.5.0"
+version = "1.5.1"
 weakdeps = ["ChainRulesCore", "EnzymeCore"]
 
     [deps.ADTypes.extensions]
@@ -101,9 +101,9 @@ version = "7.11.0"
 
 [[deps.ArrayLayouts]]
 deps = ["FillArrays", "LinearAlgebra"]
-git-tree-sha1 = "420e2853770f50e5306b9d96b5a66f26e7c73bc6"
+git-tree-sha1 = "600078184f7de14b3e60efe13fc0ba5c59f6dca5"
 uuid = "4c555306-a7a7-4459-81d9-ec55ddd5c99a"
-version = "1.9.4"
+version = "1.10.0"
 weakdeps = ["SparseArrays"]
 
     [deps.ArrayLayouts.extensions]
@@ -868,9 +868,9 @@ version = "1.2.2"
 
 [[deps.LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "SparseArrays"]
-git-tree-sha1 = "fa518725cf83bf6f0c1aecd06adb2ea2d94c4dc6"
+git-tree-sha1 = "fb43bbe51db62510b032b85e157ea87d77b2fa07"
 uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-version = "2.0.5"
+version = "2.1.0"
 
     [deps.LazyArrays.extensions]
     LazyArraysBandedMatricesExt = "BandedMatrices"
@@ -1719,9 +1719,9 @@ version = "0.2.1"
 
 [[deps.SymbolicUtils]]
 deps = ["AbstractTrees", "Bijections", "ChainRulesCore", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "IfElse", "LabelledArrays", "LinearAlgebra", "MultivariatePolynomials", "NaNMath", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "TermInterface", "TimerOutputs", "Unityper"]
-git-tree-sha1 = "79813de27af70906d223fbd89ad90dba3d88a2b0"
+git-tree-sha1 = "cc049913a449be8c7ac00979831f26891e01add2"
 uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
-version = "2.0.2"
+version = "2.1.0"
 
 [[deps.Symbolics]]
 deps = ["ADTypes", "ArrayInterface", "Bijections", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "ForwardDiff", "IfElse", "LaTeXStrings", "LambertW", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "PrecompileTools", "RecipesBase", "Reexport", "Requires", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
@@ -1791,9 +1791,9 @@ uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 version = "0.5.24"
 
 [[deps.TranscodingStreams]]
-git-tree-sha1 = "a947ea21087caba0a798c5e494d0bb78e3a1a3a0"
+git-tree-sha1 = "d73336d81cafdc277ff45558bb7eaa2b04a8e472"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.10.9"
+version = "0.10.10"
 weakdeps = ["Random", "Test"]
 
     [deps.TranscodingStreams.extensions]
