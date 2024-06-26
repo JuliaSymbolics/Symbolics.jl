@@ -45,6 +45,7 @@ end
 (D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
 (D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, T) = T
+SymbolicUtils.isbinop(f::Differential) = false
 
 is_derivative(x) = iscall(x) ? operation(x) isa Differential : false
 
