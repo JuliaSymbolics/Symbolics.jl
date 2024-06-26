@@ -1,4 +1,4 @@
-abstract type Operator <: Function end
+abstract type Operator end
 propagate_shape(::Operator, x) = axes(x)
 
 """

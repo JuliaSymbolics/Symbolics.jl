@@ -1,6 +1,6 @@
 using SymbolicUtils
 using SymbolicUtils: @capture
-using StaticArrays
+using StaticArraysCore
 import Base: eltype, length, ndims, size, axes, eachindex
 
 export @arrayop, ArrayMaker, @makearray, @setview, @setview!

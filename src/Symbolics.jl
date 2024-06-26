@@ -5,44 +5,42 @@ module Symbolics
 
 using PrecompileTools
 
-@recompile_invalidations begin
+using DocStringExtensions, Markdown
 
-    using DocStringExtensions, Markdown
+using LinearAlgebra
 
-    using LinearAlgebra
+using Reexport
 
-    using Reexport
+using DomainSets
 
-    using DomainSets
+using Setfield
 
-    using Setfield
+import DomainSets: Domain
 
-    import DomainSets: Domain
+using TermInterface
+import TermInterface: maketerm, iscall, operation, arguments, symtype, metadata
 
-    using TermInterface
-    import TermInterface: maketerm, iscall, operation, arguments, symtype, metadata
+import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
+FnType, @rule, Rewriters, substitute,
+promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
 
-    import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-    FnType, @rule, Rewriters, substitute,
-    promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+using SymbolicUtils.Code
 
-    using SymbolicUtils.Code
+import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
-    import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
+import SymbolicUtils.Code: toexpr
 
-    import SymbolicUtils.Code: toexpr
+import ArrayInterface
+using RuntimeGeneratedFunctions
+using SciMLBase, IfElse
+import MacroTools
 
-    import ArrayInterface
-    using RuntimeGeneratedFunctions
-    using SciMLBase, IfElse
-    import MacroTools
+using SymbolicIndexingInterface
 
-    using SymbolicIndexingInterface
+import SymbolicLimits
 
-    import SymbolicLimits
+using ADTypes: ADTypes
 
-    using ADTypes: ADTypes
-end
 @reexport using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
