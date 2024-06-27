@@ -54,8 +54,7 @@ Base.:*(D1::Differential, D2::Differential) = D1 ∘ D2
 Base.:^(D::Differential, n::Integer) = iszero(n) ? identity : _repeat_apply(D, n)
 
 Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ")")
-SymbolicUtils.show_term(io::IO, D::Differential) = print(io, "Differential(", D.x, ")")
-SymbolicUtils.show_call(io::IO, D::Differential, args) = print(io, "Differential(", D.x, ")(", args..., ")")
+Base.nameof(D::Differential) = :Differential
 
 Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
 Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
