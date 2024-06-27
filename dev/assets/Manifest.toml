@@ -1727,7 +1727,7 @@ version = "2.1.0"
 deps = ["ADTypes", "ArrayInterface", "Bijections", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "ForwardDiff", "IfElse", "LaTeXStrings", "LambertW", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "PrecompileTools", "RecipesBase", "Reexport", "Requires", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
 path = "/home/runner/work/Symbolics.jl/Symbolics.jl"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "5.31.0"
+version = "5.32.0"
 
     [deps.Symbolics.extensions]
     SymbolicsGroebnerExt = "Groebner"
