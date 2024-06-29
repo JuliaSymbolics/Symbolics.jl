@@ -5,6 +5,12 @@ module Symbolics
 
 using PrecompileTools
 
+import PrecompileTools: @recompile_invalidations
+
+@recompile_invalidations begin
+    import CommonWorldInvalidations
+end
+
 using DocStringExtensions, Markdown
 
 using LinearAlgebra
