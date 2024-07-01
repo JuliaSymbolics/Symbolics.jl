@@ -59,3 +59,14 @@ a, b, islinear = Symbolics.linear_expansion(D(x) - x, x)
 @test islinear
 @test isequal(a, -1)
 @test isequal(b, D(x))
+
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/524
+@variables x y
+@test Symbolics.solve_for([x + y ~ 2, x - y ~ 1], [x, y]) isa Vector{Rational{Int64}}
+@test Symbolics.solve_for([x + y ~ 2//1, x - y ~ 1//1], [x, y]) isa Vector{Rational{Int64}}
+@test Symbolics.solve_for([x + y ~ 3, x - y ~ 1], [x, y]) isa Vector{Rational{Int64}}
+@test Symbolics.solve_for([x + y ~ 3//1, x - y ~ 1//1], [x, y]) isa Vector{Rational{Int64}}
+@test Symbolics.solve_for([x + 2y ~ 2, x - y ~ 1], [x, y]) isa Vector{Rational{Int64}}
+@test Symbolics.solve_for([x + 2//1*y ~ 2, x - y ~ 1], [x, y]) isa Vector{Rational{Int64}}
+@test Symbolics.solve_for([x + y ~ π, x - y ~ 1], [x, y]) isa Vector{Float64}
+@test Symbolics.solve_for([x + π*y ~ 2, x - y ~ 1], [x, y]) isa Vector{Float64}
