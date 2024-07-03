@@ -51,6 +51,7 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
     env --> :equation
     cdot --> false
     fmt --> FancyNumberFormatter(5)
+    index --> :subscript
 
     return recipe(n)
 end
@@ -58,6 +59,7 @@ end
 @latexrecipe function f(z::Complex{Num})
     env --> :equation
     cdot --> false
+    index --> :subscript
 
     iszero(z.im) && return :($(recipe(z.re)))
     iszero(z.re) && return :($(recipe(z.im)) * $im)
@@ -67,12 +69,14 @@ end
 @latexrecipe function f(n::ArrayOp)
     env --> :equation
     cdot --> false
+    index --> :subscript
     return recipe(n.term)
 end
 
 @latexrecipe function f(n::Function)
     env --> :equation
     cdot --> false
+    index --> :subscript
 
     return nameof(n)
 end
@@ -81,6 +85,7 @@ end
 @latexrecipe function f(n::Arr)
     env --> :equation
     cdot --> false
+    index --> :subscript
 
     return unwrap(n)
 end
@@ -88,11 +93,13 @@ end
 @latexrecipe function f(n::Symbolic)
     env --> :equation
     cdot --> false
+    index --> :subscript
 
     return recipe(n)
 end
 
 @latexrecipe function f(eqs::Vector{Equation})
+    index --> :subscript
     has_connections = any(x->x.lhs isa Connection, eqs)
     if has_connections
         env --> :equation
@@ -105,6 +112,7 @@ end
 
 @latexrecipe function f(eq::Equation)
     env --> :equation
+    index --> :subscript
 
     if eq.lhs isa Connection
         return eq.rhs
@@ -114,6 +122,7 @@ end
 end
 
 @latexrecipe function f(c::Connection)
+    index --> :subscript
     return Expr(:call, :connect, map(nameof, c.systems)...)
 end
 
@@ -236,12 +245,7 @@ function getindex_to_symbol(t)
     @assert iscall(t) && operation(t) === getindex && symtype(sorted_arguments(t)[1]) <: AbstractArray
     args = sorted_arguments(t)
     idxs = args[2:end]
-    try
-        sub = join(map(map_subscripts, idxs), "ˏ")
-        return Symbol(_toexpr(args[1]), sub)
-    catch
-        return :($(_toexpr(args[1]))[$(idxs...)])
-    end
+    return :($(_toexpr(args[1]))[$(idxs...)])
 end
 
 function diffdenom(e)
