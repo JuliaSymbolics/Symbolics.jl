@@ -5,7 +5,7 @@ using ReferenceTests
 
 using DomainSets: Interval
 
-@variables x y z u(x) dx
+@variables x y z u(x) dx h[1:10,1:10]
 Dx = Differential(x)
 Dy = Differential(y)
 
@@ -53,3 +53,6 @@ Dy = Differential(y)
 @test_reference "latexify_refs/complex1.txt" latexify(x^2-y^2+2im*x*y)
 @test_reference "latexify_refs/complex2.txt" latexify(3im*x)
 @test_reference "latexify_refs/complex3.txt" latexify(1 - x + (1+2x)*im; imaginary_unit="\\mathbb{i}")
+
+@test_reference "latexify_refs/indices1.txt" latexify(h[10,10])
+@test_reference "latexify_refs/indices2.txt" latexify(h[10,10], index=:bracket)
