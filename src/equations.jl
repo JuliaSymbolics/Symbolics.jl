@@ -21,7 +21,7 @@ end
 
 function Base.show(io::IO, c::Connection)
     print(io, "connect(")
-    if c.systems isa AbstractArray
+    if c.systems isa AbstractArray || c.systems isa Tuple
         n = length(c.systems)
         for (i, s) in enumerate(c.systems)
             str = join(split(string(nameof(s)), NAMESPACE_SEPARATOR), '.')
