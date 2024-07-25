@@ -19,6 +19,7 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 
 if GROUP == "All" || GROUP == "Core"
       @testset begin
+        @safetestset "GSOC RootFinding solver" begin include("new_solver.jl") end
         @safetestset "Struct Test" begin include("struct.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
@@ -76,3 +77,4 @@ if GROUP == "All" || GROUP == "Downstream"
     #@time @safetestset "ParameterizedFunctions MATLABDiffEq Regression Test" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
     @safetestset "ModelingToolkit Variable Utils Test" begin include("downstream/modeling_toolkit_utils.jl") end
 end
+

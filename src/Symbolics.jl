@@ -197,6 +197,8 @@ for sType in [Pair, Vector, Dict]
     @eval substitute(expr::Arr, s::$sType; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
 end
 
+include("solver/RootFinding.jl")
+
 function symbolics_to_sympy end
 export symbolics_to_sympy
 
