@@ -76,7 +76,7 @@ function detect_trig(lhs, var)
     args = arguments(u_lhs)
     oper = operation(u_lhs)
 
-    # should traverse entire expresssion in the future, so
+    # should traverse entire expression in the future, so
     # u_lhs as a whole, then u_lhs arg by arg recursively,
     # say we have 2sin(x)cos(x) / y
     # or do we do this traversing outside? in the mother func attract?

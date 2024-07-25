@@ -30,7 +30,7 @@ The `solve` function implements the following backends:
 
 - x: Could be a single variable or an array of variables which should be solved
 
-- multiplicities: Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If multiplicites is inputed as true, then the output is `[-1, -1]`.
+- multiplicities: Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If multiplicities is inputted as true, then the output is `[-1, -1]`.
 
 # Examples
 

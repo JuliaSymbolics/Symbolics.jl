@@ -172,7 +172,7 @@ This function attempts to solve transcendental functions by first checking
 the "smart" number of occurrences in the input LHS. By smart here we mean
 that polynomials are counted as 1 occurrence. for example `x^2 + 2x` is 1
 occurrence of x. So we abstract all occurrences of x's as polynomials.
-Say: `log(x+1) + x^2` is seen as `log(f(x)) + g(x)` so there are 2 ocurrences
+Say: `log(x+1) + x^2` is seen as `log(f(x)) + g(x)` so there are 2 occurrences
 of x. If there is only 1 occurrence of x in an input expression, isolate is called.
 
 Isolate reverses all operations applied on the occurrence of x until we have
@@ -183,13 +183,13 @@ occurrences of x in order to reduce these occurrences to 1. For example,
 `log(x+1) + log(x-1)` can be converted to `log(x^2 - 1)` which now could be
 isolated using Isolate.
 
-`attract(lhs, var)` currently uses 3 techniques for attraction.
+`attract(lhs, var)` currently uses 4 techniques for attraction.
 - Log addition: `log(f(x)) + log(g(x)) => log(h(x))`
 - Exponential simplification: `a*b^(f(x)) + c*d^(g(x)) => f(x) * log(b) - g(x) * log(d) + log(-a/c)`. And now this is actually 1 occurrence of x since `f(x)` and `g(x)` are just multiplied by constants not wrapped in some operation.
 - Trig simplification: this bruteforces multiple trig identities and doesn't detect them before hand.
 - Polynomialization: as a last resort, attract attempts to polynomialize the expression. Say `sin(x+2)^2 + sin(x+2) + 10` is converted to `X^2 + X + 10`, we then solve this using our polynomial solver, and afterwards, isolate `sin(x+2) = the roots found by solve for X^2 + X + 10`
 
-After attraction, we check the number of ocurrences again, and if its 1, we isolate, if not,
+After attraction, we check the number of occurrences again, and if its 1, we isolate, if not,
 we throw an error to tell the user that this is currently unsolvable by our covered techniques.
 
 # Arguments
