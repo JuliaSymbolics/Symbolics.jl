@@ -86,7 +86,6 @@ function Symbolics.solve_multivar(eqs::Vector{Num}, vars::Vector{Num}, mult=fals
         for i = 1:(old_len)
             eq -= rand(1:10)*vars[i]
         end
-        println(eq)
         push!(new_eqs, eq)
         new_eqs = convert(Vector{Any}, Symbolics.groebner_basis(new_eqs, ordering=Lex(vars)))
 

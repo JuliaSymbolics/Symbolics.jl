@@ -148,10 +148,17 @@ function attract(lhs, var)
     n_func_occ(lhs, var) == 1 && return isolate(lhs, var)
 
     lhs, sub = turn_to_poly(lhs, var)
-    if (isequal(sub, Dict()) || n_func_occ(lhs, collect(keys(sub))[1]) != 1) 
-        throw("This expression cannot be solved with the methods available to solve. Try \
-        a numerical method instead.")
+
+    if (isequal(sub, Dict()) || n_func_occ(lhs, collect(keys(sub))[1]) != 1)
+        tuff_poly = detect_tuffpoly(lhs, var)
+        if tuff_poly
+            return attract_tuffpoly(lhs, var)
+        else
+            throw("This expression cannot be solved with the methods available to solve. Try \
+            a numerical method instead.")
+        end
     end
+
 
     new_var = collect(keys(sub))[1]
     new_var_val = collect(values(sub))[1]

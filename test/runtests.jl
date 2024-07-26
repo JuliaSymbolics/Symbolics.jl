@@ -19,7 +19,6 @@ limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 
 if GROUP == "All" || GROUP == "Core"
       @testset begin
-        @safetestset "GSOC RootFinding solver" begin include("new_solver.jl") end
         @safetestset "Struct Test" begin include("struct.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
@@ -53,6 +52,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
         @safetestset "LuxCore extensions Test" begin include("extensions/lux.jl") end
         @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
+        @safetestset "RootFinding solver" begin include("new_solver.jl") end
     end
 end
 

@@ -78,9 +78,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 2)
         arg1 = arguments(x)[1]
         if iscall(arg1) && (operation(arg1) === sqrt || operation(arg1) === ssqrt)
-            if _is_const_number(arguments(arg1)[1])
-                return arguments(arg1)[1]
-            end
+            return arguments(arg1)[1]
         end
     end
 

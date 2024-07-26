@@ -41,7 +41,7 @@ Dict{Any, Any} with 1 entry:
 """
 function turn_to_poly(expr, var)
     expr = unwrap(expr)
-    !iscall(expr) && return expr
+    !iscall(expr) && return (expr, Dict())
 
     args = arguments(expr)
 
@@ -64,6 +64,12 @@ function turn_to_poly(expr, var)
         end
         isequal(add_sub(sub, arg, var, broken), false) && continue
         sub = arg
+    end
+
+    for arg in args
+        if check_poly_inunivar(arg, var) && any(isequal(var, x) for x in get_variables(arg))
+            !isequal(sub, 0) && return (expr, Dict())
+        end
     end
 
     if broken[] || isequal(sub, 0) 
@@ -286,4 +292,108 @@ function prime_factors(n::Integer)
         end
     end
     return factors
+end
+
+
+function check_sqrt(arg, sqrt_term, var)
+    if operation(arg) == sqrt && check_poly_inunivar(arguments(arg)[1], var) && !sqrt_term
+        return true
+    elseif operation(arg) == sqrt && sqrt_term
+        return false
+    end
+end
+
+function detect_tuffpoly(lhs, var)
+    lhs = unwrap(expand(lhs))
+    !iscall(lhs) && return false
+    args = arguments(lhs)
+    oper = operation(lhs)
+    !isequal(oper, (+)) && return false
+    found = [false, false]
+    c = 1
+    outside = false
+    sqrt_term = false
+
+
+    for arg in args
+        if check_poly_inunivar(arg, var) && !outside
+            found[c] = true
+            c += 1
+            outside = true
+        end
+        !iscall(arg) && continue
+        
+        if isequal(check_sqrt(arg, sqrt_term, var), true)
+            found[c] = true
+            c += 1
+            sqrt_term = true
+        elseif isequal(check_sqrt(arg, sqrt_term, var), false)
+            return false
+        end
+
+        if operation(arg) == (*)
+            args_arg = arguments(arg)
+            for i in eachindex(args_arg)
+                !iscall(args_arg[i]) && continue
+                if isequal(check_sqrt(args_arg[i], sqrt_term, var), true)
+                    found[c] = true
+                    c += 1
+                    sqrt_term = true
+                elseif isequal(check_sqrt(args_arg[i], sqrt_term, var), false)
+                    return false
+                end
+            end
+        end
+    end
+
+    return all(found)
+end
+
+
+
+function attract_tuffpoly(lhs, var)
+    sqrt_term = 0
+    poly_term = 0
+    subs, filtered_expr = filter_poly(lhs, var)
+    args = arguments(filtered_expr)
+    oper = operation(filtered_expr)
+    !isequal(oper, (+)) && return []
+
+    for arg in args
+        if check_poly_inunivar(arg, var)
+            poly_term += arg
+            continue
+        end
+        
+        if isequal(check_sqrt(arg, false, var), true)
+            sqrt_term = arg
+            continue
+        end
+
+        if operation(arg) == (*)
+            args_arg = arguments(arg)
+            found = false
+            for i in eachindex(args_arg)
+                !iscall(args_arg[i]) && continue
+                if isequal(check_sqrt(args_arg[i], false, var), true)
+                    found = true
+                end
+            end
+            if found
+                sqrt_term = arg
+            end
+            continue
+        end
+
+    end
+    eq_to_solve = postprocess_root(expand((poly_term)^2 - (sqrt_term)^2))
+    eq_to_solve = ssubs(eq_to_solve, subs)
+    roots = solve(eq_to_solve, var)
+    answers = []
+    for root in roots
+        if isapprox(ssubs(lhs, Dict(var=>root)), 0, atol=1e-4)
+            push!(answers, root)
+        end
+    end
+    return answers
 end
