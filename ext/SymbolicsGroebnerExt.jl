@@ -72,17 +72,21 @@ end
 
 function Symbolics.solve_multivar(eqs::Vector{Num}, vars::Vector{Num}, mult=false)
     # do the trick
-    @variables HAT
+    new_var = (@variables HAT)[1]
+
     old_len = length(vars)
-    push!(vars, HAT)
+    push!(vars, new_var)
+
     new_eqs = []
     generating = true
+
     while generating
         new_eqs = deepcopy(eqs)
-        eq = HAT
+        eq = new_var
         for i = 1:(old_len)
             eq -= rand(1:10)*vars[i]
         end
+        println(eq)
         push!(new_eqs, eq)
         new_eqs = convert(Vector{Any}, Symbolics.groebner_basis(new_eqs, ordering=Lex(vars)))
 
@@ -154,7 +158,7 @@ function Symbolics.solve_multivar(eqs::Vector{Num}, vars::Vector{Num}, mult=fals
 
     pop!(vars)
     for roots in solutions
-        delete!(roots, HAT)
+        delete!(roots, new_var)
     end
 
     return solutions

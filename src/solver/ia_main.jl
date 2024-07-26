@@ -103,7 +103,8 @@ function isolate(lhs, var)
             rev_oper = Dict(sin=>asin, cos=>acos, tan=>atan)
             lhs = args[1]
             # make this global somehow so the user doesnt need to declare it on his own
-            new_var = eval(:(@variables $(gensym())))[1]
+            new_var = gensym()
+            new_var = (@variables $new_var)[1]
             rhs = map(sol -> term(rev_oper[oper], sol) + term(*, Base.MathConstants.pi, 2*new_var), rhs)
             @info string(new_var) * " ϵ" * " Ζ: e.g. 0, 1, 2..."
 

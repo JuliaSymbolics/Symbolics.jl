@@ -152,8 +152,10 @@ true
 ```
 """
 function detect_exponential(lhs, var)
-    args = arguments(unwrap(lhs))
-    oper = operation(unwrap(lhs))
+    lhs = unwrap(lhs)
+    !iscall(lhs) && return false
+    args = arguments(lhs)
+    oper = operation(lhs)
     !isequal(oper, (+)) && return false
     length(args) != 2 && return false
 
@@ -179,6 +181,59 @@ function detect_exponential(lhs, var)
     end
 
     return all(found) 
+end
+
+function check_sqrt(arg, sqrt_term, var)
+    if operation(arg) == sqrt && check_poly_inunivar(arguments(arg)[1], var) && !sqrt_term
+        return true
+    elseif operation(arg) == sqrt && sqrt_term
+        return false
+    end
+end
+
+function detect_tuffpoly(lhs, var)
+    lhs = unwrap(expand(lhs))
+    !iscall(lhs) && return false
+    args = arguments(lhs)
+    oper = operation(lhs)
+    !isequal(oper, (+)) && return false
+    found = [false, false]
+    c = 1
+    outside = false
+    sqrt_term = false
+
+
+    for arg in args
+        if check_poly_inunivar(arg, var) && !outside
+            found[c] = true
+            c += 1
+            outside = true
+        end
+        !iscall(arg) && continue
+        
+        if isequal(check_sqrt(arg, sqrt_term, var), true)
+            found[c] = true
+            c += 1
+            sqrt_term = true
+        elseif isequal(check_sqrt(arg, sqrt_term, var), false)
+            return false
+        end
+
+        if operation(arg) == (*)
+            args_arg = arguments(arg)
+            for i in eachindex(args_arg)
+                if isequal(check_sqrt(arg, sqrt_term, var), true)
+                    found[c] = true
+                    c += 1
+                    sqrt_term = true
+                elseif isequal(check_sqrt(arg, sqrt_term, var), false)
+                    return false
+                end
+            end
+        end
+    end
+
+    return all(found)
 end
 
 """
