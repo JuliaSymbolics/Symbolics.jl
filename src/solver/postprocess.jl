@@ -1,8 +1,4 @@
-# import SymbolicUtils
-# import 
 import TermInterface: maketerm
-# 
-# using Test
 
 # Alex: can be used in the following way.
 #
@@ -16,12 +12,6 @@ function _is_const_number(x::SymbolicUtils.BasicSymbolic)
     !iscall(x) && return false
     all(_is_const_number, arguments(x))
 end
-
-SymbolicUtils.@syms __x
-# @test !_is_const_number(__x) && !_is_const_number(sqrt(__x))
-# @test _is_const_number(1) && _is_const_number(2 // 3) && _is_const_number(3 + 4im)
-# @test _is_const_number(SymbolicUtils.term(sqrt, 2) + 21)
-# @test _is_const_number((SymbolicUtils.term(exp, 2) * SymbolicUtils.term(exp, 2)) // 99)
 
 _postprocess_root(x) = x
 
@@ -88,15 +78,4 @@ end
 function postprocess_root(x)
     _postprocess_root(x)
 end
-
-
-
-# some tests
-# SymbolicUtils.@syms __x
-# __symsqrt(x) = SymbolicUtils.term(ssqrt, x)
-# @test postprocess_root(2 // 1) == 2 && postprocess_root(2 + 0*im) == 2
-# @test postprocess_root(__symsqrt(__symsqrt(0)) - 11) == -11
-# @test postprocess_root(3*__symsqrt(2)^2) == 6
-# @test postprocess_root(__symsqrt(4)) == 2
-# @test isequal(postprocess_root(__symsqrt(__x)^2), __symsqrt(__x)^2)
 

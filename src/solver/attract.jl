@@ -303,7 +303,3 @@ function attract_trig(lhs, var)
 
     return lhs
 end
-
-# @variables x
-# lhs = 2sin(x+1)cos(x+1)
-# attract_trig(lhs, x) 

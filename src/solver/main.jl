@@ -287,7 +287,3 @@ end
 function solve_multivar(eqs::Vector{Num}, vars::Vector{Num}, mult=false)
     throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
 end
-
-# @variables a b c d e x
-# f = -19e + 93d*x + 7c*(x^2) + 45b*(x^3) - 10a*(x^4)
-#get_roots_deg4(f, x)

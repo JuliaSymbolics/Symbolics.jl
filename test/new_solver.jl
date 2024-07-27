@@ -1,5 +1,5 @@
 using Symbolics
-import Symbolics: ssqrt, slog, scbrt, solve, ia_solve
+import Symbolics: ssqrt, slog, scbrt, solve, ia_solve, postprocess_root, _is_const_number
 using Groebner
 E = Base.MathConstants.e
 
@@ -217,6 +217,20 @@ end
 
 
 # Post Process roots #
+@testset "Post Process roots" begin
+    SymbolicUtils.@syms __x
+    __symsqrt(x) = SymbolicUtils.term(ssqrt, x)
+    @test postprocess_root(2 // 1) == 2 && postprocess_root(2 + 0*im) == 2
+    @test postprocess_root(__symsqrt(__symsqrt(0)) - 11) == -11
+    @test postprocess_root(3*__symsqrt(2)^2) == 6
+    @test postprocess_root(__symsqrt(4)) == 2
+    @test isequal(postprocess_root(__symsqrt(__x)^2), __x)
+
+    @test !_is_const_number(__x) && !_is_const_number(sqrt(__x))
+    @test _is_const_number(1) && _is_const_number(2 // 3) && _is_const_number(3 + 4im)
+    @test _is_const_number(SymbolicUtils.term(sqrt, 2) + 21)
+    @test _is_const_number((SymbolicUtils.term(exp, 2) * SymbolicUtils.term(exp, 2)) // 99)
+end
 
 
 # Filter Poly # For future reference, i think @check_polynomial is not enough of a test.
