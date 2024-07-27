@@ -152,9 +152,6 @@ end
     # expr = x^3 + sqrt(complex(-2//1))*x + 2
 end
 
-
-
-
 @testset "Multivar solver" begin
     eqs = [x*y + 2x^2, y^2 -1]
     arr_calcd_roots = sort_arr(solve(eqs, [x,y]), [x,y])

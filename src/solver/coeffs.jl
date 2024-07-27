@@ -119,7 +119,7 @@ function _filter_poly(expr, var)
     end
 
     args = arguments(expr)
-    if isequal(typeof(expr), ComplexTerm{Real})
+    if expr isa ComplexTerm
         subs1, subs2 = Dict(), Dict()
         expr1, expr2 = 0, 0
 

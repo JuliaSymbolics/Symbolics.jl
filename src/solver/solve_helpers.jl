@@ -108,7 +108,7 @@ function f_numbers(n)
     end
 
     if n isa Integer
-        n = abs(n) > 10 && n isa Integer ? BigInt(n) : n
+        n = BigInt(n)
         return n
     end
 
@@ -119,12 +119,11 @@ function f_numbers(n)
     end
 
     if n isa Rational && n isa Real
-        top = abs(numerator(n)) > 10 ? BigInt(numerator(n)) : numerator(n)
-        bottom = abs(denominator(n)) > 10 ? BigInt(denominator(n)) : denominator(n)
-
-        return top//bottom
+        n = big(n)
+        return n
     end
 
+    return n
 end
 
 function comp_rational(x,y)
@@ -133,18 +132,7 @@ function comp_rational(x,y)
         r = x//y
         return r
     catch e
-        r = nothing
-        if x isa ComplexF64
-            real_p = real(x)
-            imag_p = imag(x)
-            r = Rational{BigInt}(real_p)//y
-            if !isequal(imag_p, 0)
-                r += (Rational{BigInt}(imag_p)//y)*im
-            end
-        elseif x isa Float64 
-            r = Rational{BigInt}(x)//y
-        end
-        return r
+        return x/y
     end
 end
 
