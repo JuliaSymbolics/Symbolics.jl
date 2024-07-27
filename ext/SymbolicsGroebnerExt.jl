@@ -79,12 +79,13 @@ function Symbolics.solve_multivar(eqs::Vector{Num}, vars::Vector{Num}, mult=fals
 
     new_eqs = []
     generating = true
+    n_iterations = 1
 
     while generating
         new_eqs = deepcopy(eqs)
         eq = new_var
         for i = 1:(old_len)
-            eq -= rand(1:10)*vars[i]
+            eq -= rand(1:n_iterations*10)*vars[i]
         end
         push!(new_eqs, eq)
         new_eqs = convert(Vector{Any}, Symbolics.groebner_basis(new_eqs, ordering=Lex(vars)))
@@ -96,6 +97,8 @@ function Symbolics.solve_multivar(eqs::Vector{Num}, vars::Vector{Num}, mult=fals
         for i  in eachindex(new_eqs)[2:end]
             generating |= all(Symbolics.degree(var) > 1 for var in Symbolics.get_variables(new_eqs[i]))
         end
+
+        n_iterations += 1
     end
 
     solutions = []

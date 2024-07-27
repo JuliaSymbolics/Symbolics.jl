@@ -1,5 +1,4 @@
 using Symbolics
-E = Base.MathConstants.e
 
 function isolate(lhs, var)
     rhs = Vector{Any}([0])
@@ -40,7 +39,6 @@ function isolate(lhs, var)
                 rhs = map(sol -> sol/arg, rhs)
             end
 
-        # TODO: add / oper
         elseif oper === (/)
             var_innumerator = any(isequal(x, var) for x in get_variables(args[1]))
             if var_innumerator
@@ -53,8 +51,6 @@ function isolate(lhs, var)
                 rhs = map(sol -> args[1]//sol, rhs)
             end
 
-
-
         elseif oper === (^)
             if any(isequal(x, var) for x in get_variables(args[1])) && n_occurrences(args[2], var) == 0 && args[2] isa Integer
                 lhs = args[1]
@@ -65,7 +61,7 @@ function isolate(lhs, var)
                     for k in 0:(args[2]-1)
                         r = wrap(term(^, rhs[i], (1//power)))
                         c = wrap(term(*, 2*(k), pi))*im/power
-                        root = r*E^c
+                        root = r*Base.MathConstants.e^c
                         push!(new_roots, root)
                     end
                 end

@@ -14,15 +14,10 @@ end
 
 function traverse(argument, var)
     args = []
-    try
-        args = arguments(argument)
-    catch e
-        if isequal(argument, var)
-            return 1 
-        end
-        return 0
-    end
+    !iscall(argument) && isequal(argument, var) && return 1
+    !iscall(argument) && !isequal(argument, var) && return 0
 
+    args = arguments(argument)
     n = 0
 
     for arg in args
