@@ -76,7 +76,7 @@ function Symbolics.solve_multivar(eqs::Vector{Num}, vars::Vector{Num}, mult=fals
     # Through the Rational Univariate Representation.
     # AAECC 9, 433–461 (1999). https://doi.org/10.1007/s002000050114
     
-    # Use a new variable to seperate the input polynomials (Reference above)
+    # Use a new variable to separate the input polynomials (Reference above)
     new_var = (@variables HAT)[1]
     old_len = length(vars)
     push!(vars, new_var)

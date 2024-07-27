@@ -201,7 +201,7 @@ Main.RootFinding.slog(-1 + x^2)
 ```
 """
 function attract_logs(lhs, var)
-    contains_var(arg) = occursin(string(var), string(arg))
+    contains_var(arg) = n_occurrences(arg, var) > 0
 
     r_addlogs = Vector{Any}() 
     push!(r_addlogs, @acrule log(~x::(contains_var)) + log(~y::(contains_var)) => slog(~x * ~y))
@@ -234,7 +234,7 @@ Main.RootFinding.slog(2) + log(complex(-1)) - 3Main.RootFinding.slog(5) + x*Main
 """
 function attract_exponential(lhs, var)
     lhs = unwrap(lhs)
-    contains_var(arg) = occursin(string(var), string(arg))
+    contains_var(arg) = n_occurrences(arg, var) > 0
 
     r_addexpon = Vector{Any}()
     push!(r_addexpon, @acrule (~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(log, term(complex, -1)))
@@ -270,7 +270,7 @@ cosh(2x)
 """
 function attract_trig(lhs, var)
     lhs = unwrap(lhs)
-    contains_var(arg) = occursin(string(var), string(arg))
+    contains_var(arg) = n_occurrences(arg, var) > 0
 
     # r_doubleangle1 = @acrule 2*sin(~x::(contains_var))*cos(~x::(contains_var)) => sin(2*~x)
     r_trig = [
