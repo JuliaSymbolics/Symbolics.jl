@@ -359,6 +359,23 @@ end
     @test all(lhs_solve .≈ rhs)
 end
 
+@tesetset "Sqrt case poly" begin
+    # f(x) + sqrt(g(x)) + c
+    expr = x + sqrt(x+1) - 5
+    lhs_ia = ia_solve(expr, x)[1]
+    lhs_att = Symbolics.attract_and_solve_sqrtpoly(expr, x)[1]
+    lhs_solve = solve(expr, x)[1]
+    @test all(isequal(answer, 3) for answer in [lhs_ia, lhs_att, lhs_solve])
+
+    expr = x^2 + x + sqrt(x) + 2
+    lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    rhs = sort_roots([-0.860929555 - 1.604034315im, -0.860929555 + 1.604034315im])
+    @test all(isapprox.(lhs, rhs, atol=1e-6))
+    @test all(isapprox.(lhs_solve, rhs, atol=1e-6))
+    @test all(isequal.(lhs, lhs_solve))
+end
+
 @testset "Turn to poly" begin
     @variables x
     # does not sub because these can not be solved as polys

@@ -72,6 +72,12 @@ struct RootsOf
 end
 
 Base.show(io::IO, r::RootsOf) = print(io, "roots_of(", r.poly, ", ", x, ")")
+Base.show(io::IO, f::typeof(ssqrt)) = print(io, "√")
+Base.show(io::IO, r::typeof(scbrt)) = print(io, "∛")
+
+# not sure if this is a good idea as it can hide from the
+# user when it misbehaves
+# Base.show(io::IO, r::typeof(slog)) = print(io, "log")
 
 
 function check_expr_validity(expr)

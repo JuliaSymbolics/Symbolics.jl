@@ -146,9 +146,9 @@ function attract(lhs, var)
     lhs, sub = turn_to_poly(lhs, var)
 
     if (isequal(sub, Dict()) || n_func_occ(lhs, collect(keys(sub))[1]) != 1)
-        tuff_poly = detect_tuffpoly(lhs, var)
-        if tuff_poly
-            return attract_tuffpoly(lhs, var)
+        sqrt_poly = detect_sqrtpoly(lhs, var)
+        if sqrt_poly
+            return attract_and_solve_sqrtpoly(lhs, var)
         else
             throw("This expression cannot be solved with the methods available to solve. Try \
             a numerical method instead.")

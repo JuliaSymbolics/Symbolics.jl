@@ -303,7 +303,8 @@ function check_sqrt(arg, sqrt_term, var)
     end
 end
 
-function detect_tuffpoly(lhs, var)
+# f(x) + sqrt(g(x)) + c
+function detect_sqrtpoly(lhs, var)
     lhs = unwrap(expand(lhs))
     !iscall(lhs) && return false
     args = arguments(lhs)
@@ -351,7 +352,7 @@ end
 
 
 
-function attract_tuffpoly(lhs, var)
+function attract_and_solve_sqrtpoly(lhs, var)
     sqrt_term = 0
     poly_term = 0
     subs, filtered_expr = filter_poly(lhs, var)
@@ -386,12 +387,14 @@ function attract_tuffpoly(lhs, var)
         end
 
     end
-    eq_to_solve = postprocess_root(expand((poly_term)^2 - (sqrt_term)^2))
+    lhs = lhs - sqrt_term + ssqrt(arguments(sqrt_term)[1])
+    eq_to_solve = expand((poly_term)^2 - arguments(sqrt_term)[1])
     eq_to_solve = ssubs(eq_to_solve, subs)
     roots = solve(eq_to_solve, var)
     answers = []
+
     for root in roots
-        if isapprox(ssubs(lhs, Dict(var=>root)), 0, atol=1e-4)
+        if isapprox(substitute(lhs, Dict(var=>eval(Symbolics.toexpr(root)))), 0, atol=1e-4)
             push!(answers, root)
         end
     end
