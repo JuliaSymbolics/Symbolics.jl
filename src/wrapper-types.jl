@@ -55,7 +55,7 @@ function wraps_type end
 has_symwrapper(::Type) = false
 is_wrapper_type(::Type) = false
 
-function wrap_func_expr(mod, expr)
+function wrap_func_expr(mod, expr, wrap_arrays = true)
     @assert expr.head == :function || (expr.head == :(=) &&
                                        expr.args[1] isa Expr &&
                                        expr.args[1].head == :call)
@@ -109,8 +109,26 @@ function wrap_func_expr(mod, expr)
         # expected to be defined outside Symbolics
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
-            has_symwrapper(T) ? (T, :(Symbolics.SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
+            Ts = has_symwrapper(T) ? (T, :(Symbolics.SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
                                 (T,:(Symbolics.SymbolicUtils.Symbolic{<:$T}))
+            if T <: AbstractArray && wrap_arrays
+                eT = eltype(T)
+                if eT == Any
+                    eT = Real
+                end
+                _arr_type_fn = if hasmethod(ndims, Tuple{Type{T}})
+                    (elT) -> :(AbstractArray{T, $(ndims(T))} where {T <: $elT})
+                else
+                    (elT) -> :(AbstractArray{T} where {T <: $elT})
+                end
+                if has_symwrapper(eT)
+                    Ts = (Ts..., # _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})), 
+                    _arr_type_fn(wrapper_type(eT)))
+                # else
+                #     Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})))
+                end
+            end
+            Ts
         elseif arg isa Expr && arg.head == :(...)
             Ts = type_options(arg.args[1])
             map(x->Vararg{x},Ts)
@@ -153,6 +171,6 @@ function wrap_func_expr(mod, expr)
     end |> esc
 end
 
-macro wrapped(expr)
-    wrap_func_expr(__module__, expr)
+macro wrapped(expr, wrap_arrays = true)
+    wrap_func_expr(__module__, expr, wrap_arrays)
 end

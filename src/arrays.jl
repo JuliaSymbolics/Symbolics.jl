@@ -662,12 +662,12 @@ end
 @wrapped function Base.:(\)(A::AbstractMatrix, b::AbstractVecOrMat)
     t = array_term(\, A, b)
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
-end
+end false
 
 @wrapped function Base.inv(A::AbstractMatrix)
     t = array_term(inv, A)
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
-end
+end false
 
 _det(x, lp) = det(x, laplace=lp)
 
@@ -677,7 +677,7 @@ end
 
 @wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace=true)
     Term{eltype(x)}(_det, [x, laplace])
-end
+end false
 
 
 # A * x = b
@@ -754,7 +754,7 @@ function scalarize(arr)
     end
 end
 
-@wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x))
+@wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x)) false
 Base.collect(x::Arr) = scalarize(x)
 Base.collect(x::SymArray) = scalarize(x)
 isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
