@@ -359,7 +359,7 @@ end
     @test all(lhs_solve .≈ rhs)
 end
 
-@tesetset "Sqrt case poly" begin
+@testset "Sqrt case poly" begin
     # f(x) + sqrt(g(x)) + c
     expr = x + sqrt(x+1) - 5
     lhs_ia = ia_solve(expr, x)[1]
@@ -405,6 +405,4 @@ end
     expr, sub = Symbolics.turn_to_poly(expr, x)
     @test Symbolics.check_polynomial(expr)
 end
-
-
 
