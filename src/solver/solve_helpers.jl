@@ -98,6 +98,23 @@ function check_poly_inunivar(poly, var)
     return isequal(constant, 0)
 end
 
+function islinear(expr, vars)
+    for var in vars
+        subs, filtered_expr = filter_poly(expr, var)
+        coeffs, constant = polynomial_coeffs(filtered_expr, [var])
+
+        !isequal(constant, 0) && return false
+        sdegree(coeffs, var) > 1 && return false
+        delete!(coeffs, 1)
+
+        vals = collect(values(coeffs))
+        for val in vals
+            any(x->n_occurrences(val, x) > 0, vars) && return false
+        end
+    end
+    return true
+end
+
 function f_numbers(n)
     n = unwrap(n)
     if n isa ComplexTerm || n isa Float64 || n isa Irrational

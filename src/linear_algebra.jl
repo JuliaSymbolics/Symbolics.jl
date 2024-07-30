@@ -105,7 +105,9 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     else
         x = a \ -b
     end
-    simplify || return x
+    x = length(var) == 1 ? x :  Dict(v => ans for (v, ans) in zip(var, x))
+    simplify || return [x]
+
     if x isa AbstractArray
         SymbolicUtils.simplify.(simplify_fractions.(x))
     else
