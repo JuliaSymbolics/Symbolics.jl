@@ -134,22 +134,17 @@ function solve(expr, x, multiplicities=false)
         expr = Vector{Num}(expr)
     end
 
-    # the islinear outputted here is breaks a lot:
-    # a, b, islinear = linear_expansion(expr, x)
-    # islinear && return map(postprocess_root, solve_for(expr, x))
 
     if x_univar
+
         sols = []
         if expr_univar
-            sols = !check_poly_inunivar(expr, x) ? ia_solve(expr, x) :
-                islinear(expr, [x]) ? solve_for(expr, x) :
-                   solve_univar(expr, x, multiplicities)
+            sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, multiplicities) : ia_solve(expr, x)
         else
             for i in eachindex(expr)
                 !check_poly_inunivar(expr[i], x) && throw("Solve can not solve this input currently")
             end
-            sols = all(e->islinear(e, [x]), expr) ? solve_for(expr, x) : 
-                    solve_multipoly(expr, x, multiplicities)
+            sols = solve_multipoly(expr, x, multiplicities)
         end
 
         sols = map(postprocess_root, sols)
@@ -162,8 +157,8 @@ function solve(expr, x, multiplicities=false)
                 @assert check_poly_inunivar(e, var) "This system can not be currently solved by solve."
             end
         end
-        
-        sols = all(e->islinear(e, x), expr) ? solve_for(expr, x) : solve_multivar(expr, x, multiplicities)
+
+        sols = solve_multivar(expr, x, multiplicities)
         for sol in sols
             for var in x
                 sol[var] = postprocess_root(sol[var])
