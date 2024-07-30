@@ -236,12 +236,12 @@ end
 @wrapped function Base.adjoint(A::AbstractMatrix)
     @syms i::Int j::Int
     @arrayop (i, j) A[j, i] term = A'
-end
+end false
 
 @wrapped function Base.adjoint(b::AbstractVector)
     @syms i::Int
     @arrayop (1, i) b[i] term = b'
-end
+end false
 
 import Base: *, \
 
@@ -300,8 +300,8 @@ function _matmul(A, B)
     return @arrayop (i, j) A[i, k] * B[k, j] term = (A * B)
 end
 
-@wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B)
-@wrapped (*)(A::AbstractVector, B::AbstractMatrix) = _matmul(A, B)
+@wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B) false
+@wrapped (*)(A::AbstractVector, B::AbstractMatrix) = _matmul(A, B) false
 
 function _matvec(A, b)
     A = inner_unwrap(A)
@@ -314,19 +314,19 @@ function _matvec(A, b)
         return sym_res
     end
 end
-@wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
+@wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b) false
 
 # specialize `dot` to dispatch on `Symbolic{<:Number}` to eventually work for
 # arrays of (possibly unwrapped) Symbolic types, see issue #831
-@wrapped LinearAlgebra.dot(x::Number, y::Number) = conj(x) * y
+@wrapped LinearAlgebra.dot(x::Number, y::Number) = conj(x) * y false
 
 #################### MAP-REDUCE ################
 #
 
-@wrapped Base.map(f, x::AbstractArray) = _map(f, x)
-@wrapped Base.map(f, x::AbstractArray, xs...) = _map(f, x, xs...)
-@wrapped Base.map(f, x, y::AbstractArray, z...) = _map(f, x, y, z...)
-@wrapped Base.map(f, x, y, z::AbstractArray, w...) = _map(f, x, y, z, w...)
+@wrapped Base.map(f, x::AbstractArray) = _map(f, x) false
+@wrapped Base.map(f, x::AbstractArray, xs...) = _map(f, x, xs...) false
+@wrapped Base.map(f, x, y::AbstractArray, z...) = _map(f, x, y, z...) false
+@wrapped Base.map(f, x, y, z::AbstractArray, w...) = _map(f, x, y, z, w...) false
 
 function _map(f, x, xs...)
     N = ndims(x)
@@ -368,7 +368,7 @@ end
         expr,
         g,
         Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)]))
-end
+end false
 
 for (ff, opts) in [sum => (identity, +, false),
     prod => (identity, *, true),
@@ -379,9 +379,9 @@ for (ff, opts) in [sum => (identity, +, false),
     @eval @wrapped function (::$(typeof(ff)))(x::AbstractArray;
         dims=:, init=$init)
         mapreduce($f, $g, x, dims=dims, init=init)
-    end
+    end false
     @eval @wrapped function (::$(typeof(ff)))(f::Function, x::AbstractArray;
         dims=:, init=$init)
         mapreduce(f, $g, x, dims=dims, init=init)
-    end
+    end false
 end

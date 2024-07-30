@@ -23,7 +23,7 @@ overwriting.
 ```
 See `@register_array_symbolic` to register functions which return arrays.
 """
-macro register_symbolic(expr, define_promotion = true, Ts = :([]))
+macro register_symbolic(expr, define_promotion = true, Ts = :([]), wrap_arrays = true)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, Ts)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
@@ -31,8 +31,8 @@ macro register_symbolic(expr, define_promotion = true, Ts = :([]))
 
     fexpr = :(Symbolics.@wrapped function $f($(args′...))
                   args = [$(argnames...),]
-                  unwrapped_args = map($unwrap, args)
-                  res = if !any(x->$issym(x) || $iscall(x), unwrapped_args)
+                  unwrapped_args = map($nested_unwrap, args)
+                  res = if !any($is_symbolic_or_array_of_symbolic, unwrapped_args)
                       $f(unwrapped_args...) # partial-eval if all args are unwrapped
                   else
                       $Term{$ret_type}($f, unwrapped_args)
@@ -42,7 +42,7 @@ macro register_symbolic(expr, define_promotion = true, Ts = :([]))
                   else
                       return $wrap(res)
                   end
-              end)
+              end $wrap_arrays)
 
     if define_promotion
         fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
@@ -80,8 +80,23 @@ function destructure_registration_expr(expr, Ts)
     f, ftype, argnames, Ts, ret_type
 end
 
+nested_unwrap(x) = unwrap(x)
+nested_unwrap(x::Arr) = unwrap(x)
+nested_unwrap(x::AbstractArray) = unwrap.(x)
 
-function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true)
+function is_symbolic_or_array_of_symbolic(x)
+    return issym(x) || iscall(x)
+end
+function is_symbolic_or_array_of_symbolic(arr::AbstractArray)
+    return any(is_symbolic_or_array_of_symbolic.(arr))
+end
+
+symbolic_eltype(x) = eltype(x)
+symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: SymbolicUtils.Symbolic{eT}} = eT
+symbolic_eltype(::AbstractArray{Num}) = Real
+symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
+
+function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true)
     def_assignments = MacroTools.rmlines(partial_defs).args
     defs = map(def_assignments) do ex
         @assert ex.head == :(=)
@@ -93,8 +108,9 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     fexpr = quote
         @wrapped function $f($(args′...))
             args = [$(argnames...),]
-            unwrapped_args = map($unwrap, args)
-            res = if !any(x->$issym(x) || $iscall(x), unwrapped_args)
+            unwrapped_args = map($nested_unwrap, args)
+            eltype = $symbolic_eltype
+            res = if !any($is_symbolic_or_array_of_symbolic, unwrapped_args)
                 $f(unwrapped_args...) # partial-eval if all args are unwrapped
             elseif $ret_type == nothing || ($ret_type <: AbstractArray)
                 $array_term($(Expr(:parameters, [Expr(:kw, k, v) for (k, v) in defs]...)), $f, unwrapped_args...)
@@ -107,7 +123,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             else
                 return $wrap(res)
             end
-        end
+        end $wrap_arrays
     end |> esc
 
     if define_promotion
@@ -177,7 +193,7 @@ overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
 overwriting.
 """
-macro register_array_symbolic(expr, block, define_promotion = true)
+macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, :([]))
-    register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion)
+    register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays)
 end
