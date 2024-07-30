@@ -70,7 +70,7 @@ function Symbolics.is_groebner_basis(polynomials::Vector{Num}; kwargs...)
     Groebner.isgroebner(polynoms; kwargs...)
 end
 
-function Symbolics.solve_multivar(eqs::Vector{Num}, vars::Vector{Num}, mult=false)
+function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}, mult=false)
     
     # Reference: Rouillier, F. Solving Zero-Dimensional Systems
     # Through the Rational Univariate Representation.
