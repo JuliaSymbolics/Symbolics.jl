@@ -177,3 +177,14 @@ function add_sol_to_all(solutions, new_sols, var)
     return solutions
 end
 
+function gen_separating_var(vars)
+    n = 1
+    new_var = (@variables HAT)[1]
+    present = any(isequal(new_var, var) for var in vars)
+    while present
+        new_var = variables(repeat("_", n)*"HAT")[1]
+        present = any(isequal(new_var, var) for var in vars)
+        n += 1
+    end
+    return new_var
+end

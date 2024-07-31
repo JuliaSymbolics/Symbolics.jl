@@ -77,7 +77,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}, mult=false)
     # AAECC 9, 433–461 (1999). https://doi.org/10.1007/s002000050114
     
     # Use a new variable to separate the input polynomials (Reference above)
-    new_var = (@variables HAT)[1]
+    new_var = Symbolics.gen_separating_var(vars)
     old_len = length(vars)
     push!(vars, new_var)
 

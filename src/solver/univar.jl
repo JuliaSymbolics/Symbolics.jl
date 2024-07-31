@@ -76,7 +76,8 @@ function get_roots_deg4(expression, x)
 
     r = comp_rational((-3(b^4) + 256(e*a^3) - 64(d*b*a^2) + 16(c*(b^2)*a)), (256*a^4))
 
-    @variables m
+    m = gensym()
+    m = (@variables $m)[1]
     eq_m = 8m^3 + 8(p)*m^2 + (2(p^2) - 8r)m - q^2
 
     roots_m = solve_univar(eq_m, m)
