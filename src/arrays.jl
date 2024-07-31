@@ -68,6 +68,8 @@ function SymbolicUtils.maketerm(::Type{<:ArrayOp}, f, args, _symtype, m)
         metadata(t, m) : t
 end
 
+SymbolicUtils.sorted_arguments(s::ArrayOp) = sorted_arguments(s.term)
+
 shape(aop::ArrayOp) = aop.shape
 
 const show_arrayop = Ref{Bool}(false)
