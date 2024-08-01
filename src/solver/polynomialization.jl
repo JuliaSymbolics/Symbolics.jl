@@ -390,7 +390,7 @@ function attract_and_solve_sqrtpoly(lhs, var)
     lhs = lhs - sqrt_term + ssqrt(arguments(sqrt_term)[1])
     eq_to_solve = expand((poly_term)^2 - arguments(sqrt_term)[1])
     eq_to_solve = ssubs(eq_to_solve, subs)
-    roots = solve(eq_to_solve, var)
+    roots = symbolic_solve(eq_to_solve, var)
     answers = []
 
     for root in roots

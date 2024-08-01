@@ -159,16 +159,16 @@ function add_sol!(solutions, new_sols, var, index)
     deleteat!(solutions, index)
     for new_sol in new_sols
         sol_used[var] = new_sol
-        push!(solutions, deepcopy(sol_used))
+        push!(solutions, Symbolics.unwrap(copy(Symbolics.wrap(sol_used))))
     end
     return solutions
 end
 
 function add_sol_to_all(solutions, new_sols, var)
-    existing_solutions = deepcopy(solutions)
+    existing_solutions = copy(solutions)
     solutions = []
     for new_sol in new_sols
-        copy_sol = deepcopy(existing_solutions)
+        copy_sol = copy(existing_solutions)
         for i in eachindex(copy_sol)
             copy_sol[i][var] = new_sol
         end

@@ -9,7 +9,7 @@ function isolate(lhs, var)
             if check_poly_inunivar(poly, var)
                 roots = []
                 for i in eachindex(rhs)
-                    append!(roots, solve(wrap(lhs-rhs[i]), var))
+                    append!(roots, symbolic_solve(wrap(lhs-rhs[i]), var))
                 end
                 return roots
             end

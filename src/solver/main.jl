@@ -1,7 +1,7 @@
 # This file uses Groebner, so it needs to be added in the future.
 
 """
-    solve(expr, x, multiplicities=false)
+    symbolic_solve(expr, x, multiplicities=false)
 
 Solve equations symbolically.
 
@@ -105,7 +105,7 @@ julia> solve(a*x^b + c, x)
 # References
 [^1]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
 """
-function solve(expr, x, multiplicities=false)
+function symbolic_solve(expr, x, multiplicities=false)
     type_x = typeof(x)
     expr_univar = false
     x_univar = false
@@ -199,7 +199,7 @@ function solve_univar(expression, x, mult=false)
 
     # handle multiplicities, i.e. (x+1)^20
     if iscall(expression)
-        expr = simplify(deepcopy(expression))
+        expr = simplify(Symbolics.unwrap(copy(Symbolics.wrap(expression))))
         args = arguments(expr)
         operation = SymbolicUtils.operation(expr)
         if isequal(operation, ^) && args[2] isa Int64
@@ -223,7 +223,7 @@ function solve_univar(expression, x, mult=false)
 
         # multiplicities
         if mult
-            og_arr_roots = deepcopy(arr_roots)
+            og_arr_roots = copy(arr_roots)
             for i = 1:(mult_n-1)
                 append!(arr_roots, og_arr_roots)    
             end

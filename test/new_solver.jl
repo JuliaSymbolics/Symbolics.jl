@@ -1,5 +1,5 @@
 using Symbolics
-import Symbolics: ssqrt, slog, scbrt, solve, ia_solve, postprocess_root, _is_const_number
+import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root, _is_const_number
 using Groebner
 E = Base.MathConstants.e
 
@@ -47,41 +47,41 @@ end
 end
 
 @testset "Deg 1 univar" begin
-    @test isequal(solve(x+1, x), [-1])
+    @test isequal(symbolic_solve(x+1, x), [-1])
 
-    @test isequal(solve(2x+1, x), [-1/2])
+    @test isequal(symbolic_solve(2x+1, x), [-1/2])
 
-    @test isequal(solve(x, x), [0]) 
+    @test isequal(symbolic_solve(x, x), [0]) 
 
-    @test isequal(solve((x+1)^20, x), [-1])
+    @test isequal(symbolic_solve((x+1)^20, x), [-1])
 
     @test isequal(Symbolics.get_roots_deg1(x + y^3, x), [-y^3])
 
     expr = x - Symbolics.term(sqrt, 2)
-    @test isequal(solve(expr, x)[1], Symbolics.term(sqrt, 2))
+    @test isequal(symbolic_solve(expr, x)[1], Symbolics.term(sqrt, 2))
 
     expr = x + im
-    @test solve(expr, x)[1] == -im
+    @test symbolic_solve(expr, x)[1] == -im
 end
 
 @testset "Deg 2 univar" begin
     expr = x^2 + 1
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg2(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots([-im, im])
     @test all(arr_get_roots .≈ arr_known_roots)
     @test all(arr_solve_roots .≈ arr_known_roots)
 
     expr = x^2 + 2x + 10
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg2(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots([-1 + 3im, -1 - 3im])
     @test all(arr_get_roots .≈ arr_known_roots)
     @test all(arr_solve_roots .≈ arr_known_roots)
 
     expr = x^2 - 10x + 25
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg2(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = [5,5]
     @test all(arr_get_roots .≈ arr_known_roots)
     @test all(arr_solve_roots .≈ arr_known_roots)
@@ -90,21 +90,21 @@ end
 @testset "Deg 3 univar" begin
     expr = x^3 - 2x^2 + x - 2 
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg3(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots([2, -im, im])
     @test all(isapprox.(arr_get_roots, arr_known_roots, atol=0.0000001))
     @test all(arr_solve_roots .≈ arr_known_roots)
 
     expr = x^3 + x^2 + x + 1
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg3(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots([-1, -im, im])
     @test all(isapprox.(arr_get_roots, arr_known_roots, atol=0.0000001))
     @test all(arr_solve_roots .≈ arr_known_roots)
 
     expr = x^3 + 10x
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg3(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots([0, -sqrt(10)*im, sqrt(10)*im])
     @test all(arr_get_roots .≈ arr_known_roots)
     @test all(arr_solve_roots .≈ arr_known_roots)
@@ -113,28 +113,28 @@ end
 @testset "Deg 4 univar" begin
     expr = x^4 + 1
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots(eval.([-(complex(-1))^(1/4),(complex(-1))^(1/4), (complex(-1))^(3/4), -(complex(-1))^(3/4)]))
     @test all(arr_get_roots .≈ arr_known_roots)
     @test all(arr_solve_roots .≈ arr_known_roots)
 
     expr = x^4 - 3x^2 + 2
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots(eval.([-1, 1, sqrt(2), -sqrt(2)]))
     @test all(arr_get_roots .≈ arr_known_roots)
     @test all(arr_solve_roots .≈ arr_known_roots)
 
     expr = x^4 - x^3 - 2x^2 + 6x - 4
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots(eval.([-2, 1, 1-im, 1+im]))
     @test all(arr_get_roots .≈ arr_known_roots)
     @test all(arr_solve_roots .≈ arr_known_roots)
 
     expr = 386314 - 412163x - 357800(x^2) + 1029179(x^3) - 111927(x^4)
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
-    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots(eval.([0.5840484 + 0.4176250im, 0.5840484 - 0.4176250im,
     8.788773679354421, -0.76177906049]))
     @test all(isapprox.(arr_known_roots, arr_get_roots, atol=0.00001))
@@ -143,7 +143,7 @@ end
 
 @testset "Complex coeffs univar" begin
     expr = x^4 + sqrt(complex(-2//1))
-    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     arr_known_roots = sort_roots(eval.([-Complex(-1)^(3/8)*2^(1/8), Complex(-1)^(3/8)*2^(1/8), 
         Complex(-1)^(7/8)*2^(1/8), -Complex(-1)^(7/8)*2^(1/8)]))
     @test all(arr_get_roots .≈ arr_known_roots)
@@ -154,37 +154,37 @@ end
 
 @testset "Multivar solver" begin
     eqs = [x*y + 2x^2, y^2 -1]
-    arr_calcd_roots = sort_arr(solve(eqs, [x,y]), [x,y])
-    arr_known_roots = [Dict(x=>-1/2, y=>1), Dict(x=>0, y=>-1), Dict(x=>0, y=>1), Dict(x=>1/2, y=>-1)]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
+    arr_known_roots = sort_arr([Dict(x=>-1/2, y=>1), Dict(x=>0, y=>-1), Dict(x=>0, y=>1), Dict(x=>1/2, y=>-1)], [x,y])
     arr_known_roots = sort_arr(arr_known_roots, [x,y])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 
     eqs = [x-y-z, x+y-z^2, x^2 + y^2 - 1]
-    arr_calcd_roots = sort_arr(solve(eqs, [x,y,z]), [x,y,z])
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z]), [x,y,z])
     arr_known_roots = sort_arr([Dict(x => 0, y=>1, z=>-1), Dict(x=>1, y=>0, z=>1),
         Dict(x=>(1/2)*(-2-sqrt(2)*im), y=>(1/2)*(-2+sqrt(2)*im), z=>-sqrt(2)*im),
         Dict(x=>(1/2)*(-2+sqrt(2)*im), y=>(1/2)*(-2-sqrt(2)*im), z=>sqrt(2)*im)], [x,y,z])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 
     eqs = [x^2, y, z]
-    arr_calcd_roots = sort_arr(solve(eqs, [x,y,z], true), [x,y,z])
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z], true), [x,y,z])
     arr_known_roots = sort_arr([Dict(x=>0, y=>0, z=>0), Dict(x=>0, y=>0, z=>0)], [x,y,z])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 
     eqs = [y^2 - 1, x]
-    arr_calcd_roots = sort_arr(solve(eqs, [x,y]), [x,y])
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
     arr_known_roots = sort_arr([Dict(y=>1//1, x=>0//1), Dict(y=>-1//1, x=>0//1)], [x,y])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 
     eqs = [x^5 + x, y]
-    arr_calcd_roots = sort_arr(solve(eqs, [x,y]), [x,y])
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
     arr_known_roots = sort_arr([Dict(x=>0, y=>0), Dict(x=>-(complex(-1))^(1/4), y=>0),
     Dict(x=>(complex(-1))^(1/4), y=>0), Dict(x=>-(complex(-1))^(3/4), y=>0),
     Dict(x=>(complex(-1))^(3/4), y=>0)], [x,y])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 
-    @test isequal(solve([x*y - 1, y], [x,y]), [])
-    @test isequal(solve([x+y+1, x+y+2], [x,y]), [])
+    @test isequal(symbolic_solve([x*y - 1, y], [x,y]), [])
+    @test isequal(symbolic_solve([x+y+1, x+y+2], [x,y]), [])
 
 end
 
@@ -281,41 +281,41 @@ end
 @testset "Isolate/Attract solve" begin
     @variables a b c d e x
     lhs = ia_solve(a*x^b + c, x)[1]
-    lhs2 = solve(a*x^b + c, x)[1]
+    lhs2 = symbolic_solve(a*x^b + c, x)[1]
     rhs = Symbolics.term(^, -c.val/a.val, 1/b.val) 
     #@test isequal(lhs, rhs)
     
     expr = x + 2
     lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
-    lhs_solve = eval.(Symbolics.toexpr.(solve(expr, x)))
+    lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
     rhs = [-2]
     @test lhs[1] ≈ rhs[1]
     @test lhs_solve[1] ≈ rhs[1]
 
     expr = sqrt(log(cbrt(x^2)))
     lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
-    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     rhs = sort_roots([1, -1])
     @test all(isapprox.(lhs, rhs, atol=1e-6))
     @test all(isapprox.(lhs_solve, rhs, atol=1e-6))
 
     expr = 2^(x+1) + 5^(x+3)
     lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
-    lhs_solve = eval.(Symbolics.toexpr.(solve(expr, x)))
+    lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
     rhs = [(-im*Base.MathConstants.pi - log(2) + 3log(5))/(log(2) - log(5))]
     @test lhs[1] ≈ rhs[1]
     @test lhs_solve[1] ≈ rhs[1]
 
     expr = 3*2^(x+3) + 2*5^(x+1)
     lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
-    lhs_solve = eval.(Symbolics.toexpr.(solve(expr, x)))
+    lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
     rhs = [(-im*Base.MathConstants.pi + log(5) - log(12))/(log(2) - log(5))]
     @test lhs[1] ≈ rhs[1]
     @test lhs_solve[1] ≈ rhs[1]
 
     expr = exp(2x)*exp(x^2 + 3) + 3
     lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
-    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     rhs = sort_roots([-1 + sqrt(-2 + im*Base.MathConstants.pi + log(3)),
         -1 - sqrt(-2 + im*Base.MathConstants.pi + log(3))])
     @test all(lhs .≈ rhs)
@@ -323,7 +323,7 @@ end
 
     expr = x/5 + 3x^2
     lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
-    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     rhs = sort_roots([0, -1//15])
     @test all(lhs .≈ rhs)
     @test all(lhs_solve .≈ rhs)
@@ -331,14 +331,14 @@ end
 
     expr = log(x)^2 + log(x) + 1
     lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
-    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     rhs = sort_roots([E^(-(complex(-1))^(1/3)), E^((complex(-1))^(2/3))])
     @test all(lhs .≈ rhs)
     @test all(lhs_solve .≈ rhs)
 
     expr = 2log(x^2 + 1)^2 + 3log(x^2 + 1) + 1
     lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
-    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     rhs = sort_roots([-im*ssqrt(1 - 1/E), im*ssqrt(1 - 1/E),
         -im*ssqrt(1 - 1/ssqrt(E)), im*ssqrt(1 - 1/ssqrt(E))])
     @test all(lhs .≈ rhs)
@@ -349,7 +349,7 @@ end
     # much like sin and cos solutions (i.e. infinite solutions)
     expr = 9^(x^2 + 1) + 3^(x^2 + 1) + 2
     lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
-    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     rhs = sort_roots([-ssqrt(-1 + slog(1/2*(-1 - im*ssqrt(7)))/slog(3)),
         ssqrt(-1 + slog(1/2*(-1 - im*ssqrt(7)))/slog(3)),
         ssqrt(-1 + slog(1/2*(-1 + im*ssqrt(7)))/slog(3)),
@@ -364,12 +364,12 @@ end
     expr = x + sqrt(x+1) - 5
     lhs_ia = ia_solve(expr, x)[1]
     lhs_att = Symbolics.attract_and_solve_sqrtpoly(expr, x)[1]
-    lhs_solve = solve(expr, x)[1]
+    lhs_solve = symbolic_solve(expr, x)[1]
     @test all(isequal(answer, 3) for answer in [lhs_ia, lhs_att, lhs_solve])
 
     expr = x^2 + x + sqrt(x) + 2
     lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
-    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
     rhs = sort_roots([-0.860929555 - 1.604034315im, -0.860929555 + 1.604034315im])
     @test all(isapprox.(lhs, rhs, atol=1e-6))
     @test all(isapprox.(lhs_solve, rhs, atol=1e-6))

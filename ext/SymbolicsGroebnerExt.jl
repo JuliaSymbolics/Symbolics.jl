@@ -86,7 +86,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}, mult=false)
     n_iterations = 1
 
     while generating
-        new_eqs = deepcopy(eqs)
+        new_eqs = copy(eqs)
         eq = new_var
         for i = 1:(old_len)
             eq -= rand(1:n_iterations*10)*vars[i]
@@ -122,7 +122,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}, mult=false)
             present_vars = Symbolics.get_variables(new_eqs[i])
         for var in vars
             if size(present_vars, 1) == 1 && isequal(var, present_vars[1])
-                new_sols = Symbolics.solve(Symbolics.wrap(new_eqs[i]), var, mult)
+                new_sols = Symbolics.solve_univar(Symbolics.wrap(new_eqs[i]), var, mult)
 
                 if length(solutions) == 0
                     append!(solutions, [Dict{Num, Any}(var => sol) for sol in new_sols])

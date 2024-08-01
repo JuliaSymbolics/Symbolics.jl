@@ -16,7 +16,7 @@ function sub(subs, place_to_sub)
     sub_var = gensym()
     sub_var = (@variables $sub_var)[1]
 
-    subs[sub_var] = deepcopy(place_to_sub)
+    subs[sub_var] = place_to_sub
     place_to_sub = sub_var.val
 
     return place_to_sub

@@ -87,7 +87,7 @@ function get_roots_deg4(expression, x)
     for root in roots_m
         vars = get_variables(root)
         if isequal(vars, []) && !isequal(eval(toexpr(root)), 0)
-            m = deepcopy(root)
+            m = Symbolics.unwrap(copy(Symbolics.wrap(root)))
             break
         end
     end
