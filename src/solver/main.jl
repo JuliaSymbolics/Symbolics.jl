@@ -1,111 +1,108 @@
 # This file uses Groebner, so it needs to be added in the future.
 
 """
-    symbolic_solve(expr, x, multiplicities=false)
+    symbolic_solve(expr, x; repeated=false)
 
-Solve equations symbolically.
+`symbolic_solve` is a function which attempts to solve input equations/expressions symbolically using various methods.
+It expects 2-3 arguments.
 
-Solve is a function which equates the input expression/s to 0 and solves for the input variable/s x (variables).
-It can take a single variable, a vector of variables, a single expression, an array of expressions.
-The base solver has multiple solvers which chooses from depending on the the type of input (multiple/uni var and multiple/single expression)
-only after ensuring that the input is valid.
-
-All the examples in the REPL in the documentation of the other solvers can be repeated using RootFinding.solve too.
-This makes it more convenient for the user. The solver first checks if the input is a valid polynomial, if not, attempt solving
-by attraction and isolation (`ia_solve`) which is inspired by the paper in the References section. This only works when the input is a single expression and the user wants the answer
-in terms of a single variable. Say `log(x) - a == 0` gives us `[e^a]` using ia_solve. If the input is anything else in the form of a poly,
-the solver uses 3 polynomial solvers appropriately depending on the input. 
-
-# Available solvers
-
-The `solve` function implements the following backends:
-
-- `solve_univar` (single variable single polynomial)
-- `solve_multivar` (multiple variables multiple polynomials)
-- `solve_multipoly` (single variable multiple polynomials)
-- `ia_solve` (not in the form of a polynomial, uses isolation and attraction in order to reshape the expression in the form of a poly)
-
-# Arguments
 - expr: Could be a single univar expression in the form of a poly or multiple univar expressions or multiple multivar polys or a transcendental nonlinear function which is solved by isolation, attraction and collection.
 
 - x: Could be a single variable or an array of variables which should be solved
 
-- multiplicities: Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If multiplicities is inputted as true, then the output is `[-1, -1]`.
+- multiplicities (optional): Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If multiplicities is inputted as true, then the output is `[-1, -1]`.
 
-# Examples
+It can take a single variable, a vector of variables, a single expression, an array of expressions.
+The base solver (`symbolic_solve`) has multiple solvers which chooses from depending on the the type of input
+(multiple/uni var and multiple/single expression) only after ensuring that the input is valid.
+
+## Examples
 
 TODO(Alex): add a parametric polynomial solve (perhaps smaller) to show-case `roots_of`:
 julia> f = expand((x - a)^2 * (x^10 - 1) * (a*x^2 + b*x * c) * (x^20 + a))
 julia> RootFinding.solve(f, x)
 
-## `solve_univar` (uses factoring and analytic solutions up to degree 4)
+### `solve_univar` (uses factoring and analytic solutions up to degree 4)
 ```jldoctest
-julia> solve(x^7 - 1, x)
-2-element Vector{Any}:
-roots_of((1//1) + x + x^2 + x^3 + x^4 + x^5 + x^6)
- 1//1
-```
-```jldoctest
-julia> expr = expand((x + 3)*(x^2 + 2x + 1)*(x + 2))
-6 + 17x + 17(x^2) + 7(x^3) + x^4
+julia> expr = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
+-a*b - a*x - 2a*b*x - 2a*(x^2) + b*(x^2) + x^3 - a*b*(x^2) - a*(x^3) + 2b*(x^3) + 2(x^4) + b*(x^4) + x^5
 
-julia> solve(expr, x)
-3-element Vector{Any}:
- -2//1
- -1//1
- -3//1
-
-julia> solve(expr, x, true)
+julia> Symbolics.symbolic_solve(expr, x)
 4-element Vector{Any}:
- -2//1
- -1//1
- -1//1
- -3//1
-```
+ -1
+   -b
+   (1//2)*√(4a)
+   (-1//2)*√(4a)
 
-## `solve_multivar` (uses Groebner basis and `solve_univar` to find roots)
+julia> Symbolics.symbolic_solve(expr, x, repeated=true)
+5-element Vector{Any}:
+ -1
+ -1
+   -b
+   (1//2)*√(4a)
+   (-1//2)*√(4a)
+```
 ```jldoctest
+julia> Symbolics.symbolic_solve(x^2 + a*x + 6, x)
+2-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
+ (1//2)*(-a + √(-24 + a^2))
+ (1//2)*(-a - √(-24 + a^2))
+```
+```jldoctest
+julia> symbolic_solve(x^7 - 1, x)
+2-element Vector{Any}:
+  roots_of((1//1) + x + x^2 + x^3 + x^4 + x^5 + x^6, x)
+ 1
+```
+### `solve_multivar` (uses Groebner basis and `solve_univar` to find roots)
+```jldoctest
+julia> using Groebner
+
+julia> @variables x y z
+3-element Vector{Num}:
+ x
+ y
+ z
+
 julia> eqs = [x+y^2+z, z*x*y, z+3x+y]
 3-element Vector{Num}:
  x + z + y^2
        x*y*z
   3x + y + z
 
-julia> solve(eqs, [x,y,z])
+julia> symbolic_solve(eqs, [x,y,z])
 3-element Vector{Any}:
- Dict{Num, Any}(z => 0//1, y => 0//1, x => 0//1)
- Dict{Num, Any}(z => 0//1, y => 1//3, x => -1//9)
- Dict{Num, Any}(z => -1//1, y => 1//1, x => 0//1)
+ Dict{Num, Any}(z => 0, y => 1//3, x => -1//9)
+ Dict{Num, Any}(z => 0, y => 0, x => 0)
+ Dict{Num, Any}(z => -1, y => 1, x => 0)
 ```
 
 
-## `solve_multipoly` (uses GCD between the input polys)
+### `solve_multipoly` (uses GCD between the input polys)
 ```jldoctest
-julia> solve([x-1, x^3 - 1, x^2 - 1, (x-1)^20], x)
-1-element Vector{Rational{BigInt}}:
+julia> symbolic_solve([x-1, x^3 - 1, x^2 - 1, (x-1)^20], x)
+1-element Vector{BigInt}:
  1
 ```
 
-## `ia_solve` (solving by isolation and attraction)
+### `ia_solve` (solving by isolation and attraction)
 ```jldoctest
-julia> solve(2^(x+1) + 5^(x+3), x)
+julia> symbolic_solve(2^(x+1) + 5^(x+3), x)
 1-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
- (-log(2) + 3log(5) - log(complex(-1))) / (log(2) - log(5))
+ (-slog(2) - log(complex(-1)) + 3slog(5)) / (slog(2) - slog(5))
 ```
 ```jldoctest
-julia> solve(log(x+1)+log(x-1), x)
-2-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
- (1//2)*RootFinding.ssqrt(8.0)
- (-1//2)*RootFinding.ssqrt(8.0)
+julia> symbolic_solve(log(x+1)+log(x-1), x)
+2-element Vector{SymbolicUtils.BasicSymbolic{BigFloat}}:
+ (1//2)*√(8.0)
+ (-1//2)*√(8.0)
 ```
 ```jldoctest
-julia> solve(a*x^b + c, x)
+julia> symbolic_solve(a*x^b + c, x)
 ((-c)^(1 / b)) / (a^(1 / b))
 ```
-# References
-[^1]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
 """
-function symbolic_solve(expr, x, multiplicities=false)
+function symbolic_solve(expr, x; repeated=false)
     type_x = typeof(x)
     expr_univar = false
     x_univar = false
@@ -139,12 +136,12 @@ function symbolic_solve(expr, x, multiplicities=false)
 
         sols = []
         if expr_univar
-            sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, multiplicities) : ia_solve(expr, x)
+            sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, repeated=repeated) : ia_solve(expr, x)
         else
             for i in eachindex(expr)
                 !check_poly_inunivar(expr[i], x) && throw("Solve can not solve this input currently")
             end
-            sols = solve_multipoly(expr, x, multiplicities)
+            sols = solve_multipoly(expr, x, repeated=repeated)
         end
 
         sols = map(postprocess_root, sols)
@@ -158,7 +155,7 @@ function symbolic_solve(expr, x, multiplicities=false)
             end
         end
 
-        sols = solve_multivar(expr, x, multiplicities)
+        sols = solve_multivar(expr, x, repeated=repeated)
         for sol in sols
             for var in x
                 sol[var] = postprocess_root(sol[var])
@@ -170,7 +167,7 @@ function symbolic_solve(expr, x, multiplicities=false)
 end
 
 """
-    solve_univar(expression, x, mult=false)
+    solve_univar(expression, x; repeated=false)
 This solver uses analytic solutions up to degree 4 to solve univariate polynomials.
 It first handles the special case of the expression being of operation `^`. E.g. ```math (x+2)^{20}```.
 We solve this by removing the int `20`, then solving the poly ```math x+2``` on its own.
@@ -191,13 +188,13 @@ implemented in the function `get_roots` and its children.
 # Examples
 
 """
-function solve_univar(expression, x, mult=false)
+function solve_univar(expression, x; repeated=false)
     args = []
     mult_n = 1
     expression = unwrap(expression)
     expression = expression isa PolyForm ? SymbolicUtils.toterm(expression) : expression
 
-    # handle multiplicities, i.e. (x+1)^20
+    # handle multiplicities (repeated roots), i.e. (x+1)^20
     if iscall(expression)
         expr = simplify(Symbolics.unwrap(copy(Symbolics.wrap(expression))))
         args = arguments(expr)
@@ -221,8 +218,8 @@ function solve_univar(expression, x, mult=false)
     if degree < 5 && length(factors) == 1
         arr_roots = get_roots(expression, x)
 
-        # multiplicities
-        if mult
+        # multiplicities (repeated roots)
+        if repeated 
             og_arr_roots = copy(arr_roots)
             for i = 1:(mult_n-1)
                 append!(arr_roots, og_arr_roots)    
@@ -236,7 +233,7 @@ function solve_univar(expression, x, mult=false)
         @assert isequal(expand(filtered_expr - u*expand(prod(factors))), 0)
 
         for factor in factors_subbed
-            roots = solve_univar(factor, x, mult)
+            roots = solve_univar(factor, x, repeated=repeated)
             if isequal(typeof(roots), RootsOf)
                 push!(arr_roots, roots)
             else
@@ -262,14 +259,14 @@ end
 # gcd_use_nemo(x - 1, (x-1)^20), which is again x-1.
 # now we just need to solve(x-1, x) to get the common root in this
 # system of equations.
-function solve_multipoly(polys::Vector, x::Num, mult=false)
+function solve_multipoly(polys::Vector, x::Num; repeated=false)
     polys = unique(polys)
 
     if length(polys) < 1
         throw("No expressions entered")
     end
     if length(polys) == 1
-        return solve_univar(polys[1], x, mult)
+        return solve_univar(polys[1], x, repeated=repeated)
     end
 
     gcd = gcd_use_nemo(polys[1], polys[2])
@@ -283,10 +280,10 @@ function solve_multipoly(polys::Vector, x::Num, mult=false)
         return []
     end
 
-    return solve_univar(gcd, x, mult)
+    return solve_univar(gcd, x, repeated=repeated)
 end
 
 
-function solve_multivar(eqs::Vector, vars::Vector{Num}, mult=false)
+function solve_multivar(eqs::Vector, vars::Vector{Num}; repeated=false)
     throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
 end
