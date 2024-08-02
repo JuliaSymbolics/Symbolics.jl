@@ -4,9 +4,9 @@
     symbolic_solve(expr, x; repeated=false)
 
 `symbolic_solve` is a function which attempts to solve input equations/expressions symbolically using various methods.
-It expects 2-3 arguments.
+There are 2 required arguments and 1 optional argument.
 
-- expr: Could be a single univar expression in the form of a poly or multiple univar expressions or multiple multivar polys or a transcendental nonlinear function which is solved by isolation, attraction and collection.
+- expr: Could be a single univar expression in the form of a poly or multiple univar expressions or multiple multivar polys or a transcendental nonlinear function.
 
 - x: Could be a single variable or an array of variables which should be solved
 
@@ -15,6 +15,10 @@ It expects 2-3 arguments.
 It can take a single variable, a vector of variables, a single expression, an array of expressions.
 The base solver (`symbolic_solve`) has multiple solvers which chooses from depending on the the type of input
 (multiple/uni var and multiple/single expression) only after ensuring that the input is valid.
+
+The expressions inputted can contain parameters, which are assumed to be transcendental.
+The definition is that a parameter "a" is transcendental if there exists no polynomial P with
+rational coefficients such that P(a) = 0. Check the examples section.
 
 ## Examples
 
