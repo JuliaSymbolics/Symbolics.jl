@@ -225,7 +225,7 @@ end
                     color = :green)
                 printstyled(io, "x && y", color = :blue)
                 printstyled(io, "\t\t\t\t use x & y\n", color = :green)
-                printstyled(io, "booelan_condition ? a : b", color = :blue)
+                printstyled(io, "boolean_condition ? a : b", color = :blue)
                 printstyled(io, "\t use ifelse(boolean_condition, a, b)\n", color = :green)
                 print(io,
                     "but a symbolic expression appeared instead of a Bool. For help regarding control flow with symbolic variables, see https://docs.sciml.ai/ModelingToolkit/dev/basics/FAQ/#How-do-I-handle-if-statements-in-my-symbolic-forms?")
