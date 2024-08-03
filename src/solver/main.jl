@@ -17,7 +17,7 @@ The base solver (`symbolic_solve`) has multiple solvers which chooses from depen
 (multiple/uni var and multiple/single expression) only after ensuring that the input is valid.
 
 The expressions inputted can contain parameters, which are assumed to be transcendental.
-The definition is that a parameter "a" is transcendental if there exists no polynomial P with
+A parameter "a" is transcendental if there exists no polynomial P with
 rational coefficients such that P(a) = 0. Check the examples section.
 
 ## Examples
