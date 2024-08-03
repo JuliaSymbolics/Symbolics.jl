@@ -280,7 +280,6 @@ function solve_multipoly(polys::Vector, x::Num; repeated=false)
     end
     
     if isequal(gcd, 1)
-        @info "Nemo gcd is 1."
         return []
     end
 
@@ -288,6 +287,6 @@ function solve_multipoly(polys::Vector, x::Num; repeated=false)
 end
 
 
-function solve_multivar(eqs::Vector, vars::Vector{Num}; repeated=false)
+function solve_multivar(eqs::Any, vars::Any; repeated=false)
     throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
 end

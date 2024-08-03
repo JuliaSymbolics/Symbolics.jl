@@ -27,7 +27,6 @@ LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
 MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 NaNMath = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
-Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
@@ -45,12 +44,14 @@ TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 
 [weakdeps]
 Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
+Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
 LuxCore = "bb33d45b-7691-41d6-9220-0943567d0623"
 PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 
 [extensions]
 SymbolicsGroebnerExt = "Groebner"
+SymbolicsNemoExt = "Nemo"
 SymbolicsLuxCoreExt = "LuxCore"
 SymbolicsPreallocationToolsExt = "PreallocationTools"
 SymbolicsSymPyExt = "SymPy"
@@ -111,4 +112,4 @@ SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "SymPy", "Random", "Lux", "ComponentArrays"]
+test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "SymPy", "Random", "Lux", "ComponentArrays", "Nemo"]

@@ -197,7 +197,7 @@ for sType in [Pair, Vector, Dict]
     @eval substitute(expr::Arr, s::$sType; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
 end
 
-# RootFinding
+# Symbolic solver
 include("./solver/coeffs.jl")
 include("./solver/nemo_stuff.jl")
 include("./solver/solve_helpers.jl")
@@ -226,6 +226,9 @@ end
         end
         @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
             include("../ext/SymbolicsSymPyExt.jl")
+        end
+        @require Nemo="2edaba10-b0f1-5616-af89-8c11ac63239a" begin
+            include("../ext/SymbolicsNemoExt.jl")
         end
     end
 end

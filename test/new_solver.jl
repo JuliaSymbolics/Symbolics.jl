@@ -1,6 +1,6 @@
 using Symbolics
 import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root, _is_const_number
-using Groebner
+using Groebner, Nemo
 E = Base.MathConstants.e
 
 function sort_roots(roots)
