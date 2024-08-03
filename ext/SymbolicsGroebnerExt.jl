@@ -70,4 +70,104 @@ function Symbolics.is_groebner_basis(polynomials::Vector{Num}; kwargs...)
     Groebner.isgroebner(polynoms; kwargs...)
 end
 
+function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; repeated=false)
+    
+    # Reference: Rouillier, F. Solving Zero-Dimensional Systems
+    # Through the Rational Univariate Representation.
+    # AAECC 9, 433–461 (1999). https://doi.org/10.1007/s002000050114
+    
+    # Use a new variable to separate the input polynomials (Reference above)
+    new_var = Symbolics.gen_separating_var(vars)
+    old_len = length(vars)
+    push!(vars, new_var)
+
+    new_eqs = []
+    generating = true
+    n_iterations = 1
+
+    while generating
+        new_eqs = copy(eqs)
+        eq = new_var
+        for i = 1:(old_len)
+            eq -= rand(1:n_iterations*10)*vars[i]
+        end
+        push!(new_eqs, eq)
+        new_eqs = convert(Vector{Any}, Symbolics.groebner_basis(new_eqs, ordering=Lex(vars)))
+
+        if length(new_eqs) <= length(vars) 
+            generating &= false
+        end
+
+        for i  in eachindex(new_eqs)[2:end]
+            generating |= all(Symbolics.degree(var) > 1 for var in Symbolics.get_variables(new_eqs[i]))
+        end
+
+        n_iterations += 1
+    end
+
+    solutions = []
+
+    # handle "unsolvable" cases
+    if isequal(1, new_eqs[1])
+        return solutions
+    end
+    if length(new_eqs) < length(vars)
+        throw("Infinite number of solutions")
+    end
+
+
+    # first, solve any single variable equations
+    i = 1
+    while !(i > length(new_eqs))
+            present_vars = Symbolics.get_variables(new_eqs[i])
+        for var in vars
+            if size(present_vars, 1) == 1 && isequal(var, present_vars[1])
+                new_sols = Symbolics.solve_univar(Symbolics.wrap(new_eqs[i]), var, repeated=repeated)
+
+                if length(solutions) == 0
+                    append!(solutions, [Dict{Num, Any}(var => sol) for sol in new_sols])
+                else
+                    solutions = Symbolics.add_sol_to_all(solutions, new_sols, var)
+                end
+
+                deleteat!(new_eqs, i)
+                i = i - 1
+                break
+            end
+        end
+        i = i + 1
+    end
+
+
+    # second, iterate over eqs and sub each found solution
+    # then add the roots of the remaining unknown variables 
+    for eq in new_eqs
+        solved = false
+        present_vars = Symbolics.get_variables(eq)
+        size_of_sub = length(solutions[1])
+
+        if size(present_vars, 1) <= (size_of_sub + 1)
+            while !solved 
+                subbed_eq = eq
+                for (var, root) in solutions[1]
+                    subbed_eq = Symbolics.substitute(subbed_eq, Dict([var => root]), fold=false)
+                end
+
+                var_tosolve = Symbolics.get_variables(subbed_eq)[1]
+                new_var_sols = Symbolics.solve_univar(subbed_eq, var_tosolve, repeated=repeated)
+                Symbolics.add_sol!(solutions, new_var_sols, var_tosolve, 1)
+
+                solved = all(x -> length(x) == size_of_sub+1, solutions)
+            end
+        end
+    end
+
+    pop!(vars)
+    for roots in solutions
+        delete!(roots, new_var)
+    end
+
+    return solutions
+end
+
 end # module
