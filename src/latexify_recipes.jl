@@ -48,7 +48,6 @@ end
 recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 
 @latexrecipe function f(n::Num)
-    env --> :equation
     cdot --> false
     fmt --> FancyNumberFormatter(5)
     index --> :subscript
@@ -57,7 +56,6 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 end
 
 @latexrecipe function f(z::Complex{Num})
-    env --> :equation
     cdot --> false
     index --> :subscript
 
@@ -67,14 +65,12 @@ end
 end
 
 @latexrecipe function f(n::ArrayOp)
-    env --> :equation
     cdot --> false
     index --> :subscript
     return recipe(n.term)
 end
 
 @latexrecipe function f(n::Function)
-    env --> :equation
     cdot --> false
     index --> :subscript
 
@@ -83,7 +79,6 @@ end
 
 
 @latexrecipe function f(n::Arr)
-    env --> :equation
     cdot --> false
     index --> :subscript
 
@@ -91,7 +86,6 @@ end
 end
 
 @latexrecipe function f(n::Symbolic)
-    env --> :equation
     cdot --> false
     index --> :subscript
 
@@ -131,6 +125,14 @@ Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, "\$\$ " * latexif
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
+function Base.show(io::IO, ::MIME"text/latex", x::AbstractVector{Num})
+    print(io, "\$\\left[~")
+    for (i, item) in enumerate(x)
+        print(io, latexraw(item))
+        i == length(x) || print(io, ",\\hspace{6pt}")
+    end
+    print(io, "~\\right]\$")
+end
 
 _toexpr(O::ArrayOp) = _toexpr(O.term)
 
