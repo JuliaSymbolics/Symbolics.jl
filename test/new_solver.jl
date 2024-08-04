@@ -167,7 +167,7 @@ end
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 
     eqs = [x^2, y, z]
-    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z], repeated=true), [x,y,z])
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z], dropmultiplicity=false), [x,y,z])
     arr_known_roots = sort_arr([Dict(x=>0, y=>0, z=>0), Dict(x=>0, y=>0, z=>0)], [x,y,z])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 

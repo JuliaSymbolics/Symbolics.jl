@@ -70,7 +70,7 @@ function Symbolics.is_groebner_basis(polynomials::Vector{Num}; kwargs...)
     Groebner.isgroebner(polynoms; kwargs...)
 end
 
-function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; repeated=false)
+function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true)
     
     # Reference: Rouillier, F. Solving Zero-Dimensional Systems
     # Through the Rational Univariate Representation.
@@ -122,7 +122,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; repeated=false
             present_vars = Symbolics.get_variables(new_eqs[i])
         for var in vars
             if size(present_vars, 1) == 1 && isequal(var, present_vars[1])
-                new_sols = Symbolics.solve_univar(Symbolics.wrap(new_eqs[i]), var, repeated=repeated)
+                new_sols = Symbolics.solve_univar(Symbolics.wrap(new_eqs[i]), var, dropmultiplicity=dropmultiplicity)
 
                 if length(solutions) == 0
                     append!(solutions, [Dict{Num, Any}(var => sol) for sol in new_sols])
@@ -154,7 +154,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; repeated=false
                 end
 
                 var_tosolve = Symbolics.get_variables(subbed_eq)[1]
-                new_var_sols = Symbolics.solve_univar(subbed_eq, var_tosolve, repeated=repeated)
+                new_var_sols = Symbolics.solve_univar(subbed_eq, var_tosolve, dropmultiplicity=dropmultiplicity)
                 Symbolics.add_sol!(solutions, new_var_sols, var_tosolve, 1)
 
                 solved = all(x -> length(x) == size_of_sub+1, solutions)

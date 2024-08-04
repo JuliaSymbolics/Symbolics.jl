@@ -1,7 +1,7 @@
 # This file uses Groebner, so it needs to be added in the future.
 
 """
-    symbolic_solve(expr, x; repeated=false)
+    symbolic_solve(expr, x; dropmultiplicity=true)
 
 `symbolic_solve` is a function which attempts to solve input equations/expressions symbolically using various methods.
 There are 2 required arguments and 1 optional argument.
@@ -10,7 +10,7 @@ There are 2 required arguments and 1 optional argument.
 
 - x: Could be a single variable or an array of variables which should be solved
 
-- multiplicities (optional): Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If multiplicities is inputted as true, then the output is `[-1, -1]`.
+- dropmultiplicity (optional): Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If dropmultiplicity is inputted as false, then the output is `[-1, -1]`.
 
 It can take a single variable, a vector of variables, a single expression, an array of expressions.
 The base solver (`symbolic_solve`) has multiple solvers which chooses from depending on the the type of input
@@ -19,6 +19,11 @@ The base solver (`symbolic_solve`) has multiple solvers which chooses from depen
 The expressions inputted can contain parameters, which are assumed to be transcendental.
 A parameter "a" is transcendental if there exists no polynomial P with
 rational coefficients such that P(a) = 0. Check the examples section.
+
+Currently, `symbolic_solve` supports
+- Linear and polynomial equations (with parameters)
+- Systems of linear and polynomials equations (without extra parameters, for now)
+- Equations with transcendental functions (with parameters)
 
 ## Examples
 
@@ -38,7 +43,7 @@ julia> Symbolics.symbolic_solve(expr, x)
    (1//2)*√(4a)
    (-1//2)*√(4a)
 
-julia> Symbolics.symbolic_solve(expr, x, repeated=true)
+julia> Symbolics.symbolic_solve(expr, x, dropmultiplicity=false)
 5-element Vector{Any}:
  -1
  -1
@@ -106,7 +111,7 @@ julia> symbolic_solve(a*x^b + c, x)
 ((-c)^(1 / b)) / (a^(1 / b))
 ```
 """
-function symbolic_solve(expr, x; repeated=false)
+function symbolic_solve(expr, x; dropmultiplicity=true)
     type_x = typeof(x)
     expr_univar = false
     x_univar = false
@@ -140,12 +145,12 @@ function symbolic_solve(expr, x; repeated=false)
 
         sols = []
         if expr_univar
-            sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, repeated=repeated) : ia_solve(expr, x)
+            sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, dropmultiplicity=dropmultiplicity) : ia_solve(expr, x)
         else
             for i in eachindex(expr)
                 !check_poly_inunivar(expr[i], x) && throw("Solve can not solve this input currently")
             end
-            sols = solve_multipoly(expr, x, repeated=repeated)
+            sols = solve_multipoly(expr, x, dropmultiplicity=dropmultiplicity)
         end
 
         sols = map(postprocess_root, sols)
@@ -159,7 +164,7 @@ function symbolic_solve(expr, x; repeated=false)
             end
         end
 
-        sols = solve_multivar(expr, x, repeated=repeated)
+        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity)
         for sol in sols
             for var in x
                 sol[var] = postprocess_root(sol[var])
@@ -171,7 +176,7 @@ function symbolic_solve(expr, x; repeated=false)
 end
 
 """
-    solve_univar(expression, x; repeated=false)
+    solve_univar(expression, x; dropmultiplicity=true)
 This solver uses analytic solutions up to degree 4 to solve univariate polynomials.
 It first handles the special case of the expression being of operation `^`. E.g. ```math (x+2)^{20}```.
 We solve this by removing the int `20`, then solving the poly ```math x+2``` on its own.
@@ -187,12 +192,12 @@ implemented in the function `get_roots` and its children.
 
 - x: Single symbolics variable
 
-- mult: Print repeated roots or not?
+- dropmultiplicity (optional): Print repeated roots or not?
 
 # Examples
 
 """
-function solve_univar(expression, x; repeated=false)
+function solve_univar(expression, x; dropmultiplicity=true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
@@ -223,7 +228,7 @@ function solve_univar(expression, x; repeated=false)
         arr_roots = get_roots(expression, x)
 
         # multiplicities (repeated roots)
-        if repeated 
+        if !dropmultiplicity
             og_arr_roots = copy(arr_roots)
             for i = 1:(mult_n-1)
                 append!(arr_roots, og_arr_roots)    
@@ -237,7 +242,7 @@ function solve_univar(expression, x; repeated=false)
         @assert isequal(expand(filtered_expr - u*expand(prod(factors))), 0)
 
         for factor in factors_subbed
-            roots = solve_univar(factor, x, repeated=repeated)
+            roots = solve_univar(factor, x, dropmultiplicity=dropmultiplicity)
             if isequal(typeof(roots), RootsOf)
                 push!(arr_roots, roots)
             else
@@ -263,14 +268,14 @@ end
 # gcd_use_nemo(x - 1, (x-1)^20), which is again x-1.
 # now we just need to solve(x-1, x) to get the common root in this
 # system of equations.
-function solve_multipoly(polys::Vector, x::Num; repeated=false)
+function solve_multipoly(polys::Vector, x::Num; dropmultiplicity=true)
     polys = unique(polys)
 
     if length(polys) < 1
         throw("No expressions entered")
     end
     if length(polys) == 1
-        return solve_univar(polys[1], x, repeated=repeated)
+        return solve_univar(polys[1], x, dropmultiplicity=dropmultiplicity)
     end
 
     gcd = gcd_use_nemo(polys[1], polys[2])
@@ -283,10 +288,10 @@ function solve_multipoly(polys::Vector, x::Num; repeated=false)
         return []
     end
 
-    return solve_univar(gcd, x, repeated=repeated)
+    return solve_univar(gcd, x, dropmultiplicity=dropmultiplicity)
 end
 
 
-function solve_multivar(eqs::Any, vars::Any; repeated=false)
+function solve_multivar(eqs::Any, vars::Any; dropmultiplicity=true)
     throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
 end
