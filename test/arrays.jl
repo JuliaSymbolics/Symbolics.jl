@@ -443,3 +443,9 @@ end
     @test_throws BoundsError k[-1]
     @test_throws BoundsError k[4]
 end
+
+@testset "Arrayop sorted_arguments" begin
+    @variables x[1:3] y[1:3]
+    sym = unwrap(x + y)
+    @test all(splat(isequal), zip(SymbolicUtils.sorted_arguments(sym), [+, x, y]))
+end

@@ -27,6 +27,13 @@ let
     @test eltype(gg) == Real
     @test symtype(unwrap(gg)) == SymMatrix{Real, 2}
     @test promote_symtype(ggg, symtype(unwrap(x))) == Any # no promote_symtype defined
+
+    gg = ggg([a, 2a])
+    @test ndims(gg) == 2
+    @test size(gg) == (4, 4)
+    @test eltype(gg) == Real
+    @test symtype(unwrap(gg)) == SymMatrix{Real, 2}
+    @test promote_symtype(ggg, Vector{symtype(typeof(a))}) == Any
 end
 let
     # redefine with promote_symtype
@@ -63,6 +70,12 @@ hh = ccwa(gg, x)
 @test size(hh) == (8,4,10)
 @test eltype(hh) == Real
 @test isequal(arguments(unwrap(hh)), unwrap.([gg, x]))
+
+_args = [[a 2a; 4a 6a; 3a 5a], [4a, 6a]]
+hh = ccwa(_args...)
+@test size(hh) == (3, 2, 10)
+@test eltype(hh) == Real
+@test isequal(arguments(unwrap(hh)), unwrap.(_args))
 
 @test all(t->getsource(t)[1] === :variables, many_vars)
 @test getdefaultval(t) == 0
@@ -218,3 +231,10 @@ yyy = yy(t)
 @test !isequal(yyy, y)
 @variables y(..)
 @test isequal(yyy, y(t))
+
+spam(x) = 2x
+@register_symbolic spam(x::AbstractArray)
+
+sym = spam([a, 2a])
+@test sym isa Num
+@test unwrap(sym) isa BasicSymbolic{Real}

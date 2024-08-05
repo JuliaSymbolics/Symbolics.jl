@@ -215,6 +215,22 @@ end
         @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
             include("../ext/SymbolicsSymPyExt.jl")
         end
+        Base.Experimental.register_error_hint(TypeError) do io, exc
+            if exc.expected == Bool && exc.got isa Num
+                println(io,
+                    "\nA symbolic expression appeared in a Boolean context. This error arises in situations where Julia expects a Bool, like ")
+                printstyled(io, "if boolean_condition", color = :blue)
+                printstyled(
+                    io, "\t\t use ifelse(boolean_condition, then branch, else branch)\n",
+                    color = :green)
+                printstyled(io, "x && y", color = :blue)
+                printstyled(io, "\t\t\t\t use x & y\n", color = :green)
+                printstyled(io, "boolean_condition ? a : b", color = :blue)
+                printstyled(io, "\t use ifelse(boolean_condition, a, b)\n", color = :green)
+                print(io,
+                    "but a symbolic expression appeared instead of a Bool. For help regarding control flow with symbolic variables, see https://docs.sciml.ai/ModelingToolkit/dev/basics/FAQ/#How-do-I-handle-if-statements-in-my-symbolic-forms?")
+            end
+        end
     end
 end
 
