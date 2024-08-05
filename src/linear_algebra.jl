@@ -95,6 +95,7 @@ julia> Symbolics.solve_for([x + y ~ 0, x - y ~ 2], [x, y])
 """
 function solve_for(eq, var; simplify=false, check=true) # scalar case
     Base.depwarn("solve_for is deprecated, please use symbolic_solve instead.", :solve_for, force=true)
+    return symbolic_solve(eq, var)
     # simplify defaults for `false` as canonicalization should handle most of
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
