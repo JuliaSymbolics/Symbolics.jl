@@ -194,3 +194,20 @@ function Base.Docs.getdoc(x::Num)
     end
     Markdown.parse(join(strings, "\n\n  "))
 end
+
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1206#issuecomment-2271847091
+"""
+$(TYPEDSIGNATURES)
+
+Return the alignment of printing `x` of type `Num`.
+
+The alignment is a tuple `(left, right)` showing how many characters are needed 
+on either side of an alignment feature. This function returns the text width
+of `x` and `0` to avoid matching special characters, such as `e`and `f`, with 
+the alignment algorithm in Julia Base, which leads to extra white spaces on the 
+left of the characters when displaying array of symbolic variables.
+"""
+function Base.alignment(io::IO, x::Num)
+    s = sprint(show, x, context = Base.nocolor(io), sizehint = 0)
+    textwidth(s), 0
+end
