@@ -19,7 +19,7 @@ function _postprocess_root(x::Number)
     # N // 1 => N
     if x isa Rational
         if isone(denominator(x))
-            return big(numerator(x))
+            return numerator(x)
         end
     end
 
@@ -37,12 +37,7 @@ end
 function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     !iscall(x) && return x
 
-    x = maketerm(
-        typeof(x),
-        operation(x),
-        map(_postprocess_root, arguments(x)),
-        nothing
-    )
+    x = Symbolics.term(operation(x), map(_postprocess_root, arguments(x))...)
 
     # sqrt(0), cbrt(0) => 0
     # sqrt(1), cbrt(1) => 1

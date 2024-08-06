@@ -6,6 +6,7 @@ function get_roots_deg1(expression, x)
 
     m = f_numbers(get(coeffs, x, 0))
     c = f_numbers(get(coeffs, x^0, 0))
+
     root = -comp_rational(c,m)
     root = unwrap(ssubs(root, subs))
     return [root]

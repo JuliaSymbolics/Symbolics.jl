@@ -153,7 +153,7 @@ function symbolic_solve(expr, x; dropmultiplicity=true)
             sols = solve_multipoly(expr, x, dropmultiplicity=dropmultiplicity)
         end
 
-        sols = map(postprocess_root, sols)
+        sols = map(sol -> sol isa RootsOf ? sol : postprocess_root(sol), sols)
         return sols
     end
 
@@ -243,17 +243,13 @@ function solve_univar(expression, x; dropmultiplicity=true)
 
         for factor in factors_subbed
             roots = solve_univar(factor, x, dropmultiplicity=dropmultiplicity)
-            if isequal(typeof(roots), RootsOf)
-                push!(arr_roots, roots)
-            else
-                append!(arr_roots, roots)
-            end
+            append!(arr_roots, roots)
         end
     end
 
 
     if isequal(arr_roots, [])
-        return RootsOf(wrap(expression), wrap(x))
+        return [RootsOf(wrap(expression), wrap(x))]
     end
 
     return arr_roots
