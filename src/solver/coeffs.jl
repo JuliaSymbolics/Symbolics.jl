@@ -148,7 +148,10 @@ function _filter_poly(expr, var)
         arg = unwrap(arg)
         vars = get_variables(arg)
         if isequal(vars, [])
-            if arg isa Integer || arg isa Rational
+            if arg isa Integer
+                continue
+            elseif arg isa Rational || arg isa AbstractFloat || arg isa Complex 
+                args[i] = comp_rational(arg, 1)
                 continue
             end
             args[i] = sub(subs, args[i])
