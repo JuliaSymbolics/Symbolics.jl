@@ -98,7 +98,6 @@ end
 # converts everything to BIG
 function f_numbers(n)
     n = unwrap(n)
-    return n
     if n isa ComplexTerm || n isa Float64 || n isa Irrational
         return n
     end
@@ -132,6 +131,7 @@ function f_numbers(n)
 end
 
 function comp_rational(x,y)
+    x, y = f_numbers(x), f_numbers(y)
     try
         r = x//y
         return r

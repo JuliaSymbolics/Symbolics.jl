@@ -73,10 +73,10 @@ julia> filter_stuff(123)
 ```
 """
 function filter_stuff(expr)
-
-    if expr isa Integer || expr isa Rational
+    if expr isa Integer
         return Dict(), expr
-
+    elseif expr isa Rational || expr isa AbstractFloat || expr isa Complex 
+        return Dict(), comp_rational(expr, 1)
     else
         expr = isequal(expr, true) ? 1 : expr
         subs = Dict{Any, Any}()

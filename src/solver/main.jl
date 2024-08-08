@@ -216,8 +216,8 @@ function solve_univar(expression, x; dropmultiplicity=true)
 
     subs, filtered_expr = filter_poly(expression, x)
     coeffs, constant = polynomial_coeffs(filtered_expr, [x])
-
     degree = sdegree(coeffs, x)
+
     u, factors = factor_use_nemo(wrap(filtered_expr))
     factors = convert(Vector{Any}, factors)
 

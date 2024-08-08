@@ -4,8 +4,8 @@ function get_roots_deg1(expression, x)
 
     @assert isequal(sdegree(coeffs, x), 1) "Expected a polynomial of degree 1 in $x, got $expression"
 
-    m = get(coeffs, x, 0)
-    c = get(coeffs, x^0, 0)
+    m = f_numbers(get(coeffs, x, 0))
+    c = f_numbers(get(coeffs, x^0, 0))
 
     root = -comp_rational(c,m)
     root = unwrap(ssubs(root, subs))
@@ -13,7 +13,7 @@ function get_roots_deg1(expression, x)
 end
 
 function get_deg2_with_coeffs(coeffs::Vector{Any})
-    a, b, c = coeffs
+    a, b, c = f_numbers.(coeffs)
 
     root1 = comp_rational(-b + term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
     root2 = comp_rational(-b - term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
@@ -28,7 +28,7 @@ function get_roots_deg2(expression, x)
 
     @assert isequal(sdegree(coeffs, x), 2) "Expected a polynomial of degree 2 in $x, got $expression"
 
-    results = (unwrap(ssubs(get(coeffs, x^i, 0), subs)) for i in 2:-1:0)
+    results = (f_numbers(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 2:-1:0)
     a, b, c = results
 
     root1 = comp_rational(-b + term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
@@ -43,7 +43,7 @@ function get_roots_deg3(expression, x)
 
     @assert isequal(sdegree(coeffs, x), 3) "Expected a polynomial of degree 3 in $x, got $expression"
 
-    results = (unwrap(ssubs(get(coeffs, x^i, 0), subs)) for i in 3:-1:0)
+    results = (f_numbers(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 3:-1:0)
     a, b, c, d = results
 
     
@@ -68,7 +68,7 @@ function get_roots_deg4(expression, x)
 
     @assert isequal(sdegree(coeffs, x), 4) "Expected a polynomial of degree 4 in $x, got $expression"
 
-    results = (unwrap(ssubs(get(coeffs, x^i, 0), subs)) for i in 4:-1:0)
+    results = (f_numbers(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 4:-1:0)
     a, b, c, d, e = results
 
     p = comp_rational((8(a*c)-3(b^2)), (8(a^2)))
@@ -130,7 +130,6 @@ function get_roots(expression, x)
     if degree == 0 && isequal(expression, 0)
         return [x]
     elseif degree == 0 && !isequal(expression, 0)
-        # throw("Not a valid statement")
         return [] # no roots!
     end
 
