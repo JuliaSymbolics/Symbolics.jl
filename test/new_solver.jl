@@ -229,6 +229,11 @@ end
     @test _is_const_number(1) && _is_const_number(2 // 3) && _is_const_number(3 + 4im)
     @test _is_const_number(SymbolicUtils.term(sqrt, 2) + 21)
     @test _is_const_number((SymbolicUtils.term(exp, 2) * SymbolicUtils.term(exp, 2)) // 99)
+
+    @test Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 0) ) == 1
+    @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 0) ) == 1
+    @test Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 1) ) == __x
+    @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 1) ) == Base.MathConstants.e
 end
 
 
