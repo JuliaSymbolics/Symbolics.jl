@@ -236,9 +236,9 @@ version = "1.0.0"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
-git-tree-sha1 = "b1c55339b7c6c350ee89f2c1604299660525b248"
+git-tree-sha1 = "8ae8d32e09f0dcf42a36b90d4e17f5dd2e4c4215"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "4.15.0"
+version = "4.16.0"
 weakdeps = ["Dates", "LinearAlgebra"]
 
     [deps.Compat.extensions]
@@ -477,9 +477,9 @@ uuid = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
 version = "1.0.4"
 
 [[deps.EnzymeCore]]
-git-tree-sha1 = "d445df66dd8761a4c27df950db89c6a3a0629fe7"
+git-tree-sha1 = "8f205a601760f4798a10f138c3940f0451d95188"
 uuid = "f151be2c-9106-41f4-ab19-57ee4f262869"
-version = "0.7.7"
+version = "0.7.8"
 weakdeps = ["Adapt"]
 
     [deps.EnzymeCore.extensions]
@@ -864,16 +864,18 @@ version = "0.4.6"
 
 [[deps.Latexify]]
 deps = ["Format", "InteractiveUtils", "LaTeXStrings", "MacroTools", "Markdown", "OrderedCollections", "Requires"]
-git-tree-sha1 = "5b0d630f3020b82c0775a51d05895852f8506f50"
+git-tree-sha1 = "ce5f5621cac23a86011836badfedf664a612cee4"
 uuid = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
-version = "0.16.4"
+version = "0.16.5"
 
     [deps.Latexify.extensions]
     DataFramesExt = "DataFrames"
+    SparseArraysExt = "SparseArrays"
     SymEngineExt = "SymEngine"
 
     [deps.Latexify.weakdeps]
     DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
 
 [[deps.LayoutPointers]]
@@ -889,9 +891,9 @@ version = "1.2.2"
 
 [[deps.LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "SparseArrays"]
-git-tree-sha1 = "b8ea0abe6cc872996e87356951d286d25d485aba"
+git-tree-sha1 = "507b423197fdd9e77b74aa2532c0a05eb7eb4004"
 uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-version = "2.1.9"
+version = "2.2.0"
 
     [deps.LazyArrays.extensions]
     LazyArraysBandedMatricesExt = "BandedMatrices"
@@ -996,9 +998,9 @@ uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 
 [[deps.LinearSolve]]
 deps = ["ArrayInterface", "ChainRulesCore", "ConcreteStructs", "CpuId", "DocStringExtensions", "EnumX", "FastLapackInterface", "GPUArraysCore", "InteractiveUtils", "KLU", "Krylov", "LazyArrays", "Libdl", "LinearAlgebra", "MKL_jll", "Markdown", "PrecompileTools", "Preferences", "RecursiveFactorization", "Reexport", "SciMLBase", "SciMLOperators", "Setfield", "SparseArrays", "Sparspak", "StaticArraysCore", "UnPack"]
-git-tree-sha1 = "00d9dc2ef7abb0575ec2b59fedbbc5685127e6ea"
+git-tree-sha1 = "ee625f4053362526950661ce3022c7a483c6f8e5"
 uuid = "7ed4a6bd-45f5-4d41-b270-4a48e9bafcae"
-version = "2.31.2"
+version = "2.32.0"
 
     [deps.LinearSolve.extensions]
     LinearSolveBandedMatricesExt = "BandedMatrices"
@@ -1686,10 +1688,10 @@ uuid = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
 version = "1.1.1"
 
 [[deps.StaticArrayInterface]]
-deps = ["ArrayInterface", "Compat", "IfElse", "LinearAlgebra", "PrecompileTools", "Requires", "SparseArrays", "Static", "SuiteSparse"]
-git-tree-sha1 = "8963e5a083c837531298fc41599182a759a87a6d"
+deps = ["ArrayInterface", "Compat", "IfElse", "LinearAlgebra", "PrecompileTools", "Requires", "Static"]
+git-tree-sha1 = "c3668ff1a3e4ddf374fc4f8c25539ce7194dcc39"
 uuid = "0d7ed370-da01-4f52-bd93-41d350b8b718"
-version = "1.5.1"
+version = "1.6.0"
 weakdeps = ["OffsetArrays", "StaticArrays"]
 
     [deps.StaticArrayInterface.extensions]
@@ -1757,9 +1759,9 @@ version = "7.2.1+1"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "RuntimeGeneratedFunctions", "StaticArraysCore"]
-git-tree-sha1 = "2dd32da03adaf43fd91494e38ef3df0ab2e6c20e"
+git-tree-sha1 = "c9fce29fb41a10677e24f74421ebe31220b81ad0"
 uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-version = "0.3.27"
+version = "0.3.28"
 
 [[deps.SymbolicLimits]]
 deps = ["SymbolicUtils"]
