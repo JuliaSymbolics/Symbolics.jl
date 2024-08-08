@@ -40,20 +40,23 @@ function n_func_occ(expr, var)
         for arg in args
             n_occurrences(arg, var) == 0 && continue
 
+            # x
             if !iscall(arg) && isequal(var, get_variables(expr)[1]) && !outside
                 n += 1
                 outside = true
                 continue
             end
+
             !iscall(arg) && continue
             oper = operation(arg)
 
             args_arg = arguments(arg)
             oper_arg = operation(arg)
             is_var_outside(arg) = check_poly_inunivar(arg, var) && !outside && n_occurrences(arg, var) != 0
-            case_1_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0  && n_occurrences(args_arg[1], var) != 0 && is_var_outside(arg)
+            case_1_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0  && n_occurrences(args_arg[1], var) != 0 && check_poly_inunivar(args_arg[1], var) && n_occurrences(arg, var) != 0 && !(args_arg[2] isa Number)
             case_2_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) != 0  && n_occurrences(args_arg[1], var) == 0  
             case_3_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0  && n_occurrences(args_arg[1], var) != 0 && !check_poly_inunivar(args_arg[1], var)
+
 
             # any transcedental operation and the case:  (weird_transcedental_f(x))^(something)
             if any(isequal(oper, op) for op in counted_ops) || case_3_pow
@@ -63,11 +66,14 @@ function n_func_occ(expr, var)
             elseif case_2_pow
                 n += n_func_occ(args_arg[2], var) 
             
-                
             # var is outside 'x'+1
             elseif is_var_outside(arg)
                 n += 1
                 outside = true
+
+            # case (f(x))^(weird stuff)
+            elseif case_1_pow
+                n += 1
 
             # n(2 / x) = 1; n(x/x^2) = 2?
             elseif oper_arg === (/)
