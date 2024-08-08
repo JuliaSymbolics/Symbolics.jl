@@ -23,11 +23,11 @@ operation(a::ComplexTerm{T}) where T = Complex{T}
 arguments(a::ComplexTerm) = [a.re, a.im]
 metadata(a::ComplexTerm) = metadata(a.re)
 
-function maketerm(T::Type{<:ComplexTerm}, f, args, symtype, metadata)
+function maketerm(T::Type{<:ComplexTerm}, f, args, metadata)
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        maketerm(typeof(first(args)), f, args, symtype, metadata)
+        maketerm(typeof(first(args)), f, args, metadata)
     end
 end
 

@@ -633,7 +633,7 @@ end
 
 isidx(x) = x isa TermCombination
 
-basic_mkterm(t, g, args, _, m) = metadata(Term{Any}(g, args), m)
+basic_mkterm(t, g, args, m) = metadata(Term{Any}(g, args), m)
 
 let
     # we do this in a let block so that Revise works on the list of rules

@@ -24,10 +24,10 @@ using Setfield
 import DomainSets: Domain
 
 using TermInterface
-import TermInterface: maketerm, iscall, operation, arguments, symtype, metadata
+import TermInterface: maketerm, iscall, operation, arguments, metadata
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-FnType, @rule, Rewriters, substitute,
+FnType, @rule, Rewriters, substitute, symtype,
 promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
 
 using SymbolicUtils.Code

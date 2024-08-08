@@ -77,9 +77,9 @@ end
     @variables A[1:5, 1:5] B[1:5, 1:5]
 
     T = unwrap(3A)
-    @test isequal(T, Symbolics.maketerm(typeof(T), operation(T), arguments(T), symtype(T), nothing))
+    @test isequal(T, Symbolics.maketerm(typeof(T), operation(T), arguments(T), nothing))
     T2 = unwrap(3B)
-    @test isequal(T2, Symbolics.maketerm(typeof(T), operation(T), [*, 3, unwrap(B)], symtype(T), nothing))
+    @test isequal(T2, Symbolics.maketerm(typeof(T), operation(T), [*, 3, unwrap(B)], nothing))
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)

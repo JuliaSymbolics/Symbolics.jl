@@ -491,7 +491,6 @@ function fast_substitute(expr, subs; operator = Nothing)
     maketerm(typeof(expr),
         op,
         args,
-        symtype(expr),
         metadata(expr))
 end
 function fast_substitute(expr, pair::Pair; operator = Nothing)
@@ -519,7 +518,6 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
     maketerm(typeof(expr),
         op,
         args,
-        symtype(expr),
         metadata(expr))
 end
 
