@@ -48,6 +48,16 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
         end
     end
 
+    # (X)^0 => 1
+    if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 0)
+        return 1
+    end
+
+    # (X)^1 => X
+    if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 1)
+        return arguments(x)[1]
+    end
+
     # sqrt(N^2) => N
     if iscall(x) && (operation(x) === sqrt || operation(x) === ssqrt) 
         arg = arguments(x)[1]
@@ -58,7 +68,6 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
         end
     end
 
-    
     # (sqrt(N))^2 => N
     if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 2)
         arg1 = arguments(x)[1]
