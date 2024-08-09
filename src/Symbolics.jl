@@ -200,7 +200,7 @@ for sType in [Pair, Vector, Dict]
 end
 
 # Symbolic solver
-include("./solver/coeffs.jl")
+include("./solver/preprocess.jl")
 include("./solver/nemo_stuff.jl")
 include("./solver/solve_helpers.jl")
 include("./solver/postprocess.jl")

@@ -96,6 +96,14 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
 end
 
 function postprocess_root(x)
-    x |> expand |> _postprocess_root |> expand
+    while true
+        old_x = deepcopy(x)
+        try
+            x = x |> expand |> _postprocess_root |> expand
+        catch e
+            x = _postprocess_root(x)
+        end
+        isequal(old_x, x) && return x
+    end
 end
 
