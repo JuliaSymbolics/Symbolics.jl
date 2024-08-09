@@ -405,6 +405,7 @@ end
     @register_array_symbolic bar(x::AbstractVector, p::AbstractMatrix) begin
         size = size(x)
         eltype = promote_type(eltype(x), eltype(p))
+        ndims = 1
     end
 
     @test isequal(substitute(bar(x, p), x => ones(3)), bar(ones(3), p))
