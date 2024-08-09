@@ -49,7 +49,7 @@ function clean_f(filtered_expr, var, subs)
             return filtered_expr
         end
         filtered_expr = args[1]
-        @info substitute(args[2], subs, fold=false) != 0
+        @info "Assuming $(substitute(args[2], subs, fold=false) != 0)"
     end
     return filtered_expr
 end

@@ -67,6 +67,11 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
     A, b
 end
 
+function solve_for(eq::Any, var::Any)
+    Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for, force=true)
+    return symbolic_linear_solve(eq, var)
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -84,18 +89,16 @@ julia> @variables x y
  x
  y
 
-julia> Symbolics.solve_for(x + y ~ 0, x)
+julia> Symbolics.symbolic_linear_solve(x + y ~ 0, x)
 -y
 
-julia> Symbolics.solve_for([x + y ~ 0, x - y ~ 2], [x, y])
+julia> Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])
 2-element Vector{Float64}:
   1.0
  -1.0
 ```
 """
-function solve_for(eq, var; simplify=false, check=true) # scalar case
-    Base.depwarn("solve_for is deprecated, please use symbolic_solve instead.", :solve_for, force=true)
-    return symbolic_solve(eq, var)
+function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar case
     # simplify defaults for `false` as canonicalization should handle most of
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
@@ -114,8 +117,9 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
         SymbolicUtils.simplify(simplify_fractions(x))
     end
 end
-solve_for(eq::Equation, var::T; x...) where {T<:AbstractArray} = solve_for([eq],var, x...)
-solve_for(eq::T, var::Num; x...) where {T<:AbstractArray} = first(solve_for(eq,[var], x...))
+symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq],var, x...)
+symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq,[var], x...))
+
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     A = Num.(SymbolicUtils.quick_cancel.(A))

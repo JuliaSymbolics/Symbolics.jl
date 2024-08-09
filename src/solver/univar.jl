@@ -93,7 +93,7 @@ function get_roots_deg4(expression, x)
         end
     end
     if isequal(m, 0)
-        @info roots_m[1] != 0
+        @info "Assuming $(roots_m[1] != 0)"
         m = roots_m[1]
     end
 

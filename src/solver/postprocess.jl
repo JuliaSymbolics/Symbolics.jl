@@ -103,7 +103,7 @@ function postprocess_root(x)
         catch e
             x = _postprocess_root(x)
         end
-        isequal(old_x, x) && return x
+        isequal(typeof(old_x), typeof(x)) && isequal(old_x, x) && return x
     end
 end
 

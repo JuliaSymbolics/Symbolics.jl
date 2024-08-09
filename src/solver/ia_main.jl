@@ -2,20 +2,24 @@ using Symbolics
 
 function isolate(lhs, var)
     rhs = Vector{Any}([0])
+    original_lhs = deepcopy(lhs)
     lhs = unwrap(lhs)
+
+    old_lhs = nothing
     while !isequal(lhs, var)
         subs, poly = filter_poly(lhs, var)
-        try
-            if check_poly_inunivar(poly, var)
-                roots = []
-                for i in eachindex(rhs)
-                    append!(roots, solve_univar(wrap(lhs-rhs[i]), var))
-                end
-                return roots
+
+        if check_poly_inunivar(poly, var)
+            roots = []
+            for i in eachindex(rhs)
+                append!(roots, solve_univar(wrap(lhs-rhs[i]), var))
             end
-        catch e
+            return roots
         end
 
+        isequal(old_lhs, lhs) && throw("symbolic_solve can not currently solve this expression")
+        old_lhs = deepcopy(lhs)
+        
         oper = operation(lhs)
         args = arguments(lhs)
 
@@ -122,8 +126,7 @@ function isolate(lhs, var)
 
         lhs = simplify(lhs)
     end
-    # make sure postprocess_root doesnt expand constants here
-    # like π and ℯ
+
     return rhs
 end
 
