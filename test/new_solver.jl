@@ -234,6 +234,11 @@ end
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 0) ) == 1
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 1) ) == __x
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 1) ) == Base.MathConstants.e
+
+    x = Symbolics.term(sqrt, 2)
+    @test isequal(Symbolics.postprocess_root( expand((x + 1)^4) ), 17 + 12x)
+    @test isequal(Symbolics.postprocess_root( x^5 ), 4 * x)
+
 end
 
 

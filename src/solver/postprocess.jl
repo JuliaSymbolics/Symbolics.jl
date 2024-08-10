@@ -58,21 +58,37 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
         return arguments(x)[1]
     end
 
-    # sqrt(N^2) => N
+    # sqrt(M^2 * N) => M * sqrt(N)
     if iscall(x) && (operation(x) === sqrt || operation(x) === ssqrt) 
         arg = arguments(x)[1]
-        if arg isa Integer && arg > 0 && arg == (isqrt(arg))^2
-            return isqrt(arg)
-        elseif arg isa Integer && arg < 0 && -arg == (isqrt(-arg))^2
-            return im*isqrt(-arg)
+        if arg isa Integer
+            square, radical = big(1), big(1)
+            for (p, d) in collect(Primes.factor(abs(arg)))
+                q, r = divrem(d, 2)
+                square *= p^q
+                radical *= p^r
+            end
+            if arg < 0
+                square = im*square
+            end
+            isone(radical) && return square
+            return square * Symbolics.term(Symbolics.operation(x), radical)
         end
     end
 
-    # (sqrt(N))^2 => N
-    if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 2)
-        arg1 = arguments(x)[1]
+    # (sqrt(N))^M => N^div(M, 2)*sqrt(N)^(mod(M, 2))
+    if iscall(x) && operation(x) === (^)
+        arg1, arg2 = arguments(x)
         if iscall(arg1) && (operation(arg1) === sqrt || operation(arg1) === ssqrt)
-            return arguments(arg1)[1]
+            if arg2 isa Integer
+                isequal(arg2, 2) && return arguments(arg1)[1]
+                q, r = divrem(arg2, 2)
+                if isequal(r, 1)
+                    return arguments(arg1)[1]^q * arg1
+                else
+                    return arguments(arg1)[1]^q
+                end
+            end
         end
     end
 
@@ -80,6 +96,6 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
 end
 
 function postprocess_root(x)
-    _postprocess_root(x)
+    x |> expand |> _postprocess_root |> expand
 end
 

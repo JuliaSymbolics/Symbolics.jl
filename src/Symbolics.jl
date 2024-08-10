@@ -15,6 +15,8 @@ using DocStringExtensions, Markdown
 
 using LinearAlgebra
 
+using Primes
+
 using Reexport
 
 using DomainSets
