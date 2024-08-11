@@ -52,6 +52,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
         @safetestset "LuxCore extensions Test" begin include("extensions/lux.jl") end
         @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
+        @safetestset "Show Test" begin include("show.jl") end
         @safetestset "RootFinding solver" begin include("new_solver.jl") end
     end
 end
