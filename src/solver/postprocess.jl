@@ -101,6 +101,7 @@ function postprocess_root(x)
         try
             x = x |> expand |> _postprocess_root |> expand
         catch e
+            !(e isa MethodError) && rethrow(e)
             x = _postprocess_root(x)
         end
         isequal(typeof(old_x), typeof(x)) && isequal(old_x, x) && return x

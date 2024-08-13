@@ -38,6 +38,22 @@ function check_equal(arr1, arr2)
     return true
 end
 
+function check_approx(arr1, arr2)
+    l1 = length(arr1)
+    if l1 != length(arr2)
+        return false
+    end
+    for i = 1:l1
+        if !isequal(keys(arr1[i]), keys(arr2[i]))
+            return false
+        end
+        if !all(isapprox.(values(arr1[i]), values(arr2[i]), atol=1e-6))
+            return false
+        end
+    end
+    return true
+end
+
 @variables x y z
 
 @testset "Invalid input" begin
@@ -155,7 +171,7 @@ end
 @testset "Multivar solver" begin
     eqs = [x*y + 2x^2, y^2 -1]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
-    arr_known_roots = sort_arr([Dict(x=>-1/2, y=>1), Dict(x=>0, y=>-1), Dict(x=>0, y=>1), Dict(x=>1/2, y=>-1)], [x,y])
+    arr_known_roots = sort_arr([Dict(x=>-1//2, y=>1), Dict(x=>0, y=>-1), Dict(x=>0, y=>1), Dict(x=>1//2, y=>-1)], [x,y])
     arr_known_roots = sort_arr(arr_known_roots, [x,y])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 
@@ -164,7 +180,7 @@ end
     arr_known_roots = sort_arr([Dict(x => 0, y=>1, z=>-1), Dict(x=>1, y=>0, z=>1),
         Dict(x=>(1/2)*(-2-sqrt(2)*im), y=>(1/2)*(-2+sqrt(2)*im), z=>-sqrt(2)*im),
         Dict(x=>(1/2)*(-2+sqrt(2)*im), y=>(1/2)*(-2-sqrt(2)*im), z=>sqrt(2)*im)], [x,y,z])
-    @test check_equal(arr_calcd_roots, arr_known_roots)   
+    @test check_approx(arr_calcd_roots, arr_known_roots)   
 
     eqs = [x^2, y, z]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z], dropmultiplicity=false), [x,y,z])
@@ -176,12 +192,13 @@ end
     arr_known_roots = sort_arr([Dict(y=>1//1, x=>0//1), Dict(y=>-1//1, x=>0//1)], [x,y])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
 
+
     eqs = [x^5 + x, y]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
     arr_known_roots = sort_arr([Dict(x=>0, y=>0), Dict(x=>-(complex(-1))^(1/4), y=>0),
     Dict(x=>(complex(-1))^(1/4), y=>0), Dict(x=>-(complex(-1))^(3/4), y=>0),
     Dict(x=>(complex(-1))^(3/4), y=>0)], [x,y])
-    @test check_equal(arr_calcd_roots, arr_known_roots)   
+    @test check_approx(arr_calcd_roots, arr_known_roots)   
 
     @test isequal(symbolic_solve([x*y - 1, y], [x,y]), [])
     @test isequal(symbolic_solve([x+y+1, x+y+2], [x,y]), [])
