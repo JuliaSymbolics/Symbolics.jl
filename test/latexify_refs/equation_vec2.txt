@@ -1,4 +1,4 @@
 \begin{align}
-\frac{\mathrm{d} u\left( x \right)}{\mathrm{d}x} =& z \\
-\frac{\mathrm{d}}{\mathrm{d}x} y =& x y
+\frac{\mathrm{d} u\left( x \right)}{\mathrm{d}x} &= z \\
+\frac{\mathrm{d}}{\mathrm{d}x} y &= x y
 \end{align}

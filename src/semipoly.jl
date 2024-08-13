@@ -136,7 +136,7 @@ Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.p, m.coeff)
 isop(x, op) = iscall(x) && operation(x) === op
 isop(op) = Base.Fix2(isop, op)
 
-simpleterm(T, f, args, sT, m) = Term{sT}(f, args)
+simpleterm(T, f, args, m) = Term{SymbolicUtils._promote_symtype(f, args)}(f, args)
 
 function mark_and_exponentiate(expr, vars)
     # Step 1
@@ -426,7 +426,7 @@ function unwrap_sp(x)
     x = unwrap(x)
     iscall(x) ? maketerm(typeof(x),
                          TermInterface.head(x), map(unwrap_sp,
-                                                    TermInterface.children(x))) : x
+                                                    TermInterface.children(x)), nothing) : x
 end
 
 function cautious_sum(nls)

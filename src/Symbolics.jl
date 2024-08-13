@@ -26,10 +26,10 @@ using Setfield
 import DomainSets: Domain
 
 using TermInterface
-import TermInterface: maketerm, iscall, operation, arguments, symtype, metadata
+import TermInterface: maketerm, iscall, operation, arguments, metadata
 
 import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-FnType, @rule, Rewriters, substitute,
+FnType, @rule, Rewriters, substitute, symtype,
 promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
 
 using SymbolicUtils.Code
@@ -214,20 +214,21 @@ include("./solver/main.jl")
 function symbolics_to_sympy end
 export symbolics_to_sympy
 
-include("../ext/SymbolicsForwardDiffExt.jl")
-using ..SymbolicsForwardDiffExt
-
-@static if !isdefined(Base, :get_extension)
-    using Requires
-end
-
-@static if !isdefined(Base,:get_extension)
-    function __init__()
-        @require Groebner="0b43b601-686d-58a3-8a1c-6623616c7cd4" begin
-            include("../ext/SymbolicsGroebnerExt.jl")
-        end
-        @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
-            include("../ext/SymbolicsSymPyExt.jl")
+function __init__()
+    Base.Experimental.register_error_hint(TypeError) do io, exc
+        if exc.expected == Bool && exc.got isa Num
+            println(io,
+                "\nA symbolic expression appeared in a Boolean context. This error arises in situations where Julia expects a Bool, like ")
+            printstyled(io, "if boolean_condition", color = :blue)
+            printstyled(
+                io, "\t\t use ifelse(boolean_condition, then branch, else branch)\n",
+                color = :green)
+            printstyled(io, "x && y", color = :blue)
+            printstyled(io, "\t\t\t\t use x & y\n", color = :green)
+            printstyled(io, "boolean_condition ? a : b", color = :blue)
+            printstyled(io, "\t use ifelse(boolean_condition, a, b)\n", color = :green)
+            print(io,
+                "but a symbolic expression appeared instead of a Bool. For help regarding control flow with symbolic variables, see https://docs.sciml.ai/ModelingToolkit/dev/basics/FAQ/#How-do-I-handle-if-statements-in-my-symbolic-forms?")
         end
         @require Nemo="2edaba10-b0f1-5616-af89-8c11ac63239a" begin
             include("../ext/SymbolicsNemoExt.jl")

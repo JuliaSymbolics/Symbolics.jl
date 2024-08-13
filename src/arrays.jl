@@ -62,11 +62,13 @@ end
 
 ConstructionBase.constructorof(s::Type{<:ArrayOp{T}}) where {T} = ArrayOp{T}
 
-function SymbolicUtils.maketerm(::Type{<:ArrayOp}, f, args, _symtype, m)
+function SymbolicUtils.maketerm(::Type{<:ArrayOp}, f, args, m)
     t  = f(args...)
     t isa Symbolic && !isnothing(m) ?
         metadata(t, m) : t
 end
+
+SymbolicUtils.sorted_arguments(s::ArrayOp) = sorted_arguments(s.term)
 
 shape(aop::ArrayOp) = aop.shape
 
@@ -593,7 +595,7 @@ function replace_by_scalarizing(ex, dict)
             f = operation(x)
             ff = replace_by_scalarizing(f, dict)
             if metadata(x) !== nothing
-                maketerm(typeof(x), ff, arguments(x), symtype(x),  metadata(x))
+                maketerm(typeof(x), ff, arguments(x),  metadata(x))
             else
                 ff(arguments(x)...)
             end
@@ -612,7 +614,7 @@ function prewalk_if(cond, f, t)
     if iscall(t′)
         if metadata(t′) !== nothing
             return maketerm(typeof(t′), TermInterface.head(t′),
-                           map(x->prewalk_if(cond, f, x), children(t′)), symtype(t′), metadata(t′))
+                           map(x->prewalk_if(cond, f, x), children(t′)), metadata(t′))
         else
             TermInterface.head(t′)(map(x->prewalk_if(cond, f, x), children(t′))...)
         end
@@ -662,12 +664,12 @@ end
 @wrapped function Base.:(\)(A::AbstractMatrix, b::AbstractVecOrMat)
     t = array_term(\, A, b)
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
-end
+end false
 
 @wrapped function Base.inv(A::AbstractMatrix)
     t = array_term(inv, A)
     setmetadata(t, ScalarizeCache, Ref{Any}(nothing))
-end
+end false
 
 _det(x, lp) = det(x, laplace=lp)
 
@@ -677,7 +679,7 @@ end
 
 @wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace=true)
     Term{eltype(x)}(_det, [x, laplace])
-end
+end false
 
 
 # A * x = b
@@ -747,14 +749,14 @@ function scalarize(arr)
     elseif arr isa Num
         wrap(scalarize(unwrap(arr)))
     elseif iscall(arr) && symtype(arr) <: Number
-        t = maketerm(typeof(arr), operation(arr), map(scalarize, arguments(arr)), symtype(arr), metadata(arr))
+        t = maketerm(typeof(arr), operation(arr), map(scalarize, arguments(arr)), metadata(arr))
         iscall(t) ? scalarize_op(operation(t), t) : t
     else
         arr
     end
 end
 
-@wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x))
+@wrapped Base.isempty(x::AbstractArray) = shape(unwrap(x)) !== Unknown() && _iszero(length(x)) false
 Base.collect(x::Arr) = scalarize(x)
 Base.collect(x::SymArray) = scalarize(x)
 isarraysymbolic(x) = unwrap(x) isa Symbolic && SymbolicUtils.symtype(unwrap(x)) <: AbstractArray
