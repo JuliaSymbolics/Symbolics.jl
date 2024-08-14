@@ -91,7 +91,13 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         for i = 1:(old_len)
             eq += BigInt(rand(-n_iterations:n_iterations))*vars[i]
         end
+
+        if isequal(eq, new_var)
+            continue
+        end
+
         push!(new_eqs, eq)
+
         new_eqs = convert(Vector{Any}, Symbolics.groebner_basis(new_eqs, ordering=Lex(vars)))
 
         if length(new_eqs) <= length(vars) 
@@ -100,6 +106,10 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
 
         for i  in eachindex(new_eqs)[2:end]
             generating |= all(Symbolics.degree(var) > 1 for var in Symbolics.get_variables(new_eqs[i]))
+        end
+
+        if isequal(new_eqs[1], new_var)
+            generating = true
         end
 
         n_iterations += 1
