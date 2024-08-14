@@ -230,9 +230,6 @@ function __init__()
             print(io,
                 "but a symbolic expression appeared instead of a Bool. For help regarding control flow with symbolic variables, see https://docs.sciml.ai/ModelingToolkit/dev/basics/FAQ/#How-do-I-handle-if-statements-in-my-symbolic-forms?")
         end
-        @require Nemo="2edaba10-b0f1-5616-af89-8c11ac63239a" begin
-            include("../ext/SymbolicsNemoExt.jl")
-        end
     end
 end
 
