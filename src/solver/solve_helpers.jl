@@ -176,16 +176,15 @@ function add_sol!(solutions, new_sols, var, index)
 end
 
 function add_sol_to_all(solutions, new_sols, var)
-    existing_solutions = copy(solutions)
-    solutions = []
+    new_solutions = []
     for new_sol in new_sols
-        copy_sol = copy(existing_solutions)
-        for i in eachindex(copy_sol)
-            copy_sol[i][var] = new_sol
+        sol_to_add = deepcopy(solutions)
+        for i in eachindex(sol_to_add)
+            sol_to_add[i][var] = new_sol
         end
-        append!(solutions, copy_sol)
+        append!(new_solutions, sol_to_add)
     end
-    return solutions
+    return new_solutions
 end
 
 function gen_separating_var(vars)
