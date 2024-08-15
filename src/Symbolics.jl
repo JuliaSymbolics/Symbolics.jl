@@ -153,7 +153,7 @@ include("plot_recipes.jl")
 
 include("semipoly.jl")
 
-include("solver.jl")
+include("algebraic_solver.jl")
 export solve_single_eq
 export solve_system_eq
 export lambertw
@@ -200,7 +200,7 @@ for sType in [Pair, Vector, Dict]
 end
 
 # Symbolic solver
-include("./solver/preprocess.jl")
+include("solver/preprocess.jl")
 include("solver/nemo_stuff.jl")
 include("solver/solve_helpers.jl")
 include("solver/postprocess.jl")

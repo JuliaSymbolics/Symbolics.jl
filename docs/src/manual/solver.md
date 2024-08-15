@@ -11,6 +11,13 @@ One other symbolic solver is `symbolic_linear_solve` which is limited compared t
 ```@docs
 Symbolics.symbolic_linear_solve
 ```
+
+`symbolic_solve` only supports symbolic, i.e. non-floating point computations, and thus prefers equations
+where the coefficients are integer, rational, or symbolic. Floating point coefficients are transformed into
+rational values and BigInt values are used internally with a potential performance loss, and thus it is recommended
+that this functionality is only used with floating point values if necessary. In contrast, `symbolic_linear_solve`
+directly handles floating point values using standard factorizations.
+
 ### More technical details and examples
 #### Technical details
 The `symbolic_solve` function uses 4 hidden solvers in order to solve the user's input. Its base,
@@ -28,6 +35,12 @@ using Symbolics, Nemo;
 @variables x;
 Symbolics.symbolic_solve(9^x + 3^x ~ 8, x)
 ```
+
+```@example solver
+@variables x y z;
+Symbolics.symbolic_linear_solve(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x)
+```
+
 ```@example solver
 using Groebner;
 @variables x y z;
