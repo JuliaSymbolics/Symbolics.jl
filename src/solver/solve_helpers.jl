@@ -131,26 +131,26 @@ function f_numbers(n)
 end
 
 function comp_rational(x,y)
-    x, y = f_numbers(x), f_numbers(y)
-    try
+    x, y = wrap(f_numbers(x)), wrap(f_numbers(y))
+    if !(unwrap(x) isa AbstractFloat || x isa Complex) && !(unwrap(y) isa AbstractFloat || y isa Complex)
         r = x//y
         return r
-    catch e
-        r = nothing
-
-        if x isa ComplexF64
-            real_p = real(x)
-            imag_p = imag(x)
-            r = Rational(real_p)//y
-            if !isequal(imag_p, 0)
-                r += (Rational(imag_p)//y)*im
-            end
-        elseif x isa Float64 
-            r = Rational{BigInt}(x)//y
-        end
-
-        return isequal(r, nothing) ? x/y : r
     end
+
+    x, y = unwrap(x), unwrap(y)
+    r = nothing
+    if x isa ComplexF64
+        real_p = real(x)
+        imag_p = imag(x)
+        r = Rational(real_p)//y
+        if !isequal(imag_p, 0)
+            r += (Rational(imag_p)//y)*im
+        end
+    elseif x isa Float64 
+        r = Rational{BigInt}(x)//y
+    end
+
+    return isequal(r, nothing) ? x/y : r
 end
 
 

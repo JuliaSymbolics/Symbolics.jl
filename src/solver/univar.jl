@@ -12,8 +12,8 @@ function get_roots_deg1(expression, x)
     return [root]
 end
 
-function get_deg2_with_coeffs(coeffs::Vector{Any})
-    a, b, c = f_numbers.(coeffs)
+function get_deg2_with_coeffs(a, b, c)
+    a, b, c = f_numbers(a), f_numbers(b), f_numbers(c)
 
     root1 = comp_rational(-b + term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
     root2 = comp_rational(-b - term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
@@ -113,8 +113,8 @@ function get_yroots(m, p, q)
     b2 = -term(ssqrt, 2m)
     c2 = (p//2) + m + (q//(2*term(ssqrt, 2m)))
 
-    root1, root2 = get_deg2_with_coeffs([a, b1, c1])
-    root3, root4 = get_deg2_with_coeffs([a, b2, c2])
+    root1, root2 = get_deg2_with_coeffs(a, b1, c1)
+    root3, root4 = get_deg2_with_coeffs(a, b2, c2)
     return [root1, root2, root3, root4]
 end
 
