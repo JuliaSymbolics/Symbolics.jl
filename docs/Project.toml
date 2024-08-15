@@ -7,6 +7,7 @@ Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
 
 [compat]
 BenchmarkTools = "1.3"
