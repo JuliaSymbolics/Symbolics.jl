@@ -98,7 +98,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
 
         push!(new_eqs, eq)
 
-        new_eqs = convert(Vector{Any}, Symbolics.groebner_basis(new_eqs, ordering=Lex(vars)))
+        new_eqs = Symbolics.groebner_basis(new_eqs, ordering=Lex(vars))
 
         if length(new_eqs) <= length(vars) 
             generating &= false
@@ -125,6 +125,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         throw("Infinite number of solutions")
     end
 
+    new_eqs = SymbolicUtils.toterm.(new_eqs)
 
     # first, solve any single variable equations
     i = 1
