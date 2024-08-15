@@ -1,6 +1,6 @@
 using Symbolics
 
-function isolate(lhs, var)
+function isolate(lhs, var; warns=true)
     rhs = Vector{Any}([0])
     original_lhs = deepcopy(lhs)
     lhs = unwrap(lhs)
@@ -17,7 +17,9 @@ function isolate(lhs, var)
             return roots
         end
 
-        isequal(old_lhs, lhs) && throw("symbolic_solve can not currently solve this expression")
+        isequal(old_lhs, lhs) && (warns && (@warn("This expression cannot be solved with the methods available to ia_solve. Try \
+            a numerical method instead."); return nothing) || return nothing)
+
         old_lhs = deepcopy(lhs)
         
         oper = operation(lhs)
@@ -131,7 +133,7 @@ function isolate(lhs, var)
 end
 
 
-function attract(lhs, var)
+function attract(lhs, var; warns=true)
     if n_func_occ(simplify(lhs), var) <= n_func_occ(lhs, var)
         lhs = simplify(lhs)
     end
@@ -153,8 +155,9 @@ function attract(lhs, var)
         if sqrt_poly
             return attract_and_solve_sqrtpoly(lhs, var)
         else
-            throw("This expression cannot be solved with the methods available to solve. Try \
+            warns && @warn("This expression cannot be solved with the methods available to ia_solve. Try \
             a numerical method instead.")
+            return nothing
         end
     end
 
@@ -236,14 +239,15 @@ julia> RootFinding.ia_solve(expr, x)
 # References
 [^1]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
 """
-function ia_solve(lhs, var)
+function ia_solve(lhs, var; warns=true)
     nx = n_func_occ(lhs, var)
     if nx == 0
-        throw("Var not present in given expression.")
+        warn("Var not present in given expression")
+        return []
     elseif nx == 1
-        return isolate(lhs, var)
+        return isolate(lhs, var, warns=warns)
     elseif nx > 1
-        return attract(lhs, var)
+        return attract(lhs, var, warns=warns)
     end
 
 end

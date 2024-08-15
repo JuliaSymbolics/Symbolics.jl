@@ -1,7 +1,7 @@
 # This file uses Groebner, so it needs to be added in the future.
 
 """
-    symbolic_solve(expr, x; dropmultiplicity=true)
+    symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
 
 `symbolic_solve` is a function which attempts to solve input equations/expressions symbolically using various methods.
 There are 2 required arguments and 1 optional argument.
@@ -11,6 +11,8 @@ There are 2 required arguments and 1 optional argument.
 - x: Could be a single variable or an array of variables which should be solved
 
 - dropmultiplicity (optional): Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If dropmultiplicity is inputted as false, then the output is `[-1, -1]`.
+
+- warns (optional): When invalid expressions or cases are inputted, should the solver warn you of such cases before returning nothing? if this is set to false, the solver returns nothing. By default, warns are set to true.
 
 It can take a single variable, a vector of variables, a single expression, an array of expressions.
 The base solver (`symbolic_solve`) has multiple solvers which chooses from depending on the the type of input
@@ -26,10 +28,6 @@ Currently, `symbolic_solve` supports
 - Equations with transcendental functions (with parameters)
 
 ## Examples
-
-TODO(Alex): add a parametric polynomial solve (perhaps smaller) to show-case `roots_of`:
-julia> f = expand((x - a)^2 * (x^10 - 1) * (a*x^2 + b*x * c) * (x^20 + a))
-julia> RootFinding.solve(f, x)
 
 ### `solve_univar` (uses factoring and analytic solutions up to degree 4)
 ```jldoctest
@@ -111,7 +109,7 @@ julia> symbolic_solve(a*x^b + c, x)
 ((-c)^(1 / b)) / (a^(1 / b))
 ```
 """
-function symbolic_solve(expr, x; dropmultiplicity=true)
+function symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
     type_x = typeof(x)
     expr_univar = false
     x_univar = false
@@ -135,7 +133,7 @@ function symbolic_solve(expr, x; dropmultiplicity=true)
         for i in eachindex(expr)
             expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
             check_expr_validity(expr[i])
-            !check_poly_inunivar(expr[i], x) && throw("Solve can not solve this input currently")
+            !check_poly_inunivar(expr[i], x) && (warns && (@warn "Solve can not solve this input currently"; return nothing) || return nothing)
         end
         expr = Vector{Num}(expr)
     end
@@ -148,7 +146,7 @@ function symbolic_solve(expr, x; dropmultiplicity=true)
             sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, dropmultiplicity=dropmultiplicity) : ia_solve(expr, x)
         else
             for i in eachindex(expr)
-                !check_poly_inunivar(expr[i], x) && throw("Solve can not solve this input currently")
+                !check_poly_inunivar(expr[i], x) && (warns && (@warn("Solve can not solve this input currently"); return nothing) || return nothing)
             end
             sols = solve_multipoly(expr, x, dropmultiplicity=dropmultiplicity)
         end
@@ -264,11 +262,11 @@ end
 # gcd_use_nemo(x - 1, (x-1)^20), which is again x-1.
 # now we just need to solve(x-1, x) to get the common root in this
 # system of equations.
-function solve_multipoly(polys::Vector, x::Num; dropmultiplicity=true)
+function solve_multipoly(polys::Vector, x::Num; dropmultiplicity=true, warns=true)
     polys = unique(polys)
 
     if length(polys) < 1
-        throw("No expressions entered")
+        warns && (@warn("No expressions entered"); return nothing || return nothing)
     end
     if length(polys) == 1
         return solve_univar(polys[1], x, dropmultiplicity=dropmultiplicity)
@@ -288,6 +286,6 @@ function solve_multipoly(polys::Vector, x::Num; dropmultiplicity=true)
 end
 
 
-function solve_multivar(eqs::Any, vars::Any; dropmultiplicity=true)
+function solve_multivar(eqs::Any, vars::Any; dropmultiplicity=true, warns=true)
     throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
 end

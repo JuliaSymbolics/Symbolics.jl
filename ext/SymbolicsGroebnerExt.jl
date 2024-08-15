@@ -70,7 +70,7 @@ function Symbolics.is_groebner_basis(polynomials::Vector{Num}; kwargs...)
     Groebner.isgroebner(polynoms; kwargs...)
 end
 
-function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true)
+function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, warns=true)
     
     # Reference: Rouillier, F. Solving Zero-Dimensional Systems
     # Through the Rational Univariate Representation.
@@ -122,7 +122,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         return solutions
     end
     if length(new_eqs) < length(vars)
-        throw("Infinite number of solutions")
+        warns && (@warn("Infinite number of solutions"); return nothing) || return nothing
     end
 
     new_eqs = SymbolicUtils.toterm.(new_eqs)
