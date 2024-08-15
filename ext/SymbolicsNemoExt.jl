@@ -66,5 +66,52 @@ function Symbolics.gcd_use_nemo(poly1::Num, poly2::Num)
     return sym_gcd
 end
 
+function nemo_crude_evaluate(poly::Nemo.FracElem, varmap)
+    println(typeof(numerator(poly)))
+    nemo_crude_evaluate(numerator(poly), varmap) // nemo_crude_evaluate(denominator(poly), varmap)
+end
+
+function Symbolics.demote(gb, vars::Vector{Num}, params::Vector{Num})
+    gb = Symbolics.wrap.(SymbolicUtils.toterm.(gb))
+    Symbolics.check_polynomial.(gb)
+
+    all_vars = [vars..., params...]
+    nemo_ring, nemo_all_vars = Nemo.polynomial_ring(Nemo.QQ, map(string, all_vars))
+
+    sym_to_nemo = Dict(all_vars .=> nemo_all_vars)
+    nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
+    nemo_gb = Symbolics.substitute(gb, sym_to_nemo)
+    nemo_gb = Symbolics.substitute(nemo_gb, sym_to_nemo)
+
+    nemo_vars = [v for (k, v) in sym_to_nemo if any(isequal(k, var) for var in vars)]
+    nemo_params = [v for (k, v) in sym_to_nemo if any(isequal(k, param) for param in params)]
+
+    ring_flat = parent(nemo_vars[1])
+    ring_param, params_demoted = Nemo.polynomial_ring(base_ring(ring_flat), map(string, nemo_params))
+    ring_demoted, vars_demoted = Nemo.polynomial_ring(fraction_field(ring_param), map(string, nemo_vars), internal_ordering=Nemo.internal_ordering(ring_flat))
+    varmap = Dict((nemo_vars .=> vars_demoted)..., (nemo_params .=> params_demoted)...)
+    gb_demoted = map(f -> nemo_crude_evaluate(f, varmap), nemo_gb)
+    result = empty(gb_demoted)
+    for i in 1:length(gb_demoted)
+        gb_demoted = map(f -> map_coefficients(c -> c // leading_coefficient(f), f), gb_demoted)
+        f = gb_demoted[i]
+        f_nf = Nemo.normal_form(f, result)
+        if !iszero(f_nf)
+            push!(result, f_nf)
+        end
+    end
+    @info "" result[1]
+
+    monoms = collect(Nemo.monomials(result[1]))
+    coeffs = collect(Nemo.coefficients(result[1]))
+    @info "" monoms
+    @info "" coeffs
+    println(nemo_crude_evaluate(coeffs[1], nemo_to_sym))
+    println(typeof(monoms[1]))
+
+    first_term = nemo_crude_evaluate(coeffs[1], nemo_to_sym) * nemo_crude_evaluate(monoms[1], nemo_to_sym)
+    @info "" first_term
+        
+end
 
 end # module
