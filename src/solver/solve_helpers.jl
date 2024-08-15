@@ -198,3 +198,4 @@ function gen_separating_var(vars)
     end
     return new_var
 end
+

@@ -12,10 +12,9 @@ end
 # Map each variable of the given poly.
 # Can be used to transform Nemo polynomial to expression.
 function nemo_crude_evaluate(poly::Nemo.MPolyRingElem, varmap)
-    @assert Nemo.coefficient_ring(poly) in (Nemo.ZZ, Nemo.QQ)
     new_poly = 0
     for (i, term) in enumerate(Nemo.terms(poly))
-        new_term = Rational(Nemo.coeff(poly, i))
+        new_term = nemo_crude_evaluate(Nemo.coeff(poly, i), varmap)
         for var in Nemo.vars(term)
             exp = Nemo.degree(term, var)
             exp == 0 && continue
@@ -25,6 +24,14 @@ function nemo_crude_evaluate(poly::Nemo.MPolyRingElem, varmap)
         new_poly += new_term
     end
     new_poly
+end
+
+function nemo_crude_evaluate(poly::Nemo.FracElem, varmap)
+    nemo_crude_evaluate(numerator(poly), varmap) // nemo_crude_evaluate(denominator(poly), varmap)
+end
+
+function nemo_crude_evaluate(poly::Nemo.ZZRingElem, varmap)
+    Rational(poly)
 end
 
 # factor(x^2*y + b*x*y - a*x - a*b)  ->  (x*y - a)*(x + b)
@@ -66,5 +73,55 @@ function Symbolics.gcd_use_nemo(poly1::Num, poly2::Num)
     return sym_gcd
 end
 
+
+function Symbolics.demote(gb, vars::Vector{Num}, params::Vector{Num})
+    gb = Symbolics.wrap.(SymbolicUtils.toterm.(gb))
+    Symbolics.check_polynomial.(gb)
+
+    all_vars = [vars..., params...]
+    nemo_ring, nemo_all_vars = Nemo.polynomial_ring(Nemo.QQ, map(string, all_vars))
+
+    sym_to_nemo = Dict(all_vars .=> nemo_all_vars)
+    nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
+    nemo_gb = Symbolics.substitute(gb, sym_to_nemo)
+    nemo_gb = Symbolics.substitute(nemo_gb, sym_to_nemo)
+
+    nemo_vars = [v for (k, v) in sym_to_nemo if any(isequal(k, var) for var in vars)]
+    nemo_params = [v for (k, v) in sym_to_nemo if any(isequal(k, param) for param in params)]
+
+    ring_flat = parent(nemo_vars[1])
+    ring_param, params_demoted = Nemo.polynomial_ring(base_ring(ring_flat), map(string, nemo_params))
+    ring_demoted, vars_demoted = Nemo.polynomial_ring(fraction_field(ring_param), map(string, nemo_vars), internal_ordering=Nemo.internal_ordering(ring_flat))
+    varmap = Dict((nemo_vars .=> vars_demoted)..., (nemo_params .=> params_demoted)...)
+    gb_demoted = map(f -> nemo_crude_evaluate(f, varmap), nemo_gb)
+    result = empty(gb_demoted)
+    for i in 1:length(gb_demoted)
+        gb_demoted = map(f -> map_coefficients(c -> c // leading_coefficient(f), f), gb_demoted)
+        f = gb_demoted[i]
+        f_nf = Nemo.normal_form(f, result)
+        if !iszero(f_nf)
+            push!(result, f_nf)
+        end
+    end
+
+    sym_to_nemo = Dict(sym => nem for sym in all_vars for nem in [vars_demoted..., params_demoted...] if isequal(string(sym),string(nem)))
+    nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
+
+    final_result = []
+
+    for i in eachindex(result)
+
+        monoms = collect(Nemo.monomials(result[i]))
+        coeffs = collect(Nemo.coefficients(result[i]))
+
+        poly = 0
+        for j in eachindex(monoms)
+            poly += nemo_crude_evaluate(coeffs[j], nemo_to_sym) * nemo_crude_evaluate(monoms[j], nemo_to_sym)
+        end
+        push!(final_result, poly)
+    end
+        
+    final_result
+end
 
 end # module
