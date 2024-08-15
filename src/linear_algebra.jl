@@ -69,7 +69,7 @@ end
 
 function solve_for(eq::Any, var::Any; simplify=false, check=true)
     Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for, force=true)
-    return symbolic_linear_solve(eq, var)
+    return symbolic_linear_solve(eq, var; simplify=simplify, check=check)
 end
 
 """
@@ -117,8 +117,9 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
         SymbolicUtils.simplify(simplify_fractions(x))
     end
 end
-symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq],var, x...)
-symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq,[var], x...))
+
+symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq], var; x...)
+symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq, [var]; x...))
 
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
