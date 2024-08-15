@@ -15,6 +15,11 @@ function ssubs(expr, dict)
     end
 end
 
+# In the solver we might want to return Symbolics.term(sqrt, x)
+# as a root. If x is a negative real number, the evaluation of such
+# a root will fail since sqrt is not defined for Real n < 0.
+# Thus we use Symbolics.term(Symbolics.ssqrt, x) that handles negative numbers.
+# Similarly, scbrt and slog handle such similar cases.
 function ssqrt(n)
     n = unwrap(n)
 
