@@ -98,6 +98,8 @@ end
 function postprocess_root(x)
     while true
         old_x = deepcopy(x)
+
+        # issue 1202
         try
             x = x |> expand |> _postprocess_root |> expand
         catch e
