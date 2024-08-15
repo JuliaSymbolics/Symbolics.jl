@@ -201,15 +201,15 @@ end
 
 # Symbolic solver
 include("./solver/preprocess.jl")
-include("./solver/nemo_stuff.jl")
-include("./solver/solve_helpers.jl")
-include("./solver/postprocess.jl")
-include("./solver/univar.jl")
-include("./solver/ia_helpers.jl")
-include("./solver/polynomialization.jl")
-include("./solver/attract.jl")
-include("./solver/ia_main.jl")
-include("./solver/main.jl")
+include("solver/nemo_stuff.jl")
+include("solver/solve_helpers.jl")
+include("solver/postprocess.jl")
+include("solver/univar.jl")
+include("solver/ia_helpers.jl")
+include("solver/polynomialization.jl")
+include("solver/attract.jl")
+include("solver/ia_main.jl")
+include("solver/main.jl")
 
 function symbolics_to_sympy end
 export symbolics_to_sympy
