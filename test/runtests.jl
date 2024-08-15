@@ -34,7 +34,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Parsing Test" begin include("parsing.jl") end
         @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
         @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
-        @safetestset "Algebraic Solver Test" begin include("solver.jl") end
+        @safetestset "Algebraic Solver Test" begin include("algebraic_solver.jl") end
         @safetestset "Overloading Test" begin include("overloads.jl") end
         @safetestset "ForwardDiff Extension Test" begin include("forwarddiff_symbolic_dual_ops.jl") end
         @safetestset "Nested ForwardDiff Sparsity Test" begin include("nested_forwarddiff_sparsity.jl") end
@@ -53,7 +53,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "LuxCore extensions Test" begin include("extensions/lux.jl") end
         @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
         @safetestset "Show Test" begin include("show.jl") end
-        @safetestset "RootFinding solver" begin include("new_solver.jl") end
+        @safetestset "RootFinding solver" begin include("solver.jl") end
     end
 end
 
