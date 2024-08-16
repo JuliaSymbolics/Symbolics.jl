@@ -1,5 +1,4 @@
-# This file uses Groebner, so it needs to be added in the future.
-
+Base.:^(a::Complex{<:Real}, b::Num)= Symbolics.Pow(a, b)
 """
     symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
 

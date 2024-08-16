@@ -98,14 +98,7 @@ end
 function postprocess_root(x)
     while true
         old_x = deepcopy(x)
-
-        # issue 1202
-        try
-            x = x |> expand |> _postprocess_root |> expand
-        catch e
-            !(e isa MethodError) && rethrow(e)
-            x = _postprocess_root(x)
-        end
+        x = x |> expand |> _postprocess_root |> expand
         isequal(typeof(old_x), typeof(x)) && isequal(old_x, x) && return x
     end
 end

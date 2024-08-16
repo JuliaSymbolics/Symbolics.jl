@@ -7,7 +7,7 @@ function get_roots_deg1(expression, x)
     m = f_numbers(get(coeffs, x, 0))
     c = f_numbers(get(coeffs, x^0, 0))
 
-    root = -comp_rational(c,m)
+    root = -c//m
     root = unwrap(ssubs(root, subs))
     return [root]
 end
@@ -15,8 +15,8 @@ end
 function get_deg2_with_coeffs(a, b, c)
     a, b, c = f_numbers(a), f_numbers(b), f_numbers(c)
 
-    root1 = comp_rational(-b + term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
-    root2 = comp_rational(-b - term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
+    root1 = (-b + term(ssqrt, (b^2 - 4(a*c))))//2a
+    root2 = (-b - term(ssqrt, (b^2 - 4(a*c))))//2a
 
     return [root1, root2]
 end
@@ -31,8 +31,8 @@ function get_roots_deg2(expression, x)
     results = (f_numbers(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 2:-1:0)
     a, b, c = results
 
-    root1 = comp_rational(-b + term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
-    root2 = comp_rational(-b - term(ssqrt, comp_rational((b^2 - 4(a*c)), 1)), 2a)
+    root1 = (-b + term(ssqrt, (b^2 - 4(a*c))))//2a
+    root2 = (-b - term(ssqrt, (b^2 - 4(a*c))))//2a
 
     return [root1, root2]
 end
@@ -47,8 +47,8 @@ function get_roots_deg3(expression, x)
     a, b, c, d = results
 
     
-    Q = comp_rational((((3*a*c) - b^2)), (9a^2))
-    R = comp_rational(((9*a*b*c - ((27*(a^2)*d)+2b^3))), (54a^3))
+    Q = (((3*a*c) - b^2))//(9a^2)
+    R = ((9*a*b*c - ((27*(a^2)*d)+2b^3)))//(54a^3)
     
     S = term(scbrt, (R + term(ssqrt, (Q^3+R^2))))
     T = term(scbrt, (R - term(ssqrt, (Q^3+R^2))))
@@ -71,11 +71,11 @@ function get_roots_deg4(expression, x)
     results = (f_numbers(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 4:-1:0)
     a, b, c, d, e = results
 
-    p = comp_rational((8(a*c)-3(b^2)), (8(a^2)))
+    p = (8(a*c)-3(b^2))//(8(a^2))
 
-    q = comp_rational(b^3 - 4(a*b*c) + 8(d*a^2), (8*a^3))
+    q = (b^3 - 4(a*b*c) + 8(d*a^2))//(8*a^3)
 
-    r = comp_rational((-3(b^4) + 256(e*a^3) - 64(d*b*a^2) + 16(c*(b^2)*a)), (256*a^4))
+    r = (-3(b^4) + 256(e*a^3) - 64(d*b*a^2) + 16(c*(b^2)*a))//(256*a^4)
 
     m = gensym()
     m = (@variables $m)[1]
@@ -98,9 +98,8 @@ function get_roots_deg4(expression, x)
     end
 
     arr = get_yroots(m, p, q)
-    for (i, root) in enumerate(arr)
-        r = comp_rational(b, 4a)
-        arr[i] = root - (r)
+    for i in eachindex(arr)
+        arr[i] -= unwrap(b//4a)
     end
 
     return arr
