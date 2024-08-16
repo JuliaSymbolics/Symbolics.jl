@@ -95,6 +95,7 @@ import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
 Base.show(io::IO, n::Num) = show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
 
 Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
+Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{<:Symbolic{<:Number}}, ::Type{<:Num}) = Num
 function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
     if f === :op
