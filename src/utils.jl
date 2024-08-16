@@ -20,31 +20,40 @@ function build_expr(head::Symbol, args)
 end
 
 """
-    get_variables(O) -> Vector{BasicSymbolic}
+    get_variables(e, varlist = nothing; sort::Bool = false)
 
-Returns the variables in the expression. Note that the returned variables are
-not wrapped in the `Num` type.
+Return a vector of variables appearing in `e`, optionally restricting to variables in `varlist`.
+
+Note that the returned variables are not wrapped in the `Num` type.
 
 # Examples
 ```julia
-julia> @variables t x y z(t)
-4-element Vector{Num}:
-    t
-    x
-    y
- z(t)
+julia> @variables t x y z(t);
 
-julia> ex = x + y + sin(z)
-(x + y) + sin(z(t))
-
-julia> Symbolics.get_variables(ex)
-3-element Vector{Any}:
+julia> Symbolics.get_variables(x + y + sin(z); sort = true)
+3-element Vector{SymbolicUtils.BasicSymbolic}:
  x
  y
  z(t)
+
+julia> Symbolics.get_variables(x - y; sort = true)
+2-element Vector{SymbolicUtils.BasicSymbolic}:
+ x
+ y
 ```
 """
-get_variables(e::Num, varlist=nothing) = get_variables(value(e), varlist)
+function get_variables(e::Num, varlist = nothing; sort::Bool = false)
+    get_variables(value(e), varlist; sort)
+end
+function get_variables(e, varlist = nothing; sort::Bool = false)
+    vars = Vector{BasicSymbolic}()
+    get_variables!(vars, e, varlist)
+    if sort
+        sort!(vars; by = SymbolicUtils.get_degrees)
+    end
+    vars
+end
+
 get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
 get_variables!(vars, e, varlist=nothing) = vars
 
@@ -75,8 +84,6 @@ end
 function get_variables!(vars, e::Equation, varlist=nothing)
   get_variables!(vars, e.rhs, varlist)
 end
-
-get_variables(e, varlist=nothing) = get_variables!([], e, varlist)
 
 # Sym / Term --> Symbol
 Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)

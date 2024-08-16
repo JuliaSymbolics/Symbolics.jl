@@ -53,6 +53,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "LuxCore extensions Test" begin include("extensions/lux.jl") end
         @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
         @safetestset "Show Test" begin include("show.jl") end
+        @safetestset "Utility Function Test" begin include("utils.jl") end
         @safetestset "RootFinding solver" begin include("solver.jl") end
     end
 end
