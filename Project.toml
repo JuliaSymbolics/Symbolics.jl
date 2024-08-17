@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 authors = ["Shashi Gowda <gowda@mit.edu>"]
-version = "6.1.0"
+version = "6.2.0"
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -53,7 +53,7 @@ SymbolicsForwardDiffExt = "ForwardDiff"
 SymbolicsGroebnerExt = "Groebner"
 SymbolicsLuxCoreExt = "LuxCore"
 SymbolicsNemoExt = "Nemo"
-SymbolicsPreallocationToolsExt = "PreallocationTools"
+SymbolicsPreallocationToolsExt = ["PreallocationTools", "ForwardDiff"]
 SymbolicsSymPyExt = "SymPy"
 
 [compat]
@@ -78,6 +78,7 @@ LogExpFunctions = "0.3"
 LuxCore = "0.1.11"
 MacroTools = "0.5"
 NaNMath = "1"
+Nemo = "0.45, 0.46"
 PreallocationTools = "0.4"
 PrecompileTools = "1"
 RecipesBase = "1.1"

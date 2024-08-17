@@ -30,17 +30,19 @@ Currently, `symbolic_solve` supports
 
 ### `solve_univar` (uses factoring and analytic solutions up to degree 4)
 ```jldoctest
+julia> @variables x a b;
+
 julia> expr = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
 -a*b - a*x - 2a*b*x - 2a*(x^2) + b*(x^2) + x^3 - a*b*(x^2) - a*(x^3) + 2b*(x^3) + 2(x^4) + b*(x^4) + x^5
 
-julia> Symbolics.symbolic_solve(expr, x)
+julia> symbolic_solve(expr, x)
 4-element Vector{Any}:
  -1
    -b
    (1//2)*√(4a)
    (-1//2)*√(4a)
 
-julia> Symbolics.symbolic_solve(expr, x, dropmultiplicity=false)
+julia> symbolic_solve(expr, x, dropmultiplicity=false)
 5-element Vector{Any}:
  -1
  -1
@@ -49,7 +51,7 @@ julia> Symbolics.symbolic_solve(expr, x, dropmultiplicity=false)
    (-1//2)*√(4a)
 ```
 ```jldoctest
-julia> Symbolics.symbolic_solve(x^2 + a*x + 6, x)
+julia> symbolic_solve(x^2 + a*x + 6, x)
 2-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
  (1//2)*(-a + √(-24 + a^2))
  (1//2)*(-a - √(-24 + a^2))
@@ -108,13 +110,11 @@ julia> symbolic_solve(a*x^b + c, x)
 ((-c)^(1 / b)) / (a^(1 / b))
 ```
 """
-function symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
-    type_x = typeof(x)
+function symbolic_solve(expr, x::T; dropmultiplicity=true, warns=true) where {T}
     expr_univar = false
     x_univar = false
 
-
-    if (type_x == Num || type_x == SymbolicUtils.BasicSymbolic{Real})
+    if (T == Num || T == SymbolicUtils.BasicSymbolic{Real})
         x_univar = true
         @assert is_singleton(unwrap(x)) "Expected a variable, got $x"
     else
