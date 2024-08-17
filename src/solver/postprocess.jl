@@ -1,10 +1,3 @@
-import TermInterface: maketerm
-
-# Alex: can be used in the following way.
-#
-# @variables x
-# sol = RootFinding.solve(x^12 - 1, x)
-# map(RootFinding.postprocess_root, sol)
 
 # Alex: make sure `Num`s are not processed here as they'd break it.
 _is_const_number(x::Number) = true

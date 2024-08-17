@@ -1,5 +1,3 @@
-#  TODO(Alex): it is not clear to me at the moment if we should use
-# term or TermInterface.maketerm
 
 """
     sub(subs, place_to_sub)
