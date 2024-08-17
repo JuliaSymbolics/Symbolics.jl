@@ -133,6 +133,7 @@ using LogExpFunctions
 include("logexpfunctions-lib.jl")
 
 include("linear_algebra.jl")
+export symbolic_linear_solve, solve_for
 
 include("groebner_basis.jl")
 export groebner_basis, is_groebner_basis
