@@ -300,26 +300,3 @@ function sdegree(coeffs, var)
     end
     return degree
 end
-
-
-
-########## NOT USED ########## 
-
-function lead_term(expr, var)
-    subs, expr = filter_poly(expr, var)
-    coeffs, constant = polynomial_coeffs(expr, [var])
-    degree = degree(expr, var)
-    lead_term = coeffs[var^degree]*var^degree
-    for (var, sub) in subs
-        lead_term = substitute(lead_term, Dict([var => sub]), fold=false)
-    end
-
-    return lead_term
-end
-
-function lead_coeff(expr, var)
-    degree = degree(expr, var)
-    lead_coeff = lead_term(expr, var) / (var^degree)
-    return lead_coeff
-end
-
