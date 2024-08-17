@@ -169,6 +169,11 @@ end
 end
 
 @testset "Multivar solver" begin
+    @test isequal(symbolic_solve([x^4 - 1, x - 2], [x]), [])
+    
+    # TODO: test this properly
+    sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
+
     eqs = [x*y + 2x^2, y^2 -1]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
     arr_known_roots = sort_arr([Dict(x=>-1//2, y=>1), Dict(x=>0, y=>-1), Dict(x=>0, y=>1), Dict(x=>1//2, y=>-1)], [x,y])
