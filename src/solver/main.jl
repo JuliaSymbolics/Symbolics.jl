@@ -142,12 +142,14 @@ function symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
 
         sols = []
         if expr_univar
-            sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, dropmultiplicity=dropmultiplicity) : ia_solve(expr, x)
+            sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, dropmultiplicity=dropmultiplicity) : ia_solve(expr, x, warns=warns)
+            isequal(sols, nothing) && return nothing
         else
             for i in eachindex(expr)
                 !check_poly_inunivar(expr[i], x) && (warns && (@warn("Solve can not solve this input currently"); return nothing) || return nothing)
             end
-            sols = solve_multipoly(expr, x, dropmultiplicity=dropmultiplicity)
+            sols = solve_multipoly(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+            isequal(sols, nothing) && return nothing
         end
 
         sols = map(sol -> sol isa RootsOf ? sol : postprocess_root(sol), sols)
@@ -162,6 +164,7 @@ function symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
         end
 
         sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity)
+        isequal(sols, nothing) && return nothing
         for sol in sols
             for var in x
                 sol[var] = postprocess_root(sol[var])
@@ -202,7 +205,7 @@ function solve_univar(expression, x; dropmultiplicity=true)
 
     # handle multiplicities (repeated roots), i.e. (x+1)^20
     if iscall(expression)
-        expr = simplify(Symbolics.unwrap(copy(Symbolics.wrap(expression))))
+        expr = unwrap(simplify((copy(wrap(expression)))))
         args = arguments(expr)
         operation = SymbolicUtils.operation(expr)
         if isequal(operation, ^) && args[2] isa Int64

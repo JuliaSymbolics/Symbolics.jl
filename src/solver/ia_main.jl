@@ -146,7 +146,7 @@ function attract(lhs, var; warns=true)
     end
     lhs = attract_trig(lhs, var)
 
-    n_func_occ(lhs, var) == 1 && return isolate(lhs, var)
+    n_func_occ(lhs, var) == 1 && return isolate(lhs, var, warns=warns)
 
     lhs, sub = turn_to_poly(lhs, var)
 
@@ -165,10 +165,10 @@ function attract(lhs, var; warns=true)
     new_var = collect(keys(sub))[1]
     new_var_val = collect(values(sub))[1]
 
-    roots = isolate(lhs, new_var)
+    roots = isolate(lhs, new_var, warns=warns)
     new_roots = []
     for root in roots
-        new_sol = isolate(new_var_val - root, var)
+        new_sol = isolate(new_var_val - root, var, warns=warns)
         push!(new_roots, new_sol)
     end
     new_roots = collect(Iterators.flatten(new_roots))
@@ -242,7 +242,7 @@ julia> RootFinding.ia_solve(expr, x)
 function ia_solve(lhs, var; warns=true)
     nx = n_func_occ(lhs, var)
     if nx == 0
-        warn("Var not present in given expression")
+        warns && @warn("Var not present in given expression")
         return []
     elseif nx == 1
         return isolate(lhs, var, warns=warns)

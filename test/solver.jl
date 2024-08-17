@@ -435,3 +435,47 @@ end
     @test Symbolics.check_polynomial(expr)
 end
 
+
+using LambertW
+
+
+#Testing
+
+@testset "Algebraic solver tests" begin
+
+    @variables x y z a b c
+    function correctAns(solve_roots, known_roots)
+        solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve_roots)))
+        known_roots = sort_roots(known_roots)
+        r = isapprox.(solve_roots, known_roots, atol=1e-6)
+        isequal(r, []) && return false
+        return all(r)
+    end
+
+    #quadratics
+    @test correctAns(symbolic_solve(x^2~4,x), [-2, 2])
+    @test correctAns(symbolic_solve(x^2~2,x),[-sqrt(2.0),sqrt(2.0)])
+    @test correctAns(symbolic_solve(x^2~32,x),[-sqrt(32.0),sqrt(32.0)])
+    @test correctAns([symbolic_solve(x^3~32,x)[1]],[32.0^(1.0/3.0)])
+
+    #lambert w, currently unsupported
+    @test_broken correctAns(symbolic_solve(x^x~2, x, warns=false),[log(2.0)/LambertW.lambertw(log(2.0))])
+    @test_broken correctAns(symbolic_solve(2*x*exp(x)~3, x, warns=false),[LambertW.lambertw(3.0/2.0)])
+
+    #more challenging quadratics
+    @test correctAns(symbolic_solve(x+sqrt(1+x)~5,x),[3.0])
+    @test correctAns(symbolic_solve(2*x^2-6*x-7~0,x),[(3.0/2.0)-sqrt(23.0)/2.0,(3.0/2.0)+sqrt(23.0)/2.0])
+
+    #functions inverses
+    @test correctAns(symbolic_solve(exp(x^2)~7,x),[-sqrt(log(7.0)),sqrt(log(7.0))])
+
+    root = symbolic_solve(sin(x+3)~1//3,x)[1]
+    var = Symbolics.get_variables(root)[1]
+    root = Symbolics.ssubs(root, Dict(var=>0))
+    @test correctAns([root],[asin(1.0/3.0)-3.0])
+
+    @test_broken correctAns(symbolic_solve(sin(x+2//5)+cos(x+2//5)~1//2 , x, warns=false), [acos(0.5/sqrt(2.0))+pi/4.0-(2.0/5.0)])
+
+    #product
+    @test correctAns(symbolic_solve((x^2-4)*(x+1)~0,x),[-2.0,-1.0,2.0])
+end

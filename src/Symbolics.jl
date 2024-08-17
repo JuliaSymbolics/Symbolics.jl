@@ -153,9 +153,6 @@ include("plot_recipes.jl")
 
 include("semipoly.jl")
 
-include("algebraic_solver.jl")
-export solve_single_eq
-export solve_system_eq
 export lambertw
 
 include("parsing.jl")
@@ -210,6 +207,7 @@ include("solver/polynomialization.jl")
 include("solver/attract.jl")
 include("solver/ia_main.jl")
 include("solver/main.jl")
+export symbolic_solve
 
 function symbolics_to_sympy end
 export symbolics_to_sympy
