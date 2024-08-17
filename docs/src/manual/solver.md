@@ -64,5 +64,5 @@ Symbolics.symbolic_solve(eqs, [x,y,z])
 
 # References
 
-[^1] [Rouillier, F. Solving Zero-Dimensional Systems Through the Rational Univariate Representation. AAECC 9, 433–461 (1999).](https://doi.org/10.1007/s002000050114)
+[^1]: [Rouillier, F. Solving Zero-Dimensional Systems Through the Rational Univariate Representation. AAECC 9, 433–461 (1999).](https://doi.org/10.1007/s002000050114)
 [^2]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
