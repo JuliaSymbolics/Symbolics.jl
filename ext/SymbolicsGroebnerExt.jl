@@ -199,13 +199,19 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         push!(new_eqs, eq)
 
         new_eqs = Symbolics.groebner_basis(new_eqs, ordering=Lex(vcat(vars, params)))
+
+        # handle "unsolvable" case
+        if isequal(1, new_eqs[1])
+            return []
+        end
+
         new_eqs = demote(new_eqs, vars, params)
         new_eqs = map(Symbolics.unwrap, new_eqs)
 
-        # condition for positive dimensionality
+        # condition for positive dimensionality, i.e. infinite solutions
         if length(new_eqs) < length(vars)
-            generating &= false
-            break
+            warns && @warn("Infinite number of solutions")
+            return nothing
         end
 
         # We exit when the system is in Shape Lemma case:
@@ -231,15 +237,6 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     end
 
     solutions = []
-
-    # handle "unsolvable" cases
-    if isequal(1, new_eqs[1])
-        return solutions
-    end
-    if length(new_eqs) < length(vars)
-        warns && @warn("Infinite number of solutions")
-        return nothing
-    end
 
     # first, solve the first minimal polynomial
     @assert length(new_eqs) == length(vars)

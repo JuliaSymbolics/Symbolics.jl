@@ -316,6 +316,7 @@ function detect_sqrtpoly(lhs, var)
         !iscall(arg) && continue
 
         if isequal(check_sqrt(arg, sqrt_term, var), true)
+            sqrt_term_n += arg
             sqrt_term = true
             continue
         elseif isequal(check_sqrt(arg, sqrt_term, var), false)

@@ -128,7 +128,7 @@ function attract_logs(lhs, var)
     condition_y = expand(simplify(lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_conditiony))))
     lhs = expand(simplify(lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addlogs))))
 
-    return lhs, [condition_x, condition_y]
+    return lhs, [(condition_x, >), (condition_y, >)]
 end
 
 """
