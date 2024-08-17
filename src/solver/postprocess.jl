@@ -91,9 +91,15 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
 end
 
 function postprocess_root(x)
+    math_consts = (Base.MathConstants.pi, Base.MathConstants.e)
+    contains_math_const = any([Symbolics.n_occurrences(x, c) > 0 for c in math_consts])
     while true
         old_x = deepcopy(x)
-        x = x |> expand |> _postprocess_root |> expand
+        if contains_math_const
+            x = _postprocess_root(x)
+        else
+            x = x |> expand |> _postprocess_root |> expand
+        end
         isequal(typeof(old_x), typeof(x)) && isequal(old_x, x) && return x
     end
 end
