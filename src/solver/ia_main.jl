@@ -247,12 +247,22 @@ julia> RootFinding.ia_solve(expr, x)
 """
 function ia_solve(lhs, var; warns = true)
     nx = n_func_occ(lhs, var)
+    sols = []
     if nx == 0
         warns && @warn("Var not present in given expression")
         return []
     elseif nx == 1
-        return isolate(lhs, var, warns = warns)
+        sols = isolate(lhs, var, warns = warns)
     elseif nx > 1
-        return attract(lhs, var, warns = warns)
+        sols = attract(lhs, var, warns = warns)
     end
+
+    filtered_sols = []
+    for i in eachindex(sols)
+        lhs_val = substitute(lhs, Dict(var=>complex(eval(toexpr(sols[i])))))
+        if isapprox(lhs_val, 0, atol=1e-16)
+            push!(filtered_sols, sols[i])
+        end
+    end
+    return filtered_sols
 end
