@@ -153,7 +153,6 @@ include("plot_recipes.jl")
 
 include("semipoly.jl")
 
-export lambertw
 
 include("parsing.jl")
 export parse_expr_to_symbolic
