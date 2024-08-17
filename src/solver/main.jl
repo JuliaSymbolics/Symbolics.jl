@@ -159,7 +159,8 @@ function symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
     if !expr_univar && !x_univar
         for e in expr
             for var in x
-                @assert check_poly_inunivar(e, var) "This system can not be currently solved by solve."
+                check_poly_inunivar(e, var) && 
+                (warns && @warn("This system can not be currently solved by solve."); return nothing) || return nothing
             end
         end
 
