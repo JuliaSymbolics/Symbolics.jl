@@ -263,32 +263,6 @@ function contains_transcendental(arg, var, n_occ = 1)
     return false
 end
 
-# prime_factors(9) = [(3, 2)] i.e. 3^2 
-# prime_factors(36) = [(2, 2), (3,2)] i.e. 2^2 + 3^2
-# a.i. generated
-function prime_factors(n::Integer)
-    factors = []
-    d = 2
-    while n > 1
-        count = 0
-        while n % d == 0
-            n ÷= d
-            count += 1
-        end
-        if count > 0
-            push!(factors, (d, count))
-        end
-        d += 1
-        if d * d > n
-            if n > 1
-                push!(factors, (n, 1))
-                break
-            end
-        end
-    end
-    return factors
-end
-
 function check_sqrt(arg, sqrt_term, var)
     if operation(arg) == sqrt && check_poly_inunivar(arguments(arg)[1], var) && !sqrt_term
         return true
