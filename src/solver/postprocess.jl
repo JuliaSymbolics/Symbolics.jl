@@ -16,6 +16,13 @@ function _postprocess_root(x::Number)
         end
     end
 
+    # N//1 + M//1*im => N + M*im
+    if x isa Complex{Rational{T}} where {T <: Integer}
+        if isone(denominator(real(x))) && isone(denominator(imag(x)))
+            return numerator(real(x)) + numerator(imag(x))*im
+        end
+    end
+
     # A + im*0 => A
     if x isa Complex
         if iszero(imag(x))

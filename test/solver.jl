@@ -203,8 +203,6 @@ end
     @test isequal(symbolic_solve([x*y - 1, y], [x,y]), [])
     @test isequal(symbolic_solve([x+y+1, x+y+2], [x,y]), [])
 
-
-
     eqs = [-1 + y + z + x^2,
            -1 + x + z + y^2,
            -1 + x + y + z^2]
@@ -214,7 +212,7 @@ end
     Dict(z=>0, y=>0, x=>1),
     Dict(z=>-1+sqrt(2), y=>-1+sqrt(2), x=>-1+sqrt(2)),
     Dict(z=>-1-sqrt(2), y=>-1-sqrt(2), x=>-1-sqrt(2))], [x,y,z])
-    @test check_approx(arr_calcd_roots, arr_known_roots)   
+    @test check_approx(arr_calcd_roots, arr_known_roots)    
 end
 
 
