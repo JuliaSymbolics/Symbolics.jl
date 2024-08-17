@@ -108,6 +108,7 @@ function isolate(lhs, var; warns=true, conditions=[])
 
         elseif oper === (sqrt)
             lhs = args[1]
+            append!(conditions, rhs)
             rhs = map(sol -> term(^, sol, 2), rhs)
 
         elseif oper === (cbrt)
@@ -124,7 +125,7 @@ function isolate(lhs, var; warns=true, conditions=[])
                 sol -> term(rev_oper[oper], sol) +
                        term(*, Base.MathConstants.pi, 2 * new_var),
                 rhs)
-            @info string(new_var) * " ϵ" * " Ζ: e.g. 0, 1, 2..."
+            @info string(new_var) * " ϵ" * " Ζ"
 
         elseif oper === (asin)
             lhs = args[1]

@@ -304,23 +304,20 @@ function detect_sqrtpoly(lhs, var)
     args = arguments(lhs)
     oper = operation(lhs)
     !isequal(oper, (+)) && return false
-    found = [false, false]
-    c = 1
-    outside = false
     sqrt_term = false
+    poly_term_n = 0
+    sqrt_term_n = 0
 
     for arg in args
-        if check_poly_inunivar(arg, var) && !outside
-            found[c] = true
-            c += 1
-            outside = true
+        if check_poly_inunivar(arg, var)
+            poly_term_n += arg
+            continue
         end
         !iscall(arg) && continue
 
         if isequal(check_sqrt(arg, sqrt_term, var), true)
-            found[c] = true
-            c += 1
             sqrt_term = true
+            continue
         elseif isequal(check_sqrt(arg, sqrt_term, var), false)
             return false
         end
@@ -330,8 +327,7 @@ function detect_sqrtpoly(lhs, var)
             for i in eachindex(args_arg)
                 !iscall(args_arg[i]) && continue
                 if isequal(check_sqrt(args_arg[i], sqrt_term, var), true)
-                    found[c] = true
-                    c += 1
+                    sqrt_term_n += arg
                     sqrt_term = true
                 elseif isequal(check_sqrt(args_arg[i], sqrt_term, var), false)
                     return false
@@ -340,13 +336,15 @@ function detect_sqrtpoly(lhs, var)
         end
     end
 
-    return all(found)
+    isequal(sqrt_term_n + poly_term_n, lhs)
 end
 
 function attract_and_solve_sqrtpoly(lhs, var)
     sqrt_term = 0
     poly_term = 0
+    lhs = unwrap(lhs)
     subs, filtered_expr = filter_poly(lhs, var)
+    filtered_expr = unwrap(filtered_expr)
     args = arguments(filtered_expr)
     oper = operation(filtered_expr)
     !isequal(oper, (+)) && return []
