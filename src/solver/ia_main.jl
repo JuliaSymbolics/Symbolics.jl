@@ -23,10 +23,10 @@ function isolate(lhs, var; warns=true, conditions=[])
             return roots, conditions
         end
 
-        isequal(old_lhs, lhs) && (warns &&
-         (@warn("This expression cannot be solved with the methods available to ia_solve. Try \
-        a numerical method instead.");
-        return nothing) || return nothing)
+        if isequal(old_lhs, lhs) 
+            warns && @warn("This expression cannot be solved with the methods available to ia_solve. Try a numerical method instead.")
+            return nothing
+        end
 
         old_lhs = deepcopy(lhs)
 
@@ -173,8 +173,7 @@ function attract(lhs, var; warns = true)
         if sqrt_poly
             return attract_and_solve_sqrtpoly(lhs, var), conditions
         else
-            warns &&
-            @warn("This expression cannot be solved with the methods available to ia_solve. Try \
+            warns && @warn("This expression cannot be solved with the methods available to ia_solve. Try \
             a numerical method instead.")
             return nothing, conditions
         end

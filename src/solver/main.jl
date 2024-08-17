@@ -132,9 +132,10 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         for i in eachindex(expr)
             expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
             check_expr_validity(expr[i])
-            !check_poly_inunivar(expr[i], x) && (warns &&
-             (@warn "Solve can not solve this input currently"; return nothing) ||
-             return nothing)
+            if !check_poly_inunivar(expr[i], x)
+                warns && @warn("Solve can not solve this input currently")
+                return nothing
+            end
         end
         expr = Vector{Num}(expr)
     end
@@ -148,9 +149,10 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             isequal(sols, nothing) && return nothing
         else
             for i in eachindex(expr)
-                !check_poly_inunivar(expr[i], x) && (warns &&
-                 (@warn("Solve can not solve this input currently"); return nothing) ||
-                 return nothing)
+                if !check_poly_inunivar(expr[i], x)
+                    warns && @warn("Solve can not solve this input currently")
+                    return nothing
+                end
             end
             sols = solve_multipoly(
                 expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
@@ -164,11 +166,10 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
     if !expr_univar && !x_univar
         for e in expr
             for var in x
-                !check_poly_inunivar(e, var) &&
-                    ((warns &&
-                        @warn("This system can not be currently solved by solve.");
-                    return nothing) ||
-                     return nothing)
+                if !check_poly_inunivar(e, var)
+                    warns && @warn("This system can not be currently solved by solve.")
+                    return nothing
+                end
             end
         end
 
@@ -276,7 +277,8 @@ function solve_multipoly(polys::Vector, x::Num; dropmultiplicity = true, warns =
     polys = unique(polys)
 
     if length(polys) < 1
-        warns && (@warn("No expressions entered"); return nothing || return nothing)
+        warns && @warn("No expressions entered")
+        return nothing
     end
     if length(polys) == 1
         return solve_univar(polys[1], x, dropmultiplicity = dropmultiplicity)
