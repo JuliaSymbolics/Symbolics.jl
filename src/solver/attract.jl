@@ -22,7 +22,7 @@ function detect_addlogs(lhs, var)
     args = arguments(u_lhs)
     oper = operation(u_lhs)
     !isequal(oper, (+)) && return false
-    
+
     found = [false, false]
     c = 1
     for arg in args
@@ -86,7 +86,7 @@ function detect_exponential(lhs, var)
         end
     end
 
-    return all(found) 
+    return all(found)
 end
 
 """
@@ -109,13 +109,18 @@ Main.RootFinding.slog(-1 + x^2)
 function attract_logs(lhs, var)
     contains_var(arg) = n_occurrences(arg, var) > 0
 
-    r_addlogs = Vector{Any}() 
-    push!(r_addlogs, @acrule log(~x::(contains_var)) + log(~y::(contains_var)) => slog(~x * ~y))
-    push!(r_addlogs, @acrule ~z*log(~x::(contains_var)) + log(~y::(contains_var)) => slog((~x)^(~z) * ~y))
-    push!(r_addlogs, @acrule ~z*log(~x::(contains_var)) + ~h*log(~y::(contains_var)) => slog((~x)^(~z) * (~y)^(~h)))
+    r_addlogs = Vector{Any}()
+    push!(r_addlogs,
+        @acrule log(~x::(contains_var)) + log(~y::(contains_var)) => slog(~x * ~y))
+    push!(r_addlogs,
+        @acrule ~z * log(~x::(contains_var)) + log(~y::(contains_var)) => slog((~x)^(~z) *
+                                                                               ~y))
+    push!(r_addlogs,
+        @acrule ~z * log(~x::(contains_var)) + ~h * log(~y::(contains_var)) => slog((~x)^(~z) *
+                                                                                    (~y)^(~h)))
 
-
-    lhs = expand(simplify(lhs, rewriter=SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addlogs))))
+    lhs = expand(simplify(
+        lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addlogs))))
 
     return lhs
 end
@@ -143,11 +148,23 @@ function attract_exponential(lhs, var)
     contains_var(arg) = n_occurrences(arg, var) > 0
 
     r_addexpon = Vector{Any}()
-    push!(r_addexpon, @acrule (~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(log, term(complex, -1)))
-    push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -~a))
-    push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~c)*(~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -(~a)//(~c)))
+    push!(r_addexpon,
+        @acrule (~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f *
+                                                                         term(slog, ~b) -
+                                                                         ~g *
+                                                                         term(slog, ~d) +
+                                                                         term(
+            log, term(complex, -1)))
+    push!(r_addexpon,
+        @acrule (~a) * (~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f * term(
+            slog, ~b) - ~g * term(slog, ~d) + term(slog, -~a))
+    push!(r_addexpon,
+        @acrule (~a) * (~b)^(~f::(contains_var)) + (~c) * (~d)^(~g::(contains_var)) => ~f *
+                                                                                       term(
+            slog, ~b) - ~g * term(slog, ~d) + term(slog, -(~a) // (~c)))
 
-    lhs = expand(simplify(lhs, rewriter=SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addexpon))))
+    lhs = expand(simplify(
+        lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addexpon))))
 
     return expand(lhs)
 end
@@ -179,33 +196,29 @@ function attract_trig(lhs, var)
     contains_var(arg) = n_occurrences(arg, var) > 0
 
     # r_doubleangle1 = @acrule 2*sin(~x::(contains_var))*cos(~x::(contains_var)) => sin(2*~x)
-    r_trig = [
-        @acrule(sin(~x::(contains_var))^2 + cos(~x::(contains_var))^2 => one(~x))
-        @acrule(sin(~x::(contains_var))^2 + -1 => -1*cos(~x)^2)
-        @acrule(cos(~x::(contains_var))^2 + -1 => -1*sin(~x)^2)
+    r_trig = [@acrule(sin(~x::(contains_var))^2 + cos(~x::(contains_var))^2=>one(~x))
+              @acrule(sin(~x::(contains_var))^2 + -1=>-1 * cos(~x)^2)
+              @acrule(cos(~x::(contains_var))^2 + -1=>-1 * sin(~x)^2)
+              @acrule(cos(~x::(contains_var))^2 + -1 * sin(~x::(contains_var))^2=>cos(2 *
+                                                                                      ~x))
+              @acrule(sin(~x::(contains_var))^2 + -1 * cos(~x::(contains_var))^2=>-cos(2 *
+                                                                                       ~x))
+              @acrule(cos(~x::(contains_var)) * sin(~x::(contains_var))=>sin(2 * ~x) / 2)
+              @acrule(tan(~x::(contains_var))^2 + -1 * sec(~x::(contains_var))^2=>one(~x))
+              @acrule(-1 * tan(~x::(contains_var))^2 + sec(~x::(contains_var))^2=>one(~x))
+              @acrule(tan(~x::(contains_var))^2 + 1=>sec(~x)^2)
+              @acrule(sec(~x::(contains_var))^2 + -1=>tan(~x)^2)
+              @acrule(cot(~x::(contains_var))^2 + -1 * csc(~x)^2=>one(~x))
+              @acrule(cot(~x::(contains_var))^2 + 1=>csc(~x)^2)
+              @acrule(csc(~x::(contains_var))^2 + -1=>cot(~x)^2)
+              @acrule(cosh(~x::(contains_var))^2 + -1 * sinh(~x)^2=>one(~x))
+              @acrule(cosh(~x::(contains_var))^2 + -1=>sinh(~x)^2)
+              @acrule(sinh(~x::(contains_var))^2 + 1=>cosh(~x)^2)
+              @acrule(cosh(~x::(contains_var))^2 + sinh(~x::(contains_var))^2=>cosh(2 * ~x))
+              @acrule(cosh(~x::(contains_var)) * sinh(~x::(contains_var))=>sinh(2 * ~x) / 2)]
 
-        @acrule(cos(~x::(contains_var))^2 + -1*sin(~x::(contains_var))^2 => cos(2 * ~x))
-        @acrule(sin(~x::(contains_var))^2 + -1*cos(~x::(contains_var))^2 => -cos(2 * ~x))
-        @acrule(cos(~x::(contains_var)) * sin(~x::(contains_var)) => sin(2 * ~x)/2)
-
-        @acrule(tan(~x::(contains_var))^2 + -1*sec(~x::(contains_var))^2 => one(~x))
-        @acrule(-1*tan(~x::(contains_var))^2 + sec(~x::(contains_var))^2 => one(~x))
-        @acrule(tan(~x::(contains_var))^2 +  1 => sec(~x)^2)
-        @acrule(sec(~x::(contains_var))^2 + -1 => tan(~x)^2)
-
-        @acrule(cot(~x::(contains_var))^2 + -1*csc(~x)^2 => one(~x))
-        @acrule(cot(~x::(contains_var))^2 +  1 => csc(~x)^2)
-        @acrule(csc(~x::(contains_var))^2 + -1 => cot(~x)^2)
-
-        @acrule(cosh(~x::(contains_var))^2 + -1*sinh(~x)^2 => one(~x))
-        @acrule(cosh(~x::(contains_var))^2 + -1  => sinh(~x)^2)
-        @acrule(sinh(~x::(contains_var))^2 +  1  => cosh(~x)^2)
-
-        @acrule(cosh(~x::(contains_var))^2 + sinh(~x::(contains_var))^2 => cosh(2 * ~x))
-        @acrule(cosh(~x::(contains_var)) * sinh(~x::(contains_var)) => sinh(2 * ~x)/2)
-    ]
-
-    lhs = expand(simplify(lhs, rewriter=SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_trig))))
+    lhs = expand(simplify(
+        lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_trig))))
 
     return lhs
 end

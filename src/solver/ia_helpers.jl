@@ -1,7 +1,7 @@
 function n_occurrences(expr, var)
     n = 0
     !iscall(unwrap(expr)) && any(isequal(var, x) for x in get_variables(expr)) && return 1
-    !iscall(unwrap(expr)) && return 0 
+    !iscall(unwrap(expr)) && return 0
 
     args = arguments(unwrap(expr))
 
@@ -30,12 +30,11 @@ function n_func_occ(expr, var)
     expr = unwrap(expr)
     !iscall(expr) && return n_occurrences(expr, var)
     args, cur_oper = arguments(expr), operation(expr)
-    counted_ops = [sqrt, cbrt, sin, log, log2, log10, cos, tan, asin, acos, atan, exp, ssqrt, scbrt, slog]
+    counted_ops = [sqrt, cbrt, sin, log, log2, log10, cos, tan,
+        asin, acos, atan, exp, ssqrt, scbrt, slog]
     n = 0
 
-
     if cur_oper === (*) || cur_oper === (+)
-
         outside = false
         for arg in args
             n_occurrences(arg, var) == 0 && continue
@@ -52,35 +51,42 @@ function n_func_occ(expr, var)
 
             args_arg = arguments(arg)
             oper_arg = operation(arg)
-            is_var_outside(arg) = check_poly_inunivar(arg, var) && !outside && n_occurrences(arg, var) != 0
-            case_1_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0  && n_occurrences(args_arg[1], var) != 0 && check_poly_inunivar(args_arg[1], var) && n_occurrences(arg, var) != 0 && !(args_arg[2] isa Number)
-            case_2_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) != 0  && n_occurrences(args_arg[1], var) == 0  
-            case_3_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0  && n_occurrences(args_arg[1], var) != 0 && !check_poly_inunivar(args_arg[1], var)
-
+            function is_var_outside(arg)
+                check_poly_inunivar(arg, var) && !outside && n_occurrences(arg, var) != 0
+            end
+            case_1_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0 &&
+                         n_occurrences(args_arg[1], var) != 0 &&
+                         check_poly_inunivar(args_arg[1], var) &&
+                         n_occurrences(arg, var) != 0 && !(args_arg[2] isa Number)
+            case_2_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) != 0 &&
+                         n_occurrences(args_arg[1], var) == 0
+            case_3_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0 &&
+                         n_occurrences(args_arg[1], var) != 0 &&
+                         !check_poly_inunivar(args_arg[1], var)
 
             # any transcedental operation and the case:  (weird_transcedental_f(x))^(something)
             if any(isequal(oper, op) for op in counted_ops) || case_3_pow
                 n += n_func_occ(args_arg[1], var)
-            
-            # the case (some constant)^(f(x))
+
+                # the case (some constant)^(f(x))
             elseif case_2_pow
-                n += n_func_occ(args_arg[2], var) 
-            
-            # var is outside 'x'+1
+                n += n_func_occ(args_arg[2], var)
+
+                # var is outside 'x'+1
             elseif is_var_outside(arg)
                 n += 1
                 outside = true
 
-            # case (f(x))^(weird stuff)
+                # case (f(x))^(weird stuff)
             elseif case_1_pow
                 n += 1
 
-            # n(2 / x) = 1; n(x/x^2) = 2?
+                # n(2 / x) = 1; n(x/x^2) = 2?
             elseif oper_arg === (/)
                 n += n_func_occ(args_arg[1], var)
                 n += n_func_occ(args_arg[2], var)
 
-            # multiplication cases
+                # multiplication cases
             elseif oper_arg === (*)
                 args_arg = arguments(arg)
 
@@ -89,7 +95,7 @@ function n_func_occ(expr, var)
                     if is_var_outside(sub_arg)
                         n += 1
                         outside = true
-                    # log(x)*y
+                        # log(x)*y
                     elseif !check_poly_inunivar(sub_arg, var)
                         n += n_func_occ(sub_arg, var)
                     end
@@ -102,10 +108,9 @@ function n_func_occ(expr, var)
             n += n_func_occ(arg, var)
         end
     end
-    
+
     return n
 end
-
 
 function arg_contains_log(arg, var)
     oper = operation(arg)
@@ -118,15 +123,14 @@ function arg_contains_log(arg, var)
     return false
 end
 
-
 function find_logandexpon(arg, var, oper, poly_index)
     args_arg = arguments(arg)
 
-    oper_term, constant_term = 0, 0 
+    oper_term, constant_term = 0, 0
 
     for a in args_arg
         if n_occurrences(a, var) != 0 && iscall(a) && operation(a) == (oper) &&
-                check_poly_inunivar(arguments(a)[poly_index], var)
+           check_poly_inunivar(arguments(a)[poly_index], var)
             oper_term = a
         elseif n_occurrences(a, var) == 0
             constant_term = a

@@ -34,7 +34,9 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
 
     # sqrt(0), cbrt(0) => 0
     # sqrt(1), cbrt(1) => 1
-    if iscall(x) && (operation(x) === sqrt || operation(x) === cbrt || operation(x) === ssqrt || operation(x) === scbrt)
+    if iscall(x) &&
+       (operation(x) === sqrt || operation(x) === cbrt || operation(x) === ssqrt ||
+        operation(x) === scbrt)
         arg = arguments(x)[1]
         if isequal(arg, 0) || isequal(arg, 1)
             return arg
@@ -52,7 +54,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     end
 
     # sqrt(M^2 * N) => M * sqrt(N)
-    if iscall(x) && (operation(x) === sqrt || operation(x) === ssqrt) 
+    if iscall(x) && (operation(x) === sqrt || operation(x) === ssqrt)
         arg = arguments(x)[1]
         if arg isa Integer
             square, radical = big(1), big(1)
@@ -62,7 +64,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
                 radical *= p^r
             end
             if arg < 0
-                square = im*square
+                square = im * square
             end
             isone(radical) && return square
             return square * Symbolics.term(Symbolics.operation(x), radical)
@@ -95,4 +97,3 @@ function postprocess_root(x)
         isequal(typeof(old_x), typeof(x)) && isequal(old_x, x) && return x
     end
 end
-

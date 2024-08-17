@@ -1,4 +1,4 @@
-Base.:^(a::Complex{<:Real}, b::Num)= Symbolics.Pow(a, b)
+Base.:^(a::Complex{<:Real}, b::Num) = Symbolics.Pow(a, b)
 """
     symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
 
@@ -110,7 +110,7 @@ julia> symbolic_solve(a*x^b + c, x)
 ((-c)^(1 / b)) / (a^(1 / b))
 ```
 """
-function symbolic_solve(expr, x::T; dropmultiplicity=true, warns=true) where {T}
+function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where {T}
     expr_univar = false
     x_univar = false
 
@@ -123,7 +123,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity=true, warns=true) where {T}
         end
     end
 
-    if !(expr isa Vector) 
+    if !(expr isa Vector)
         expr_univar = true
         expr = expr isa Equation ? expr.lhs - expr.rhs : expr
         check_expr_validity(expr)
@@ -132,23 +132,28 @@ function symbolic_solve(expr, x::T; dropmultiplicity=true, warns=true) where {T}
         for i in eachindex(expr)
             expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
             check_expr_validity(expr[i])
-            !check_poly_inunivar(expr[i], x) && (warns && (@warn "Solve can not solve this input currently"; return nothing) || return nothing)
+            !check_poly_inunivar(expr[i], x) && (warns &&
+             (@warn "Solve can not solve this input currently"; return nothing) ||
+             return nothing)
         end
         expr = Vector{Num}(expr)
     end
 
-
     if x_univar
-
         sols = []
         if expr_univar
-            sols = check_poly_inunivar(expr, x) ? solve_univar(expr, x, dropmultiplicity=dropmultiplicity) : ia_solve(expr, x, warns=warns)
+            sols = check_poly_inunivar(expr, x) ?
+                   solve_univar(expr, x, dropmultiplicity = dropmultiplicity) :
+                   ia_solve(expr, x, warns = warns)
             isequal(sols, nothing) && return nothing
         else
             for i in eachindex(expr)
-                !check_poly_inunivar(expr[i], x) && (warns && (@warn("Solve can not solve this input currently"); return nothing) || return nothing)
+                !check_poly_inunivar(expr[i], x) && (warns &&
+                 (@warn("Solve can not solve this input currently"); return nothing) ||
+                 return nothing)
             end
-            sols = solve_multipoly(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+            sols = solve_multipoly(
+                expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
             isequal(sols, nothing) && return nothing
         end
 
@@ -159,12 +164,15 @@ function symbolic_solve(expr, x::T; dropmultiplicity=true, warns=true) where {T}
     if !expr_univar && !x_univar
         for e in expr
             for var in x
-                !check_poly_inunivar(e, var) && 
-                ((warns && @warn("This system can not be currently solved by solve."); return nothing) || return nothing)
+                !check_poly_inunivar(e, var) &&
+                    ((warns &&
+                        @warn("This system can not be currently solved by solve.");
+                    return nothing) ||
+                     return nothing)
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity)
+        sols = solve_multivar(expr, x, dropmultiplicity = dropmultiplicity)
         isequal(sols, nothing) && return nothing
         for sol in sols
             for var in x
@@ -172,7 +180,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity=true, warns=true) where {T}
             end
         end
 
-        return sols 
+        return sols
     end
 end
 
@@ -198,7 +206,7 @@ implemented in the function `get_roots` and its children.
 # Examples
 
 """
-function solve_univar(expression, x; dropmultiplicity=true)
+function solve_univar(expression, x; dropmultiplicity = true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
@@ -231,8 +239,8 @@ function solve_univar(expression, x; dropmultiplicity=true)
         # multiplicities (repeated roots)
         if !dropmultiplicity
             og_arr_roots = copy(arr_roots)
-            for i = 1:(mult_n-1)
-                append!(arr_roots, og_arr_roots)    
+            for i in 1:(mult_n - 1)
+                append!(arr_roots, og_arr_roots)
             end
         end
 
@@ -240,14 +248,13 @@ function solve_univar(expression, x; dropmultiplicity=true)
     end
 
     if length(factors) != 1
-        @assert isequal(expand(filtered_expr - u*expand(prod(factors))), 0)
+        @assert isequal(expand(filtered_expr - u * expand(prod(factors))), 0)
 
         for factor in factors_subbed
-            roots = solve_univar(factor, x, dropmultiplicity=dropmultiplicity)
+            roots = solve_univar(factor, x, dropmultiplicity = dropmultiplicity)
             append!(arr_roots, roots)
         end
     end
-
 
     if isequal(arr_roots, [])
         return [RootsOf(wrap(expression), wrap(x))]
@@ -265,14 +272,14 @@ end
 # gcd_use_nemo(x - 1, (x-1)^20), which is again x-1.
 # now we just need to solve(x-1, x) to get the common root in this
 # system of equations.
-function solve_multipoly(polys::Vector, x::Num; dropmultiplicity=true, warns=true)
+function solve_multipoly(polys::Vector, x::Num; dropmultiplicity = true, warns = true)
     polys = unique(polys)
 
     if length(polys) < 1
         warns && (@warn("No expressions entered"); return nothing || return nothing)
     end
     if length(polys) == 1
-        return solve_univar(polys[1], x, dropmultiplicity=dropmultiplicity)
+        return solve_univar(polys[1], x, dropmultiplicity = dropmultiplicity)
     end
 
     gcd = gcd_use_nemo(polys[1], polys[2])
@@ -280,15 +287,14 @@ function solve_multipoly(polys::Vector, x::Num; dropmultiplicity=true, warns=tru
     for i in eachindex(polys)[3:end]
         gcd = gcd_use_nemo(gcd, polys[i])
     end
-    
+
     if isequal(gcd, 1)
         return []
     end
 
-    return solve_univar(gcd, x, dropmultiplicity=dropmultiplicity)
+    return solve_univar(gcd, x, dropmultiplicity = dropmultiplicity)
 end
 
-
-function solve_multivar(eqs::Any, vars::Any; dropmultiplicity=true, warns=true)
+function solve_multivar(eqs::Any, vars::Any; dropmultiplicity = true, warns = true)
     throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
 end

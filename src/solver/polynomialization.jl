@@ -52,7 +52,6 @@ function turn_to_poly(expr, var)
         !iscall(arg) && continue
         arg_oper = operation(arg)
 
-
         if arg_oper === (^)
             tp = trav_pow(args, i, var, broken, sub)
             sub = isequal(tp, false) ? sub : tp
@@ -72,14 +71,13 @@ function turn_to_poly(expr, var)
         end
     end
 
-    if broken[] || isequal(sub, 0) 
+    if broken[] || isequal(sub, 0)
         return (expr, Dict{Any, Any}())
     end
 
     new_var = gensym()
     new_var = (@variables $new_var)[1]
-    return ssubs(expr, Dict(sub=>new_var)), Dict{Any,Any}(new_var=>sub)
-    
+    return ssubs(expr, Dict(sub => new_var)), Dict{Any, Any}(new_var => sub)
 end
 
 """
@@ -110,7 +108,7 @@ function trav_pow(args, index, var, broken, sub)
     args_arg = arguments(args[index])
     base = args_arg[1]
     power = args_arg[2]
-    
+
     # case 1: log(x)^2 .... 9^x = 3^2^x = 3^2x = (3^x)^2
     !isequal(add_sub(sub, base, var, broken), false) && power isa Integer && return base
 
@@ -119,7 +117,7 @@ function trav_pow(args, index, var, broken, sub)
     if base isa Integer && n_func_occ(power, var) == 1
         factors = prime_factors(base)
         length(factors) != 1 && return false
-        b, p = factors[1] 
+        b, p = factors[1]
         new_b = b^power
         sub = isequal(sub, 0) ? new_b : sub
         if !isequal(sub, new_b)
@@ -133,7 +131,6 @@ function trav_pow(args, index, var, broken, sub)
 
     return false
 end
-
 
 """
     trav_mult(arg, var, broken, sub)
@@ -170,9 +167,9 @@ function trav_mult(arg, var, broken, sub)
         !iscall(arg2) && continue
 
         oper = operation(arg2)
-        if oper === (^) 
+        if oper === (^)
             tp = trav_pow(args_arg, i, var, broken, sub)
-            sub = isequal(tp, false) ? sub : tp 
+            sub = isequal(tp, false) ? sub : tp
             continue
         end
 
@@ -181,7 +178,6 @@ function trav_mult(arg, var, broken, sub)
     end
     return sub
 end
-
 
 """
     add_sub(sub, arg, var, broken::Ref{Bool})
@@ -215,7 +211,7 @@ false
 """
 function add_sub(sub, arg, var, broken::Ref{Bool})
     if contains_transcendental(arg, var)
-        if isequal(sub, 0) 
+        if isequal(sub, 0)
             return true
         elseif !isequal(sub, arg)
             broken[] = true
@@ -227,7 +223,6 @@ function add_sub(sub, arg, var, broken::Ref{Bool})
     cond2 = isequal(sub, arg)
     return (cond1 && cond2)
 end
-
 
 """
     contains_transcendental(arg, var, n_occ=1)
@@ -257,7 +252,7 @@ julia> contains_transcendental(unwrap(sin(x)), x)
 true
 ```
 """
-function contains_transcendental(arg, var, n_occ=1)
+function contains_transcendental(arg, var, n_occ = 1)
     !iscall(arg) && return false
     arg_oper = operation(arg)
 
@@ -294,7 +289,6 @@ function prime_factors(n::Integer)
     return factors
 end
 
-
 function check_sqrt(arg, sqrt_term, var)
     if operation(arg) == sqrt && check_poly_inunivar(arguments(arg)[1], var) && !sqrt_term
         return true
@@ -315,7 +309,6 @@ function detect_sqrtpoly(lhs, var)
     outside = false
     sqrt_term = false
 
-
     for arg in args
         if check_poly_inunivar(arg, var) && !outside
             found[c] = true
@@ -323,7 +316,7 @@ function detect_sqrtpoly(lhs, var)
             outside = true
         end
         !iscall(arg) && continue
-        
+
         if isequal(check_sqrt(arg, sqrt_term, var), true)
             found[c] = true
             c += 1
@@ -350,8 +343,6 @@ function detect_sqrtpoly(lhs, var)
     return all(found)
 end
 
-
-
 function attract_and_solve_sqrtpoly(lhs, var)
     sqrt_term = 0
     poly_term = 0
@@ -365,7 +356,7 @@ function attract_and_solve_sqrtpoly(lhs, var)
             poly_term += arg
             continue
         end
-        
+
         if isequal(check_sqrt(arg, false, var), true)
             sqrt_term = arg
             continue
@@ -385,7 +376,6 @@ function attract_and_solve_sqrtpoly(lhs, var)
             end
             continue
         end
-
     end
     lhs = lhs - sqrt_term + ssqrt(arguments(sqrt_term)[1])
     eq_to_solve = expand((poly_term)^2 - arguments(sqrt_term)[1])
@@ -394,7 +384,8 @@ function attract_and_solve_sqrtpoly(lhs, var)
     answers = []
 
     for root in roots
-        if isapprox(substitute(lhs, Dict(var=>eval(Symbolics.toexpr(root)))), 0, atol=1e-4)
+        if isapprox(
+            substitute(lhs, Dict(var => eval(Symbolics.toexpr(root)))), 0, atol = 1e-4)
             push!(answers, root)
         end
     end

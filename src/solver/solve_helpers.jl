@@ -28,16 +28,14 @@ function ssqrt(n)
         return sqrt(complex(n))
     end
 
-    if n isa Complex 
+    if n isa Complex
         return sqrt(n)
     end
 
     if n isa SymbolicUtils.BasicSymbolic{Real}
         return term(ssqrt, n)
     end
-
 end
-
 
 function scbrt(n)
     n = unwrap(n)
@@ -47,13 +45,12 @@ function scbrt(n)
     end
 
     if n isa Complex
-        return (n)^(1/3)
+        return (n)^(1 / 3)
     end
 
     if n isa SymbolicUtils.BasicSymbolic{Real}
         return term(scbrt, n)
     end
-
 end
 
 function slog(n)
@@ -70,7 +67,6 @@ function slog(n)
     return term(slog, n)
 end
 
-
 struct RootsOf
     poly::Num
     var::Num
@@ -81,13 +77,12 @@ Base.show(io::IO, f::typeof(ssqrt)) = print(io, "√")
 Base.show(io::IO, r::typeof(scbrt)) = print(io, "∛")
 Base.show(io::IO, r::typeof(slog)) = print(io, "slog")
 
-
 function check_expr_validity(expr)
     type_expr = typeof(expr)
     valid_type = false
 
-    if type_expr == Num || type_expr == SymbolicUtils.BasicSymbolic{Real} || 
-    type_expr == Complex{Num} || type_expr == ComplexTerm{Real}
+    if type_expr == Num || type_expr == SymbolicUtils.BasicSymbolic{Real} ||
+       type_expr == Complex{Num} || type_expr == ComplexTerm{Real}
         valid_type = true
     end
     @assert valid_type && return true
@@ -124,7 +119,7 @@ function f_numbers(n)
     if n isa Complex
         real_part = f_numbers(n.re)
         im_part = f_numbers(n.im)
-        return real_part + im_part*im
+        return real_part + im_part * im
     end
 
     if n isa Rational && n isa Real
@@ -135,10 +130,11 @@ function f_numbers(n)
     return n
 end
 
-function comp_rational(x,y)
+function comp_rational(x, y)
     x, y = wrap(f_numbers(x)), wrap(f_numbers(y))
-    if !(unwrap(x) isa AbstractFloat || x isa Complex) && !(unwrap(y) isa AbstractFloat || y isa Complex)
-        r = x//y
+    if !(unwrap(x) isa AbstractFloat || x isa Complex) &&
+       !(unwrap(y) isa AbstractFloat || y isa Complex)
+        r = x // y
         return r
     end
 
@@ -147,18 +143,16 @@ function comp_rational(x,y)
     if x isa ComplexF64
         real_p = real(x)
         imag_p = imag(x)
-        r = Rational(real_p)//y
+        r = Rational(real_p) // y
         if !isequal(imag_p, 0)
-            r += (Rational(imag_p)//y)*im
+            r += (Rational(imag_p) // y) * im
         end
-    elseif x isa Float64 
-        r = Rational{BigInt}(x)//y
+    elseif x isa Float64
+        r = Rational{BigInt}(x) // y
     end
 
-    return isequal(r, nothing) ? x/y : r
+    return isequal(r, nothing) ? x / y : r
 end
-
-
 
 ### multivar stuff ###
 function contains_var(var, vars)
@@ -197,10 +191,9 @@ function gen_separating_var(vars)
     new_var = (@variables HAT)[1]
     present = any(isequal(new_var, var) for var in vars)
     while present
-        new_var = variables(repeat("_", n)*"HAT")[1]
+        new_var = variables(repeat("_", n) * "HAT")[1]
         present = any(isequal(new_var, var) for var in vars)
         n += 1
     end
     return new_var
 end
-

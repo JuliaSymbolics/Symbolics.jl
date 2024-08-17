@@ -1,6 +1,6 @@
 using Symbolics
 
-function isolate(lhs, var; warns=true)
+function isolate(lhs, var; warns = true)
     rhs = Vector{Any}([0])
     original_lhs = deepcopy(lhs)
     lhs = unwrap(lhs)
@@ -12,16 +12,18 @@ function isolate(lhs, var; warns=true)
         if check_poly_inunivar(poly, var)
             roots = []
             for i in eachindex(rhs)
-                append!(roots, solve_univar(wrap(lhs-rhs[i]), var))
+                append!(roots, solve_univar(wrap(lhs - rhs[i]), var))
             end
             return roots
         end
 
-        isequal(old_lhs, lhs) && (warns && (@warn("This expression cannot be solved with the methods available to ia_solve. Try \
-            a numerical method instead."); return nothing) || return nothing)
+        isequal(old_lhs, lhs) && (warns &&
+         (@warn("This expression cannot be solved with the methods available to ia_solve. Try \
+a numerical method instead.");
+        return nothing) || return nothing)
 
         old_lhs = deepcopy(lhs)
-        
+
         oper = operation(lhs)
         args = arguments(lhs)
 
@@ -42,7 +44,7 @@ function isolate(lhs, var; warns=true)
                     continue
                 end
                 lhs = lhs / arg
-                rhs = map(sol -> sol/arg, rhs)
+                rhs = map(sol -> sol / arg, rhs)
             end
 
         elseif oper === (/)
@@ -50,32 +52,34 @@ function isolate(lhs, var; warns=true)
             if var_innumerator
                 # x / 2 = y
                 lhs = args[1]
-                rhs = map(sol -> sol*args[2], rhs)
+                rhs = map(sol -> sol * args[2], rhs)
             else
                 # 2 / x = y
                 lhs = args[2]
-                rhs = map(sol -> args[1]//sol, rhs)
+                rhs = map(sol -> args[1] // sol, rhs)
             end
 
         elseif oper === (^)
-            if any(isequal(x, var) for x in get_variables(args[1])) && n_occurrences(args[2], var) == 0 && args[2] isa Integer
+            if any(isequal(x, var) for x in get_variables(args[1])) &&
+               n_occurrences(args[2], var) == 0 && args[2] isa Integer
                 lhs = args[1]
                 power = args[2]
                 new_roots = []
 
                 for i in eachindex(rhs)
-                    for k in 0:(args[2]-1)
-                        r = wrap(term(^, rhs[i], (1//power)))
-                        c = wrap(term(*, 2*(k), pi))*im/power
-                        root = r*Base.MathConstants.e^c
+                    for k in 0:(args[2] - 1)
+                        r = wrap(term(^, rhs[i], (1 // power)))
+                        c = wrap(term(*, 2 * (k), pi)) * im / power
+                        root = r * Base.MathConstants.e^c
                         push!(new_roots, root)
                     end
                 end
                 rhs = []
                 append!(rhs, new_roots)
-            elseif any(isequal(x, var) for x in get_variables(args[1])) && n_occurrences(args[2], var) == 0
+            elseif any(isequal(x, var) for x in get_variables(args[1])) &&
+                   n_occurrences(args[2], var) == 0
                 lhs = args[1]
-                rhs = map(sol -> term(^, sol, 1//args[2]), rhs)
+                rhs = map(sol -> term(^, sol, 1 // args[2]), rhs)
             else
                 lhs = args[2]
                 rhs = map(sol -> term(/, term(slog, sol), term(slog, args[1])), rhs)
@@ -102,12 +106,15 @@ function isolate(lhs, var; warns=true)
             rhs = map(sol -> term(^, sol, 3), rhs)
 
         elseif oper === (sin) || oper === (cos) || oper === (tan)
-            rev_oper = Dict(sin=>asin, cos=>acos, tan=>atan)
+            rev_oper = Dict(sin => asin, cos => acos, tan => atan)
             lhs = args[1]
             # make this global somehow so the user doesnt need to declare it on his own
             new_var = gensym()
             new_var = (@variables $new_var)[1]
-            rhs = map(sol -> term(rev_oper[oper], sol) + term(*, Base.MathConstants.pi, 2*new_var), rhs)
+            rhs = map(
+                sol -> term(rev_oper[oper], sol) +
+                       term(*, Base.MathConstants.pi, 2 * new_var),
+                rhs)
             @info string(new_var) * " ϵ" * " Ζ: e.g. 0, 1, 2..."
 
         elseif oper === (asin)
@@ -122,8 +129,8 @@ function isolate(lhs, var; warns=true)
             lhs = args[1]
             rhs = map(sol -> term(tan, sol), rhs)
         elseif oper === (exp)
-           lhs = args[1] 
-           rhs = map(sol -> term(slog, sol), rhs)
+            lhs = args[1]
+            rhs = map(sol -> term(slog, sol), rhs)
         end
 
         lhs = simplify(lhs)
@@ -132,8 +139,7 @@ function isolate(lhs, var; warns=true)
     return rhs
 end
 
-
-function attract(lhs, var; warns=true)
+function attract(lhs, var; warns = true)
     if n_func_occ(simplify(lhs), var) <= n_func_occ(lhs, var)
         lhs = simplify(lhs)
     end
@@ -146,7 +152,7 @@ function attract(lhs, var; warns=true)
     end
     lhs = attract_trig(lhs, var)
 
-    n_func_occ(lhs, var) == 1 && return isolate(lhs, var, warns=warns)
+    n_func_occ(lhs, var) == 1 && return isolate(lhs, var, warns = warns)
 
     lhs, sub = turn_to_poly(lhs, var)
 
@@ -155,20 +161,20 @@ function attract(lhs, var; warns=true)
         if sqrt_poly
             return attract_and_solve_sqrtpoly(lhs, var)
         else
-            warns && @warn("This expression cannot be solved with the methods available to ia_solve. Try \
-            a numerical method instead.")
+            warns &&
+                @warn("This expression cannot be solved with the methods available to ia_solve. Try \
+       a numerical method instead.")
             return nothing
         end
     end
 
-
     new_var = collect(keys(sub))[1]
     new_var_val = collect(values(sub))[1]
 
-    roots = isolate(lhs, new_var, warns=warns)
+    roots = isolate(lhs, new_var, warns = warns)
     new_roots = []
     for root in roots
-        new_sol = isolate(new_var_val - root, var, warns=warns)
+        new_sol = isolate(new_var_val - root, var, warns = warns)
         push!(new_roots, new_sol)
     end
     new_roots = collect(Iterators.flatten(new_roots))
@@ -239,15 +245,14 @@ julia> RootFinding.ia_solve(expr, x)
 # References
 [^1]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
 """
-function ia_solve(lhs, var; warns=true)
+function ia_solve(lhs, var; warns = true)
     nx = n_func_occ(lhs, var)
     if nx == 0
         warns && @warn("Var not present in given expression")
         return []
     elseif nx == 1
-        return isolate(lhs, var, warns=warns)
+        return isolate(lhs, var, warns = warns)
     elseif nx > 1
-        return attract(lhs, var, warns=warns)
+        return attract(lhs, var, warns = warns)
     end
-
 end

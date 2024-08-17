@@ -73,14 +73,14 @@ julia> filter_stuff(123)
 function filter_stuff(expr)
     if expr isa Integer
         return Dict(), expr
-    elseif expr isa Rational || expr isa AbstractFloat || expr isa Complex 
+    elseif expr isa Rational || expr isa AbstractFloat || expr isa Complex
         return Dict(), comp_rational(expr, 1)
     else
         expr = isequal(expr, true) ? 1 : expr
         subs = Dict{Any, Any}()
 
         expr = sub(subs, expr)
-        return subs, expr 
+        return subs, expr
     end
 end
 
@@ -133,7 +133,7 @@ function _filter_poly(expr, var)
         i_var = (@variables $i_var)[1]
 
         subs[i_var] = im
-        expr = unwrap(expr1 + i_var*expr2)
+        expr = unwrap(expr1 + i_var * expr2)
 
         args = arguments(expr)
         oper = operation(expr)
@@ -148,7 +148,7 @@ function _filter_poly(expr, var)
         if isequal(vars, [])
             if arg isa Integer
                 continue
-            elseif arg isa Rational || arg isa AbstractFloat || arg isa Complex 
+            elseif arg isa Rational || arg isa AbstractFloat || arg isa Complex
                 args[i] = comp_rational(arg, 1)
                 continue
             end
@@ -162,11 +162,12 @@ function _filter_poly(expr, var)
                 continue
             end
         end
-        
+
         oper = operation(arg)
         monomial = arguments(arg)
         if oper === (^)
-            if any(arg -> isequal(arg, var), monomial) continue
+            if any(arg -> isequal(arg, var), monomial)
+                continue
             end
             # filter(args[1]), filter[args[2]] and then merge
             subs1, monomial[1] = _filter_poly(monomial[1], var)
@@ -181,7 +182,8 @@ function _filter_poly(expr, var)
             for (j, x) in enumerate(monomial)
                 type_x = typeof(x)
                 vars = get_variables(x)
-                if (!isequal(vars, []) && isequal(vars[1], x))  || isequal(type_x, Int64) || isequal(type_x, Rational{Int64})
+                if (!isequal(vars, []) && isequal(vars[1], x)) || isequal(type_x, Int64) ||
+                   isequal(type_x, Rational{Int64})
                     continue
                 end
                 # filter each arg and then merge
@@ -206,7 +208,6 @@ function _filter_poly(expr, var)
     expr = term(oper, args...)
     return subs, expr
 end
-
 
 """
     filter_poly(og_expr, var)
@@ -255,7 +256,6 @@ function filter_poly(og_expr, var)
     return subs, new_expr
 end
 
-
 """
     sdegree(coeffs, var)
 Gets the degree of a polynomial by traversing the `coeffs`
@@ -288,13 +288,13 @@ function sdegree(coeffs, var)
         isequal(n, 1) && continue
         isequal(n, var) && degree > 1 && continue
 
-        if isequal(n, var) && degree < 1 
+        if isequal(n, var) && degree < 1
             degree = 1
             continue
         end
 
         args = arguments(n)
-        if args[2] > degree 
+        if args[2] > degree
             degree = args[2]
         end
     end
