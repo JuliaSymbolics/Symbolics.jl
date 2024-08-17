@@ -11,8 +11,14 @@ function isolate(lhs, var; warns=true, conditions=[])
 
         if check_poly_inunivar(poly, var)
             roots = []
-            for i in eachindex(rhs)
-                append!(roots, solve_univar(wrap(lhs - rhs[i]), var))
+            new_var = gensym()
+            new_var = (@variables $new_var)[1]
+            lhs_roots = solve_univar(lhs - new_var, var)
+
+            for i in eachindex(lhs_roots)
+                for j in eachindex(rhs)
+                    push!(roots, substitute(lhs_roots[i], Dict(new_var=>rhs[j]), fold=false))
+                end
             end
             return roots, conditions
         end
