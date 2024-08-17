@@ -110,16 +110,25 @@ function attract_logs(lhs, var)
     contains_var(arg) = n_occurrences(arg, var) > 0
 
     r_addlogs = Vector{Any}()
+    r_conditionx = Vector{Any}()
+    r_conditiony = Vector{Any}()
     #! format: off
     push!(r_addlogs, @acrule log(~x::(contains_var)) + log(~y::(contains_var)) => slog(~x * ~y))
     push!(r_addlogs, @acrule ~z*log(~x::(contains_var)) + log(~y::(contains_var)) => slog((~x)^(~z) * ~y))
     push!(r_addlogs, @acrule ~z*log(~x::(contains_var)) + ~h*log(~y::(contains_var)) => slog((~x)^(~z) * (~y)^(~h)))
+
+    push!(r_conditionx, @acrule log(~x::(contains_var)) + log(~y::(contains_var)) => ~x)
+    push!(r_conditionx, @acrule ~z*log(~x::(contains_var)) + log(~y::(contains_var)) => ~x)
+    push!(r_conditionx, @acrule ~z*log(~x::(contains_var)) + ~h*log(~y::(contains_var)) => ~x)
+    push!(r_conditiony, @acrule log(~x::(contains_var)) + log(~y::(contains_var)) => ~y)
+    push!(r_conditiony, @acrule ~z*log(~x::(contains_var)) + log(~y::(contains_var)) => ~y)
+    push!(r_conditiony, @acrule ~z*log(~x::(contains_var)) + ~h*log(~y::(contains_var)) => ~y)
     #! format: on
+    condition_x = expand(simplify(lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_conditionx))))
+    condition_y = expand(simplify(lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_conditiony))))
+    lhs = expand(simplify(lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addlogs))))
 
-    lhs = expand(simplify(
-        lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addlogs))))
-
-    return lhs
+    return lhs, [condition_x, condition_y]
 end
 
 """

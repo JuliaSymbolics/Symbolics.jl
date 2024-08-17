@@ -1,6 +1,6 @@
 using Symbolics
 
-function isolate(lhs, var; warns = true)
+function isolate(lhs, var; warns=true, conditions=[])
     rhs = Vector{Any}([0])
     original_lhs = deepcopy(lhs)
     lhs = unwrap(lhs)
@@ -14,12 +14,12 @@ function isolate(lhs, var; warns = true)
             for i in eachindex(rhs)
                 append!(roots, solve_univar(wrap(lhs - rhs[i]), var))
             end
-            return roots
+            return roots, conditions
         end
 
         isequal(old_lhs, lhs) && (warns &&
          (@warn("This expression cannot be solved with the methods available to ia_solve. Try \
-a numerical method instead.");
+        a numerical method instead.");
         return nothing) || return nothing)
 
         old_lhs = deepcopy(lhs)
@@ -88,14 +88,17 @@ a numerical method instead.");
         elseif oper === (log) || oper === (slog)
             lhs = args[1]
             rhs = map(sol -> term(^, Base.MathConstants.e, sol), rhs)
+            push!(conditions, args[1])
 
         elseif oper === (log2)
             lhs = args[1]
             rhs = map(sol -> term(^, 2, sol), rhs)
+            push!(conditions, args[1])
 
         elseif oper === (log10)
             lhs = args[1]
             rhs = map(sol -> term(^, 10, sol), rhs)
+            push!(conditions, args[1])
 
         elseif oper === (sqrt)
             lhs = args[1]
@@ -136,50 +139,55 @@ a numerical method instead.");
         lhs = simplify(lhs)
     end
 
-    return rhs
+    return rhs, conditions
 end
 
 function attract(lhs, var; warns = true)
     if n_func_occ(simplify(lhs), var) <= n_func_occ(lhs, var)
         lhs = simplify(lhs)
     end
+    conditions = []
 
     if detect_exponential(lhs, var)
         lhs = attract_exponential(lhs, var)
     end
     if detect_addlogs(lhs, var)
-        lhs = attract_logs(lhs, var)
+        lhs, new_conds = attract_logs(lhs, var)
+        append!(conditions, new_conds)
     end
     lhs = attract_trig(lhs, var)
 
-    n_func_occ(lhs, var) == 1 && return isolate(lhs, var, warns = warns)
+    n_func_occ(lhs, var) == 1 && return isolate(lhs, var, warns = warns, conditions=conditions)
 
     lhs, sub = turn_to_poly(lhs, var)
 
     if (isequal(sub, Dict()) || n_func_occ(lhs, collect(keys(sub))[1]) != 1)
         sqrt_poly = detect_sqrtpoly(lhs, var)
         if sqrt_poly
-            return attract_and_solve_sqrtpoly(lhs, var)
+            return attract_and_solve_sqrtpoly(lhs, var), conditions
         else
             warns &&
-                @warn("This expression cannot be solved with the methods available to ia_solve. Try \
-       a numerical method instead.")
-            return nothing
+            @warn("This expression cannot be solved with the methods available to ia_solve. Try \
+            a numerical method instead.")
+            return nothing, conditions
         end
     end
 
     new_var = collect(keys(sub))[1]
     new_var_val = collect(values(sub))[1]
 
-    roots = isolate(lhs, new_var, warns = warns)
+    roots, new_conds = isolate(lhs, new_var, warns = warns)
+    append!(conditions, new_conds)
     new_roots = []
+
     for root in roots
-        new_sol = isolate(new_var_val - root, var, warns = warns)
+        new_sol, new_conds = isolate(new_var_val - root, var, warns = warns)
+        append!(conditions, new_conds)
         push!(new_roots, new_sol)
     end
     new_roots = collect(Iterators.flatten(new_roots))
 
-    return new_roots
+    return new_roots, conditions
 end
 
 """
@@ -248,21 +256,33 @@ julia> RootFinding.ia_solve(expr, x)
 function ia_solve(lhs, var; warns = true)
     nx = n_func_occ(lhs, var)
     sols = []
+    conditions = []
     if nx == 0
         warns && @warn("Var not present in given expression")
         return []
     elseif nx == 1
-        sols = isolate(lhs, var, warns = warns)
+        sols, conditions = isolate(lhs, var, warns = warns)
     elseif nx > 1
-        sols = attract(lhs, var, warns = warns)
+        sols, conditions = attract(lhs, var, warns = warns)
     end
 
+    isequal(sols, nothing) && return nothing
+
+    
     filtered_sols = []
     for i in eachindex(sols)
-        lhs_val = substitute(lhs, Dict(var=>complex(eval(toexpr(sols[i])))))
-        if isapprox(lhs_val, 0, atol=1e-16)
+        if length(get_variables(sols[i])) > 0
             push!(filtered_sols, sols[i])
+            continue
         end
+        domain_error = false
+        for j in eachindex(conditions)
+            cond_val = substitute(conditions[j], Dict(var=>eval(toexpr(sols[i])))) 
+            cond_val isa Complex && continue
+            domain_error |= cond_val <= 0
+        end
+        !domain_error && push!(filtered_sols, sols[i])
     end
+
     return filtered_sols
 end

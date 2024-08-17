@@ -340,6 +340,9 @@ end
     @test all(isapprox.(lhs, rhs, atol=1e-6))
     @test all(isapprox.(lhs_solve, rhs, atol=1e-6))
 
+    expr = log(x+1) + log(x-1)
+    @test isequal(eval(Symbolics.toexpr(symbolic_solve(expr, x)[1]), sqrt(2))
+
     expr = 2^(x+1) + 5^(x+3)
     lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
     lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
