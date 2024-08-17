@@ -82,7 +82,8 @@ function check_expr_validity(expr)
         valid_type = true
     end
     iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
-    @assert valid_type "Invalid input"
+    @assert valid_type "Invalid input" 
+    valid_type && return nothing
     @assert isequal(expr, 0) "Invalid input"
 end
 function check_x(x)
@@ -98,7 +99,7 @@ function check_poly_inunivar(poly, var)
 end
 
 # converts everything to BIG
-function f_numbers(n)
+function bigify(n)
     n = unwrap(n)
     if n isa ComplexTerm || n isa Float64 || n isa Irrational
         return n
@@ -108,7 +109,7 @@ function f_numbers(n)
         !iscall(n) && return n
         args = arguments(n)
         for i in eachindex(args)
-            args[i] = f_numbers(args[i])
+            args[i] = bigify(args[i])
         end
         return n
     end
@@ -119,8 +120,8 @@ function f_numbers(n)
     end
 
     if n isa Complex
-        real_part = f_numbers(n.re)
-        im_part = f_numbers(n.im)
+        real_part = bigify(n.re)
+        im_part = bigify(n.im)
         return real_part + im_part * im
     end
 
@@ -133,7 +134,7 @@ function f_numbers(n)
 end
 
 function comp_rational(x, y)
-    x, y = wrap(f_numbers(x)), wrap(f_numbers(y))
+    x, y = wrap(bigify(x)), wrap(bigify(y))
     if !(unwrap(x) isa AbstractFloat || x isa Complex) &&
        !(unwrap(y) isa AbstractFloat || y isa Complex)
         r = x // y

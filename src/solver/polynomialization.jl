@@ -115,7 +115,7 @@ function trav_pow(args, index, var, broken, sub)
     # case 2: int^f(x)
     # n_func_occ may not be strictly 1, we could attempt attracting it after solving
     if base isa Integer && n_func_occ(power, var) == 1
-        factors = prime_factors(base)
+        factors = collect(Primes.factor(base))
         length(factors) != 1 && return false
         b, p = factors[1]
         new_b = b^power
@@ -256,7 +256,7 @@ function contains_transcendental(arg, var, n_occ = 1)
     !iscall(arg) && return false
     arg_oper = operation(arg)
 
-    friends = [sin, log, log2, log10, cos, tan, asin, acos, atan, exp]
+    friends = append!(monadic_nonlinear, [slog, ssqrt, scbrt])
     if any(isequal(arg_oper, oper) for oper in friends) && n_func_occ(arg, var) == n_occ
         return true
     end

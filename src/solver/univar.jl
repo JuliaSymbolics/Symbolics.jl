@@ -4,8 +4,8 @@ function get_roots_deg1(expression, x)
 
     @assert isequal(sdegree(coeffs, x), 1) "Expected a polynomial of degree 1 in $x, got $expression"
 
-    m = f_numbers(get(coeffs, x, 0))
-    c = f_numbers(get(coeffs, x^0, 0))
+    m = get(coeffs, x, 0)
+    c = get(coeffs, x^0, 0)
 
     root = -c // m
     root = unwrap(ssubs(root, subs))
@@ -13,7 +13,7 @@ function get_roots_deg1(expression, x)
 end
 
 function get_deg2_with_coeffs(a, b, c)
-    a, b, c = f_numbers(a), f_numbers(b), f_numbers(c)
+    a, b, c = bigify(a), bigify(b), bigify(c)
 
     root1 = (-b + term(ssqrt, (b^2 - 4(a * c)))) // 2a
     root2 = (-b - term(ssqrt, (b^2 - 4(a * c)))) // 2a
@@ -28,7 +28,7 @@ function get_roots_deg2(expression, x)
 
     @assert isequal(sdegree(coeffs, x), 2) "Expected a polynomial of degree 2 in $x, got $expression"
 
-    results = (f_numbers(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 2:-1:0)
+    results = (unwrap(ssubs(get(coeffs, x^i, 0), subs)) for i in 2:-1:0)
     a, b, c = results
 
     root1 = (-b + term(ssqrt, (b^2 - 4(a * c)))) // 2a
@@ -43,7 +43,7 @@ function get_roots_deg3(expression, x)
 
     @assert isequal(sdegree(coeffs, x), 3) "Expected a polynomial of degree 3 in $x, got $expression"
 
-    results = (f_numbers(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 3:-1:0)
+    results = (unwrap(ssubs(get(coeffs, x^i, 0), subs)) for i in 3:-1:0)
     a, b, c, d = results
 
     Q = (((3 * a * c) - b^2)) // (9a^2)
@@ -65,7 +65,7 @@ function get_roots_deg4(expression, x)
 
     @assert isequal(sdegree(coeffs, x), 4) "Expected a polynomial of degree 4 in $x, got $expression"
 
-    results = (f_numbers(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 4:-1:0)
+    results = (unwrap(ssubs(get(coeffs, x^i, 0), subs)) for i in 4:-1:0)
     a, b, c, d, e = results
 
     p = (8(a * c) - 3(b^2)) // (8(a^2))
