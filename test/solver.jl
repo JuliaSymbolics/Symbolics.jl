@@ -262,6 +262,10 @@ end
     @test isnothing(symbolic_solve([x*y - 1, sin(x)], [x, y]))
 
     @test isnothing(symbolic_solve([x*y - a, sin(x)], [x, y]))
+
+    @variables t w u v
+    sol = symbolic_solve([t*w - 1 ~ 4, u + v + w ~ 1], [t,w,u,v])
+    @test isequal(sol, [Dict(u => u, t => -5 / (-1 + u + v), v => v, w => 1 - u - v)])
 end
 
 @testset "Factorisation" begin
