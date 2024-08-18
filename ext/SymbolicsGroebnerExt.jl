@@ -168,8 +168,7 @@ function demote(gb, vars::Vector{Num}, params::Vector{Num})
     final_result
 end
 
-function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, warns=true)
-    
+function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, warns=true)
     # Reference: Rouillier, F. Solving Zero-Dimensional Systems
     # Through the Rational Univariate Representation.
     # AAECC 9, 433–461 (1999). https://doi.org/10.1007/s002000050114
@@ -182,7 +181,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     # Use a new variable to separate the input polynomials (Reference above)
     new_var = gen_separating_var(vars)
     old_len = length(vars)
-    push!(vars, new_var)
+    vars = vcat(vars, new_var)
 
     new_eqs = []
     generating = true
@@ -272,12 +271,41 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         end
     end
 
-    pop!(vars)
+    vars = vars[1:end-1]
     for roots in solutions
         delete!(roots, new_var)
     end
 
     return solutions
+end
+
+function transendence_basis(sys, vars)
+    J = Symbolics.jacobian(sys, vars)
+    x0 = Dict(v => rand(-10:10) for v in vars)
+    J_x0 = substitute(J, x0)
+    rk, rref = Nemo.rref(Nemo.matrix(Nemo.QQ, J_x0))
+    pivots = Int[]
+    for i in 1:length(sys)
+        col = findfirst(!iszero, rref[i, :])
+        !isnothing(col) && push!(pivots, col)
+    end
+    vars[setdiff(collect(1:length(vars)), pivots)]
+end
+
+function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, warns=true)
+    sol = solve_zerodim(eqs, vars; dropmultiplicity=dropmultiplicity, warns=warns)
+    !isnothing(sol) && return sol
+    tr_basis = transendence_basis(eqs, vars)
+    @info "" tr_basis
+    isempty(tr_basis) && return nothing
+    vars_gen = setdiff(vars, tr_basis)
+    sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
+    for roots in sol
+        for x in tr_basis
+            roots[x] = x
+        end
+    end
+    sol
 end
 
 end # module
