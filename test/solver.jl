@@ -253,6 +253,7 @@ end
 end
 
 @testset "Multivar parametric" begin
+    @variables x y a
     @test isequal(symbolic_solve([x + a, a - 1], x), [])
     @test isequal(symbolic_solve([x - a, y + a], [x, y]), [Dict(y => -a, x => a)])
     @test isequal(symbolic_solve([x*y - a, x*y + x], [x, y]), [Dict(y => -1, x => -a)])
