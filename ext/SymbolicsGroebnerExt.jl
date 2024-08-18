@@ -245,7 +245,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     @assert length(new_eqs) == length(vars)
     @assert isequal(setdiff(Symbolics.get_variables(new_eqs[1]), params), [new_var])
     minpoly_sols = Symbolics.symbolic_solve(Symbolics.wrap(new_eqs[1]), new_var, dropmultiplicity=dropmultiplicity)
-    solutions = [Dict{Num, Any}(var => sol) for sol in new_sols]
+    solutions = [Dict{Num, Any}(new_var => sol) for sol in minpoly_sols]
 
     new_eqs = new_eqs[2:end]
 
