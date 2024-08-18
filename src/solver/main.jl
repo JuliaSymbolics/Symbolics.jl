@@ -157,7 +157,8 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             isequal(sols, nothing) && return nothing
         end
 
-        sols = map(sol -> sol isa RootsOf ? sol : postprocess_root(sol), sols)
+        # sols = map(sol -> sol isa RootsOf ? sol : postprocess_root(sol), sols)
+        sols = map(postprocess_root, sols)
         return sols
     end
 

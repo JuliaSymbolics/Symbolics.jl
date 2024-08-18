@@ -100,10 +100,10 @@ end
 
 function gen_separating_var(vars)
     n = 1
-    new_var = (Symbolics.@variables HAT)[1]
+    new_var = (Symbolics.@variables _T)[1]
     present = any(isequal(new_var, var) for var in vars)
     while present
-        new_var = Symbolics.variables(repeat("_", n) * "HAT")[1]
+        new_var = Symbolics.variables(repeat("_", n) * "_T")[1]
         present = any(isequal(new_var, var) for var in vars)
         n += 1
     end
@@ -112,6 +112,7 @@ end
 
 # Given a GB in k[params][vars] produces a GB in k(params)[vars]
 function demote(gb, vars::Vector{Num}, params::Vector{Num})
+    isequal(gb, [1]) && return gb 
     gb = Symbolics.wrap.(SymbolicUtils.toterm.(gb))
     Symbolics.check_polynomial.(gb)
 
@@ -173,6 +174,8 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     # Through the Rational Univariate Representation.
     # AAECC 9, 433–461 (1999). https://doi.org/10.1007/s002000050114
     
+    rng = Groebner.Random.Xoshiro(42)
+
     all_indeterminates = reduce(union, map(Symbolics.get_variables, eqs))
     params = map(Symbolics.Num ∘ Symbolics.wrap, setdiff(all_indeterminates, vars))
 
@@ -184,19 +187,20 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     new_eqs = []
     generating = true
     n_iterations = 1
+    separating_form = new_var
 
     while generating
         new_eqs = copy(eqs)
-        eq = new_var
+        separating_form = new_var
         for i = 1:(old_len)
-            eq += BigInt(rand(-n_iterations:n_iterations))*vars[i]
+            separating_form += BigInt(rand(rng, -n_iterations:n_iterations))*vars[i]
         end
 
-        if isequal(eq, new_var)
+        if isequal(separating_form, new_var)
             continue
         end
 
-        push!(new_eqs, eq)
+        push!(new_eqs, separating_form)
 
         new_eqs = Symbolics.groebner_basis(new_eqs, ordering=Lex(vcat(vars, params)))
         new_eqs = demote(new_eqs, vars, params)
@@ -263,7 +267,8 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
             subbded_eq = Symbolics.substitute(subbded_eq, Dict([var_tosolve => 0]); fold=false)
             new_var_sols = [-subbded_eq]
             @assert length(new_var_sols) == 1
-            roots[var_tosolve] = new_var_sols[1]
+            root = new_var_sols[1]
+            roots[var_tosolve] = root
         end
     end
 

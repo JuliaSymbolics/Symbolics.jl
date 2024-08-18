@@ -109,4 +109,5 @@ function postprocess_root(x)
         end
         isequal(typeof(old_x), typeof(x)) && isequal(old_x, x) && return x
     end
+    x # unreachable
 end

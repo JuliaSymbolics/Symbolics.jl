@@ -67,12 +67,8 @@ function slog(n)
     return term(slog, n)
 end
 
-struct RootsOf
-    poly::Num
-    var::Num
-end
+const RootsOf = (SymbolicUtils.@syms roots_of(poly,var))[1]
 
-Base.show(io::IO, r::RootsOf) = print(io, "roots_of(", r.poly, ", ", r.var, ")")
 Base.show(io::IO, f::typeof(ssqrt)) = print(io, "√")
 Base.show(io::IO, r::typeof(scbrt)) = print(io, "∛")
 Base.show(io::IO, r::typeof(slog)) = print(io, "slog")
