@@ -103,6 +103,7 @@ include("register.jl")
 export @variables, Variable
 include("variable.jl")
 
+function slog end; function ssqrt end; function scbrt end
 include("linearity.jl")
 
 using DiffRules, SpecialFunctions, NaNMath

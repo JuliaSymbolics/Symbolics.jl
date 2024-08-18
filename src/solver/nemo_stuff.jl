@@ -18,7 +18,3 @@ end
 function gcd_use_nemo(poly1::Any, poly2::Any)
     throw("Nemo is required. Execute `using Nemo` to enable this functionality.")
 end
-
-function demote(gb, vars::Any, params::Any)
-    throw("Nemo is required. Execute `using Nemo` to enable this functionality.")
-end

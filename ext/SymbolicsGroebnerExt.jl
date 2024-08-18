@@ -1,6 +1,7 @@
 module SymbolicsGroebnerExt
 
 using Groebner
+const Nemo = Groebner.Nemo
 
 if isdefined(Base, :get_extension)
     using Symbolics
@@ -70,14 +71,134 @@ function Symbolics.is_groebner_basis(polynomials::Vector{Num}; kwargs...)
     Groebner.isgroebner(polynoms; kwargs...)
 end
 
+### Solver ###
+
+# Map each variable of the given poly.
+# Can be used to transform Nemo polynomial to expression.
+function nemo_crude_evaluate(poly::Nemo.MPolyRingElem, varmap)
+    new_poly = 0
+    for (i, term) in enumerate(Nemo.terms(poly))
+        new_term = nemo_crude_evaluate(Nemo.coeff(poly, i), varmap)
+        for var in Nemo.vars(term)
+            exp = Nemo.degree(term, var)
+            exp == 0 && continue
+            new_var = varmap[var]
+            new_term *= new_var^exp
+        end
+        new_poly += new_term
+    end
+    new_poly
+end
+
+function nemo_crude_evaluate(poly::Nemo.FracElem, varmap)
+    nemo_crude_evaluate(numerator(poly), varmap) // nemo_crude_evaluate(denominator(poly), varmap)
+end
+
+function nemo_crude_evaluate(poly::Nemo.ZZRingElem, varmap)
+    BigInt(poly)
+end
+
+function add_sol!(solutions, new_sols, var, index)
+    sol_used = solutions[index]
+    deleteat!(solutions, index)
+    for new_sol in new_sols
+        sol_used[var] = new_sol
+        push!(solutions, Symbolics.unwrap(copy(Symbolics.wrap(sol_used))))
+    end
+    return solutions
+end
+
+function add_sol_to_all(solutions, new_sols, var)
+    new_solutions = []
+    for new_sol in new_sols
+        sol_to_add = deepcopy(solutions)
+        for i in eachindex(sol_to_add)
+            sol_to_add[i][var] = new_sol
+        end
+        append!(new_solutions, sol_to_add)
+    end
+    return new_solutions
+end
+
+function gen_separating_var(vars)
+    n = 1
+    new_var = (Symbolics.@variables HAT)[1]
+    present = any(isequal(new_var, var) for var in vars)
+    while present
+        new_var = Symbolics.variables(repeat("_", n) * "HAT")[1]
+        present = any(isequal(new_var, var) for var in vars)
+        n += 1
+    end
+    return new_var
+end
+
+# Given a GB in k[params][vars] produces a GB in k(params)[vars]
+function demote(gb, vars::Vector{Num}, params::Vector{Num})
+    gb = Symbolics.wrap.(SymbolicUtils.toterm.(gb))
+    Symbolics.check_polynomial.(gb)
+
+    all_vars = [vars..., params...]
+    nemo_ring, nemo_all_vars = Nemo.polynomial_ring(Nemo.QQ, map(string, all_vars))
+
+    sym_to_nemo = Dict(all_vars .=> nemo_all_vars)
+    nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
+    nemo_gb = Symbolics.substitute(gb, sym_to_nemo)
+    nemo_gb = Symbolics.substitute(nemo_gb, sym_to_nemo)
+
+    nemo_vars = [v for (k, v) in sym_to_nemo if any(isequal(k, var) for var in vars)]
+    nemo_params = [v for (k, v) in sym_to_nemo if any(isequal(k, param) for param in params)]
+
+    ring_flat = parent(nemo_vars[1])
+    ring_param, params_demoted = Nemo.polynomial_ring(Nemo.base_ring(ring_flat), map(string, nemo_params))
+    ring_demoted, vars_demoted = Nemo.polynomial_ring(Nemo.fraction_field(ring_param), map(string, nemo_vars), internal_ordering=Nemo.internal_ordering(ring_flat))
+    varmap = Dict((nemo_vars .=> vars_demoted)..., (nemo_params .=> params_demoted)...)
+    gb_demoted = map(f -> nemo_crude_evaluate(f, varmap), nemo_gb)
+    result = empty(gb_demoted)
+    while true
+        gb_demoted = map(f -> Nemo.map_coefficients(c -> c // Nemo.leading_coefficient(f), f), gb_demoted)
+        for i in 1:length(gb_demoted)
+            f = gb_demoted[i]
+            f_nf = Nemo.normal_form(f, result)
+            if !iszero(f_nf)
+                push!(result, f_nf)
+            end
+        end
+        isequal(gb_demoted, result) && break
+        gb_demoted = result
+        result = empty(result)
+    end
+
+    sym_to_nemo = Dict(sym => nem for sym in all_vars for nem in [vars_demoted..., params_demoted...] if isequal(string(sym),string(nem)))
+    nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
+
+    final_result = Num[]
+
+    for i in eachindex(result)
+
+        monoms = collect(Nemo.monomials(result[i]))
+        coeffs = collect(Nemo.coefficients(result[i]))
+
+        poly = 0
+        for j in eachindex(monoms)
+            poly += nemo_crude_evaluate(coeffs[j], nemo_to_sym) * nemo_crude_evaluate(monoms[j], nemo_to_sym)
+        end
+        push!(final_result, poly)
+    end
+        
+    final_result
+end
+
 function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, warns=true)
     
     # Reference: Rouillier, F. Solving Zero-Dimensional Systems
     # Through the Rational Univariate Representation.
     # AAECC 9, 433–461 (1999). https://doi.org/10.1007/s002000050114
     
+    all_indeterminates = reduce(union, map(Symbolics.get_variables, eqs))
+    params = map(Symbolics.wrap, setdiff(all_indeterminates, vars))
+
     # Use a new variable to separate the input polynomials (Reference above)
-    new_var = Symbolics.gen_separating_var(vars)
+    new_var = gen_separating_var(vars)
     old_len = length(vars)
     push!(vars, new_var)
 
@@ -98,13 +219,16 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
 
         push!(new_eqs, eq)
 
-        new_eqs = Symbolics.groebner_basis(new_eqs, ordering=Lex(vars))
+        new_eqs = Symbolics.groebner_basis(new_eqs, ordering=Lex(vcat(vars, params)))
+        if !isempty(params)
+            new_eqs = demote(new_eqs, vars, params)
+        end
 
-        if length(new_eqs) <= length(vars) 
+        if length(new_eqs) <= length(vars)
             generating &= false
         end
 
-        for i  in eachindex(new_eqs)[2:end]
+        for i in eachindex(new_eqs)[2:end]
             generating |= all(Symbolics.degree(var) > 1 for var in Symbolics.get_variables(new_eqs[i]))
         end
 
@@ -114,6 +238,8 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
 
         n_iterations += 1
     end
+
+    @info "" new_eqs
 
     solutions = []
 
@@ -125,12 +251,12 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         warns && (@warn("Infinite number of solutions"); return nothing) || return nothing
     end
 
-    new_eqs = SymbolicUtils.toterm.(new_eqs)
+    new_eqs = map(Symbolics.wrap, new_eqs)
 
     # first, solve any single variable equations
     i = 1
     while !(i > length(new_eqs))
-            present_vars = Symbolics.get_variables(new_eqs[i])
+        present_vars = setdiff(Symbolics.get_variables(new_eqs[i]), params)
         for var in vars
             if size(present_vars, 1) == 1 && isequal(var, present_vars[1])
                 new_sols = Symbolics.solve_univar(Symbolics.wrap(new_eqs[i]), var, dropmultiplicity=dropmultiplicity)
@@ -138,7 +264,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
                 if length(solutions) == 0
                     append!(solutions, [Dict{Num, Any}(var => sol) for sol in new_sols])
                 else
-                    solutions = Symbolics.add_sol_to_all(solutions, new_sols, var)
+                    solutions = add_sol_to_all(solutions, new_sols, var)
                 end
 
                 deleteat!(new_eqs, i)
@@ -149,12 +275,13 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         i = i + 1
     end
 
+    @info "" solutions
 
     # second, iterate over eqs and sub each found solution
     # then add the roots of the remaining unknown variables 
     for eq in new_eqs
         solved = false
-        present_vars = Symbolics.get_variables(eq)
+        present_vars = setdiff(Symbolics.get_variables(eq), params)
         size_of_sub = length(solutions[1])
 
         if size(present_vars, 1) <= (size_of_sub + 1)
@@ -164,9 +291,14 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
                     subbed_eq = Symbolics.substitute(subbed_eq, Dict([var => root]), fold=false)
                 end
 
-                var_tosolve = Symbolics.get_variables(subbed_eq)[1]
-                new_var_sols = Symbolics.solve_univar(subbed_eq, var_tosolve, dropmultiplicity=dropmultiplicity)
-                Symbolics.add_sol!(solutions, new_var_sols, var_tosolve, 1)
+                var_tosolve = setdiff(Symbolics.get_variables(subbed_eq), params)[1]
+                
+                @info "" subbed_eq var_tosolve
+
+                # new_var_sols = Symbolics.solve_univar(subbed_eq, var_tosolve, dropmultiplicity=dropmultiplicity)
+                new_var_sols = [-Symbolics.substitute(subbed_eq, Dict(var_tosolve => 0))]
+
+                add_sol!(solutions, new_var_sols, var_tosolve, 1)
 
                 solved = all(x -> length(x) == size_of_sub+1, solutions)
             end
