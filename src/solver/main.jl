@@ -116,10 +116,10 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 
     if (T == Num || T == SymbolicUtils.BasicSymbolic{Real})
         x_univar = true
-        @assert is_singleton(unwrap(x)) "Expected a variable, got $x"
+        check_x(x)
     else
         for var in x
-            @assert is_singleton(unwrap(var)) "Expected a variable, got $x"
+            check_x(var)
         end
     end
 

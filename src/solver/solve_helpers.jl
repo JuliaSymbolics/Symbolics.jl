@@ -81,9 +81,15 @@ function check_expr_validity(expr)
        type_expr == Complex{Num} || type_expr == ComplexTerm{Real}
         valid_type = true
     end
-    @assert valid_type && return true
+    iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
+    @assert valid_type "Invalid input"
     @assert isequal(expr, 0) "Invalid input"
 end
+function check_x(x)
+    iscall(unwrap(x)) && @assert !hasderiv(unwrap(x)) "Differential equations are not currently supported"
+    @assert is_singleton(unwrap(x)) "Expected a variable, got $x"
+end
+
 
 function check_poly_inunivar(poly, var)
     subs, filtered = filter_poly(poly, var)

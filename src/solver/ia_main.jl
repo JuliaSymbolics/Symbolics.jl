@@ -94,20 +94,21 @@ function isolate(lhs, var; warns=true, conditions=[])
         elseif oper === (log) || oper === (slog)
             lhs = args[1]
             rhs = map(sol -> term(^, Base.MathConstants.e, sol), rhs)
-            push!(conditions, args[1])
+            push!(conditions, (args[1], >))
 
         elseif oper === (log2)
             lhs = args[1]
             rhs = map(sol -> term(^, 2, sol), rhs)
-            push!(conditions, args[1])
+            push!(conditions, (args[1], >))
 
         elseif oper === (log10)
             lhs = args[1]
             rhs = map(sol -> term(^, 10, sol), rhs)
-            push!(conditions, args[1])
+            push!(conditions, (args[1], >))
 
         elseif oper === (sqrt)
             lhs = args[1]
+            append!(conditions, [(r, >=) for r in rhs])
             rhs = map(sol -> term(^, sol, 2), rhs)
 
         elseif oper === (cbrt)
@@ -124,7 +125,7 @@ function isolate(lhs, var; warns=true, conditions=[])
                 sol -> term(rev_oper[oper], sol) +
                        term(*, Base.MathConstants.pi, 2 * new_var),
                 rhs)
-            @info string(new_var) * " ϵ" * " Ζ: e.g. 0, 1, 2..."
+            @info string(new_var) * " ϵ" * " Ζ"
 
         elseif oper === (asin)
             lhs = args[1]
@@ -283,9 +284,10 @@ function ia_solve(lhs, var; warns = true)
         end
         domain_error = false
         for j in eachindex(conditions)
-            cond_val = substitute(conditions[j], Dict(var=>eval(toexpr(sols[i])))) 
+            condition, t = conditions[j]
+            cond_val = substitute(condition, Dict(var=>eval(toexpr(sols[i])))) 
             cond_val isa Complex && continue
-            domain_error |= cond_val <= 0
+            domain_error |= !t(cond_val, 0)
         end
         !domain_error && push!(filtered_sols, sols[i])
     end
