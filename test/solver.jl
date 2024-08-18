@@ -169,6 +169,7 @@ end
 end
 
 @testset "Multivar solver" begin
+    @variables x y z
     @test isequal(symbolic_solve([x^4 - 1, x - 2], [x]), [])
     
     # TODO: test this properly
@@ -218,8 +219,49 @@ end
     Dict(z=>-1+sqrt(2), y=>-1+sqrt(2), x=>-1+sqrt(2)),
     Dict(z=>-1-sqrt(2), y=>-1-sqrt(2), x=>-1-sqrt(2))], [x,y,z])
     @test check_approx(arr_calcd_roots, arr_known_roots)    
+
+    # cyclic 3
+    @variables z1 z2 z3
+    eqs = [z1 + z2 + z3, z1*z2 + z1*z3 + z2*z3, z1*z2*z3 - 1]
+    sol = Symbolics.symbolic_solve(eqs, [z1,z2,z3])
+    backward = [Symbolics.substitute(eqs, s) for s in sol]
+    @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
+
+    @variables x y
+    eqs = [2332//232*x + 2131232*y - 1//343434, x + y + 1]
+    sol = Symbolics.symbolic_solve(eqs, [x,y])
+    backward = [Symbolics.substitute(eqs, s) for s in sol]
+    @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
+
+    # TODO: broken
+    # @variables H1 H2
+    # eqs = [-288421779135875//1125899906842624*H1^2 + 1963378034549373//562949953421312*H1 - 4, -288421779135875//844424930131968*H1*H2 + 1963378034549373//562949953421312*H2 - 4]
+    # symbolic_solve(eqs, [H1, H2])
+
+    @test isnothing(symbolic_solve([x*y - 1, sin(x)], [x, y]))
+
+    @variables x y z
+    boot = 10
+    for i in 1:boot
+        # at most 4 roots by Bézout's theorem
+        rand_eq(xs, d) = rand(-10:10) + rand(-10:10)*x + rand(-10:10)*y + rand(-10:10)*x*y + rand(-10:10)*x^2 + rand(-10:10)*y^2
+        eqs = [rand_eq([x,y],2), rand_eq([x,y],2)]
+        sol = Symbolics.symbolic_solve(eqs, [x,y])
+        backward = [Symbolics.substitute(eqs, s) for s in sol]
+        @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
+    end
 end
 
+@testset "Multivar parametric" begin
+    @test isequal(symbolic_solve([x + a, a - 1], x), [])
+    @test isequal(symbolic_solve([x - a, y + a], [x, y]), [Dict(y => -a, x => a)])
+    @test isequal(symbolic_solve([x*y - a, x*y + x], [x, y]), [Dict(y => -1, x => -a)])
+    @test isequal(symbolic_solve([x*y - a, 1 ~ 3], [x, y]), [])
+
+    @test isnothing(symbolic_solve([x*y - 1, sin(x)], [x, y]))
+
+    @test isnothing(symbolic_solve([x*y - a, sin(x)], [x, y]))
+end
 
 @testset "Factorisation" begin
     f = 10x

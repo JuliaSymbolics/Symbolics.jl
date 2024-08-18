@@ -59,7 +59,8 @@ Symbolics.symbolic_solve(eqs, [x,y,z])
 - [x] Systems of linear and polynomial equations
 - [x] Some transcendental functions
 - [x] Systems of linear equations with parameters (via `symbolic_linear_solve`)
-- [ ] Systems of polynomial equations with parameters
+- [ ] Equations with radicals
+- [ ] Systems of polynomial equations with parameters and positive dimensional systems
 - [ ] Inequalities
 
 # References

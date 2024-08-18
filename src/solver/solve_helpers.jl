@@ -77,14 +77,14 @@ function check_expr_validity(expr)
     type_expr = typeof(expr)
     valid_type = false
 
-    if type_expr == Num || type_expr == SymbolicUtils.BasicSymbolic{Real} ||
+    if type_expr <: Number || type_expr == Num || type_expr == SymbolicUtils.BasicSymbolic{Real} ||
        type_expr == Complex{Num} || type_expr == ComplexTerm{Real}
         valid_type = true
     end
     iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
     @assert valid_type "Invalid input" 
     valid_type && return nothing
-    @assert isequal(expr, 0) "Invalid input"
+    # @assert isequal(expr, 0) "Invalid input"
 end
 function check_x(x)
     iscall(unwrap(x)) && @assert !hasderiv(unwrap(x)) "Differential equations are not currently supported"

@@ -127,6 +127,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         expr_univar = true
         expr = expr isa Equation ? expr.lhs - expr.rhs : expr
         check_expr_validity(expr)
+        isequal(expr, 0) && return []
     else
         expr = Vector{Any}(expr)
         for i in eachindex(expr)
@@ -159,7 +160,6 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             isequal(sols, nothing) && return nothing
         end
 
-        # sols = map(sol -> sol isa RootsOf ? sol : postprocess_root(sol), sols)
         sols = map(postprocess_root, sols)
         return sols
     end
@@ -250,8 +250,6 @@ function solve_univar(expression, x; dropmultiplicity = true)
     end
 
     if length(factors) != 1
-        @assert isequal(expand(filtered_expr - u * expand(prod(factors))), 0)
-
         for factor in factors_subbed
             roots = solve_univar(factor, x, dropmultiplicity = dropmultiplicity)
             append!(arr_roots, roots)

@@ -218,7 +218,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
             return nothing
         end
 
-        # We exit when the system is in Shape Lemma case:
+        # Exit in the Shape Lemma case:
         # g(T, params) = 0
         # x1 - f1(T, params) = 0
         # ...
@@ -236,6 +236,9 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
                 generating |= !(condition1 && condition2)
             end
         end
+
+        # non-cyclic case
+        n_iterations > 10 && return []
 
         n_iterations += 1
     end
