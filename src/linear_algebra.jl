@@ -117,7 +117,6 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
         SymbolicUtils.simplify(simplify_fractions(x))
     end
 end
-
 symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq], var; x...)
 symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq, [var]; x...))
 

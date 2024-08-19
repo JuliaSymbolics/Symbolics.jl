@@ -147,6 +147,7 @@ function _filter_poly(expr, var)
         vars = get_variables(arg)
         if isequal(vars, [])
             if arg isa Integer
+                args[i] = bigify(args[i])
                 continue
             elseif arg isa Rational || arg isa AbstractFloat || arg isa Complex
                 args[i] = comp_rational(arg, 1)
@@ -180,10 +181,14 @@ function _filter_poly(expr, var)
         if oper === (*)
             subs_of_monom = Dict{Any, Any}()
             for (j, x) in enumerate(monomial)
-                type_x = typeof(x)
                 vars = get_variables(x)
-                if (!isequal(vars, []) && isequal(vars[1], x)) || isequal(type_x, Int64) ||
-                   isequal(type_x, Rational{Int64})
+                if (!isempty(vars) && isequal(vars[1], x))
+                    continue
+                elseif x isa Integer
+                    monomial[j] = bigify(monomial[j])
+                    continue
+                elseif x isa Rational || x isa AbstractFloat || x isa Complex
+                    monomial[j] = comp_rational(x, 1)
                     continue
                 end
                 # filter each arg and then merge
@@ -255,6 +260,12 @@ function filter_poly(og_expr, var)
 
     return subs, new_expr
 end
+function filter_poly(og_expr)
+    new_var = gensym()
+    new_var = (@variables $(new_var))[1]
+    return filter_poly(og_expr, new_var)
+end
+
 
 """
     sdegree(coeffs, var)

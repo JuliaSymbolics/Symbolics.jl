@@ -148,21 +148,25 @@ end
     @test all(arr_get_roots .≈ arr_known_roots)
     @test all(arr_solve_roots .≈ arr_known_roots)
 
-    expr = BigInt(386314) - BigInt(412163)*x - BigInt(357800)*(x^2) + BigInt(1029179)*(x^3) - BigInt(111927)*(x^4)
+    expr = 386314 - 412163*x - 357800*(x^2) + 1029179*(x^3) - 111927*(x^4)
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
     arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    r_novar = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr))))
     arr_known_roots = sort_roots(eval.([0.5840484 + 0.4176250im, 0.5840484 - 0.4176250im,
     8.788773679354421, -0.76177906049]))
     @test all(isapprox.(arr_known_roots, arr_get_roots, atol=0.00001))
     @test all(isapprox.(arr_known_roots, arr_solve_roots, atol=0.00001))
+    @test all(isapprox.(arr_known_roots, r_novar, atol=0.00001))
 end
 
 @testset "Complex coeffs univar" begin
     expr = x^4 + sqrt(complex(-2//1))
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    r_novar = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr))))
     arr_known_roots = sort_roots(eval.([-Complex(-1)^(3/8)*2^(1/8), Complex(-1)^(3/8)*2^(1/8), 
         Complex(-1)^(7/8)*2^(1/8), -Complex(-1)^(7/8)*2^(1/8)]))
     @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(r_novar .≈ arr_known_roots)
 
     # standby
     # expr = x^3 + sqrt(complex(-2//1))*x + 2
@@ -177,9 +181,11 @@ end
 
     eqs = [x*y + 2x^2, y^2 -1]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
+    r_novar = sort_arr(symbolic_solve(eqs), [x,y])
     arr_known_roots = sort_arr([Dict(x=>-1//2, y=>1), Dict(x=>0, y=>-1), Dict(x=>0, y=>1), Dict(x=>1//2, y=>-1)], [x,y])
     arr_known_roots = sort_arr(arr_known_roots, [x,y])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
+    @test check_equal(r_novar, arr_known_roots)   
 
     eqs = [x-y-z, x+y-z^2, x^2 + y^2 - 1]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z]), [x,y,z])
@@ -190,8 +196,10 @@ end
 
     eqs = [x^2, y, z]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z], dropmultiplicity=false), [x,y,z])
+    r_novar = sort_arr(symbolic_solve(eqs, dropmultiplicity=false), [x,y,z])
     arr_known_roots = sort_arr([Dict(x=>0, y=>0, z=>0), Dict(x=>0, y=>0, z=>0)], [x,y,z])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
+    @test check_equal(r_novar, arr_known_roots)   
 
     eqs = [y^2 - 1, x]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])

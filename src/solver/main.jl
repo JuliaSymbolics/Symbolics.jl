@@ -121,6 +121,10 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         for var in x
             check_x(var)
         end
+        if length(x) == 1
+            x = x[1]
+            x_univar = true
+        end
     end
 
     if !(expr isa Vector)
@@ -184,6 +188,25 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 
         return sols
     end
+end
+
+function symbolic_solve(expr; x...)
+    r = filter_poly.(expr)
+    subs, filtered = r isa Tuple ? r : (map(t -> t[1], r), map(t -> t[2], r))
+
+    sub_vars = []
+    if !isempty(subs)
+        sub_vars = reduce(vcat, subs isa Dict ? collect(keys(subs)) : collect.(keys.(subs)))
+    end
+
+    vars_list = get_variables.(filtered)
+    filt_vars = unique(isa(vars_list, AbstractArray) && all(isa.(vars_list, AbstractArray)) ? reduce(vcat, vars_list) : vars_list)
+
+    vars = isempty(sub_vars) ? filt_vars : setdiff(filt_vars, sub_vars)
+    vars = wrap.(vars)
+    @assert all(v isa Num for v in vars) "All variables should be Nums or BasicSymbolics"
+
+    return symbolic_solve(expr, vars; x...)
 end
 
 """
