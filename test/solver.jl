@@ -307,7 +307,7 @@ end
 
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 0) ) == 1
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 0) ) == 1
-    @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.pi, 0) ) == Base.MathConstants.pi
+    @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.pi, 1) ) == Base.MathConstants.pi
     @test isequal(Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 1) ), __x)
 
     x = Symbolics.term(sqrt, 2)
