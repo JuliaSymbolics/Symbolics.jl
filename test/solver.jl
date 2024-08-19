@@ -300,10 +300,6 @@ end
     @test postprocess_root(__symsqrt(4)) == 2
     @test isequal(postprocess_root(__symsqrt(__x)^2), __x)
 
-    # Symbolics.term Makes this fail
-    # @test postprocess_root(__symsqrt(__symsqrt(0)) - 11) == -11
-    # @test postprocess_root(3*__symsqrt(2)^2) == 6
-
     @test !_is_const_number(__x) && !_is_const_number(sqrt(__x))
     @test _is_const_number(1) && _is_const_number(2 // 3) && _is_const_number(3 + 4im)
     @test _is_const_number(SymbolicUtils.term(sqrt, 2) + 21)
@@ -311,13 +307,12 @@ end
 
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 0) ) == 1
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 0) ) == 1
+    @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.pi, 0) ) == Base.MathConstants.pi
     @test isequal(Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 1) ), __x)
-    # @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 1) ) == Base.MathConstants.e
 
     x = Symbolics.term(sqrt, 2)
     @test isequal(Symbolics.postprocess_root( expand((x + 1)^4) ), 17 + 12x)
     @test isequal(Symbolics.postprocess_root( x^5 ), 4 * x)
-
 end
 
 
