@@ -41,6 +41,7 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 TermInterface = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
 
 [weakdeps]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
 LuxCore = "bb33d45b-7691-41d6-9220-0943567d0623"
 PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
