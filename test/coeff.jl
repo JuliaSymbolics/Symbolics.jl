@@ -50,3 +50,7 @@ e = x*y^2 + 2x + y^3*x^3
 @test isequal(coeff(x^2 + 1, x^0), 1)
 @test isequal(coeff(e, x^0), 0)
 @test isequal(coeff(a*x + 3, x^0), 3)
+
+@test isequal(coeff(x / 5, x), 1//5)
+@test isequal(coeff(x / y, x), 1/y)
+@test isequal(coeff(x * 5y / (1 + y + z) , x), 5y / (1 + y + z))
