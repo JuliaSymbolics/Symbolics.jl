@@ -296,7 +296,6 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     sol = solve_zerodim(eqs, vars; dropmultiplicity=dropmultiplicity, warns=warns)
     !isnothing(sol) && return sol
     tr_basis = transendence_basis(eqs, vars)
-    @info "" tr_basis
     isempty(tr_basis) && return nothing
     vars_gen = setdiff(vars, tr_basis)
     sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
