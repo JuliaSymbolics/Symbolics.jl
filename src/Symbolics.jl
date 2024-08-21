@@ -15,6 +15,8 @@ using DocStringExtensions, Markdown
 
 using LinearAlgebra
 
+using Primes
+
 using Reexport
 
 using DomainSets
@@ -101,6 +103,7 @@ include("register.jl")
 export @variables, Variable
 include("variable.jl")
 
+function slog end; function ssqrt end; function scbrt end
 include("linearity.jl")
 
 using DiffRules, SpecialFunctions, NaNMath
@@ -131,6 +134,7 @@ using LogExpFunctions
 include("logexpfunctions-lib.jl")
 
 include("linear_algebra.jl")
+export symbolic_linear_solve, solve_for
 
 include("groebner_basis.jl")
 export groebner_basis, is_groebner_basis
@@ -151,10 +155,6 @@ include("plot_recipes.jl")
 
 include("semipoly.jl")
 
-include("solver.jl")
-export solve_single_eq
-export solve_system_eq
-export lambertw
 
 include("parsing.jl")
 export parse_expr_to_symbolic
@@ -196,6 +196,19 @@ end
 for sType in [Pair, Vector, Dict]
     @eval substitute(expr::Arr, s::$sType; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
 end
+
+# Symbolic solver
+include("solver/preprocess.jl")
+include("solver/nemo_stuff.jl")
+include("solver/solve_helpers.jl")
+include("solver/postprocess.jl")
+include("solver/univar.jl")
+include("solver/ia_helpers.jl")
+include("solver/polynomialization.jl")
+include("solver/attract.jl")
+include("solver/ia_main.jl")
+include("solver/main.jl")
+export symbolic_solve
 
 function symbolics_to_sympy end
 export symbolics_to_sympy
