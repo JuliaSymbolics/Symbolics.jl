@@ -1,10 +1,61 @@
-module SymbolicsForwardDiffExt
+module SymbolicsPreallocationToolsForwardDiffExt
+
+using Symbolics
+
+# PreallocationTools
+
+using PreallocationTools
+import PreallocationTools: _restructure, get_tmp
+using ForwardDiff
+
+function get_tmp(dc::DiffCache, u::Type{X}) where {T,N, X<: ForwardDiff.Dual{T, Num, N}}
+    if length(dc.du) > length(dc.any_du)
+        resize!(dc.any_du, length(dc.du))
+    end
+    _restructure(dc.du, dc.any_du)
+end
+
+function get_tmp(dc::DiffCache, u::X) where {T,N, X<: ForwardDiff.Dual{T, Num, N}}
+    if length(dc.du) > length(dc.any_du)
+        resize!(dc.any_du, length(dc.du))
+    end
+    _restructure(dc.du, dc.any_du)
+end
+
+function get_tmp(dc::DiffCache, u::AbstractArray{X}) where {T,N, X<: ForwardDiff.Dual{T, Num, N}}
+    if length(dc.du) > length(dc.any_du)
+        resize!(dc.any_du, length(dc.du))
+    end
+    _restructure(dc.du, dc.any_du)
+end
+
+function get_tmp(dc::FixedSizeDiffCache, u::Type{X}) where {T,N, X<: ForwardDiff.Dual{T, Num, N}}
+    if length(dc.du) > length(dc.any_du)
+        resize!(dc.any_du, length(dc.du))
+    end
+    _restructure(dc.du, dc.any_du)
+end
+
+function get_tmp(dc::FixedSizeDiffCache, u::X) where {T,N, X<: ForwardDiff.Dual{T, Num, N}}
+    if length(dc.du) > length(dc.any_du)
+        resize!(dc.any_du, length(dc.du))
+    end
+    _restructure(dc.du, dc.any_du)
+end
+
+function get_tmp(dc::FixedSizeDiffCache, u::AbstractArray{X}) where {T,N, X<: ForwardDiff.Dual{T, Num, N}}
+    if length(dc.du) > length(dc.any_du)
+        resize!(dc.any_du, length(dc.du))
+    end
+    _restructure(dc.du, dc.any_du)
+end
+
+# ForwardDiff
 
 using ForwardDiff
 using ForwardDiff.NaNMath
 using ForwardDiff.DiffRules
 using ForwardDiff: value, Dual, partials
-using Symbolics
 
 # The method generation in this file have been adapted from
 # https://github.com/JuliaDiff/ForwardDiff.jl/blob/v0.10.36/src/dual.jl

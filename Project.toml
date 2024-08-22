@@ -50,11 +50,10 @@ PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 
 [extensions]
-SymbolicsForwardDiffExt = "ForwardDiff"
 SymbolicsGroebnerExt = "Groebner"
 SymbolicsLuxCoreExt = "LuxCore"
 SymbolicsNemoExt = "Nemo"
-SymbolicsPreallocationToolsExt = ["PreallocationTools", "ForwardDiff"]
+SymbolicsPreallocationToolsForwardDiffExt = ["PreallocationTools", "ForwardDiff"]
 SymbolicsSymPyExt = "SymPy"
 
 [compat]
