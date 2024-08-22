@@ -343,7 +343,12 @@ function coeff(p, sym=nothing)
             @views prod(Iterators.flatten((coeffs[findall(!iszero, coeffs)], args[findall(iszero, coeffs)])))
         end
     elseif isdiv(p)
-        throw(DomainError(p, "coeff on expressions with division is not yet implemented."))
+        numerator, denominator = arguments(p)
+        if !occursin(sym, denominator)
+            coeff(numerator, sym) / denominator
+        else
+            throw(DomainError(p, "coeff on fractions is not yet implemented."))
+        end
     else
         p isa Number && return sym === nothing ? p : 0
         p isa Symbolic && return coeff(p, sym)
