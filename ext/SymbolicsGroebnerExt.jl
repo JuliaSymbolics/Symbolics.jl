@@ -187,6 +187,7 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
     generating = true
     n_iterations = 1
     separating_form = new_var
+    eqs = Symbolics.wrap.(eqs)
 
     while generating
         new_eqs = copy(eqs)
