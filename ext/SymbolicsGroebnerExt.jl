@@ -2,6 +2,7 @@ module SymbolicsGroebnerExt
 
 using Groebner
 const Nemo = Groebner.Nemo
+import PrecompileTools
 
 if isdefined(Base, :get_extension)
     using Symbolics
@@ -305,6 +306,22 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         end
     end
     sol
+end
+
+PrecompileTools.@setup_workload begin
+    @variables a b c x y z
+    equation1 = a*log(x)^b + c ~ 0
+    equation_actually_polynomial = sin(x^2 +1)^2 + sin(x^2 + 1) + 3
+    simple_linear_equations = [x - y, y + 2z]
+    expr_with_params = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
+    equations_intersect_sphere_line = [x^2 + y^2 + z^2 - 9, x - 2y + 3, y - z]
+    PrecompileTools.@compile_workload begin
+        symbolic_solve(equation1, x)
+        symbolic_solve(equation_actually_polynomial)
+        symbolic_solve(simple_linear_equations, [x, y])
+        symbolic_solve(expr_with_params, x, dropmultiplicity=false)
+        symbolic_solve(equations_intersect_sphere_line, [x, y, z])
+    end
 end
 
 end # module
