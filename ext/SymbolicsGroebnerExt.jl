@@ -2,15 +2,9 @@ module SymbolicsGroebnerExt
 
 using Groebner
 const Nemo = Groebner.Nemo
-import PrecompileTools
-
-if isdefined(Base, :get_extension)
-    using Symbolics
-    using Symbolics: Num, symtype
-else
-    using ..Symbolics
-    using ..Symbolics: Num, symtype
-end
+using Symbolics
+using Symbolics: Num, symtype
+import Symbolics.PrecompileTools
 
 """
     groebner_basis(polynomials; kwargs...)
