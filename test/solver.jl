@@ -54,7 +54,7 @@ function check_approx(arr1, arr2)
     return true
 end
 
-@variables x y z
+@variables x y z a b c d e
 
 @testset "Invalid input" begin
     @test_throws AssertionError Symbolics.get_roots(x, x^2)
@@ -172,6 +172,11 @@ end
     # expr = x^3 + sqrt(complex(-2//1))*x + 2
 end
 
+@testset "Multipoly solver" begin
+    @test isequal(symbolic_solve([x^2 - 1, x + 1], x)[1], -1)
+    @test isequal(symbolic_solve([x^2 - a^2, x + a], x)[1], -a)
+    @test isequal(symbolic_solve([x^20 - a^20, x + a], x)[1], -a)
+end
 @testset "Multivar solver" begin
     @variables x y z
     @test isequal(symbolic_solve([x^4 - 1, x - 2], [x]), [])
@@ -356,6 +361,7 @@ end
 
     # standby
     # @test Symbolics.(log(y) + x , x) == 1
+    @test Symbolics.n_func_occ(log(a*x) + b, x) == 1
     
     @test Symbolics.n_func_occ(log(x + sin((x^2 + x)/log(x))), x) == 3
     @test Symbolics.n_func_occ(x^2 + x + x^3, x) == 1
@@ -373,7 +379,6 @@ end
 
 
 @testset "Isolate/Attract solve" begin
-    @variables a b c d e x
     lhs = ia_solve(a*x^b + c, x)[1]
     lhs2 = symbolic_solve(a*x^b + c, x)[1]
     rhs = Symbolics.term(^, -c.val/a.val, 1/b.val) 
@@ -513,8 +518,6 @@ using LambertW
 #Testing
 
 @testset "Algebraic solver tests" begin
-
-    @variables x y z a b c
     function correctAns(solve_roots, known_roots)
         solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve_roots)))
         known_roots = sort_roots(known_roots)

@@ -145,6 +145,11 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         expr = Vector{Num}(expr)
     end
 
+    if expr_univar && !x_univar
+        expr = [expr]
+        expr_univar = false
+    end
+
     if x_univar
         sols = []
         if expr_univar
