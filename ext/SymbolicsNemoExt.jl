@@ -1,5 +1,6 @@
 module SymbolicsNemoExt
 using Nemo
+import Symbolics.PrecompileTools
 
 if isdefined(Base, :get_extension)
     using Symbolics
@@ -71,6 +72,18 @@ function Symbolics.gcd_use_nemo(poly1::Num, poly2::Num)
     nemo_gcd = Nemo.gcd(nemo_poly1, nemo_poly2)
     sym_gcd = Symbolics.wrap(nemo_crude_evaluate(nemo_gcd, nemo_to_sym))
     return sym_gcd
+end
+
+
+# Helps with precompilation time
+PrecompileTools.@setup_workload begin
+    @variables a b c x y z
+    expr_with_params = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
+    PrecompileTools.@compile_workload begin
+        symbolic_solve(expr_with_params, x, dropmultiplicity=false)
+        symbolic_solve(x^10 - a^10, x, dropmultiplicity=false)
+        symbolic_solve([x^2 - a^2, x + a], x)
+    end
 end
 
 end # module

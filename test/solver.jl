@@ -175,6 +175,7 @@ end
 @testset "Multipoly solver" begin
     @test isequal(symbolic_solve([x^2 - 1, x + 1], x)[1], -1)
     @test isequal(symbolic_solve([x^2 - a^2, x + a], x)[1], -a)
+    @test isequal(symbolic_solve([x^20 - a^20, x + a], x)[1], -a)
 end
 @testset "Multivar solver" begin
     @variables x y z
