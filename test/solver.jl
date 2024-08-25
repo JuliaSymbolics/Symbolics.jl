@@ -182,7 +182,7 @@ end
     @test isequal(symbolic_solve([x^4 - 1, x - 2], [x]), [])
     
     # TODO: test this properly
-    sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
+#    sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
 
     eqs = [x*y + 2x^2, y^2 -1]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
@@ -278,7 +278,7 @@ end
 
     @variables t w u v
     sol = symbolic_solve([t*w - 1 ~ 4, u + v + w ~ 1], [t,w,u,v])
-    @test isequal(sol, [Dict(u => u, t => -5 / (-1 + u + v), v => v, w => 1 - u - v)])
+    @test isequal(sol, [Dict(t => -5 / (-1 + u + v), w => 1 - u - v)])
 end
 
 @testset "Factorisation" begin

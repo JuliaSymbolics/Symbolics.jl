@@ -295,11 +295,6 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     isempty(tr_basis) && return nothing
     vars_gen = setdiff(vars, tr_basis)
     sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
-    for roots in sol
-        for x in tr_basis
-            roots[x] = x
-        end
-    end
     sol
 end
 

@@ -187,7 +187,10 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         isequal(sols, nothing) && return nothing
         for sol in sols
             for var in x
-                sol[var] = postprocess_root(sol[var])
+                root = get(sol, var, missing)
+                if !isequal(wrap(root), missing)
+                    sol[var] = postprocess_root(sol[var])
+                end
             end
         end
 
