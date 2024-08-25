@@ -182,7 +182,7 @@ end
     @test isequal(symbolic_solve([x^4 - 1, x - 2], [x]), [])
     
     # TODO: test this properly
-#    sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
+    sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
 
     eqs = [x*y + 2x^2, y^2 -1]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
