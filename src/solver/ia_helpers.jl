@@ -40,7 +40,7 @@ function n_func_occ(expr, var)
             n_occurrences(arg, var) == 0 && continue
 
             # x
-            if !iscall(arg) && isequal(var, get_variables(expr)[1]) && !outside
+            if !iscall(arg) && isequal(var, get_variables(arg)[1]) && !outside
                 n += 1
                 outside = true
                 continue
@@ -89,7 +89,6 @@ function n_func_occ(expr, var)
                 # multiplication cases
             elseif oper_arg === (*)
                 args_arg = arguments(arg)
-
                 for sub_arg in args_arg
                     # x*log(2)
                     if is_var_outside(sub_arg)
@@ -101,6 +100,7 @@ function n_func_occ(expr, var)
                     end
                 end
             end
+
         end
 
     else

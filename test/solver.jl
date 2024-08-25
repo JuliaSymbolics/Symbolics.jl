@@ -382,6 +382,9 @@ end
     lhs2 = symbolic_solve(a*x^b + c, x)[1]
     rhs = Symbolics.term(^, -c.val/a.val, 1/b.val) 
     #@test isequal(lhs, rhs)
+
+    lhs = symbolic_solve(log(a*x)-b,x)[1]
+    @test isequal(Symbolics.arguments(Symbolics.unwrap(Symbolics.ssubs(lhs, Dict(a=>1, b=>1))))[1], E)
     
     expr = x + 2
     lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
