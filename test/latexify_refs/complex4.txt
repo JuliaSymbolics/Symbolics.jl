@@ -1,0 +1,3 @@
+\begin{equation}
+\mathit{i} \sqrt{2}
+\end{equation}

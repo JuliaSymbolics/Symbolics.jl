@@ -168,7 +168,9 @@ function _toexpr(O)
             end
         end
 
-        if isempty(numer) || !isone(abs(m.coeff))
+        if !isreal(m.coeff)
+            numer_expr = Expr(:call, :*, m.coeff, numer...)
+        elseif isempty(numer) || !isone(abs(m.coeff))
             numer_expr = Expr(:call, :*, abs(m.coeff), numer...)
         else
             numer_expr = length(numer) > 1 ? Expr(:call, :*, numer...) : numer[1]
@@ -181,7 +183,7 @@ function _toexpr(O)
             frac_expr = Expr(:call, :/, numer_expr, denom_expr)
         end
 
-        if m.coeff < 0
+        if isreal(m.coeff) && m.coeff < 0
             return Expr(:call, :-, frac_expr)
         else
             return frac_expr
