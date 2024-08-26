@@ -315,15 +315,36 @@ julia> Symbolics.coeff(3x + 2y, y)
 
 julia> Symbolics.coeff(x^2 + y, x^2)
 1
+
+julia> Symbolics.coeff(2*x*y + y, x*y)
+2
 ```
 """
 function coeff(p, sym=nothing)
+    # if `sym` is a product, iteratively compute the coefficient w.r.t. each term in `sym`
+    if iscall(value(sym)) && operation(value(sym)) === (*)
+        for t in arguments(value(sym))
+            @assert !(t isa Number) "`coeff(p, sym)` does not allow `sym` containing numerical factors"
+            p = coeff(p, t)
+        end
+        return p
+    end
+            
     p, sym = value(p), value(sym)
 
     if isequal(sym, 1)
         sym = nothing
     end
 
+    return _coeff(p, sym)
+end
+
+"""
+    _coeff(p, sym)
+
+Function used internally by `coeff(p, sym)`, after the latter function performs some initial steps and re-assigns `p, sym = value(p), value(sym)`
+"""
+function _coeff(p, sym)
     if issym(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif ispow(p)
