@@ -54,3 +54,8 @@ e = x*y^2 + 2x + y^3*x^3
 @test isequal(coeff(x / 5, x), 1//5)
 @test isequal(coeff(x / y, x), 1/y)
 @test isequal(coeff(x * 5y / (1 + y + z) , x), 5y / (1 + y + z))
+
+# issue #1041 - coefficient of cross term in multivariate polynomial
+@test isequal(coeff(2*x*y + y, x*y), 2)
+@test isequal(coeff(2*x^2*y + y, x^2*y), 2)
+@test_throws AssertionError coeff(2*x*y + y, 2*x*y) # numerical factors not allowed in second argument of `coeff`
