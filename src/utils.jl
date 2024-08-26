@@ -336,15 +336,6 @@ function coeff(p, sym=nothing)
         sym = nothing
     end
 
-    return _coeff(p, sym)
-end
-
-"""
-    _coeff(p, sym)
-
-Function used internally by `coeff(p, sym)`, after the latter function performs some initial steps and re-assigns `p, sym = value(p), value(sym)`
-"""
-function _coeff(p, sym)
     if issym(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif ispow(p)
