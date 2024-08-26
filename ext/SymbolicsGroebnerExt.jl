@@ -233,7 +233,10 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
         end
 
         # non-cyclic case
-        n_iterations > 10 && return []
+        if n_iterations > 10 
+            warns && @warn("symbolic_solve can not currently solve this system of polynomials.")
+            return nothing
+        end
 
         n_iterations += 1
     end
