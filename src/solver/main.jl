@@ -154,7 +154,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         sols = []
         if expr_univar
             sols = check_poly_inunivar(expr, x) ?
-                   solve_univar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns) :
+                   solve_univar(expr, x, dropmultiplicity=dropmultiplicity) :
                    ia_solve(expr, x, warns=warns)
             isequal(sols, nothing) && return nothing
         else
@@ -238,7 +238,7 @@ implemented in the function `get_roots` and its children.
 # Examples
 
 """
-function solve_univar(expression, x; dropmultiplicity = true)
+function solve_univar(expression, x; dropmultiplicity=true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
