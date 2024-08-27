@@ -173,9 +173,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
 
     ex = :($wrap($ex))
 
-    if call_args[1] == :..
-        ex = :($transform($ex))
-    end
+    ex = :($transform($ex))
     if isruntime
         lhs = gensym(lhs)
     end
