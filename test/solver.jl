@@ -309,9 +309,9 @@ end
 @testset "Post Process roots" begin
     SymbolicUtils.@syms __x
     __symsqrt(x) = SymbolicUtils.term(ssqrt, x)
-    @test postprocess_root(2 // 1) == 2 && postprocess_root(2 + 0*im) == 2
-    @test postprocess_root(__symsqrt(4)) == 2
-    @test isequal(postprocess_root(__symsqrt(__x)^2), __x)
+    @test Symbolics.postprocess_root(2 // 1) == 2 && Symbolics.postprocess_root(2 + 0*im) == 2
+    @test Symbolics.postprocess_root(__symsqrt(4)) == 2
+    @test isequal(Symbolics.postprocess_root(__symsqrt(__x)^2), __x)
 
     @test !_is_const_number(__x) && !_is_const_number(sqrt(__x))
     @test _is_const_number(1) && _is_const_number(2 // 3) && _is_const_number(3 + 4im)
@@ -326,6 +326,9 @@ end
     x = Symbolics.term(sqrt, 2)
     @test isequal(Symbolics.postprocess_root( expand((x + 1)^4) ), 17 + 12x)
     @test isequal(Symbolics.postprocess_root( x^5 ), 4 * x)
+
+    @test isequal(Symbolics.postprocess_root(Symbolics.term(sqrt, 9//4)), 3//2)
+    @test isequal(Symbolics.postprocess_root(Symbolics.term(sqrt, -27//8)), im*3//2*Symbolics.term(sqrt, 3//2))
 end
 
 
