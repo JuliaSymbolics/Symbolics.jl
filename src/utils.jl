@@ -431,6 +431,7 @@ symbolic_to_float((1//2)*√(279//4)) # 4.175823272122517
 """
 function symbolic_to_float end
 symbolic_to_float(x::Num) = symbolic_to_float(unwrap(x))
+symbolic_to_float(x::Number) = x
 function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
     if _x isa Number
         return _x
