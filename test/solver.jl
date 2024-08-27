@@ -1,5 +1,5 @@
 using Symbolics
-import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root, _is_const_number
+import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root
 using Groebner, Nemo
 E = Base.MathConstants.e
 
@@ -312,11 +312,6 @@ end
     @test Symbolics.postprocess_root(2 // 1) == 2 && Symbolics.postprocess_root(2 + 0*im) == 2
     @test Symbolics.postprocess_root(__symsqrt(4)) == 2
     @test isequal(Symbolics.postprocess_root(__symsqrt(__x)^2), __x)
-
-    @test !_is_const_number(__x) && !_is_const_number(sqrt(__x))
-    @test _is_const_number(1) && _is_const_number(2 // 3) && _is_const_number(3 + 4im)
-    @test _is_const_number(SymbolicUtils.term(sqrt, 2) + 21)
-    @test _is_const_number((SymbolicUtils.term(exp, 2) * SymbolicUtils.term(exp, 2)) // 99)
 
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 0) ) == 1
     @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 0) ) == 1

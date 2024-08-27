@@ -1,11 +1,5 @@
 
 # Alex: make sure `Num`s are not processed here as they'd break it.
-_is_const_number(x::Number) = true
-function _is_const_number(x::SymbolicUtils.BasicSymbolic)
-    !iscall(x) && return false
-    all(_is_const_number, arguments(x))
-end
-
 _postprocess_root(x) = x
 
 function _postprocess_root(x::Number)
