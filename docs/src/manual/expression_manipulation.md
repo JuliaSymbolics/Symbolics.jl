@@ -25,7 +25,6 @@ Other additional manipulation functions are given below.
 Symbolics.get_variables
 Symbolics.tosymbol
 Symbolics.diff2term
-Symbolics.solve_for
 Symbolics.degree
 Symbolics.coeff
 Symbolics.replace
@@ -33,4 +32,5 @@ Symbolics.occursin
 Symbolics.filterchildren
 Symbolics.fixpoint_sub
 Symbolics.fast_substitute
+Symbolics.symbolic_to_float
 ```
