@@ -414,3 +414,27 @@ symbolic expressions mapping variables w.r.t pvar2sym
 function poly_to_symbol(polys, pvar2sym, sym2term, ::Type{T}) where {T}
     map(f -> PolyForm{T}(f, pvar2sym, sym2term), polys)
 end
+
+"""
+    symbolic_to_float(x::Union{Num, BasicSymbolic})::Union{AbstractFloat, BasicSymbolic}
+
+If the symbolic value is exactly equal to a number, converts the symbolic value
+to a floating point number. Otherwise retains the symbolic value.
+
+## Examples
+
+```julia
+symbolic_to_float((1//2 * x)/x) # 0.5
+symbolic_to_float((1/2 * x)/x) # 0.5
+symbolic_to_float((1//2)*√(279//4)) # 4.175823272122517
+```
+"""
+function symbolic_to_float end
+symbolic_to_float(x::Num) = symbolic_to_float(unwrap(x))
+function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
+    if _x isa Number
+        return _x
+    else
+        substitute(x,Dict())
+    end
+end

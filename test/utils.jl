@@ -1,4 +1,5 @@
 using Symbolics
+using Symbolics: symbolic_to_float
 
 @testset "get_variables" begin
     @variables t x y z(t)
@@ -19,3 +20,8 @@ using Symbolics
     sorted_vars2 = Symbolics.get_variables(ex2; sort = true)
     @test isequal(sorted_vars2, [x, y])
 end
+
+symbolic_to_float((1//2 * x)/x) isa Float64
+symbolic_to_float((1/2 * x)/x) isa Float64
+symbolic_to_float((1//2)*√(279//4)) isa Float64
+symbolic_to_float((-1//2)*√(279//4)) isa Float64
