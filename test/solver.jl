@@ -236,13 +236,13 @@ end
     # cyclic 3
     @variables z1 z2 z3
     eqs = [z1 + z2 + z3, z1*z2 + z1*z3 + z2*z3, z1*z2*z3 - 1]
-    sol = Symbolics.symbolic_solve(eqs, [z1,z2,z3])
+    sol = symbolic_solve(eqs, [z1,z2,z3])
     backward = [Symbolics.substitute(eqs, s) for s in sol]
     @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
 
     @variables x y
     eqs = [2332//232*x + 2131232*y - 1//343434, x + y + 1]
-    sol = Symbolics.symbolic_solve(eqs, [x,y])
+    sol = symbolic_solve(eqs, [x,y])
     backward = [Symbolics.substitute(eqs, s) for s in sol]
     @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
 
@@ -259,10 +259,12 @@ end
         # at most 4 roots by Bézout's theorem
         rand_eq(xs, d) = rand(-10:10) + rand(-10:10)*x + rand(-10:10)*y + rand(-10:10)*x*y + rand(-10:10)*x^2 + rand(-10:10)*y^2
         eqs = [rand_eq([x,y],2), rand_eq([x,y],2)]
-        sol = Symbolics.symbolic_solve(eqs, [x,y])
+        sol = symbolic_solve(eqs, [x,y])
         backward = [Symbolics.substitute(eqs, s) for s in sol]
         @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
     end
+
+    @test isnothing(symbolic_solve([x^2, x*y, y^2], [x,y], warns=false))
 end
 
 @testset "Multivar parametric" begin

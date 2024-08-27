@@ -154,8 +154,8 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         sols = []
         if expr_univar
             sols = check_poly_inunivar(expr, x) ?
-                   solve_univar(expr, x, dropmultiplicity = dropmultiplicity) :
-                   ia_solve(expr, x, warns = warns)
+                   solve_univar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns) :
+                   ia_solve(expr, x, warns=warns)
             isequal(sols, nothing) && return nothing
         else
             for i in eachindex(expr)
@@ -165,7 +165,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
                 end
             end
             sols = solve_multipoly(
-                expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
+                expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
             isequal(sols, nothing) && return nothing
         end
 
@@ -183,7 +183,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity = dropmultiplicity)
+        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
         isequal(sols, nothing) && return nothing
         for sol in sols
             for var in x
