@@ -279,7 +279,7 @@ end
     @test isnothing(symbolic_solve([x*y - a, sin(x)], [x, y]))
 
     @variables t w u v
-    sol = symbolic_solve([t*w - 1 ~ 4, u + v + w ~ 1], [t,w,u,v])
+    sol = symbolic_solve([t*w - 1 ~ 4, u + v + w ~ 1], [t,w])
     @test isequal(sol, [Dict(t => -5 / (-1 + u + v), w => 1 - u - v)])
 end
 

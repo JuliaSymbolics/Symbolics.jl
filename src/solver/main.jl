@@ -121,10 +121,6 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         for var in x
             check_x(var)
         end
-        if length(x) == 1
-            x = x[1]
-            x_univar = true
-        end
     end
 
     if !(expr isa Vector)
@@ -213,6 +209,7 @@ function symbolic_solve(expr; x...)
     vars = wrap.(vars)
     @assert all(v isa Num for v in vars) "All variables should be Nums or BasicSymbolics"
 
+    vars = isone(length(vars)) ? vars[1] : vars
     return symbolic_solve(expr, vars; x...)
 end
 

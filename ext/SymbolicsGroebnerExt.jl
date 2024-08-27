@@ -298,6 +298,13 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     isempty(tr_basis) && return nothing
     vars_gen = setdiff(vars, tr_basis)
     sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
+
+    for roots in sol
+        for x in tr_basis
+            roots[x] = x
+        end
+    end
+
     sol
 end
 
@@ -311,8 +318,8 @@ PrecompileTools.@setup_workload begin
     PrecompileTools.@compile_workload begin
         symbolic_solve(equation1, x)
         symbolic_solve(equation_actually_polynomial)
-        symbolic_solve(simple_linear_equations, [x, y])
-        symbolic_solve(equations_intersect_sphere_line, [x, y, z])
+        symbolic_solve(simple_linear_equations, [x, y], warns=false)
+        symbolic_solve(equations_intersect_sphere_line, [x, y, z], warns=false)
     end
 end
 
