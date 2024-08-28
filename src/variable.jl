@@ -522,6 +522,9 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
         symtype(expr),
         metadata(expr))
 end
+function fast_substitute(expr::Number, args...; kwargs...)
+    return expr # unnecessary to substitute non-symbolic expressions
+end
 
 function getparent(x, val=_fail)
     maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
