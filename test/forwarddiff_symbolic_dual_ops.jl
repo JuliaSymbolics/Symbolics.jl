@@ -107,3 +107,10 @@ for f ∈ (hypot, muladd)
 end
 
 # fma is not defined for Symbolics.Num
+
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1246
+@testset "isequal type ambiguity" begin
+    @variables z
+    y(x) = isequal(z, x) ? 0 : x
+    @test ForwardDiff.derivative(y, 0) == 1 # expect ∂(x)/∂x
+end
