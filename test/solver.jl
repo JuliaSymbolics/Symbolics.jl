@@ -281,6 +281,9 @@ end
     @variables t w u v
     sol = symbolic_solve([t*w - 1 ~ 4, u + v + w ~ 1], [t,w])
     @test isequal(sol, [Dict(t => -5 / (-1 + u + v), w => 1 - u - v)])
+
+    sol = symbolic_solve([x-y, y-z], [x])
+    @test isequal(sol, [Dict(x=>z)])
 end
 
 @testset "Factorisation" begin
