@@ -206,6 +206,13 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
             return []
         end
 
+        for i in reverse(eachindex(new_eqs))
+            all_present = Symbolics.get_variables(new_eqs[i])
+            if length(intersect(all_present, vars)) < 1
+                deleteat!(new_eqs, i)
+            end
+        end
+
         new_eqs = demote(new_eqs, vars, params)
         new_eqs = map(Symbolics.unwrap, new_eqs)
 
@@ -294,19 +301,10 @@ function transendence_basis(sys, vars)
 end
 
 function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, warns=true)
-    for i in reverse(eachindex(eqs))
-        present_vars = Symbolics.get_variables(eqs[i])
-        if length(intersect(present_vars, vars)) < 1 && length(present_vars) != 0
-            deleteat!(eqs, i)
-        end
-    end
-
     sol = solve_zerodim(eqs, vars; dropmultiplicity=dropmultiplicity, warns=warns)
     !isnothing(sol) && return sol
-
     tr_basis = transendence_basis(eqs, vars)
     isempty(tr_basis) && return nothing
-
     vars_gen = setdiff(vars, tr_basis)
     sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
 
