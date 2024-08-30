@@ -103,6 +103,25 @@ function binary_dual_definition(M, f, Ts)
     return expr
 end
 
+#####################
+# Generic Functions #
+#####################
+
+# Predicates #
+#------------#
+
+for pred in [:isequal, :(==)]
+    @eval begin
+        @define_binary_dual_op(
+            Base.$(pred),
+            $(pred)(value(x), value(y)) && $(pred)(partials(x), partials(y)),
+            $(pred)(value(x), y)        && iszero(partials(x)),
+            $(pred)(x, value(y))        && iszero(partials(y)),
+            $AMBIGUOUS_TYPES
+        )
+    end
+end
+
 ###################################
 # General Mathematical Operations #
 ###################################
