@@ -1,4 +1,5 @@
 [deps]
+DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 ParameterizedFunctions = "65888b18-ceab-5e60-b2b9-181511a3b968"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
