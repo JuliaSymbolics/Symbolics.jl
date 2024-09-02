@@ -230,6 +230,8 @@ function _toexpr(O)
         return :(solve($(_toexpr(args[1])), $(_toexpr(args[2]))))
     elseif issym(op) && symtype(op) <: AbstractArray
         return :(_textbf($(nameof(op))))
+    elseif op === identity
+        return _toexpr(only(args)) # suppress identity transformations (e.g. "identity(π)" -> "π")
     end
     return Expr(:call, Symbol(op), _toexpr(args)...)
 end
