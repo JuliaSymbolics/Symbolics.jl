@@ -29,7 +29,13 @@ Currently, `symbolic_solve` supports
 ## Examples
 
 ### `solve_univar` (uses factoring and analytic solutions up to degree 4)
+!!! note
+    The package `Nemo` is needed in order to use `solve_univar` as well as `solve_multipoly`,
+    so executing `using Nemo` as you will see in the following examples is necessary; otherwise,
+    the function will throw an error.
 ```jldoctest
+julia> using Symbolics, Nemo;
+
 julia> @variables x a b;
 
 julia> expr = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
@@ -63,6 +69,8 @@ julia> symbolic_solve(x^7 - 1, x)
  1
 ```
 ### `solve_multivar` (uses Groebner basis and `solve_univar` to find roots)
+!!! note
+    Similar to `solve_univar`, `Groebner` is needed for `solve_multivar` or to be fully functional.
 ```jldoctest
 julia> using Groebner
 
@@ -85,7 +93,19 @@ julia> symbolic_solve(eqs, [x,y,z])
  Dict{Num, Any}(z => -1, y => 1, x => 0)
 ```
 
+!!! note
+    If `Nemo` or `Groebner` are not imported when needed, the solver throws an error.
+```jldoctest
+julia> using Symbolics
 
+julia> @variables x y z;
+
+julia> symbolic_solve(x+1, x)
+ERROR: "Nemo is required. Execute `using Nemo` to enable this functionality."
+
+julia> symbolic_solve([x+1, y], [x, y])
+ERROR: "Groebner bases engine is required. Execute `using Groebner` to enable this functionality."
+```
 ### `solve_multipoly` (uses GCD between the input polys)
 ```jldoctest
 julia> symbolic_solve([x-1, x^3 - 1, x^2 - 1, (x-1)^20], x)

@@ -1,11 +1,5 @@
 
 # Alex: make sure `Num`s are not processed here as they'd break it.
-_is_const_number(x::Number) = true
-function _is_const_number(x::SymbolicUtils.BasicSymbolic)
-    !iscall(x) && return false
-    all(_is_const_number, arguments(x))
-end
-
 _postprocess_root(x) = x
 
 function _postprocess_root(x::Number)
@@ -60,21 +54,38 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
         return arguments(x)[1]
     end
 
-    # sqrt(M^2 * N) => M * sqrt(N)
+    # sqrt((N / D)^2 * M) => N / D * sqrt(M)
     if iscall(x) && (operation(x) === sqrt || operation(x) === ssqrt)
-        arg = arguments(x)[1]
-        if arg isa Integer
-            square, radical = big(1), big(1)
-            for (p, d) in collect(Primes.factor(abs(arg)))
+        function squarefree_decomp(x::Integer)
+            square, squarefree = big(1), big(1)
+            for (p, d) in collect(Primes.factor(abs(x)))
                 q, r = divrem(d, 2)
                 square *= p^q
-                radical *= p^r
+                squarefree *= p^r
             end
+            square, squarefree
+        end
+        arg = arguments(x)[1]
+        if arg isa Integer
+            square, squarefree = squarefree_decomp(arg)
             if arg < 0
                 square = im * square
             end
-            isone(radical) && return square
-            return square * Symbolics.term(Symbolics.operation(x), radical)
+            if !isone(square)
+                return square * Symbolics.term(Symbolics.operation(x), squarefree)
+            end
+        elseif arg isa Rational
+            n, d = numerator(arg), denominator(arg)
+            n_square, n_squarefree = squarefree_decomp(n)
+            if n < 0
+                n_square = im * n_square
+            end
+            d_square, d_squarefree = squarefree_decomp(d)
+            nd_square = n_square // d_square
+            nd_squarefree = n_squarefree // d_squarefree
+            if !isone(nd_square)
+                return nd_square * Symbolics.term(Symbolics.operation(x), nd_squarefree)
+            end
         end
     end
 
