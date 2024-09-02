@@ -57,3 +57,5 @@ Dy = Differential(y)
 
 @test_reference "latexify_refs/indices1.txt" latexify(h[10,10])
 @test_reference "latexify_refs/indices2.txt" latexify(h[10,10], index=:bracket)
+
+@test !occursin("identity", latexify(Num(π))) # issue #1254
