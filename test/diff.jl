@@ -390,3 +390,11 @@ let
         )
     end
 end
+
+# Check `Function` inputs throw for non-Num second input (#1085)
+let
+    @testset for f in [sqrt, sin, acos, exp, cis]
+        @test_throws TypeError Symbolics.derivative(f, rand())
+        @test_throws TypeError Symbolics.derivative(f, Val(rand(Int)))
+    end
+end
