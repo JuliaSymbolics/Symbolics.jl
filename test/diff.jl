@@ -379,3 +379,14 @@ let
     @test isequal(Dt, identity)
     test_equal(Dt(t + 2t^2), t + 2t^2)
 end
+
+# Check `Function` inputs for derivative (#1085)
+let
+    @variables x
+    @testset for f in [sqrt, sin, acos, exp, cis]
+        @test isequal(
+            Symbolics.derivative(f, x),
+            Symbolics.derivative(f(x), x)
+        )
+    end
+end
