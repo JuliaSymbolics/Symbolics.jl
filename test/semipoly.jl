@@ -426,6 +426,10 @@ end
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
 
+function verify(t::Symbolics.BasicSymbolic{Number}, d, wrt, nl)
+    verify(Num(t), d, wrt, nl)
+end
+
 function verify(t, d, wrt, nl)
     try
         iszero(t - (isempty(d) ? nl : sum(k*v for (k, v) in d) + nl))
