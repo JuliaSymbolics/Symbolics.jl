@@ -315,6 +315,7 @@ PrecompileTools.@setup_workload begin
         symbolic_solve(equation_actually_polynomial)
         symbolic_solve(simple_linear_equations, [x, y])
         symbolic_solve(equations_intersect_sphere_line, [x, y, z])
+        symbolic_solve([x^2 - a^2, x + a], x)
     end
 end
 

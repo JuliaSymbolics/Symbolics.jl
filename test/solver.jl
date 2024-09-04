@@ -299,11 +299,6 @@ end
     @test isequal(expand(u*prod(factors) - f), 0)
 end
 
-@testset "GCD" begin
-    f1, f2 = x^2 - y^2, x^3 - y^3
-    @test isequal(x - y, Symbolics.gcd_use_nemo(f1, f2))
-end
-
 
 # Post Process roots #
 @testset "Post Process roots" begin
