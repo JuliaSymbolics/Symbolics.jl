@@ -3,8 +3,8 @@ Base.:^(a::Complex{<:Real}, b::Num) = Symbolics.Pow(a, b)
     symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
 
 `symbolic_solve` is a function which attempts to solve input equations/expressions symbolically using various methods.
-There are 2 required arguments and 1 optional argument.
 
+## Arguments
 - expr: Could be a single univar expression in the form of a poly or multiple univar expressions or multiple multivar polys or a transcendental nonlinear function.
 
 - x: Could be a single variable or an array of variables which should be solved
@@ -13,7 +13,7 @@ There are 2 required arguments and 1 optional argument.
 
 - warns (optional): When invalid expressions or cases are inputted, should the solver warn you of such cases before returning nothing? if this is set to false, the solver returns nothing. By default, warns are set to true.
 
-It can take a single variable, a vector of variables, a single expression, an array of expressions.
+## Supported input
 The base solver (`symbolic_solve`) has multiple solvers which chooses from depending on the the type of input
 (multiple/uni var and multiple/single expression) only after ensuring that the input is valid.
 
@@ -128,6 +128,18 @@ julia> symbolic_solve(log(x+1)+log(x-1), x)
 ```jldoctest
 julia> symbolic_solve(a*x^b + c, x)
 ((-c)^(1 / b)) / (a^(1 / b))
+```
+
+### Evaluating output (converting to floats)
+If you want to evaluate the exact expressions found by `symbolic_solve`, you can do the following:
+```jldoctest
+julia> roots = symbolic_solve(2^(x+1) + 5^(x+3), x)
+1-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
+ (-slog(2) - log(complex(-1)) + 3slog(5)) / (slog(2) - slog(5))
+
+julia> eval.(Symbolics.toexpr.(roots))
+1-element Vector{Complex{BigFloat}}:
+ -4.512941594732059759689023145584186058252768936052415430071569066192919491762214 + 3.428598090438030380369414618548038962770087500755160535832807433942464545729382im
 ```
 """
 function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where {T}
