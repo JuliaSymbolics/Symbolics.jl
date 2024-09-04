@@ -379,3 +379,22 @@ let
     @test isequal(Dt, identity)
     test_equal(Dt(t + 2t^2), t + 2t^2)
 end
+
+# Check `Function` inputs for derivative (#1085)
+let
+    @variables x
+    @testset for f in [sqrt, sin, acos, exp, cis]
+        @test isequal(
+            Symbolics.derivative(f, x),
+            Symbolics.derivative(f(x), x)
+        )
+    end
+end
+
+# Check `Function` inputs throw for non-Num second input (#1085)
+let
+    @testset for f in [sqrt, sin, acos, exp, cis]
+        @test_throws TypeError Symbolics.derivative(f, rand())
+        @test_throws TypeError Symbolics.derivative(f, Val(rand(Int)))
+    end
+end
