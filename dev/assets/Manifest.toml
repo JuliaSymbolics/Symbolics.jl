@@ -912,9 +912,9 @@ version = "1.2.2"
 
 [[deps.LazyArrays]]
 deps = ["ArrayLayouts", "FillArrays", "LinearAlgebra", "MacroTools", "SparseArrays"]
-git-tree-sha1 = "507b423197fdd9e77b74aa2532c0a05eb7eb4004"
+git-tree-sha1 = "360f6039babd6e4d6364eff0d4fc9120834a2d9a"
 uuid = "5078a376-72f3-5289-bfd5-ec5146d43c02"
-version = "2.2.0"
+version = "2.2.1"
 
     [deps.LazyArrays.extensions]
     LazyArraysBandedMatricesExt = "BandedMatrices"
@@ -1276,9 +1276,9 @@ version = "1.4.3"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "a028ee3cb5641cccc4c24e90c36b0a4f7707bdf5"
+git-tree-sha1 = "1b35263570443fdd9e76c76b7062116e2f374ab8"
 uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
-version = "3.0.14+0"
+version = "3.0.15+0"
 
 [[deps.OpenSpecFun_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "Pkg"]
@@ -1317,9 +1317,9 @@ version = "1.1.1"
 
 [[deps.OrdinaryDiffEqCore]]
 deps = ["ADTypes", "Adapt", "ArrayInterface", "DataStructures", "DiffEqBase", "DocStringExtensions", "EnumX", "FastBroadcast", "FastClosures", "FillArrays", "FunctionWrappersWrappers", "InteractiveUtils", "LinearAlgebra", "Logging", "MacroTools", "MuladdMacro", "Polyester", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "SciMLBase", "SciMLOperators", "SciMLStructures", "SimpleUnPack", "Static", "StaticArrayInterface", "StaticArraysCore", "TruncatedStacktraces"]
-git-tree-sha1 = "bc70a38874c801549d415c16a23ec632ad91afd1"
+git-tree-sha1 = "3754744bb29fe79092338f44e6564eb4b78349ca"
 uuid = "bbf590c4-e513-4bbe-9b18-05decba2e5d8"
-version = "1.4.0"
+version = "1.4.1"
 weakdeps = ["EnzymeCore"]
 
     [deps.OrdinaryDiffEqCore.extensions]
@@ -1393,9 +1393,9 @@ version = "1.1.0"
 
 [[deps.OrdinaryDiffEqLowOrderRK]]
 deps = ["DiffEqBase", "FastBroadcast", "LinearAlgebra", "MuladdMacro", "OrdinaryDiffEqCore", "RecursiveArrayTools", "Reexport", "SciMLBase", "Static"]
-git-tree-sha1 = "1938fd639ae6688a46d606a5435e523dfdd80776"
+git-tree-sha1 = "d4bb32e09d6b68ce2eb45fb81001eab46f60717a"
 uuid = "1344f307-1e59-4825-a18e-ace9aa3fa4c6"
-version = "1.1.0"
+version = "1.2.0"
 
 [[deps.OrdinaryDiffEqLowStorageRK]]
 deps = ["Adapt", "DiffEqBase", "FastBroadcast", "MuladdMacro", "OrdinaryDiffEqCore", "Polyester", "PrecompileTools", "Preferences", "RecursiveArrayTools", "Reexport", "Static", "StaticArrays"]
@@ -1783,9 +1783,9 @@ version = "0.6.43"
 
 [[deps.SciMLBase]]
 deps = ["ADTypes", "Accessors", "ArrayInterface", "CommonSolve", "ConstructionBase", "Distributed", "DocStringExtensions", "EnumX", "Expronicon", "FunctionWrappersWrappers", "IteratorInterfaceExtensions", "LinearAlgebra", "Logging", "Markdown", "PrecompileTools", "Preferences", "Printf", "RecipesBase", "RecursiveArrayTools", "Reexport", "RuntimeGeneratedFunctions", "SciMLOperators", "SciMLStructures", "StaticArraysCore", "Statistics", "SymbolicIndexingInterface", "Tables"]
-git-tree-sha1 = "8001043f80051c86f264fd6e936d97e6b9eff401"
+git-tree-sha1 = "85db52701c4f9044a6ebe5887948443bcca3626d"
 uuid = "0bca4576-84f4-4d90-8ffe-ffa030f20462"
-version = "2.52.0"
+version = "2.52.1"
 
     [deps.SciMLBase.extensions]
     SciMLBaseChainRulesCoreExt = "ChainRulesCore"
@@ -2022,9 +2022,9 @@ version = "7.2.1+1"
 
 [[deps.SymbolicIndexingInterface]]
 deps = ["Accessors", "ArrayInterface", "RuntimeGeneratedFunctions", "StaticArraysCore"]
-git-tree-sha1 = "161e37de84fdc2d071c50b55ed07c8bac537268c"
+git-tree-sha1 = "988e04b34a4c3b824fb656f542473df99a4f610d"
 uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
-version = "0.3.29"
+version = "0.3.30"
 
 [[deps.SymbolicLimits]]
 deps = ["SymbolicUtils"]
@@ -2050,7 +2050,7 @@ version = "3.6.0"
 deps = ["ADTypes", "ArrayInterface", "Bijections", "CommonWorldInvalidations", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "IfElse", "LaTeXStrings", "LambertW", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "PrecompileTools", "Primes", "RecipesBase", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
 path = "/home/runner/work/Symbolics.jl/Symbolics.jl"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "6.5.0"
+version = "6.6.0"
 
     [deps.Symbolics.extensions]
     SymbolicsForwardDiffExt = "ForwardDiff"
