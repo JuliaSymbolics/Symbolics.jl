@@ -1,4 +1,3 @@
-
 # Alex: make sure `Num`s are not processed here as they'd break it.
 _postprocess_root(x) = x
 
@@ -32,12 +31,12 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     !iscall(x) && return x
 
     x = Symbolics.term(operation(x), map(_postprocess_root, arguments(x))...)
+    oper = operation(x)
 
     # sqrt(0), cbrt(0) => 0
     # sqrt(1), cbrt(1) => 1
-    if iscall(x) &&
-       (operation(x) === sqrt || operation(x) === cbrt || operation(x) === ssqrt ||
-        operation(x) === scbrt)
+    if (oper === sqrt || oper === cbrt || oper === ssqrt ||
+        oper === scbrt)
         arg = arguments(x)[1]
         if isequal(arg, 0) || isequal(arg, 1)
             return arg
@@ -45,17 +44,17 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     end
 
     # (X)^0 => 1
-    if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 0)
+    if oper === (^) && isequal(arguments(x)[2], 0)
         return 1
     end
 
     # (X)^1 => X
-    if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 1)
+    if oper === (^) && isequal(arguments(x)[2], 1)
         return arguments(x)[1]
     end
 
     # sqrt((N / D)^2 * M) => N / D * sqrt(M)
-    if iscall(x) && (operation(x) === sqrt || operation(x) === ssqrt)
+    if (oper === sqrt || oper === ssqrt)
         function squarefree_decomp(x::Integer)
             square, squarefree = big(1), big(1)
             for (p, d) in collect(Primes.factor(abs(x)))
@@ -90,7 +89,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     end
 
     # (sqrt(N))^M => N^div(M, 2)*sqrt(N)^(mod(M, 2))
-    if iscall(x) && operation(x) === (^)
+    if oper === (^)
         arg1, arg2 = arguments(x)
         if iscall(arg1) && (operation(arg1) === sqrt || operation(arg1) === ssqrt)
             if arg2 isa Integer
@@ -101,6 +100,32 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
                 else
                     return arguments(arg1)[1]^q
                 end
+            end
+        end
+    end
+
+    arg = arguments(x)[1]
+    if oper === acos
+        if arg === 0
+            return Symbolics.term(/, pi, 2)
+        elseif arg === 1
+            return 0
+        end
+    elseif oper === asin
+        if arg === 0
+            return 0
+        elseif arg === 1
+            return Symbolics.term(/, pi, 2)
+        end
+    end
+
+    if oper === (+)
+        args = arguments(x)
+        for arg in args
+            if isequal(arg, 0)
+                after_removing = setdiff(args, arg)
+                isone(length(after_removing)) && return after_removing[1]
+                return Symbolics.term(+, after_removing)
             end
         end
     end
