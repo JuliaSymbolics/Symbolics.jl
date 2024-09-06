@@ -72,6 +72,8 @@ SymbolicUtils.sorted_arguments(s::ArrayOp) = sorted_arguments(s.term)
 
 shape(aop::ArrayOp) = aop.shape
 
+SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.ArrayOp}) = ArraySymbolic()
+
 const show_arrayop = Ref{Bool}(false)
 function Base.show(io::IO, aop::ArrayOp)
     if iscall(aop.term) && !show_arrayop[]
