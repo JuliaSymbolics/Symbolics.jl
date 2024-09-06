@@ -123,7 +123,7 @@ function isolate(lhs, var; warns=true, conditions=[])
             new_var = (@variables $new_var)[1]
             rhs = map(
                 sol -> term(rev_oper[oper], sol) +
-                       term(*, Base.MathConstants.pi, 2 * new_var),
+                       term(*, Base.MathConstants.pi, new_var),
                 rhs)
             @info string(new_var) * " ϵ" * " Ζ"
 
