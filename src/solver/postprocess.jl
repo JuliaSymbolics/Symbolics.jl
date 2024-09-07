@@ -104,20 +104,37 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
         end
     end
 
-    arg = arguments(x)[1]
+    isnegone(x) = isequal(-1, expand(x))
+    ishalf(x) = isequal(1/2, expand(x))
+    isneghalf(x) = isequal(-1/2, expand(x))
+    symiszero(x) = isequal(0, expand(x))
+    symisone(x) = isequal(1, expand(x))
+    acos_rules = [(@rule acos(~x::symiszero) => Symbolics.term(/, pi, 2)),
+        (@rule acos(~x::symisone) => 0),
+        (@rule acos(~x::isnegone) => Symbolics.term(*, pi)),
+        (@rule acos(~x::ishalf) => Symbolics.term(/, pi, 3)),
+        (@rule acos(~x::isneghalf) => Symbolics.term(/, Symbolics.term(*,2,pi), 3))
+    ]
+
+    asin_rules = [(@rule asin(~x::symiszero) => 0), 
+        (@rule asin(~x::symisone) => Symbolics.term(/, pi, 2)),
+        (@rule asin(~x::isnegone) => -Symbolics.term(/, pi, 2)),
+        (@rule asin(~x::ishalf) => Symbolics.term(/, pi, 6)),
+        (@rule asin(~x::isneghalf) => Symbolics.term(/, Symbolics.term(*,-1,pi), 6))
+    ]
+
     if oper === acos
-        if arg === 0
-            return Symbolics.term(/, pi, 2)
-        elseif arg === 1
-            return 0
+        for r in acos_rules
+            after_r = r(x)
+            !isnothing(after_r) && return after_r
         end
     elseif oper === asin
-        if arg === 0
-            return 0
-        elseif arg === 1
-            return Symbolics.term(/, pi, 2)
+        for r in asin_rules
+            after_r = r(x)
+            !isnothing(after_r) && return after_r
         end
     end
+
 
     if oper === (+)
         args = arguments(x)
