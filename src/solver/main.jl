@@ -141,10 +141,6 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         for var in x
             check_x(var)
         end
-        if length(x) == 1
-            x = x[1]
-            x_univar = true
-        end
     end
 
     if !(expr isa Vector)
@@ -174,8 +170,8 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         sols = []
         if expr_univar
             sols = check_poly_inunivar(expr, x) ?
-                   solve_univar(expr, x, dropmultiplicity = dropmultiplicity) :
-                   ia_solve(expr, x, warns = warns)
+                   solve_univar(expr, x, dropmultiplicity=dropmultiplicity) :
+                   ia_solve(expr, x, warns=warns)
             isequal(sols, nothing) && return nothing
         else
             for i in eachindex(expr)
@@ -185,7 +181,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
                 end
             end
             sols = solve_multipoly(
-                expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
+                expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
             isequal(sols, nothing) && return nothing
         end
 
@@ -203,11 +199,13 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity = dropmultiplicity)
+        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
         isequal(sols, nothing) && return nothing
         for sol in sols
             for var in x
-                sol[var] = postprocess_root(sol[var])
+                if haskey(sol, var)
+                    sol[var] = postprocess_root(sol[var])
+                end
             end
         end
 
@@ -231,6 +229,7 @@ function symbolic_solve(expr; x...)
     vars = wrap.(vars)
     @assert all(v isa Num for v in vars) "All variables should be Nums or BasicSymbolics"
 
+    vars = isone(length(vars)) ? vars[1] : vars
     return symbolic_solve(expr, vars; x...)
 end
 
@@ -256,7 +255,7 @@ implemented in the function `get_roots` and its children.
 # Examples
 
 """
-function solve_univar(expression, x; dropmultiplicity = true)
+function solve_univar(expression, x; dropmultiplicity=true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
