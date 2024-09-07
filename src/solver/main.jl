@@ -247,7 +247,7 @@ implemented in the function `get_roots` and its children.
 # Examples
 
 """
-function solve_univar(expression, x; dropmultiplicity = true)
+function solve_univar(expression, x; dropmultiplicity=true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
