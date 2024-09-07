@@ -269,7 +269,7 @@ end
 
 @testset "Multivar parametric" begin
     @variables x y a
-    @test isequal(symbolic_solve([x + a, a - 1], x), [])
+    @test isequal(symbolic_solve([x + a, a - 1], x), [-1])
     @test isequal(symbolic_solve([x - a, y + a], [x, y]), [Dict(y => -a, x => a)])
     @test isequal(symbolic_solve([x*y - a, x*y + x], [x, y]), [Dict(y => -1, x => -a)])
     @test isequal(symbolic_solve([x*y - a, 1 ~ 3], [x, y]), [])
@@ -283,13 +283,13 @@ end
     @test isequal(sol, [Dict(t => -5 / (-1 + u + v), w => 1 - u - v)])
 
     sol = symbolic_solve([x-y, y-z], [x])
-    @test isequal(sol, [Dict(x=>z)])
+    @test isequal(sol, [z])
 
     sol = symbolic_solve([x-y, y-z], [x, y])
     @test isequal(sol, [Dict(x=>z, y=>z)])
 
     sol = symbolic_solve([x + y - z, y - z], [x])
-    @test isequal(sol, [Dict(x=>0)])
+    @test isequal(sol, [0])
 end
 
 @testset "Factorisation" begin
