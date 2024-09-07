@@ -63,6 +63,14 @@ Symbolics.symbolic_solve(eqs, [x,y,z])
 - [ ] Systems of polynomial equations with parameters and positive dimensional systems
 - [ ] Inequalities
 
+### Expressions we can not solve (but aim to)
+```
+# Mathematica
+
+In[1]:= Reduce[x^2 - x - 6 > 0, x]
+Out[1]= x < -2 || x > 3
+```
+
 # References
 
 [^1]: [Rouillier, F. Solving Zero-Dimensional Systems Through the Rational Univariate Representation. AAECC 9, 433–461 (1999).](https://doi.org/10.1007/s002000050114)

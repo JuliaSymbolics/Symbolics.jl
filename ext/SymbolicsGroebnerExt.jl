@@ -108,6 +108,7 @@ end
 # Given a GB in k[params][vars] produces a GB in k(params)[vars]
 function demote(gb, vars::Vector{Num}, params::Vector{Num})
     isequal(gb, [1]) && return gb 
+
     gb = Symbolics.wrap.(SymbolicUtils.toterm.(gb))
     Symbolics.check_polynomial.(gb)
 
@@ -126,7 +127,7 @@ function demote(gb, vars::Vector{Num}, params::Vector{Num})
     ring_param, params_demoted = Nemo.polynomial_ring(Nemo.base_ring(ring_flat), map(string, nemo_params))
     ring_demoted, vars_demoted = Nemo.polynomial_ring(Nemo.fraction_field(ring_param), map(string, nemo_vars), internal_ordering=:lex)
     varmap = Dict((nemo_vars .=> vars_demoted)..., (nemo_params .=> params_demoted)...)
-    gb_demoted = map(f -> nemo_crude_evaluate(f, varmap), nemo_gb)
+    gb_demoted = map(f -> ring_demoted(nemo_crude_evaluate(f, varmap)), nemo_gb)
     result = empty(gb_demoted)
     while true
         gb_demoted = map(f -> Nemo.map_coefficients(c -> c // Nemo.leading_coefficient(f), f), gb_demoted)
@@ -176,6 +177,7 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
     # Use a new variable to separate the input polynomials (Reference above)
     new_var = gen_separating_var(vars)
     old_len = length(vars)
+    old_vars = deepcopy(vars)
     vars = vcat(vars, new_var)
 
     new_eqs = []
@@ -202,6 +204,13 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
         # handle "unsolvable" case
         if isequal(1, new_eqs[1])
             return []
+        end
+
+        for i in reverse(eachindex(new_eqs))
+            all_present = Symbolics.get_variables(new_eqs[i])
+            if length(intersect(all_present, vars)) < 1
+                deleteat!(new_eqs, i)
+            end
         end
 
         new_eqs = demote(new_eqs, vars, params)
@@ -233,7 +242,10 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
         end
 
         # non-cyclic case
-        n_iterations > 10 && return []
+        if n_iterations > 10 
+            warns && @warn("symbolic_solve can not currently solve this system of polynomials.")
+            return nothing
+        end
 
         n_iterations += 1
     end
@@ -295,11 +307,13 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     isempty(tr_basis) && return nothing
     vars_gen = setdiff(vars, tr_basis)
     sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
+
     for roots in sol
         for x in tr_basis
             roots[x] = x
         end
     end
+
     sol
 end
 
@@ -313,8 +327,8 @@ PrecompileTools.@setup_workload begin
     PrecompileTools.@compile_workload begin
         symbolic_solve(equation1, x)
         symbolic_solve(equation_actually_polynomial)
-        symbolic_solve(simple_linear_equations, [x, y])
-        symbolic_solve(equations_intersect_sphere_line, [x, y, z])
+        symbolic_solve(simple_linear_equations, [x, y], warns=false)
+        symbolic_solve(equations_intersect_sphere_line, [x, y, z], warns=false)
     end
 end
 
