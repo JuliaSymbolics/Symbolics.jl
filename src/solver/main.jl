@@ -153,10 +153,6 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         for var in x
             check_x(var)
         end
-        if length(x) == 1
-            x = x[1]
-            x_univar = true
-        end
     end
 
     if !(expr isa Vector)
@@ -181,31 +177,21 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         expr = [expr]
         expr_univar = false
     end
+    if !expr_univar && x_univar
+        x = [x]
+        x_univar = false
+    end
 
     if x_univar
-        sols = []
-        if expr_univar
-            sols = check_poly_inunivar(expr, x) ?
-                   solve_univar(expr, x, dropmultiplicity = dropmultiplicity) :
-                   ia_solve(expr, x, warns = warns)
-            isequal(sols, nothing) && return nothing
-        else
-            for i in eachindex(expr)
-                if !check_poly_inunivar(expr[i], x)
-                    warns && @warn("Solve can not solve this input currently")
-                    return nothing
-                end
-            end
-            sols = solve_multipoly(
-                expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
-            isequal(sols, nothing) && return nothing
-        end
-
+        sols = check_poly_inunivar(expr, x) ?
+               solve_univar(expr, x, dropmultiplicity = dropmultiplicity) :
+               ia_solve(expr, x, warns = warns)
+        isequal(sols, nothing) && return nothing
         sols = map(postprocess_root, sols)
         return sols
     end
 
-    if !expr_univar && !x_univar
+    if !x_univar
         for e in expr
             for var in x
                 if !check_poly_inunivar(e, var)
@@ -215,11 +201,15 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity = dropmultiplicity)
+        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
         isequal(sols, nothing) && return nothing
-        for sol in sols
+        sols = convert(Vector{Any}, sols)
+        for i in eachindex(sols)
             for var in x
-                sol[var] = postprocess_root(sol[var])
+                sols[i][var] = postprocess_root(sols[i][var])
+            end
+            if length(collect(keys(sols[i]))) == 1
+                sols[i] = collect(values(sols[i]))[1]
             end
         end
 
@@ -243,6 +233,7 @@ function symbolic_solve(expr; x...)
     vars = wrap.(vars)
     @assert all(v isa Num for v in vars) "All variables should be Nums or BasicSymbolics"
 
+    vars = isone(length(vars)) ? vars[1] : vars
     return symbolic_solve(expr, vars; x...)
 end
 
@@ -268,7 +259,7 @@ implemented in the function `get_roots` and its children.
 # Examples
 
 """
-function solve_univar(expression, x; dropmultiplicity = true)
+function solve_univar(expression, x; dropmultiplicity=true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
@@ -321,39 +312,6 @@ function solve_univar(expression, x; dropmultiplicity = true)
     end
 
     return arr_roots
-end
-
-# You can compute the GCD between a system of polynomials by doing the following:
-# Get the GCD between the first two polys,
-# and get the GCD between this result and the following index,
-# say: solve([x^2 - 1, x - 1, (x-1)^20], x)
-# the GCD between the first two terms is obviously x-1,
-# now we call gcd_use_nemo() on this term, and the following,
-# gcd_use_nemo(x - 1, (x-1)^20), which is again x-1.
-# now we just need to solve(x-1, x) to get the common root in this
-# system of equations.
-function solve_multipoly(polys::Vector, x::Num; dropmultiplicity = true, warns = true)
-    polys = unique(polys)
-
-    if length(polys) < 1
-        warns && @warn("No expressions entered")
-        return nothing
-    end
-    if length(polys) == 1
-        return solve_univar(polys[1], x, dropmultiplicity = dropmultiplicity)
-    end
-
-    gcd = gcd_use_nemo(polys[1], polys[2])
-
-    for i in eachindex(polys)[3:end]
-        gcd = gcd_use_nemo(gcd, polys[i])
-    end
-
-    if isequal(gcd, 1)
-        return []
-    end
-
-    return solve_univar(gcd, x, dropmultiplicity = dropmultiplicity)
 end
 
 function solve_multivar(eqs::Any, vars::Any; dropmultiplicity = true, warns = true)

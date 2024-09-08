@@ -242,6 +242,8 @@ SymbolicUtils.Code.toexpr(x::CallWithMetadata, st) = SymbolicUtils.Code.toexpr(x
 
 CallWithMetadata(f) = CallWithMetadata(f, nothing)
 
+SymbolicIndexingInterface.symbolic_type(::Type{<:CallWithMetadata}) = ScalarSymbolic()
+
 function Base.show(io::IO, c::CallWithMetadata)
     show(io, c.f)
     print(io, "⋆")

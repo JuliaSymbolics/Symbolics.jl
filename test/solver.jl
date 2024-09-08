@@ -236,13 +236,13 @@ end
     # cyclic 3
     @variables z1 z2 z3
     eqs = [z1 + z2 + z3, z1*z2 + z1*z3 + z2*z3, z1*z2*z3 - 1]
-    sol = Symbolics.symbolic_solve(eqs, [z1,z2,z3])
+    sol = symbolic_solve(eqs, [z1,z2,z3])
     backward = [Symbolics.substitute(eqs, s) for s in sol]
     @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
 
     @variables x y
     eqs = [2332//232*x + 2131232*y - 1//343434, x + y + 1]
-    sol = Symbolics.symbolic_solve(eqs, [x,y])
+    sol = symbolic_solve(eqs, [x,y])
     backward = [Symbolics.substitute(eqs, s) for s in sol]
     @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
 
@@ -259,15 +259,17 @@ end
         # at most 4 roots by Bézout's theorem
         rand_eq(xs, d) = rand(-10:10) + rand(-10:10)*x + rand(-10:10)*y + rand(-10:10)*x*y + rand(-10:10)*x^2 + rand(-10:10)*y^2
         eqs = [rand_eq([x,y],2), rand_eq([x,y],2)]
-        sol = Symbolics.symbolic_solve(eqs, [x,y])
+        sol = symbolic_solve(eqs, [x,y])
         backward = [Symbolics.substitute(eqs, s) for s in sol]
         @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
     end
+
+    @test isnothing(symbolic_solve([x^2, x*y, y^2], [x,y], warns=false))
 end
 
 @testset "Multivar parametric" begin
     @variables x y a
-    @test isequal(symbolic_solve([x + a, a - 1], x), [])
+    @test isequal(symbolic_solve([x + a, a - 1], x), [-1])
     @test isequal(symbolic_solve([x - a, y + a], [x, y]), [Dict(y => -a, x => a)])
     @test isequal(symbolic_solve([x*y - a, x*y + x], [x, y]), [Dict(y => -1, x => -a)])
     @test isequal(symbolic_solve([x*y - a, 1 ~ 3], [x, y]), [])
@@ -277,8 +279,17 @@ end
     @test isnothing(symbolic_solve([x*y - a, sin(x)], [x, y]))
 
     @variables t w u v
-    sol = symbolic_solve([t*w - 1 ~ 4, u + v + w ~ 1], [t,w,u,v])
-    @test isequal(sol, [Dict(u => u, t => -5 / (-1 + u + v), v => v, w => 1 - u - v)])
+    sol = symbolic_solve([t*w - 1 ~ 4, u + v + w ~ 1], [t,w])
+    @test isequal(sol, [Dict(t => -5 / (-1 + u + v), w => 1 - u - v)])
+
+    sol = symbolic_solve([x-y, y-z], [x])
+    @test isequal(sol, [z])
+
+    sol = symbolic_solve([x-y, y-z], [x, y])
+    @test isequal(sol, [Dict(x=>z, y=>z)])
+
+    sol = symbolic_solve([x + y - z, y - z], [x])
+    @test isequal(sol, [0])
 end
 
 @testset "Factorisation" begin
@@ -297,11 +308,6 @@ end
     f = expand((x + 1//3) * ((x*y)^2 + 2x*y + y^2) * (x - z))
     u, factors = Symbolics.factor_use_nemo(f)
     @test isequal(expand(u*prod(factors) - f), 0)
-end
-
-@testset "GCD" begin
-    f1, f2 = x^2 - y^2, x^3 - y^3
-    @test isequal(x - y, Symbolics.gcd_use_nemo(f1, f2))
 end
 
 
