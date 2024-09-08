@@ -68,6 +68,16 @@ end
 @register_symbolic Base.rand(x)
 @register_symbolic Base.randn(x)
 
+@register_symbolic Base.clamp(x, y, z)
+
+function derivative(::typeof(Base.clamp), args::NTuple{3, Any}, ::Val{1})
+    x, l, h = args
+    T = promote_type(symtype(x), symtype(l), symtype(h))
+    z = zero(T)
+    o = one(T)
+    ifelse(x<l, z, ifelse(x>h, z, o))
+end
+
 @register_symbolic Distributions.pdf(dist,x)
 @register_symbolic Distributions.logpdf(dist,x)
 @register_symbolic Distributions.cdf(dist,x)
