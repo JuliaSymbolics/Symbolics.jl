@@ -104,37 +104,26 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
         end
     end
 
-    isnegone(x) = isequal(-1, expand(x))
-    ishalf(x) = isequal(1/2, expand(x))
-    isneghalf(x) = isequal(-1/2, expand(x))
-    symiszero(x) = isequal(0, expand(x))
-    symisone(x) = isequal(1, expand(x))
-    acos_rules = [(@rule acos(~x::symiszero) => Symbolics.term(/, pi, 2)),
-        (@rule acos(~x::symisone) => 0),
-        (@rule acos(~x::isnegone) => Symbolics.term(*, pi)),
-        (@rule acos(~x::ishalf) => Symbolics.term(/, pi, 3)),
-        (@rule acos(~x::isneghalf) => Symbolics.term(/, Symbolics.term(*,2,pi), 3))
+    opers = [acos, asin, atan]
+    exacts = [0, Symbolics.term(*, pi), Symbolics.term(/,pi,3),
+        Symbolics.term(/, pi, 2),
+        Symbolics.term(/, Symbolics.term(*, 2, pi), 3),
+        Symbolics.term(/, pi, 6),
+        Symbolics.term(/, Symbolics.term(*, 5, pi), 6),
+        Symbolics.term(/, pi, 4)
     ]
 
-    asin_rules = [(@rule asin(~x::symiszero) => 0), 
-        (@rule asin(~x::symisone) => Symbolics.term(/, pi, 2)),
-        (@rule asin(~x::isnegone) => -Symbolics.term(/, pi, 2)),
-        (@rule asin(~x::ishalf) => Symbolics.term(/, pi, 6)),
-        (@rule asin(~x::isneghalf) => Symbolics.term(/, Symbolics.term(*,-1,pi), 6))
-    ]
-
-    if oper === acos
-        for r in acos_rules
-            after_r = r(x)
-            !isnothing(after_r) && return after_r
-        end
-    elseif oper === asin
-        for r in asin_rules
-            after_r = r(x)
-            !isnothing(after_r) && return after_r
+    if any(isequal(oper, o) for o in opers) && isempty(Symbolics.get_variables(x))
+        val = eval(Symbolics.toexpr(x))
+        for i in eachindex(exacts)
+            exact_val = eval(Symbolics.toexpr(exacts[i]))
+            if isapprox(exact_val, val, atol=1e-6)
+                return exacts[i]
+            elseif isapprox(-exact_val, val, atol=1e-6)
+                return -exacts[i]
+            end
         end
     end
-
 
     if oper === (+)
         args = arguments(x)
