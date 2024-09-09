@@ -151,9 +151,9 @@ function check_trig_consts(x)
     ]
 
     if any(isequal(oper, o) for o in inv_opers) && isempty(Symbolics.get_variables(x))
-        val = eval(Symbolics.toexpr(x))
+        val = Symbolics.symbolic_to_float(x)
         for i in eachindex(inv_exacts)
-            exact_val = eval(Symbolics.toexpr(inv_exacts[i]))
+            exact_val = Symbolics.symbolic_to_float(inv_exacts[i])
             if isapprox(exact_val, val, atol=1e-6)
                 return inv_exacts[i]
             elseif isapprox(-exact_val, val, atol=1e-6)
