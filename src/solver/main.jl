@@ -137,7 +137,7 @@ julia> roots = symbolic_solve(2^(x+1) + 5^(x+3), x)
 1-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
  (-slog(2) - log(complex(-1)) + 3slog(5)) / (slog(2) - slog(5))
 
-julia> eval.(Symbolics.toexpr.(roots))
+julia> Symbolics.symbolic_to_float.(roots)
 1-element Vector{Complex{BigFloat}}:
  -4.512941594732059759689023145584186058252768936052415430071569066192919491762214 + 3.428598090438030380369414618548038962770087500755160535832807433942464545729382im
 ```
