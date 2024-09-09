@@ -433,9 +433,5 @@ function symbolic_to_float end
 symbolic_to_float(x::Num) = symbolic_to_float(unwrap(x))
 symbolic_to_float(x::Number) = x
 function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
-    if _x isa Number
-        return _x
-    else
-        substitute(x,Dict())
-    end
+    substitute(x,Dict())
 end
