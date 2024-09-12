@@ -61,6 +61,12 @@ end
     @test_throws AssertionError symbolic_solve(1/x, x)
 end
 
+@testset "Nice univar cases" begin
+    found_roots = symbolic_solve(1/x^2 ~ 1/y^2 - 2/x^3 * (x-y), x)
+    known_roots = Symbolics.unwrap.([y, -2y])
+    @test isequal(found_roots, known_roots)
+end
+
 @testset "Deg 1 univar" begin
     @test isequal(symbolic_solve(x+1, x), [-1])
 
