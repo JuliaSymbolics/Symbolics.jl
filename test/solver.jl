@@ -57,9 +57,8 @@ end
 @variables x y z a b c d e
 
 @testset "Invalid input" begin
-    @test_throws AssertionError Symbolics.get_roots(x, x^2)
-    @test_throws AssertionError Symbolics.get_roots(x^3 + sin(x), x)
-    @test_throws AssertionError Symbolics.get_roots(1/x, x)
+    @test_throws AssertionError symbolic_solve(x, x^2)
+    @test_throws AssertionError symbolic_solve(1/x, x)
 end
 
 @testset "Deg 1 univar" begin

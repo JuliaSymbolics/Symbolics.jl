@@ -40,16 +40,19 @@ function clean_f(filtered_expr, var, subs)
     unwrapped_f = unwrap(filtered_expr)
     !iscall(unwrapped_f) && return filtered_expr
     oper = operation(unwrapped_f)
+    assumptions = []
 
     if oper === (/)
         args = arguments(unwrapped_f)
         if any(isequal(var, x) for x in get_variables(args[2]))
-            return filtered_expr
+            filtered_expr = expand(args[1] * args[2])
+            push!(assumptions, substitute(args[2], subs, fold=false))
+            return filtered_expr, assumptions
         end
         filtered_expr = args[1]
         @info "Assuming $(substitute(args[2], subs, fold=false) != 0)"
     end
-    return filtered_expr
+    return filtered_expr, assumptions
 end
 
 """
@@ -238,15 +241,17 @@ julia> filter_poly((x+1)*term(log, 3), x)
 (Dict{Any, Any}(var"##247" => log(3)), var"##247"*(1 + x))
 ```
 """
-function filter_poly(og_expr, var)
+function filter_poly(og_expr, var; assum=false)
     expr = deepcopy(og_expr)
     expr = unwrap(expr)
     vars = get_variables(expr)
 
     # handle edge cases
     if !isequal(vars, []) && isequal(vars[1], expr)
+        assum && return Dict{Any, Any}(), expr, []
         return (Dict{Any, Any}(), expr)
     elseif isequal(vars, [])
+        assum && return filter_stuff(expr), []
         return filter_stuff(expr)
     end
 
@@ -256,14 +261,16 @@ function filter_poly(og_expr, var)
     # reassemble expr to avoid variables remembering original values issue and clean
     args = arguments(expr)
     oper = operation(expr)
-    new_expr = clean_f(term(oper, args...), var, subs)
+    new_expr, assumptions = clean_f(term(oper, args...), var, subs)
 
+    assum && return subs, new_expr, assumptions
     return subs, new_expr
 end
-function filter_poly(og_expr)
+
+function filter_poly(og_expr; assum=false)
     new_var = gensym()
     new_var = (@variables $(new_var))[1]
-    return filter_poly(og_expr, new_var)
+    return filter_poly(og_expr, new_var; assum=assum)
 end
 
 
