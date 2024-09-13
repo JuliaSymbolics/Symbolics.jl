@@ -97,7 +97,7 @@ Base.show(io::IO, n::Num) = show_numwrap[] ? print(io, :(Num($(value(n))))) : Ba
 Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{<:Symbolic{<:Number}}, ::Type{<:Num}) = Num
-function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
+function Base.getproperty(t::BasicSymbolic, f::Symbol)
     if f === :op
         Base.depwarn("`x.op` is deprecated, use `operation(x)` instead", :getproperty, force=true)
         operation(t)
