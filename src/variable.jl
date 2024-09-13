@@ -101,6 +101,11 @@ function _parse_vars(macroname, type, x, transform=identity)
         # x = 1, [connect = flow; unit = u"m^3/s"]
         if Meta.isexpr(v, :(=))
             v, val = v.args
+            # defaults with metadata for function variables
+            if Meta.isexpr(val, :block)
+                Base.remove_linenums!(val)
+                val = only(val.args)
+            end
             if Meta.isexpr(val, :tuple) && length(val.args) == 2 && isoption(val.args[2])
                 options = val.args[2].args
                 val = val.args[1]
@@ -124,7 +129,7 @@ function _parse_vars(macroname, type, x, transform=identity)
         isruntime, v = unwrap_runtime_var(v)
         iscall = Meta.isexpr(v, :call)
         isarray = Meta.isexpr(v, :ref)
-        if iscall && Meta.isexpr(v.args[1], :ref)
+        if iscall && Meta.isexpr(v.args[1], :ref) && !call_args_are_function(map(last∘unwrap_runtime_var, @view v.args[2:end]))
             @warn("The variable syntax $v is deprecated. Use $(Expr(:ref, Expr(:call, v.args[1].args[1], v.args[2]), v.args[1].args[2:end]...)) instead.
                   The former creates an array of functions, while the latter creates an array valued function.
                   The deprecated syntax will cause an error in the next major release of Symbolics.
@@ -155,35 +160,54 @@ function _parse_vars(macroname, type, x, transform=identity)
     return ex
 end
 
+call_args_are_function(_) = false
+function call_args_are_function(call_args::AbstractArray)
+    !isempty(call_args) && (call_args[end] == :(..) || all(Base.Fix2(Meta.isexpr, :(::)), call_args))
+end
+
 function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime)
     ndim = :($length(($(indices...),)))
-    vname = !isruntime ? Meta.quot(lhs) : lhs
-    if call_args[1] == :..
-        ex = :($CallWithMetadata($Sym{$FnType{Tuple, Array{$type, $ndim}}}($vname)))
+    if call_args_are_function(call_args)
+        vname, fntype = function_name_and_type(lhs)
+        isruntime, vname = unwrap_runtime_var(vname)
+        if isruntime
+            _vname = vname
+        else
+            _vname = Meta.quot(vname)
+        end
+        argtypes = arg_types_from_call_args(call_args)
+        ex = :($CallWithMetadata($Sym{$FnType{$argtypes, Array{$type, $ndim}, $fntype}}($_vname)))
     else
-        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($vname)(map($unwrap, ($(call_args...),))...))
+        vname = lhs
+        if isruntime
+            _vname = vname
+        else
+            _vname = Meta.quot(vname)
+        end
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}, Nothing}}($_vname)(map($unwrap, ($(call_args...),))...))
     end
     ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
 
     if val !== nothing
         ex = :($setdefaultval($ex, $val))
     end
-    ex = setprops_expr(ex, prop, macroname, Meta.quot(lhs))
+    ex = setprops_expr(ex, prop, macroname, Meta.quot(vname))
     #ex = :($scalarize_getindex($ex))
 
     ex = :($wrap($ex))
 
     ex = :($transform($ex))
     if isruntime
-        lhs = gensym(lhs)
+        vname = gensym(vname)
     end
-    lhs, :($lhs = $ex)
+    vname, :($vname = $ex)
 end
 
 function construct_vars(macroname, v, type, call_args, val, prop, transform, isruntime)
     issym  = v isa Symbol
-    isarray = isa(v, Expr) && v.head == :ref
+    isarray = Meta.isexpr(v, :ref)
     if isarray
+        # this can't be an array of functions, since that was handled by `construct_dep_array_vars`
         var_name = v.args[1]
         if Meta.isexpr(var_name, :(::))
             var_name, type′ = var_name.args
@@ -192,6 +216,15 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
         isruntime, var_name = unwrap_runtime_var(var_name)
         indices = v.args[2:end]
         expr = _construct_array_vars(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, indices...)
+    elseif call_args_are_function(call_args)
+        var_name, fntype = function_name_and_type(v)
+        isruntime, var_name = unwrap_runtime_var(var_name)
+        if isruntime
+            vname = var_name
+        else
+            vname = Meta.quot(var_name)
+        end
+        expr = construct_var(macroname, fntype == Nothing ? vname : Expr(:(::), vname, fntype), type, call_args, val, prop)
     else
         var_name = v
         if Meta.isexpr(v, :(::))
@@ -253,13 +286,48 @@ function (f::CallWithMetadata)(args...)
     metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f))
 end
 
+function arg_types_from_call_args(call_args)
+    if length(call_args) == 1 && only(call_args) == :..
+        return Tuple
+    end
+    Ts = map(call_args) do arg
+        if arg == :..
+            Vararg
+        elseif arg isa Expr && arg.head == :(::)
+            if length(arg.args) == 1
+                arg.args[1]
+            elseif arg.args[1] == :..
+                :(Vararg{$(arg.args[2])})
+            else
+                arg.args[2]
+            end
+        else
+            error("Invalid call argument $arg")
+        end
+    end
+    return :(Tuple{$(Ts...)})
+end
+
+function function_name_and_type(var_name)
+    if var_name isa Expr && Meta.isexpr(var_name, :(::), 2)
+        var_name.args
+    else
+        var_name, Nothing
+    end
+end
+
 function construct_var(macroname, var_name, type, call_args, val, prop)
     expr = if call_args === nothing
         :($Sym{$type}($var_name))
-    elseif !isempty(call_args) && call_args[end] == :..
-        :($CallWithMetadata($Sym{$FnType{Tuple, $type}}($var_name)))
+    elseif call_args_are_function(call_args)
+        # function syntax is (x::TFunc)(.. or ::TArg1, ::TArg2)::TRet
+        # .. is Vararg
+        # (..)::ArgT is Vararg{ArgT}
+        var_name, fntype = function_name_and_type(var_name)
+        argtypes = arg_types_from_call_args(call_args)
+        :($CallWithMetadata($Sym{$FnType{$argtypes, $type, $fntype}}($var_name)))
     else
-        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
+        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type, Nothing}}($var_name)($(map(x->:($value($x)), call_args)...)))
     end
 
     if val !== nothing
@@ -283,15 +351,17 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
     expr = if call_args === nothing
         ex = :($Sym{Array{$type, $ndim}}($var_name))
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-    elseif !isempty(call_args) && call_args[end] == :..
+    elseif call_args_are_function(call_args)
         need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        var_name, fntype = function_name_and_type(var_name)
+        argtypes = arg_types_from_call_args(call_args)
+        ex = :($Sym{Array{$FnType{$argtypes, $type, $fntype}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWithMetadata, $ex))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        ex = :($Sym{Array{$FnType{Tuple, $type, Nothing}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWith(($(call_args...),)), $ex))
     end

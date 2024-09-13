@@ -1,5 +1,5 @@
 using Symbolics
-import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
+import Symbolics: CallWithMetadata, getsource, getdefaultval, wrap, unwrap, getname
 import SymbolicUtils: Term, symtype, FnType, BasicSymbolic, promote_symtype
 using LinearAlgebra
 using Test
@@ -221,12 +221,12 @@ let
 end
 
 @variables t y(t)
-yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple{Any}, Real})
+yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple{Any}, Real, Nothing})
 yyy = yy(t)
 @test isequal(yyy, y)
 @test yyy isa Num
 @test y isa Num
-yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple, Real})
+yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple, Real, Nothing})
 yyy = yy(t)
 @test !isequal(yyy, y)
 @variables y(..)
@@ -238,3 +238,120 @@ spam(x) = 2x
 sym = spam([a, 2a])
 @test sym isa Num
 @test unwrap(sym) isa BasicSymbolic{Real}
+
+fn_defaults = [print, min, max, identity, (+), (-), max, sum, vcat, (*)]
+
+struct VariableFoo end
+Symbolics.option_to_metadata_type(::Val{:foo}) = VariableFoo
+
+function test_all_functions(fns)
+    f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 = fns
+    @variables x y::Int z::Function w[1:3, 1:3] v[1:3, 1:3]::String
+    @test f1 isa CallWithMetadata{FnType{Tuple, Real, Nothing}}
+    @test all(x -> symtype(x) <: Real, [f1(), f1(1), f1(x), f1(x, y), f1(x, y, x+y)])
+    @test f2 isa CallWithMetadata{FnType{Tuple{Any, Vararg}, Int, Nothing}}
+    @test all(x -> symtype(x) <: Int, [f2(1), f2(z), f2(x), f2(x, y), f2(x, y, x+y)])
+    @test_throws ErrorException f2()
+    @test f3 isa CallWithMetadata{FnType{Tuple, Real, typeof(max)}}
+    @test all(x -> symtype(x) <: Real, [f3(), f3(1), f3(x), f3(x, y), f3(x, y, x+y)])
+    @test f4 isa CallWithMetadata{FnType{Tuple{Int}, Real, Nothing}}
+    @test all(x -> symtype(x) <: Real, [f4(1), f4(y), f4(2y)])
+    @test_throws ErrorException f4(x)
+    @test f5 isa CallWithMetadata{FnType{Tuple{Int, Vararg{Int}}, Real, Nothing}}
+    @test all(x -> symtype(x) <: Real, [f5(1), f5(y), f5(y, y), f5(2, 3)])
+    @test_throws ErrorException f5(x)
+    @test f6 isa CallWithMetadata{FnType{Tuple{Int, Int}, Int, Nothing}}
+    @test all(x -> symtype(x) <: Int, [f6(1, 1), f6(y, y), f6(1, y), f6(y, 1)])
+    @test_throws ErrorException f6()
+    @test_throws ErrorException f6(1)
+    @test_throws ErrorException f6(x, y)
+    @test_throws ErrorException f6(y)
+    @test f7 isa CallWithMetadata{FnType{Tuple{Int, Int}, Int, typeof(max)}}
+    # call behavior tested by f6
+    @test f8 isa CallWithMetadata{FnType{Tuple{Function, Vararg}, Real, typeof(sum)}}
+    @test all(x -> symtype(x) <: Real, [f8(z), f8(z, x), f8(identity), f8(identity, x)])
+    @test_throws ErrorException f8(x)
+    @test_throws ErrorException f8(1)
+    @test f9 isa CallWithMetadata{FnType{Tuple, Vector{Real}, Nothing}}
+    @test all(x -> symtype(unwrap(x)) <: Vector{Real} && size(x) == (3,), [f9(), f9(1), f9(x), f9(x + y), f9(z), f9(1, x)])
+    @test f10 isa CallWithMetadata{FnType{Tuple{Matrix{<:Real}, Matrix{<:Real}}, Matrix{Real}, typeof(*)}}
+    @test all(x -> symtype(unwrap(x)) <: Matrix{Real} && size(x) == (3, 3), [f10(w, w), f10(w, ones(3, 3)), f10(ones(3, 3), ones(3, 3)), f10(w + w, w)])
+    @test_throws ErrorException f10(w, v)
+end
+
+function test_functions_defaults(fns)
+    for (fn, def) in zip(fns, fn_defaults)
+        @test Symbolics.getdefaultval(fn, nothing) == def
+    end
+end
+
+function test_functions_metadata(fns)
+    for (i, fn) in enumerate(fns)
+        @test Symbolics.getmetadata(fn, VariableFoo, nothing) == i
+    end
+end
+
+fns = @test_nowarn @variables begin
+    f1(..)
+    f2(::Any, ..)::Int
+    (f3::typeof(max))(..)
+    f4(::Int)
+    f5(::Int, (..)::Int)
+    f6(::Int, ::Int)::Int
+    (f7::typeof(max))(::Int, ::Int)::Int
+    (f8::typeof(sum))(::Function, ..)
+    f9(..)[1:3]
+    (f10::typeof(*))(::Matrix{<:Real}, ::Matrix{<:Real})[1:3, 1:3]
+    # f11[1:3](::Int)::Int
+end
+
+test_all_functions(fns)
+
+fns = @test_nowarn @variables begin
+    f1(..) = fn_defaults[1]
+    f2(::Any, ..)::Int = fn_defaults[2]
+    (f3::typeof(max))(..) = fn_defaults[3]
+    f4(::Int) = fn_defaults[4]
+    f5(::Int, (..)::Int) = fn_defaults[5]
+    f6(::Int, ::Int)::Int = fn_defaults[6]
+    (f7::typeof(max))(::Int, ::Int)::Int = fn_defaults[7]
+    (f8::typeof(sum))(::Function, ..) = fn_defaults[8]
+    f9(..)[1:3] = fn_defaults[9]
+    (f10::typeof(*))(::Matrix{<:Real}, ::Matrix{<:Real})[1:3, 1:3] = fn_defaults[10]
+end
+
+test_all_functions(fns)
+test_functions_defaults(fns)
+
+fns = @variables begin
+    f1(..) = fn_defaults[1], [foo = 1]
+    f2(::Any, ..)::Int = fn_defaults[2], [foo = 2;]
+    (f3::typeof(max))(..) = fn_defaults[3], [foo = 3;]
+    f4(::Int) = fn_defaults[4], [foo = 4;]
+    f5(::Int, (..)::Int) = fn_defaults[5], [foo = 5;]
+    f6(::Int, ::Int)::Int = fn_defaults[6], [foo = 6;]
+    (f7::typeof(max))(::Int, ::Int)::Int = fn_defaults[7], [foo = 7;]
+    (f8::typeof(sum))(::Function, ..) = fn_defaults[8], [foo = 8;]
+    f9(..)[1:3] = fn_defaults[9], [foo = 9;]
+    (f10::typeof(*))(::Matrix{<:Real}, ::Matrix{<:Real})[1:3, 1:3] = fn_defaults[10], [foo = 10;]
+end
+
+test_all_functions(fns)
+test_functions_defaults(fns)
+test_functions_metadata(fns)
+
+fns = @test_nowarn @variables begin
+    f1(..), [foo = 1,]
+    f2(::Any, ..)::Int, [foo = 2,]
+    (f3::typeof(max))(..), [foo = 3,]
+    f4(::Int), [foo = 4,]
+    f5(::Int, (..)::Int), [foo = 5,]
+    f6(::Int, ::Int)::Int, [foo = 6,]
+    (f7::typeof(max))(::Int, ::Int)::Int, [foo = 7,]
+    (f8::typeof(sum))(::Function, ..), [foo = 8,]
+    f9(..)[1:3], [foo = 9,]
+    (f10::typeof(*))(::Matrix{<:Real}, ::Matrix{<:Real})[1:3, 1:3], [foo = 10,]
+end
+
+test_all_functions(fns)
+test_functions_metadata(fns)
