@@ -282,8 +282,10 @@ function Base.show(io::IO, c::CallWithMetadata)
     print(io, "⋆")
 end
 
+struct CallWithParent end
+
 function (f::CallWithMetadata)(args...)
-    metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f))
+    setmetadata(metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f)), CallWithParent, f)
 end
 
 function arg_types_from_call_args(call_args)
