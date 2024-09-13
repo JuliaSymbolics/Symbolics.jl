@@ -151,7 +151,7 @@ const inv_pairs = collect(zip(inv_exacts, inv_evald))
     function convert_consts(x)
 This function takes BasicSymbolic terms as input (x) and attempts
 to simplify these basic symbolic terms using known values.
-Currently, this function only supports inverse trignometric functions.
+Currently, this function only supports inverse trigonometric functions.
 
 ## Examples
 ```jldoctest
