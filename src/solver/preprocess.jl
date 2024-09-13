@@ -241,17 +241,17 @@ julia> filter_poly((x+1)*term(log, 3), x)
 (Dict{Any, Any}(var"##247" => log(3)), var"##247"*(1 + x))
 ```
 """
-function filter_poly(og_expr, var; assum=false)
+function filter_poly(og_expr, var; assumptions=false)
     expr = deepcopy(og_expr)
     expr = unwrap(expr)
     vars = get_variables(expr)
 
     # handle edge cases
     if !isequal(vars, []) && isequal(vars[1], expr)
-        assum && return Dict{Any, Any}(), expr, []
+        assumptions && return Dict{Any, Any}(), expr, []
         return (Dict{Any, Any}(), expr)
     elseif isequal(vars, [])
-        assum && return filter_stuff(expr), []
+        assumptions && return filter_stuff(expr), []
         return filter_stuff(expr)
     end
 
@@ -261,16 +261,16 @@ function filter_poly(og_expr, var; assum=false)
     # reassemble expr to avoid variables remembering original values issue and clean
     args = arguments(expr)
     oper = operation(expr)
-    new_expr, assumptions = clean_f(term(oper, args...), var, subs)
+    new_expr, assum_array = clean_f(term(oper, args...), var, subs)
 
-    assum && return subs, new_expr, assumptions
+    assumptions && return subs, new_expr, assum_array
     return subs, new_expr
 end
 
-function filter_poly(og_expr; assum=false)
+function filter_poly(og_expr; assumptions=false)
     new_var = gensym()
     new_var = (@variables $(new_var))[1]
-    return filter_poly(og_expr, new_var; assum=assum)
+    return filter_poly(og_expr, new_var; assumptions=assumptions)
 end
 
 

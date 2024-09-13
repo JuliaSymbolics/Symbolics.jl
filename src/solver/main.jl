@@ -276,7 +276,7 @@ function solve_univar(expression, x; dropmultiplicity=true)
         end
     end
 
-    subs, filtered_expr, assumptions = filter_poly(expression, x, assum=true)
+    subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions=true)
     coeffs, constant = polynomial_coeffs(filtered_expr, [x])
     degree = sdegree(coeffs, x)
 
