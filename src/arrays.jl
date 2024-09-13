@@ -496,7 +496,7 @@ const ArrayLike{T,N} = Union{
     ArrayOp{AbstractArray{T,N}},
     Symbolic{AbstractArray{T,N}},
     Arr{T,N},
-    SymbolicUtils.Term{AbstractArray{T, N}}
+    SymbolicUtils.BasicSymbolic{AbstractArray{T, N}}
 } # Like SymArray but includes Arr and Term{Arr}
 
 unwrap(x::Arr) = x.value
