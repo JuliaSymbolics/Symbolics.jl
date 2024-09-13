@@ -288,6 +288,8 @@ function (f::CallWithMetadata)(args...)
     setmetadata(metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f)), CallWithParent, f)
 end
 
+Base.isequal(a::CallWithMetadata, b::CallWithMetadata) = isequal(a.f,  b.f)
+
 function arg_types_from_call_args(call_args)
     if length(call_args) == 1 && only(call_args) == :..
         return Tuple
