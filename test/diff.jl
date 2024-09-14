@@ -398,3 +398,12 @@ let
         @test_throws TypeError Symbolics.derivative(f, Val(rand(Int)))
     end
 end
+
+# Check ssqrt, scbrt, slog
+let
+    @variables x
+    D = Differential(x)
+    @test isequal(expand_derivatives(D(Symbolics.ssqrt(1 + x ^ 2))), simplify((2x) / (2Symbolics.ssqrt(1 + x^2))))
+    @test isequal(expand_derivatives(D(Symbolics.scbrt(1 + x ^ 2))), simplify((2x) / (3Symbolics.scbrt(1 + x^2)^2)))
+    @test isequal(expand_derivatives(D(Symbolics.slog(1 + x ^ 2))), simplify((2x) / (1 + x ^ 2)))
+end

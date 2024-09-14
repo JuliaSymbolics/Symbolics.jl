@@ -37,6 +37,8 @@ function ssqrt(n)
     end
 end
 
+derivative(::typeof(ssqrt), args...) = substitute(derivative(sqrt, args...), sqrt => ssqrt)
+
 function scbrt(n)
     n = unwrap(n)
 
@@ -53,6 +55,8 @@ function scbrt(n)
     end
 end
 
+derivative(::typeof(scbrt), args...) = substitute(derivative(cbrt, args...), cbrt => scbrt)
+
 function slog(n)
     n = unwrap(n)
 
@@ -66,6 +70,8 @@ function slog(n)
 
     return term(slog, n)
 end
+
+derivative(::typeof(slog), args...) = substitute(derivative(log, args...), log => slog)
 
 const RootsOf = (SymbolicUtils.@syms roots_of(poly,var))[1]
 
