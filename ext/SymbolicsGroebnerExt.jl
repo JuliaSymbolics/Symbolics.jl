@@ -320,9 +320,13 @@ end
 # Helps with precompilation time
 PrecompileTools.@setup_workload begin
     @variables a b c x y z
+    equation1 = a*log(x)^b + c ~ 0
+    equation_actually_polynomial = sin(x^2 +1)^2 + sin(x^2 + 1) + 3
     simple_linear_equations = [x - y, y + 2z]
     equations_intersect_sphere_line = [x^2 + y^2 + z^2 - 9, x - 2y + 3, y - z]
     PrecompileTools.@compile_workload begin
+        symbolic_solve(equation1, x)
+        symbolic_solve(equation_actually_polynomial)
         symbolic_solve(simple_linear_equations, [x, y], warns=false)
         symbolic_solve(equations_intersect_sphere_line, [x, y, z], warns=false)
     end

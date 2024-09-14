@@ -61,13 +61,7 @@ end
 PrecompileTools.@setup_workload begin
     @variables a b c x y z
     expr_with_params = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
-    equation1 = a*log(x)^b + c ~ 0
-    equation_polynomial = 9^x + 3^x + 2
-    exp_eq = 5*2^(x+1) + 7^(x+3)
     PrecompileTools.@compile_workload begin
-        symbolic_solve(equation1, x)
-        symbolic_solve(equation_polynomial, x)
-        symbolic_solve(exp_eq)
         symbolic_solve(expr_with_params, x, dropmultiplicity=false)
         symbolic_solve(x^10 - a^10, x, dropmultiplicity=false)
     end
