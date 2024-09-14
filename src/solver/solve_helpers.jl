@@ -78,7 +78,7 @@ function check_expr_validity(expr)
     valid_type = false
 
     if type_expr <: Number || type_expr == Num || type_expr == SymbolicUtils.BasicSymbolic{Real} ||
-       type_expr == Complex{Num} || type_expr == ComplexTerm{Real}
+       type_expr == Complex{Num} || type_expr == ComplexTerm{Real} || type_expr == SymbolicUtils.BasicSymbolic{Complex{Real}}
         valid_type = true
     end
     iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
