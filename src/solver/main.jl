@@ -195,7 +195,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         for e in expr
             for var in x
                 if !check_poly_inunivar(e, var)
-                    warns && @warn("This system can not be currently solved by solve.")
+                    warns && @warn("This system can not be currently solved by `symbolic_solve`.")
                     return nothing
                 end
             end
@@ -276,7 +276,7 @@ function solve_univar(expression, x; dropmultiplicity=true)
         end
     end
 
-    subs, filtered_expr = filter_poly(expression, x)
+    subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions=true)
     coeffs, constant = polynomial_coeffs(filtered_expr, [x])
     degree = sdegree(coeffs, x)
 
@@ -296,18 +296,28 @@ function solve_univar(expression, x; dropmultiplicity=true)
                 append!(arr_roots, og_arr_roots)
             end
         end
-
-        return arr_roots
     end
 
     if length(factors) != 1
-        for factor in factors_subbed
-            roots = solve_univar(factor, x, dropmultiplicity = dropmultiplicity)
+        for i in eachindex(factors_subbed)
+            if !any(isequal(x, var) for var in get_variables(factors[i]))
+                continue
+            end
+            roots = solve_univar(factors_subbed[i], x, dropmultiplicity = dropmultiplicity)
             append!(arr_roots, roots)
         end
     end
 
+    for i in reverse(eachindex(arr_roots))
+        for j in eachindex(assumptions)
+            if isequal(substitute(assumptions[j], Dict(x=>arr_roots[i])), 0)
+                deleteat!(arr_roots, i)
+            end
+        end
+    end
+
     if isequal(arr_roots, [])
+        @assert check_polynomial(expression) "This expression could not be solved by `symbolic_solve`."
         return [RootsOf(wrap(expression), wrap(x))]
     end
 
