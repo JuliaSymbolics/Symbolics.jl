@@ -221,12 +221,12 @@ let
 end
 
 @variables t y(t)
-yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple{Any}, Real, Nothing})
+yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple{Any}, Real})
 yyy = yy(t)
 @test isequal(yyy, y)
 @test yyy isa Num
 @test y isa Num
-yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple, Real, Nothing})
+yy = Symbolics.variable(:y, T = Symbolics.FnType{Tuple, Real})
 yyy = yy(t)
 @test !isequal(yyy, y)
 @variables y(..)
@@ -247,20 +247,20 @@ Symbolics.option_to_metadata_type(::Val{:foo}) = VariableFoo
 function test_all_functions(fns)
     f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 = fns
     @variables x y::Int z::Function w[1:3, 1:3] v[1:3, 1:3]::String
-    @test f1 isa CallWithMetadata{FnType{Tuple, Real, Nothing}}
+    @test f1 isa CallWithMetadata{FnType{Tuple, Real}}
     @test all(x -> symtype(x) <: Real, [f1(), f1(1), f1(x), f1(x, y), f1(x, y, x+y)])
-    @test f2 isa CallWithMetadata{FnType{Tuple{Any, Vararg}, Int, Nothing}}
+    @test f2 isa CallWithMetadata{FnType{Tuple{Any, Vararg}, Int}}
     @test all(x -> symtype(x) <: Int, [f2(1), f2(z), f2(x), f2(x, y), f2(x, y, x+y)])
     @test_throws ErrorException f2()
     @test f3 isa CallWithMetadata{FnType{Tuple, Real, typeof(max)}}
     @test all(x -> symtype(x) <: Real, [f3(), f3(1), f3(x), f3(x, y), f3(x, y, x+y)])
-    @test f4 isa CallWithMetadata{FnType{Tuple{Int}, Real, Nothing}}
+    @test f4 isa CallWithMetadata{FnType{Tuple{Int}, Real}}
     @test all(x -> symtype(x) <: Real, [f4(1), f4(y), f4(2y)])
     @test_throws ErrorException f4(x)
-    @test f5 isa CallWithMetadata{FnType{Tuple{Int, Vararg{Int}}, Real, Nothing}}
+    @test f5 isa CallWithMetadata{FnType{Tuple{Int, Vararg{Int}}, Real}}
     @test all(x -> symtype(x) <: Real, [f5(1), f5(y), f5(y, y), f5(2, 3)])
     @test_throws ErrorException f5(x)
-    @test f6 isa CallWithMetadata{FnType{Tuple{Int, Int}, Int, Nothing}}
+    @test f6 isa CallWithMetadata{FnType{Tuple{Int, Int}, Int}}
     @test all(x -> symtype(x) <: Int, [f6(1, 1), f6(y, y), f6(1, y), f6(y, 1)])
     @test_throws ErrorException f6()
     @test_throws ErrorException f6(1)
@@ -272,7 +272,7 @@ function test_all_functions(fns)
     @test all(x -> symtype(x) <: Real, [f8(z), f8(z, x), f8(identity), f8(identity, x)])
     @test_throws ErrorException f8(x)
     @test_throws ErrorException f8(1)
-    @test f9 isa CallWithMetadata{FnType{Tuple, Vector{Real}, Nothing}}
+    @test f9 isa CallWithMetadata{FnType{Tuple, Vector{Real}}}
     @test all(x -> symtype(unwrap(x)) <: Vector{Real} && size(x) == (3,), [f9(), f9(1), f9(x), f9(x + y), f9(z), f9(1, x)])
     @test f10 isa CallWithMetadata{FnType{Tuple{Matrix{<:Real}, Matrix{<:Real}}, Matrix{Real}, typeof(*)}}
     @test all(x -> symtype(unwrap(x)) <: Matrix{Real} && size(x) == (3, 3), [f10(w, w), f10(w, ones(3, 3)), f10(ones(3, 3), ones(3, 3)), f10(w + w, w)])

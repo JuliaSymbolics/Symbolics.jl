@@ -176,7 +176,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
             _vname = Meta.quot(vname)
         end
         argtypes = arg_types_from_call_args(call_args)
-        ex = :($CallWithMetadata($Sym{$FnType{$argtypes, Array{$type, $ndim}, $fntype}}($_vname)))
+        ex = :($CallWithMetadata($Sym{$FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}}($_vname)))
     else
         vname = lhs
         if isruntime
@@ -184,7 +184,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
         else
             _vname = Meta.quot(vname)
         end
-        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}, Nothing}}($_vname)(map($unwrap, ($(call_args...),))...))
+        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($_vname)(map($unwrap, ($(call_args...),))...))
     end
     ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
 
@@ -224,7 +224,7 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
         else
             vname = Meta.quot(var_name)
         end
-        expr = construct_var(macroname, fntype == Nothing ? vname : Expr(:(::), vname, fntype), type, call_args, val, prop)
+        expr = construct_var(macroname, fntype == () ? vname : Expr(:(::), vname, fntype[1]), type, call_args, val, prop)
     else
         var_name = v
         if Meta.isexpr(v, :(::))
@@ -314,9 +314,9 @@ end
 
 function function_name_and_type(var_name)
     if var_name isa Expr && Meta.isexpr(var_name, :(::), 2)
-        var_name.args
+        var_name.args[1], (var_name.args[2],)
     else
-        var_name, Nothing
+        var_name, ()
     end
 end
 
@@ -329,9 +329,9 @@ function construct_var(macroname, var_name, type, call_args, val, prop)
         # (..)::ArgT is Vararg{ArgT}
         var_name, fntype = function_name_and_type(var_name)
         argtypes = arg_types_from_call_args(call_args)
-        :($CallWithMetadata($Sym{$FnType{$argtypes, $type, $fntype}}($var_name)))
+        :($CallWithMetadata($Sym{$FnType{$argtypes, $type, $(fntype...)}}($var_name)))
     else
-        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type, Nothing}}($var_name)($(map(x->:($value($x)), call_args)...)))
+        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
     end
 
     if val !== nothing
@@ -359,13 +359,13 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         need_scalarize = true
         var_name, fntype = function_name_and_type(var_name)
         argtypes = arg_types_from_call_args(call_args)
-        ex = :($Sym{Array{$FnType{$argtypes, $type, $fntype}, $ndim}}($var_name))
+        ex = :($Sym{Array{$FnType{$argtypes, $type, $(fntype...)}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWithMetadata, $ex))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type, Nothing}, $ndim}}($var_name))
+        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWith(($(call_args...),)), $ex))
     end
