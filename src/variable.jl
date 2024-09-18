@@ -169,11 +169,18 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
     ndim = :($length(($(indices...),)))
     if call_args_are_function(call_args)
         vname, fntype = function_name_and_type(lhs)
-        isruntime, vname = unwrap_runtime_var(vname)
+        # name was already unwrapped before calling this function and is of the form $x
         if isruntime
             _vname = vname
         else
-            _vname = Meta.quot(vname)
+            # either no ::fnType or $x::fnType
+            vname, fntype = function_name_and_type(lhs)
+            isruntime, vname = unwrap_runtime_var(vname)
+            if isruntime
+                _vname = vname
+            else
+                _vname = Meta.quot(vname)
+            end
         end
         argtypes = arg_types_from_call_args(call_args)
         ex = :($CallWithMetadata($Sym{$FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}}($_vname)))
@@ -198,14 +205,14 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
 
     ex = :($transform($ex))
     if isruntime
-        vname = gensym(vname)
+        vname = gensym(Symbol(vname))
     end
     vname, :($vname = $ex)
 end
 
 function construct_vars(macroname, v, type, call_args, val, prop, transform, isruntime)
     issym  = v isa Symbol
-    isarray = Meta.isexpr(v, :ref)
+    isarray = !isruntime && Meta.isexpr(v, :ref)
     if isarray
         # this can't be an array of functions, since that was handled by `construct_dep_array_vars`
         var_name = v.args[1]
@@ -218,11 +225,18 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
         expr = _construct_array_vars(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, indices...)
     elseif call_args_are_function(call_args)
         var_name, fntype = function_name_and_type(v)
-        isruntime, var_name = unwrap_runtime_var(var_name)
+        # name was already unwrapped before calling this function and is of the form $x
         if isruntime
             vname = var_name
         else
-            vname = Meta.quot(var_name)
+            # either no ::fnType or $x::fnType
+            var_name, fntype = function_name_and_type(v)
+            isruntime, var_name = unwrap_runtime_var(var_name)
+            if isruntime
+                vname = var_name
+            else
+                vname = Meta.quot(var_name)
+            end
         end
         expr = construct_var(macroname, fntype == () ? vname : Expr(:(::), vname, fntype[1]), type, call_args, val, prop)
     else
@@ -233,7 +247,7 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
         end
         expr = construct_var(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop)
     end
-    lhs = isruntime ? gensym(var_name) : var_name
+    lhs = isruntime ? gensym(Symbol(var_name)) : var_name
     rhs = :($transform($expr))
     lhs, :($lhs = $rhs)
 end

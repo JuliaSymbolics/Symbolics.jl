@@ -240,6 +240,7 @@ sym = spam([a, 2a])
 @test unwrap(sym) isa BasicSymbolic{Real}
 
 fn_defaults = [print, min, max, identity, (+), (-), max, sum, vcat, (*)]
+fn_names = [Symbol(:f, i) for i in 1:10]
 
 struct VariableFoo end
 Symbolics.option_to_metadata_type(::Val{:foo}) = VariableFoo
@@ -355,3 +356,18 @@ end
 
 test_all_functions(fns)
 test_functions_metadata(fns)
+
+fns = @test_nowarn @variables begin
+    $(fn_names[1])(..)
+    $(fn_names[2])(::Any, ..)::Int
+    ($(fn_names[3])::typeof(max))(..)
+    $(fn_names[4])(::Int)
+    $(fn_names[5])(::Int, (..)::Int)
+    $(fn_names[6])(::Int, ::Int)::Int
+    ($(fn_names[7])::typeof(max))(::Int, ::Int)::Int
+    ($(fn_names[8])::typeof(sum))(::Function, ..)
+    $(fn_names[9])(..)[1:3]
+    ($(fn_names[10])::typeof(*))(::Matrix{<:Real}, ::Matrix{<:Real})[1:3, 1:3]
+end
+
+test_all_functions(fns)
