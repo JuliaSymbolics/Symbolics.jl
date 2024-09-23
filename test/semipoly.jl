@@ -509,3 +509,7 @@ for i=1:20
         trial()
     end
 end
+
+@testset "Extracted from fuzz testing" begin
+    @test verify(2.25(2.0 + 2c)*(c^2), Dict{Any, Any}(c^3 => 4.5, c^2 => 4.5), Num[c, y, z], 0)
+end
