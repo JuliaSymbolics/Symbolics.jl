@@ -131,8 +131,8 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
             string(nameof(arguments(oldop)[1]))
         elseif oldop == getindex
             args = arguments(O)
-            opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
-            return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
+            opname = string(tosymbol(args[1]))
+            return metadata(Sym{symtype(args[1])}(Symbol(opname, d_separator, ds)), metadata(args[1]))[args[2:end]...]
         elseif oldop isa Function
             return nothing
         else
