@@ -15,7 +15,7 @@ Pkg.add(&quot;Symbolics&quot;)</code></pre><h2 id="Citation"><a class="docs-head
   [91a5bcdd] Plots v1.40.8
   [90137ffa] StaticArrays v1.9.7
   [d1185830] SymbolicUtils v3.7.1
-  [0c5d862f] Symbolics v6.12.0 `~/work/Symbolics.jl/Symbolics.jl`
+  [0c5d862f] Symbolics v6.13.0 `~/work/Symbolics.jl/Symbolics.jl`
 Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated`</code></pre></details><details><summary>and using this machine and Julia version.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Julia Version 1.10.5
 Commit 6f3fdf7b362 (2024-08-27 14:19 UTC)
 Build Info:
@@ -29,7 +29,7 @@ Platform Info:
 Threads: 1 default, 0 interactive, 1 GC (on 4 virtual cores)
 Environment:
   JULIA_DEBUG = Documenter</code></pre></details><details><summary>A more complete overview of all dependencies and their versions is also provided.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Status `~/work/Symbolics.jl/Symbolics.jl/docs/Manifest.toml`
-  [47edcb42] ADTypes v1.8.1
+  [47edcb42] ADTypes v1.9.0
   [a4c015fc] ANSIColoredPrinters v0.0.1
 ⌅ [c3fe647b] AbstractAlgebra v0.41.11
   [1520ce14] AbstractTrees v0.4.5
@@ -73,7 +73,7 @@ Environment:
   [163ba53b] DiffResults v1.1.0
   [b552c78f] DiffRules v1.15.1
   [a0c0ee7d] DifferentiationInterface v0.5.17
-  [31c24e10] Distributions v0.25.111
+  [31c24e10] Distributions v0.25.112
   [ffbed154] DocStringExtensions v0.9.3
   [e30172f5] Documenter v1.7.0
   [5b8099bc] DomainSets v0.7.14
@@ -191,7 +191,7 @@ Environment:
   [d236fae5] PreallocationTools v0.4.24
   [aea7be01] PrecompileTools v1.2.1
   [21216c6a] Preferences v1.4.3
-  [08abe8d2] PrettyTables v2.3.2
+  [08abe8d2] PrettyTables v2.4.0
   [27ebfcd6] Primes v0.5.6
   [43287f4e] PtrArrays v1.2.1
   [1fd47b50] QuadGK v2.11.1
@@ -215,7 +215,7 @@ Environment:
   [efcf1570] Setfield v1.1.1
   [992d4aef] Showoff v1.0.3
   [777ac1f9] SimpleBufferStream v1.2.0
-  [727e6d20] SimpleNonlinearSolve v1.12.1
+  [727e6d20] SimpleNonlinearSolve v1.12.2
   [699a6c99] SimpleTraits v0.9.4
   [ce78b400] SimpleUnPack v1.1.0
   [a2af1166] SortingAlgorithms v1.2.1
@@ -231,11 +231,11 @@ Environment:
   [2913bbd2] StatsBase v0.34.3
   [4c63d2b9] StatsFuns v1.3.2
   [7792a7ef] StrideArraysCore v0.5.7
-  [892a3eda] StringManipulation v0.3.4
+  [892a3eda] StringManipulation v0.4.0
   [2efcf032] SymbolicIndexingInterface v0.3.30
   [19f23fe9] SymbolicLimits v0.2.2
   [d1185830] SymbolicUtils v3.7.1
-  [0c5d862f] Symbolics v6.12.0 `~/work/Symbolics.jl/Symbolics.jl`
+  [0c5d862f] Symbolics v6.13.0 `~/work/Symbolics.jl/Symbolics.jl`
   [3783bdb8] TableTraits v1.0.1
   [bd369af6] Tables v1.12.0
   [62fd8b95] TensorCore v0.1.1
@@ -269,7 +269,7 @@ Environment:
   [0656b61e] GLFW_jll v3.4.0+1
   [d2c73de3] GR_jll v0.73.7+0
   [78b55507] Gettext_jll v0.21.0+0
-  [f8c6e375] Git_jll v2.44.0+2
+  [f8c6e375] Git_jll v2.46.2+0
   [7746bdde] Glib_jll v2.80.2+0
   [3b182d85] Graphite2_jll v1.3.14+0
   [2e76f6c2] HarfBuzz_jll v8.3.1+0
@@ -278,7 +278,7 @@ Environment:
   [c1c5ebd0] LAME_jll v3.100.2+0
 ⌅ [88015f11] LERC_jll v3.0.0+1
   [1d63c593] LLVMOpenMP_jll v18.1.7+0
-  [dd4b983a] LZO_jll v2.10.2+0
+  [dd4b983a] LZO_jll v2.10.2+1
 ⌅ [e9f186c6] Libffi_jll v3.2.2+1
   [d4300ac3] Libgcrypt_jll v1.8.11+0
   [7e76a0d4] Libglvnd_jll v1.6.0+0
@@ -398,4 +398,4 @@ Environment:
   [8e850b90] libblastrampoline_jll v5.11.0+0
   [8e850ede] nghttp2_jll v1.52.0+1
   [3f19e933] p7zip_jll v17.4.0+2
-Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v6.12.0/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v6.12.0/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Tuesday 24 September 2024 09:59">Tuesday 24 September 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v6.13.0/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v6.13.0/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.7.0 on <span class="colophon-date" title="Wednesday 25 September 2024 12:38">Wednesday 25 September 2024</span>. Using Julia version 1.10.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
