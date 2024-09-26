@@ -92,6 +92,7 @@ export Inequality, ≲, ≳
 include("inequality.jl")
 
 import Bijections, DynamicPolynomials
+export tosymbol
 include("utils.jl")
 
 using ConstructionBase
