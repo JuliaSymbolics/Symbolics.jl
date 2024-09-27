@@ -976,7 +976,7 @@ end
 ### Codegen
 
 function SymbolicUtils.Code.toexpr(x::ArrayOp, st)
-    haskey(st.symbolify, x) && return st.symbolify[x]
+    haskey(st.rewrites, x) && return st.rewrites[x]
 
     if iscall(x.term)
         toexpr(x.term, st)
