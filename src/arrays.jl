@@ -1047,7 +1047,7 @@ function get_inputs(x::ArrayOp)
 end
 
 function similar_arrayvar(ex, name)
-    Sym{symtype(ex)}(name) #TODO: shape?
+    _Sym(symtype(ex), name) #TODO: shape?
 end
 
 function reset_to_one(range)
@@ -1056,7 +1056,7 @@ function reset_to_one(range)
 end
 
 function reset_sym(i)
-    Sym{Int}(Symbol(nameof(i), "′"))
+    _Sym(Int, Symbol(nameof(i), "′"))
 end
 
 function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)

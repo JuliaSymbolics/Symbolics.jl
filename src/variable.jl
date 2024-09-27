@@ -159,9 +159,9 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
     ndim = :($length(($(indices...),)))
     vname = !isruntime ? Meta.quot(lhs) : lhs
     if call_args[1] == :..
-        ex = :($CallWithMetadata($Sym{$FnType{Tuple, Array{$type, $ndim}}}($vname)))
+        ex = :($CallWithMetadata($_Sym($FnType{Tuple, Array{$type, $ndim}}, $vname)))
     else
-        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($vname)(map($unwrap, ($(call_args...),))...))
+        ex = :($_Sym($FnType{Tuple, Array{$type, $ndim}}, $vname)(map($unwrap, ($(call_args...),))...))
     end
     ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
 
@@ -281,17 +281,17 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
 
     need_scalarize = false
     expr = if call_args === nothing
-        ex = :($Sym{Array{$type, $ndim}}($var_name))
+        ex = :($_Sym(Array{$type, $ndim}, $var_name))
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
     elseif !isempty(call_args) && call_args[end] == :..
         need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        ex = :($_Sym(Array{$FnType{Tuple, $type}, $ndim}, $var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWithMetadata, $ex))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        ex = :($_Sym(Array{$FnType{Tuple, $type}, $ndim}, $var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWith(($(call_args...),)), $ex))
     end

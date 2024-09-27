@@ -11,8 +11,8 @@ vars = @variables t $a $b(t) $c(t)[1:3]
 @test b === :value_b
 @test c === :value_c
 @test isequal(vars[1], t)
-@test isequal(vars[2], Num(Sym{Real}(a)))
-@test isequal(vars[3], Num(Sym{FnType{Tuple{Any},Real}}(b)(value(t))))
+@test isequal(vars[2], Num(_Sym(Real, a)))
+@test isequal(vars[3], Num(_Sym(FnType{Tuple{Any},Real}, b)(value(t))))
 
 vars = @variables a,b,c,d,e,f,g,h,i
 @test isequal(vars, [a,b,c,d,e,f,g,h,i])

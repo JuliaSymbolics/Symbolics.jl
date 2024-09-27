@@ -132,7 +132,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
         elseif oldop == getindex
             args = arguments(O)
             opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
-            return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
+            return _Sym(symtype(O), Symbol(opname, d_separator, ds))
         elseif oldop isa Function
             return nothing
         else
@@ -227,7 +227,7 @@ function makesubscripts(n)
     map(1:n) do i
         repeats = ceil(Int, i / m)
         c = set[(i-1) % m + 1]
-        Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
+        _Sym(Int, Symbol(join([c for _ in 1:repeats], "")))
     end
 end
 
