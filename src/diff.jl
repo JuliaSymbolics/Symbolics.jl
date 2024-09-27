@@ -107,7 +107,7 @@ function occursin_info(x, expr, fail = true)
     end
 end
 
-function occursin_info(x, expr::Sym, fail)
+function occursin_info(x, expr::BasicSymbolic, fail)
     if symtype(expr) <: AbstractArray && fail
             error("Differentiation of expressions involving arrays and array variables is not yet supported.")
     end
