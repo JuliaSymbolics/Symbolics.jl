@@ -1,4 +1,3 @@
-
 # Alex: make sure `Num`s are not processed here as they'd break it.
 _postprocess_root(x) = x
 
@@ -32,12 +31,12 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     !iscall(x) && return x
 
     x = Symbolics.term(operation(x), map(_postprocess_root, arguments(x))...)
+    oper = operation(x)
 
     # sqrt(0), cbrt(0) => 0
     # sqrt(1), cbrt(1) => 1
-    if iscall(x) &&
-       (operation(x) === sqrt || operation(x) === cbrt || operation(x) === ssqrt ||
-        operation(x) === scbrt)
+    if (oper === sqrt || oper === cbrt || oper === ssqrt ||
+        oper === scbrt)
         arg = arguments(x)[1]
         if isequal(arg, 0) || isequal(arg, 1)
             return arg
@@ -45,17 +44,17 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     end
 
     # (X)^0 => 1
-    if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 0)
+    if oper === (^) && isequal(arguments(x)[2], 0)
         return 1
     end
 
     # (X)^1 => X
-    if iscall(x) && operation(x) === (^) && isequal(arguments(x)[2], 1)
+    if oper === (^) && isequal(arguments(x)[2], 1)
         return arguments(x)[1]
     end
 
     # sqrt((N / D)^2 * M) => N / D * sqrt(M)
-    if iscall(x) && (operation(x) === sqrt || operation(x) === ssqrt)
+    if (oper === sqrt || oper === ssqrt)
         function squarefree_decomp(x::Integer)
             square, squarefree = big(1), big(1)
             for (p, d) in collect(Primes.factor(abs(x)))
@@ -90,7 +89,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     end
 
     # (sqrt(N))^M => N^div(M, 2)*sqrt(N)^(mod(M, 2))
-    if iscall(x) && operation(x) === (^)
+    if oper === (^)
         arg1, arg2 = arguments(x)
         if iscall(arg1) && (operation(arg1) === sqrt || operation(arg1) === ssqrt)
             if arg2 isa Integer
@@ -101,6 +100,19 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
                 else
                     return arguments(arg1)[1]^q
                 end
+            end
+        end
+    end
+
+    x = convert_consts(x)
+
+    if oper === (+)
+        args = arguments(x)
+        for arg in args
+            if isequal(arg, 0)
+                after_removing = setdiff(args, arg)
+                isone(length(after_removing)) && return after_removing[1]
+                return Symbolics.term(+, after_removing)
             end
         end
     end
@@ -121,4 +133,55 @@ function postprocess_root(x)
         isequal(typeof(old_x), typeof(x)) && isequal(old_x, x) && return x
     end
     x # unreachable
+end
+
+
+inv_exacts = [0, Symbolics.term(*, pi),
+        Symbolics.term(/,pi,3),
+        Symbolics.term(/, pi, 2),
+        Symbolics.term(/, Symbolics.term(*, 2, pi), 3),
+        Symbolics.term(/, pi, 6),
+        Symbolics.term(/, Symbolics.term(*, 5, pi), 6),
+        Symbolics.term(/, pi, 4)
+]
+inv_evald = Symbolics.symbolic_to_float.(inv_exacts)
+
+const inv_pairs = collect(zip(inv_exacts, inv_evald))
+"""
+    function convert_consts(x)
+This function takes BasicSymbolic terms as input (x) and attempts
+to simplify these basic symbolic terms using known values.
+Currently, this function only supports inverse trigonometric functions.
+
+## Examples
+```jldoctest
+julia> Symbolics.convert_consts(Symbolics.term(acos, 0))
+π / 2
+
+julia> Symbolics.convert_consts(Symbolics.term(atan, 0))
+0
+
+julia> Symbolics.convert_consts(Symbolics.term(atan, 1))
+π / 4
+```
+"""
+function convert_consts(x)
+    !iscall(x) && return x
+
+    oper = operation(x)
+    inv_opers = [asin, acos, atan]
+
+    if any(isequal(oper, o) for o in inv_opers) && isempty(Symbolics.get_variables(x))
+        val = Symbolics.symbolic_to_float(x)
+        for (exact, evald) in inv_pairs
+            if isapprox(evald, val)
+                return exact
+            elseif isapprox(-evald, val)
+                return -exact
+            end
+        end
+    end
+
+    # add [sin, cos, tan] simplifications in the future?
+    return x
 end

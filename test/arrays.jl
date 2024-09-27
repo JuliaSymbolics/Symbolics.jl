@@ -36,7 +36,9 @@ end
 @testset "getname" begin
     @variables t x(t)[1:4]
     v = Symbolics.lower_varname(unwrap(x[2]), unwrap(t), 2)
-    @test getname(v) == Symbol("x(t)[2]ˍtt")
+    @test operation(v) == getindex
+    @test arguments(v)[2] == 2
+    @test getname(v) == getname(arguments(v)[1]) == Symbol("x(t)ˍtt")
 end
 
 @testset "getindex" begin
@@ -80,6 +82,8 @@ end
     @test isequal(T, Symbolics.maketerm(typeof(T), operation(T), arguments(T), nothing))
     T2 = unwrap(3B)
     @test isequal(T2, Symbolics.maketerm(typeof(T), operation(T), [*, 3, unwrap(B)], nothing))
+    T3 = unwrap(A .^ 2)
+    @test isequal(T3, Symbolics.maketerm(typeof(T3), operation(T3), arguments(T3), nothing))
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)

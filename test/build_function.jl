@@ -1,7 +1,7 @@
 using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 using Symbolics: value
-using SymbolicUtils.Code: DestructuredArgs, Func
+using SymbolicUtils.Code: DestructuredArgs, Func, NameState
 @variables a b c1 c2 c3 d e g
 oop, iip = Symbolics.build_function([sqrt(a), sin(b)], [a, b], nanmath = true)
 @test all(isnan, eval(oop)([-1, Inf]))
@@ -274,4 +274,10 @@ let #658
     @variables a, X1[1:3], X2[1:3]
     k = eval(build_function(a * X1 + X2, X1, X2, a)[2])
     @test k(ones(3), ones(3), 1.5) == [2.5, 2.5, 2.5]
+end
+
+@testset "ArrayOp codegen" begin
+    @variables x[1:2]
+    T = value(x .^ 2)
+    @test_nowarn toexpr(T, NameState())
 end
