@@ -279,9 +279,9 @@ function degree(p, sym=nothing)
             return Int(isequal(p, sym))
         end
     elseif ismul(p)
-        return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
+        return sum(degree(k^v, sym) for (k, v) in zip(keys(get_dict(p)), values(get_dict(p))))
     elseif isadd(p)
-        return maximum(degree(key, sym) for key in keys(p.dict))
+        return maximum(degree(key, sym) for key in keys(get_dict(p)))
     elseif ispow(p)
         return p.exp * degree(p.base, sym)
     elseif isdiv(p)
@@ -344,7 +344,7 @@ function coeff(p, sym=nothing)
         if sym===nothing
             p.coeff
         else
-            sum(coeff(k, sym) * v for (k, v) in p.dict)
+            sum(coeff(k, sym) * v for (k, v) in get_dict(p))
         end
     elseif ismul(p)
         args = arguments(p)

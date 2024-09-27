@@ -139,7 +139,7 @@ function recursive_hasoperator(op, O)
         return true
     else
         if isadd(O) || ismul(O)
-            any(recursive_hasoperator(op), keys(O.dict))
+            any(recursive_hasoperator(op), keys(get_dict(O)))
         elseif ispow(O)
             recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
         elseif isdiv(O)

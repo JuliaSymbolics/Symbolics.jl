@@ -60,7 +60,7 @@ end
 # return a dictionary of exponents with respect to variables
 function pdegrees(x)
     if ismul(x)
-        return x.dict
+        return get_dict(x)
     elseif isdiv(x)
         num_dict = pdegrees(x.num)
         den_dict = pdegrees(x.den)

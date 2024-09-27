@@ -29,7 +29,8 @@ using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
 import SymbolicUtils: BasicSymbolic, FnType, @rule, Rewriters, substitute, symtype,
-                      promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, _Sym
+                      promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, _Sym,
+                      get_dict
 
 using SymbolicUtils.Code
 
