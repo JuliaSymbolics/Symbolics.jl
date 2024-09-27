@@ -1,12 +1,12 @@
 using Symbolics
 import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
-import SymbolicUtils: Term, symtype, FnType, BasicSymbolic, promote_symtype
+import SymbolicUtils: symtype, FnType, BasicSymbolic, promote_symtype, _Term
 using LinearAlgebra
 using Test
 
 @variables t
 Symbolics.@register_symbolic fff(t)
-@test isequal(fff(t), Symbolics.Num(Symbolics.Term{Real}(fff, [Symbolics.value(t)])))
+@test isequal(fff(t), Symbolics.Num(_Term(Real, fff, [Symbolics.value(t)])))
 
 const SymMatrix{T,N} =  Symmetric{T, AbstractArray{T, N}}
 many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5 p(..)[1:4]

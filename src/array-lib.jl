@@ -32,7 +32,7 @@ function Base.getindex(x::SymArray, idx...)
                 throw(BoundsError(x, idx))
             end
         end
-        res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...]; metadata = meta)
+        res = _Term(eltype(symtype(x)), getindex, [x, Tuple(ii)...]; metadata = meta)
     elseif all(i -> symtype(i) <: Integer, idx)
         shape(x) !== Unknown() && @boundscheck begin
             if length(idx) > 1
@@ -43,7 +43,7 @@ function Base.getindex(x::SymArray, idx...)
                 end
             end
         end
-        res = Term{eltype(symtype(x))}(getindex, [x, idx...]; metadata = meta)
+        res = _Term(eltype(symtype(x)), getindex, [x, idx...]; metadata = meta)
     elseif length(idx) == 1 && symtype(first(idx)) <: CartesianIndex
         i = first(idx)
         ii = i isa CartesianIndex ? Tuple(i) : arguments(i)
@@ -70,7 +70,7 @@ function Base.getindex(x::SymArray, idx...)
             end
         end
 
-        term = Term{Any}(getindex, [x, idx...]; metadata = meta)
+        term = _Term(Any, getindex, [x, idx...]; metadata = meta)
         T = eltype(symtype(x))
         N = ndims(x) - count(i -> symtype(i) <: Integer, idx)
         res = ArrayOp(atype(symtype(x)){T,N},
@@ -197,12 +197,12 @@ function Broadcast.copy(bc::Broadcast.Broadcasted{SymBroadcast})
     # then you get pairs, and index matcher cannot
     # recurse into pairs
     Atype = propagate_atype(broadcast, bc.f, args...)
-    args = map(x -> x isa Base.RefValue ? Term{Any}(Ref, [x[]]) : x, args)
+    args = map(x -> x isa Base.RefValue ? _Term(Any, Ref, [x[]]) : x, args)
     ArrayOp(Atype{symtype(expr),ndim},
         (subscripts...,),
         expr,
         +,
-        Term{Any}(broadcast, [bc.f, args...]))
+        _Term(Any, broadcast, [bc.f, args...]))
 end
 
 # On wrapper:
@@ -270,15 +270,15 @@ function symeltype(A)
 end
 # TODO: add more such methods
 function getindex(A::AbstractArray, i::Symbolic{<:Integer}, ii::Symbolic{<:Integer}...)
-    Term{symeltype(A)}(getindex, [A, i, ii...])
+    _Term(symeltype(A), getindex, [A, i, ii...])
 end
 
 function getindex(A::AbstractArray, i::Int, j::Symbolic{<:Integer})
-    Term{symeltype(A)}(getindex, [A, i, j])
+    _Term(symeltype(A), getindex, [A, i, j])
 end
 
 function getindex(A::AbstractArray, j::Symbolic{<:Integer}, i::Int)
-    Term{symeltype(A)}(getindex, [A, j, i])
+    _Term(symeltype(A), getindex, [A, j, i])
 end
 
 function getindex(A::Arr, i::Int, j::Symbolic{<:Integer})
@@ -341,7 +341,7 @@ function _map(f, x, xs...)
         (idx...,),
         expr,
         +,
-        Term{Any}(map, [f, x, xs...]))
+        _Term(Any, map, [f, x, xs...]))
 end
 
 @inline _mapreduce(f, g, x, dims, kw) = mapreduce(f, g, x; dims=dims, kw...)
@@ -359,7 +359,7 @@ end
     expr = f(x[idx...])
     T = symtype(g(expr, expr))
     if dims === (:)
-        return Term{T}(_mapreduce, [f, g, x, dims, (kw...,)])
+        return _Term(T, _mapreduce, [f, g, x, dims, (kw...,)])
     end
 
     Atype = propagate_atype(_mapreduce, f, g, x, dims, (kw...,))
@@ -367,7 +367,7 @@ end
         (out_idx...,),
         expr,
         g,
-        Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)]))
+        _Term(Any, _mapreduce, [f, g, x, dims, (kw...,)]))
 end false
 
 for (ff, opts) in [sum => (identity, +, false),

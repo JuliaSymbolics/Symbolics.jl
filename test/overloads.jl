@@ -1,4 +1,4 @@
-using Symbolics: Sym, FnType, Term, value, scalarize
+using Symbolics: FnType, _Term, value, scalarize
 using Symbolics
 using LinearAlgebra
 using SparseArrays: sparse
@@ -163,7 +163,7 @@ z2 = c + d * im
 @test conj(a) === a
 @test imag(a) === Num(0)
 
-@test isequal(sign(x), Num(SymbolicUtils.Term{Int}(sign, [Symbolics.value(x)])))
+@test isequal(sign(x), Num(_Term(Int, sign, [Symbolics.value(x)])))
 @test sign(Num(1)) isa Num
 @test isequal(sign(Num(1)), Num(1))
 @test isequal(sign(Num(-1)), Num(-1))

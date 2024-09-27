@@ -407,7 +407,7 @@ function array_term(f, args...;
         end
     end
     S = container_type{eltype, ndims}
-    setmetadata(Term{S}(f, Any[args...]), ArrayShapeCtx, shape)
+    setmetadata(_Term(S, f, Any[args...]), ArrayShapeCtx, shape)
 end
 
 """
@@ -680,7 +680,7 @@ function scalarize_op(f::typeof(_det), arr)
 end
 
 @wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace=true)
-    Term{eltype(x)}(_det, [x, laplace])
+    _Term(eltype(x), _det, [x, laplace])
 end false
 
 
