@@ -1,4 +1,4 @@
-using SymbolicUtils: FnType, Sym, metadata
+using SymbolicUtils: FnType, metadata
 using Setfield
 
 const IndexMap = Dict{Char,Char}(
@@ -255,11 +255,11 @@ end
 
 function construct_var(macroname, var_name, type, call_args, val, prop)
     expr = if call_args === nothing
-        :($Sym{$type}($var_name))
+        :($_Sym($type, $var_name))
     elseif !isempty(call_args) && call_args[end] == :..
-        :($CallWithMetadata($Sym{$FnType{Tuple, $type}}($var_name)))
+        :($CallWithMetadata($_Sym($FnType{Tuple, $type}, $var_name)))
     else
-        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
+        :($_Sym($FnType{NTuple{$(length(call_args)), Any}, $type}, $var_name)($(map(x->:($value($x)), call_args)...)))
     end
 
     if val !== nothing
@@ -582,7 +582,7 @@ Also see `variables`.
 """
 function variable(name, idx...; T=Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
-    v = Sym{T}(name_ij)
+    v = _Sym(T, name_ij)
     if T <: FnType
         v = CallWithMetadata(v)
     end
