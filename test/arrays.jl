@@ -82,6 +82,8 @@ end
     @test isequal(T, Symbolics.maketerm(typeof(T), operation(T), arguments(T), nothing))
     T2 = unwrap(3B)
     @test isequal(T2, Symbolics.maketerm(typeof(T), operation(T), [*, 3, unwrap(B)], nothing))
+    T3 = unwrap(A .^ 2)
+    @test isequal(T3, Symbolics.maketerm(typeof(T3), operation(T3), arguments(T3), nothing))
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
