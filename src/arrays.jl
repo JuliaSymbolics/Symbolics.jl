@@ -181,9 +181,9 @@ macro arrayop(output_idx, expr, options...)
     end |> esc
 end
 
-const SymArray = Union{ArrayOp, Symbolic{<:AbstractArray}}
-const SymMat = Union{ArrayOp{<:AbstractMatrix}, Symbolic{<:AbstractMatrix}}
-const SymVec = Union{ArrayOp{<:AbstractVector}, Symbolic{<:AbstractVector}}
+const SymArray = Union{ArrayOp, BasicSymbolic{<:AbstractArray}}
+const SymMat = Union{ArrayOp{<:AbstractMatrix}, BasicSymbolic{<:AbstractMatrix}}
+const SymVec = Union{ArrayOp{<:AbstractVector}, BasicSymbolic{<:AbstractVector}}
 
 ### Propagate ###
 #
