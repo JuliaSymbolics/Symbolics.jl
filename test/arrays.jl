@@ -2,7 +2,7 @@ using Symbolics
 using SymbolicUtils, Test
 using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, array_term, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
 using Base: Slice
-using SymbolicUtils: Sym, term, operation
+using SymbolicUtils: _Sym, term, operation
 import LinearAlgebra: dot
 
 struct TestMetaT end
