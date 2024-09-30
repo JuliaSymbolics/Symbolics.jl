@@ -71,12 +71,14 @@ end
 get_variables!(vars, e::Number, varlist=nothing) = vars
 
 function get_variables!(vars, e::Symbolic, varlist=nothing)
-    if is_singleton(e)
-        if isnothing(varlist) || any(isequal(e), varlist)
-            push!(vars, e)
+    if !isconst(e)
+        if is_singleton(e)
+            if isnothing(varlist) || any(isequal(e), varlist)
+                push!(vars, e)
+            end
+        else
+            foreach(x -> get_variables!(vars, x, varlist), arguments(e))
         end
-    else
-        foreach(x -> get_variables!(vars, x, varlist), arguments(e))
     end
     return (vars isa AbstractVector) ? unique!(vars) : vars
 end

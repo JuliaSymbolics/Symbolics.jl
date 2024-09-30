@@ -30,7 +30,7 @@ import TermInterface: maketerm, iscall, operation, arguments, metadata
 
 import SymbolicUtils: BasicSymbolic, FnType, @rule, Rewriters, substitute, symtype,
                       promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, _Sym,
-                      _Term, get_dict
+                      _Term, get_dict, isconst
 
 using SymbolicUtils.Code
 
