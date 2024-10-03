@@ -6,7 +6,7 @@
 
 Perturbation methods are a collection of techniques to solve intractable problems that generally don't have a closed solution but depend on a tunable parameter and have closed or easy solutions for some values of the parameter. The main idea is to assume a solution as a power series in the tunable parameter (say $ϵ$), such that $ϵ = 0$ corresponds to an easy solution.
 
-We will discuss the general steps of the perturbation methods to solve algebraic (this tutorial) and [differential equations](@ref perturb_diff)
+We will discuss the general steps of the perturbation methods to solve algebraic (this tutorial) and [differential equations](https://docs.sciml.ai/ModelingToolkit/stable/examples/perturbation/)
 
 The hallmark of the perturbation method is the generation of long and convoluted intermediate equations, which are subjected to algorithmic and mechanical manipulations. Therefore, these problems are well suited for CAS. In fact, CAS software packages have been used to help with the perturbation calculations since the early 1970s.
 
@@ -111,15 +111,9 @@ expand(eq)
 We need a way to get the coefficients of different powers of `ϵ`. Function `collect_powers(eq, x, ns)` returns the powers of variable `x` in expression `eq`. Argument `ns` is the range of the powers.
 
 ```@example perturb
-function collect_powers(eq, x, ns; max_power=100)
-    eq = substitute(expand(eq), Dict(x^j => 0 for j=last(ns)+1:max_power))
-
-    eqs = []
-    for i in ns
-        powers = Dict(x^j => (i==j ? 1 : 0) for j=1:last(ns))
-        push!(eqs, substitute(eq, powers))
-    end
-    eqs
+function collect_powers(eq, x, ns)
+    eq = expand(eq)
+    [Symbolics.coeff(eq, x^i) for i in ns]
 end
 ```
 
@@ -129,22 +123,7 @@ To return the coefficients of $ϵ$ and $ϵ^2$ in `eq`, we can write
 eqs = collect_powers(eq, ϵ, 1:2)
 ```
 
-A few words on how `collect_powers` works, It uses `substitute` to find the coefficient of a given power of `x` by passing a `Dict` with all powers of `x` set to 0, except the target power which is set to 1. For example, the following expression returns the coefficient of `ϵ^2` in `eq`,
-
-```@example perturb
-substitute(expand(eq), Dict(
-  ϵ => 0,
-  ϵ^2 => 1,
-  ϵ^3 => 0,
-  ϵ^4 => 0,
-  ϵ^5 => 0,
-  ϵ^6 => 0,
-  ϵ^7 => 0,
-  ϵ^8 => 0)
-)
-```
-
-Back to our problem. Having the coefficients of the powers of `ϵ`, we can set each equation in `eqs` to 0 (remember, we rearrange the problem such that `eq` is 0) and solve the system of linear equations to find the numerical values of the coefficients. **Symbolics.jl** has a function `Symbolics.solve_for` that can solve systems of linear equations. However, the presence of higher-order terms in `eqs` prevents `Symbolics.solve_for(eqs .~ 0, a)` from workings properly. Instead, we can exploit the fact that our system is in a triangular form and start by solving `eqs[1]` for `a₁` and then substitute this in `eqs[2]` and solve for `a₂`, and so on.  This *cascading* process is done by function `solve_coef(eqs, ps)`:
+Having the coefficients of the powers of `ϵ`, we can set each equation in `eqs` to 0 (remember, we rearrange the problem such that `eq` is 0) and solve the system of linear equations to find the numerical values of the coefficients. **Symbolics.jl** has a function `symbolic_linear_solve` that can solve systems of linear equations. However, the presence of higher-order terms in `eqs` prevents `symbolic_linear_solve(eqs, a)` from workings properly. Instead, we can exploit the fact that our system is in a triangular form and start by solving `eqs[1]` for `a₁` and then substitute this in `eqs[2]` and solve for `a₂`, and so on.  This *cascading* process is done by function `solve_coef(eqs, ps)`:
 
 ```@example perturb
 function solve_coef(eqs, ps)
@@ -152,7 +131,7 @@ function solve_coef(eqs, ps)
 
     for i = 1:length(ps)
         eq = substitute(eqs[i], vals)
-        vals[ps[i]] = Symbolics.solve_for(eq ~ 0, ps[i])
+        vals[ps[i]] = symbolic_linear_solve(eq, ps[i])
     end
     vals
 end
@@ -252,8 +231,7 @@ X = (𝜀, 𝑀) -> substitute(x′, Dict(ϵ => 𝜀, M => 𝑀))
 X(0.01671, π/2)
 ```
 
-The result is 1.5876, compared to the numerical value of 1.5875. It is customary to order `X` based on the powers of `𝑀` instead of `𝜀`. We can calculate this series as `collect_powers(sol, M, 0:3)
-`. The result (after manual cleanup) is
+The result is 1.5876, compared to the numerical value of 1.5875. It is customary to order `X` based on the powers of `𝑀` instead of `𝜀`. We can calculate this series as `collect_powers(x′, M, 0:5)`. The result (after manual cleanup) is
 
 ```
 (1 + 𝜀 + 𝜀^2 + 𝜀^3)*𝑀
