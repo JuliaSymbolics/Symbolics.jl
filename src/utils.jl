@@ -71,12 +71,14 @@ end
 get_variables!(vars, e::Number, varlist=nothing) = vars
 
 function get_variables!(vars, e::Symbolic, varlist=nothing)
-    if is_singleton(e)
-        if isnothing(varlist) || any(isequal(e), varlist)
-            push!(vars, e)
+    if !isconst(e)
+        if is_singleton(e)
+            if isnothing(varlist) || any(isequal(e), varlist)
+                push!(vars, e)
+            end
+        else
+            foreach(x -> get_variables!(vars, x, varlist), arguments(e))
         end
-    else
-        foreach(x -> get_variables!(vars, x, varlist), arguments(e))
     end
     return (vars isa AbstractVector) ? unique!(vars) : vars
 end
@@ -132,7 +134,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
         elseif oldop == getindex
             args = arguments(O)
             opname = string(tosymbol(args[1]))
-            return metadata(Sym{symtype(args[1])}(Symbol(opname, d_separator, ds)), metadata(args[1]))[args[2:end]...]
+            return metadata(_Sym(symtype(args[1]), Symbol(opname, d_separator, ds)), metadata(args[1]))[args[2:end]...]
         elseif oldop isa Function
             return nothing
         else
@@ -227,7 +229,7 @@ function makesubscripts(n)
     map(1:n) do i
         repeats = ceil(Int, i / m)
         c = set[(i-1) % m + 1]
-        Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
+        _Sym(Int, Symbol(join([c for _ in 1:repeats], "")))
     end
 end
 
@@ -279,9 +281,9 @@ function degree(p, sym=nothing)
             return Int(isequal(p, sym))
         end
     elseif ismul(p)
-        return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
+        return sum(degree(k^v, sym) for (k, v) in zip(keys(get_dict(p)), values(get_dict(p))))
     elseif isadd(p)
-        return maximum(degree(key, sym) for key in keys(p.dict))
+        return maximum(degree(key, sym) for key in keys(get_dict(p)))
     elseif ispow(p)
         return p.exp * degree(p.base, sym)
     elseif isdiv(p)
@@ -344,7 +346,7 @@ function coeff(p, sym=nothing)
         if sym===nothing
             p.coeff
         else
-            sum(coeff(k, sym) * v for (k, v) in p.dict)
+            sum(coeff(k, sym) * v for (k, v) in get_dict(p))
         end
     elseif ismul(p)
         args = arguments(p)
