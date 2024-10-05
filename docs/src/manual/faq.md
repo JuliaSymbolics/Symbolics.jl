@@ -88,3 +88,31 @@ be selected (since `x == y` is unknown for arbitrary symbolic values!). This is 
 required, since this is a non-lazy check of whether the symbol `x` is always equal to the symbol `y`, rather than
 an expression of whether `x` and `y` currently have the same value.
 
+## Understanding the Difference Between the Julia Variable and the Symbolic Variable
+
+In the most basic usage of Symbolics, the name of the Julia variable
+and the symbolic variable are the same. For example, when we do:
+
+```@example faq
+@variables a
+```
+
+the name of the symbolic variable is `a` and same with the Julia variable. However, we can
+de-couple these by setting `a` to a new symbolic variable, for example:
+
+```@example faq
+b = only(@variables(a))
+```
+
+Now the Julia variable `b` refers to the variable named `a`. However, the downside of this current
+approach is that it requires that the user writing the script knows the name `a` that they want to
+place to the variable. But what if for example we needed to get the variable's name from a file?
+
+To do this, one can interpolate a symbol into the `@variables` macro using `$`. For example:
+
+```@example faq
+a = :c
+b = only(@variables($a))
+```
+
+In this example, `@variables($a)` created a variable named `c`, and set this variable to `b`.
