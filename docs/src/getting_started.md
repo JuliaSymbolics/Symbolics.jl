@@ -196,6 +196,17 @@ convert the output to an `Expr`:
 Symbolics.toexpr(x + y^2)
 ```
 
+The other way around is also possible, parsing Julia expressions into symbolic expressions
+
+```@example symbolic_basics
+ex = [:(v ~ w)
+      :(w ~ -v)]
+eqs = parse_expr_to_symbolic.(ex, (Main,))
+eqs_lhs = [eq.lhs for eq in eqs]
+eqs_rhs = [eq.rhs for eq in eqs]
+Symbolics.jacobian(eqs_rhs, eqs_lhs)
+```
+
 ## `Sym`s and callable `Sym`s
 
 In the definition
