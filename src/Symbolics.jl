@@ -138,6 +138,9 @@ export symbolic_linear_solve, solve_for
 include("groebner_basis.jl")
 export groebner_basis, is_groebner_basis
 
+include("taylor.jl")
+export taylor
+
 import Libdl
 include("build_function.jl")
 export build_function
