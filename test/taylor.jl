@@ -26,3 +26,10 @@ end
 
 # around x ≠ 0
 @test substitute(taylor(√(x), x, 1, 0:6), x => x + 1) - taylor(√(1+x), x, 0:6) == 0
+
+# equations
+eq = sin(2*x) ~ 2*sin(x)*cos(x)
+eq = taylor(eq, x, 0:7)
+eqs = taylor_coeff(eq, x) # should automatically expand to 7th order
+@test length(eqs) == 7+1 && all(isequal(eq.lhs, eq.rhs) for eq in eqs)
+

@@ -1,9 +1,21 @@
 """
     taylor_coeff(f, x, n; rationalize=true)
 
-Calculate the `n`-th order coefficient(s) in the Taylor series of the expression `f(x)` around `x = 0`.
+"""
+    taylor_coeff(f, x[, n]; rationalize=true)
+
+Calculate the `n`-th order coefficient(s) in the Taylor series of `f` around `x = 0`.
 """
 function taylor_coeff(f, x, n; rationalize=true)
+    if n isa AbstractArray
+        # return array of expressions/equations for each order
+        return taylor_coeff.(Ref(f), Ref(x), n; rationalize)
+    elseif f isa Equation
+        # return new equation with coefficients of each side
+        return taylor_coeff(f.lhs, x, n; rationalize) ~ taylor_coeff(f.rhs, x, n; rationalize)
+        end
+    end
+
     # TODO: error if x is not a "pure variable"
     D = Differential(x)
     n! = factorial(n)
@@ -21,7 +33,7 @@ end
 """
     taylor(f, x, [x0=0,] n; rationalize=true)
 
-Calculate the `n`-th order term(s) in the Taylor series of the expression `f(x)` around `x = x0`.
+Calculate the `n`-th order term(s) in the Taylor series of `f` around `x = x0`.
 If `rationalize`, float coefficients are approximated as rational numbers (this can produce unexpected results for irrational numbers, for example).
 
 Examples
@@ -42,6 +54,10 @@ julia> taylor(√(x), x, 1, 0:3)
 ```
 """
 function taylor(f, x, ns; kwargs...)
+    if f isa Equation
+        return taylor(f.lhs, x, ns; kwargs...) ~ taylor(f.rhs, x, ns; kwargs...)
+    end
+
     return sum(taylor_coeff(f, x, n; kwargs...) * x^n for n in ns)
 end
 function taylor(f, x, x0, n; kwargs...)
