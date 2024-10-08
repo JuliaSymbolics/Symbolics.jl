@@ -1,5 +1,23 @@
-# TODO: error if x is not a "pure variable"
-# TODO: optimize for multiple orders with loop/recursion
+"""
+    taylor_coeff(f, x, n; rationalize=true)
+
+Calculate the `n`-th order coefficient(s) in the Taylor series of the expression `f(x)` around `x = 0`.
+"""
+function taylor_coeff(f, x, n; rationalize=true)
+    # TODO: error if x is not a "pure variable"
+    D = Differential(x)
+    n! = factorial(n)
+    c = (D^n)(f) / n! # TODO: optimize the implementation for multiple n with a loop that avoids re-differentiating the same expressions
+    c = expand_derivatives(c)
+    c = substitute(c, x => 0)
+    if rationalize && unwrap(c) isa Number
+        # TODO: make rational coefficients "organically" and not using rationalize (see https://github.com/JuliaSymbolics/Symbolics.jl/issues/1299)
+        c = unwrap(c)
+        c = isinteger(c) ? Int(c) : Base.rationalize(c) # convert non-integer floats to rational numbers; avoid name clash between rationalize and Base.rationalize()
+    end
+    return c
+end
+
 """
     taylor(f, x, [x0=0,] n; rationalize=true)
 
@@ -23,21 +41,8 @@ julia> taylor(√(x), x, 1, 0:3)
 1 + (1//2)*(-1 + x) - (1//8)*((-1 + x)^2) + (1//16)*((-1 + x)^3)
 ```
 """
-function taylor(f, x, n::Int; rationalize=true)
-    D = Differential(x)
-    n! = factorial(n)
-    c = (D^n)(f) / n!
-    c = expand_derivatives(c)
-    c = substitute(c, x => 0)
-    if rationalize && unwrap(c) isa Number
-        # TODO: make rational coefficients "organically" and not using rationalize (see https://github.com/JuliaSymbolics/Symbolics.jl/issues/1299)
-        c = unwrap(c)
-        c = c % 1.0 == 0.0 ? Int(c) : Base.rationalize(c) # avoid nameclash with keyword argument
-    end
-    return c * x^n
-end
-function taylor(f, x, n::AbstractArray{Int}; kwargs...)
-    return sum(taylor.(f, x, n; kwargs...))
+function taylor(f, x, ns; kwargs...)
+    return sum(taylor_coeff(f, x, n; kwargs...) * x^n for n in ns)
 end
 function taylor(f, x, x0, n; kwargs...)
     # 1) substitute dummy x′ = x - x0
