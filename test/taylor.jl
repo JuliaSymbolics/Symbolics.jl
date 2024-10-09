@@ -33,3 +33,13 @@ eq = taylor(eq, x, 0:7)
 eqs = taylor_coeff(eq, x) # should automatically expand to 7th order
 @test length(eqs) == 7+1 && all(isequal(eq.lhs, eq.rhs) for eq in eqs)
 
+
+# expand quintic equation around x=1
+@variables ϵ
+x_series = series(x, ϵ, 0:3)
+x_coeffs = taylor_coeff(x_series, ϵ)
+eq = x^5 + ϵ*x ~ 1
+eqs = taylor_coeff(substitute(eq, x => x_series), ϵ, 0:3)
+sol = x_coeffs .=> [1, -1//5, -1//25, -1//125] # e.g. https://ekamperi.github.io/mathematics/2020/06/21/perturbation-theory.html#MathJax-Element-39-Frame
+eqs = substitute(eqs, Dict(sol))
+@test all(isequal(eq.lhs, eq.rhs) for eq in eqs)
