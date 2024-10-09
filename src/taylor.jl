@@ -1,5 +1,15 @@
 """
-    taylor_coeff(f, x, n; rationalize=true)
+    series(y, x, [x0=0,] ns; name = nameof(y))
+
+Expand the variable `y` in a power series in the variable `x` around `x0` to orders `ns`.
+"""
+function series(y, x, x0, ns; name = nameof(y))
+    c, = @variables $name[ns]
+    return sum(c[n] * (x - x0)^n for n in ns)
+end
+function series(y, x, ns; kwargs...)
+    return series(y, x, 0, ns; kwargs...)
+end
 
 """
     taylor_coeff(f, x[, n]; rationalize=true)
