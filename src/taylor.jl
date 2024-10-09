@@ -104,7 +104,9 @@ true
 ```
 """
 function taylor(f, x, ns; kwargs...)
-    if f isa Equation
+    if f isa AbstractArray
+        return taylor.(f, Ref(x), Ref(ns); kwargs...)
+    elseif f isa Equation
         return taylor(f.lhs, x, ns; kwargs...) ~ taylor(f.rhs, x, ns; kwargs...)
     end
 

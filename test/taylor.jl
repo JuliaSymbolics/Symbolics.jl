@@ -43,3 +43,6 @@ eqs = taylor_coeff(substitute(eq, x => x_series), ϵ, 0:3)
 sol = x_coeffs .=> [1, -1//5, -1//25, -1//125] # e.g. https://ekamperi.github.io/mathematics/2020/06/21/perturbation-theory.html#MathJax-Element-39-Frame
 eqs = substitute(eqs, Dict(sol))
 @test all(isequal(eq.lhs, eq.rhs) for eq in eqs)
+
+# system of equations
+@test taylor(exp(im*x) ~ 0, x, 0:5) == taylor([cos(x) ~ 0, sin(x) ~ 0], x, 0:5)
