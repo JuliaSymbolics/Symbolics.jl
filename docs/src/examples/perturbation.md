@@ -1,250 +1,141 @@
 # [Mixed Symbolic-Numeric Perturbation Theory](@id perturb_alg)
 
-## Background
+[**Symbolics.jl**](https://github.com/JuliaSymbolics/Symbolics.jl) is a fast and modern Computer Algebra System (CAS) written in Julia. It is an integral part of the [SciML](https://sciml.ai/) ecosystem of differential equation solvers and scientific machine learning packages. While **Symbolics.jl** is primarily designed for modern scientific computing (e.g. automatic differentiation and machine learning), it is also a powerful CAS that can be used for *classic* scientific computing. One such application is using *perturbation theory* to solve algebraic and differential equations.
 
-[**Symbolics.jl**](https://github.com/JuliaSymbolics/Symbolics.jl) is a fast and modern Computer Algebra System (CAS) written in the Julia Programming Language. It is an integral part of the [SciML](https://sciml.ai/) ecosystem of differential equation solvers and scientific machine learning packages. While **Symbolics.jl** is primarily designed for modern scientific computing (e.g., auto-differentiation, machine learning), it is a powerful CAS that can also be useful for *classic* scientific computing. One such application is using the *perturbation* theory to solve algebraic and differential equations.
+Perturbation methods are a collection of techniques to solve hard problems that generally don't have a closed solution, but depend on a tunable parameter and have closed or easy solutions for some values of this parameter. The main idea is to assume a solution that is a power series in the tunable parameter (say $ϵ$), such that $ϵ = 0$ corresponds to an easy solution, and then solve iteratively for higher-order corrections.
 
-Perturbation methods are a collection of techniques to solve intractable problems that generally don't have a closed solution but depend on a tunable parameter and have closed or easy solutions for some values of the parameter. The main idea is to assume a solution as a power series in the tunable parameter (say $ϵ$), such that $ϵ = 0$ corresponds to an easy solution.
+The hallmark of perturbation theory is the generation of long and convoluted intermediate equations by this process. These are subjected to algorithmic and mechanical manipulations, which makes perturbation methods an excellent fit for a CAS. In fact, CAS software have been used for perturbation calculations since the early 1970s.
 
-We will discuss the general steps of the perturbation methods to solve algebraic (this tutorial) and [differential equations](https://docs.sciml.ai/ModelingToolkit/stable/examples/perturbation/)
+This tutorial shows how to mix symbolic manipulations and numerical methods to solve algebraic equations with perturbation theory. [Another tutorial applies it to differential equations](https://docs.sciml.ai/ModelingToolkit/stable/examples/perturbation/).
 
-The hallmark of the perturbation method is the generation of long and convoluted intermediate equations, which are subjected to algorithmic and mechanical manipulations. Therefore, these problems are well suited for CAS. In fact, CAS software packages have been used to help with the perturbation calculations since the early 1970s.
+## Solving the quintic equation
 
-In this tutorial, our goal is to show how to use a mix of symbolic manipulations (**Symbolics.jl**) and numerical methods to solve simple perturbation problems.
-
-## Solving the Quintic
-
-We start with the “hello world!” analog of the perturbation problems, solving the quintic (fifth-order) equations. We want to find a real valued $x$ such that $x^5 + x = 1$. According to the Abel's theorem, a general quintic equation does not have a closed form solution. Of course, we can easily solve this equation numerically; for example, by using the Newton's method. We use the following implementation of the Newton's method:
-
+The “hello world!” analog of perturbation problems is to find a real solution $x$ to the quintic (fifth-order) equation
 ```@example perturb
-using Symbolics, SymbolicUtils
+using Symbolics
+@variables x
+quintic = x^5 + x ~ 1
+```
+According to Abel's theorem, a general quintic equation does not have a closed form solution. But we can easily solve it numerically using Newton's method (here implemented for simplicity, and not performance):
+```@example perturb
+function solve_newton(eq, x, x₀; abstol=1e-8, maxiters=50)
+    # symbolic expressions for f(x) and f′(x)
+    f = eq.lhs - eq.rhs # want to find root of f(x)
+    f′ = Symbolics.derivative(f, x)
 
-function solve_newton(f, x, x₀; abstol=1e-8, maxiter=50)
-    xₙ = Float64(x₀)
-    fₙ₊₁ = x - f / Symbolics.derivative(f, x)
-
-    for i = 1:maxiter
-        xₙ₊₁ = substitute(fₙ₊₁, Dict(x => xₙ))
+    xₙ = x₀ # numerical value of the initial guess
+    for i = 1:maxiters
+        # calculate new guess by numerically evaluating symbolic expression at previous guess
+        xₙ₊₁ = substitute(x - f / f′, x => xₙ)
         if abs(xₙ₊₁ - xₙ) < abstol
-            return xₙ₊₁
+            return xₙ₊₁ # converged
         else
             xₙ = xₙ₊₁
         end
     end
-    return xₙ₊₁
+    error("Newton's method failed to converge")
 end
+
+x_newton = solve_newton(quintic, x, 1.0)
+println("Newton's method solution: x = ", x_newton)
 ```
 
-In this code, `Symbolics.derivative(eq, x)` does exactly what it names implies: it calculates the symbolic derivative of `eq` (a **Symbolics.jl** expression) with respect to `x` (a **Symbolics.jl** variable). We use `Symbolics.substitute(eq, D)` to evaluate the update formula by substituting variables or sub-expressions (defined in a dictionary `D`) in `eq`. It should be noted that `substitute` is the workhorse of our code and will be used multiple times in the rest of these tutorials. `solve_newton` is written with simplicity and clarity in mind, and not performance.
-
-Let's go back to our quintic. We can define a Symbolics variable as `@variables x` and then solve the equation `solve_newton(x^5 + x - 1, x, 1.0)` (here, `x₀ = 1.0` is our first guess). The answer is 0.7549. Now, let's see how we can solve the same problem using the perturbation methods.
-
-We introduce a tuning parameter $\epsilon$ into our equation: $x^5 + \epsilon x = 1$. If $\epsilon = 1$, we get our original problem. For $\epsilon = 0$, the problem transforms to an easy one: $x^5 = 1$ which has an exact real solution $x = 1$ (and four complex solutions which we ignore here). We expand $x$ as a power series on $\epsilon$:
-
-```math
-  x(\epsilon) = a_0 + a_1 \epsilon + a_2 \epsilon^2 + O(\epsilon^3)
-```
-
-$a_0$ is the solution of the easy equation, therefore $a_0 = 1$. Substituting into the original problem,
-
-```math
-  (a_0 + a_1 \epsilon + a_2 \epsilon^2)^5 + \epsilon (a_0 + a_1 \epsilon + a_2 \epsilon^2) - 1 = 0
-```
-
-Expanding the equations, we get
-
-```math
-  \epsilon (1 + 5 a_1) + \epsilon^2 (a_1 + 5 a_2 + 10 a_1^2) + 𝑂(\epsilon^3) = 0
-```
-
-This equation should hold for each power of $\epsilon$. Therefore,
-
-```math
-  1 + 5 a_1 = 0
-```
-
-and
-
-```math
-  a_1 + 5 a_2 + 10 a_1^2 = 0
-```
-
-This system of equations does not initially seem to be linear because of the presence of terms like $10 a_1^2$, but upon closer inspection is found to be linear (this is a feature of the perturbation methods). In addition, the system is in a triangular form, meaning the first equation depends only on $a_1$, the second one on $a_1$ and $a_2$, such that we can replace the result of $a_1$ from the first one into the second equation and remove the non-linear term. We solve the first equation to get $a_1 = -\frac{1}{5}$. Substituting in the second one and solve for $a_2$:
-
-```math
-  a_2 = \frac{(-\frac{1}{5} + 10(-(\frac{1}{5})²)}{5}  = -\frac{1}{25}
-```
-
-Finally,
-
-```math
-  x(\epsilon) = 1 - \frac{\epsilon}{5} - \frac{\epsilon^2}{25} + O(\epsilon^3)
-```
-
-Solving the original problem, $x(1) = 0.76$, compared to 0.7548 calculated numerically. We can improve the accuracy by including more terms in the expansion of $x$. However, the calculations, while straightforward, become messy and intractable to do manually very quickly. This is why a CAS is very helpful to solve perturbation problems.
-
-Now, let's see how we can do these calculations in Julia. Let $n$ be the order of the expansion. We start by defining the symbolic variables:
-
+To solve the same problem with perturbation theory, we must introduce an expansion variable $ϵ$ in the equation:
 ```@example perturb
-n = 2
-@variables ϵ a[1:n]
+@variables ϵ # expansion variable
+quintic = x^5 + ϵ*x ~ 1
 ```
-
-Then, we define
-
+If $ϵ = 1$, we get our original problem. With $ϵ = 0$, the problem transforms to the easy quintic equation $x^5 = 1$ with the trivial real solution $x = 1$ (and four complex solutions which we ignore). Next, expand $x$ as a power series in $ϵ$:
 ```@example perturb
-x = 1 + a[1]*ϵ + a[2]*ϵ^2
+x_taylor = series(x, ϵ, 0:3) # expand x to third order
 ```
-
-The next step is to substitute `x` in the problem equation
-
+Then insert this into the quintic equation and expand it, too, to the same order:
 ```@example perturb
-  eq = x^5 + ϵ*x - 1
+quintic_taylor = substitute(quintic, x => x_taylor)
+quintic_taylor = taylor(quintic_taylor, ϵ, 0:3)
 ```
-
-The expanded form of `eq` is
-
+This equation must hold for each power of $ϵ$, so we can separate it into one equation per order:
 ```@example perturb
-expand(eq)
+quintic_eqs = taylor_coeff(quintic_taylor, ϵ)
 ```
-
-We need a way to get the coefficients of different powers of `ϵ`. Function `collect_powers(eq, x, ns)` returns the powers of variable `x` in expression `eq`. Argument `ns` is the range of the powers.
-
+These equations show three important features of perturbation theory:
+1. The $0$-th order equation is *trivial* in $x_0$: here $x_0^5 = 1$ has the trivial real solution $x_0 = 1$.
+2. The $n$-th order equation is *linear* in $x_n$ (except the trivial $0$-th order equation).
+3. The equations are *triangular* in $x_n$: the $n$-th order equation can be solved for $x_n$ given only $x_m$ for $m<n$.
+This structure is what makes the perturbation theory so attractive: we can start with the trivial solution $x_0 = 1$, then linearly solve for $x_n$ order-by-order and substitute in the solutions of $x_m$ for $m<n$ obtained so far. Let us write a function that solves a general equation `eq` for the variable `x` perturbatively with this *cascading* process:
 ```@example perturb
-function collect_powers(eq, x, ns)
-    eq = expand(eq)
-    [Symbolics.coeff(eq, x^i) for i in ns]
-end
-```
+function solve_perturbed(eq, x, x₀, ϵ, order)
+    x_taylor = series(x, ϵ, 0:order) # expand unknown in a taylor series
+    x_coeffs = taylor_coeff(x_taylor, ϵ, 0:order) # array of coefficients
+    eq_taylor = substitute(eq, x => x_taylor) # expand equation in taylor series
+    eqs = taylor_coeff(eq_taylor, ϵ, 0:order) # separate into order-by-order equations
+    sol = Dict(x_coeffs[1] => x₀) # store solutions in a symbolic-numeric map
 
-To return the coefficients of $ϵ$ and $ϵ^2$ in `eq`, we can write
-
-```@example perturb
-eqs = collect_powers(eq, ϵ, 1:2)
-```
-
-Having the coefficients of the powers of `ϵ`, we can set each equation in `eqs` to 0 (remember, we rearrange the problem such that `eq` is 0) and solve the system of linear equations to find the numerical values of the coefficients. **Symbolics.jl** has a function `symbolic_linear_solve` that can solve systems of linear equations. However, the presence of higher-order terms in `eqs` prevents `symbolic_linear_solve(eqs, a)` from workings properly. Instead, we can exploit the fact that our system is in a triangular form and start by solving `eqs[1]` for `a₁` and then substitute this in `eqs[2]` and solve for `a₂`, and so on.  This *cascading* process is done by function `solve_coef(eqs, ps)`:
-
-```@example perturb
-function solve_coef(eqs, ps)
-    vals = Dict()
-
-    for i = 1:length(ps)
-        eq = substitute(eqs[i], vals)
-        vals[ps[i]] = symbolic_linear_solve(eq, ps[i])
+    # verify that x₀ is a solution of the 0-th order equation
+    eq0 = substitute(eqs[1], sol)
+    if !isequal(eq0.lhs, eq0.rhs)
+        error("$sol is not a 0-th order solution of $(eqs[1])")
     end
-    vals
+
+    # solve higher-order equations order-by-order
+    for i in 2:length(eqs)
+        x_coeff = Symbolics.symbolic_linear_solve(eqs[i], x_coeffs[i]) # solve linear n-th order equation for x_n
+        x_coeff = substitute(x_coeff, sol) # substitute lower-order solutions to get numerical value
+        sol = merge(sol, Dict(x_coeffs[i] => x_coeff)) # store solution
+    end
+
+    return substitute(x_taylor, sol) # evalaute series with solved coefficients
+end
+
+x_pert = solve_perturbed(quintic, x, 1, ϵ, 7)
+```
+The $n$-th order solution of our original quintic equation is the sum up to the $ϵ^n$-th order term, evaluated at $ϵ=1$:
+```@example perturb
+for n in 0:7
+    println("$n-th order solution: x = ", substitute(taylor(x_pert, ϵ, 0:n), ϵ => 1.0))
 end
 ```
+This is close to the solution from Newton's method!
 
-Here, `eqs` is an array of expressions (assumed to be equal to 0) and `ps` is an array of variables. The result is a dictionary of *variable* => *value* pairs. We apply `solve_coef` to `eqs` to get the numerical values of the parameters:
+## Solving Kepler's Equation
 
+Historically, perturbation methods were first invented to calculate orbits of the Moon and the planets. In homage to this history, our second example is to solve [Kepler's equation](https://en.wikipedia.org/wiki/Kepler's_equation), which is central to solving two-body Keplerian orbits:
 ```@example perturb
-vals = solve_coef(eqs, a)
+@variables e E M
+kepler = E - e * sin(E) ~ M
 ```
-
-Finally, we substitute back the values of `a` in the definition of `x` as a function of `𝜀`. Note that `𝜀` is a number (usually Float64), whereas `ϵ` is a symbolic variable.
-
+We want to solve for the *eccentric anomaly* $E$ given the *eccentricity* $e$ and *mean anomaly* $M$.
+This is also easy with Newton's method. With Earth's eccentricity $e = 0.01671$ and $M = \pi/2$:
 ```@example perturb
-X = 𝜀 -> 1 + vals[a[1]]*𝜀 + vals[a[2]]*𝜀^2
+vals_earth = Dict(e => 0.01671, M => π/2)
+E_newton = solve_newton(substitute(kepler, vals_earth), E, π/2)
+println("Newton's method solution: E = ", E_newton)
 ```
 
-Therefore, the solution to our original problem becomes `X(1)`, which is equal to 0.76. We can use larger values of `n` to improve the accuracy of estimations.
-
-| n | x              |
-|---|----------------|
-|1  |0.8 |
-|2  |0.76|
-|3  |0.752|
-|4  |0.752|
-|5  |0.7533|
-|6  |0.7543|
-|7  |0.7548|
-|8  |0.7550|
-
-Remember, the numerical value is 0.7549. The two functions `collect_powers` and `solve_coef(eqs, a)` are used in all the examples in this and the next tutorial.
-
-## Solving the Kepler's Equation
-
-Historically, the perturbation methods were first invented to solve orbital calculations of the Moon and the planets. In homage to this history, our second example has a celestial theme. Our goal is solving the Kepler's equation:
-
-```math
-  E - e\sin(E) = M
-```
-
-where $e$ is the *eccentricity* of the elliptical orbit, $M$ is the *mean anomaly*, and $E$ (unknown) is the *eccentric anomaly* (the angle between the position of a planet in an elliptical orbit and the point of periapsis). This equation is central to solving two-body Keplerian orbits.
-
-Similar to the first example, it is easy to solve this problem using the Newton's method. For example, let $e = 0.01671$ (the eccentricity of the Earth) and $M = \pi/2$. We have `solve_newton(x - e*sin(x) - M, x, M)` equals to 1.5875 (compared to π/2 = 1.5708). Now, we try to solve the same problem using the perturbation techniques (see function `test_kepler`).
-
-For $e = 0$, we get $E = M$. Therefore, we can use $e$ as our perturbation parameter. For consistency with other problems, we also rename $e$ to $\epsilon$ and $E$ to $x$.
-
-From here on, we use the helper function `def_taylor` to define Taylor's series by calling it as `x = def_taylor(ϵ, a, 1)`, where the arguments are, respectively, the perturbation variable, which is an array of coefficients (starting from the coefficient of $\epsilon^1$), and an optional constant term.
-
+Next, let us solve the same problem with our perturbative solver. It is most common to expand Kepler's equation in $M$ (the trivial solution when $M=0$ is $E=0$):
 ```@example perturb
-def_taylor(x, ps) = sum([a*x^i for (i,a) in enumerate(ps)])
-def_taylor(x, ps, p₀) = p₀ + def_taylor(x, ps)
+E_pert = solve_perturbed(kepler, E, 0, M, 5)
 ```
-
-We start by defining the variables (assuming `n = 3`):
-
+Numerically, this gives almost the same answer as Newton's method:
 ```@example perturb
-n = 3
-@variables ϵ M a[1:n]
-x = def_taylor(ϵ, a, M)
+for n in 0:5
+    println("$n-th order solution: E = ", substitute(taylor(E_pert, M, 0:n), vals_earth))
+end
 ```
-
-We further simplify by substituting `sin` with its power series using the `expand_sin` helper function:
-
+But unlike Newtons method, perturbation theory also gives us the power to work with the full *symbolic* series solution for $E$ (*before* numbers for $e$ and $M$ are inserted). Our series matches [this result from Wikipedia](https://en.wikipedia.org/wiki/Kepler%27s_equation#Inverse_Kepler_equation):
 ```@example perturb
-expand_sin(x, n) = sum([(isodd(k) ? -1 : 1)*(-x)^(2k-1)/factorial(2k-1) for k=1:n])
+E_wiki = 1/(1-e)*M - e/(1-e)^4*M^3/factorial(3) + (9e^2+e)/(1-e)^7*M^5/factorial(5)
 ```
 
-To test,
-
+Alternatively, we can expand Kepler's equation in $e$ instead of $M$ (the trivial solution when $e = 0$ is $E=M$):
 ```@example perturb
-expand_sin(0.1, 10) ≈ sin(0.1)
+E_pert′ = solve_perturbed(kepler, E, M, e, 5)
 ```
-
-The problem equation is
-
+We can expand the trigonometric functions in $M$:
 ```@example perturb
-eq = x - ϵ * expand_sin(x, n) - M
+E_pert′ = taylor(E_pert′, M, 0:5)
 ```
-
-We follow the same process as the first example. We collect the coefficients of the powers of `ϵ`
-
+Up to order $e^5 M^5$, we see that this two-variable $(e,M)$-series also matches the result from Wikipedia:
 ```@example perturb
-eqs = collect_powers(eq, ϵ, 1:n)
+E_wiki′ = taylor(taylor(E_wiki, e, 0:5), M, 0:5)
 ```
-
-and then solve for `a`:
-
-```@example perturb
-vals = solve_coef(eqs, a)
-```
-
-Finally, we substitute `vals` back in `x`:
-
-```@example perturb
-x′ = substitute(x, vals)
-X = (𝜀, 𝑀) -> substitute(x′, Dict(ϵ => 𝜀, M => 𝑀))
-X(0.01671, π/2)
-```
-
-The result is 1.5876, compared to the numerical value of 1.5875. It is customary to order `X` based on the powers of `𝑀` instead of `𝜀`. We can calculate this series as `collect_powers(x′, M, 0:5)`. The result (after manual cleanup) is
-
-```
-(1 + 𝜀 + 𝜀^2 + 𝜀^3)*𝑀
-- (𝜀 + 4*𝜀^2 + 10*𝜀^3)*𝑀^3/6
-+ (𝜀 + 16*𝜀^2 + 91*𝜀^3)*𝑀^5/120
-```
-
-Comparing the formula to the one for 𝐸 in the [Wikipedia article on the Kepler's equation](https://en.wikipedia.org/wiki/Kepler%27s_equation):
-
-```math
-  E = \frac{1}{1-\epsilon}M
-    -\frac{\epsilon}{(1-\epsilon)^4} \frac{M^3}{3!} + \frac{(9\epsilon^2
-    + \epsilon)}{(1-\epsilon)^7}\frac{M^5}{5!}\cdots
-```
-
-The first deviation is in the coefficient of $\epsilon^3 M^5$.
