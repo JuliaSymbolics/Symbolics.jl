@@ -41,6 +41,7 @@ makedocs(
             "manual/variables.md",
             "manual/expression_manipulation.md",
             "manual/derivatives.md",
+            "manual/taylor.md",
             "manual/groebner.md",
             "manual/solver.md",
             "manual/arrays.md",
