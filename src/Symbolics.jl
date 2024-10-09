@@ -139,7 +139,7 @@ include("groebner_basis.jl")
 export groebner_basis, is_groebner_basis
 
 include("taylor.jl")
-export taylor
+export taylor, taylor_coeff
 
 import Libdl
 include("build_function.jl")

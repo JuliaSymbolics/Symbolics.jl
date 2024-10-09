@@ -6,14 +6,23 @@
 
 Calculate the `n`-th order coefficient(s) in the Taylor series of `f` around `x = 0`.
 """
-function taylor_coeff(f, x, n; rationalize=true)
+function taylor_coeff(f, x, n = missing; rationalize=true)
     if n isa AbstractArray
         # return array of expressions/equations for each order
         return taylor_coeff.(Ref(f), Ref(x), n; rationalize)
     elseif f isa Equation
-        # return new equation with coefficients of each side
-        return taylor_coeff(f.lhs, x, n; rationalize) ~ taylor_coeff(f.rhs, x, n; rationalize)
+        if ismissing(n)
+            # assume user wants maximum order in the equation
+            n = 0:max(degree(f.lhs, x), degree(f.rhs, x))
+            return taylor_coeff(f, x, n; rationalize)
+        else
+            # return new equation with coefficients of each side
+            return taylor_coeff(f.lhs, x, n; rationalize) ~ taylor_coeff(f.rhs, x, n; rationalize)
         end
+    elseif ismissing(n)
+        # assume user wants maximum order in the expression
+        n = 0:degree(f, x)
+        return taylor_coeff(f, x, n; rationalize)
     end
 
     # TODO: error if x is not a "pure variable"
