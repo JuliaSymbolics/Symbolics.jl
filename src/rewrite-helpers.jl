@@ -34,7 +34,7 @@ end
 
 """
     hasnode(c, x)
-Returns true if any part of `x` fufills the condition given in c. c can be a function or an expression.
+Returns true if any part of `x` fulfills the condition given in c. c can be a function or an expression.
 If it is a function, returns true if x is true for any part of x. If c is an expression, returns
 true if x contains c.
 
@@ -76,7 +76,7 @@ end
 
 """
 filterchildren(c, x)
-Returns all parts of `x` that fufills the condition given in c. c can be a function or an expression.
+Returns all parts of `x` that fulfills the condition given in c. c can be a function or an expression.
 If it is a function, returns everything for which the function is `true`. If c is an expression, returns
 all expressions that matches it.
 
