@@ -32,10 +32,8 @@ makedocs(
         "getting_started.md",
         "Tutorials" => Any[
             "tutorials/auto_parallel.md",
-            "tutorials/converting_to_C.md"
-        ],
-        "Examples" => Any[
-            "examples/perturbation.md"
+            "tutorials/converting_to_C.md",
+            "tutorials/perturbation.md"
         ],
         "Manual" => Any[
             "manual/variables.md",
