@@ -79,8 +79,8 @@ function solve_perturbed(eq, x, x₀, ϵ, order)
 
     # solve higher-order equations order-by-order
     for i in 2:length(eqs)
+        eqs[i] = substitute(eqs[i], sol) # substitute lower-order solutions
         x_coeff = Symbolics.symbolic_linear_solve(eqs[i], x_coeffs[i]) # solve linear n-th order equation for x_n
-        x_coeff = substitute(x_coeff, sol) # substitute lower-order solutions to get numerical value
         sol = merge(sol, Dict(x_coeffs[i] => x_coeff)) # store solution
     end
 

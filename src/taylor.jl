@@ -72,7 +72,7 @@ function taylor_coeff(f, x, n = missing; rationalize=true)
     if rationalize && unwrap(c) isa Number
         # TODO: make rational coefficients "organically" and not using rationalize (see https://github.com/JuliaSymbolics/Symbolics.jl/issues/1299)
         c = unwrap(c)
-        c = isinteger(c) ? Int(c) : Base.rationalize(c) # convert non-integer floats to rational numbers; avoid name clash between rationalize and Base.rationalize()
+        c = Base.rationalize(c) # convert integers/floats to rational numbers; avoid name clash between rationalize and Base.rationalize()
     end
     return c
 end
