@@ -52,6 +52,8 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
     cdot --> false
     fmt --> FancyNumberFormatter(5)
     index --> :subscript
+    snakecase --> true
+    safescripts --> true
 
     return recipe(n)
 end
@@ -189,7 +191,10 @@ function _toexpr(O)
             return frac_expr
         end
     end
-    issym(O) && return nameof(O)
+    if issym(O) 
+        sym = string(nameof(O))
+        return Symbol(replace(sym, NAMESPACE_SEPARATOR => "."))
+    end
     !iscall(O) && return O
 
     op = operation(O)
