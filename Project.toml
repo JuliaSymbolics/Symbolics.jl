@@ -72,6 +72,7 @@ ForwardDiff = "0.10.36"
 Groebner = "0.5, 0.6, 0.7"
 IfElse = "0.1"
 LaTeXStrings = "1.3"
+LambertW = "1.0.0"
 Latexify = "0.16"
 LogExpFunctions = "0.3"
 Lux = "1"
@@ -101,6 +102,7 @@ ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
+LambertW = "984bce1d-4616-540c-a9ee-88d1112d94c9"
 Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 PkgBenchmark = "32113eaa-f34f-5b0d-bd6c-c81e245fc73d"
@@ -111,4 +113,4 @@ SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "Random", "Lux", "ComponentArrays", "Nemo", "DynamicQuantities"]
+test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "Random", "LambertW", "Lux", "ComponentArrays", "Nemo", "DynamicQuantities"]
