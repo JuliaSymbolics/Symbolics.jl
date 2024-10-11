@@ -233,7 +233,7 @@ end
 
 function var_from_nested_derivative(x,i=0)
     x = unwrap(x)
-    if issym(x)
+    if issym(x) || x isa CallWithMetadata
         (x, i)
     elseif iscall(x)
         operation(x) isa Differential ?

@@ -1,5 +1,5 @@
 using Symbolics
-using Symbolics: symbolic_to_float
+using Symbolics: symbolic_to_float, var_from_nested_derivative
 
 @testset "get_variables" begin
     @variables t x y z(t)
@@ -28,4 +28,13 @@ end
     @test symbolic_to_float((1//2)*√(279//4)) isa Float64
     @test symbolic_to_float((big(1)//2)*√(279//4)) isa BigFloat
     @test symbolic_to_float((-1//2)*√(279//4)) isa Float64
+end
+
+@testset "var_from_nested_derivative" begin
+    @variables t x(t) p(..)
+    D = Differential(t)
+    @test var_from_nested_derivative(x) == (x, 0)
+    @test var_from_nested_derivative(D(x)) == (x, 1)
+    @test var_from_nested_derivative(p) == (p, 0)
+    @test var_from_nested_derivative(D(p(x))) == (p(x), 1)
 end

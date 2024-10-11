@@ -9,6 +9,12 @@ function activate_downstream_env()
     Pkg.instantiate()
 end
 
+function activate_sympy_env()
+    Pkg.activate("sympy")
+    Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+    Pkg.instantiate()
+end
+
 if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
 end
@@ -45,7 +51,6 @@ if GROUP == "All" || GROUP == "Core"
         VERSION >= v"1.9" && @safetestset "Build Targets Test" begin include("build_targets.jl") end
         @safetestset "Latexify Test" begin include("latexify.jl") end
         @safetestset "Domain Test" begin include("domains.jl") end
-        @safetestset "SymPy Test" begin include("sympy.jl") end
         @safetestset "Inequality Test" begin include("inequality.jl") end
         @safetestset "Integral Test" begin include("integral.jl") end
         @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
@@ -80,3 +85,7 @@ if GROUP == "All" || GROUP == "Downstream"
     @safetestset "ModelingToolkit Variable Utils Test" begin include("downstream/modeling_toolkit_utils.jl") end
 end
 
+if GROUP == "All" || GROUP == "SymPy"
+    activate_sympy_env()
+    @safetestset "SymPy Test" begin include("sympy.jl") end
+end
