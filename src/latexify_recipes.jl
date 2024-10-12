@@ -197,7 +197,7 @@ function _toexpr(O)
         if length(sym) > 1
             return LaTeXString(string("\\texttt", "{", sym, "}"))
         else
-            return sym
+            return Symbol(sym)
         end
     end
     !iscall(O) && return O
