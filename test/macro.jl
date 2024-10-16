@@ -34,6 +34,14 @@ let
     @test eltype(gg) == Real
     @test symtype(unwrap(gg)) == SymMatrix{Real, 2}
     @test promote_symtype(ggg, Vector{symtype(typeof(a))}) == Any
+
+    _a = unwrap(a)
+    gg = ggg([_a, 2_a])
+    @test ndims(gg) == 2
+    @test size(gg) == (4, 4)
+    @test eltype(gg) == Real
+    @test symtype(unwrap(gg)) == SymMatrix{Real, 2}
+    @test promote_symtype(ggg, Vector{symtype(typeof(a))}) == Any
 end
 let
     # redefine with promote_symtype
