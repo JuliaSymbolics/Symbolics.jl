@@ -122,10 +122,10 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
                     (elT) -> :(AbstractArray{T} where {T <: $elT})
                 end
                 if has_symwrapper(eT)
-                    Ts = (Ts..., # _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})), 
+                    Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})), 
                     _arr_type_fn(wrapper_type(eT)))
-                # else
-                #     Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})))
+                else
+                    Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})))
                 end
             end
             Ts
