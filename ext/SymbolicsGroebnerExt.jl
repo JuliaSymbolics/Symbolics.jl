@@ -317,15 +317,4 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     sol
 end
 
-# Helps with precompilation time
-PrecompileTools.@setup_workload begin
-    @variables a b c x y z
-    simple_linear_equations = [x - y, y + 2z]
-    equations_intersect_sphere_line = [x^2 + y^2 + z^2 - 9, x - 2y + 3, y - z]
-    PrecompileTools.@compile_workload begin
-        symbolic_solve(simple_linear_equations, [x, y], warns=false)
-        symbolic_solve(equations_intersect_sphere_line, [x, y, z], warns=false)
-    end
-end
-
 end # module
