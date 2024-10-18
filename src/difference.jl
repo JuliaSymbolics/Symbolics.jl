@@ -24,7 +24,7 @@ struct Difference <: Operator
     update::Bool
     Difference(t; dt, update=false) = new(value(t), dt, update)
 end
-(D::Difference)(t) = Term{symtype(t)}(D, [t])
+(D::Difference)(t) = _Term(symtype(t), D, [t])
 (D::Difference)(t::Num) = Num(D(value(t)))
 SymbolicUtils.promote_symtype(::Difference, t) = t
 """
