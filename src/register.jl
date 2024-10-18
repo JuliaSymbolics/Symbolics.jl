@@ -129,7 +129,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     if define_promotion
         container_type = get(defs, :container_type, :($propagate_atype(f, $(argnames...))))
         etype = get(defs, :eltype, :($propagate_eltype(f, $(argnames...))))
-        ndims = get(defs, :ndims, nothing)
+        ndim = get(defs, :ndims, nothing)
         is_callable_struct = f isa Expr && f.head == :(::)
         fn_arg = if is_callable_struct
             f
@@ -147,10 +147,10 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
                 container_type = $container_type
                 etype = $etype
                 $(
-                    if ndims === nothing
+                    if ndim === nothing
                         :(return container_type{etype})
                     else
-                        :(ndims = $ndims; return container_type{etype, ndims})
+                        :(ndim = $ndim; return container_type{etype, ndim})
                     end
                 )
             end

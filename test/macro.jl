@@ -54,6 +54,16 @@ let
 end
 
 # ndims specified
+
+# in terms of argument
+@register_array_symbolic ggg(x::AbstractVector) begin
+    container_type=SymMatrix
+    size=(length(x) * 2, length(x) * 2)
+    eltype=eltype(x)
+    ndims = ndims(x) + 1
+end
+@test promote_symtype(ggg, symtype(unwrap(x))) == SymMatrix{Real, 2}
+
 @register_array_symbolic ggg(x::AbstractVector) begin
     container_type=SymMatrix
     size=(length(x) * 2, length(x) * 2)
