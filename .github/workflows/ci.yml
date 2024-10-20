@@ -23,13 +23,14 @@ jobs:
           - SymPy
         version:
           - '1'
+          - 'lts'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - run: |
           if [ "`git rev-parse --abbrev-ref HEAD`" != master ]; then git fetch origin master:master; fi
-      - uses: julia-actions/setup-julia@v1
+      - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
       - uses: actions/cache@v4
