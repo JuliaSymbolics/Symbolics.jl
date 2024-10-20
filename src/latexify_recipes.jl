@@ -194,9 +194,9 @@ function _toexpr(O)
     if issym(O) 
         sym = string(nameof(O))
         sym = replace(sym, NAMESPACE_SEPARATOR => ".")
-        sym = Latexify.unicode2latex(sym)
-        sym = replace(sym, "_"=>"\\_")
         if length(sym) > 1
+            sym = Latexify.unicode2latex(sym)
+            sym = replace(sym, "_"=>"\\_")
             return LaTeXString(string("\\texttt", "{", sym, "}"))
         else
             return Symbol(sym)
