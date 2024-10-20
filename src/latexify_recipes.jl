@@ -193,7 +193,14 @@ function _toexpr(O)
     end
     if issym(O) 
         sym = string(nameof(O))
-        return Symbol(replace(sym, NAMESPACE_SEPARATOR => "."))
+        sym = replace(sym, NAMESPACE_SEPARATOR => ".")
+        if length(sym) > 1
+            sym = Latexify.unicode2latex(sym)
+            sym = replace(sym, "_"=>"\\_")
+            return LaTeXString(string("\\texttt", "{", sym, "}"))
+        else
+            return Symbol(sym)
+        end
     end
     !iscall(O) && return O
 
