@@ -195,12 +195,9 @@ function _toexpr(O)
         sym = string(nameof(O))
         sym = replace(sym, NAMESPACE_SEPARATOR => ".")
         if length(sym) > 1
-            sym = Latexify.unicode2latex(sym)
-            sym = replace(sym, "_"=>"\\_")
-            return LaTeXString(string("\\texttt", "{", sym, "}"))
-        else
-            return Symbol(sym)
+            sym = string("\\mathtt{", sym, "}")
         end
+        return Symbol(sym)
     end
     !iscall(O) && return O
 
