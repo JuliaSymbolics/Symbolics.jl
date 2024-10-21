@@ -1,12 +1,12 @@
 using Symbolics
 import Symbolics: CallWithMetadata, getsource, getdefaultval, wrap, unwrap, getname
-import SymbolicUtils: Term, symtype, FnType, BasicSymbolic, promote_symtype
+import SymbolicUtils: _Term, symtype, FnType, BasicSymbolic, promote_symtype, Symbolic
 using LinearAlgebra
 using Test
 
 @variables t
 Symbolics.@register_symbolic fff(t)
-@test isequal(fff(t), Symbolics.Num(Symbolics.Term{Real}(fff, [Symbolics.value(t)])))
+@test isequal(fff(t), Symbolics.Num(_Term(Real, fff, [Symbolics.value(t)])))
 
 const SymMatrix{T,N} =  Symmetric{T, AbstractArray{T, N}}
 many_vars = @variables t=0 a=1 x[1:4]=2 y(t)[1:4]=3 w[1:4] = 1:4 z(t)[1:4] = 2:5 p(..)[1:4]
@@ -93,7 +93,7 @@ _args = [[a 2a; 4a 6a; 3a 5a], [4a, 6a]]
 hh = ccwa(_args...)
 @test size(hh) == (3, 2, 10)
 @test eltype(hh) == Real
-@test isequal(arguments(unwrap(hh)), unwrap.(_args))
+@test isequal(arguments(unwrap(hh)), convert(Vector{SymbolicUtils.Symbolic}, map(x -> unwrap.(x), _args)))
 
 @test all(t->getsource(t)[1] === :variables, many_vars)
 @test getdefaultval(t) == 0

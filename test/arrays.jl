@@ -2,7 +2,7 @@ using Symbolics
 using SymbolicUtils, Test
 using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, array_term, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
 using Base: Slice
-using SymbolicUtils: Sym, term, operation
+using SymbolicUtils: _Sym, term, operation
 import LinearAlgebra: dot
 
 struct TestMetaT end
@@ -22,8 +22,8 @@ Symbolics.option_to_metadata_type(::Val{:test_meta}) = TestMetaT
     B = A[3:5]
     @test axes(B) == (Slice(1:3),)
 
-    i = Sym{Int}(:i)
-    j = Sym{Int}(:j)
+    i = _Sym(Int, :i)
+    j = _Sym(Int, :j)
     @test symtype(X[i, j]) == Real
     @test symtype(X[1, j]) == Real
 
@@ -37,7 +37,7 @@ end
     @variables t x(t)[1:4]
     v = Symbolics.lower_varname(unwrap(x[2]), unwrap(t), 2)
     @test operation(v) == getindex
-    @test arguments(v)[2] == 2
+    @test SymbolicUtils.get_val(arguments(v)[2]) == 2
     @test getname(v) == getname(arguments(v)[1]) == Symbol("x(t)ˍtt")
 end
 
