@@ -64,8 +64,13 @@ ConstructionBase.constructorof(s::Type{<:ArrayOp{T}}) where {T} = ArrayOp{T}
 
 function SymbolicUtils.maketerm(::Type{<:ArrayOp}, f, args, m)
     args = map(args) do arg
-        if iscall(arg) && operation(arg) == Ref && symbolic_type(only(arguments(arg))) == NotSymbolic()
-            return Ref(only(arguments(arg)))
+        if iscall(arg) && operation(arg) == Ref
+            inner = only(arguments(arg))
+            if symbolic_type(inner) == NotSymbolic()
+                return Ref(inner)
+            else
+                return inner
+            end
         else
             return arg
         end

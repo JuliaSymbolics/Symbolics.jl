@@ -76,7 +76,7 @@ end
 end
 
 @testset "maketerm" begin
-    @variables A[1:5, 1:5] B[1:5, 1:5]
+    @variables A[1:5, 1:5] B[1:5, 1:5] C
 
     T = unwrap(3A)
     @test isequal(T, Symbolics.maketerm(typeof(T), operation(T), arguments(T), nothing))
@@ -84,6 +84,8 @@ end
     @test isequal(T2, Symbolics.maketerm(typeof(T), operation(T), [*, 3, unwrap(B)], nothing))
     T3 = unwrap(A .^ 2)
     @test isequal(T3, Symbolics.maketerm(typeof(T3), operation(T3), arguments(T3), nothing))
+    T4 = unwrap(A .* C)
+    @test isequal(T4, Symbolics.maketerm(typeof(T4), operation(T4), arguments(T4), nothing))
 end
 
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
