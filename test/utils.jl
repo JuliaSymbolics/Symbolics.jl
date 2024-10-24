@@ -38,3 +38,11 @@ end
     @test var_from_nested_derivative(p) == (p, 0)
     @test var_from_nested_derivative(D(p(x))) == (p(x), 1)
 end
+
+@testset "fixpoint_sub maxiters" begin
+    @variables x y
+    expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x))
+    @test isequal(expr, x)
+    expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9)
+    @test isequal(expr, y)
+end
