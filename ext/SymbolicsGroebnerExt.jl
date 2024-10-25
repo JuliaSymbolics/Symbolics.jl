@@ -38,8 +38,8 @@ function Symbolics.groebner_basis(polynomials::Vector{Num}; ordering=InputOrderi
     sym2term_for_groebner = Dict{Any,Any}(v1 => k for (k, (v1, v2)) in sym2term)
     all_sym_vars = Groebner.ordering_variables(ordering)
     missed = setdiff(all_sym_vars, Set(collect(keys(sym2term_for_groebner))))
-    for k in missed
-        sym2term_for_groebner[k] = k
+    for var in missed
+        sym2term_for_groebner[var] = var
     end
     ordering = Groebner.ordering_transform(ordering, sym2term_for_groebner )
     basis = Groebner.groebner(polynoms; ordering=ordering, kwargs...)

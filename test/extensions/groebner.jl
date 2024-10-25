@@ -72,5 +72,13 @@ truebasis = [
 basis = groebner_basis(system)
 @test isequal(expand.(basis), truebasis)
 
+# issues/1323
+@variables t S(t) R(t)
+sys = [-12 + 5S, 2 + 5R]
+@test isequal(groebner_basis(sys, ordering=Lex(S, R)), [2//5 + R, -12//5 + S])
+sys = [S^2 + 2*R^2 - 1, S*R - 1]
+res = [(1//2) - (1//2)*(R^2) + R^4, S - R + (2//1)*(R^3)]
+@test isequal(groebner_basis(sys, ordering=Lex(S, R), res)
+
 # Groebner does not yet work with constant ideals
 @test_broken groebner_basis([1])
