@@ -503,21 +503,29 @@ function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symboli
 end
 
 """
-    fixpoint_sub(expr, dict; operator = Nothing)
+    fixpoint_sub(expr, dict; operator = Nothing, maxiters = 10000)
 
 Given a symbolic expression, equation or inequality `expr` perform the substitutions in
 `dict` recursively until the expression does not change. Substitutions that depend on one
 another will thus be recursively expanded. For example,
 `fixpoint_sub(x, Dict(x => y, y => 3))` will return `3`. The `operator` keyword can be
-specified to prevent substitution of expressions inside operators of the given type.
+specified to prevent substitution of expressions inside operators of the given type. The
+`maxiters` keyword is used to limit the number of times the substitution can occur to avoid
+infinite loops in cases where the substitutions in `dict` are circular
+(e.g. `[x => y, y => x]`).
 
 See also: [`fast_substitute`](@ref).
 """
-function fixpoint_sub(x, dict; operator = Nothing)
+function fixpoint_sub(x, dict; operator = Nothing, maxiters = 10000)
     y = fast_substitute(x, dict; operator)
-    while !isequal(x, y)
+    while !isequal(x, y) && maxiters > 0
         y = x
         x = fast_substitute(y, dict; operator)
+        maxiters -= 1
+    end
+
+    if !isequal(x, y)
+        @warn "Did not converge after `maxiters = $maxiters` substitutions. Either there is a cycle in the rules or `maxiters` needs to be higher."
     end
 
     return x
