@@ -33,9 +33,16 @@ julia> @variables x y;
 julia> groebner_basis([x*y^2 + x, x^2*y + y])
 ```
 """
-function Symbolics.groebner_basis(polynomials::Vector{Num}; kwargs...)
+function Symbolics.groebner_basis(polynomials::Vector{Num}; ordering=InputOrdering(), kwargs...)
     polynoms, pvar2sym, sym2term = Symbolics.symbol_to_poly(polynomials)
-    basis = Groebner.groebner(polynoms; kwargs...)
+    sym2term_for_groebner = Dict{Any,Any}(v1 => k for (k, (v1, v2)) in sym2term)
+    all_sym_vars = Groebner.ordering_variables(ordering)
+    missed = setdiff(all_sym_vars, Set(collect(keys(sym2term_for_groebner))))
+    for var in missed
+        sym2term_for_groebner[var] = var
+    end
+    ordering = Groebner.ordering_transform(ordering, sym2term_for_groebner )
+    basis = Groebner.groebner(polynoms; ordering=ordering, kwargs...)
     PolyType = symtype(first(polynomials))
     Symbolics.poly_to_symbol(basis, pvar2sym, sym2term, PolyType)
 end
