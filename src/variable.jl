@@ -499,7 +499,16 @@ end
 SymbolicIndexingInterface.getname(x, val=_fail) = _getname(unwrap(x), val)
 
 function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symbolic, Equation, Inequality}, d::Dict; kwargs...)
-    fixpoint_sub(ex, d; kwargs...)
+    val = fixpoint_sub(ex, d; kwargs...)
+    return _recursive_unwrap(val)
+end
+
+function _recursive_unwrap(val)
+    if symbolic_type(val) == NotSymbolic() && val isa AbstractArray
+        return _recursive_unwrap.(val)
+    else
+        return unwrap(val)
+    end
 end
 
 """
