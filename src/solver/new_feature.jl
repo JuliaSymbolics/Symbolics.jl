@@ -1,53 +1,65 @@
-function solve_eq_for_multivar(eq, s)
-    args = arguments(unwrap(eq))
+function solve_interms_ofvar(eq, s; dropmultiplicity=true, warns=true)
     vars = Symbolics.get_variables(eq)
     vars = filter(v -> !isequal(v, s), vars)
+    vars = wrap.(vars)
 
     term_tm = 1
-    if operation(unwrap(eq)) != (/)
-    end
+    done = false
 
-    for arg in args
-        oper = operation(arg)
-        if oper == (/) 
-            term_tm *= wrap(arguments(arg)[2])
-            @info "" term_tm
+    # do this until no / are present
+    while !done
+        args = arguments(unwrap(eq))
+        done = true
+
+        for arg in args
+            !iscall(arg) && continue
+            oper = operation(arg)
+            if oper == (/) 
+                done = false
+                term_tm *= wrap(arguments(arg)[2])
+            end
         end
+        args = [arg*term_tm for arg in args]
+        eq = expand(Symbolics.term((+), unwrap.(args)...))
+        term_tm = 1
     end
-    args = [arg*term_tm for arg in args]
-    eq = expand(Symbolics.term((+), unwrap.(args)...))
     coeffs, constant = polynomial_coeffs(eq, [s])
     eqs = wrap.(collect(values(coeffs)))
 
+    symbolic_solve(eqs, vars)
+
 end
 
-function solve_system_using_ia(eqs, vars, sols)
-    cur_sols = []
-    if isequal(eqs, [])
-        return sols
-    end
-    try
-        grb_eqs = Symbolics.groebner_basis(eqs)
-        eqs = grb_eqs
-    catch e
-    end
 
-    if length(new_eqs) < length(vars)
-        throw("Infinite number of solutions")
-    end
+# an attempt at using ia_solve recursively.
+function find_v(eqs, v, vars)
+    vars = filter(var -> !isequal(var, v), vars)
+    n_eqs = deepcopy(eqs)
 
-
-    eq = lastindex(eqs)
-    present_vs = Symbolics.get_variables(eq)
-    isequal(present_vs, []) && !isequal(eq, 0) && throw("System of equations has a contradiction.")
-
-    if length(present_vs) == 1
-        new_sols = ia_solve(eq, present_vs[1])
-        append!(cur_sols, [Dict{Num, Any}(var => sol) for sol in new_sols])
-        deleteat!(eqs, lastindex(eqs))
-
-        for s in cur_sols
-        end
+    if isequal(n_eqs[1], 0)
+        n_eqs = n_eqs[2:end]
     end
     
+    present_vars = Symbolics.get_variables(n_eqs[1])
+    var = present_vars[1]
+    if length(present_vars) == 1 && isequal(present_vars[1], v)
+        return ia_solve(n_eqs[1], var)
+    end
+    if isequal(present_vars[1], v)
+        var = present_vars[2]
+    end
+
+    @info "" n_eqs[1]
+    @info "" var
+    sols = ia_solve(n_eqs[1], var)
+    isequal(sols, nothing) && return []
+
+    for s in sols
+        for j in 2:length(n_eqs)
+            n_eqs[j] = substitute(n_eqs[j], Dict(var => s))
+        end
+        # other solutions are cut out here
+        return find_v(n_eqs[2:end], v, vars)
+    end
+
 end
