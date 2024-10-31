@@ -2,7 +2,7 @@
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "79261a7fa145d7586f2e8c618c94a74b76aa32fd"
+project_hash = "62e94160f004c178d7079bbbecfc0c5e22a4efb8"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "eea5d80188827b35333801ef97a40c2ed653b081"
@@ -21,9 +21,9 @@ version = "0.0.1"
 
 [[deps.AbstractAlgebra]]
 deps = ["InteractiveUtils", "LinearAlgebra", "MacroTools", "Preferences", "Random", "RandomExtensions", "SparseArrays", "Test"]
-git-tree-sha1 = "f2a57c180f34a96825210cb3e0864a700f2ea5f2"
+git-tree-sha1 = "f2ed325e84ff435220a1dd93c421e1d8ca2e5da0"
 uuid = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
-version = "0.42.7"
+version = "0.43.9"
 
 [[deps.AbstractTrees]]
 git-tree-sha1 = "2d9c9a55f9c93e8887ad391fbae72f8ef55e1177"
@@ -1253,9 +1253,9 @@ version = "1.0.2"
 
 [[deps.Nemo]]
 deps = ["AbstractAlgebra", "FLINT_jll", "Libdl", "LinearAlgebra", "Pkg", "Random", "RandomExtensions", "SHA"]
-git-tree-sha1 = "71cff3f853e1cb2c6d5d75ab5e0092058936c460"
+git-tree-sha1 = "927b528248680e1597cb1e72e19d072e61fd6860"
 uuid = "2edaba10-b0f1-5616-af89-8c11ac63239a"
-version = "0.46.2"
+version = "0.47.3"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
