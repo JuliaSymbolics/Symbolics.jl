@@ -60,6 +60,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Show Test" begin include("show.jl") end
         @safetestset "Utility Function Test" begin include("utils.jl") end
         @safetestset "RootFinding solver" begin include("solver.jl") end
+        @safetestset "Function inverses test" begin include("inverse.jl") end
     end
 end
 
