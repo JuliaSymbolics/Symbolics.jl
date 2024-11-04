@@ -78,9 +78,18 @@ end
 substitute(expr, s::Pair; kw...) = substituter([s[1] => s[2]])(expr; kw...)
 substitute(expr, s::Vector; kw...) = substituter(s)(expr; kw...)
 
-substituter(pair::Pair) = substituter((pair,))
+function _unwrap_callwithmeta(x)
+    x = value(x)
+    return x isa CallWithMetadata ? x.f : x
+end
+function subrules_to_dict(pairs)
+    if pairs isa Pair
+        pairs = (pairs,)
+    end
+    return Dict(_unwrap_callwithmeta(k) => value(v)  for (k, v) in pairs)
+end
 function substituter(pairs)
-    dict = Dict(value(k) => value(v)  for (k, v) in pairs)
+    dict = subrules_to_dict(pairs)
     (expr; kw...) -> SymbolicUtils.substitute(value(expr), dict; kw...)
 end
 
