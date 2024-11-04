@@ -1,5 +1,7 @@
 using Symbolics
 
+const SAFE_ALTERNATIVES = Dict(log => slog, sqrt => ssqrt, cbrt => scbrt)
+
 function isolate(lhs, var; warns=true, conditions=[])
     rhs = Vector{Any}([0])
     original_lhs = deepcopy(lhs)
@@ -90,57 +92,24 @@ function isolate(lhs, var; warns=true, conditions=[])
                 lhs = args[2]
                 rhs = map(sol -> term(/, term(slog, sol), term(slog, args[1])), rhs)
             end
-
-        elseif oper === (log) || oper === (slog)
+        elseif has_left_inverse(oper)
             lhs = args[1]
-            rhs = map(sol -> term(^, Base.MathConstants.e, sol), rhs)
-            push!(conditions, (args[1], >))
-
-        elseif oper === (log2)
-            lhs = args[1]
-            rhs = map(sol -> term(^, 2, sol), rhs)
-            push!(conditions, (args[1], >))
-
-        elseif oper === (log10)
-            lhs = args[1]
-            rhs = map(sol -> term(^, 10, sol), rhs)
-            push!(conditions, (args[1], >))
-
-        elseif oper === (sqrt)
-            lhs = args[1]
-            append!(conditions, [(r, >=) for r in rhs])
-            rhs = map(sol -> term(^, sol, 2), rhs)
-
-        elseif oper === (cbrt)
-            lhs = args[1]
-            rhs = map(sol -> term(^, sol, 3), rhs)
-
-        elseif oper === (sin) || oper === (cos) || oper === (tan)
-            rev_oper = Dict(sin => asin, cos => acos, tan => atan)
-            lhs = args[1]
-            # make this global somehow so the user doesnt need to declare it on his own
-            new_var = gensym()
-            new_var = (@variables $new_var)[1]
-            rhs = map(
-                sol -> term(rev_oper[oper], sol) +
-                       term(*, Base.MathConstants.pi, new_var),
-                rhs)
-            @info string(new_var) * " ϵ" * " Ζ"
-
-        elseif oper === (asin)
-            lhs = args[1]
-            rhs = map(sol -> term(sin, sol), rhs)
-
-        elseif oper === (acos)
-            lhs = args[1]
-            rhs = map(sol -> term(cos, sol), rhs)
-
-        elseif oper === (atan)
-            lhs = args[1]
-            rhs = map(sol -> term(tan, sol), rhs)
-        elseif oper === (exp)
-            lhs = args[1]
-            rhs = map(sol -> term(slog, sol), rhs)
+            ia_conditions!(oper, lhs, rhs, conditions)
+            invop = left_inverse(oper)
+            invop = get(SAFE_ALTERNATIVES, invop, invop)
+            if is_periodic(oper)
+                # make this global somehow so the user doesnt need to declare it on his own
+                new_var = gensym()
+                new_var = (@variables $new_var)[1]
+                period = fundamental_period(oper)
+                rhs = map(
+                    sol -> term(invop, sol) +
+                           term(*, period, new_var),
+                    rhs)
+                @info string(new_var) * " ϵ" * " Ζ"
+            else
+                rhs = map(sol -> term(invop, sol), rhs)
+            end
         end
 
         lhs = simplify(lhs)
@@ -256,6 +225,16 @@ julia> RootFinding.ia_solve(expr, x)
  -2 + π*2var"##230" + asin((1//2)*(-1 + RootFinding.ssqrt(-39)))
  -2 + π*2var"##234" + asin((1//2)*(-1 - RootFinding.ssqrt(-39)))
 ```
+
+All transcendental functions for which `left_inverse` is defined are supported.
+To enable `ia_solve` to handle custom transcendental functions, define an inverse or
+left inverse. If the function is periodic, `is_periodic` and `fundamental_period` must
+be defined. If the function imposes certain conditions on its input or output (for
+example, `log` requires that its input be positive) define `ia_conditions!`.
+
+See also: [`left_inverse`](@ref), [`inverse`](@ref), [`is_periodic`](@ref),
+[`fundamental_period`](@ref), [`ia_conditions!`](@ref).
+
 # References
 [^1]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
 """
