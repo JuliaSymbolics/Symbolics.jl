@@ -1,5 +1,23 @@
 using Symbolics
 
+# test all variations of series() input
+ns = 0:3
+Y, = @variables y[ns]
+@variables x y
+
+# 1) first argument is a variable
+@test isequal(series(y, x, 7, ns), Y[0] + Y[1]*(x-7)^1 + Y[2]*(x-7)^2 + Y[3]*(x-7)^3)
+@test isequal(series(y, x, ns), substitute(series(y, x, 7, ns), x => x + 7))
+@test_throws ErrorException series(2*y, x, ns) # 2*y is a meaningless variable name
+
+# 2) first argument is coefficients
+@test isequal(series(Y, x, 7), series(y, x, 7, ns))
+@test isequal(series(Y, x, ns), substitute(series(Y, x, 7), x => x + 7))
+@test isequal(series([1,2,3], 8, 4, [5,6,7]), 1*(8-4)^5 + 2*(8-4)^6 + 3*(8-4)^7)
+@test isequal(series([1,2,3], 8, 4), 1 + 2*(8-4)^1 + 3*(8-4)^2)
+@test isequal(series([1,2,3], 4, [5,6,7]), series([1,2,3], 8, 4, [5,6,7]))
+@test isequal(series([1,2,3], 4), 1^0 + 2*4^1 + 3*4^2)
+
 # https://en.wikipedia.org/wiki/Taylor_series#List_of_Maclaurin_series_of_some_common_functions
 @variables x
 @test taylor(exp(x), x, 0:9) - sum(x^n//factorial(n) for n in 0:9) == 0

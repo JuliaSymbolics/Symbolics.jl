@@ -1,27 +1,43 @@
 """
-    series(y, x, [x0=0,] ns; name = nameof(y))
+    series(cs, x, [x0=0,], ns=0:length(cs)-1)
 
-Expand the variable `y` in a power series in the variable `x` around `x0` to orders `ns`.
+Return the power series in `x` around `x0` to the powers `ns` with coefficients `cs`.
+
+    series(y, x, [x0=0,] ns)
+
+Return the power series in `x` around `x0` to the powers `ns` with coefficients automatically created from the variable `y`.
 
 Examples
 ========
 
 ```julia
-julia> @variables z ϵ
-2-element Vector{Num}:
+julia> @variables x y[0:3] z
+3-element Vector{Any}:
+ x
+  y[0:3]
  z
- ϵ
 
-julia> series(z, ϵ, 2, 0:3)
-z[0] + z[1]*(-2 + ϵ) + z[2]*((-2 + ϵ)^2) + z[3]*((-2 + ϵ)^3)
+julia> series(y, x, 2)
+y[0] + (-2 + x)*y[1] + ((-2 + x)^2)*y[2] + ((-2 + x)^3)*y[3]
+
+julia> series(z, x, 2, 0:3)
+z[0] + (-2 + x)*z[1] + ((-2 + x)^2)*z[2] + ((-2 + x)^3)*z[3]
 ```
 """
-function series(y, x, x0, ns; name = nameof(y))
-    c, = @variables $name[ns]
-    return sum(c[n] * (x - x0)^n for n in ns)
+function series(cs::AbstractArray, x::Number, x0::Number, ns::AbstractArray = 0:length(cs)-1)
+    length(cs) == length(ns) || error("There are different numbers of coefficients and orders")
+    s = sum(c * (x - x0)^n for (c, n) in zip(cs, ns))
+    return s
 end
-function series(y, x, ns; kwargs...)
-    return series(y, x, 0, ns; kwargs...)
+function series(cs::AbstractArray, x::Number, ns::AbstractArray = 0:length(cs)-1)
+    return series(cs, x, 0, ns)
+end
+function series(y::Num, x::Number, x0::Number, ns::AbstractArray)
+    cs, = @variables $(nameof(y))[ns]
+    return series(cs, x, x0, ns)
+end
+function series(y::Num, x::Number, ns::AbstractArray)
+    return series(y, x, 0, ns)
 end
 
 """

@@ -47,9 +47,8 @@ quintic = x^5 + ϵ*x ~ 1
 ```
 If $ϵ = 1$, we get our original problem. With $ϵ = 0$, the problem transforms to the easy quintic equation $x^5 = 1$ with the trivial real solution $x = 1$ (and four complex solutions which we ignore). Next, expand $x$ as a power series in $ϵ$:
 ```@example perturb
-x_taylor = series(x, ϵ, 0:7) # expand x in a power series in ϵ
-x_coeffs = taylor_coeff(x_taylor, ϵ) # TODO: get coefficients at series creation
-x_taylor
+x_coeffs, = @variables a[0:7] # create Taylor series coefficients
+x_taylor = series(x_coeffs, ϵ) # expand x in a power series in ϵ
 ```
 Then insert this into the quintic equation and expand it, too, to the same order:
 ```@example perturb
@@ -58,7 +57,7 @@ quintic_taylor = taylor(quintic_taylor, ϵ, 0:7)
 ```
 This messy equation must hold for each power of $ϵ$, so we can separate it into one nicer equation per order:
 ```@example perturb
-quintic_eqs = taylor_coeff(quintic_taylor, ϵ)
+quintic_eqs = taylor_coeff(quintic_taylor, ϵ, 0:7)
 quintic_eqs[1:5] # for readability, show only 5 shortest equations
 ```
 These equations show three important features of perturbation theory:
@@ -77,10 +76,11 @@ function solve_cascade(eqs, xs, x₀, ϵ)
     isequal(eq0.lhs, eq0.rhs) || error("$sol does not solve $(eqs[1])")
 
     # solve remaining equations sequentially
-    for i in 2:lastindex(eqs)
+    for i in 2:length(eqs)
         eq = substitute(eqs[i], sol) # insert previous solutions
-        x = Symbolics.symbolic_linear_solve(eq, xs[i]) # solve current equation
-        sol = merge(sol, Dict(xs[i] => x)) # store solution
+        x = xs[begin+i-1] # need not be 1-indexed
+        xsol = Symbolics.symbolic_linear_solve(eq, x) # solve current equation
+        sol = merge(sol, Dict(x => xsol)) # store solution
     end
 
     return sol
@@ -117,8 +117,8 @@ println("Newton's method solution: E = ", E_newton)
 
 Next, let us solve the same problem with the perturbative method. It is most common to expand $E$ as a series in $M$. Repeating the procedure from the quintic example, we get these equations:
 ```@example perturb
-E_taylor = series(E, M, 0:5)
-E_coeffs = taylor_coeff(E_taylor, M) # TODO: get coefficients at series creation
+E_taylor = series(E, M, 0:5) # this auto-creates coefficients E[0:5]
+E_coeffs = taylor_coeff(E_taylor, M) # get a handle to the coefficients
 kepler_eqs = taylor_coeff(substitute(kepler, E => E_taylor), M, 0:5)
 kepler_eqs[1:4] # for readability
 ```
@@ -142,7 +142,7 @@ E_wiki = 1/(1-e)*M - e/(1-e)^4*M^3/factorial(3) + (9e^2+e)/(1-e)^7*M^5/factorial
 Alternatively, we can expand $E$ in $e$ instead of $M$, giving the solution (the trivial solution when $e = 0$ is $E_0=M$):
 ```@example perturb
 E_taylor′ = series(E, e, 0:5)
-E_coeffs′ = taylor_coeff(E_taylor′, e) # TODO: get at creation
+E_coeffs′ = taylor_coeff(E_taylor′, e)
 kepler_eqs′ = taylor_coeff(substitute(kepler, E => E_taylor′), e, 0:5)
 E_coeffs_sol′ = solve_cascade(kepler_eqs′, E_coeffs′, M, e)
 E_pert′ = substitute(E_taylor′, E_coeffs_sol′)
