@@ -32,6 +32,15 @@ to `solve_univar`. We can see that essentially, `solve_univar` is the building b
 it to `ia_solve`, which attempts solving by attraction and isolation [^2]. This only works when the input is a single expression
 and the user wants the answer in terms of a single variable. Say `log(x) - a == 0` gives us `[e^a]`.
 
+```@docs
+Symbolics.solve_univar
+Symbolics.solve_multivar
+Symbolics.ia_solve
+Symbolics.ia_conditions!
+Symbolics.is_periodic
+Symbolics.fundamental_period
+```
+
 #### Nice examples
 
 ```@example solver
