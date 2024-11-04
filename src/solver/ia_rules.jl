@@ -50,7 +50,7 @@ function solve_interms_ofvar(eq, s; dropmultiplicity=true, warns=true)
     coeffs, constant = polynomial_coeffs(eq, [s])
     eqs = wrap.(collect(values(coeffs)))
 
-    solve_multivar(eqs, vars, dropmultiplicity=dropmultiplicity, warns=warns)
+    symbolic_solve(eqs, vars, dropmultiplicity=dropmultiplicity, warns=warns)
 end
 
 # an attempt at using ia_solve recursively.
