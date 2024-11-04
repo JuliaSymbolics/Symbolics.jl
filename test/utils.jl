@@ -1,5 +1,5 @@
 using Symbolics
-using Symbolics: symbolic_to_float, var_from_nested_derivative
+using Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap
 
 @testset "get_variables" begin
     @variables t x y z(t)
@@ -45,4 +45,13 @@ end
     @test isequal(expr, x)
     expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9)
     @test isequal(expr, y)
+end
+
+@testset "Issue#1342 substitute working on called symbolics" begin
+    @variables p(..) x y
+    arg = unwrap(substitute(p(x), [p => identity]))
+    @test iscall(arg) && operation(arg) == identity && isequal(only(arguments(arg)), x)
+    @test unwrap(substitute(p(x), [p => sqrt, x => 4.0])) ≈ 2.0
+    arg = Symbolics.fixpoint_sub(p(x), [p => sqrt, x => 2y + 3, y => 1.0 + p(4)])
+    @test arg ≈ 3.0
 end

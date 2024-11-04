@@ -526,6 +526,7 @@ infinite loops in cases where the substitutions in `dict` are circular
 See also: [`fast_substitute`](@ref).
 """
 function fixpoint_sub(x, dict; operator = Nothing, maxiters = 10000)
+    dict = subrules_to_dict(dict)
     y = fast_substitute(x, dict; operator)
     while !isequal(x, y) && maxiters > 0
         y = x
