@@ -47,52 +47,55 @@ quintic = x^5 + ϵ*x ~ 1
 ```
 If $ϵ = 1$, we get our original problem. With $ϵ = 0$, the problem transforms to the easy quintic equation $x^5 = 1$ with the trivial real solution $x = 1$ (and four complex solutions which we ignore). Next, expand $x$ as a power series in $ϵ$:
 ```@example perturb
-x_taylor = series(x, ϵ, 0:3) # expand x to third order
+x_taylor = series(x, ϵ, 0:7) # expand x in a power series in ϵ
+x_coeffs = taylor_coeff(x_taylor, ϵ) # TODO: get coefficients at series creation
+x_taylor
 ```
 Then insert this into the quintic equation and expand it, too, to the same order:
 ```@example perturb
 quintic_taylor = substitute(quintic, x => x_taylor)
-quintic_taylor = taylor(quintic_taylor, ϵ, 0:3)
+quintic_taylor = taylor(quintic_taylor, ϵ, 0:7)
 ```
-This equation must hold for each power of $ϵ$, so we can separate it into one equation per order:
+This messy equation must hold for each power of $ϵ$, so we can separate it into one nicer equation per order:
 ```@example perturb
 quintic_eqs = taylor_coeff(quintic_taylor, ϵ)
+quintic_eqs[1:5] # for readability, show only 5 shortest equations
 ```
 These equations show three important features of perturbation theory:
 1. The $0$-th order equation is *trivial* in $x_0$: here $x_0^5 = 1$ has the trivial real solution $x_0 = 1$.
 2. The $n$-th order equation is *linear* in $x_n$ (except the trivial $0$-th order equation).
 3. The equations are *triangular* in $x_n$: the $n$-th order equation can be solved for $x_n$ given only $x_m$ for $m<n$.
-This structure is what makes the perturbation theory so attractive: we can start with the trivial solution $x_0 = 1$, then linearly solve for $x_n$ order-by-order and substitute in the solutions of $x_m$ for $m<n$ obtained so far. Let us write a function that solves a general equation `eq` for the variable `x` perturbatively with this *cascading* process:
+This structure is what makes the perturbation theory so attractive: we can start with the trivial solution $x_0 = 1$, then linearly solve for $x_n$ order-by-order and substitute in the solutions of $x_m$ for $m<n$ obtained so far.
+
+Here is a simple function that uses this *cascading* strategy to solve such a set of equations `eqs` for the variables `xs`, given a solution `x₀` of the first equation `eqs[begin]`:
 ```@example perturb
-function solve_perturbed(eq, x, x₀, ϵ, order)
-    x_taylor = series(x, ϵ, 0:order) # expand unknown in a taylor series
-    x_coeffs = taylor_coeff(x_taylor, ϵ, 0:order) # array of coefficients
-    eq_taylor = substitute(eq, x => x_taylor) # expand equation in taylor series
-    eqs = taylor_coeff(eq_taylor, ϵ, 0:order) # separate into order-by-order equations
-    sol = Dict(x_coeffs[1] => x₀) # store solutions in a symbolic-numeric map
+function solve_cascade(eqs, xs, x₀, ϵ)
+    sol = Dict(xs[begin] => x₀) # store solutions in a map
 
-    # verify that x₀ is a solution of the 0-th order equation
+    # verify that x₀ is a solution of the first equation
     eq0 = substitute(eqs[1], sol)
-    if !isequal(eq0.lhs, eq0.rhs)
-        error("$sol is not a 0-th order solution of $(eqs[1])")
+    isequal(eq0.lhs, eq0.rhs) || error("$sol does not solve $(eqs[1])")
+
+    # solve remaining equations sequentially
+    for i in 2:lastindex(eqs)
+        eq = substitute(eqs[i], sol) # insert previous solutions
+        x = Symbolics.symbolic_linear_solve(eq, xs[i]) # solve current equation
+        sol = merge(sol, Dict(xs[i] => x)) # store solution
     end
 
-    # solve higher-order equations order-by-order
-    for i in 2:length(eqs)
-        eqs[i] = substitute(eqs[i], sol) # substitute lower-order solutions
-        x_coeff = Symbolics.symbolic_linear_solve(eqs[i], x_coeffs[i]) # solve linear n-th order equation for x_n
-        sol = merge(sol, Dict(x_coeffs[i] => x_coeff)) # store solution
-    end
-
-    return substitute(x_taylor, sol) # evalaute series with solved coefficients
+    return sol
 end
-
-x_pert = solve_perturbed(quintic, x, 1, ϵ, 7)
+```
+Let us solve our order-separated quintics for the coefficients, and substitute them into the full series for $x$:
+```@example perturb
+x_coeffs_sol = solve_cascade(quintic_eqs, x_coeffs, 1, ϵ)
+x_pert = substitute(x_taylor, x_coeffs_sol)
 ```
 The $n$-th order solution of our original quintic equation is the sum up to the $ϵ^n$-th order term, evaluated at $ϵ=1$:
 ```@example perturb
 for n in 0:7
-    println("$n-th order solution: x = ", substitute(taylor(x_pert, ϵ, 0:n), ϵ => 1.0))
+    x_pert_sol = substitute(taylor(x_pert, ϵ, 0:n), ϵ => 1)
+    println("$n-th order solution: x = $x_pert_sol = $(x_pert_sol * 1.0)")
 end
 ```
 This is close to the solution from Newton's method!
@@ -112,30 +115,40 @@ E_newton = solve_newton(substitute(kepler, vals_earth), E, π/2)
 println("Newton's method solution: E = ", E_newton)
 ```
 
-Next, let us solve the same problem with our perturbative solver. It is most common to expand Kepler's equation in $M$ (the trivial solution when $M=0$ is $E=0$):
+Next, let us solve the same problem with the perturbative method. It is most common to expand $E$ as a series in $M$. Repeating the procedure from the quintic example, we get these equations:
 ```@example perturb
-E_pert = solve_perturbed(kepler, E, 0, M, 5)
+E_taylor = series(E, M, 0:5)
+E_coeffs = taylor_coeff(E_taylor, M) # TODO: get coefficients at series creation
+kepler_eqs = taylor_coeff(substitute(kepler, E => E_taylor), M, 0:5)
+kepler_eqs[1:4] # for readability
 ```
-Numerically, this gives almost the same answer as Newton's method:
+The trivial $0$-th order solution (when $M=0$) is $E_0=0$. This gives this full perturbative solution:
+```@example perturb
+E_coeffs_sol = solve_cascade(kepler_eqs, E_coeffs, 0, M)
+E_pert = substitute(E_taylor, E_coeffs_sol)
+```
+
+Numerically, the result again converges to that from Newton's method:
 ```@example perturb
 for n in 0:5
     println("$n-th order solution: E = ", substitute(taylor(E_pert, M, 0:n), vals_earth))
 end
 ```
-But unlike Newtons method, perturbation theory also gives us the power to work with the full *symbolic* series solution for $E$ (*before* numbers for $e$ and $M$ are inserted). Our series matches [this result from Wikipedia](https://en.wikipedia.org/wiki/Kepler%27s_equation#Inverse_Kepler_equation):
+But unlike Newtons method, this example shows how perturbation theory also gives us the powerful *symbolic* series solution for $E$ (*before* numbers for $e$ and $M$ are inserted). Our series matches [this result from Wikipedia](https://en.wikipedia.org/wiki/Kepler%27s_equation#Inverse_Kepler_equation):
 ```@example perturb
 E_wiki = 1/(1-e)*M - e/(1-e)^4*M^3/factorial(3) + (9e^2+e)/(1-e)^7*M^5/factorial(5)
 ```
 
-Alternatively, we can expand Kepler's equation in $e$ instead of $M$ (the trivial solution when $e = 0$ is $E=M$):
+Alternatively, we can expand $E$ in $e$ instead of $M$, giving the solution (the trivial solution when $e = 0$ is $E_0=M$):
 ```@example perturb
-E_pert′ = solve_perturbed(kepler, E, M, e, 5)
+E_taylor′ = series(E, e, 0:5)
+E_coeffs′ = taylor_coeff(E_taylor′, e) # TODO: get at creation
+kepler_eqs′ = taylor_coeff(substitute(kepler, E => E_taylor′), e, 0:5)
+E_coeffs_sol′ = solve_cascade(kepler_eqs′, E_coeffs′, M, e)
+E_pert′ = substitute(E_taylor′, E_coeffs_sol′)
 ```
-We can expand the trigonometric functions in $M$:
+This looks very different from our first series `E_pert`. If they are the same, we should get $0$ if we subtract and expand both as multivariate Taylor series in $(e,M)$. Indeed:
 ```@example perturb
-E_pert′ = taylor(E_pert′, M, 0:5)
-```
-Up to order $e^5 M^5$, we see that this two-variable $(e,M)$-series also matches the result from Wikipedia:
-```@example perturb
-E_wiki′ = taylor(taylor(E_wiki, e, 0:5), M, 0:5)
+@assert taylor(taylor(E_pert′ - E_pert, e, 0:4), M, 0:4) == 0 # use this as a test # hide
+taylor(taylor(E_pert′ - E_pert, e, 0:4), M, 0:4)
 ```
