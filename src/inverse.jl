@@ -157,6 +157,10 @@ inverse(::typeof(NaNMath.log10)) = inverse(log10)
 inverse(::typeof(NaNMath.log1p)) = inverse(log1p)
 inverse(::typeof(NaNMath.log2)) = inverse(log2)
 left_inverse(::typeof(NaNMath.sqrt)) = left_inverse(sqrt)
+# inverses of solve helpers
+left_inverse(::typeof(ssqrt)) = left_inverse(sqrt)
+left_inverse(::typeof(scbrt)) = left_inverse(cbrt)
+left_inverse(::typeof(slog)) = left_inverse(log)
 
 function inverse(f::ComposedFunction)
     return inverse(f.inner) ∘ inverse(f.outer)
