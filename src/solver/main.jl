@@ -286,7 +286,7 @@ function solve_univar(expression, x; dropmultiplicity=true)
     factors_subbed = map(factor -> ssubs(factor, subs), factors)
     arr_roots = []
 
-    if degree < 5 && length(factors) == 1
+    if degree < 5 && isequal(factors_subbed[1], wrap(expression))
         arr_roots = get_roots(expression, x)
 
         # multiplicities (repeated roots)
@@ -296,10 +296,8 @@ function solve_univar(expression, x; dropmultiplicity=true)
                 append!(arr_roots, og_arr_roots)
             end
         end
-    end
-
-    if length(factors) != 1
-        for i in eachindex(factors_subbed)
+    elseif length(factors) > 1 || (length(factors) == 1 && !isequal(factors_subbed[1], wrap(expression)))
+        for i in eachindex(factors_subbed) 
             if !any(isequal(x, var) for var in get_variables(factors[i]))
                 continue
             end

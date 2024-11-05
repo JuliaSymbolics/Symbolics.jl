@@ -54,7 +54,24 @@ function check_approx(arr1, arr2)
     return true
 end
 
-@variables x y z a b c d e
+@variables x y z a b c d e s
+
+@testset "Solving in terms of a constant var" begin
+    eq = ((s^2 + 1)/(s^2 + 2*s + 1)) - ((s^2 + a)/(b*c*s^2 + (b+c)*s + d))
+    calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b,c,d])
+    known_roots = sort_arr([Dict(a=>1, b=>1, c=>1, d=>1)], [a,b,c,d])
+    @test check_approx(calcd_roots, known_roots)   
+
+    eq = (a+b)*s^2 - 2s^2 + 2*b*s - 3*s
+    calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b])
+    known_roots = sort_arr([Dict(a=>1/2, b=>3/2)], [a,b])
+    @test check_approx(calcd_roots, known_roots)   
+
+    eq = (a*x^2+b)*s^2 - 2s^2 + 2*b*s - 3*s + 2(x^2)*(s^3) + 10*s^3
+    calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b])
+    known_roots = sort_arr([Dict(a=>-1/10, b=>3/2, x=>-im*sqrt(5)), Dict(a=>-1/10, b=>3/2, x=>im*sqrt(5))], [a,b,x])
+    @test check_approx(calcd_roots, known_roots)   
+end
 
 @testset "Invalid input" begin
     @test_throws AssertionError symbolic_solve(x, x^2)
