@@ -10,6 +10,7 @@ using SymbolicIndexingInterface
 @test symbolic_type(x) == ScalarSymbolic()
 @variables y[1:3]
 @test symbolic_type(y) == ArraySymbolic()
+@test symbolic_type(Symbolics.unwrap(y)) == ArraySymbolic()
 @test all(symbolic_type.(collect(y)) .== (ScalarSymbolic(),))
 @test symbolic_type(Symbolics.unwrap(y .* y)) == ArraySymbolic()
 @variables z(..)
