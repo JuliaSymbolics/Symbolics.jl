@@ -107,7 +107,6 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             invop = left_inverse(oper)
             invop = get(SAFE_ALTERNATIVES, invop, invop)
             if is_periodic(oper) && periodic_roots
-                # make this global somehow so the user doesnt need to declare it on his own
                 new_var = gensym()
                 new_var = (@variables $new_var)[1]
                 period = fundamental_period(oper)
