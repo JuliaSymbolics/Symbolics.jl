@@ -471,6 +471,22 @@ end
 
     @test all(lhs .≈ rhs)
     @test all(lhs_solve .≈ rhs)
+
+    @testset "Keyword arguments" begin
+        expr = sec(x ^ 2 + 4x + 4) ^ 3 - 3
+        roots = ia_solve(expr, x)
+        @test length(roots) == 6 # 2 quadratic roots * 3 roots from cbrt(3)
+        roots = ia_solve(expr, x; complex_roots = false)
+        @test length(roots) == 2
+        # the `n` in `θ + n * 2π`
+        @test length(Symbolics.get_variables(roots[1])) == 1
+        @test length(Symbolics.get_variables(roots[2])) == 1
+        roots = ia_solve(expr, x; complex_roots = false, periodic_roots = false)
+        @test length(roots) == 2
+        @test length(Symbolics.get_variables(roots[1])) == 0
+        @test length(Symbolics.get_variables(roots[2])) ==0
+        @test_nowarn eval.(Symbolics.toexpr.(roots))
+    end
 end
 
 @testset "Sqrt case poly" begin
