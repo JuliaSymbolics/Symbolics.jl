@@ -394,7 +394,7 @@ end
     #@test isequal(lhs, rhs)
 
     lhs = symbolic_solve(log(a*x)-b,x)[1]
-    @test isequal(Symbolics.arguments(Symbolics.unwrap(Symbolics.ssubs(lhs, Dict(a=>1, b=>1))))[1], E)
+    @test isequal(Symbolics.unwrap(Symbolics.ssubs(lhs, Dict(a=>1, b=>1))), 1E)
     
     expr = x + 2
     lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
@@ -414,7 +414,7 @@ end
     @test isapprox(eval(Symbolics.toexpr(symbolic_solve(expr, x)[1])), sqrt(2), atol=1e-6)
 
     expr = 2^(x+1) + 5^(x+3)
-    lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
+    lhs = ComplexF64.(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
     lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
     rhs = [(-im*Base.MathConstants.pi - log(2) + 3log(5))/(log(2) - log(5))]
     @test lhs[1] ≈ rhs[1]
