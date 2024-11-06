@@ -77,17 +77,17 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                 if complex_roots
                     for i in eachindex(rhs)
                         for k in 0:(args[2] - 1)
-                            r = wrap(term(^, rhs[i], (1 // power)))
-                            c = wrap(term(*, 2 * (k), pi)) * im / power
+                            r = term(^, rhs[i], (1 // power))
+                            c = term(*, 2 * (k), pi) * im / power
                             root = r * Base.MathConstants.e^c
                             push!(new_roots, root)
                         end
                     end
                 else
                     for i in eachindex(rhs)
-                        push!(new_roots, wrap(term(^, rhs[i], (1 // power))))
+                        push!(new_roots, term(^, rhs[i], (1 // power)))
                         if iseven(power)
-                            push!(new_roots, wrap(term(-, new_roots[end])))
+                            push!(new_roots, term(-, new_roots[end]))
                         end
                     end
                 end
