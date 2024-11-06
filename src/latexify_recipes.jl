@@ -45,6 +45,46 @@ function latexify_derivatives(ex)
     end
 end
 
+@doc raw"""
+    latexify_variable(name)
+
+Transform the LaTeX expression of a Symbolics variable name `name` before display.
+Symbolics calls this method internally.
+Redefine it to customize how variables are shown in a LaTeX environment.
+
+Example
+=======
+```
+julia> using Symbolics, Latexify
+
+julia> @variables car₊wheel₊ω
+1-element Vector{Num}:
+ car₊wheel₊ω
+
+julia> latexify(car₊wheel₊ω)
+L"\begin{equation}
+car.wheel.\omega
+\end{equation}
+"
+
+julia> Symbolics.latexify_variable(name) = "\\mathrm{$name}"
+
+julia> latexify(car₊wheel₊ω)
+L"\begin{equation}
+\mathrm{$name}
+\end{equation}
+"
+```
+"""
+latexify_variable(name) = name
+
+# Internal dispatch used in _toexpr()
+function _latexify_variable(name::Symbol)
+    name = replace(String(name), NAMESPACE_SEPARATOR => ".") # always do this
+    name = latexify_variable(name) # do whatever the user wants
+    return Symbol(name) # always convert back to Symbol
+end
+
 recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 
 @latexrecipe function f(n::Num)
@@ -192,12 +232,7 @@ function _toexpr(O)
         end
     end
     if issym(O) 
-        sym = string(nameof(O))
-        sym = replace(sym, NAMESPACE_SEPARATOR => ".")
-        if length(sym) > 1
-            sym = string("\\mathtt{", sym, "}")
-        end
-        return Symbol(sym)
+        return _latexify_variable(nameof(O))
     end
     !iscall(O) && return O
 

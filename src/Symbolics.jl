@@ -151,6 +151,7 @@ include("extra_functions.jl")
 using Latexify
 using LaTeXStrings
 include("latexify_recipes.jl")
+export latexify_variable
 
 using RecipesBase
 include("plot_recipes.jl")
