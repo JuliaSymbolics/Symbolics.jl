@@ -476,16 +476,25 @@ end
         expr = sec(x ^ 2 + 4x + 4) ^ 3 - 3
         roots = ia_solve(expr, x)
         @test length(roots) == 6 # 2 quadratic roots * 3 roots from cbrt(3)
+        @test length(Symbolics.get_variables(roots[1])) == 1
+        _n = only(Symbolics.get_variables(roots[1]))
+        vals = substitute.(roots, (Dict(_n => 0),))
+        @test all(x -> isapprox(norm(sec(x^2 + 4x + 4) ^ 3 - 3), 0.0, atol = 1e-14), vals)
+
         roots = ia_solve(expr, x; complex_roots = false)
         @test length(roots) == 2
         # the `n` in `θ + n * 2π`
         @test length(Symbolics.get_variables(roots[1])) == 1
-        @test length(Symbolics.get_variables(roots[2])) == 1
+        _n = only(Symbolics.get_variables(roots[1]))
+        vals = substitute.(roots, (Dict(_n => 0),))
+        @test all(x -> isapprox(norm(sec(x^2 + 4x + 4) ^ 3 - 3), 0.0, atol = 1e-14), vals)
+
         roots = ia_solve(expr, x; complex_roots = false, periodic_roots = false)
         @test length(roots) == 2
         @test length(Symbolics.get_variables(roots[1])) == 0
-        @test length(Symbolics.get_variables(roots[2])) ==0
-        @test_nowarn eval.(Symbolics.toexpr.(roots))
+        @test length(Symbolics.get_variables(roots[2])) == 0
+        vals = eval.(Symbolics.toexpr.(roots))
+        @test all(x -> isapprox(norm(sec(x^2 + 4x + 4) ^ 3 - 3), 0.0, atol = 1e-14), vals)
     end
 end
 
