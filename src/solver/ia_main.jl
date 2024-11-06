@@ -1,6 +1,8 @@
 using Symbolics
 
-function isolate(lhs, var; warns=true, conditions=[])
+const SAFE_ALTERNATIVES = Dict(log => slog, sqrt => ssqrt, cbrt => scbrt)
+
+function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, periodic_roots = true)
     rhs = Vector{Any}([0])
     original_lhs = deepcopy(lhs)
     lhs = unwrap(lhs)
@@ -72,12 +74,21 @@ function isolate(lhs, var; warns=true, conditions=[])
                 power = args[2]
                 new_roots = []
 
-                for i in eachindex(rhs)
-                    for k in 0:(args[2] - 1)
-                        r = wrap(term(^, rhs[i], (1 // power)))
-                        c = wrap(term(*, 2 * (k), pi)) * im / power
-                        root = r * Base.MathConstants.e^c
-                        push!(new_roots, root)
+                if complex_roots
+                    for i in eachindex(rhs)
+                        for k in 0:(args[2] - 1)
+                            r = term(^, rhs[i], (1 // power))
+                            c = term(*, 2 * (k), pi) * im / power
+                            root = r * Base.MathConstants.e^c
+                            push!(new_roots, root)
+                        end
+                    end
+                else
+                    for i in eachindex(rhs)
+                        push!(new_roots, term(^, rhs[i], (1 // power)))
+                        if iseven(power)
+                            push!(new_roots, term(-, new_roots[end]))
+                        end
                     end
                 end
                 rhs = []
@@ -90,57 +101,23 @@ function isolate(lhs, var; warns=true, conditions=[])
                 lhs = args[2]
                 rhs = map(sol -> term(/, term(slog, sol), term(slog, args[1])), rhs)
             end
-
-        elseif oper === (log) || oper === (slog)
+        elseif has_left_inverse(oper)
             lhs = args[1]
-            rhs = map(sol -> term(^, Base.MathConstants.e, sol), rhs)
-            push!(conditions, (args[1], >))
-
-        elseif oper === (log2)
-            lhs = args[1]
-            rhs = map(sol -> term(^, 2, sol), rhs)
-            push!(conditions, (args[1], >))
-
-        elseif oper === (log10)
-            lhs = args[1]
-            rhs = map(sol -> term(^, 10, sol), rhs)
-            push!(conditions, (args[1], >))
-
-        elseif oper === (sqrt)
-            lhs = args[1]
-            append!(conditions, [(r, >=) for r in rhs])
-            rhs = map(sol -> term(^, sol, 2), rhs)
-
-        elseif oper === (cbrt)
-            lhs = args[1]
-            rhs = map(sol -> term(^, sol, 3), rhs)
-
-        elseif oper === (sin) || oper === (cos) || oper === (tan)
-            rev_oper = Dict(sin => asin, cos => acos, tan => atan)
-            lhs = args[1]
-            # make this global somehow so the user doesnt need to declare it on his own
-            new_var = gensym()
-            new_var = (@variables $new_var)[1]
-            rhs = map(
-                sol -> term(rev_oper[oper], sol) +
-                       term(*, Base.MathConstants.pi, new_var),
-                rhs)
-            @info string(new_var) * " ϵ" * " Ζ"
-
-        elseif oper === (asin)
-            lhs = args[1]
-            rhs = map(sol -> term(sin, sol), rhs)
-
-        elseif oper === (acos)
-            lhs = args[1]
-            rhs = map(sol -> term(cos, sol), rhs)
-
-        elseif oper === (atan)
-            lhs = args[1]
-            rhs = map(sol -> term(tan, sol), rhs)
-        elseif oper === (exp)
-            lhs = args[1]
-            rhs = map(sol -> term(slog, sol), rhs)
+            ia_conditions!(oper, lhs, rhs, conditions)
+            invop = left_inverse(oper)
+            invop = get(SAFE_ALTERNATIVES, invop, invop)
+            if is_periodic(oper) && periodic_roots
+                new_var = gensym()
+                new_var = (@variables $new_var)[1]
+                period = fundamental_period(oper)
+                rhs = map(
+                    sol -> term(invop, sol) +
+                           term(*, period, new_var),
+                    rhs)
+                @info string(new_var) * " ϵ" * " Ζ"
+            else
+                rhs = map(sol -> term(invop, sol), rhs)
+            end
         end
 
         lhs = simplify(lhs)
@@ -149,7 +126,7 @@ function isolate(lhs, var; warns=true, conditions=[])
     return rhs, conditions
 end
 
-function attract(lhs, var; warns = true)
+function attract(lhs, var; warns = true, complex_roots = true, periodic_roots = true)
     if n_func_occ(simplify(lhs), var) <= n_func_occ(lhs, var)
         lhs = simplify(lhs)
     end
@@ -164,7 +141,9 @@ function attract(lhs, var; warns = true)
     end
     lhs = attract_trig(lhs, var)
 
-    n_func_occ(lhs, var) == 1 && return isolate(lhs, var, warns = warns, conditions=conditions)
+    if n_func_occ(lhs, var) == 1
+        return isolate(lhs, var; warns, conditions, complex_roots, periodic_roots)
+    end
 
     lhs, sub = turn_to_poly(lhs, var)
 
@@ -182,12 +161,12 @@ function attract(lhs, var; warns = true)
     new_var = collect(keys(sub))[1]
     new_var_val = collect(values(sub))[1]
 
-    roots, new_conds = isolate(lhs, new_var, warns = warns)
+    roots, new_conds = isolate(lhs, new_var; warns = warns, complex_roots, periodic_roots)
     append!(conditions, new_conds)
     new_roots = []
 
     for root in roots
-        new_sol, new_conds = isolate(new_var_val - root, var, warns = warns)
+        new_sol, new_conds = isolate(new_var_val - root, var; warns = warns, complex_roots, periodic_roots)
         append!(conditions, new_conds)
         push!(new_roots, new_sol)
     end
@@ -197,7 +176,7 @@ function attract(lhs, var; warns = true)
 end
 
 """
-    ia_solve(lhs, var)
+    ia_solve(lhs, var; kwargs...)
 This function attempts to solve transcendental functions by first checking
 the "smart" number of occurrences in the input LHS. By smart here we mean
 that polynomials are counted as 1 occurrence. for example `x^2 + 2x` is 1
@@ -225,6 +204,13 @@ we throw an error to tell the user that this is currently unsolvable by our cove
 # Arguments
 - lhs: a Num/SymbolicUtils.BasicSymbolic
 - var: variable to solve for.
+
+# Keyword arguments
+- `warns = true`: Whether to emit warnings for unsolvable expressions.
+- `complex_roots = true`: Whether to consider complex roots of `x ^ n ~ y`, where `n` is an integer.
+- `periodic_roots = true`: If `true`, isolate `f(x) ~ y` as `x ~ finv(y) + n * period` where
+   `is_periodic(f) == true`, `finv = left_inverse(f)` and `period = fundamental_period(f)`. `n`
+   is a new anonymous symbolic variable.
 
 # Examples
 ```jldoctest
@@ -256,10 +242,20 @@ julia> RootFinding.ia_solve(expr, x)
  -2 + π*2var"##230" + asin((1//2)*(-1 + RootFinding.ssqrt(-39)))
  -2 + π*2var"##234" + asin((1//2)*(-1 - RootFinding.ssqrt(-39)))
 ```
+
+All transcendental functions for which `left_inverse` is defined are supported.
+To enable `ia_solve` to handle custom transcendental functions, define an inverse or
+left inverse. If the function is periodic, `is_periodic` and `fundamental_period` must
+be defined. If the function imposes certain conditions on its input or output (for
+example, `log` requires that its input be positive) define `ia_conditions!`.
+
+See also: [`left_inverse`](@ref), [`inverse`](@ref), [`is_periodic`](@ref),
+[`fundamental_period`](@ref), [`ia_conditions!`](@ref).
+
 # References
 [^1]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
 """
-function ia_solve(lhs, var; warns = true)
+function ia_solve(lhs, var; warns = true, complex_roots = true, periodic_roots = true)
     nx = n_func_occ(lhs, var)
     sols = []
     conditions = []
@@ -267,9 +263,9 @@ function ia_solve(lhs, var; warns = true)
         warns && @warn("Var not present in given expression")
         return []
     elseif nx == 1
-        sols, conditions = isolate(lhs, var, warns = warns)
+        sols, conditions = isolate(lhs, var; warns = warns, complex_roots, periodic_roots)
     elseif nx > 1
-        sols, conditions = attract(lhs, var, warns = warns)
+        sols, conditions = attract(lhs, var; warns = warns, complex_roots, periodic_roots)
     end
 
     isequal(sols, nothing) && return nothing

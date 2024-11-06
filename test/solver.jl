@@ -411,7 +411,7 @@ end
     #@test isequal(lhs, rhs)
 
     lhs = symbolic_solve(log(a*x)-b,x)[1]
-    @test isequal(Symbolics.arguments(Symbolics.unwrap(Symbolics.ssubs(lhs, Dict(a=>1, b=>1))))[1], E)
+    @test isequal(Symbolics.unwrap(Symbolics.ssubs(lhs, Dict(a=>1, b=>1))), 1E)
     
     expr = x + 2
     lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
@@ -431,7 +431,7 @@ end
     @test isapprox(eval(Symbolics.toexpr(symbolic_solve(expr, x)[1])), sqrt(2), atol=1e-6)
 
     expr = 2^(x+1) + 5^(x+3)
-    lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
+    lhs = ComplexF64.(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
     lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
     rhs = [(-im*Base.MathConstants.pi - log(2) + 3log(5))/(log(2) - log(5))]
     @test lhs[1] ≈ rhs[1]
@@ -488,6 +488,31 @@ end
 
     @test all(lhs .≈ rhs)
     @test all(lhs_solve .≈ rhs)
+
+    @testset "Keyword arguments" begin
+        expr = sec(x ^ 2 + 4x + 4) ^ 3 - 3
+        roots = ia_solve(expr, x)
+        @test length(roots) == 6 # 2 quadratic roots * 3 roots from cbrt(3)
+        @test length(Symbolics.get_variables(roots[1])) == 1
+        _n = only(Symbolics.get_variables(roots[1]))
+        vals = substitute.(roots, (Dict(_n => 0),))
+        @test all(x -> isapprox(norm(sec(x^2 + 4x + 4) ^ 3 - 3), 0.0, atol = 1e-14), vals)
+
+        roots = ia_solve(expr, x; complex_roots = false)
+        @test length(roots) == 2
+        # the `n` in `θ + n * 2π`
+        @test length(Symbolics.get_variables(roots[1])) == 1
+        _n = only(Symbolics.get_variables(roots[1]))
+        vals = substitute.(roots, (Dict(_n => 0),))
+        @test all(x -> isapprox(norm(sec(x^2 + 4x + 4) ^ 3 - 3), 0.0, atol = 1e-14), vals)
+
+        roots = ia_solve(expr, x; complex_roots = false, periodic_roots = false)
+        @test length(roots) == 2
+        @test length(Symbolics.get_variables(roots[1])) == 0
+        @test length(Symbolics.get_variables(roots[2])) == 0
+        vals = eval.(Symbolics.toexpr.(roots))
+        @test all(x -> isapprox(norm(sec(x^2 + 4x + 4) ^ 3 - 3), 0.0, atol = 1e-14), vals)
+    end
 end
 
 @testset "Sqrt case poly" begin
