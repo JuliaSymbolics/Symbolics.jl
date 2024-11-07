@@ -45,9 +45,14 @@ function latexify_derivatives(ex)
     end
 end
 
-recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
+recipe(n; kw...) = latexify_derivatives(cleanup_exprs(_toexpr(n; kw...)))
 
 @latexrecipe function f(n::Num)
+    # SMALL HACK: forward any keyword arguments passed to latexify()
+    # must be done *before* attributes are set (since they modify kwargs internally inside Latexify)
+    # (see https://github.com/korsbo/Latexify.jl/issues/320)
+    ret = recipe(n; kwargs...)
+
     env --> :equation
     cdot --> false
     fmt --> FancyNumberFormatter(5)
@@ -55,49 +60,58 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
     snakecase --> true
     safescripts --> true
 
-    return recipe(n)
+    return ret
 end
 
 @latexrecipe function f(z::Complex{Num})
+    # same hack as above
+    if iszero(z.im)
+        ret = :($(recipe(z.re; kwargs...)))
+    elseif iszero(z.re)
+        ret = :($(recipe(z.im; kwargs...)) * $im)
+    else
+        ret = :($(recipe(z.re; kwargs...)) + $(recipe(z.im; kwargs...)) * $im)
+    end
+
     env --> :equation
     cdot --> false
     index --> :subscript
 
-    iszero(z.im) && return :($(recipe(z.re)))
-    iszero(z.re) && return :($(recipe(z.im)) * $im)
-    return :($(recipe(z.re)) + $(recipe(z.im)) * $im)
+    return ret
 end
 
 @latexrecipe function f(n::ArrayOp)
+    ret = recipe(n.term) # same hack as above
+
     env --> :equation
     cdot --> false
     index --> :subscript
-    return recipe(n.term)
+    
+    return ret
 end
 
 @latexrecipe function f(n::Function)
     env --> :equation
     cdot --> false
     index --> :subscript
-
     return nameof(n)
 end
-
 
 @latexrecipe function f(n::Arr)
     env --> :equation
     cdot --> false
     index --> :subscript
-
     return unwrap(n)
 end
 
 @latexrecipe function f(n::Symbolic)
+    ret = recipe(n; kwargs...) # same hack as above
+
     env --> :equation
     cdot --> false
     index --> :subscript
 
-    return recipe(n)
+    return ret
 end
 
 @latexrecipe function f(eqs::Vector{Equation})
@@ -134,10 +148,8 @@ Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexif
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 
-_toexpr(O::ArrayOp) = _toexpr(O.term)
-
 # `_toexpr` is only used for latexify
-function _toexpr(O)
+function _toexpr(O; kw...)
     if ismul(O)
         m = O
         numer = Any[]
@@ -147,7 +159,7 @@ function _toexpr(O)
         # This iteration needs to be stable, so we can't iterate over m.dict.
         for term in Iterators.drop(sorted_arguments(m), isone(m.coeff) ? 0 : 1)
             if !ispow(term)
-                push!(numer, _toexpr(term))
+                push!(numer, _toexpr(term; kw...))
                 continue
             end
 
@@ -156,16 +168,16 @@ function _toexpr(O)
             isneg = (pow isa Number && pow < 0) || (iscall(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
             if !isneg
                 if _isone(pow)
-                    pushfirst!(numer, _toexpr(base))
+                    pushfirst!(numer, _toexpr(base; kw...))
                 else
-                    pushfirst!(numer, Expr(:call, :^, _toexpr(base), _toexpr(pow)))
+                    pushfirst!(numer, Expr(:call, :^, _toexpr(base; kw...), _toexpr(pow; kw...)))
                 end
             else
                 newpow = -1*pow
                 if _isone(newpow)
-                    pushfirst!(denom, _toexpr(base))
+                    pushfirst!(denom, _toexpr(base; kw...))
                 else
-                    pushfirst!(denom, Expr(:call, :^, _toexpr(base), _toexpr(newpow)))
+                    pushfirst!(denom, Expr(:call, :^, _toexpr(base; kw...), _toexpr(newpow; kw...)))
                 end
             end
         end
@@ -191,13 +203,10 @@ function _toexpr(O)
             return frac_expr
         end
     end
-    if issym(O) 
-        sym = string(nameof(O))
-        sym = replace(sym, NAMESPACE_SEPARATOR => ".")
-        if length(sym) > 1
-            sym = string("\\mathtt{", sym, "}")
-        end
-        return Symbol(sym)
+    if issym(O)
+        name = String(nameof(O))
+        name = replace(name, NAMESPACE_SEPARATOR => ".")
+        return Symbol(_toexpr(name; kw...))
     end
     !iscall(O) && return O
 
@@ -205,7 +214,7 @@ function _toexpr(O)
     args = sorted_arguments(O)
 
     if (op===(*)) && (args[1] === -1)
-        arg_mul = Expr(:call, :(*), _toexpr(args[2:end])...)
+        arg_mul = Expr(:call, :(*), _toexpr(args[2:end]; kw...)...)
         return Expr(:call, :(-), arg_mul)
     end
 
@@ -218,47 +227,45 @@ function _toexpr(O)
             den *= num.f.x
             num = num.arguments[1]
         end
-        return :(_derivative($(_toexpr(num)), $den, $deg))
+        return :(_derivative($(_toexpr(num; kw...)), $den, $deg))
     elseif op isa Integral
         lower = op.domain.domain.left
         upper = op.domain.domain.right
         vars = op.domain.variables
         integrand = args[1]
         var = if vars isa Tuple
-            Expr(:call, :(*), _toexpr(vars...))
+            Expr(:call, :(*), _toexpr(vars...; kw...))
         else
-                _toexpr(vars)
+            _toexpr(vars; kw...)
         end
-        return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), vars, _toexpr(integrand))
+        return Expr(:call, :_integral, _toexpr(lower; kw...), _toexpr(upper; kw...), vars, _toexpr(integrand; kw...))
     elseif symtype(op) <: FnType
         isempty(args) && return nameof(op)
-        return Expr(:call, _toexpr(op), _toexpr(args)...)
+        return Expr(:call, _toexpr(op; kw...), _toexpr(args; kw...)...)
     elseif op === getindex && symtype(args[1]) <: AbstractArray
         return getindex_to_symbol(O)
     elseif op === (\)
-        return :(solve($(_toexpr(args[1])), $(_toexpr(args[2]))))
+        return :(solve($(_toexpr(args[1]; kw...)), $(_toexpr(args[2]; kw...))))
     elseif issym(op) && symtype(op) <: AbstractArray
         return :(_textbf($(nameof(op))))
     elseif op === identity
-        return _toexpr(only(args)) # suppress identity transformations (e.g. "identity(π)" -> "π")
+        return _toexpr(only(args); kw...) # suppress identity transformations (e.g. "identity(π)" -> "π")
     end
-    return Expr(:call, Symbol(op), _toexpr(args)...)
+    return Expr(:call, Symbol(op), _toexpr(args; kw...)...)
 end
-_toexpr(x::Integer) = x
-_toexpr(x::AbstractFloat) = x
-
-function _toexpr(eq::Equation)
-    Expr(:(=), _toexpr(eq.lhs), _toexpr(eq.rhs))
-end
-
-_toexpr(eqs::AbstractArray) = map(eq->_toexpr(eq), eqs)
-_toexpr(x::Num) = _toexpr(value(x))
+_toexpr(x::Integer; kw...) = x
+_toexpr(x::AbstractFloat; kw...) = x
+_toexpr(x::AbstractString; variable_formatter = identity) = variable_formatter(x) # variable_formatter can modify latexified variable names
+_toexpr(eq::Equation; kw...) = Expr(:(=), _toexpr(eq.lhs; kw...), _toexpr(eq.rhs; kw...))
+_toexpr(eqs::AbstractArray; kw...) = map(eq->_toexpr(eq; kw...), eqs)
+_toexpr(O::ArrayOp; kw...) = _toexpr(O.term; kw...)
+_toexpr(x::Num; kw...) = _toexpr(value(x); kw...)
 
 function getindex_to_symbol(t)
     @assert iscall(t) && operation(t) === getindex && symtype(sorted_arguments(t)[1]) <: AbstractArray
     args = sorted_arguments(t)
     idxs = args[2:end]
-    return :($(_toexpr(args[1]))[$(idxs...)])
+    return :($(_toexpr(args[1]; kw...))[$(idxs...)])
 end
 
 function diffdenom(e)
