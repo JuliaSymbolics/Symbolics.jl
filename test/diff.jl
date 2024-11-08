@@ -349,6 +349,36 @@ let
     @test isequal(expand_derivatives(Differential(t)(t^2 + im*t)), 2t + im)
 end
 
+# 1262
+#
+let 
+    @variables t  b(t)
+	D = Differential(t)
+	expr = b - ((D(b))^2) * D(D(b))
+	expr2 = D(expr)
+	@test isequal(expand_derivatives(expr), expand_derivatives(expr; robust=true))
+	@test_throws BoundsError expand_derivatives(expr2)
+    @test isequal(expand_derivatives(expr2; robust=true), D(b) - (D(b)^2)*D(D(D(b))) - 2D(b)*(D(D(b))^2))
+end
+
+# 1126
+#
+let
+    @syms y f(y) g(y) h(y)
+    D = Differential(y)
+
+    expr_gen = (fun) -> D(D(((-D(D(fun))) / g(y))))
+    
+    expr = expr_gen(g(y))
+    @test_broken isequal(expand_derivatives(expr), expand_derivatives(expr; robust=true))
+    expr = expr_gen(h(y))
+    @test_broken isequal(expand_derivatives(expr), expand_derivatives(expr; robust=true))
+
+    expected = substitute(expand_derivatives(expr; robust=true), h(y) => f(y))
+    expr = expr_gen(f(y))
+    @test_throws BoundsError expand_derivatives(expr)
+    @test isequal(expand(expand_derivatives(expr; robust=true)), expected)
+end
 
 # Check `is_derivative` function
 let
