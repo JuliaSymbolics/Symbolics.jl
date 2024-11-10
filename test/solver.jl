@@ -1,5 +1,15 @@
 using Symbolics
 import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root
+
+@testset "ia_solve without Nemo" begin
+    @test Base.get_extension(Symbolics, :SymbolicsNemoExt) === nothing
+    @variables x
+    roots = ia_solve(log(2 + x), x)
+    @test substitute(roots[1], Dict()) == -1.0
+    roots = @test_warn ["Nemo", "required"] ia_solve(log(2 + x^2), x)
+    @test operation(roots[1]) == Symbolics.RootsOf
+end
+
 using Groebner, Nemo
 E = Base.MathConstants.e
 
