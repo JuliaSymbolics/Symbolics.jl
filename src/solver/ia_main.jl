@@ -18,7 +18,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             else
                 a, b, islin = linear_expansion(lhs, var)
                 if islin
-                    lhs_roots = [-b / a]
+                    lhs_roots = [-b // a]
                 else
                     lhs_roots = [RootsOf(lhs, var)]
                     if warns
@@ -29,7 +29,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
 
             for i in eachindex(lhs_roots)
                 for j in eachindex(rhs)
-                    push!(roots, lhs_roots[i]-rhs[j])
+                    push!(roots, rhs[j]+lhs_roots[i])
                 end
             end
             return roots, conditions
