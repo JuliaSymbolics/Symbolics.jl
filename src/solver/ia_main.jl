@@ -17,13 +17,13 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             new_var = gensym()
             new_var = (@variables $new_var)[1]
             if Base.get_extension(Symbolics, :SymbolicsNemoExt) !== nothing
-                lhs_roots = solve_univar(lhs-new_var, var)
+                lhs_roots = solve_univar(lhs - new_var, var)
             else
-                a, b, islin = linear_expansion(lhs-new_var, var)
+                a, b, islin = linear_expansion(lhs - new_var, var)
                 if islin
                     lhs_roots = [-b // a]
                 else
-                    lhs_roots = [RootsOf(lhs-new_var, var)]
+                    lhs_roots = [RootsOf(lhs - new_var, var)]
                     if warns
                         @warn "Nemo is required to properly solve this expression. Execute `using Nemo` to enable this functionality."
                     end
