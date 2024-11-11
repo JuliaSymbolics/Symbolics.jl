@@ -150,6 +150,109 @@ function recursive_hasoperator(op, O)
     end
 end
 
+function executediff(D, arg, simplify=false; robust=false, occurrences=nothing)
+    if robust || occurrences == nothing
+        occurrences = occursin_info(D.x, arg)
+    end
+
+    _isfalse(occurrences) && return 0
+    occurrences isa Bool && return 1 # means it's a `true`
+
+    if !iscall(arg)
+        return D(arg) # Cannot expand
+    elseif (op = operation(arg); issym(op))
+        inner_args = arguments(arg)
+        if any(isequal(D.x), inner_args)
+            return D(arg) # base case if any argument is directly equal to the i.v.
+        else
+            return sum(inner_args, init=0) do a
+                return executediff(Differential(a), arg; robust) *
+                executediff(D, a; robust)
+            end
+        end
+    elseif op === (IfElse.ifelse)
+        args = arguments(arg)
+        O = op(args[1], 
+            executediff(D, args[2], simplify; robust, occurrences=arguments(occurrences)[2]), 
+            executediff(D, args[3], simplify; robust, occurrences=arguments(occurrences)[3]))
+        return O
+    elseif isa(op, Differential)
+        # The recursive expand_derivatives was not able to remove
+        # a nested Differential. We can attempt to differentiate the
+        # inner expression wrt to the outer iv. And leave the
+        # unexpandable Differential outside.
+        if isequal(op.x, D.x)
+            return D(arg)
+        else
+            inner = executediff(D, arguments(arg)[1], false; robust)
+            # if the inner expression is not expandable either, return
+            if iscall(inner) && operation(inner) isa Differential
+                return D(arg)
+            else
+                return expand_derivatives(op(inner), simplify; robust) # TODO
+            end
+        end
+    elseif isa(op, Integral)
+        if isa(op.domain.domain, AbstractInterval)
+            domain = op.domain.domain
+            a, b = DomainSets.endpoints(domain)
+            c = 0
+            inner_function = expand_derivatives(arguments(arg)[1]; robust) # TODO
+            if iscall(value(a))
+                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(a)))
+                t2 = D(a)
+                c -= t1*t2
+            end
+            if iscall(value(b))
+                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(b)))
+                t2 = D(b)
+                c += t1*t2
+            end
+            inner = executediff(D, arguments(arg)[1]; robust)
+            c += op(inner)
+            return value(c)
+        end
+    end
+
+    inner_args = arguments(arg)
+    l = length(inner_args)
+    exprs = []
+    c = 0
+
+    for i in 1:l
+        t2 = executediff(D, inner_args[i],false; robust, occurrences=arguments(occurrences)[i])
+
+        x = if _iszero(t2)
+            t2
+        elseif _isone(t2)
+            d = derivative_idx(arg, i)
+            d isa NoDeriv ? D(arg) : d
+        else
+            t1 = derivative_idx(arg, i)
+            t1 = t1 isa NoDeriv ? D(arg) : t1
+            t1 * t2
+        end
+
+        if _iszero(x)
+            continue
+        elseif x isa Symbolic
+            push!(exprs, x)
+        else
+            c += x
+        end
+    end
+
+    if isempty(exprs)
+        return c
+    elseif length(exprs) == 1
+        term = (simplify ? SymbolicUtils.simplify(exprs[1]) : exprs[1])
+        return _iszero(c) ? term : c + term
+    else
+        x = +((!_iszero(c) ? vcat(c, exprs) : exprs)...)
+        return simplify ? SymbolicUtils.simplify(x) : x
+    end
+end
+
 """
 $(SIGNATURES)
 
@@ -184,107 +287,6 @@ function expand_derivatives(O::Symbolic, simplify=false; robust=false, occurrenc
     if iscall(O) && isa(operation(O), Differential)
         arg = only(arguments(O))
         arg = expand_derivatives(arg, false; robust)
-
-        if robust || occurrences == nothing
-            occurrences = occursin_info(operation(O).x, arg)
-        end
-
-        _isfalse(occurrences) && return 0
-        occurrences isa Bool && return 1 # means it's a `true`
-
-        D = operation(O)
-
-        if !iscall(arg)
-            return D(arg) # Cannot expand
-        elseif (op = operation(arg); issym(op))
-            inner_args = arguments(arg)
-            if any(isequal(D.x), inner_args)
-                return D(arg) # base case if any argument is directly equal to the i.v.
-            else
-                return sum(inner_args, init=0) do a
-                    return expand_derivatives(Differential(a)(arg); robust) *
-                           expand_derivatives(D(a); robust)
-                end
-            end
-        elseif op === (IfElse.ifelse)
-            args = arguments(arg)
-            O = op(args[1], D(args[2]), D(args[3]))
-            return expand_derivatives(O, simplify; robust, occurrences)
-        elseif isa(op, Differential)
-            # The recursive expand_derivatives was not able to remove
-            # a nested Differential. We can attempt to differentiate the
-            # inner expression wrt to the outer iv. And leave the
-            # unexpandable Differential outside.
-            if isequal(op.x, D.x)
-                return D(arg)
-            else
-                inner = expand_derivatives(D(arguments(arg)[1]), false; robust)
-                # if the inner expression is not expandable either, return
-                if iscall(inner) && operation(inner) isa Differential
-                    return D(arg)
-                else
-                    return expand_derivatives(op(inner), simplify; robust)
-                end
-            end
-        elseif isa(op, Integral)
-            if isa(op.domain.domain, AbstractInterval)
-                domain = op.domain.domain
-                a, b = DomainSets.endpoints(domain)
-                c = 0
-                inner_function = expand_derivatives(arguments(arg)[1]; robust)
-                if iscall(value(a))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(a)))
-                    t2 = D(a)
-                    c -= t1*t2
-                end
-                if iscall(value(b))
-                    t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(b)))
-                    t2 = D(b)
-                    c += t1*t2
-                end
-                inner = expand_derivatives(D(arguments(arg)[1]); robust)
-                c += op(inner)
-                return value(c)
-            end
-        end
-
-        inner_args = arguments(arg)
-        l = length(inner_args)
-        exprs = []
-        c = 0
-
-        for i in 1:l
-            t2 = expand_derivatives(D(inner_args[i]),false; robust, occurrences=arguments(occurrences)[i])
-
-            x = if _iszero(t2)
-                t2
-            elseif _isone(t2)
-                d = derivative_idx(arg, i)
-                d isa NoDeriv ? D(arg) : d
-            else
-                t1 = derivative_idx(arg, i)
-                t1 = t1 isa NoDeriv ? D(arg) : t1
-                t1 * t2
-            end
-
-            if _iszero(x)
-                continue
-            elseif x isa Symbolic
-                push!(exprs, x)
-            else
-                c += x
-            end
-        end
-
-        if isempty(exprs)
-            return c
-        elseif length(exprs) == 1
-            term = (simplify ? SymbolicUtils.simplify(exprs[1]) : exprs[1])
-            return _iszero(c) ? term : c + term
-        else
-            x = +((!_iszero(c) ? vcat(c, exprs) : exprs)...)
-            return simplify ? SymbolicUtils.simplify(x) : x
-        end
     elseif iscall(O) && isa(operation(O), Integral)
         return operation(O)(expand_derivatives(arguments(O)[1]; robust))
     elseif !hasderiv(O)
@@ -294,6 +296,8 @@ function expand_derivatives(O::Symbolic, simplify=false; robust=false, occurrenc
         O1 = operation(O)(args...)
         return simplify ? SymbolicUtils.simplify(O1) : O1
     end
+
+    executediff(operation(O), arg, simplify; robust, occurrences)
 end
 function expand_derivatives(n::Num, simplify=false; robust=false, occurrences=nothing)
     wrap(expand_derivatives(value(n), simplify; robust, occurrences))
