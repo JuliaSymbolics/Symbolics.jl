@@ -68,18 +68,24 @@ end
 @testset "Solving in terms of a constant var" begin
     eq = ((s^2 + 1)/(s^2 + 2*s + 1)) - ((s^2 + a)/(b*c*s^2 + (b+c)*s + d))
     calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b,c,d])
+    solve_roots = sort_arr(symbolic_solve(eq, [a,b,c,d]), [a,b,c,d])
     known_roots = sort_arr([Dict(a=>1, b=>1, c=>1, d=>1)], [a,b,c,d])
     @test check_approx(calcd_roots, known_roots)   
+    @test check_approx(solve_roots, known_roots)   
 
     eq = (a+b)*s^2 - 2s^2 + 2*b*s - 3*s
     calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b])
+    solve_roots = sort_arr(symbolic_solve(eq, [a,b]), [a,b])
     known_roots = sort_arr([Dict(a=>1/2, b=>3/2)], [a,b])
     @test check_approx(calcd_roots, known_roots)   
+    @test check_approx(solve_roots, known_roots)   
 
     eq = (a*x^2+b)*s^2 - 2s^2 + 2*b*s - 3*s + 2(x^2)*(s^3) + 10*s^3
-    calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b])
+    calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b,x])
+    solve_roots = sort_arr(symbolic_solve(eq, [a,b,x]), [a,b,x])
     known_roots = sort_arr([Dict(a=>-1/10, b=>3/2, x=>-im*sqrt(5)), Dict(a=>-1/10, b=>3/2, x=>im*sqrt(5))], [a,b,x])
     @test check_approx(calcd_roots, known_roots)   
+    @test check_approx(solve_roots, known_roots)   
 end
 
 @testset "Invalid input" begin
@@ -345,14 +351,18 @@ end
 @testset "Post Process roots" begin
     SymbolicUtils.@syms __x
     __symsqrt(x) = SymbolicUtils.term(ssqrt, x)
+    term = SymbolicUtils.term
     @test Symbolics.postprocess_root(2 // 1) == 2 && Symbolics.postprocess_root(2 + 0*im) == 2
     @test Symbolics.postprocess_root(__symsqrt(4)) == 2
     @test isequal(Symbolics.postprocess_root(__symsqrt(__x)^2), __x)
 
-    @test Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 0) ) == 1
-    @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.e, 0) ) == 1
-    @test Symbolics.postprocess_root( SymbolicUtils.term(^, Base.MathConstants.pi, 1) ) == Base.MathConstants.pi
-    @test isequal(Symbolics.postprocess_root( SymbolicUtils.term(^, __x, 1) ), __x)
+
+    @test isequal(Symbolics.postprocess_root(term(^, 0, __x)), 0)
+    @test_broken isequal(Symbolics.postprocess_root(term(/, __x, 0)), Inf)
+    @test Symbolics.postprocess_root(term(^, __x, 0) ) == 1
+    @test Symbolics.postprocess_root(term(^, Base.MathConstants.e, 0) ) == 1
+    @test Symbolics.postprocess_root(term(^, Base.MathConstants.pi, 1) ) == Base.MathConstants.pi
+    @test isequal(Symbolics.postprocess_root(term(^, __x, 1) ), __x)
 
     x = Symbolics.term(sqrt, 2)
     @test isequal(Symbolics.postprocess_root( expand((x + 1)^4) ), 17 + 12x)
@@ -416,7 +426,10 @@ end
     lhs = ia_solve(a*x^b + c, x)[1]
     lhs2 = symbolic_solve(a*x^b + c, x)[1]
     rhs = Symbolics.term(^, -c.val/a.val, 1/b.val) 
-    #@test isequal(lhs, rhs)
+    @test_broken isequal(lhs, rhs)
+
+    @test isequal(symbolic_solve(2/x, x)[1], Inf)
+    @test isequal(symbolic_solve(x^1.5, x)[1], 0)
 
     lhs = symbolic_solve(log(a*x)-b,x)[1]
     @test isequal(Symbolics.unwrap(Symbolics.ssubs(lhs, Dict(a=>1, b=>1))), 1E)

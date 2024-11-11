@@ -45,7 +45,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
 
         if isequal(old_lhs, lhs) 
             warns && @warn("This expression cannot be solved with the methods available to ia_solve. Try a numerical method instead.")
-            return nothing
+            return nothing, conditions
         end
 
         old_lhs = deepcopy(lhs)
@@ -82,7 +82,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             else
                 # 2 / x = y
                 lhs = args[2]
-                rhs = map(sol -> args[1] // sol, rhs)
+                rhs = map(sol -> term(/, args[1], sol), rhs)
             end
 
         elseif oper === (^)
@@ -114,6 +114,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             elseif any(isequal(x, var) for x in get_variables(args[1])) &&
                    n_occurrences(args[2], var) == 0
                 lhs = args[1]
+                s, args[2] = filter_stuff(args[2])
                 rhs = map(sol -> term(^, sol, 1 // args[2]), rhs)
             else
                 lhs = args[2]
@@ -280,9 +281,9 @@ function ia_solve(lhs, var; warns = true, complex_roots = true, periodic_roots =
     conditions = []
     if nx == 0
         warns && @warn("Var not present in given expression")
-        return []
+        return nothing
     elseif nx == 1
-        sols, conditions = isolate(lhs, var; warns = warns, complex_roots, periodic_roots)
+       sols, conditions = isolate(lhs, var; warns = warns, complex_roots, periodic_roots)
     elseif nx > 1
         sols, conditions = attract(lhs, var; warns = warns, complex_roots, periodic_roots)
     end

@@ -43,14 +43,26 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
         end
     end
 
+    args = arguments(x)
+
     # (X)^0 => 1
-    if oper === (^) && isequal(arguments(x)[2], 0)
+    if oper === (^) && isequal(args[2], 0) && !isequal(args[1], 0)
         return 1
     end
 
     # (X)^1 => X
-    if oper === (^) && isequal(arguments(x)[2], 1)
-        return arguments(x)[1]
+    if oper === (^) && isequal(args[2], 1)
+        return args[1]
+    end
+
+    # (0)^X => 0
+    if oper === (^) && isequal(args[1], 0) && !isequal(args[2], 0)
+        return 0
+    end
+
+    # y / 0 => Inf
+    if oper === (/) && !isequal(args[1], 0) && isequal(args[2], 0)
+        return Inf
     end
 
     # sqrt((N / D)^2 * M) => N / D * sqrt(M)

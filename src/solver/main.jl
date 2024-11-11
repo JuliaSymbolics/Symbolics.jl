@@ -173,10 +173,6 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         expr = Vector{Num}(expr)
     end
 
-    if expr_univar && !x_univar
-        expr = [expr]
-        expr_univar = false
-    end
     if !expr_univar && x_univar
         x = [x]
         x_univar = false
@@ -189,7 +185,16 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         isequal(sols, nothing) && return nothing
         sols = map(postprocess_root, sols)
         return sols
+    elseif expr_univar
+        all_vars = get_variables(expr)
+        diff_vars = setdiff(wrap.(all_vars), x)
+        if length(diff_vars) == 1
+            return solve_interms_ofvar(expr, diff_vars[1], dropmultiplicity=dropmultiplicity, warns=warns)
+        end
+
+        expr = [expr]
     end
+
 
     if !x_univar
         for e in expr
@@ -237,6 +242,7 @@ function symbolic_solve(expr; x...)
     return symbolic_solve(expr, vars; x...)
 end
 
+
 """
     solve_univar(expression, x; dropmultiplicity=true)
 This solver uses analytic solutions up to degree 4 to solve univariate polynomials.
@@ -255,6 +261,8 @@ implemented in the function `get_roots` and its children.
 - x: Single symbolics variable
 
 - dropmultiplicity (optional): Print repeated roots or not?
+
+- strict (optional): Bool that enables/disables strict assert if input expression is a univariate polynomial or not. If strict=true and expression is not a polynomial, `solve_univar` throws an assertion error.
 
 # Examples
 
@@ -277,8 +285,8 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
     end
 
     subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions=true)
-    if strict
-        @assert check_polynomial(filtered_expr) "This expression could not be solved by `symbolic_solve`."
+    if !strict && !check_polynomial(filtered_expr, strict=false)
+        return [RootsOf(wrap(expression), wrap(x))]
     end
     coeffs, constant = polynomial_coeffs(filtered_expr, [x])
     degree = sdegree(coeffs, x)
