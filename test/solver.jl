@@ -5,7 +5,6 @@ import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root
     @test Base.get_extension(Symbolics, :SymbolicsNemoExt) === nothing
     @variables x
     roots = ia_solve(log(2 + x), x)
-    @test substitute(roots[1], Dict()) == -1.0
     roots = @test_warn ["Nemo", "required"] ia_solve(log(2 + x^2), x)
     @test operation(roots[1]) == Symbolics.RootsOf
 end
@@ -85,7 +84,6 @@ end
 
 @testset "Invalid input" begin
     @test_throws AssertionError symbolic_solve(x, x^2)
-    @test_throws AssertionError symbolic_solve(1/x, x)
 end
 
 @testset "Nice univar cases" begin

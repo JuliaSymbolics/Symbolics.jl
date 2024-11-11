@@ -8,19 +8,22 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
     lhs = unwrap(lhs)
 
     old_lhs = nothing
+    
     while !isequal(lhs, var)
         subs, poly = filter_poly(lhs, var)
 
-        if check_poly_inunivar(poly, var)
+        if check_polynomial(poly, strict=false)
             roots = []
+            new_var = gensym()
+            new_var = (@variables $new_var)[1]
             if Base.get_extension(Symbolics, :SymbolicsNemoExt) !== nothing
-                lhs_roots = solve_univar(lhs, var)
+                lhs_roots = solve_univar(lhs-new_var, var)
             else
-                a, b, islin = linear_expansion(lhs, var)
+                a, b, islin = linear_expansion(lhs-new_var, var)
                 if islin
                     lhs_roots = [-b // a]
                 else
-                    lhs_roots = [RootsOf(lhs, var)]
+                    lhs_roots = [RootsOf(lhs-new_var, var)]
                     if warns
                         @warn "Nemo is required to properly solve this expression. Execute `using Nemo` to enable this functionality."
                     end
@@ -29,7 +32,12 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
 
             for i in eachindex(lhs_roots)
                 for j in eachindex(rhs)
-                    push!(roots, rhs[j]+lhs_roots[i])
+                    if iscall(lhs_roots[i]) && operation(lhs_roots[i]) == RootsOf
+                        lhs_roots[i].arguments[1] = substitute(lhs_roots[i].arguments[1], Dict(new_var=>rhs[j]), fold=false)
+                        push!(roots, lhs_roots[i])
+                    else
+                        push!(roots, substitute(lhs_roots[i], Dict(new_var=>rhs[j]), fold=false))
+                    end
                 end
             end
             return roots, conditions
@@ -167,7 +175,7 @@ function attract(lhs, var; warns = true, complex_roots = true, periodic_roots = 
             return nothing, conditions
         end
     end
-
+    
     new_var = collect(keys(sub))[1]
     new_var_val = collect(values(sub))[1]
 
@@ -176,6 +184,7 @@ function attract(lhs, var; warns = true, complex_roots = true, periodic_roots = 
     new_roots = []
 
     for root in roots
+        iscall(root) && operation(root) == RootsOf && continue
         new_sol, new_conds = isolate(new_var_val - root, var; warns = warns, complex_roots, periodic_roots)
         append!(conditions, new_conds)
         push!(new_roots, new_sol)

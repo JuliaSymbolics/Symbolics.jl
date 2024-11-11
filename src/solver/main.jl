@@ -259,7 +259,7 @@ implemented in the function `get_roots` and its children.
 # Examples
 
 """
-function solve_univar(expression, x; dropmultiplicity=true)
+function solve_univar(expression, x; dropmultiplicity=true, strict=true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
@@ -277,6 +277,9 @@ function solve_univar(expression, x; dropmultiplicity=true)
     end
 
     subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions=true)
+    if strict
+        @assert check_polynomial(filtered_expr) "This expression could not be solved by `symbolic_solve`."
+    end
     coeffs, constant = polynomial_coeffs(filtered_expr, [x])
     degree = sdegree(coeffs, x)
 
@@ -315,7 +318,6 @@ function solve_univar(expression, x; dropmultiplicity=true)
     end
 
     if isequal(arr_roots, [])
-        @assert check_polynomial(expression) "This expression could not be solved by `symbolic_solve`."
         return [RootsOf(wrap(expression), wrap(x))]
     end
 
