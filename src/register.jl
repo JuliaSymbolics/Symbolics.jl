@@ -35,7 +35,7 @@ macro register_symbolic(expr, define_promotion = true, Ts = :([]), wrap_arrays =
                   res = if !any($is_symbolic_or_array_of_symbolic, unwrapped_args)
                       $f(unwrapped_args...) # partial-eval if all args are unwrapped
                   else
-                      $Term{$ret_type}($f, unwrapped_args)
+                      $_Term($ret_type, $f, unwrapped_args)
                   end
                   if typeof.(args) == typeof.(unwrapped_args)
                       return res
@@ -115,7 +115,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             elseif $ret_type == nothing || ($ret_type <: AbstractArray)
                 $array_term($(Expr(:parameters, [Expr(:kw, k, v) for (k, v) in defs]...)), $f, unwrapped_args...)
             else
-                $Term{$ret_type}($f, unwrapped_args)
+                $_Term($ret_type, $f, unwrapped_args)
             end
 
             if typeof.(args) == typeof.(unwrapped_args)

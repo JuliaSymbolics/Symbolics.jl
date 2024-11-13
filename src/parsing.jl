@@ -81,7 +81,7 @@ function parse_expr_to_symbolic(ex, mod::Module)
         else
             x = parse_expr_to_symbolic(ex.args[1], mod)
             ys = parse_expr_to_symbolic.(ex.args[2:end],(mod,))
-            return Term{Real}(x,[ys...])
+            return _Term(Real, x,[ys...])
         end
     end
 end

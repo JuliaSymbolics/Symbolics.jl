@@ -186,9 +186,9 @@ macro arrayop(output_idx, expr, options...)
     end |> esc
 end
 
-const SymArray = Union{ArrayOp, Symbolic{<:AbstractArray}}
-const SymMat = Union{ArrayOp{<:AbstractMatrix}, Symbolic{<:AbstractMatrix}}
-const SymVec = Union{ArrayOp{<:AbstractVector}, Symbolic{<:AbstractVector}}
+const SymArray = Union{ArrayOp, BasicSymbolic{<:AbstractArray}}
+const SymMat = Union{ArrayOp{<:AbstractMatrix}, BasicSymbolic{<:AbstractMatrix}}
+const SymVec = Union{ArrayOp{<:AbstractVector}, BasicSymbolic{<:AbstractVector}}
 
 ### Propagate ###
 #
@@ -420,7 +420,7 @@ function array_term(f, args...;
         end
     end
     S = container_type{eltype, ndims}
-    setmetadata(Term{S}(f, Any[args...]), ArrayShapeCtx, shape)
+    setmetadata(_Term(S, f, Any[args...]), ArrayShapeCtx, shape)
 end
 
 """
@@ -509,7 +509,7 @@ const ArrayLike{T,N} = Union{
     ArrayOp{AbstractArray{T,N}},
     Symbolic{AbstractArray{T,N}},
     Arr{T,N},
-    SymbolicUtils.Term{AbstractArray{T, N}}
+    SymbolicUtils.BasicSymbolic{AbstractArray{T, N}}
 } # Like SymArray but includes Arr and Term{Arr}
 
 unwrap(x::Arr) = x.value
@@ -693,7 +693,7 @@ function scalarize_op(f::typeof(_det), arr)
 end
 
 @wrapped function LinearAlgebra.det(x::AbstractMatrix; laplace=true)
-    Term{eltype(x)}(_det, [x, laplace])
+    _Term(eltype(x), _det, [x, laplace])
 end false
 
 
@@ -1060,7 +1060,7 @@ function get_inputs(x::ArrayOp)
 end
 
 function similar_arrayvar(ex, name)
-    Sym{symtype(ex)}(name) #TODO: shape?
+    _Sym(symtype(ex), name) #TODO: shape?
 end
 
 function reset_to_one(range)
@@ -1069,7 +1069,7 @@ function reset_to_one(range)
 end
 
 function reset_sym(i)
-    Sym{Int}(Symbol(nameof(i), "′"))
+    _Sym(Int, Symbol(nameof(i), "′"))
 end
 
 function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)

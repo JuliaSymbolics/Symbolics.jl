@@ -8,7 +8,7 @@ function _binomial(nothing, n, k)
                             end), unwrapped_args))
                 Base.binomial(unwrapped_args...)
             else
-                SymbolicUtils.Term{Int}(Base.binomial, unwrapped_args)
+                _Term(Int, Base.binomial, unwrapped_args)
             end
         if typeof.(args) == typeof.(unwrapped_args)
             return res

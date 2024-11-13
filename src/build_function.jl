@@ -310,7 +310,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
         oop_expr = wrap_code[1](oop_expr)
     end
 
-    out = Sym{Any}(:ˍ₋out)
+    out = _Sym(Any, :ˍ₋out)
     ip_body = if iip
         postprocess_fbody(set_array(parallel,
                                     dargs,
@@ -553,13 +553,13 @@ _set_array(out, outputidxs, rhs, checkbounds, skipzeros, cse) = rhs
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())
     vs_names = tosymbol.(vs)
     for (v,k) in zip(vs_names, vs)
-        symsdict[k] = Sym{symtype(k)}(v)
+        symsdict[k] = _Sym(symtype(k), v)
     end
     exs = [:($name[$i]) for (i, u) ∈ enumerate(vs)]
     vs_names,exs
 end
 function vars_to_pairs(name,vs, symsdict)
-    symsdict[vs] = Sym{symtype(vs)}(tosymbol(vs))
+    symsdict[vs] = _Sym(symtype(vs), tosymbol(vs))
     [tosymbol(vs)], [name]
 end
 

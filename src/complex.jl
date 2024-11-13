@@ -48,7 +48,7 @@ function Base.show(io::IO, a::Complex{Num})
         return print(io, arguments(rr)[1])
     end
 
-    i = Sym{Real}(:im)
+    i = _Sym(Real, :im)
     show(io, real(a) + i * imag(a))
 end
 

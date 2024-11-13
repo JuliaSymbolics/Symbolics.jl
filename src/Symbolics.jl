@@ -26,9 +26,9 @@ import DomainSets: Domain, DomainSets
 using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-FnType, @rule, Rewriters, substitute, symtype,
-promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+import SymbolicUtils: BasicSymbolic, FnType, @rule, Rewriters, substitute, symtype,
+                      promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, _Sym,
+                      _Term, get_dict, isconst, get_val
 
 using SymbolicUtils.Code
 

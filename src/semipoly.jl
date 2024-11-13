@@ -60,7 +60,7 @@ end
 # return a dictionary of exponents with respect to variables
 function pdegrees(x)
     if ismul(x)
-        return x.dict
+        return get_dict(x)
     elseif isdiv(x)
         num_dict = pdegrees(x.num)
         den_dict = pdegrees(x.den)
@@ -136,7 +136,7 @@ Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.p, m.coeff)
 isop(x, op) = iscall(x) && operation(x) === op
 isop(op) = Base.Fix2(isop, op)
 
-simpleterm(T, f, args, m) = Term{SymbolicUtils._promote_symtype(f, args)}(f, args)
+simpleterm(T, f, args, m) = _Term(SymbolicUtils._promote_symtype(f, args), f, args)
 
 function mark_and_exponentiate(expr, vars)
     # Step 1
@@ -197,16 +197,16 @@ function mark_vars(expr, vars)
     if op === (^) || op == (/)
         args = arguments(expr)
         @assert length(args) == 2
-        return Term{symtype(expr)}(op, map(mark_vars(vars), args))
+        return _Term(symtype(expr), op, map(mark_vars(vars), args))
     end
     args = arguments(expr)
     if op === (+) || op === (*)
-        return Term{symtype(expr)}(op, map(mark_vars(vars), args))
+        return _Term(symtype(expr), op, map(mark_vars(vars), args))
     elseif length(args) == 1
         if op == sqrt
             return mark_vars(args[1]^(1//2), vars)
         elseif linearity_1(op)
-            return Term{symtype(expr)}(op, mark_vars(args[1], vars))
+            return _Term(symtype(expr), op, mark_vars(args[1], vars))
         end
     end
     return SemiMonomial(1, expr)

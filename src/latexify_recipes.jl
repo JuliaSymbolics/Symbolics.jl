@@ -144,7 +144,7 @@ function _toexpr(O)
         denom = Any[]
 
         # We need to iterate over each term in m, ignoring the numeric coefficient.
-        # This iteration needs to be stable, so we can't iterate over m.dict.
+        # This iteration needs to be stable, so we can't iterate over get_dict(m).
         for term in Iterators.drop(sorted_arguments(m), isone(m.coeff) ? 0 : 1)
             if !ispow(term)
                 push!(numer, _toexpr(term))
@@ -269,7 +269,7 @@ function diffdenom(e)
     elseif ismul(e)
         LaTeXString(prod(
                 "\\mathrm{d}$(k)$(isone(v) ? "" : "^{$v}")"
-                for (k, v) in e.dict
+                for (k, v) in get_dict(e)
                ))
     else
         e

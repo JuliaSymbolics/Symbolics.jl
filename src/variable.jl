@@ -1,4 +1,4 @@
-using SymbolicUtils: FnType, Sym, metadata
+using SymbolicUtils: FnType, metadata
 using Setfield
 
 const IndexMap = Dict{Char,Char}(
@@ -183,7 +183,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
             end
         end
         argtypes = arg_types_from_call_args(call_args)
-        ex = :($CallWithMetadata($Sym{$FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}}($_vname)))
+        ex = :($CallWithMetadata($_Sym($FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}, $_vname)))
     else
         vname = lhs
         if isruntime
@@ -191,7 +191,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
         else
             _vname = Meta.quot(vname)
         end
-        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($_vname)(map($unwrap, ($(call_args...),))...))
+        ex = :($_Sym($FnType{Tuple, Array{$type, $ndim}}, $_vname)(map($unwrap, ($(call_args...),))...))
     end
     ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
 
@@ -336,16 +336,16 @@ end
 
 function construct_var(macroname, var_name, type, call_args, val, prop)
     expr = if call_args === nothing
-        :($Sym{$type}($var_name))
+        :($_Sym($type, $var_name))
     elseif call_args_are_function(call_args)
         # function syntax is (x::TFunc)(.. or ::TArg1, ::TArg2)::TRet
         # .. is Vararg
         # (..)::ArgT is Vararg{ArgT}
         var_name, fntype = function_name_and_type(var_name)
         argtypes = arg_types_from_call_args(call_args)
-        :($CallWithMetadata($Sym{$FnType{$argtypes, $type, $(fntype...)}}($var_name)))
+        :($CallWithMetadata($_Sym($FnType{$argtypes, $type, $(fntype...)}, $var_name)))
     else
-        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
+        :($_Sym($FnType{NTuple{$(length(call_args)), Any}, $type}, $var_name)($(map(x->:($value($x)), call_args)...)))
     end
 
     if val !== nothing
@@ -367,19 +367,19 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
 
     need_scalarize = false
     expr = if call_args === nothing
-        ex = :($Sym{Array{$type, $ndim}}($var_name))
+        ex = :($_Sym(Array{$type, $ndim}, $var_name))
         :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
     elseif call_args_are_function(call_args)
         need_scalarize = true
         var_name, fntype = function_name_and_type(var_name)
         argtypes = arg_types_from_call_args(call_args)
-        ex = :($Sym{Array{$FnType{$argtypes, $type, $(fntype...)}, $ndim}}($var_name))
+        ex = :($_Sym(Array{$FnType{$argtypes, $type, $(fntype...)}, $ndim}, $var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWithMetadata, $ex))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
+        ex = :($_Sym(Array{$FnType{Tuple, $type}, $ndim}, $var_name))
         ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
         :($map($CallWith(($(call_args...),)), $ex))
     end
@@ -696,7 +696,7 @@ Also see `variables`.
 """
 function variable(name, idx...; T=Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
-    v = Sym{T}(name_ij)
+    v = _Sym(T, name_ij)
     if T <: FnType
         v = CallWithMetadata(v)
     end
@@ -773,9 +773,3 @@ function (::Type{Variable{T}})(s, i...) where {T}
 end
 
 (::Type{Variable})(s, i...) = Variable{Real}(s, i...)
-
-function (::Type{Sym{T}})(s, x, i...) where {T}
-    Base.depwarn("Sym{T}(name, x, idx...) is deprecated, use variable(name, x, idx...; T=T)", :Variable, force=true)
-    variable(s, x, i...; T=T)
-end
-(::Type{Sym})(s, x, i...) = Sym{Real}(s, x, i...)

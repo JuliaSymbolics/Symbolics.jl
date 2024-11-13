@@ -103,11 +103,11 @@ function occursin_info(x, expr, fail = true)
         if all(_isfalse, args)
             return false
         end
-        Term{Real}(true, args)
+        _Term(Real, true, args)
     end
 end
 
-function occursin_info(x, expr::Sym, fail)
+function occursin_info(x, expr::BasicSymbolic, fail)
     if symtype(expr) <: AbstractArray && fail
             error("Differentiation of expressions involving arrays and array variables is not yet supported.")
     end
@@ -139,7 +139,7 @@ function recursive_hasoperator(op, O)
         return true
     else
         if isadd(O) || ismul(O)
-            any(recursive_hasoperator(op), keys(O.dict))
+            any(recursive_hasoperator(op), keys(get_dict(O)))
         elseif ispow(O)
             recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
         elseif isdiv(O)
@@ -636,7 +636,7 @@ end
 
 isidx(x) = x isa TermCombination
 
-basic_mkterm(t, g, args, m) = metadata(Term{Any}(g, args), m)
+basic_mkterm(t, g, args, m) = metadata(_Term(Any, g, args), m)
 
 let
     # we do this in a let block so that Revise works on the list of rules
