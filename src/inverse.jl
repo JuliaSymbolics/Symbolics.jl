@@ -47,24 +47,26 @@ inverse.
 """
 macro register_inverse(f, g, dir::QuoteNode = :(:both))
     dir = dir.value
+    f = esc(f)
+    g = esc(g)
     if dir == :both
         quote
-            (::typeof($inverse))(::typeof($f)) = $g
-            (::typeof($inverse))(::typeof($g)) = $f
-            (::typeof($left_inverse))(::typeof($f)) = $(inverse)($f)
-            (::typeof($right_inverse))(::typeof($f)) = $(inverse)($f)
-            (::typeof($left_inverse))(::typeof($g)) = $(inverse)($g)
-            (::typeof($right_inverse))(::typeof($g)) = $(inverse)($g)
+            (::$typeof($inverse))(::$typeof($f)) = $g
+            (::$typeof($inverse))(::$typeof($g)) = $f
+            (::$typeof($left_inverse))(::$typeof($f)) = $(inverse)($f)
+            (::$typeof($right_inverse))(::$typeof($f)) = $(inverse)($f)
+            (::$typeof($left_inverse))(::$typeof($g)) = $(inverse)($g)
+            (::$typeof($right_inverse))(::$typeof($g)) = $(inverse)($g)
         end
     elseif dir == :left
         quote
-            (::typeof($left_inverse))(::typeof($f)) = $g
-            (::typeof($right_inverse))(::typeof($g)) = $f
+            (::$typeof($left_inverse))(::$typeof($f)) = $g
+            (::$typeof($right_inverse))(::$typeof($g)) = $f
         end
     elseif dir == :right
         quote
-            (::typeof($right_inverse))(::typeof($f)) = $g
-            (::typeof($left_inverse))(::typeof($g)) = $f
+            (::$typeof($right_inverse))(::$typeof($f)) = $g
+            (::$typeof($left_inverse))(::$typeof($g)) = $f
         end
     else
         throw(ArgumentError("The third argument to `@register_inverse` must be `left` or `right`"))
