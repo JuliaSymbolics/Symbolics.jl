@@ -62,6 +62,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "RootFinding solver" begin include("solver.jl") end
         @safetestset "Function inverses test" begin include("inverse.jl") end
         @safetestset "Taylor Series Test" begin include("taylor.jl") end
+        @safetestset "Discontinuity registration test" begin include("discontinuities.jl") end
     end
 end
 
