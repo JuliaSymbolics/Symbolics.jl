@@ -238,4 +238,7 @@ end
 export inverse, left_inverse, right_inverse, @register_inverse, has_inverse, has_left_inverse, has_right_inverse
 include("inverse.jl")
 
+export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
+include("discontinuities.jl")
+
 end # module
