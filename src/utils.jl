@@ -62,7 +62,7 @@ function is_singleton(e)
         op = operation(e)
         op === getindex && return true
         iscall(op) && return is_singleton(op) # recurse to reach getindex for array element variables
-        return issym(op)
+        return issym(op) && !hasmetadata(e, CallWithParent)
     else
         return issym(e)
     end
@@ -76,6 +76,7 @@ function get_variables!(vars, e::Symbolic, varlist=nothing)
             push!(vars, e)
         end
     else
+        get_variables!(vars, operation(e), varlist)
         foreach(x -> get_variables!(vars, x, varlist), arguments(e))
     end
     return (vars isa AbstractVector) ? unique!(vars) : vars

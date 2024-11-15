@@ -19,6 +19,14 @@ using Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap
 
     sorted_vars2 = Symbolics.get_variables(ex2; sort = true)
     @test isequal(sorted_vars2, [x, y])
+
+    @variables c(..)
+    ex3 = c(x) + c(t) - c(c(t) + y)
+    vars3 = Symbolics.get_variables(ex3)
+    @test length(vars3) == 4
+
+    sorted_vars3 = Symbolics.get_variables(ex3; sort = true)
+    @test isequal(sorted_vars3, [c.f, t, x, y])
 end
 
 @testset "symbolic_to_float" begin
