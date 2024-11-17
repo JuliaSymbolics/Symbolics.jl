@@ -148,6 +148,7 @@ function _parse_vars(macroname, type, x, transform=identity)
             isruntime, fname = unwrap_runtime_var(v.args[1])
             call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
             var_name, expr = construct_vars(macroname, fname, type′, call_args, val, options, transform, isruntime)
+
         else
             var_name, expr = construct_vars(macroname, v, type′, nothing, val, options, transform, isruntime)
         end
@@ -344,6 +345,11 @@ function construct_var(macroname, var_name, type, call_args, val, prop)
         var_name, fntype = function_name_and_type(var_name)
         argtypes = arg_types_from_call_args(call_args)
         :($CallWithMetadata($Sym{$FnType{$argtypes, $type, $(fntype...)}}($var_name)))
+    # This elseif handles the special case with e.g. variables on the form
+    # @variables X(deps...) where deps is a vector (which length might be unknown).
+    elseif (call_args isa Vector) && (length(call_args) == 1) && (call_args[1] isa Expr) &&
+            call_args[1].head == :(...) && (length(call_args[1].args) == 1)
+        :($Sym{$FnType{NTuple{$length($(call_args[1].args[1])), Any}, $type}}($var_name)($value.($(call_args[1].args[1]))...))
     else
         :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
     end

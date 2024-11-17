@@ -389,3 +389,31 @@ fns = @test_nowarn @variables begin
 end
 
 test_all_functions(fns)
+
+# Tests that variables can be declared using vectors of dependants.
+let
+    @variables x y z v w
+    args1 = [x]
+    args2 = [x, y]
+    args3 = [x, y, z]
+
+    v1 = only(@variables X(x))
+    v2 = only(@variables X(args1...))
+    @test isequal(v1, v2)
+
+    v1 = only(@variables X(x,y))
+    v2 = only(@variables X(args3[1:2]...))
+    @test isequal(v1, v2)
+
+    v1 = only(@variables X(x, y, z))
+    v2 = only(@variables X([args2; z]...))
+    @test isequal(v1, v2)
+
+    v1 = only(@variables X(x, y, z, v))
+    v2 = only(@variables X(vcat(args2, [z, v])...))
+    @test isequal(v1, v2)
+
+    v1 = only(@variables X(x, y, z, v, w))
+    v2 = only(@variables X([v for v in [args3; [v, w]]]...))
+    @test isequal(v1, v2)
+end
