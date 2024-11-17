@@ -148,7 +148,6 @@ function _parse_vars(macroname, type, x, transform=identity)
             isruntime, fname = unwrap_runtime_var(v.args[1])
             call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
             var_name, expr = construct_vars(macroname, fname, type′, call_args, val, options, transform, isruntime)
-
         else
             var_name, expr = construct_vars(macroname, v, type′, nothing, val, options, transform, isruntime)
         end
