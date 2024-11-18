@@ -220,10 +220,13 @@ end
 function symbolic_solve(expr; x...)
     if expr isa Vector
         expr = convert(Vector{Any}, expr)
+        for i in eachindex(expr)
+            expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
+        end
+    else
+        expr = expr isa Equation ? expr.lhs - expr.rhs : expr
     end
-    for i in eachindex(expr)
-        expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
-    end
+
 
     r = filter_poly.(expr)
     subs, filtered = r isa Tuple ? r : (map(t -> t[1], r), map(t -> t[2], r))
