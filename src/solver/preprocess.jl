@@ -44,13 +44,10 @@ function clean_f(filtered_expr, var, subs)
 
     if oper === (/)
         args = arguments(unwrapped_f)
-        if any(isequal(var, x) for x in get_variables(args[2]))
-            filtered_expr = expand(args[1] * args[2])
+        if !all(isequal(var, x) for x in get_variables(args[2]))
+            filtered_expr = args[1]
             push!(assumptions, substitute(args[2], subs, fold=false))
-            return filtered_expr, assumptions
         end
-        filtered_expr = args[1]
-        @info "Assuming $(substitute(args[2], subs, fold=false) != 0)"
     end
     return filtered_expr, assumptions
 end

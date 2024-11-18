@@ -210,7 +210,7 @@ include("solver/polynomialization.jl")
 include("solver/attract.jl")
 include("solver/ia_main.jl")
 include("solver/main.jl")
-include("solver/ia_rules.jl")
+include("solver/special_cases.jl")
 export symbolic_solve
 
 function symbolics_to_sympy end
