@@ -225,18 +225,26 @@ end
     @test check_equal(r_novar, arr_known_roots)   
 
     eqs = [x-y-z, x+y-z^2, x^2 + y^2 - 1]
+    eqs_in_equation_form = [x-y ~ z, x+y-z^2 ~ 0, x^2 + y^2 ~ 1]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z]), [x,y,z])
+    r_novar = sort_arr(symbolic_solve(eqs_in_equation_form), [x,y,z])
+    r_eq = sort_arr(symbolic_solve(eqs_in_equation_form, [x,y,z]), [x,y,z])
     arr_known_roots = sort_arr([Dict(x => 0, y=>1, z=>-1), Dict(x=>1, y=>0, z=>1),
         Dict(x=>(1/2)*(-2-sqrt(2)*im), y=>(1/2)*(-2+sqrt(2)*im), z=>-sqrt(2)*im),
         Dict(x=>(1/2)*(-2+sqrt(2)*im), y=>(1/2)*(-2-sqrt(2)*im), z=>sqrt(2)*im)], [x,y,z])
     @test check_approx(arr_calcd_roots, arr_known_roots)   
+    @test check_approx(r_novar, arr_known_roots)   
+    @test check_approx(r_eq, arr_known_roots)   
 
     eqs = [x^2, y, z]
+    eqs_in_equation_form = [x^2 ~ 0, y ~ 0, z ~ 0]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z], dropmultiplicity=false), [x,y,z])
     r_novar = sort_arr(symbolic_solve(eqs, dropmultiplicity=false), [x,y,z])
+    r_eq_novar = sort_arr(symbolic_solve(eqs_in_equation_form, dropmultiplicity=false), [x,y,z])
     arr_known_roots = sort_arr([Dict(x=>0, y=>0, z=>0), Dict(x=>0, y=>0, z=>0)], [x,y,z])
     @test check_equal(arr_calcd_roots, arr_known_roots)   
     @test check_equal(r_novar, arr_known_roots)   
+    @test check_equal(r_eq_novar, arr_known_roots)   
 
     eqs = [y^2 - 1, x]
     arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
