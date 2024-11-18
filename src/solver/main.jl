@@ -218,6 +218,13 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 end
 
 function symbolic_solve(expr; x...)
+    if expr isa Vector
+        expr = convert(Vector{Any}, expr)
+    end
+    for i in eachindex(expr)
+        expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
+    end
+
     r = filter_poly.(expr)
     subs, filtered = r isa Tuple ? r : (map(t -> t[1], r), map(t -> t[2], r))
 
