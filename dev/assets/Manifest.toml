@@ -84,9 +84,9 @@ version = "0.4.0"
 
 [[deps.ArrayInterface]]
 deps = ["Adapt", "LinearAlgebra"]
-git-tree-sha1 = "d60a1922358aa203019b7857a2c8c37329b8736c"
+git-tree-sha1 = "d5140b60b87473df18cf4fe66382b7c3596df047"
 uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
-version = "7.17.0"
+version = "7.17.1"
 
     [deps.ArrayInterface.extensions]
     ArrayInterfaceBandedMatricesExt = "BandedMatrices"
@@ -1257,9 +1257,9 @@ version = "0.5.7"
 
 [[deps.MutableArithmetics]]
 deps = ["LinearAlgebra", "SparseArrays", "Test"]
-git-tree-sha1 = "90077f1e79de8c9c7c8a90644494411111f4e07b"
+git-tree-sha1 = "a2710df6b0931f987530f59427441b21245d8f5e"
 uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
-version = "1.5.2"
+version = "1.6.0"
 
 [[deps.NLSolversBase]]
 deps = ["DiffResults", "Distributed", "FiniteDiff", "ForwardDiff"]
