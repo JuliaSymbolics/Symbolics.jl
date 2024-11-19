@@ -503,13 +503,18 @@ function SymbolicIndexingInterface.symbolic_type(::Type{T}) where {S <: Abstract
     ArraySymbolic()
 end
 
-SymbolicIndexingInterface.hasname(x::Union{Num,Arr}) = hasname(unwrap(x))
+SymbolicIndexingInterface.hasname(x::Union{Num,Arr,Complex{Num}}) = hasname(unwrap(x))
 
 function SymbolicIndexingInterface.hasname(x::Symbolic)
     issym(x) || !iscall(x) || iscall(x) && (issym(operation(x)) || operation(x) == getindex)
 end
 
-SymbolicIndexingInterface.getname(x, val=_fail) = _getname(unwrap(x), val)
+# This is type piracy, but changing it breaks precompilation for MTK because it relies on this falling back to
+# `_getname` which calls `nameof` which returns the name of the system, when `x::AbstractSystem`.
+# FIXME: In a breaking release
+function SymbolicIndexingInterface.getname(x, val = _fail)
+    _getname(unwrap(x), val)
+end
 
 function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symbolic, Equation, Inequality}, d::Dict; kwargs...)
     val = fixpoint_sub(ex, d; kwargs...)
