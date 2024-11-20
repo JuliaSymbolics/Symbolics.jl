@@ -1,6 +1,7 @@
 using Symbolics, Test
 using SymbolicUtils: metadata
 using Symbolics: unwrap
+using SymbolicIndexingInterface: getname, hasname
 
 @variables a b::Real z::Complex (Z::Complex)[1:10]
 
@@ -36,4 +37,16 @@ end
     @test metadata(z1) == unwrap(z1.re).metadata
     z2 = 1.0 + z*im
     @test isnothing(metadata(unwrap(z1.re)))
+end
+
+@testset "getname" begin
+    @variables t a b x::Complex y(t)::Complex z(a, b)::Complex
+    @test hasname(x)
+    @test getname(x) == :x
+    @test hasname(y)
+    @test getname(y) == :y
+    @test hasname(z)
+    @test getname(z) == :z
+    @test !hasname(2x)
+    @test !hasname(x + y)
 end
