@@ -185,7 +185,7 @@ function _toexpr(O)
             frac_expr = Expr(:call, :/, numer_expr, denom_expr)
         end
 
-        if isreal(m.coeff) && m.coeff < 0
+        if isreal(m.coeff) && real(m.coeff) < 0
             return Expr(:call, :-, frac_expr)
         else
             return frac_expr
