@@ -55,6 +55,9 @@ Dy = Differential(y)
 @test_reference "latexify_refs/complex3.txt" latexify(1 - x + (1+2x)*im; imaginary_unit="\\mathbb{i}")
 @test_reference "latexify_refs/complex4.txt" latexify(im * Symbolics.Term(sqrt, [2]))
 
+@syms c
+@test_reference "latexify_refs/complex5.txt" latexify((3+im/im)c)
+
 @test_reference "latexify_refs/indices1.txt" latexify(h[10,10])
 @test_reference "latexify_refs/indices2.txt" latexify(h[10,10], index=:bracket)
 
