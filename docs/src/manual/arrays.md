@@ -121,6 +121,43 @@ b * b'
 size(b*b')
 ```
 
+Tensor or Einstein notation can also be used for array operations using the `@arrayop` macro. For example, a matrix-vector product can be written as:
+
+```julia
+julia> d = Symbolics.@arrayop (i,) A[i,j]*b[j]
+@arrayop(_[i] := A[i, j]*b[j])
+```
+These array operations are computed lazily:
+
+```julia
+julia> c = A*b
+(A*b)[1:5]
+
+julia> isequal(collect(c), collect(d))
+true
+```
+
+This can be useful for vector calculus operations such as the gradient of a vector expression:
+
+```julia
+julia> @variables x y;
+
+julia> V = [sin(x), x^2 + y]
+2-element Vector{Num}:
+  sin(x)
+ y + x^2
+
+julia> D = Differential.([x,y]);
+julia> expand_derivatives.(collect(Symbolics.@arrayop (i,j) D[i](V[j])))
+2×2 Matrix{Num}:
+ cos(x)  2x
+      0   1
+```
+or the divergence of a vector expression:
+```julia
+julia> expand_derivatives.(collect(Symbolics.@arrayop () D[i](V[i])))
+1 + cos(x)
+```
 ### Broadcast, map and reduce
 
 
