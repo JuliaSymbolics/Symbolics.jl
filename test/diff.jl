@@ -498,3 +498,15 @@ let
     @test Symbolics.islinear(z, x)
     @test Symbolics.isaffine(z, x)
 end
+
+# issue #790
+let
+    c(x) = [sum(x) - 1]
+    @variables xs[1:2] ys[1:1]
+    w = Symbolics.scalarize(xs)
+    v = Symbolics.scalarize(ys)
+    expr = dot(v, c(w))
+    @test !Symbolics.islinear(expr, w)
+    @test Symbolics.isaffine(expr, w)
+    @test collect(Symbolics.hessian_sparsity(expr, w)) == fill(false, 2, 2)
+end
