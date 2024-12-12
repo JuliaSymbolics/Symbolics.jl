@@ -510,3 +510,13 @@ let
     @test Symbolics.isaffine(expr, w)
     @test collect(Symbolics.hessian_sparsity(expr, w)) == fill(false, 2, 2)
 end
+
+# issue #749
+let
+    @variables x y
+    @register_symbolic Base.FastMath.exp_fast(x, y)
+    expr = Base.FastMath.exp_fast(x, y)
+    @test !Symbolics.islinear(expr, [x, y])
+    @test !Symbolics.isaffine(expr, [x, y])
+    @test collect(Symbolics.hessian_sparsity(expr, [x, y])) == fill(true, 2, 2)
+end
