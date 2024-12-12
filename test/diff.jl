@@ -483,3 +483,18 @@ let
     @test collect(Symbolics.sparsehessian(ex, [a[1]])) == [2;;]
     @test collect(Symbolics.sparsehessian(ex, a)) == fill(2, 2, 2)
 end
+
+# issue #847
+let
+    @variables x[1:2] y[1:2]
+    x = Symbolics.scalarize(x)
+    y = Symbolics.scalarize(y)
+
+    z = (x[1] + x[2]) * (y[1] + y[2])
+    @test Symbolics.islinear(z, x)
+    @test Symbolics.isaffine(z, x)
+
+    z = (x[1] + x[2])
+    @test Symbolics.islinear(z, x)
+    @test Symbolics.isaffine(z, x)
+end
