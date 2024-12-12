@@ -407,3 +407,61 @@ let
     @test isequal(expand_derivatives(D(Symbolics.scbrt(1 + x ^ 2))), simplify((2x) / (3Symbolics.scbrt(1 + x^2)^2)))
     @test isequal(expand_derivatives(D(Symbolics.slog(1 + x ^ 2))), simplify((2x) / (1 + x ^ 2)))
 end
+
+# Hessian sparsity involving unknown functions
+let 
+    @variables x₁ x₂ p q[1:1]
+    expr = 3x₁^2 + 4x₁ * x₂
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    
+    expr = 3x₁^2 + 4x₁ * x₂ + p
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+
+    # issue 643: example test2_num
+    expr = 3x₁^2 + 4x₁ * x₂ + q[1]
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+
+    # Custom function: By default assumed to be non-linear
+    myexp(x) = exp(x)
+    @register_symbolic myexp(x)
+    expr = 3x₁^2 + 4x₁ * x₂ + myexp(p)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + myexp(x₂)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
+
+    mylogaddexp(x, y) = log(exp(x) + exp(y))
+    @register_symbolic mylogaddexp(x, y)
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(p, 2)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(3, p)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(p, 2)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(p, q[1])
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(p, x₂)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(x₂, 4)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
+
+    # Custom linear function: Possible to extend `Symbolics.linearity_1`/`Symbolics.linearity_2`
+    myidentity(x) = x
+    @register_symbolic myidentity(x)
+    Symbolics.linearity_1(::typeof(myidentity)) = true
+    expr = 3x₁^2 + 4x₁ * x₂ + myidentity(p)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + myidentity(q[1])
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + myidentity(x₂)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+
+    mymul1plog(x, y) = x * (1 + log(y))
+    @register_symbolic mymul1plog(x, y)
+    Symbolics.linearity_2(::typeof(mymul1plog)) = (true, false, false)
+    expr = 3x₁^2 + 4x₁ * x₂ + mymul1plog(p, q[1])
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mymul1plog(x₂, q[1])
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mymul1plog(q[1], x₂)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
+end

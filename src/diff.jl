@@ -646,24 +646,13 @@ let
     linearity_rules = [
           @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
           @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
-          @rule (~f)(~x::(!isidx)) => _scalar
 
-          @rule (~f)(~x::isidx) => if haslinearity_1(~f)
-              combine_terms_1(linearity_1(~f), ~x)
-          else
-              error("Function of unknown linearity used: ", ~f)
-          end
+          @rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar
           @rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)
-          @rule (~f)(~x, ~y) => begin
-              if haslinearity_2(~f)
-                  a = isidx(~x) ? ~x : _scalar
-                  b = isidx(~y) ? ~y : _scalar
-                  combine_terms_2(linearity_2(~f), a, b)
-              else
-                  error("Function of unknown linearity used: ", ~f)
-              end
-          end
-          @rule ~x::issym => 0]
+          @rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)
+
+          @rule ~x::issym => 0
+    ]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 
     global hessian_sparsity
@@ -696,9 +685,8 @@ let
         @assert !(expr isa AbstractArray)
         expr = value(expr)
         u = map(value, vars)
-        idx(i) = TermCombination(Set([Dict(i=>1)]))
-        dict = Dict(u .=> idx.(1:length(u)))
-        f = Rewriters.Prewalk(x->haskey(dict, x) ? dict[x] : x; maketerm=basic_mkterm)(expr)
+        dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
+        f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
         lp = linearity_propagator(f)
         S = _sparse(lp, length(u))
         S = full ? S : tril(S)
