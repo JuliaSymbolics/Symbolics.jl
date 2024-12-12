@@ -465,3 +465,21 @@ let
     expr = 3x₁^2 + 4x₁ * x₂ + mymul1plog(q[1], x₂)
     @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
 end
+
+# issue #555
+let
+    # first example
+    @variables p[1:1] x[1:1]
+    p = collect(p)
+    x = collect(x)
+    @test collect(Symbolics.sparsehessian(p[1] * x[1], x)) == [0;;] 
+    @test isequal(collect(Symbolics.sparsehessian(p[1] * x[1]^2, x)), [2p[1];;])
+
+    # second example
+    @variables a[1:2]
+    a = collect(a)
+    ex = (a[1]+a[2])^2
+    @test Symbolics.hessian(ex, [a[1]]) == [2;;]
+    @test collect(Symbolics.sparsehessian(ex, [a[1]])) == [2;;]
+    @test collect(Symbolics.sparsehessian(ex, a)) == fill(2, 2, 2)
+end
