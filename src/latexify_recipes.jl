@@ -244,6 +244,10 @@ function _toexpr(O)
         end
         return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), vars, _toexpr(integrand))
     elseif symtype(op) <: FnType
+        # Preserve latex metadata field when `x(t)` becomes `x`
+        if hasmetadata(O, VariableLatex)
+            op = setmetadata(op, VariableLatex, getmetadata(O, VariableLatex))
+        end
         isempty(args) && return nameof(op)
         return Expr(:call, _toexpr(op), _toexpr(args)...)
     elseif op === getindex && symtype(args[1]) <: AbstractArray
