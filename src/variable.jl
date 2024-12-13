@@ -17,6 +17,7 @@ const IndexMap = Dict{Char,Char}(
 abstract type AbstractVariableMetadata end
 struct VariableDefaultValue <: AbstractVariableMetadata end
 struct VariableSource <: AbstractVariableMetadata end
+struct VariableLatex <: AbstractVariableMetadata end
 
 function recurse_and_apply(f, x)
     if symtype(x) <: AbstractArray
@@ -252,9 +253,8 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
     lhs, :($lhs = $rhs)
 end
 
-function option_to_metadata_type(::Val{opt}) where {opt}
-    throw(Base.Meta.ParseError("unknown property type $opt"))
-end
+option_to_metadata_type(::Val{:latex}) = VariableLatex
+option_to_metadata_type(::Val{opt}) where {opt} = throw(Base.Meta.ParseError("unknown property type $opt"))
 
 function setprops_expr(expr, props, macroname, varname)
     expr = :($setmetadata($expr, $VariableSource, ($(Meta.quot(macroname)), $varname,)))
