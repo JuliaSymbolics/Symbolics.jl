@@ -407,3 +407,116 @@ let
     @test isequal(expand_derivatives(D(Symbolics.scbrt(1 + x ^ 2))), simplify((2x) / (3Symbolics.scbrt(1 + x^2)^2)))
     @test isequal(expand_derivatives(D(Symbolics.slog(1 + x ^ 2))), simplify((2x) / (1 + x ^ 2)))
 end
+
+# Hessian sparsity involving unknown functions
+let 
+    @variables x₁ x₂ p q[1:1]
+    expr = 3x₁^2 + 4x₁ * x₂
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    
+    expr = 3x₁^2 + 4x₁ * x₂ + p
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+
+    # issue 643: example test2_num
+    expr = 3x₁^2 + 4x₁ * x₂ + q[1]
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+
+    # Custom function: By default assumed to be non-linear
+    myexp(x) = exp(x)
+    @register_symbolic myexp(x)
+    expr = 3x₁^2 + 4x₁ * x₂ + myexp(p)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + myexp(x₂)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
+
+    mylogaddexp(x, y) = log(exp(x) + exp(y))
+    @register_symbolic mylogaddexp(x, y)
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(p, 2)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(3, p)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(p, 2)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(p, q[1])
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(p, x₂)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
+    expr = 3x₁^2 + 4x₁ * x₂ + mylogaddexp(x₂, 4)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
+
+    # Custom linear function: Possible to extend `Symbolics.linearity_1`/`Symbolics.linearity_2`
+    myidentity(x) = x
+    @register_symbolic myidentity(x)
+    Symbolics.linearity_1(::typeof(myidentity)) = true
+    expr = 3x₁^2 + 4x₁ * x₂ + myidentity(p)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + myidentity(q[1])
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + myidentity(x₂)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+
+    mymul1plog(x, y) = x * (1 + log(y))
+    @register_symbolic mymul1plog(x, y)
+    Symbolics.linearity_2(::typeof(mymul1plog)) = (true, false, false)
+    expr = 3x₁^2 + 4x₁ * x₂ + mymul1plog(p, q[1])
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mymul1plog(x₂, q[1])
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
+    expr = 3x₁^2 + 4x₁ * x₂ + mymul1plog(q[1], x₂)
+    @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true true]
+end
+
+# issue #555
+let
+    # first example
+    @variables p[1:1] x[1:1]
+    p = collect(p)
+    x = collect(x)
+    @test collect(Symbolics.sparsehessian(p[1] * x[1], x)) == [0;;] 
+    @test isequal(collect(Symbolics.sparsehessian(p[1] * x[1]^2, x)), [2p[1];;])
+
+    # second example
+    @variables a[1:2]
+    a = collect(a)
+    ex = (a[1]+a[2])^2
+    @test Symbolics.hessian(ex, [a[1]]) == [2;;]
+    @test collect(Symbolics.sparsehessian(ex, [a[1]])) == [2;;]
+    @test collect(Symbolics.sparsehessian(ex, a)) == fill(2, 2, 2)
+end
+
+# issue #847
+let
+    @variables x[1:2] y[1:2]
+    x = Symbolics.scalarize(x)
+    y = Symbolics.scalarize(y)
+
+    z = (x[1] + x[2]) * (y[1] + y[2])
+    @test Symbolics.islinear(z, x)
+    @test Symbolics.isaffine(z, x)
+
+    z = (x[1] + x[2])
+    @test Symbolics.islinear(z, x)
+    @test Symbolics.isaffine(z, x)
+end
+
+# issue #790
+let
+    c(x) = [sum(x) - 1]
+    @variables xs[1:2] ys[1:1]
+    w = Symbolics.scalarize(xs)
+    v = Symbolics.scalarize(ys)
+    expr = dot(v, c(w))
+    @test !Symbolics.islinear(expr, w)
+    @test Symbolics.isaffine(expr, w)
+    @test collect(Symbolics.hessian_sparsity(expr, w)) == fill(false, 2, 2)
+end
+
+# issue #749
+let
+    @variables x y
+    @register_symbolic Base.FastMath.exp_fast(x, y)
+    expr = Base.FastMath.exp_fast(x, y)
+    @test !Symbolics.islinear(expr, [x, y])
+    @test !Symbolics.isaffine(expr, [x, y])
+    @test collect(Symbolics.hessian_sparsity(expr, [x, y])) == fill(true, 2, 2)
+end
