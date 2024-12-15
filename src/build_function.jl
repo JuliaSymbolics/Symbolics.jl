@@ -689,7 +689,7 @@ and returns a lambda to that compiled function. These special keyword arguments
 control the compilation:
 
 - libpath: the path to store the binary. Defaults to a temporary path.
-- compiler: which C compiler to use. Defaults to :gcc, which is currently the
+- compiler: which C compiler to use. Defaults to `:gcc`, which is currently the
   only available option.
 """
 function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
@@ -830,7 +830,7 @@ _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
 ```
 
 This builds an in-place Stan function compatible with the Stan differential equation solvers.
-Unlike other build targets, this one requires (vs, ps, iv) as the function arguments.
+Unlike other build targets, this one requires `(vs, ps, iv)` as the function arguments.
 Only allowed on arrays of equations.
 """
 function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
@@ -871,7 +871,7 @@ _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
 ```
 
 This builds an in-place Stan function compatible with the Stan differential equation solvers.
-Unlike other build targets, this one requires (vs, ps, iv) as the function arguments.
+Unlike other build targets, this one requires `(vs, ps, iv)` as the function arguments.
 Only allowed on expressions, and arrays of expressions.
 """
 function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
@@ -926,7 +926,7 @@ _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
                 rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
-This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
+This builds an out of place anonymous function `@(t,rhsnames[1])` to be used in MATLAB.
 Compatible with the MATLAB differential equation solvers. Only allowed on expressions,
 and arrays of expressions.
 """
