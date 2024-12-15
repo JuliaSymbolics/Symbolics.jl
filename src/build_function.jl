@@ -34,17 +34,13 @@ function throw_missing_specialization(n)
 end
 
 """
-`build_function`
+    build_function(ex, args...;
+                   expression = Val{true},
+                   target = JuliaTarget(),
+                   parallel=nothing,
+                   kwargs...)
 
 Generates a numerically-usable function from a Symbolics `Num`.
-
-```julia
-build_function(ex, args...;
-               expression = Val{true},
-               target = JuliaTarget(),
-               parallel=nothing,
-               kwargs...)
-```
 
 Arguments:
 
