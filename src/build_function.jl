@@ -220,16 +220,16 @@ end
 Build function target: `JuliaTarget`
 
 ```julia
-function _build_function(target::JuliaTarget, rhss, args...;
-                         conv = toexpr,
-                         expression = Val{true},
-                         checkbounds = false,
-                         linenumbers = false,
-                         headerfun = addheader, outputidxs=nothing,
-                         convert_oop = true, force_SA = false,
-                         skipzeros = outputidxs===nothing,
-                         fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
-                         parallel=SerialForm(), kwargs...)
+_build_function(target::JuliaTarget, rhss, args...;
+                conv = toexpr,
+                expression = Val{true},
+                checkbounds = false,
+                linenumbers = false,
+                headerfun = addheader, outputidxs=nothing,
+                convert_oop = true, force_SA = false,
+                skipzeros = outputidxs===nothing,
+                fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
+                parallel=SerialForm(), kwargs...)
 ```
 
 Generates a Julia function which can then be utilized for further evaluations.
@@ -676,11 +676,11 @@ end
 Build function target: `CTarget`
 
 ```julia
-function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
-                         conv = toexpr, expression = Val{true},
-                         fname = :diffeqf,
-                         lhsname=:du,rhsnames=[Symbol("RHS\$i") for i in 1:length(args)],
-                         libpath=tempname(),compiler=:gcc)
+_build_function(target::CTarget, eqs::Array{<:Equation}, args...;
+                conv = toexpr, expression = Val{true},
+                fname = :diffeqf,
+                lhsname=:du,rhsnames=[Symbol("RHS\$i") for i in 1:length(args)],
+                libpath=tempname(), compiler=:gcc)
 ```
 
 This builds an in-place C function. Only works on arrays of equations. If
@@ -736,15 +736,15 @@ end
 Build function target: `CTarget`
 
 ```julia
-function _build_function(target::CTarget, ex::AbstractArray, args...;
-                         columnmajor = true,
-                         conv        = toexpr,
-                         expression  = Val{true},
-                         fname       = :diffeqf,
-                         lhsname     = :du,
-                         rhsnames    = [Symbol("RHS\$i") for i in 1:length(args)],
-                         libpath     = tempname(),
-                         compiler    = :gcc)
+_build_function(target::CTarget, ex::AbstractArray, args...;
+                columnmajor = true,
+                conv        = toexpr,
+                expression  = Val{true},
+                fname       = :diffeqf,
+                lhsname     = :du,
+                rhsnames    = [Symbol("RHS\$i") for i in 1:length(args)],
+                libpath     = tempname(),
+                compiler    = :gcc)
 ```
 
 This builds an in-place C function. Only works on expressions. If
@@ -823,10 +823,10 @@ _build_function(target::CTarget, ex::Num, args...; kwargs...) = _build_function(
 Build function target: `StanTarget`
 
 ```julia
-function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
-                         conv = toexpr, expression = Val{true},
-                         fname = :diffeqf, lhsname=:internal_var___du,
-                         rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
+_build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
+                conv = toexpr, expression = Val{true},
+                fname = :diffeqf, lhsname=:internal_var___du,
+                rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
 This builds an in-place Stan function compatible with the Stan differential equation solvers.
@@ -862,12 +862,12 @@ end
 Build function target: `StanTarget`
 
 ```julia
-function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
-                         columnmajor = true,
-                         conv        = toexpr,
-                         expression  = Val{true},
-                         fname       = :diffeqf, lhsname=:internal_var___du,
-                         rhsnames    =  [:internal_var___u,:internal_var___p,:internal_var___t])
+_build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
+                columnmajor = true,
+                conv        = toexpr,
+                expression  = Val{true},
+                fname       = :diffeqf, lhsname=:internal_var___du,
+                rhsnames    =  [:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
 This builds an in-place Stan function compatible with the Stan differential equation solvers.
@@ -920,10 +920,10 @@ _build_function(target::StanTarget, ex::Num, vs, ps, iv; kwargs...) = _build_fun
 Build function target: `MATLABTarget`
 
 ```julia
-function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
-                         conv = toexpr, expression = Val{true},
-                         lhsname=:internal_var___du,
-                         rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
+_build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
+                conv = toexpr, expression = Val{true},
+                lhsname=:internal_var___du,
+                rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
 This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
@@ -953,13 +953,13 @@ end
 Build function target: `MATLABTarget`
 
 ```julia
-function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
-                         columnmajor = true,
-                         conv        = toexpr,
-                         expression  = Val{true},
-                         fname       = :diffeqf,
-                         lhsname     = :internal_var___du,
-                         rhsnames    = [:internal_var___u,:internal_var___p,:internal_var___t])
+_build_function(target::MATLABTarget, ex::AbstractArray, args...;
+                columnmajor = true,
+                conv        = toexpr,
+                expression  = Val{true},
+                fname       = :diffeqf,
+                lhsname     = :internal_var___du,
+                rhsnames    = [:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
 This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
