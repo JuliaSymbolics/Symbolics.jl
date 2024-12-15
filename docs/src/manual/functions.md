@@ -151,7 +151,7 @@ Note that at this time array derivatives cannot be defined.
 
 ## Direct Registration API (Advanced, Experimental)
 
-!!! warn
+!!! warning
 
     This is a lower level API which is not as stable as the macro APIs.
 
