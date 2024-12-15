@@ -10,7 +10,7 @@ Return the power series in `x` around `x0` to the powers `ns` with coefficients 
 Examples
 ========
 
-```julia
+```jldoctest
 julia> @variables x y[0:3] z
 3-element Vector{Any}:
  x
@@ -47,7 +47,7 @@ Calculate the `n`-th order coefficient(s) in the Taylor series of `f` around `x 
 
 Examples
 ========
-```julia
+```jldoctest
 julia> @variables x y
 2-element Vector{Num}:
  x
@@ -101,7 +101,7 @@ If `rationalize`, float coefficients are approximated as rational numbers (this 
 
 Examples
 ========
-```julia
+```jldoctest
 julia> @variables x
 1-element Vector{Num}:
  x

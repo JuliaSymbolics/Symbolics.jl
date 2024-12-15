@@ -83,7 +83,7 @@ Currently only works if all equations are linear. `check` if the expr is linear
 w.r.t `vars`.
 
 # Examples
-```julia
+```jldoctest
 julia> @variables x y
 2-element Vector{Num}:
  x
