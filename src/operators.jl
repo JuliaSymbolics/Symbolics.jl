@@ -32,7 +32,7 @@ end
 Get the time (in seconds) spent in a state in a finite state machine.
 
 When used to query the time spent in the enclosing state, the method without arguments is used, i.e.,
-```
+```julia
 @mtkmodel FSM begin
     ...
     @equations begin
@@ -56,7 +56,7 @@ timeInState
 Get the number of ticks spent in a state in a finite state machine.
 
 When used to query the number of ticks spent in the enclosing state, the method without arguments is used, i.e.,
-```
+```julia
 @mtkmodel FSM begin
     ...
     @equations begin

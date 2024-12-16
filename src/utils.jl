@@ -27,7 +27,7 @@ Return a vector of variables appearing in `e`, optionally restricting to variabl
 Note that the returned variables are not wrapped in the `Num` type.
 
 # Examples
-```julia
+```jldoctest
 julia> @variables t x y z(t);
 
 julia> Symbolics.get_variables(x + y + sin(z); sort = true)
@@ -97,7 +97,7 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 Any upstream metadata can be passed via `x_metadata`
 
-```julia
+```jldoctest
 julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
@@ -156,7 +156,7 @@ it will only output `y` instead of `y(t)`.
 
 # Examples
 
-```julia
+```jldoctest
 julia> @variables t z(t)
 2-element Vector{Num}:
     t
@@ -251,7 +251,7 @@ Extract the degree of `p` with respect to `sym`.
 
 # Examples
 
-```julia
+```jldoctest
 julia> @variables x;
 
 julia> Symbolics.degree(x^0)
@@ -305,7 +305,7 @@ Note that `p` might need to be expanded and/or simplified with `expand` and/or `
 
 # Examples
 
-```julia
+```jldoctest
 julia> @variables a x y;
 
 julia> Symbolics.coeff(2a, x)

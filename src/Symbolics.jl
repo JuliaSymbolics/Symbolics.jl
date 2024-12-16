@@ -68,7 +68,7 @@ include("complex.jl")
 
 Performs the substitution on `expr` according to rule(s) `s`.
 # Examples
-```julia
+```jldoctest
 julia> @variables t x y z(t)
 4-element Vector{Num}:
     t

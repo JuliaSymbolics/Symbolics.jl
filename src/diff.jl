@@ -170,13 +170,13 @@ and other derivative rules to expand any derivatives it encounters.
 ```jldoctest
 julia> @variables x y z k;
 
-julia> f=k*(abs(x-y)/y-z)^2
+julia> f = k*(abs(x-y)/y-z)^2
 k*((abs(x - y) / y - z)^2)
 
-julia> Dx=Differential(x) # Differentiate wrt x
+julia> Dx = Differential(x) # Differentiate wrt x
 (::Differential) (generic function with 2 methods)
 
-julia> dfx=expand_derivatives(Dx(f))
+julia> dfx = expand_derivatives(Dx(f))
 (k*((2abs(x - y)) / y - 2z)*IfElse.ifelse(signbit(x - y), -1, 1)) / y
 ```
 """

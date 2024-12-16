@@ -426,7 +426,7 @@ end
 """
     shape(s::Any)
 
-Returns `axes(s)` or Unknown().
+Returns `axes(s)` or `Unknown()`.
 """
 shape(s) = axes(s)
 

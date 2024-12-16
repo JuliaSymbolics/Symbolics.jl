@@ -1,5 +1,6 @@
 """
-replacenode(expr::Symbolic, rules...)
+    replacenode(expr::Symbolic, rules...)
+
 Walk the expression and replacenode subexpressions according to `rules`. `rules`
 could be rules constructed with `@rule`, a function, or a pair where the
 left hand side is matched with equality (using `isequal`) and is replacenoded by the right hand side.
@@ -75,7 +76,8 @@ function _hasnode(r, y)
 end
 
 """
-filterchildren(c, x)
+    filterchildren(c, x)
+
 Returns all parts of `x` that fulfills the condition given in c. c can be a function or an expression.
 If it is a function, returns everything for which the function is `true`. If c is an expression, returns
 all expressions that matches it.

@@ -7,10 +7,10 @@ to convert from Julia expressions to Symbolics.jl expressions for further
 manipulation. Towards this end is the `parse_expr_to_symbolic` which performs
 the parsing.
 
-!!! warn
+!!! warning
     Take the limitations mentioned in the `parse_expr_to_symbolic` docstrings
     seriously! Because Julia expressions contain no symbolic metadata, there
-    is limited information and thus the parsing requires heuristics to work. 
+    is limited information and thus the parsing requires heuristics to work.
 
 ```@docs
 parse_expr_to_symbolic
