@@ -119,7 +119,10 @@ function _build_function(target::JuliaTarget, op, args...;
         (wrap_code !== nothing) && (fun = wrap_code(fun))
         conv(fun, states)
     end
-
+    if !checkbounds
+        @assert Meta.isexpr(expr, :function)
+        expr.args[2] = :(@inbounds begin; $(expr.args[2]); end)
+    end
     if expression == Val{true}
         expr
     else
@@ -165,6 +168,12 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
           end) |> LiteralExpr
     end
     ip_expr = conv(Func(dargs, [], op_body), states)
+    if !checkbounds
+        @assert Meta.isexpr(oop_expr, :function)
+        oop_expr.args[2] = :(@inbounds begin; $(oop_expr.args[2]); end)
+        @assert Meta.isexpr(ip_expr, :function)
+        ip_expr.args[2] = :(@inbounds begin; $(ip_expr.args[2]); end)
+    end
     if expression == Val{true}
         oop_expr, ip_expr
     else
@@ -325,11 +334,18 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
         ip_expr = wrap_code[2](ip_expr)
     end
 
+    oop_expr, ip_expr = conv(oop_expr, states), conv(ip_expr, states)
+    if !checkbounds
+        @assert Meta.isexpr(oop_expr, :function)
+        oop_expr.args[2] = :(@inbounds begin; $(oop_expr.args[2]); end)
+        @assert Meta.isexpr(ip_expr, :function)
+        ip_expr.args[2] = :(@inbounds begin; $(ip_expr.args[2]); end)
+    end
     if expression == Val{true}
-        return conv(oop_expr, states), conv(ip_expr, states)
+        return oop_expr, ip_expr
     else
-        return _build_and_inject_function(expression_module, conv(oop_expr, states)),
-        _build_and_inject_function(expression_module, conv(ip_expr, states))
+        return _build_and_inject_function(expression_module, oop_expr),
+        _build_and_inject_function(expression_module, ip_expr)
     end
 end
 
