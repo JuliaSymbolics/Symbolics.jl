@@ -194,16 +194,16 @@ show(A)</code></pre><pre class="documenter-example-output"><code class="nohighli
           begin
               var&quot;##out#236&quot; = ˍ₋out.nzval
               begin
-                  (Symbolics.var&quot;#noop#447&quot;())(map(fetch, (begin
+                  (Symbolics.var&quot;#noop#444&quot;())(map(fetch, (begin
                                   let
-                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#236&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xa2f7d5c0, 0x91e74e4e, 0xd03beeee, 0xda6a22d0, 0x4ed3657f), Nothing}(nothing), (var&quot;##out#236&quot;, ˍ₋arg1)))
+                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#236&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x95031f7e, 0x4f74d35b, 0x13f815a1, 0xb352fe3f, 0x855fe682), Nothing}(nothing), (var&quot;##out#236&quot;, ˍ₋arg1)))
                                       task.sticky = false
                                       Base.schedule(task)
                                       task
                                   end
                               end, begin
                                   let
-                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#236&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xeca38124, 0x621b70be, 0xfbd2fc1f, 0x8e6c7cd4, 0x8cfb4c20), Nothing}(nothing), (var&quot;##out#236&quot;, ˍ₋arg1)))
+                                      task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#236&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x4922dc0e, 0x48e8de0c, 0x907e6564, 0x5fce431d, 0xfaab2500), Nothing}(nothing), (var&quot;##out#236&quot;, ˍ₋arg1)))
                                       task.sticky = false
                                       Base.schedule(task)
                                       task
@@ -233,9 +233,9 @@ rows, cols, _ = findnz(sj)
 out = sparse(rows, cols, zeros(length(cols)), size(sj)...) # pre-allocate, and correct structure
 myf = eval(last(f_expr))
 myf(out, rand(N)) # note that out matches the sparsity structure of sj
-out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 18 stored entries:
-⎡⠀⠈⠀⠀⠀⎤
-⎢⠰⡠⠆⠁⠀⎥
-⎢⠀⠀⠀⠃⠀⎥
-⎢⠀⠆⠀⠂⠀⎥
-⎣⢀⠀⠐⠁⢐⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Tuesday 17 December 2024 11:16">Tuesday 17 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 28 stored entries:
+⎡⠠⠐⠀⠕⢀⎤
+⎢⠀⠀⠈⠀⠠⎥
+⎢⡁⠑⠄⣀⢌⎥
+⎢⢂⠀⠚⢅⠐⎥
+⎣⠀⠀⠐⠀⠀⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.8.0 on <span class="colophon-date" title="Sunday 22 December 2024 12:24">Sunday 22 December 2024</span>. Using Julia version 1.11.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
