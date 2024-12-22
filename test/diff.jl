@@ -349,6 +349,34 @@ let
     @test isequal(expand_derivatives(Differential(t)(t^2 + im*t)), 2t + im)
 end
 
+# 1262
+#
+let 
+    @variables t  b(t)
+	D = Differential(t)
+	expr = b - ((D(b))^2) * D(D(b))
+	expr2 = D(expr)
+	@test isequal(expand_derivatives(expr), expr)
+    @test isequal(expand_derivatives(expr2), D(b) - (D(b)^2)*D(D(D(b))) - 2D(b)*(D(D(b))^2))
+end
+
+# 1126
+#
+let
+    @syms y f(y) g(y) h(y)
+    D = Differential(y)
+
+    expr_gen = (fun) -> D(D(((-D(D(fun))) / g(y))))
+    
+    expr = expr_gen(g(y))
+    # just make sure that no errors are thrown in the following, the results are to complicated to compare
+    expand_derivatives(expr)
+    expr = expr_gen(h(y))
+    expand_derivatives(expr)
+
+    expr = expr_gen(f(y))
+    expand_derivatives(expr)
+end
 
 # Check `is_derivative` function
 let
