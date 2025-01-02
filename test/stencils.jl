@@ -6,7 +6,7 @@ using SymbolicUtils.Code: toexpr, LiteralExpr
 
 _repr(x) = repr(toexpr(LiteralExpr(x)) |> Base.remove_linenums!)
 function test_funcs(name, f, args...; broken=false)
-    outplace, inplace = build_function(f, args...)
+    outplace, inplace = build_function(f, args...; checkbounds = true)
     if broken
         @test_broken open(x->read(x, String), "build_function_tests/$name-outplace.jl") == _repr(outplace)
         @test_broken open(x->read(x, String), "build_function_tests/$name-inplace.jl") == _repr(outplace)
