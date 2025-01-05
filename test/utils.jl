@@ -1,5 +1,8 @@
 using Symbolics
-using Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap
+import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap, 
+                  isblock, flatten_expr!, build_expr, get_variables, 
+                  is_singleton, diff2term, tosymbol, lower_varname, 
+                  makesubscripts, degree, coeff
 
 @testset "get_variables" begin
     @variables t x y z(t)
@@ -62,4 +65,92 @@ end
     @test unwrap(substitute(p(x), [p => sqrt, x => 4.0])) ≈ 2.0
     arg = Symbolics.fixpoint_sub(p(x), [p => sqrt, x => 2y + 3, y => 1.0 + p(4)])
     @test arg ≈ 3.0
+end
+
+# Helper Functions
+@variables x y z t u(x, t) v(t) w[1:2]
+
+@testset "isblock" begin
+    @test isblock([Expr(:block, :(x + y))]) == true
+    @test isblock([Expr(:call, :f, x, y)]) == false
+    @test isblock([Expr(:block, :(begin x; y; end))]) == true
+    @test isblock([Expr(:return, :(x + y))]) == false
+end
+
+@testset "flatten_expr!" begin
+    expr = Expr(:block, :(x + y))
+    @test flatten_expr!(expr.args) == Any[:(x + y)]
+
+    expr2 = Expr(:block, :(begin x + y; z; end))
+    @test flatten_expr!(expr2.args) == Any[:(x + y), :z]
+end
+
+@testset "build_expr" begin
+    expr = build_expr(:block, [:(x + y), :(y + z)])
+    @test expr.head == :block
+    @test expr.args == [:(x + y), :(y + z)]
+end
+
+@testset "is_singleton" begin
+    @test is_singleton(x) == false
+    @test is_singleton(sin(x)) == false
+    @test is_singleton(u) == false
+end
+
+@testset "tosymbol" begin
+    expr1 = sin(x)
+    @test tosymbol(expr1) == Symbol("sin(x)")
+
+    expr2 = cos(y)
+    @test tosymbol(expr2) == Symbol("cos(y)")
+
+    expr4 = u
+    @test tosymbol(expr4) == Symbol("u(x, t)")
+end
+
+@testset "degree" begin
+    expr1 = x^2 + y^3
+    @test degree(expr1, x) == 2
+    @test degree(expr1, y) == 3
+
+    expr2 = x * y^2 + x^3
+    @test degree(expr2, x) == 3
+    @test degree(expr2, y) == 2
+
+    expr3 = 1
+    @test degree(expr3, x) == 0
+end
+
+@testset "coeff" begin
+    expr1 = 3x + 2y
+    @test coeff(expr1, x) == 3
+    @test coeff(expr1, y) == 2
+    @test coeff(expr1, x^2) == 0
+
+    expr2 = x^2 + 3x + 2
+    @test coeff(expr2, x) == 3
+    @test coeff(expr2, x^2) == 1
+end
+
+@testset "makesubscripts" begin
+    sub1 = makesubscripts(5)
+    @test length(sub1) == 5
+    @test typeof(sub1[1]) == SymbolicUtils.BasicSymbolic{Int64}
+
+    sub2 = makesubscripts(10)
+    @test length(sub2) == 10
+end
+
+@testset "diff2term" begin
+    @variables x t u(x, t) z(t)
+    Dt = Differential(t)
+    Dx = Differential(x)
+
+    test_var = x
+    result = diff2term(test_var)
+    @test result === x
+
+    test_nested_derivative = Dx(Dt(Dt(u)))
+    result = diff2term(Symbolics.value(test_nested_derivative))
+    @test typeof(result) === Symbolics.BasicSymbolic{Real}
 end
