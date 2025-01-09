@@ -154,3 +154,11 @@ end
     result = diff2term(Symbolics.value(test_nested_derivative))
     @test typeof(result) === Symbolics.BasicSymbolic{Real}
 end
+
+@testset "`fast_substitute` inside array symbolics" begin
+    @variables x y z
+    @register_symbolic foo(a::AbstractArray, b)
+    ex = foo([x, y], z)
+    ex2 = Symbolics.fixpoint_sub(ex, Dict(y => 1.0, z => 2.0))
+    @test isequal(ex2, foo([x, 1.0], 2.0))
+end
