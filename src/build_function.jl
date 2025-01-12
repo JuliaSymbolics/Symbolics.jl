@@ -379,7 +379,11 @@ function make_array(s::ShardedForm, closed_args, arr, similarto, cse)
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
-        Func(closed_args, [], _make_array(slice, similarto, cse)), closed_args
+        Func(closed_args, [],
+             quote
+                 $(Expr(:meta, :noinline))
+                 $(LiteralExpr(_make_array(slice, similarto, cse)))
+             end), closed_args
     end
     SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
 end
@@ -522,8 +526,10 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     end
     all_args = [outvar, closed_args...]
     ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
-        Func(all_args, [],
-             _set_array(outvar, idxs, xs, checkbounds, skipzeros, cse),
+        Func(all_args, [], LiteralExpr(quote
+                                           $(Expr(:meta, :noinline))
+                                           $(_set_array(outvar, idxs, xs, checkbounds, skipzeros, cse))
+                                       end),
              [])
     end.body
 
