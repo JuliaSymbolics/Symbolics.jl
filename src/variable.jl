@@ -546,10 +546,11 @@ See also: [`fast_substitute`](@ref).
 function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000)
     dict = subrules_to_dict(dict)
     y = fast_substitute(x, dict; operator)
-    while !isequal(x, y) && maxiters > 0
+    iters = maxiters
+    while !isequal(x, y) && iters > 0
         y = x
         x = fast_substitute(y, dict; operator)
-        maxiters -= 1
+        iters -= 1
     end
 
     if !isequal(x, y)
