@@ -530,7 +530,7 @@ function _recursive_unwrap(val)
 end
 
 """
-    fixpoint_sub(expr, dict; operator = Nothing, maxiters = 10000)
+    fixpoint_sub(expr, dict; operator = Nothing, maxiters = 1000)
 
 Given a symbolic expression, equation or inequality `expr` perform the substitutions in
 `dict` recursively until the expression does not change. Substitutions that depend on one
