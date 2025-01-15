@@ -388,7 +388,7 @@ end
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
-    f, g = build_function(dtu, u, v, t, expression=Val{false})
+    f, g = build_function(dtu, u, v, t, expression=Val{false}, nanmath = false)
     du = zeros(Num, 8, 8)
     f(du, u,v,t)
     @test isequal(collect(du), collect(dtu))
