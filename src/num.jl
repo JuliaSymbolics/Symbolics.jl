@@ -177,7 +177,7 @@ Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
 Base.convert(::Type{Num}, x::Number) = Num(x)
 Base.convert(::Type{Num}, x::Num) = x
 
-Base.convert(::Type{<:Array{Num}}, x::AbstractArray) = Matrix(map(Num, x))
+Base.convert(::Type{T}, x::AbstractArray{Num}) where T <: Array{Num} = T(map(Num, x))
 Base.convert(::Type{Sym}, x::Num) = value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
 
 LinearAlgebra.lu(x::Union{Adjoint{<:RCNum},Transpose{<:RCNum},Array{<:RCNum}}; check=true, kw...) = sym_lu(x; check=check)
