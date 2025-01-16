@@ -135,7 +135,7 @@ function _filter_poly(expr, var)
         subs[i_var] = im
         expr = unwrap(expr1 + i_var * expr2)
 
-        args = arguments(expr)
+        args = map(unwrap, arguments(expr))
         oper = operation(expr)
         return subs, term(oper, args...)
     end
@@ -208,7 +208,7 @@ function _filter_poly(expr, var)
         end
     end
 
-    args = arguments(expr)
+    args = map(unwrap, arguments(expr))
     oper = operation(expr)
     expr = term(oper, args...)
     return subs, expr
