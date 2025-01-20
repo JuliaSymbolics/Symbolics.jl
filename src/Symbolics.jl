@@ -47,6 +47,8 @@ import SymbolicLimits
 
 using ADTypes: ADTypes
 
+import OffsetArrays
+
 @reexport using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
