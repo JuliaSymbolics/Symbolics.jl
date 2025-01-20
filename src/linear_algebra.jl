@@ -328,6 +328,7 @@ function _linear_expansion(t, x)
     elseif op === getindex
         arrt, idxst... = arguments(t)
         isequal(arrt, arrx) && return (0, t, true)
+        shape(arrt) == Unknown() && return (0, t, true)
 
         indexed_t = OffsetArrays.Origin(map(first, axes(arrt)))(Symbolics.scalarize(arrt))[idxst...]
         # when indexing a registered function/callable symbolic

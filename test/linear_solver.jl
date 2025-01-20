@@ -77,4 +77,8 @@ a, b, islinear = Symbolics.linear_expansion(D(x) - x, x)
     @variables x[0:2]
     a, b, islin = Symbolics.linear_expansion(x[0] - z(x[1]), z(x[1]))
     @test islin && isequal(a, -1) && isequal(b, x[0])
+
+    @variables x::Vector{Real}
+    a, b, islin = Symbolics.linear_expansion(x[0] - z(x[1]), z(x[1]))
+    @test islin && isequal(a, -1) && isequal(b, x[0])
 end
