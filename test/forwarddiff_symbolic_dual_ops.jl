@@ -114,3 +114,9 @@ end
     y(x) = isequal(z, x) ? 0 : x
     @test ForwardDiff.derivative(y, 0) == 1 # expect ∂(x)/∂x
 end
+
+@testset "NaNMath.pow (issue #1399)" begin
+    @variables x
+    @test_throws DomainError substitute(ForwardDiff.derivative(z -> x^z, 0.5), x => -1.0)
+    @test isnan(Symbolics.value(substitute(ForwardDiff.derivative(z -> NaNMath.pow(x, z), 0.5), x => -1.0)))
+end
