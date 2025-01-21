@@ -70,6 +70,10 @@ if GROUP == "All" || GROUP == "GroebnerExt"
     @safetestset "Groebner extension Test" begin include("extensions/groebner.jl") end
 end
 
+if GROUP == "All" || GROUP == "LuxExt"
+    @safetestset "Lux extension Test" begin include("extensions/lux.jl") end
+end
+
 if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
     @safetestset "SymbolicIndexingInterface Trait Test" begin
         include("symbolic_indexing_interface_trait.jl")
