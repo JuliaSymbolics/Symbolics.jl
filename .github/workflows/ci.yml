@@ -20,6 +20,7 @@ jobs:
           - Core
           - Downstream
           - GroebnerExt
+          - LuxExt
           - SymPy
         version:
           - '1'
