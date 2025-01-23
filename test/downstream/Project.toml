@@ -1,11 +1,13 @@
 [deps]
 DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 ParameterizedFunctions = "65888b18-ceab-5e60-b2b9-181511a3b968"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
+KernelAbstractions = "<0.9.31"
 ModelingToolkit = "8.33, 9"
 ParameterizedFunctions = "5.15"
 Symbolics = "6"

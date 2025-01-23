@@ -362,9 +362,12 @@ function _occursin_array(sym, arrsym, arr)
         if symbolic_type(el) == NotSymbolic()
             return el isa AbstractArray && _occursin_array(sym, arrsym, el)
         else
-            return occursin(sym, el) || occursin(arrsym, el)
+            if sym !== nothing && occursin(sym, el) || arrsym !== nothing && occursin(arrsym, el)
+                return true
+            end
         end
     end
+    return false
 end
 
 ###
