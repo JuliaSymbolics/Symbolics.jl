@@ -273,6 +273,8 @@ Special Keyword Arguments:
 - `force_SA`: Forces the output of the OOP version to be a StaticArray.
   Defaults to `false`, and outputs a static array when the first argument
   is a static array.
+- `similarto`: An `AbstractArray` subtype which controls the type of the
+  returned array for the OOP version. If provided, it ignores the value of `force_SA`.
 - `skipzeros`: Whether to skip filling zeros in the in-place version if the
   filling function is 0.
 - `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
