@@ -281,3 +281,12 @@ end
     T = value(x .^ 2)
     @test_nowarn toexpr(T, NameState())
 end
+
+@testset "`similarto` keyword argument" begin
+    @variables x[1:2]
+    T = collect(value(x .^ 2))
+    fn = build_function(T, collect(x); expression = false)[1]
+    @test_throws MethodError fn((1.0, 2.0))
+    fn = build_function(T, collect(x); similarto = Array, expression = false)[1]
+    @test fn((1.0, 2.0)) ≈ [1.0, 4.0]
+end
