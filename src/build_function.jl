@@ -273,6 +273,8 @@ Special Keyword Arguments:
 - `force_SA`: Forces the output of the OOP version to be a StaticArray.
   Defaults to `false`, and outputs a static array when the first argument
   is a static array.
+- `similarto`: An `AbstractArray` subtype which controls the type of the
+  returned array for the OOP version. If provided, it ignores the value of `force_SA`.
 - `skipzeros`: Whether to skip filling zeros in the in-place version if the
   filling function is 0.
 - `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
@@ -288,6 +290,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        outputidxs=nothing,
                        skipzeros = false,
                        force_SA = false,
+                       similarto = nothing,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
@@ -301,7 +304,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
-    similarto = force_SA ? SArray : i === nothing ? Array : dargs[i].name
+    if similarto === nothing
+        similarto = force_SA ? SArray : i === nothing ? Array : dargs[i].name
+    end
 
     oop, iip = iip_config
     oop_body = if oop
