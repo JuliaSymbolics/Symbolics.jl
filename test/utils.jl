@@ -162,3 +162,11 @@ end
     ex2 = Symbolics.fixpoint_sub(ex, Dict(y => 1.0, z => 2.0))
     @test isequal(ex2, foo([x, 1.0], 2.0))
 end
+
+@testset "`fast_substitute` of subarray symbolics" begin
+    @variables p[1:4] q[1:5]
+    @test isequal(p[1:2], Symbolics.fast_substitute(p[1:2], Dict()))
+    @test isequal(p[1:2], Symbolics.fast_substitute(p[1:2], p => p))
+    @test isequal(q[1:2], Symbolics.fast_substitute(p[1:2], Dict(p => q)))
+    @test isequal(q[1:2], Symbolics.fast_substitute(p[1:2], p => q))
+end

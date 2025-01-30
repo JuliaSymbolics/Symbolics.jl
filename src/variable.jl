@@ -606,6 +606,7 @@ function fast_substitute(expr, subs; operator = Nothing)
         canfold = Ref(!(op isa Symbolic))
         args = let canfold = canfold
             map(args) do x
+                symbolic_type(x) == NotSymbolic() && !is_array_of_symbolics(x) && return x
                 x′ = fast_substitute(x, subs; operator)
                 canfold[] = canfold[] && (symbolic_type(x′) == NotSymbolic() && !is_array_of_symbolics(x′))
                 x′
@@ -633,6 +634,7 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
         canfold = Ref(!(op isa Symbolic))
         args = let canfold = canfold
             map(args) do x
+                symbolic_type(x) == NotSymbolic() && !is_array_of_symbolics(x) && return x
                 x′ = fast_substitute(x, pair; operator)
                 canfold[] = canfold[] && (symbolic_type(x′) == NotSymbolic() && !is_array_of_symbolics(x′))
                 x′
