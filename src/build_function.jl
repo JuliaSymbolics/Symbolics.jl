@@ -132,7 +132,7 @@ end
 
 SymbolicUtils.Code.get_rewrites(x::Arr) = SymbolicUtils.Code.get_rewrites(unwrap(x))
 
-function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
+function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUtils.BasicSymbolic{<:AbstractArray}}, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
@@ -141,6 +141,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
                          linenumbers = true,
                          cse = false,
                          nanmath = true,
+                         wrap_code = (identity, identity),
                          kwargs...)
 
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
@@ -155,7 +156,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
 
     outsym = Symbol("ˍ₋out")
     body = inplace_expr(unwrap(op), outsym)
-    oop_expr = conv(Func([outsym, dargs...], [], body), states)
+    iip_expr = conv(wrap_code[2](Func([outsym, dargs...], [], body)), states)
 
     N = length(shape(op))
     op = unwrap(op)
@@ -167,18 +168,18 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
               $outsym
           end) |> LiteralExpr
     end
-    ip_expr = conv(Func(dargs, [], op_body), states)
+    oop_expr = conv(wrap_code[1](Func(dargs, [], op_body)), states)
     if !checkbounds
         @assert Meta.isexpr(oop_expr, :function)
         oop_expr.args[2] = :(@inbounds begin; $(oop_expr.args[2]); end)
-        @assert Meta.isexpr(ip_expr, :function)
-        ip_expr.args[2] = :(@inbounds begin; $(ip_expr.args[2]); end)
+        @assert Meta.isexpr(iip_expr, :function)
+        iip_expr.args[2] = :(@inbounds begin; $(iip_expr.args[2]); end)
     end
     if expression == Val{true}
-        oop_expr, ip_expr
+        oop_expr, iip_expr
     else
         _build_and_inject_function(expression_module, oop_expr),
-        _build_and_inject_function(expression_module, ip_expr)
+        _build_and_inject_function(expression_module, iip_expr)
     end
 end
 

@@ -290,3 +290,14 @@ end
     fn = build_function(T, collect(x); similarto = Array, expression = false)[1]
     @test fn((1.0, 2.0)) ≈ [1.0, 4.0]
 end
+
+@testset "`build_function` with array symbolics" begin
+    @variables x[1:4]
+    for var in [x[1:2], x[1:2] .+ 0.0, Symbolics.unwrap(x[1:2])]
+        foop, fiip = build_function(var[1:2], x; expression = false)
+        @test foop(ones(4)) ≈ ones(2)
+        buf = zeros(2)
+        fiip(buf, ones(4))
+        @test buf ≈ ones(2)
+    end
+end
