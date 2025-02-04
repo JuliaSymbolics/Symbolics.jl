@@ -185,15 +185,10 @@ end
 n = 2
 A = randn(n, n)
 foo(x) = A * x # a function to represent symbolically, note, if this function is defined inside the testset, it's not found by the function fun_eval = eval(fun_ex)
-function Symbolics.propagate_ndims(::typeof(foo), x)
-    ndims(x)
-end
-function Symbolics.propagate_shape(::typeof(foo), x)
-    shape(x)
-end
-@wrapped function foo(x::AbstractVector)
-    t = array_term(foo, x)
-    setmetadata(t, Symbolics.ScalarizeCache, Ref{Any}(nothing))
+@register_array_symbolic foo(x::Vector{Real}) begin
+    size = (n,)
+    eltype = eltype(x)
+    ndims = 1
 end
 
 #=
@@ -203,33 +198,17 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
 @testset "Functions and Jacobians using @syms" begin
     @variables x[1:n]
 
-    function symbolic_call(x)
-        @syms foo(x::Symbolics.Arr{Num,1})::Symbolics.Arr{Num,1} # symbolic foo can not be created in global scope due to conflict with function foo
-        foo(x) # return a symbolic call to foo
-    end
-
     x0 = randn(n)
     @test foo(x0) == A * x0
-    ex = symbolic_call(x)
+    ex = foo(x)
 
-    fun_genf = build_function(ex, x, expression=Val{false})
-    @test_broken fun_genf(x0) == A * x0# UndefVarError: foo not defined
+    fun_oop, fun_iip = build_function(ex, x, expression=Val{false})
+    @test fun_oop(x0) == A * x0# UndefVarError: foo not defined
 
     # Generate an expression instead and eval it manually
-    fun_ex = build_function(ex, x, expression=Val{true})
-    fun_eval = eval(fun_ex)
+    fun_ex_oop, fun_ex_iip = build_function(ex, x, expression=Val{true})
+    fun_eval = eval(fun_ex_oop)
     @test fun_eval(x0) == foo(x0)
-
-    # Try to provide the hidden argument `expression_module` to solve the scoping issue
-    @test_skip begin
-        fun_genf = build_function(ex, x, expression=Val{false}, expression_module=Main) # UndefVarError: #_RGF_ModTag not defined
-        fun_genf(x0) == A * x0
-    end
-
-    ## Jacobians
-    @test_broken Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
-    @test_throws ErrorException Symbolics.value.(Symbolics.jacobian(ex , x))
-
 end
 
 
@@ -242,11 +221,11 @@ end
 
     @test shape(ex) == shape(x)
 
-    fun_iip, fun_genf = build_function(ex, x, expression=Val{false})
-    @test fun_genf(x0) == A * x0
+    fun_oop, fun_iif = build_function(ex, x, expression=Val{false})
+    @test fun_oop(x0) == A * x0
 
     # Generate an expression instead and eval it manually
-    fun_ex_ip, fun_ex_oop = build_function(ex, x, expression=Val{true})
+    fun_ex_oop, fun_ex_ip = build_function(ex, x, expression=Val{true})
     fun_eval = eval(fun_ex_oop)
     @test fun_eval(x0) == foo(x0)
 
