@@ -291,6 +291,16 @@ CallWithMetadata(f) = CallWithMetadata(f, nothing)
 
 SymbolicIndexingInterface.symbolic_type(::Type{<:CallWithMetadata}) = ScalarSymbolic()
 
+# HACK:
+# A `DestructuredArgs` with `create_bindings = false` doesn't create a `Let` block, and
+# instead adds the assignments to the rewrites dictionary. This is problematic, because
+# if the `DestructuredArgs` contains a `CallWithMetadata` the key in the `Dict` will be
+# a `CallWithMetadata` which won't match against the operation of the called symbolic.
+# This is the _only_ hook we have and relies on the `DestructuredArgs` being converted
+# into a list of `Assignment`s before being addded to the `Dict` inside `toexpr(::Let, st)`.
+# The callable symbolic is unwrapped so it matches the operation of the called version.
+SymbolicUtils.Code.Assignment(f::CallWithMetadata, x) = SymbolicUtils.Code.Assignment(f.f, x)
+
 function Base.show(io::IO, c::CallWithMetadata)
     show(io, c.f)
     print(io, "⋆")

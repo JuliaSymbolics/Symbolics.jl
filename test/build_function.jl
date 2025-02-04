@@ -310,3 +310,9 @@ end
     @test res isa Let
     @test !isempty(res.pairs)
 end
+
+@testset "`CallWithMetadata` in `DestructuredArgs` with `create_bindings = false`" begin
+    @variables x f(..)
+    fn = build_function(f(x), DestructuredArgs([f]; create_bindings = false), x; expression = Val{false})
+    @test fn([isodd], 3)
+end
