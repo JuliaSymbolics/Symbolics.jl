@@ -4,6 +4,7 @@ using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, array_term, jacobia
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 import LinearAlgebra: dot
+import ..limit2
 
 struct TestMetaT end
 Symbolics.option_to_metadata_type(::Val{:test_meta}) = TestMetaT
@@ -336,29 +337,28 @@ end
     A = 3.4
     alpha = 10.0
 
-    limit = Main.limit
-    dtu = @arrayop (i, j) alpha * (u[limit(i - 1, n), j] +
-                                   u[limit(i + 1, n), j] +
-                                   u[i, limit(j + 1, n)] +
-                                   u[i, limit(j - 1, n)] -
+    dtu = @arrayop (i, j) alpha * (u[limit2(i - 1, n), j] +
+                                   u[limit2(i + 1, n), j] +
+                                   u[i, limit2(j + 1, n)] +
+                                   u[i, limit2(j - 1, n)] -
                                    4u[i, j]) +
                           1.0 + u[i, j]^2 * v[i, j] - (A + 1) *
                             u[i, j] + brusselator_f(x[i], y[j], t) i in 1:n j in 1:n
-    dtv = @arrayop (i, j) alpha * (v[limit(i - 1, n), j] +
-                                   v[limit(i + 1, n), j] +
-                                   v[i, limit(j + 1, n)] +
-                                   v[i, limit(j - 1, n)] -
+    dtv = @arrayop (i, j) alpha * (v[limit2(i - 1, n), j] +
+                                   v[limit2(i + 1, n), j] +
+                                   v[i, limit2(j + 1, n)] +
+                                   v[i, limit2(j - 1, n)] -
                                    4v[i, j]) -
                           u[i, j]^2 * v[i, j] + A * u[i, j] i in 1:n j in 1:n
-    lapu = @arrayop (i, j) (u[limit(i - 1, n), j] +
-                            u[limit(i + 1, n), j] +
-                            u[i, limit(j + 1, n)] +
-                            u[i, limit(j - 1, n)] -
+    lapu = @arrayop (i, j) (u[limit2(i - 1, n), j] +
+                            u[limit2(i + 1, n), j] +
+                            u[i, limit2(j + 1, n)] +
+                            u[i, limit2(j - 1, n)] -
                             4u[i, j]) i in 1:n j in 1:n
-    lapv = @arrayop (i, j) (v[limit(i - 1, n), j] +
-                            v[limit(i + 1, n), j] +
-                            v[i, limit(j + 1, n)] +
-                            v[i, limit(j - 1, n)] -
+    lapv = @arrayop (i, j) (v[limit2(i - 1, n), j] +
+                            v[limit2(i + 1, n), j] +
+                            v[i, limit2(j + 1, n)] +
+                            v[i, limit2(j - 1, n)] -
                             4v[i, j]) i in 1:n j in 1:n
     s = brusselator_f.(x, y', t)
 
@@ -367,7 +367,7 @@ end
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
-    f, g = build_function(dtu, u, v, t, expression=Val{false}, nanmath = false)
+    g, f = build_function(dtu, u, v, t, expression=Val{false}, nanmath = false)
     du = zeros(Num, 8, 8)
     f(du, u,v,t)
     @test isequal(collect(du), collect(dtu))
