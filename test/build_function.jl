@@ -1,7 +1,7 @@
 using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 using Symbolics: value
-using SymbolicUtils.Code: DestructuredArgs, Func, NameState
+using SymbolicUtils.Code: DestructuredArgs, Func, NameState, Let, cse
 @variables a b c1 c2 c3 d e g
 oop, iip = Symbolics.build_function([sqrt(a), sin(b)], [a, b], nanmath = true)
 @test all(isnan, eval(oop)([-1, Inf]))
@@ -300,4 +300,19 @@ end
         fiip(buf, ones(4))
         @test buf ≈ ones(2)
     end
+end
+
+@testset "cse with arrayops" begin
+    @variables x[1:3] y f(..)
+    t = x .+ y
+    t = t .* f(t)
+    res = cse(value(t))
+    @test res isa Let
+    @test !isempty(res.pairs)
+end
+
+@testset "`CallWithMetadata` in `DestructuredArgs` with `create_bindings = false`" begin
+    @variables x f(..)
+    fn = build_function(f(x), DestructuredArgs([f]; create_bindings = false), x; expression = Val{false})
+    @test fn([isodd], 3)
 end
