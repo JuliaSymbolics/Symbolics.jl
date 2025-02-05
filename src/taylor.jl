@@ -1,3 +1,4 @@
+
 """
     series(cs, x, [x0=0,], ns=0:length(cs)-1)
 
@@ -41,9 +42,11 @@ function series(y::Num, x::Number, ns::AbstractArray)
 end
 
 """
-    taylor_coeff(f, x[, n]; rationalize=true)
+    taylor_coeff(f, x[, n]; rationalize=true, kwargs...)
 
 Calculate the `n`-th order coefficient(s) in the Taylor series of `f` around `x = 0`.
+If `rationalize`, float coefficients are approximated as rational numbers (this can produce unexpected results for irrational numbers, for example).
+Keyword arguments `kwargs...` are forwarded to internal `substitute()` calls.
 
 Examples
 ========
@@ -60,23 +63,23 @@ julia> taylor_coeff(series(y, x, 0:5), x, 0:2:4)
  y[4]
 ```
 """
-function taylor_coeff(f, x, n = missing; rationalize=true)
+function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
     if n isa AbstractArray
         # return array of expressions/equations for each order
-        return taylor_coeff.(Ref(f), Ref(x), n; rationalize)
+        return taylor_coeff.(Ref(f), Ref(x), n; rationalize, kwargs...)
     elseif f isa Equation
         if ismissing(n)
             # assume user wants maximum order in the equation
             n = 0:max(degree(f.lhs, x), degree(f.rhs, x))
-            return taylor_coeff(f, x, n; rationalize)
+            return taylor_coeff(f, x, n; rationalize, kwargs...)
         else
             # return new equation with coefficients of each side
-            return taylor_coeff(f.lhs, x, n; rationalize) ~ taylor_coeff(f.rhs, x, n; rationalize)
+            return taylor_coeff(f.lhs, x, n; rationalize, kwargs...) ~ taylor_coeff(f.rhs, x, n; rationalize, kwargs...)
         end
     elseif ismissing(n)
         # assume user wants maximum order in the expression
         n = 0:degree(f, x)
-        return taylor_coeff(f, x, n; rationalize)
+        return taylor_coeff(f, x, n; rationalize, kwargs...)
     end
 
     # TODO: error if x is not a "pure variable"
@@ -84,7 +87,7 @@ function taylor_coeff(f, x, n = missing; rationalize=true)
     n! = factorial(n)
     c = (D^n)(f) / n! # TODO: optimize the implementation for multiple n with a loop that avoids re-differentiating the same expressions
     c = expand_derivatives(c)
-    c = substitute(c, x => 0)
+    c = substitute(c, x => 0; kwargs...)
     if rationalize && unwrap(c) isa Number
         # TODO: make rational coefficients "organically" and not using rationalize (see https://github.com/JuliaSymbolics/Symbolics.jl/issues/1299)
         c = unwrap(c)
@@ -94,10 +97,11 @@ function taylor_coeff(f, x, n = missing; rationalize=true)
 end
 
 """
-    taylor(f, x, [x0=0,] n; rationalize=true)
+    taylor(f, x, [x0=0,] n; rationalize=true, kwargs...)
 
 Calculate the `n`-th order term(s) in the Taylor series of `f` around `x = x0`.
 If `rationalize`, float coefficients are approximated as rational numbers (this can produce unexpected results for irrational numbers, for example).
+Keyword arguments `kwargs...` are forwarded to internal `substitute()` calls.
 
 Examples
 ========
@@ -119,23 +123,23 @@ julia> isequal(taylor(exp(im*x), x, 0:5), taylor(exp(im*x), x, 0:5))
 true
 ```
 """
-function taylor(f, x, ns; kwargs...)
+function taylor(f, x, ns; rationalize=true, kwargs...)
     if f isa AbstractArray
-        return taylor.(f, Ref(x), Ref(ns); kwargs...)
+        return taylor.(f, Ref(x), Ref(ns); rationalize, kwargs...)
     elseif f isa Equation
-        return taylor(f.lhs, x, ns; kwargs...) ~ taylor(f.rhs, x, ns; kwargs...)
+        return taylor(f.lhs, x, ns; rationalize, kwargs...) ~ taylor(f.rhs, x, ns; rationalize, kwargs...)
     end
 
-    return sum(taylor_coeff(f, x, n; kwargs...) * x^n for n in ns)
+    return sum(taylor_coeff(f, x, n; rationalize, kwargs...) * x^n for n in ns)
 end
-function taylor(f, x, x0, n; kwargs...)
+function taylor(f, x, x0, n; rationalize=true, kwargs...)
     # 1) substitute dummy x′ = x - x0
     name = Symbol(nameof(x), "′") # e.g. Symbol("x′")
     x′ = only(@variables $name)
     f = substitute(f, x => x′ + x0)
 
     # 2) expand f around x′ = 0
-    s = taylor(f, x′, n; kwargs...)
+    s = taylor(f, x′, n; rationalize, kwargs...)
 
     # 3) substitute back x = x′ + x0
     return substitute(s, x′ => x - x0)

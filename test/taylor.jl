@@ -51,7 +51,6 @@ eq = taylor(eq, x, 0:7)
 eqs = taylor_coeff(eq, x) # should automatically expand to 7th order
 @test length(eqs) == 7+1 && all(isequal(eq.lhs, eq.rhs) for eq in eqs)
 
-
 # expand quintic equation around x=1
 @variables ϵ
 x_series = series(x, ϵ, 0:3)
@@ -64,3 +63,8 @@ eqs = substitute(eqs, Dict(sol))
 
 # system of equations
 @test taylor(exp(im*x) ~ 0, x, 0:5) == taylor([cos(x) ~ 0, sin(x) ~ 0], x, 0:5)
+
+# don't evaluate numerical expressions
+eq = y ~ 2*Num(π)*x
+eq = taylor(eq, x, 1; rationalize=false, fold=false)
+@test contains(string(eq), "π") # should not turn 2*π into 6.28...
