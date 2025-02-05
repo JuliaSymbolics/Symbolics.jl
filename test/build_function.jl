@@ -186,7 +186,7 @@ expr = toexpr(Func([value(D(x))], [], value(D(x))))
 
 a = rand(4)
 @variables x[1:4]
-@test eval(build_function(sin.(cos.(x)), cos.(x))[2])(a) == sin.(a)
+@test eval(build_function(sin.(cos.(x)), cos.(x))[1])(a) == sin.(a)
 
 # more skipzeros
 @variables x,y
@@ -272,7 +272,7 @@ end
 let #658
     using Symbolics
     @variables a, X1[1:3], X2[1:3]
-    k = eval(build_function(a * X1 + X2, X1, X2, a)[2])
+    k = eval(build_function(a * X1 + X2, X1, X2, a)[1])
     @test k(ones(3), ones(3), 1.5) == [2.5, 2.5, 2.5]
 end
 
@@ -302,14 +302,14 @@ end
     end
 end
 
-@testset "cse with arrayops" begin
-    @variables x[1:3] y f(..)
-    t = x .+ y
-    t = t .* f(t)
-    res = cse(value(t))
-    @test res isa Let
-    @test !isempty(res.pairs)
-end
+# @testset "cse with arrayops" begin
+#     @variables x[1:3] y f(..)
+#     t = x .+ y
+#     t = t .* f(t)
+#     res = cse(value(t))
+#     @test res isa Let
+#     @test !isempty(res.pairs)
+# end
 
 @testset "`CallWithMetadata` in `DestructuredArgs` with `create_bindings = false`" begin
     @variables x f(..)

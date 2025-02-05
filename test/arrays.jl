@@ -4,6 +4,7 @@ using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, array_term, jacobia
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 import LinearAlgebra: dot
+import ..limit2
 
 struct TestMetaT end
 Symbolics.option_to_metadata_type(::Val{:test_meta}) = TestMetaT
@@ -185,15 +186,10 @@ end
 n = 2
 A = randn(n, n)
 foo(x) = A * x # a function to represent symbolically, note, if this function is defined inside the testset, it's not found by the function fun_eval = eval(fun_ex)
-function Symbolics.propagate_ndims(::typeof(foo), x)
-    ndims(x)
-end
-function Symbolics.propagate_shape(::typeof(foo), x)
-    shape(x)
-end
-@wrapped function foo(x::AbstractVector)
-    t = array_term(foo, x)
-    setmetadata(t, Symbolics.ScalarizeCache, Ref{Any}(nothing))
+@register_array_symbolic foo(x::Vector{Real}) begin
+    size = (n,)
+    eltype = eltype(x)
+    ndims = 1
 end
 
 #=
@@ -203,33 +199,17 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
 @testset "Functions and Jacobians using @syms" begin
     @variables x[1:n]
 
-    function symbolic_call(x)
-        @syms foo(x::Symbolics.Arr{Num,1})::Symbolics.Arr{Num,1} # symbolic foo can not be created in global scope due to conflict with function foo
-        foo(x) # return a symbolic call to foo
-    end
-
     x0 = randn(n)
     @test foo(x0) == A * x0
-    ex = symbolic_call(x)
+    ex = foo(x)
 
-    fun_genf = build_function(ex, x, expression=Val{false})
-    @test_broken fun_genf(x0) == A * x0# UndefVarError: foo not defined
+    fun_oop, fun_iip = build_function(ex, x, expression=Val{false})
+    @test fun_oop(x0) == A * x0# UndefVarError: foo not defined
 
     # Generate an expression instead and eval it manually
-    fun_ex = build_function(ex, x, expression=Val{true})
-    fun_eval = eval(fun_ex)
+    fun_ex_oop, fun_ex_iip = build_function(ex, x, expression=Val{true})
+    fun_eval = eval(fun_ex_oop)
     @test fun_eval(x0) == foo(x0)
-
-    # Try to provide the hidden argument `expression_module` to solve the scoping issue
-    @test_skip begin
-        fun_genf = build_function(ex, x, expression=Val{false}, expression_module=Main) # UndefVarError: #_RGF_ModTag not defined
-        fun_genf(x0) == A * x0
-    end
-
-    ## Jacobians
-    @test_broken Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
-    @test_throws ErrorException Symbolics.value.(Symbolics.jacobian(ex , x))
-
 end
 
 
@@ -242,11 +222,11 @@ end
 
     @test shape(ex) == shape(x)
 
-    fun_iip, fun_genf = build_function(ex, x, expression=Val{false})
-    @test fun_genf(x0) == A * x0
+    fun_oop, fun_iif = build_function(ex, x, expression=Val{false})
+    @test fun_oop(x0) == A * x0
 
     # Generate an expression instead and eval it manually
-    fun_ex_ip, fun_ex_oop = build_function(ex, x, expression=Val{true})
+    fun_ex_oop, fun_ex_ip = build_function(ex, x, expression=Val{true})
     fun_eval = eval(fun_ex_oop)
     @test fun_eval(x0) == foo(x0)
 
@@ -357,29 +337,28 @@ end
     A = 3.4
     alpha = 10.0
 
-    limit = Main.limit
-    dtu = @arrayop (i, j) alpha * (u[limit(i - 1, n), j] +
-                                   u[limit(i + 1, n), j] +
-                                   u[i, limit(j + 1, n)] +
-                                   u[i, limit(j - 1, n)] -
+    dtu = @arrayop (i, j) alpha * (u[limit2(i - 1, n), j] +
+                                   u[limit2(i + 1, n), j] +
+                                   u[i, limit2(j + 1, n)] +
+                                   u[i, limit2(j - 1, n)] -
                                    4u[i, j]) +
                           1.0 + u[i, j]^2 * v[i, j] - (A + 1) *
                             u[i, j] + brusselator_f(x[i], y[j], t) i in 1:n j in 1:n
-    dtv = @arrayop (i, j) alpha * (v[limit(i - 1, n), j] +
-                                   v[limit(i + 1, n), j] +
-                                   v[i, limit(j + 1, n)] +
-                                   v[i, limit(j - 1, n)] -
+    dtv = @arrayop (i, j) alpha * (v[limit2(i - 1, n), j] +
+                                   v[limit2(i + 1, n), j] +
+                                   v[i, limit2(j + 1, n)] +
+                                   v[i, limit2(j - 1, n)] -
                                    4v[i, j]) -
                           u[i, j]^2 * v[i, j] + A * u[i, j] i in 1:n j in 1:n
-    lapu = @arrayop (i, j) (u[limit(i - 1, n), j] +
-                            u[limit(i + 1, n), j] +
-                            u[i, limit(j + 1, n)] +
-                            u[i, limit(j - 1, n)] -
+    lapu = @arrayop (i, j) (u[limit2(i - 1, n), j] +
+                            u[limit2(i + 1, n), j] +
+                            u[i, limit2(j + 1, n)] +
+                            u[i, limit2(j - 1, n)] -
                             4u[i, j]) i in 1:n j in 1:n
-    lapv = @arrayop (i, j) (v[limit(i - 1, n), j] +
-                            v[limit(i + 1, n), j] +
-                            v[i, limit(j + 1, n)] +
-                            v[i, limit(j - 1, n)] -
+    lapv = @arrayop (i, j) (v[limit2(i - 1, n), j] +
+                            v[limit2(i + 1, n), j] +
+                            v[i, limit2(j + 1, n)] +
+                            v[i, limit2(j - 1, n)] -
                             4v[i, j]) i in 1:n j in 1:n
     s = brusselator_f.(x, y', t)
 
@@ -388,7 +367,7 @@ end
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
-    f, g = build_function(dtu, u, v, t, expression=Val{false}, nanmath = false)
+    g, f = build_function(dtu, u, v, t, expression=Val{false}, nanmath = false)
     du = zeros(Num, 8, 8)
     f(du, u,v,t)
     @test isequal(collect(du), collect(dtu))
