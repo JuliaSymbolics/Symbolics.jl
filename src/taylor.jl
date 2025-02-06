@@ -136,11 +136,11 @@ function taylor(f, x, x0, n; rationalize=true, kwargs...)
     # 1) substitute dummy x′ = x - x0
     name = Symbol(nameof(x), "′") # e.g. Symbol("x′")
     x′ = only(@variables $name)
-    f = substitute(f, x => x′ + x0)
+    f = substitute(f, x => x′ + x0; kwargs...)
 
     # 2) expand f around x′ = 0
     s = taylor(f, x′, n; rationalize, kwargs...)
 
     # 3) substitute back x = x′ + x0
-    return substitute(s, x′ => x - x0)
+    return substitute(s, x′ => x - x0; kwargs...)
 end
