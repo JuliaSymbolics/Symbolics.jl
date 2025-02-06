@@ -66,5 +66,5 @@ eqs = substitute(eqs, Dict(sol))
 
 # don't evaluate numerical expressions
 eq = y ~ 2*Num(π)*x
-eq = taylor(eq, x, 1; rationalize=false, fold=false)
+eq = taylor(eq, x, 0, 1; rationalize=false, fold=false)
 @test contains(string(eq), "π") # should not turn 2*π into 6.28...
