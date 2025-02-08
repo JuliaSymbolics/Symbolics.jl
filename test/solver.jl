@@ -633,3 +633,10 @@ using LambertW
     #product
     @test correctAns(symbolic_solve((x^2-4)*(x+1)~0,x),[-2.0,-1.0,2.0])
 end
+
+@testset "`NaN` handling in `$fn`" for fn in [ssqrt, slog, scbrt]
+    x = fn(NaN)
+    @test x isa Real && isnan(x)
+    x = fn(NaN + NaN * im)
+    @test x isa Complex && isnan(x)
+end
