@@ -24,6 +24,7 @@ function ssqrt(n)
     n = unwrap(n)
 
     if n isa Real
+        isnan(n) && return n
         n > 0 && return sqrt(n)
         return sqrt(complex(n))
     end
@@ -43,6 +44,7 @@ function scbrt(n)
     n = unwrap(n)
 
     if n isa Real
+    isnan(n) && return n
         return cbrt(n)
     end
 
@@ -61,6 +63,7 @@ function slog(n)
     n = unwrap(n)
 
     if n isa Real
+        isnan(n) && return n
         return n > 0 ? log(n) : log(complex(n))
     end
 
