@@ -302,14 +302,14 @@ end
     end
 end
 
-# @testset "cse with arrayops" begin
-#     @variables x[1:3] y f(..)
-#     t = x .+ y
-#     t = t .* f(t)
-#     res = cse(value(t))
-#     @test res isa Let
-#     @test !isempty(res.pairs)
-# end
+@testset "cse with arrayops" begin
+    @variables x[1:3] y f(..)
+    t = x .+ y
+    t = t .* f(t)
+    res = cse(value(t))
+    @test res isa Let
+    @test !isempty(res.pairs)
+end
 
 @testset "`CallWithMetadata` in `DestructuredArgs` with `create_bindings = false`" begin
     @variables x f(..)
