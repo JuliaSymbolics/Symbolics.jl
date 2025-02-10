@@ -94,7 +94,7 @@ StaticArraysCore = "1.4"
 SymPy = "2.2"
 SymbolicIndexingInterface = "0.3.14"
 SymbolicLimits = "0.2.2"
-SymbolicUtils = "3.10"
+SymbolicUtils = "3.14"
 TermInterface = "2"
 julia = "1.10"
 
