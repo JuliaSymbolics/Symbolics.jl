@@ -148,8 +148,11 @@ end
 propagate_eltype(::typeof(getindex), x, idx...) = geteltype(x)
 
 function SymbolicUtils.promote_symtype(::typeof(getindex), X, ii...)
-    @assert all(i -> i <: Integer, ii)
-    eltype(X)
+    if all(i -> i <: Union{Integer, CartesianIndex}, ii)
+        eltype(X)
+    else
+        AbstractArray{eltype(X)}
+    end
 end
 
 
