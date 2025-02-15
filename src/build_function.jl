@@ -155,13 +155,13 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUt
     end
 
     outsym = Symbol("ˍ₋out")
-    body = inplace_expr(unwrap(op), outsym)
+    body = inplace_expr(unwrap(op), outsym; cse)
     iip_expr = conv(wrap_code[2](Func([outsym, dargs...], [], body)), states)
 
     N = length(shape(op))
     op = unwrap(op)
     if op isa ArrayOp && iscall(op.term)
-        op_body = op.term
+        op_body = cse ? Code.cse(op.term) : op.term
     else
         op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
                    $body
@@ -299,6 +299,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        nanmath = true,
                        parallel=nothing, cse = false, kwargs...)
 
+    if parallel isa MultithreadedForm && cse
+        @warn "CSE is not supported with `MultithreadedForm`"
+        cse = false
+    end
     states.rewrites[:nanmath] = nanmath
     # We cannot switch to ShardedForm because it deadlocks with
     # RuntimeGeneratedFunctions
@@ -323,14 +327,21 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     out = Sym{Any}(:ˍ₋out)
     ip_body = if iip
-        postprocess_fbody(set_array(parallel,
+        if cse
+            letblock = Code.cse(unwrap.(rhss))
+            assignments = letblock.pairs
+            rhss = letblock.body
+        else
+            assignments = []
+        end
+        Let(assignments, postprocess_fbody(set_array(parallel,
                                     dargs,
                                     out,
                                     outputidxs,
                                     rhss,
                                     checkbounds,
                                     skipzeros,
-                                    cse,))
+                                    cse,)), false)
     else
         term(throw_missing_specialization, length(dargs) + 1)
     end

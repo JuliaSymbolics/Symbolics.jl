@@ -1008,8 +1008,11 @@ function _array_toexpr(x, st)
     toexpr(ex, st)
 end
 
-function inplace_expr(x, out_array, dict=nothing)
+function inplace_expr(x, out_array, dict=nothing; cse = false)
     x = unwrap(x)
+    if cse
+        x = Code.cse(unwrap(x))
+    end
     if symtype(x) <: Number
         :($out_array .= $x)
     else
@@ -1017,24 +1020,37 @@ function inplace_expr(x, out_array, dict=nothing)
     end
 end
 
-function inplace_expr(x::ArrayMaker, out, dict=Dict())
+# TODO: CSE support
+function inplace_expr(x::ArrayMaker, out, dict=Dict(); cse = false)
     ex = []
 
     intermediates = Dict()
     for (i, (vw, op)) in enumerate(x.sequence)
         out′ = Symbol(out, "_", i)
         push!(ex, :($out′ = $view($out, $(vw...))))
-        push!(ex, inplace_expr(unwrap(op), out′, intermediates))
+        push!(ex, inplace_expr(unwrap(op), out′, intermediates; cse))
     end
 
     Expr(:block, (:($sym = $ex) for (ex, sym) in  intermediates)..., ex...)
 end
 
-function inplace_expr(x::AbstractArray, out, intermediates=Dict())
+function inplace_expr(x::AbstractArray, out, intermediates=Dict(); cse = false)
     # TODO: extract more intermediates
-    :(begin
+    if cse
+        letblock = Code.cse(unwrap.(x))
+        assignments = letblock.pairs
+        x = letblock.body
+    else
+        assignments = nothing
+    end
+    expr = :(begin
           $([:($out[$(Tuple(idx)...)] = $(substitute(x, intermediates)[Tuple(idx)...])) for idx in eachindex(x)]...)
       end)
+
+    if assignments !== nothing
+        expr = Let(assignments, expr, false)
+    end
+    return expr
 end
 
 function inplace_builtin(term, outsym)
@@ -1072,7 +1088,12 @@ function reset_sym(i)
     Sym{Int}(Symbol(nameof(i), "′"))
 end
 
-function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
+function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing; cse = false)
+    if cse
+        letblock = Code.cse(x)
+        assignments = letblock.pairs
+        return Let(assignments, inplace_expr(letblock.body, outsym, intermediates; cse = false), false)
+    end
     if x.term !== nothing
         ex = inplace_builtin(x.term, outsym)
         if ex !== nothing
