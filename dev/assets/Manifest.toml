@@ -802,9 +802,9 @@ version = "1.0.2"
 
 [[deps.Groebner]]
 deps = ["AbstractAlgebra", "Atomix", "Combinatorics", "Logging", "Nemo", "PrecompileTools", "Primes", "Printf", "Random"]
-git-tree-sha1 = "d9f4108409c65c80a49132b5a83a016d09d6a933"
+git-tree-sha1 = "9f2a808da3d06208e5e7062ec51bfb7ecc9e9259"
 uuid = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
-version = "0.9.0"
+version = "0.8.3"
 weakdeps = ["DynamicPolynomials"]
 
     [deps.Groebner.extensions]
