@@ -62,3 +62,7 @@ Dy = Differential(y)
 @test_reference "latexify_refs/indices2.txt" latexify(h[10,10], index=:bracket)
 
 @test !occursin("identity", latexify(Num(π))) # issue #1254
+
+@variables t
+@test String(latexify(only(@variables sys₊x123(t)[1:3])[1]; env=:raw)) == raw"\mathtt{sys.x123}\left( t \right)_{1}" # x without subscript
+@test String(latexify(only(@variables sys₊x123(t)[1:3] [latex = raw"x_{123}"])[1]; env=:raw)) == raw"\mathtt{sys.}x_{{123}}\left( t \right)_{1}" # x with subscript
