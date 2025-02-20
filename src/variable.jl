@@ -622,6 +622,9 @@ function fast_substitute(expr, subs; operator = Nothing)
                 x′
             end
         end
+        if op === getindex && symbolic_type(args[1]) == NotSymbolic()
+            canfold[] = true
+        end
         canfold[] && return op(args...)
     end
     maketerm(typeof(expr),
@@ -649,6 +652,9 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
                 canfold[] = canfold[] && (symbolic_type(x′) == NotSymbolic() && !is_array_of_symbolics(x′))
                 x′
             end
+        end
+        if op === getindex && symbolic_type(args[1]) == NotSymbolic()
+            canfold[] = true
         end
         canfold[] && return op(args...)
     end

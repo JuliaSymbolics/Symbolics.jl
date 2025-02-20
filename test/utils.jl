@@ -170,3 +170,9 @@ end
     @test isequal(q[1:2], Symbolics.fast_substitute(p[1:2], Dict(p => q)))
     @test isequal(q[1:2], Symbolics.fast_substitute(p[1:2], p => q))
 end
+
+@testset "`fast_substitute` folding `getindex`" begin
+    @variables x[1:3]
+    @test isequal(Symbolics.fast_substitute(x[1], Dict(unwrap(x) => collect(unwrap(x)))), x[1])
+    @test isequal(Symbolics.fast_substitute(x[1], unwrap(x) => collect(unwrap(x))), x[1])
+end
