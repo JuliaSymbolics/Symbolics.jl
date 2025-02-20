@@ -176,3 +176,25 @@ end
     @test isequal(Symbolics.fast_substitute(x[1], Dict(unwrap(x) => collect(unwrap(x)))), x[1])
     @test isequal(Symbolics.fast_substitute(x[1], unwrap(x) => collect(unwrap(x))), x[1])
 end
+
+@testset "numerator and denominator" begin
+    @variables x y
+    num_den(x) = (numerator(x), denominator(x))
+    @test num_den(x) == (x, 1)
+    @test num_den(1/x) == (1, x)
+    @test num_den(x/y) == (x, y)
+end
+
+@testset "factors and terms" begin
+    @variables x y z
+
+    @test Set(factors(0)) == Set([0])
+    @test Set(factors(1)) == Set([1])
+    @test Set(factors(x)) == Set([x])
+    @test Set(factors(x*y*z)) == Set([x, y, z])
+
+    @test Set(terms(0)) == Set([0])
+    @test Set(terms(x)) == Set([x])
+    @test Set(terms(x + y + z)) == Set([x, y, z])
+    @test Set(terms(-x - y + z)) == Set([-x, -y, z])
+end

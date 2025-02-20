@@ -436,3 +436,94 @@ symbolic_to_float(x::Number) = x
 function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
     substitute(x,Dict())
 end
+
+"""
+    numerator(x)
+
+Return the numerator of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> numerator(x/y)
+x
+```
+"""
+function Base.numerator(x::Union{Num, Symbolic})
+    x = unwrap(x)
+    if iscall(x) && operation(x) == /
+        x = arguments(x)[1] # get numerator
+    end
+    return wrap(x)
+end
+
+"""
+    denominator(x)
+
+Return the denominator of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> denominator(x/y)
+y
+```
+"""
+function Base.denominator(x::Union{Num, Symbolic})
+    x = unwrap(x)
+    if iscall(x) && operation(x) == /
+        x = arguments(x)[2] # get denominator
+    else
+        x = 1
+    end
+    return wrap(x)
+end
+
+"""
+    arguments(x, op::Function)
+
+Get the arguments of the symbolic expression `x` with respect to the operation or function `op`.
+"""
+function arguments(x, op::Function)
+    x = unwrap(x)
+    if iscall(x) && operation(x) == op
+        args = [arguments(arg, op) for arg in arguments(x)] # recurse into each argument and obtain its factors
+        args = reduce(vcat, args) # concatenate array of arrays into one array
+    else
+        args = [wrap(x)] # base case
+    end
+    return args
+end
+
+"""
+    terms(x)
+
+Get the terms of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> terms(-x + y - z)
+3-element Vector{Num}:
+ -z
+  y
+ -x
+```
+"""
+terms(x) = arguments(x, +)
+
+"""
+    factors(x)
+
+Get the factors of the symbolic expression `x`.
+Examples
+========
+```julia-repl
+julia> factors(2 * x * y)
+3-element Vector{Num}:
+ 2
+ y
+ x
+```
+"""
+factors(x) = arguments(x, *)
