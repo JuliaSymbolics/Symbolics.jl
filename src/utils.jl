@@ -436,3 +436,45 @@ symbolic_to_float(x::Number) = x
 function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
     substitute(x,Dict())
 end
+
+"""
+    numerator(x)
+
+Return the numerator of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> numerator(x/y)
+x
+```
+"""
+function Base.numerator(x::Union{Num, Symbolic})
+    x = unwrap(x)
+    if iscall(x) && operation(x) == /
+        x = arguments(x)[1] # get numerator
+    end
+    return wrap(x)
+end
+
+"""
+    denominator(x)
+
+Return the denominator of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> denominator(x/y)
+y
+```
+"""
+function Base.denominator(x::Union{Num, Symbolic})
+    x = unwrap(x)
+    if iscall(x) && operation(x) == /
+        x = arguments(x)[2] # get denominator
+    else
+        x = 1
+    end
+    return wrap(x)
+end

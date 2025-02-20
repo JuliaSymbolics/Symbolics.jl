@@ -176,3 +176,11 @@ end
     @test isequal(Symbolics.fast_substitute(x[1], Dict(unwrap(x) => collect(unwrap(x)))), x[1])
     @test isequal(Symbolics.fast_substitute(x[1], unwrap(x) => collect(unwrap(x))), x[1])
 end
+
+@testset "numerator and denominator" begin
+    @variables x y
+    num_den(x) = (numerator(x), denominator(x))
+    @test num_den(x) == (x, 1)
+    @test num_den(1/x) == (1, x)
+    @test num_den(x/y) == (x, y)
+end
