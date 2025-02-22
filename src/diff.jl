@@ -167,7 +167,31 @@ passed differential and not any other Differentials it encounters.
     variable in the argument of the derivative. This is used internally for
     optimization purposes.
 """
-function executediff(D, arg, simplify=false; occurrences=nothing)
+function foo end
+
+using WeakValueDicts, UUIDs
+const EDC = WeakValueDict{Tuple{UUID, UUID, Bool}, BasicSymbolic}()
+
+function executediff(a, b, simplify; occurrences = nothing)
+    if SymbolicUtils.ENABLE_HASHCONSING[] && a.x isa BasicSymbolic && b isa BasicSymbolic && a.x.uuid !== nothing && b.uuid !== nothing
+        k = (a.x.uuid, b.uuid, simplify)
+        v = get(EDC, k, nothing)
+        if v !== nothing
+            @show "HIT"
+            return v
+        end
+    else
+        k = nothing
+    end
+
+    v = _executediff(a, b, simplify; occurrences)
+    if k !== nothing && v isa BasicSymbolic
+        EDC[k] = v
+    end
+    return v
+end
+
+function _executediff(D, arg, simplify=false; occurrences=nothing)
     if occurrences == nothing
         occurrences = occursin_info(D.x, arg)
     end
