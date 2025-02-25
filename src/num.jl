@@ -33,7 +33,7 @@ Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
 
-IfElse.ifelse(x::Num,y,z) = Num(IfElse.ifelse(value(x), value(y), value(z)))
+Base.ifelse(x::Num,y,z) = Num(ifelse(value(x), value(y), value(z)))
 
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
 for C in [Complex, Complex{Bool}]
