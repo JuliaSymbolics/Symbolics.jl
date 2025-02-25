@@ -562,3 +562,13 @@ let
     @test Symbolics.hessian_sparsity(expr, [x]) == [true;;]
     @test !iszero(Symbolics.simplify(only(Symbolics.hessian(expr, [x]))))
 end
+
+@testset "`throw_no_derivative`" begin
+    @variables t x(t) y::Bool z(..)
+    D = Differential(t)
+    @register_symbolic f(x)
+
+    for expr in [D(f(x)), D(f(x)) + x^2, ifelse(y, D(f(x)), x^2), D(z(f(x))), z(D(f(x)))]
+        @test_throws Symbolics.DerivativeNotDefinedError expand_derivatives(expr; throw_no_derivative = true)
+    end
+end
