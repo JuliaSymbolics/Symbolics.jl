@@ -169,6 +169,9 @@ function Base.showerror(io::IO, err::DerivativeNotDefinedError)
             # ...
         end
         ```
+
+        Refer to the documentation for `Symbolics.derivative` and the
+        "[Adding Analytical Derivatives](@ref)" section of the docs for further information.
         """)
     show(io, MIME"text/plain"(), err_str)
 end
