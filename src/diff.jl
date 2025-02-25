@@ -187,7 +187,7 @@ function executediff(D, arg, simplify=false; occurrences=nothing)
                 executediff(D, a)
             end
         end
-    elseif op === (IfElse.ifelse)
+    elseif op === ifelse
         args = arguments(arg)
         O = op(args[1], 
             executediff(D, args[2], simplify; occurrences=arguments(occurrences)[2]), 
@@ -295,7 +295,7 @@ julia> Dx = Differential(x) # Differentiate wrt x
 (::Differential) (generic function with 2 methods)
 
 julia> dfx = expand_derivatives(Dx(f))
-(k*((2abs(x - y)) / y - 2z)*IfElse.ifelse(signbit(x - y), -1, 1)) / y
+(k*((2abs(x - y)) / y - 2z)*ifelse(signbit(x - y), -1, 1)) / y
 ```
 """
 function expand_derivatives(O::Symbolic, simplify=false)

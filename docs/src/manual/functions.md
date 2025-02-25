@@ -103,7 +103,7 @@ differentiated. So for example:
 ```julia
 function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{1})
     x, y = args
-    IfElse.ifelse(x < y, one(x), zero(x))
+    ifelse(x < y, one(x), zero(x))
 end
 ```
 

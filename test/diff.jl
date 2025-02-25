@@ -1,6 +1,5 @@
 using Symbolics
 using Test
-using IfElse
 using Symbolics: value
 
 # Derivatives
@@ -255,8 +254,8 @@ expression2 = substitute(expression, Dict(collect(Differential(t).(x) .=> ẋ)))
 @test isequal(expression2, (ẋ[1] + ẋ[2] + ẋ[3] + ẋ[4])*cos(x[1] + x[2] + x[3] + x[4]))
 
 @test isequal(
-    Symbolics.derivative(IfElse.ifelse(signbit(b), b^2, sqrt(b)), b),
-    IfElse.ifelse(signbit(b), 2b,(SymbolicUtils.unstable_pow(2Symbolics.unwrap(sqrt(b)), -1)))
+    Symbolics.derivative(ifelse(signbit(b), b^2, sqrt(b)), b),
+    ifelse(signbit(b), 2b,(SymbolicUtils.unstable_pow(2Symbolics.unwrap(sqrt(b)), -1)))
 )
 
 # Chain rule
