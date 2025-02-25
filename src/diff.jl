@@ -507,12 +507,18 @@ $(SIGNATURES)
 
 A helper function for computing the derivative of the expression `O` with respect to
 `var`.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function derivative(O, var; simplify=false)
+function derivative(O, var; simplify=false, kwargs...)
     if O isa AbstractArray
-        Num[Num(expand_derivatives(Differential(var)(value(o)), simplify)) for o in O]
+        Num[Num(expand_derivatives(Differential(var)(value(o)), simplify; kwargs...)) for o in O]
     else
-        Num(expand_derivatives(Differential(var)(value(O)), simplify))
+        Num(expand_derivatives(Differential(var)(value(O)), simplify; kwargs...))
     end
 end
 
@@ -521,9 +527,15 @@ $(SIGNATURES)
 
 A helper function for computing the gradient of the expression `O` with respect to
 an array of variable expressions.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function gradient(O, vars::AbstractVector; simplify=false)
-    Num[Num(expand_derivatives(Differential(v)(value(O)),simplify)) for v in vars]
+function gradient(O, vars::AbstractVector; simplify=false, kwargs...)
+    Num[Num(expand_derivatives(Differential(v)(value(O)),simplify; kwargs...)) for v in vars]
 end
 
 """
@@ -531,19 +543,26 @@ $(SIGNATURES)
 
 A helper function for computing the Jacobian of an array of expressions with respect to
 an array of variable expressions.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+- `scalarize=true`: Whether to scalarize `ops` and `vars` before computing the jacobian.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false, scalarize=true)
+function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false, scalarize=true, kwargs...)
     if scalarize
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
-    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify)) for O in ops, v in vars]
+    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify; kwargs...)) for O in ops, v in vars]
 end
 
-function jacobian(ops, vars; simplify=false)
+function jacobian(ops, vars; simplify=false, kwargs...)
     ops = vec(scalarize(ops))
     vars = vec(scalarize(vars)) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
-    jacobian(ops, vars; simplify=simplify, scalarize=false)
+    jacobian(ops, vars; simplify=simplify, scalarize=false, kwargs...)
 end
 
 """
@@ -551,14 +570,20 @@ $(SIGNATURES)
 
 A helper function for computing the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify::Bool=false)
+function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify::Bool=false, kwargs...)
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
     sp = jacobian_sparsity(ops, vars)
     I,J,_ = findnz(sp)
 
-    exprs = sparsejacobian_vals(ops, vars, I, J, simplify=simplify)
+    exprs = sparsejacobian_vals(ops, vars, I, J; simplify=simplify, kwargs...)
 
     sparse(I, J, exprs, length(ops), length(vars))
 end
@@ -568,15 +593,21 @@ $(SIGNATURES)
 
 A helper function for computing the values of the sparse Jacobian of an array of expressions with respect to
 an array of variable expressions given the sparsity structure.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false)
+function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false, kwargs...)
     ops = Symbolics.scalarize(ops)
     vars = Symbolics.scalarize(vars)
 
     exprs = Num[]
 
     for (i,j) in zip(I, J)
-        push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify)))
+        push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify; kwargs...)))
     end
     exprs
 end
@@ -689,16 +720,22 @@ $(SIGNATURES)
 
 A helper function for computing the Hessian of the expression `O` with respect to
 an array of variable expressions.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function hessian(O, vars::AbstractVector; simplify=false)
+function hessian(O, vars::AbstractVector; simplify=false, kwargs...)
     vars = map(value, vars)
-    first_derivs = map(value, vec(jacobian([values(O)], vars, simplify=simplify)))
+    first_derivs = map(value, vec(jacobian([values(O)], vars; simplify=simplify, kwargs...)))
     n = length(vars)
     H = Array{Num, 2}(undef,(n, n))
     fill!(H, 0)
     for i=1:n
         for j=1:i
-            H[j, i] = H[i, j] = expand_derivatives(Differential(vars[i])(first_derivs[j]))
+            H[j, i] = H[i, j] = expand_derivatives(Differential(vars[i])(first_derivs[j]), simplify; kwargs...)
         end
     end
     H
@@ -818,14 +855,22 @@ $(SIGNATURES)
 
 A helper function for computing the sparse Hessian of an expression with respect to
 an array of variable expressions.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+- `full=false`: Whether to construct the full hessian by also including entries in
+  the upper-triangular half of the matrix.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function sparsehessian(op, vars::AbstractVector; simplify::Bool=false, full::Bool=true)
+function sparsehessian(op, vars::AbstractVector; simplify::Bool=false, full::Bool=true, kwargs...)
     op = value(op)
     vars = map(value, vars)
     S = hessian_sparsity(op, vars, full=full)
     I, J, _ = findnz(S)
 
-    exprs = sparsehessian_vals(op, vars, I, J, simplify=simplify)
+    exprs = sparsehessian_vals(op, vars, I, J; simplify=simplify, kwargs...)
 
     H = sparse(I, J, exprs, length(vars), length(vars))
 
@@ -842,8 +887,14 @@ $(SIGNATURES)
 
 A helper function for computing the values of the sparse Hessian of an expression with respect to
 an array of variable expressions given the sparsity structure.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false)
+function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false, kwargs...)
     vars = Symbolics.scalarize(vars)
 
     exprs = Array{Num}(undef, length(I))
@@ -854,9 +905,9 @@ function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::Abst
     for (k, (i, j)) in enumerate(zip(I, J))
         j > i && continue
         if j != prev_j
-            d = expand_derivatives(Differential(vars[j])(op), false)
+            d = expand_derivatives(Differential(vars[j])(op), false; kwargs...)
         end
-        expr = expand_derivatives(Differential(vars[i])(d), simplify)
+        expr = expand_derivatives(Differential(vars[i])(d), simplify; kwargs...)
         exprs[k] = expr
         prev_j = j
     end
