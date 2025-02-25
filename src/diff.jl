@@ -410,6 +410,16 @@ end
 # Indicate that no derivative is defined.
 struct NoDeriv
 end
+
+"""
+    Symbolics.derivative(::typeof(f), args::NTuple{N, Any}, ::Val{i})
+
+Return the derivative of `f(args...)` with respect to `args[i]`. `N` should be the number
+of arguments that `f` takes and `i` is the argument with respect to which the derivative
+is taken. The result can be a numeric value (if the derivative is constant) or a symbolic
+expression. This function is useful for defining derivatives of custom functions registered
+via `@register_symbolic`, to be used when calling `expand_derivatives`.
+"""
 derivative(f, args, v) = NoDeriv()
 
 # Pre-defined derivatives
