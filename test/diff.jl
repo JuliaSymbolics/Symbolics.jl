@@ -547,3 +547,18 @@ let
     @test !Symbolics.isaffine(expr, [x, y])
     @test collect(Symbolics.hessian_sparsity(expr, [x, y])) == fill(true, 2, 2)
 end
+
+let
+    @variables x
+    expr = ifelse(x <= 0, -x, x)
+    @test Symbolics.hessian_sparsity(expr, [x]) == [false;;]
+    @test iszero(Symbolics.simplify(only(Symbolics.hessian(expr, [x]))))
+
+    expr = ifelse(x <= 0, -x^2, x^2)
+    @test Symbolics.hessian_sparsity(expr, [x]) == [true;;]
+    @test !iszero(Symbolics.simplify(only(Symbolics.hessian(expr, [x]))))
+
+    expr = ifelse(x <= 0, -x^2, x)
+    @test Symbolics.hessian_sparsity(expr, [x]) == [true;;]
+    @test !iszero(Symbolics.simplify(only(Symbolics.hessian(expr, [x]))))
+end
