@@ -670,6 +670,9 @@ let
           @rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)
 
           @rule ~x::issym => 0
+
+          # Fallback: Unknown functions with other number of arguments have non-zero partial derivatives
+          @rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2
     ]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 
