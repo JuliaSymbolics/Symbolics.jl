@@ -670,6 +670,10 @@ let
           @rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)
 
           @rule ~x::issym => 0
+
+          # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
+          # where condition `cond` is considered constant in differentiation
+          @rule ifelse(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)
     ]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 
