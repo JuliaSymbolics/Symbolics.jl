@@ -563,6 +563,26 @@ let
     @test !iszero(Symbolics.simplify(only(Symbolics.hessian(expr, [x]))))
 end
 
+@testset "`throw_no_derivative`" begin
+    @variables t x(t) y::Bool z(..)
+    D = Differential(t)
+    @register_symbolic f(x)
+
+    for expr in [D(f(x)), D(f(x)) + x^2, ifelse(y, D(f(x)), x^2), D(z(f(x))), z(D(f(x)))]
+        @test_throws Symbolics.DerivativeNotDefinedError expand_derivatives(expr; throw_no_derivative = true)
+        @test_throws Symbolics.DerivativeNotDefinedError Symbolics.derivative(expr, t; throw_no_derivative = true)
+    end
+
+    arr = [f(x) + t, x * t]
+    vars = [x, t]
+    @test_throws Symbolics.DerivativeNotDefinedError Symbolics.derivative(arr, t; throw_no_derivative = true)
+    @test_throws Symbolics.DerivativeNotDefinedError Symbolics.gradient(arr[1], vars; throw_no_derivative = true)
+    @test_throws Symbolics.DerivativeNotDefinedError Symbolics.jacobian(arr, vars; throw_no_derivative = true)
+    @test_throws Symbolics.DerivativeNotDefinedError Symbolics.sparsejacobian(arr, vars; throw_no_derivative = true)
+    @test_throws Symbolics.DerivativeNotDefinedError Symbolics.hessian(arr[1], vars; throw_no_derivative = true)
+    @test_throws Symbolics.DerivativeNotDefinedError Symbolics.sparsehessian(arr[1], vars; throw_no_derivative = true)
+end
+
 # issue #1452
 let
     @variables x y z
