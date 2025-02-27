@@ -95,3 +95,10 @@ end
 @register_symbolic ⊆(x, y)
 
 LinearAlgebra.norm(x::Num, p::Real) = abs(x)
+
+derivative(::typeof(<), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
+derivative(::typeof(<=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
+derivative(::typeof(>), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
+derivative(::typeof(>=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
+derivative(::typeof(==), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
+derivative(::typeof(!=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
