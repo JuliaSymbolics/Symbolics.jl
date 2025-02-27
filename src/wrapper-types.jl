@@ -55,7 +55,7 @@ function wraps_type end
 has_symwrapper(::Type) = false
 is_wrapper_type(::Type) = false
 
-function wrap_func_expr(mod, expr, wrap_arrays = true)
+function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
     @assert expr.head == :function || (expr.head == :(=) &&
                                        expr.args[1] isa Expr &&
                                        expr.args[1].head == :call)
@@ -142,8 +142,19 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
     impl = :(function $impl_name($self, $(names...))
         $body
     end)
-    # TODO: maybe don't drop first lol
-    methods = map(Iterators.drop(Iterators.product(types...), 1)) do Ts
+
+    if isempty(args_list)
+        # TODO: maybe don't drop first lol
+        it = Iterators.drop(Iterators.product(types...), 1)
+    else
+        # sanity check
+        if length(args_list[1]) != length(names)
+            error("args_list must have the same length as the number of arguments")
+        end
+        it = args_list
+    end
+
+    methods = map(it) do Ts
         method_args = map(names, Ts) do n, T
             :($n::$T)
         end
@@ -171,6 +182,6 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
     end |> esc
 end
 
-macro wrapped(expr, wrap_arrays = true)
-    wrap_func_expr(__module__, expr, wrap_arrays)
+macro wrapped(expr, wrap_arrays = true, args_list = [])
+    wrap_func_expr(__module__, expr, wrap_arrays, args_list)
 end
