@@ -71,10 +71,9 @@ This will work for any floating-point input, as well as symbolic input.
 
 ## Symbolic Control Flow
 
-Control flow can be expressed in Symbolics.jl in the following ways:
+Control flow can be expressed in Symbolics.jl in the following way:
 
-- `IfElse.ifelse(cond,x,y)`: this is a dispatch-able version of the `ifelse`
-  function provided by `IfElse.jl` which allows for encoding conditionals in
+- `ifelse(cond,x,y)`: this function allows to encode conditionals in
   the symbolic branches.
 
 ## Inspection Functions

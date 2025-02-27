@@ -187,7 +187,7 @@ function executediff(D, arg, simplify=false; occurrences=nothing)
                 executediff(D, a)
             end
         end
-    elseif op === (IfElse.ifelse)
+    elseif op === ifelse
         args = arguments(arg)
         O = op(args[1], 
             executediff(D, args[2], simplify; occurrences=arguments(occurrences)[2]), 
@@ -295,7 +295,7 @@ julia> Dx = Differential(x) # Differentiate wrt x
 (::Differential) (generic function with 2 methods)
 
 julia> dfx = expand_derivatives(Dx(f))
-(k*((2abs(x - y)) / y - 2z)*IfElse.ifelse(signbit(x - y), -1, 1)) / y
+(k*((2abs(x - y)) / y - 2z)*ifelse(signbit(x - y), -1, 1)) / y
 ```
 """
 function expand_derivatives(O::Symbolic, simplify=false)
@@ -671,7 +671,12 @@ let
 
           @rule ~x::issym => 0
 
-          # Fallback: Unknown functions with other number of arguments have non-zero partial derivatives
+          # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
+          # where condition `cond` is considered constant in differentiation
+          @rule ifelse(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)
+
+          # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
+          # Functions with 1 and 2 arguments are already handled above
           @rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2
     ]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))

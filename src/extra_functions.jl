@@ -38,23 +38,23 @@ derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
 
 @register_symbolic Base.signbit(x)::Bool
 derivative(::typeof(signbit), args::NTuple{1,Any}, ::Val{1}) = 0
-derivative(::typeof(abs), args::NTuple{1,Any}, ::Val{1}) = IfElse.ifelse(signbit(args[1]),-one(args[1]),one(args[1]))
+derivative(::typeof(abs), args::NTuple{1,Any}, ::Val{1}) = ifelse(signbit(args[1]),-one(args[1]),one(args[1]))
 
 function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{1})
     x, y = args
-    IfElse.ifelse(x < y, one(x), zero(x))
+    ifelse(x < y, one(x), zero(x))
 end
 function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{2})
     x, y = args
-    IfElse.ifelse(x < y, zero(y), one(y))
+    ifelse(x < y, zero(y), one(y))
 end
 function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{1})
     x, y = args
-    IfElse.ifelse(x > y, one(x), zero(x))
+    ifelse(x > y, one(x), zero(x))
 end
 function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{2})
     x, y = args
-    IfElse.ifelse(x > y, zero(y), one(y))
+    ifelse(x > y, zero(y), one(y))
 end
 
 @register_symbolic Base.ceil(x)
