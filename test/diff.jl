@@ -582,3 +582,13 @@ end
     @test_throws Symbolics.DerivativeNotDefinedError Symbolics.hessian(arr[1], vars; throw_no_derivative = true)
     @test_throws Symbolics.DerivativeNotDefinedError Symbolics.sparsehessian(arr[1], vars; throw_no_derivative = true)
 end
+
+# issue #1452
+let
+    @variables x y z
+    f(x, y, z) = x * y^2 + z
+    @test Symbolics.hessian_sparsity(f(x, y, z), [x, y, z]) == [false true false; true true false; false false false]
+    g(x, y, z) = x * y^2 + z
+    @register_symbolic g(x, y, z)
+    @test Symbolics.hessian_sparsity(g(x, y, z), [x, y, z]) == fill(true, 3, 3)
+end

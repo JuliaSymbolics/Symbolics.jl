@@ -763,6 +763,10 @@ let
           # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
           # where condition `cond` is considered constant in differentiation
           @rule ifelse(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)
+
+          # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
+          # Functions with 1 and 2 arguments are already handled above
+          @rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2
     ]
     linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 
