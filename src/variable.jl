@@ -516,7 +516,7 @@ end
 SymbolicIndexingInterface.hasname(x::Union{Num,Arr,Complex{Num}}) = hasname(unwrap(x))
 
 function SymbolicIndexingInterface.hasname(x::Symbolic)
-    issym(x) || !iscall(x) || iscall(x) && (issym(operation(x)) || operation(x) == getindex)
+    issym(x) || !iscall(x) || iscall(x) && (issym(operation(x)) || operation(x) == getindex && hasname(arguments(x)[1]))
 end
 
 # This is type piracy, but changing it breaks precompilation for MTK because it relies on this falling back to
