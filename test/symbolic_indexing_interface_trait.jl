@@ -23,3 +23,8 @@ subs2 = merge(subs, Dict(z => 2x+3))
 @test symbolic_evaluate(x, subs) == 0.1
 @test isequal(symbolic_evaluate(y, subs), 2z)
 @test symbolic_evaluate(y, subs2) == 6.4
+
+@testset "`hasname` for `getindex`ed trees" begin
+    @variables x[1:2] y[1:2]
+    @test !Symbolics.hasname((x .+ y)[1])
+end
