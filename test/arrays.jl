@@ -222,7 +222,7 @@ end
 
     @test shape(ex) == shape(x)
 
-    fun_oop, fun_iif = build_function(ex, x, expression=Val{false})
+    fun_oop, fun_iip = build_function(ex, x, expression=Val{false})
     @test fun_oop(x0) == A * x0
 
     # Generate an expression instead and eval it manually
