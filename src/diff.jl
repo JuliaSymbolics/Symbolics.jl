@@ -215,6 +215,8 @@ function executediff(D, arg, simplify=false; occurrences=nothing, throw_no_deriv
                 executediff(D, a; throw_no_derivative)
             end
         end
+    elseif op === getindex
+        return D(arg)
     elseif op === ifelse
         args = arguments(arg)
         O = op(args[1], 
