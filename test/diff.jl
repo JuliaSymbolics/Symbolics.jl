@@ -581,6 +581,9 @@ end
     @test_throws Symbolics.DerivativeNotDefinedError Symbolics.sparsejacobian(arr, vars; throw_no_derivative = true)
     @test_throws Symbolics.DerivativeNotDefinedError Symbolics.hessian(arr[1], vars; throw_no_derivative = true)
     @test_throws Symbolics.DerivativeNotDefinedError Symbolics.sparsehessian(arr[1], vars; throw_no_derivative = true)
+
+    @variables x(t)[1:2]
+    @test isequal(expand_derivatives(D(x[1]); throw_no_derivative = true), D(x[1]))
 end
 
 # issue #1452
