@@ -11,6 +11,7 @@ programming language (Julia). The goal is to have a high-performance and paralle
 symbolic algebra system that is directly extendable in the same language as that of the
 users.
 
+
 ## Installation
 
 To install Symbolics.jl, use the Julia package manager:
