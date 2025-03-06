@@ -63,11 +63,7 @@ Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Symbolic) = iscall(occ) && _isfalse(operation(occ))
 
-SymbolicUtils.@cache function occursin_info(x::BasicSymbolic, expr::BasicSymbolic, fail::Bool = true)::Union{Bool, BasicSymbolic{Real}}
-    _occursin_info(x, expr, fail)
-end
-
-function occursin_info(x, expr, fail = true)
+SymbolicUtils.@cache function occursin_info(x::BasicSymbolic, expr::Any, fail::Bool = true)::Union{Bool, BasicSymbolic{Real}}
     _occursin_info(x, expr, fail)
 end
 
