@@ -63,7 +63,15 @@ Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Symbolic) = iscall(occ) && _isfalse(operation(occ))
 
+SymbolicUtils.@cache function occursin_info(x::BasicSymbolic, expr::BasicSymbolic, fail::Bool = true)::Union{Bool, BasicSymbolic{Real}}
+    _occursin_info(x, expr, fail)
+end
+
 function occursin_info(x, expr, fail = true)
+    _occursin_info(x, expr, fail)
+end
+
+function _occursin_info(x, expr, fail = true)
     if symtype(expr) <: AbstractArray
         if fail
             error("Differentiation with array expressions is not yet supported")
@@ -107,7 +115,7 @@ function occursin_info(x, expr, fail = true)
     end
 end
 
-function occursin_info(x, expr::Sym, fail)
+function _occursin_info(x, expr::Sym, fail)
     if symtype(expr) <: AbstractArray && fail
             error("Differentiation of expressions involving arrays and array variables is not yet supported.")
     end
