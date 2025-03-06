@@ -516,6 +516,7 @@ terms(x) = arguments(x, +)
     factors(x)
 
 Get the factors of the symbolic expression `x`.
+
 Examples
 ========
 ```julia-repl
