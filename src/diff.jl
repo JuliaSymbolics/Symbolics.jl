@@ -220,7 +220,16 @@ function executediff(D, arg, simplify=false; occurrences=nothing, throw_no_deriv
             end
         end
     elseif op === getindex
-        return D(arg)
+        inner_args = arguments(arguments(arg)[1])
+        c = 0
+        for a in inner_args
+            if isequal(a, D.x)
+                return D(arg)
+            else
+                c += Differential(a)(arg) * D(a)
+            end
+        end
+        return expand_derivatives(c)
     elseif op === ifelse
         args = arguments(arg)
         O = op(args[1], 
