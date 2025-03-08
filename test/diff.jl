@@ -595,3 +595,12 @@ let
     @register_symbolic g(x, y, z)
     @test Symbolics.hessian_sparsity(g(x, y, z), [x, y, z]) == fill(true, 3, 3)
 end
+
+# Chain rule for array variables (issue #1383)
+let
+    @variables t x(t) y1(x) y(x)[1:1] Y(x)[1:1,1:1]
+    Dt, Dx = Differential.([t, x])
+    @test isequal(expand_derivatives(Dt(y1)), Dt(x) * Dx(y1)) # scalar
+    @test isequal(expand_derivatives(Dt(y[1])), Dt(x) * Dx(y[1])) # same for vector var
+    @test isequal(expand_derivatives(Dt(Y[1,1])), Dt(x) * Dx(Y[1,1])) # same for matrix arr
+end
