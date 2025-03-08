@@ -2,7 +2,7 @@ using Symbolics
 using SymbolicUtils, Test
 using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, array_term, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
 using Base: Slice
-using SymbolicUtils: Sym, term, operation
+using SymbolicUtils: Sym, term, operation, promote_symtype
 import LinearAlgebra: dot
 import ..limit2
 
@@ -204,7 +204,7 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
     ex = foo(x)
 
     fun_oop, fun_iip = build_function(ex, x, expression=Val{false})
-    @test fun_oop(x0) == A * x0# UndefVarError: foo not defined
+    @test fun_oop(x0) == A * x0
 
     # Generate an expression instead and eval it manually
     fun_ex_oop, fun_ex_iip = build_function(ex, x, expression=Val{true})
@@ -434,4 +434,11 @@ end
     @variables x[1:3] y[1:3]
     sym = unwrap(x + y)
     @test all(splat(isequal), zip(SymbolicUtils.sorted_arguments(sym), [+, x, y]))
+end
+
+@testset "`promote_symtype(getindex, ...)` with array indices" begin
+    @test promote_symtype(getindex, Vector{Real}, Int) == Real
+    @test promote_symtype(getindex, Array{Real}, CartesianIndex, Int) == Real
+    @test promote_symtype(getindex, Vector{Real}, UnitRange{Int}) == AbstractArray{Real}
+    @test promote_symtype(getindex, Array{Real}, Int, Vector{Int}) == AbstractArray{Real}
 end
