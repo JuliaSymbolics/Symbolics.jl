@@ -24,7 +24,7 @@ jobs:
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE, subdir: .}
           - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core, subdir: .}
           - {user: SciML, repo: ModelOrderReduction.jl, group: All, subdir: .}
-          - {user: JuliaDiff, repo: DifferentiationInterface.jl, group: Back/SymbolicBackends, subdir: ./DifferentiationInterface}
+          - {user: JuliaDiff, repo: DifferentiationInterface.jl, group: Back/SymbolicBackends, subdir: DifferentiationInterface}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,12 +39,12 @@ jobs:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
       - name: Load this and run the downstream tests
-        shell: julia --color=yes --project=downstream {0}
+        shell: julia --color=yes --project="downstream/${{ matrix.package.subdir }}" {0}
         run: |
           using Pkg
           try
             # force it to use this PR's version of the package
-            Pkg.develop(PackageSpec(path="${{ matrix.package.subdir }}"))  # resolver may fail with main deps
+            Pkg.develop(PackageSpec(path="."))  # resolver may fail with main deps
             Pkg.update()
             Pkg.test()  # resolver may fail with test time deps
           catch err
