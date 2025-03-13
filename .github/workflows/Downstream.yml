@@ -11,6 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       GROUP: ${{ matrix.package.group }}
+      JULIA_DI_TEST_GROUP: ${{ matrix.package.group }}
     strategy:
       fail-fast: false
       matrix:
@@ -23,6 +24,7 @@ jobs:
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
           - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core}
           - {user: SciML, repo: ModelOrderReduction.jl, group: All}
+          - {user: JuliaDiff, repo: DifferentiationInterface.jl, group: Back/SymbolicBackends}
 
     steps:
       - uses: actions/checkout@v4
