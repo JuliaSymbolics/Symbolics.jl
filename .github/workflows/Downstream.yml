@@ -18,13 +18,13 @@ jobs:
         julia-version: [1]
         os: [ubuntu-latest]
         package:
-          - {user: SciML, repo: ModelingToolkit.jl, group: All}
-          - {user: SciML, repo: Catalyst.jl, group: All}
-          - {user: SciML, repo: CellMLToolkit.jl, group: All}
-          - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
-          - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core}
-          - {user: SciML, repo: ModelOrderReduction.jl, group: All}
-          - {user: JuliaDiff, repo: DifferentiationInterface.jl, group: Back/SymbolicBackends}
+          - {user: SciML, repo: ModelingToolkit.jl, group: All, subdir: .}
+          - {user: SciML, repo: Catalyst.jl, group: All, subdir: .}
+          - {user: SciML, repo: CellMLToolkit.jl, group: All, subdir: .}
+          - {user: SciML, repo: NeuralPDE.jl, group: NNPDE, subdir: .}
+          - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core, subdir: .}
+          - {user: SciML, repo: ModelOrderReduction.jl, group: All, subdir: .}
+          - {user: JuliaDiff, repo: DifferentiationInterface.jl, group: Back/SymbolicBackends, subdir: DifferentiationInterface}
 
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
           using Pkg
           try
             # force it to use this PR's version of the package
-            Pkg.develop(PackageSpec(path="."))  # resolver may fail with main deps
+            Pkg.develop(PackageSpec(path="${{ matrix.package.subdir }}"))  # resolver may fail with main deps
             Pkg.update()
             Pkg.test()  # resolver may fail with test time deps
           catch err
