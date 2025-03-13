@@ -24,7 +24,7 @@ jobs:
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE, subdir: .}
           - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core, subdir: .}
           - {user: SciML, repo: ModelOrderReduction.jl, group: All, subdir: .}
-          - {user: JuliaDiff, repo: DifferentiationInterface.jl, group: Back/SymbolicBackends, subdir: DifferentiationInterface}
+          - {user: JuliaDiff, repo: DifferentiationInterface.jl, group: Back/SymbolicBackends, subdir: ./DifferentiationInterface}
 
     steps:
       - uses: actions/checkout@v4
