@@ -11,20 +11,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       GROUP: ${{ matrix.package.group }}
-      JULIA_DI_TEST_GROUP: ${{ matrix.package.group }}
     strategy:
       fail-fast: false
       matrix:
         julia-version: [1]
         os: [ubuntu-latest]
         package:
-          - {user: SciML, repo: ModelingToolkit.jl, group: All, subdir: .}
-          - {user: SciML, repo: Catalyst.jl, group: All, subdir: .}
-          - {user: SciML, repo: CellMLToolkit.jl, group: All, subdir: .}
-          - {user: SciML, repo: NeuralPDE.jl, group: NNPDE, subdir: .}
-          - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core, subdir: .}
-          - {user: SciML, repo: ModelOrderReduction.jl, group: All, subdir: .}
-          - {user: JuliaDiff, repo: DifferentiationInterface.jl, group: Back/SymbolicBackends, subdir: DifferentiationInterface}
+          - {user: SciML, repo: ModelingToolkit.jl, group: All}
+          - {user: SciML, repo: Catalyst.jl, group: All}
+          - {user: SciML, repo: CellMLToolkit.jl, group: All}
+          - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
+          - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core}
+          - {user: SciML, repo: ModelOrderReduction.jl, group: All}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +37,7 @@ jobs:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
       - name: Load this and run the downstream tests
-        shell: "julia --color=yes --project=\"downstream/${{ matrix.package.subdir }}\" {0}"
+        shell: julia --color=yes --project=downstream {0}
         run: |
           using Pkg
           try
