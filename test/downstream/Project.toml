@@ -1,4 +1,7 @@
 [deps]
+ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+DifferentiationInterfaceTest = "a82114a7-5aa3-49a8-9643-716bb13727a3"
 DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
@@ -7,6 +10,7 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
+DifferentiationInterface = "0.6"
 KernelAbstractions = "0.9"
 ModelingToolkit = "8.33, 9"
 ParameterizedFunctions = "5.15"
