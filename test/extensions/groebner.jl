@@ -72,7 +72,7 @@ truebasis = [
     x3^3 + x3^2 * x4 + x3 * x4^2 + x4^3,
     x4^4 - N
 ]
-basis = groebner_basis(system)
+basis = expand.(groebner_basis(system))
 @test_broken isequal(expand.(basis), truebasis)
 @test Symbolics.is_groebner_basis(basis)
 
