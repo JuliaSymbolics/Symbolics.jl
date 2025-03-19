@@ -116,10 +116,11 @@ function bigify(n)
 
     if n isa SymbolicUtils.BasicSymbolic
         !iscall(n) && return n
-        args = arguments(n)
+        args = copy(parent(arguments(n)))
         for i in eachindex(args)
             args[i] = bigify(args[i])
         end
+        n = maketerm(typeof(n), operation(n), args, metadata(n))
         return n
     end
 

@@ -33,7 +33,12 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             for i in eachindex(lhs_roots)
                 for j in eachindex(rhs)
                     if iscall(lhs_roots[i]) && operation(lhs_roots[i]) == RootsOf
-                        lhs_roots[i].arguments[1] = substitute(lhs_roots[i].arguments[1], Dict(new_var=>rhs[j]), fold=false)
+                        _args = copy(parent(arguments(lhs_roots[i])))
+                        _args[1] = substitute(_args[1], Dict(new_var => rhs[j]), fold = false)
+                        T = typeof(lhs_roots[i])
+                        _op = operation(lhs_roots[i])
+                        _meta = metadata(lhs_roots[i])
+                        lhs_roots[i] = maketerm(T, _op, _args, _meta)
                         push!(roots, lhs_roots[i])
                     else
                         push!(roots, substitute(lhs_roots[i], Dict(new_var=>rhs[j]), fold=false))
@@ -86,8 +91,9 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             end
 
         elseif oper === (^)
-            if any(isequal(x, var) for x in get_variables(args[1])) &&
-               n_occurrences(args[2], var) == 0 && args[2] isa Integer
+            var_in_base = any(isequal(x, var) for x in get_variables(args[1]))
+            var_in_pow = n_occurrences(args[2], var) != 0
+            if var_in_base && !var_in_pow && args[2] isa Integer
                 lhs = args[1]
                 power = args[2]
                 new_roots = []
@@ -111,11 +117,10 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                 end
                 rhs = []
                 append!(rhs, new_roots)
-            elseif any(isequal(x, var) for x in get_variables(args[1])) &&
-                   n_occurrences(args[2], var) == 0
+            elseif var_in_base && !var_in_pow
                 lhs = args[1]
-                s, args[2] = filter_stuff(args[2])
-                rhs = map(sol -> term(^, sol, 1 // args[2]), rhs)
+                s, power = filter_stuff(args[2])
+                rhs = map(sol -> term(^, sol, 1 // power), rhs)
             else
                 lhs = args[2]
                 rhs = map(sol -> term(/, term(slog, sol), term(slog, args[1])), rhs)
