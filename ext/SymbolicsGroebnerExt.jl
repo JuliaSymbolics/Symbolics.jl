@@ -3,7 +3,7 @@ module SymbolicsGroebnerExt
 using Groebner
 const Nemo = Groebner.Nemo
 using Symbolics
-using Symbolics: Num, symtype
+using Symbolics: Num, symtype, BasicSymbolic
 import Symbolics.PrecompileTools
 
 """
@@ -68,7 +68,7 @@ julia> @variables x y;
 julia> is_groebner_basis([x^2 - y^2, x*y^2 + x, y^3 + y])
 ```
 """
-function Symbolics.is_groebner_basis(polynomials::Vector{Num}; kwargs...)
+function Symbolics.is_groebner_basis(polynomials::Vector{<:Union{Num, BasicSymbolic{<:Number}}}; kwargs...)
     polynoms, _, _ = Symbolics.symbol_to_poly(polynomials)
     Groebner.isgroebner(polynoms; kwargs...)
 end
