@@ -216,7 +216,7 @@ function _toexpr(O)
         while num isa Term && num.f isa Differential
             deg += 1
             den *= num.f.x
-            num = num.arguments[1]
+            num = first(arguments(num))
         end
         return :(_derivative($(_toexpr(num)), $den, $deg))
     elseif op isa Integral

@@ -116,7 +116,7 @@ function _filter_poly(expr, var)
         return filter_stuff(expr)
     end
 
-    args = arguments(expr)
+    args = copy(parent(arguments(expr)))
     if expr isa ComplexTerm
         subs1, subs2 = Dict(), Dict()
         expr1, expr2 = 0, 0
@@ -165,7 +165,7 @@ function _filter_poly(expr, var)
         end
 
         oper = operation(arg)
-        monomial = arguments(arg)
+        monomial = copy(parent(arguments(arg)))
         if oper === (^)
             if any(arg -> isequal(arg, var), monomial)
                 continue
@@ -175,6 +175,7 @@ function _filter_poly(expr, var)
             subs2, monomial[2] = _filter_poly(monomial[2], var)
 
             merge!(subs, merge(subs1, subs2))
+            args[i] = maketerm(typeof(arg), oper, monomial, metadata(arg))
             continue
         end
 
@@ -196,6 +197,7 @@ function _filter_poly(expr, var)
                 merge!(subs_of_monom, new_subs)
             end
             merge!(subs, subs_of_monom)
+            args[i] = maketerm(typeof(arg), oper, monomial, metadata(arg))
             continue
         end
 
@@ -208,9 +210,9 @@ function _filter_poly(expr, var)
         end
     end
 
-    args = map(unwrap, arguments(expr))
+    args = map(unwrap, args)
     oper = operation(expr)
-    expr = term(oper, args...)
+    expr = maketerm(typeof(expr), oper, args, metadata(expr))
     return subs, expr
 end
 
