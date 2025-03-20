@@ -417,3 +417,14 @@ let
     v2 = only(@variables X([v for v in [args3; [v, w]]]...))
     @test isequal(v1, v2)
 end
+
+@testset "Unwrap defaults and other metadata" begin
+    @variables a b[1:2]
+    @variables x = a [foo = 1 + a]
+    @variables y = b [foo = [a, b[1]]]
+
+    @test getdefaultval(x) isa BasicSymbolic
+    @test Symbolics.getmetadata(unwrap(x), VariableFoo, nothing) isa BasicSymbolic
+    @test getdefaultval(y) isa BasicSymbolic
+    @test Symbolics.getmetadata(unwrap(y), VariableFoo, nothing) isa Vector{<:BasicSymbolic}
+end
