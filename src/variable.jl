@@ -29,6 +29,10 @@ function recurse_and_apply(f, x)
 end
 
 function set_scalar_metadata(x, V, val)
+    val = unwrap(val)
+    if val isa AbstractArray
+        val = unwrap.(val)
+    end
     if symtype(x) <: AbstractArray
         x = if val isa AbstractArray
             getindex_posthook(x) do r,x,i...
