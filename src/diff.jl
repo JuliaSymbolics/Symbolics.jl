@@ -370,9 +370,15 @@ function expand_derivatives(O::Symbolic, simplify=false; throw_no_derivative=fal
         return simplify ? SymbolicUtils.simplify(O1) : O1
     end
 end
+
+using SymbolicUtils: walk
+
 function expand_derivatives(n::Num, simplify=false; kwargs...)
-    wrap(expand_derivatives(value(n), simplify; kwargs...))
+    n = walk(x -> x isa Float64 ? Rational(x) : x, value(n))
+    wrap(expand_derivatives(n, simplify; kwargs...))
 end
+
+
 function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
     wrap(ComplexTerm{Real}(expand_derivatives(real(n), simplify; kwargs...),
                            expand_derivatives(imag(n), simplify; kwargs...)))

@@ -97,3 +97,4 @@ if GROUP == "All" || GROUP == "SymPy"
     activate_sympy_env()
     @safetestset "SymPy Test" begin include("sympy.jl") end
 end
+include("test_expand_derivatives.jl")
