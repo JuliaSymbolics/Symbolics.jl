@@ -792,7 +792,7 @@ function ArrayMaker(a::ArrayLike; eltype=eltype(a))
 end
 
 function arraymaker(T, shape, views, seq...)
-    ArrayMaker{T}(shape, [(views .=> seq)...], nothing)
+    ArrayMaker{T}(shape, [(views .=> seq)...])
 end
 
 iscall(x::ArrayMaker) = true
@@ -1001,47 +1001,53 @@ end
 function _array_toexpr(x, st)
     outsym = Symbol("_out")
     N = length(shape(x))
-    ex = :(let $outsym = zeros(Float64, map(length, ($(shape(x)...),)))
-          $(inplace_expr(x, outsym))
-          $outsym
-      end) |> LiteralExpr
+    ex = Let(
+        [
+            Assignment(outsym, term(zeros, Float64, term(map, length, shape(x)))),
+            Assignment(gensym(), inplace_expr(x, outsym))
+        ], outsym, true)
+
     toexpr(ex, st)
 end
 
-function inplace_expr(x, out_array, dict=nothing)
+"""
+    $(TYPEDSIGNATURES)
+
+Utility to represent `dst .= src` as a function call.
+"""
+function broadcast_assign!(dst, src)
+    dst .= src
+end
+
+function inplace_expr(x, out_array)
     x = unwrap(x)
     if symtype(x) <: Number
-        :($out_array .= $x)
+        return term(broadcast_assign!, out_array, x)
     else
-        :($copy!($out_array, $x))
+        return term(copy!, out_array, x)
     end
 end
 
-function inplace_expr(x::ArrayMaker, out, dict=Dict())
-    ex = []
-
-    intermediates = Dict()
+function inplace_expr(x::ArrayMaker, out)
+    steps = Assignment[]
     for (i, (vw, op)) in enumerate(x.sequence)
         out′ = Symbol(out, "_", i)
-        push!(ex, :($out′ = $view($out, $(vw...))))
-        push!(ex, inplace_expr(unwrap(op), out′, intermediates))
+        push!(steps, Assignment(out′, term(view, out, vw...)))
+        push!(steps, Assignment(gensym(), inplace_expr(unwrap(op), out′)))
     end
 
-    Expr(:block, (:($sym = $ex) for (ex, sym) in  intermediates)..., ex...)
+    return Let(steps, nothing, false)
 end
 
-function inplace_expr(x::AbstractArray, out, intermediates=Dict())
-    # TODO: extract more intermediates
-    :(begin
-          $([:($out[$(Tuple(idx)...)] = $(substitute(x, intermediates)[Tuple(idx)...])) for idx in eachindex(x)]...)
-      end)
+function inplace_expr(x::AbstractArray, out)
+    return SetArray(false, out, x, true)
 end
 
 function inplace_builtin(term, outsym)
     isarr(n) = x->symtype(x) <: AbstractArray{<:Any, n}
     if iscall(term) && operation(term) == (*) && length(arguments(term)) == 2
         A, B = arguments(term)
-        isarr(2)(A) && (isarr(1)(B) || isarr(2)(B)) && return :($mul!($outsym, $A, $B))
+        isarr(2)(A) && (isarr(1)(B) || isarr(2)(B)) && return term(mul!, outsym, A, B)
     end
     return nothing
 end
@@ -1072,7 +1078,7 @@ function reset_sym(i)
     Sym{Int}(Symbol(nameof(i), "′"))
 end
 
-function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
+function inplace_expr(x::ArrayOp, outsym = :_out)
     if x.term !== nothing
         ex = inplace_builtin(x.term, outsym)
         if ex !== nothing
@@ -1081,49 +1087,19 @@ function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
     end
 
     rs = copy(ranges(x))
-
-    inters = filter(!issym, get_inputs(x))
-    intermediate_exprs = map(enumerate(inters)) do (i, ex)
-        if !isnothing(intermediates)
-            if haskey(intermediates, ex)
-                return ex => intermediates[ex]
-            else
-                sym = similar_arrayvar(ex, Symbol(outsym, :_input_, i))
-                intermediates[ex] = sym
-                return ex => sym
-            end
-        else
-            return ex => similar_arrayvar(ex, Symbol(outsym, :_input_, i))
-        end
-    end
-
     loops = best_order(x.output_idx, keys(rs), rs)
-
-    expr = substitute(unwrap(x.expr), Dict(intermediate_exprs))
+    expr = unwrap(x.expr)
 
     out_idxs = map(reset_sym, x.output_idx)
-    inner_expr = :($outsym[$(out_idxs...)] = $(x.reduce)($outsym[$(out_idxs...)], $(expr)))
+    inner_expr = SetArray(false, outsym, [AtIndex(term(CartesianIndex, out_idxs...), term(x.reduce, term(getindex, outsym, out_idxs...), expr))])
 
-
-    loops = foldl(reverse(loops), init=inner_expr) do acc, k
+    return foldl(reverse(loops), init=inner_expr) do acc, k
         if any(isequal(k), x.output_idx)
-            :(for ($k, $(reset_sym(k))) in zip($(get_extents(rs[k])),
-                                               reset_to_one($(get_extents(rs[k]))))
-                  $acc
-              end)
+            loopvar = gensym()
+            ForLoop(loopvar, term(zip, get_extents(rs[k]), term(reset_to_one, get_extents(rs[k]))), Let([DestructuredArgs([k, reset_sym(k)], loopvar)], acc, false))
         else
-            :(for $k in $(get_extents(rs[k]))
-                  $acc
-              end)
+            ForLoop(k, get_extents(rs[k]), acc)
         end
-    end
-
-    if intermediates === nothing
-        # output the intermediate generation
-        :($(map(x->:($(x[2]) = $(x[1])), intermediate_exprs)...);
-          $loops) |> SymbolicUtils.Code.LiteralExpr
-    else
-        SymbolicUtils.Code.LiteralExpr(loops)
     end
 end
 
