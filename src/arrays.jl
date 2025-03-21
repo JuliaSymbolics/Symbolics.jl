@@ -1019,7 +1019,7 @@ function broadcast_assign!(dst, src)
     dst .= src
 end
 
-function inplace_expr(x, out_array)
+function inplace_expr(x, out_array, intermediates = nothing)
     x = unwrap(x)
     if symtype(x) <: Number
         return term(broadcast_assign!, out_array, x)
@@ -1028,19 +1028,30 @@ function inplace_expr(x, out_array)
     end
 end
 
-function inplace_expr(x::ArrayMaker, out)
+function inplace_expr(x::ArrayMaker, out, intermediates = nothing)
     steps = Assignment[]
+
+    _intermediates = something(intermediates, Dict())
     for (i, (vw, op)) in enumerate(x.sequence)
         out′ = Symbol(out, "_", i)
         push!(steps, Assignment(out′, term(view, out, vw...)))
-        push!(steps, Assignment(gensym(), inplace_expr(unwrap(op), out′)))
+        push!(steps, Assignment(gensym(), inplace_expr(unwrap(op), out′, _intermediates)))
     end
 
-    return Let(steps, nothing, false)
+    expr = Let(steps, nothing, false)
+    if intermediates === nothing && !isempty(_intermediates)
+        steps = [map(k -> Assignment(_intermediates[k], k), collect(keys(_intermediates))); steps]
+        expr = Let(steps, nothing, false)
+    end
+    return expr
 end
 
-function inplace_expr(x::AbstractArray, out)
-    return SetArray(false, out, x, true)
+function inplace_expr(x::AbstractArray, out, intermediates = nothing)
+    expr = SetArray(false, out, x, true)
+    if intermediates !== nothing
+        expr = Let(map(k -> Assignment(intermediates[k], k), collect(keys(intermediates))), expr, false)
+    end
+    return expr
 end
 
 function inplace_builtin(term, outsym)
@@ -1078,7 +1089,7 @@ function reset_sym(i)
     Sym{Int}(Symbol(nameof(i), "′"))
 end
 
-function inplace_expr(x::ArrayOp, outsym = :_out)
+function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
     if x.term !== nothing
         ex = inplace_builtin(x.term, outsym)
         if ex !== nothing
@@ -1086,14 +1097,30 @@ function inplace_expr(x::ArrayOp, outsym = :_out)
         end
     end
 
+    inters = filter(!issym, get_inputs(x))
+    intermediate_exprs = map(enumerate(inters)) do (i, ex)
+        if intermediates !== nothing
+            if haskey(intermediates, ex)
+                return ex => intermediates[ex]
+            else
+                sym = similar_arrayvar(ex, Symbol(outsym, :_input_, i))
+                intermediates[ex] = sym
+                return ex => sym
+            end
+        else
+            return ex => similar_arrayvar(ex, Symbol(outsym, :_input_, i))
+        end
+    end
+
+
     rs = copy(ranges(x))
     loops = best_order(x.output_idx, keys(rs), rs)
-    expr = unwrap(x.expr)
+    expr = substitute(unwrap(x.expr), Dict(intermediate_exprs))
 
     out_idxs = map(reset_sym, x.output_idx)
     inner_expr = SetArray(false, outsym, [AtIndex(term(CartesianIndex, out_idxs...), term(x.reduce, term(getindex, outsym, out_idxs...), expr))])
 
-    return foldl(reverse(loops), init=inner_expr) do acc, k
+    loops = foldl(reverse(loops), init=inner_expr) do acc, k
         if any(isequal(k), x.output_idx)
             loopvar = gensym()
             ForLoop(loopvar, term(zip, get_extents(rs[k]), term(reset_to_one, get_extents(rs[k]))), Let([DestructuredArgs([k, reset_sym(k)], loopvar)], acc, false))
@@ -1101,6 +1128,11 @@ function inplace_expr(x::ArrayOp, outsym = :_out)
             ForLoop(k, get_extents(rs[k]), acc)
         end
     end
+
+    if intermediates === nothing && !isempty(intermediate_exprs)
+        return Let(map(x -> Assignment(x[2], x[1]), intermediate_exprs), loops, false)
+    end
+    return loops
 end
 
 
