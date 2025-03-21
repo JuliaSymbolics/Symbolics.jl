@@ -96,6 +96,12 @@ function destructure_arg(arg::Union{AbstractArray, Tuple,NamedTuple}, inbounds, 
 end
 destructure_arg(arg, _, _) = unwrap_nometa(arg)
 
+function default_arg_name(i)
+    Symbol("ˍ₋arg$(i)")
+end
+
+const DEFAULT_OUTSYM = Symbol("ˍ₋out")
+
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
                          expression = Val{true},
@@ -108,17 +114,16 @@ function _build_function(target::JuliaTarget, op, args...;
                          nanmath = true,
                          kwargs...)
 
-  states.rewrites[:nanmath] = nanmath
-  dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = if cse
-        fun = Func(dargs, [], Code.cse(unwrap(op)))
-        (wrap_code !== nothing) && (fun = wrap_code(fun))
-        conv(fun, states)
-    else
-        fun = Func(dargs, [], op)
-        (wrap_code !== nothing) && (fun = wrap_code(fun))
-        conv(fun, states)
+    states.rewrites[:nanmath] = nanmath
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
+    fun = Func(dargs, [], unwrap(op))
+    if wrap_code !== nothing
+        fun = wrap_code(fun)
     end
+    if cse
+        fun = Code.cse(fun)
+    end
+    expr = conv(fun, states)
     if !checkbounds
         @assert Meta.isexpr(expr, :function)
         expr.args[2] = :(@inbounds begin; $(expr.args[2]); end)
@@ -129,6 +134,8 @@ function _build_function(target::JuliaTarget, op, args...;
         _build_and_inject_function(expression_module, expr)
     end
 end
+
+const UNIMPLEMENTED_EXPR = :(function (args...); $throw_missing_specialization(length(args)); end)
 
 SymbolicUtils.Code.get_rewrites(x::Arr) = SymbolicUtils.Code.get_rewrites(unwrap(x))
 
@@ -142,33 +149,33 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUt
                          cse = false,
                          nanmath = true,
                          wrap_code = (identity, identity),
+                         iip_config = (true, true),
                          kwargs...)
 
-    dargs = map((x) -> destructure_arg(x[2], !checkbounds,
-                                  Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
     states.rewrites[:nanmath] = nanmath
-    expr = if cse
-        conv(Func(dargs, [], Code.cse(unwrap(op))), states)
+    if iip_config[1]
+        oop_expr = wrap_code[1](Func(dargs, [], unwrap(op)))
     else
-        conv(Func(dargs, [], op), states)
+        oop_expr = UNIMPLEMENTED_EXPR
     end
 
-    outsym = Symbol("ˍ₋out")
+    outsym = DEFAULT_OUTSYM
     body = inplace_expr(unwrap(op), outsym)
-    iip_expr = conv(wrap_code[2](Func([outsym, dargs...], [], body)), states)
-
-    N = length(shape(op))
-    op = unwrap(op)
-    if op isa ArrayOp && iscall(op.term)
-        op_body = op.term
+    if iip_config[2]
+        iip_expr = wrap_code[2](Func(vcat(outsym, dargs), [], body))
     else
-        op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
-                   $body
-              $outsym
-          end) |> LiteralExpr
+        iip_expr = UNIMPLEMENTED_EXPR
     end
-    oop_expr = conv(wrap_code[1](Func(dargs, [], op_body)), states)
+
+    if cse
+        oop_expr = Code.cse(oop_expr)
+        iip_expr = Code.cse(iip_expr)
+    end
+
+    oop_expr = conv(oop_expr, states)
+    iip_expr = conv(iip_expr, states)
+
     if !checkbounds
         @assert Meta.isexpr(oop_expr, :function)
         oop_expr.args[2] = :(@inbounds begin; $(oop_expr.args[2]); end)
@@ -310,48 +317,51 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 
     oop, iip = iip_config
-    oop_body = if oop
-        postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse))
+    if oop
+        oop_expr = Func(dargs, [], postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
+        if wrap_code[1] !== nothing
+            oop_expr = wrap_code[1](oop_expr)
+        end
     else
-        term(throw_missing_specialization, length(dargs))
-    end
-    oop_expr = Func(dargs, [], oop_body)
-
-    if !isnothing(wrap_code[1])
-        oop_expr = wrap_code[1](oop_expr)
+        oop_expr = UNIMPLEMENTED_EXPR
     end
 
-    out = Sym{Any}(:ˍ₋out)
-    ip_body = if iip
-        postprocess_fbody(set_array(parallel,
+
+    if iip
+        out = Sym{Any}(DEFAULT_OUTSYM)
+        iip_expr = Func(vcat(out, dargs), [], postprocess_fbody(set_array(parallel,
                                     dargs,
                                     out,
                                     outputidxs,
                                     rhss,
                                     checkbounds,
-                                    skipzeros,
-                                    cse,))
+                                    skipzeros)))
+        if wrap_code[2] !== nothing
+            iip_expr = wrap_code[2](iip_expr)
+        end
     else
-        term(throw_missing_specialization, length(dargs) + 1)
-    end
-    ip_expr = Func([out, dargs...], [], ip_body)
-
-    if !isnothing(wrap_code[2])
-        ip_expr = wrap_code[2](ip_expr)
+        iip_expr = UNIMPLEMENTED_EXPR
     end
 
-    oop_expr, ip_expr = conv(oop_expr, states), conv(ip_expr, states)
+    if cse
+        oop_expr = Code.cse(oop_expr)
+        iip_expr = Code.cse(iip_expr)
+    end
+
+    oop_expr = conv(oop_expr, states)
+    iip_expr = conv(iip_expr, states)
+
     if !checkbounds
         @assert Meta.isexpr(oop_expr, :function)
         oop_expr.args[2] = :(@inbounds begin; $(oop_expr.args[2]); end)
-        @assert Meta.isexpr(ip_expr, :function)
-        ip_expr.args[2] = :(@inbounds begin; $(ip_expr.args[2]); end)
+        @assert Meta.isexpr(iip_expr, :function)
+        iip_expr.args[2] = :(@inbounds begin; $(iip_expr.args[2]); end)
     end
     if expression == Val{true}
-        return oop_expr, ip_expr
+        return oop_expr, iip_expr
     else
         return _build_and_inject_function(expression_module, oop_expr),
-        _build_and_inject_function(expression_module, ip_expr)
+        _build_and_inject_function(expression_module, iip_expr)
     end
 end
 
@@ -359,33 +369,23 @@ _nnz(x::AbstractArray) = length(x)
 _nnz(x::AbstractSparseArray) = nnz(x)
 _nnz(x::Union{Base.ReshapedArray, LinearAlgebra.Transpose}) = _nnz(parent(x))
 
-function make_array(s, dargs, arr, similarto, cse)
+function make_array(s, dargs, arr, similarto)
     s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
-    _make_array(arr, similarto, cse)
+    _make_array(arr, similarto)
 end
 
-function make_array(s::SerialForm, dargs, arr, similarto, cse)
-    _make_array(arr, similarto, cse)
+function make_array(s::SerialForm, dargs, arr, similarto)
+    _make_array(arr, similarto)
 end
 
-function make_array(s::ShardedForm, closed_args, arr, similarto, cse)
+function make_array(s::ShardedForm, closed_args, arr, similarto)
     if arr isa AbstractSparseArray
-
-        return LiteralExpr(quote
-                               $SparseMatrixCSC($(arr.m),
-                                               $(arr.n),
-                                               copy($(arr.colptr)),
-                                               copy($(arr.rowval)),
-                                               $(make_array(s,
-                                                            closed_args,
-                                                            arr.nzval,
-                                                            Vector,cse)))
-                           end)
+        return term(SparseMatrixCSC, arr.m, arr.n, copy(arr.colptr), copy(arr.rowval), make_array(s, closed_args, arr.nzval, Vector))
     end
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
-        Func(closed_args, [], _make_array(slice, similarto, cse)), closed_args
+        Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
     SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
 end
@@ -452,34 +452,34 @@ nzmap(f, x) = map(f, x)
 _issparse(x::AbstractArray) = issparse(x)
 _issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
 
-function _make_sparse_array(arr, similarto, cse)
+function setparent(arr, val)
+    Setfield.@set arr.parent = val
+end
+
+function set_nzval(arr, val)
+    Setfield.@set arr.nzval = val
+end
+
+function _make_sparse_array(arr, similarto)
     if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
-        LiteralExpr(quote
-            $Setfield.@set $(nzmap(x->true, arr)).parent =
-                $(_make_array(parent(arr), typeof(parent(arr)), cse))
-            end)
+        newarr = _make_array(parent(arr), typeof(parent(arr)))
+        return term(setparent, nzmap(Returns(true), arr), newarr)
     else
-        LiteralExpr(quote
-                        let __reference = copy($(nzmap(x->true, arr)))
-                            $Setfield.@set __reference.nzval =
-                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}, cse))
-                        end
-                    end)
+        newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))})
+        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), true)
     end
 end
 
-function _make_array(rhss::AbstractArray, similarto, cse)
-    arr = nzmap(x->_make_array(x, similarto, cse), rhss)
+function _make_array(rhss::AbstractArray, similarto)
+    arr = nzmap(x->_make_array(x, similarto), rhss)
     if _issparse(arr)
-        _make_sparse_array(arr, similarto, cse)
-    elseif cse
-        Code.cse(MakeArray(unwrap.(arr), similarto))
+        _make_sparse_array(arr, similarto)
     else
         MakeArray(arr, similarto)
     end
 end
 
-_make_array(x, similarto, cse) = x
+_make_array(x, similarto) = x
 
 ## In-place version
 
@@ -509,7 +509,7 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
     end
 end
 
-function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros, cse)
+function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
         return set_array(s,
                          closed_args,
@@ -517,8 +517,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
                          nothing,
                          rhss.nzval,
                          checkbounds,
-                         skipzeros,
-                         cse)
+                         skipzeros)
     end
 
     outvar = !(out isa Sym) ? gensym("out") : out
@@ -529,7 +528,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     all_args = [outvar, closed_args...]
     ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
         Func(all_args, [],
-             _set_array(outvar, idxs, xs, checkbounds, skipzeros, cse),
+             _set_array(outvar, idxs, xs, checkbounds, skipzeros),
              [])
     end.body
 
@@ -539,33 +538,26 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     end)
 end
 
-function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros, cse)
-    _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros, cse)
+function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
+    Let([Assignment(gensym(), _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros))], out)
 end
 
-function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros, cse)
+function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
-    # sometimes outputidxs is a Tuple
-    ii = findall(i->!(rhss[i] isa AbstractArray) && !(skipzeros && _iszero(rhss[i])), eachindex(outputidxs))
-    jj = findall(i->rhss[i] isa AbstractArray, eachindex(outputidxs))
-    exprs = []
-    setterexpr = SetArray(!checkbounds,
-                          out,
-                          [AtIndex(outputidxs[i],
-                                   rhss[i])
-                           for i in ii])
-    cse ? push!(exprs, Code.cse(setterexpr)) : push!(exprs, setterexpr)
-    for j in jj
-        push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros, cse))
+    indexes = AtIndex[]
+    for (i, outi) in enumerate(outputidxs)
+        if !(rhss[i] isa AbstractArray) && !(skipzeros && _iszero(rhss[i]))
+            push!(indexes, AtIndex(outi, rhss[i]))
+        elseif rhss[i] isa AbstractArray
+            push!(indexes, AtIndex(outi, _set_array(LiteralExpr(:($out[$outi])), nothing, rhss[outi], checkbounds, skipzeros)))
+        end
     end
-    LiteralExpr(quote
-                    $(exprs...)
-                end)
+    return SetArray(!checkbounds, out, indexes, true)
 end
 
-_set_array(out, outputidxs, rhs, checkbounds, skipzeros, cse) = rhs
+_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = rhs
 
 
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())
