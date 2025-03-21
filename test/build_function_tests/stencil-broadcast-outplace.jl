@@ -1,16 +1,27 @@
 :(function (x,)
-      let ˍ₋out = zeros(Float64, map(length, (1:6, 1:6)))
-          begin
-              ˍ₋out_2_input_1 = (broadcast)(+, x, (adjoint)(x))
-              ˍ₋out_1 = (view)(ˍ₋out, 1:6, 1:6)
-              ˍ₋out_1 .= 0
-              ˍ₋out_2 = (view)(ˍ₋out, 2:5, 2:5)
-              for (j, j′) = zip(Base.OneTo(4), reset_to_one(Base.OneTo(4)))
-                  for (i, i′) = zip(Base.OneTo(4), reset_to_one(Base.OneTo(4)))
-                      ˍ₋out_2[i′, j′] = (+)(ˍ₋out_2[i′, j′], (+)(1, (getindex)(ˍ₋out_2_input_1, i, j)))
-                  end
+      let _out = (zeros)(Float64, (map)(length, (1:6, 1:6))), var"##334" = begin
+                  _out_2_input_1 = (broadcast)(+, x, (adjoint)(x))
+                  _out_1 = (view)(_out, 1:6, 1:6)
+                  var"##335" = (Symbolics.broadcast_assign!)(_out_1, 0)
+                  _out_2 = (view)(_out, 2:5, 2:5)
+                  var"##336" = for var"##338" = (zip)(Base.OneTo(4), (Symbolics.reset_to_one)(Base.OneTo(4)))
+                          begin
+                              j = var"##338"[1]
+                              j′ = var"##338"[2]
+                              for var"##337" = (zip)(Base.OneTo(4), (Symbolics.reset_to_one)(Base.OneTo(4)))
+                                  begin
+                                      i = var"##337"[1]
+                                      i′ = var"##337"[2]
+                                      begin
+                                          _out_2[(CartesianIndex)(i′, j′)] = (+)((getindex)(_out_2, i′, j′), (+)(1, (getindex)(_out_2_input_1, i, j)))
+                                          nothing
+                                      end
+                                  end
+                              end
+                          end
+                      end
+                  nothing
               end
-          end
-          ˍ₋out
+          _out
       end
   end)

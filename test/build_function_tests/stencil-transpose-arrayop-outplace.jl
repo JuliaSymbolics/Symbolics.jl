@@ -1,13 +1,24 @@
 :(function (x,)
-      let ˍ₋out = zeros(Float64, map(length, (1:6, 1:6)))
-          begin
-              ˍ₋out_1 = (view)(ˍ₋out, 2:5, 2:5)
-              for (j, j′) = zip(1:4, reset_to_one(1:4))
-                  for (i, i′) = zip(1:4, reset_to_one(1:4))
-                      ˍ₋out_1[i′, j′] = (+)(ˍ₋out_1[i′, j′], (getindex)(x, j, i))
-                  end
+      let _out = (zeros)(Float64, (map)(length, (1:6, 1:6))), var"##326" = begin
+                  _out_1 = (view)(_out, 2:5, 2:5)
+                  var"##327" = for var"##329" = (zip)(1:4, (Symbolics.reset_to_one)(1:4))
+                          begin
+                              j = var"##329"[1]
+                              j′ = var"##329"[2]
+                              for var"##328" = (zip)(1:4, (Symbolics.reset_to_one)(1:4))
+                                  begin
+                                      i = var"##328"[1]
+                                      i′ = var"##328"[2]
+                                      begin
+                                          _out_1[(CartesianIndex)(i′, j′)] = (+)((getindex)(_out_1, i′, j′), (getindex)(x, j, i))
+                                          nothing
+                                      end
+                                  end
+                              end
+                          end
+                      end
+                  nothing
               end
-          end
-          ˍ₋out
+          _out
       end
   end)
