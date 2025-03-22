@@ -1,5 +1,7 @@
 :(function (x,)
-      let _out = (zeros)(Float64, (map)(length, (Base.OneTo(4), Base.OneTo(4)))), var"%_out" = for var"%jj′" = (zip)(1:4, (Symbolics.reset_to_one)(1:4))
+      begin
+          _out = (zeros)(Float64, (map)(length, (Base.OneTo(4), Base.OneTo(4))))
+          var"%_out" = for var"%jj′" = (zip)(1:4, (Symbolics.reset_to_one)(1:4))
                   begin
                       j = var"%jj′"[1]
                       j′ = var"%jj′"[2]

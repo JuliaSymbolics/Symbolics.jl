@@ -316,3 +316,32 @@ end
     fn = build_function(f(x), DestructuredArgs([f]; create_bindings = false), x; expression = Val{false})
     @test fn([isodd], 3)
 end
+
+@testset "iip_config with RGF" begin
+    @variables a b
+    oop, iip = build_function([a + b, a - b], a, b; iip_config = (false, false), expression = Val{false})
+    @test_throws ArgumentError oop(1, 2)
+    @test_throws ArgumentError iip(ones(2), 1, 2)
+
+    @variables a[1:2]
+    oop, iip = build_function(a .* 2, a; iip_config = (false, false), expression = Val{false})
+    @test_throws ArgumentError oop(ones(2))
+    @test_throws ArgumentError iip(ones(2), ones(2))
+end
+
+@testset "unwrapping/CSE in array of symbolics codegen" begin
+    @variables a b
+    oop, _ = build_function([a^2 + b^2, a^2 + b^2], a, b; expression = Val{true}, cse = true)
+
+    function find_create_array(expr)
+        while expr isa Expr && (!Meta.isexpr(expr, :call) || expr.args[1] != SymbolicUtils.Code.create_array)
+            expr = expr.args[end]
+        end
+        return expr
+    end
+
+    expr = find_create_array(oop)
+    # CSE works, we just need to test that it's happening and OOP is the easiest way to do it
+    @test Meta.isexpr(expr, :call) && expr.args[1] == SymbolicUtils.Code.create_array &&
+          expr.args[end] isa Symbol && expr.args[end-1] isa Symbol
+end

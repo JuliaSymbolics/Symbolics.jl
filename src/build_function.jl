@@ -113,10 +113,10 @@ function _build_function(target::JuliaTarget, op, args...;
                          cse = false,
                          nanmath = true,
                          kwargs...)
-
+    op = _recursive_unwrap(op)
     states.rewrites[:nanmath] = nanmath
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
-    fun = Func(dargs, [], unwrap(op))
+    fun = Func(dargs, [], op)
     if wrap_code !== nothing
         fun = wrap_code(fun)
     end
@@ -135,7 +135,9 @@ function _build_function(target::JuliaTarget, op, args...;
     end
 end
 
-const UNIMPLEMENTED_EXPR = :(function (args...); $throw_missing_specialization(length(args)); end)
+function get_unimplemented_expr(dargs)
+    Func(dargs, [], term(throw_missing_specialization, length(dargs)))
+end
 
 SymbolicUtils.Code.get_rewrites(x::Arr) = SymbolicUtils.Code.get_rewrites(unwrap(x))
 
@@ -151,21 +153,21 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUt
                          wrap_code = (identity, identity),
                          iip_config = (true, true),
                          kwargs...)
-
+    op = _recursive_unwrap(op)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
     states.rewrites[:nanmath] = nanmath
     if iip_config[1]
-        oop_expr = wrap_code[1](Func(dargs, [], unwrap(op)))
+        oop_expr = wrap_code[1](Func(dargs, [], op))
     else
-        oop_expr = UNIMPLEMENTED_EXPR
+        oop_expr = get_unimplemented_expr(dargs)
     end
 
     outsym = DEFAULT_OUTSYM
-    body = inplace_expr(unwrap(op), outsym)
+    body = inplace_expr(op, outsym)
     if iip_config[2]
         iip_expr = wrap_code[2](Func(vcat(outsym, dargs), [], body))
     else
-        iip_expr = UNIMPLEMENTED_EXPR
+        iip_expr = get_unimplemented_expr([outsym; dargs])
     end
 
     if cse
@@ -196,10 +198,7 @@ function _build_and_inject_function(mod::Module, ex)
     elseif ex.head == :(->)
         return _build_and_inject_function(mod, Expr(:function, ex.args...))
     end
-    # XXX: Workaround to specify the module as both the cache module AND context module.
-    # Currently, the @RuntimeGeneratedFunction macro only sets the context module.
-    module_tag = getproperty(mod, RuntimeGeneratedFunctions._tagname)
-    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=false)
+    RuntimeGeneratedFunction(mod, mod, ex)
 end
 
 toexpr(n::Num, st) = toexpr(value(n), st)
@@ -305,7 +304,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        iip_config = (true, true),
                        nanmath = true,
                        parallel=nothing, cse = false, kwargs...)
-
+    if rhss isa SubArray
+        rhss = copy(rhss)
+    end
+    rhss = _recursive_unwrap(rhss)
     states.rewrites[:nanmath] = nanmath
     # We cannot switch to ShardedForm because it deadlocks with
     # RuntimeGeneratedFunctions
@@ -323,7 +325,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
             oop_expr = wrap_code[1](oop_expr)
         end
     else
-        oop_expr = UNIMPLEMENTED_EXPR
+        oop_expr = get_unimplemented_expr(dargs)
     end
 
 
@@ -340,7 +342,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
             iip_expr = wrap_code[2](iip_expr)
         end
     else
-        iip_expr = UNIMPLEMENTED_EXPR
+        iip_expr = get_unimplemented_expr([DEFAULT_OUTSYM; dargs])
     end
 
     if cse
@@ -466,7 +468,7 @@ function _make_sparse_array(arr, similarto)
         return term(setparent, nzmap(Returns(true), arr), newarr)
     else
         newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))})
-        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), true)
+        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), false)
     end
 end
 
@@ -539,10 +541,13 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
 end
 
 function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
-    Let([Assignment(Symbol("%$out"), _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros))], out)
+    Let([Assignment(Symbol("%$out"), _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros))], out, false)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
+    if parent(rhss) !== rhss
+        return _set_array(out, outputidxs, parent(rhss), checkbounds, skipzeros)
+    end
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end

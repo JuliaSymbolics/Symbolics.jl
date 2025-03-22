@@ -1005,7 +1005,7 @@ function _array_toexpr(x, st)
         [
             Assignment(outsym, term(zeros, Float64, term(map, length, shape(x)))),
             Assignment(Symbol("%$outsym"), inplace_expr(x, outsym))
-        ], outsym, true)
+        ], outsym, false)
 
     toexpr(ex, st)
 end

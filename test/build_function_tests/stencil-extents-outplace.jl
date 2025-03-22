@@ -1,5 +1,7 @@
 :(function (x,)
-      let _out = (zeros)(Float64, (map)(length, (1:5, 1:5))), var"%_out" = begin
+      begin
+          _out = (zeros)(Float64, (map)(length, (1:5, 1:5)))
+          var"%_out" = begin
                   _out_1 = (view)(_out, 1:5, 1:5)
                   var"%_out_1" = (Symbolics.broadcast_assign!)(_out_1, 0)
                   _out_2 = (view)(_out, 2:4, 2:4)
