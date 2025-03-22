@@ -304,6 +304,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        iip_config = (true, true),
                        nanmath = true,
                        parallel=nothing, cse = false, kwargs...)
+    if rhss isa SubArray
+        rhss = copy(rhss)
+    end
     rhss = _recursive_unwrap(rhss)
     states.rewrites[:nanmath] = nanmath
     # We cannot switch to ShardedForm because it deadlocks with
