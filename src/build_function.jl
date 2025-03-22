@@ -539,7 +539,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
 end
 
 function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
-    Let([Assignment(gensym(), _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros))], out)
+    Let([Assignment(Symbol("%$out"), _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros))], out)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
