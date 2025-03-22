@@ -374,7 +374,7 @@ end
 using SymbolicUtils: walk
 
 function expand_derivatives(n::Num, simplify=false; kwargs...)
-    n = walk(x -> x isa Float64 ? Rational(x) : x, value(n))
+    n = walk(x -> x isa Int ? Rational(x) : x, value(n))
     wrap(expand_derivatives(n, simplify; kwargs...))
 end
 
