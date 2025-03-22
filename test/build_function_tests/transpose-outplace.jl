@@ -1,12 +1,20 @@
 :(function (x,)
-      let ˍ₋out = zeros(Float64, map(length, (Base.OneTo(4), Base.OneTo(4))))
-          begin
-              for (j, j′) = zip(1:4, reset_to_one(1:4))
-                  for (i, i′) = zip(1:4, reset_to_one(1:4))
-                      ˍ₋out[i′, j′] = (+)(ˍ₋out[i′, j′], (getindex)(x, j, i))
+      let _out = (zeros)(Float64, (map)(length, (Base.OneTo(4), Base.OneTo(4)))), var"%_out" = for var"%jj′" = (zip)(1:4, (Symbolics.reset_to_one)(1:4))
+                  begin
+                      j = var"%jj′"[1]
+                      j′ = var"%jj′"[2]
+                      for var"%ii′" = (zip)(1:4, (Symbolics.reset_to_one)(1:4))
+                          begin
+                              i = var"%ii′"[1]
+                              i′ = var"%ii′"[2]
+                              begin
+                                  _out[(CartesianIndex)(i′, j′)] = (+)((getindex)(_out, i′, j′), (getindex)(x, j, i))
+                                  nothing
+                              end
+                          end
+                      end
                   end
               end
-          end
-          ˍ₋out
+          _out
       end
   end)
