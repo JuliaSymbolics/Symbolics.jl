@@ -542,6 +542,9 @@ function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, ski
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
+    if parent(rhss) !== rhss
+        return _set_array(out, outputidxs, parent(rhss), checkbounds, skipzeros)
+    end
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
