@@ -16,6 +16,13 @@ Dx = Differential(x)
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
 
+@testset "ZeroOperator handling" begin
+    @test isequal(Differential(0.1)(x), 0)
+    @test isequal(Differential(0.1)(0.1x), 0)
+    @test isequal(Differential(1)(x), 0)
+    @test isequal(Differential(2)(2x), 0)
+end
+
 #@test @macroexpand(@derivatives D'~t D2''~t) == @macroexpand(@derivatives (D'~t), (D2''~t))
 
 @test isequal(expand_derivatives(D(t)), 1)
