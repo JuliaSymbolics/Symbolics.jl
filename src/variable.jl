@@ -537,6 +537,9 @@ end
 
 function _recursive_unwrap(val)
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
+        if parent(val) !== val
+            return Setfield.@set val.parent = _recursive_unwrap(parent(val))
+        end
         return _recursive_unwrap.(val)
     else
         return unwrap(val)
