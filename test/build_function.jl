@@ -316,3 +316,15 @@ end
     fn = build_function(f(x), DestructuredArgs([f]; create_bindings = false), x; expression = Val{false})
     @test fn([isodd], 3)
 end
+
+@testset "iip_config with RGF" begin
+    @variables a b
+    oop, iip = build_function([a + b, a - b], a, b; iip_config = (false, false), expression = Val{false})
+    @test_throws ArgumentError oop(1, 2)
+    @test_throws ArgumentError iip(ones(2), 1, 2)
+
+    @variables a[1:2]
+    oop, iip = build_function(a .* 2, a; iip_config = (false, false), expression = Val{false})
+    @test_throws ArgumentError oop(ones(2))
+    @test_throws ArgumentError iip(ones(2), ones(2))
+end

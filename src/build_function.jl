@@ -135,7 +135,9 @@ function _build_function(target::JuliaTarget, op, args...;
     end
 end
 
-const UNIMPLEMENTED_EXPR = :(function (args...); $throw_missing_specialization(length(args)); end)
+function get_unimplemented_expr(dargs)
+    Func(dargs, [], term(throw_missing_specialization, length(dargs)))
+end
 
 SymbolicUtils.Code.get_rewrites(x::Arr) = SymbolicUtils.Code.get_rewrites(unwrap(x))
 
@@ -157,7 +159,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUt
     if iip_config[1]
         oop_expr = wrap_code[1](Func(dargs, [], unwrap(op)))
     else
-        oop_expr = UNIMPLEMENTED_EXPR
+        oop_expr = get_unimplemented_expr(dargs)
     end
 
     outsym = DEFAULT_OUTSYM
@@ -165,7 +167,7 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUt
     if iip_config[2]
         iip_expr = wrap_code[2](Func(vcat(outsym, dargs), [], body))
     else
-        iip_expr = UNIMPLEMENTED_EXPR
+        iip_expr = get_unimplemented_expr([outsym; dargs])
     end
 
     if cse
@@ -320,7 +322,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
             oop_expr = wrap_code[1](oop_expr)
         end
     else
-        oop_expr = UNIMPLEMENTED_EXPR
+        oop_expr = get_unimplemented_expr(dargs)
     end
 
 
@@ -337,7 +339,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
             iip_expr = wrap_code[2](iip_expr)
         end
     else
-        iip_expr = UNIMPLEMENTED_EXPR
+        iip_expr = get_unimplemented_expr([DEFAULT_OUTSYM; dargs])
     end
 
     if cse
