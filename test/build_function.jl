@@ -331,7 +331,7 @@ end
 
 @testset "unwrapping/CSE in array of symbolics codegen" begin
     @variables a b
-    oop, _ = build_function([a^2 + b^2, a^2 + b^2], a, b; expression = Val{true})
+    oop, _ = build_function([a^2 + b^2, a^2 + b^2], a, b; expression = Val{true}, cse = true)
 
     function find_create_array(expr)
         while expr isa Expr && (!Meta.isexpr(expr, :call) || expr.args[1] != SymbolicUtils.Code.create_array)
