@@ -536,7 +536,7 @@ function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symboli
 end
 
 function _recursive_unwrap(val)
-    if symbolic_type(val) == NotSymbolic() && val isa AbstractArray
+    if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
         return _recursive_unwrap.(val)
     else
         return unwrap(val)
