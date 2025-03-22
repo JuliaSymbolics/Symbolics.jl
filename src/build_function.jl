@@ -465,7 +465,7 @@ function _make_sparse_array(arr, similarto)
         return term(setparent, nzmap(Returns(true), arr), newarr)
     else
         newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))})
-        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), true)
+        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), false)
     end
 end
 
@@ -538,7 +538,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
 end
 
 function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
-    Let([Assignment(Symbol("%$out"), _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros))], out)
+    Let([Assignment(Symbol("%$out"), _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros))], out, false)
 end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
