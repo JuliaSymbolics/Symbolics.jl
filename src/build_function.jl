@@ -196,10 +196,7 @@ function _build_and_inject_function(mod::Module, ex)
     elseif ex.head == :(->)
         return _build_and_inject_function(mod, Expr(:function, ex.args...))
     end
-    # XXX: Workaround to specify the module as both the cache module AND context module.
-    # Currently, the @RuntimeGeneratedFunction macro only sets the context module.
-    module_tag = getproperty(mod, RuntimeGeneratedFunctions._tagname)
-    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=false)
+    RuntimeGeneratedFunction(mod, mod, ex)
 end
 
 toexpr(n::Num, st) = toexpr(value(n), st)
