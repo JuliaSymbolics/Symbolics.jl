@@ -1004,7 +1004,7 @@ function _array_toexpr(x, st)
     ex = Let(
         [
             Assignment(outsym, term(zeros, Float64, term(map, length, shape(x)))),
-            Assignment(gensym(), inplace_expr(x, outsym))
+            Assignment(Symbol("%$outsym"), inplace_expr(x, outsym))
         ], outsym, true)
 
     toexpr(ex, st)
@@ -1035,7 +1035,7 @@ function inplace_expr(x::ArrayMaker, out, intermediates = nothing)
     for (i, (vw, op)) in enumerate(x.sequence)
         out′ = Symbol(out, "_", i)
         push!(steps, Assignment(out′, term(view, out, vw...)))
-        push!(steps, Assignment(gensym(), inplace_expr(unwrap(op), out′, _intermediates)))
+        push!(steps, Assignment(Symbol("%$out′"), inplace_expr(unwrap(op), out′, _intermediates)))
     end
 
     expr = Let(steps, nothing, false)
@@ -1122,7 +1122,8 @@ function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
 
     loops = foldl(reverse(loops), init=inner_expr) do acc, k
         if any(isequal(k), x.output_idx)
-            loopvar = gensym()
+            k′ = reset_sym(k)
+            loopvar = Symbol("%$k$k′")
             ForLoop(loopvar, term(zip, get_extents(rs[k]), term(reset_to_one, get_extents(rs[k]))), Let([DestructuredArgs([k, reset_sym(k)], loopvar)], acc, false))
         else
             ForLoop(k, get_extents(rs[k]), acc)
