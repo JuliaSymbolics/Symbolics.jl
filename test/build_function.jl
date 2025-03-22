@@ -328,3 +328,20 @@ end
     @test_throws ArgumentError oop(ones(2))
     @test_throws ArgumentError iip(ones(2), ones(2))
 end
+
+@testset "unwrapping/CSE in array of symbolics codegen" begin
+    @variables a b
+    oop, _ = build_function([a^2 + b^2, a^2 + b^2], a, b; expression = Val{true})
+
+    function find_create_array(expr)
+        while expr isa Expr && (!Meta.isexpr(expr, :call) || expr.args[1] != SymbolicUtils.Code.create_array)
+            expr = expr.args[end]
+        end
+        return expr
+    end
+
+    expr = find_create_array(oop)
+    # CSE works, we just need to test that it's happening and OOP is the easiest way to do it
+    @test Meta.isexpr(expr, :call) && expr.args[1] == SymbolicUtils.Code.create_array &&
+          expr.args[end] isa Symbol && expr.args[end-1] isa Symbol
+end

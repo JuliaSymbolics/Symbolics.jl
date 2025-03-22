@@ -113,10 +113,10 @@ function _build_function(target::JuliaTarget, op, args...;
                          cse = false,
                          nanmath = true,
                          kwargs...)
-
+    op = _recursive_unwrap(op)
     states.rewrites[:nanmath] = nanmath
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
-    fun = Func(dargs, [], unwrap(op))
+    fun = Func(dargs, [], op)
     if wrap_code !== nothing
         fun = wrap_code(fun)
     end
@@ -153,17 +153,17 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUt
                          wrap_code = (identity, identity),
                          iip_config = (true, true),
                          kwargs...)
-
+    op = _recursive_unwrap(op)
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
     states.rewrites[:nanmath] = nanmath
     if iip_config[1]
-        oop_expr = wrap_code[1](Func(dargs, [], unwrap(op)))
+        oop_expr = wrap_code[1](Func(dargs, [], op))
     else
         oop_expr = get_unimplemented_expr(dargs)
     end
 
     outsym = DEFAULT_OUTSYM
-    body = inplace_expr(unwrap(op), outsym)
+    body = inplace_expr(op, outsym)
     if iip_config[2]
         iip_expr = wrap_code[2](Func(vcat(outsym, dargs), [], body))
     else
@@ -304,7 +304,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        iip_config = (true, true),
                        nanmath = true,
                        parallel=nothing, cse = false, kwargs...)
-
+    rhss = _recursive_unwrap(rhss)
     states.rewrites[:nanmath] = nanmath
     # We cannot switch to ShardedForm because it deadlocks with
     # RuntimeGeneratedFunctions
