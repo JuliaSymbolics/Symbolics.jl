@@ -241,9 +241,9 @@ function make_shape(output_idx, expr, ranges=Dict())
             @assert !isempty(mi)
             ext = get_extents(mi)
             ext isa Unknown && return Unknown()
-            return Base.OneTo(length(ext))
+            return 1:(length(ext))
         elseif i isa Integer
-            return Base.OneTo(1)
+            return 1:(1)
         end
     end
     # TODO: maybe we can remove this restriction?
@@ -580,7 +580,7 @@ end
 function axes(A::SymArray, i)
     s = shape(A)
     s === Unknown() && error("axes of $A not known")
-    return i <= length(s) ? s[i] : Base.OneTo(1)
+    return i <= length(s) ? s[i] : 1:(1)
 end
 
 function eachindex(A::Union{Arr, SymArray})
@@ -1082,7 +1082,7 @@ end
 
 function reset_to_one(range)
     @assert step(range) == 1
-    Base.OneTo(length(range))
+    1:(length(range))
 end
 
 function reset_sym(i)
