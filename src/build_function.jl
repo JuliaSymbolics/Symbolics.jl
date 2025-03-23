@@ -102,6 +102,14 @@ end
 
 const DEFAULT_OUTSYM = Symbol("ˍ₋out")
 
+# don't CSE inside operators
+SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator, args...) = false
+# don't CSE inside `getindex` of things created via `@variables`
+# EXCEPT called variables
+function SymbolicUtils.Code.cse_inside_expr(sym, ::typeof(getindex), x::BasicSymbolic, idxs...)
+    return !hasmetadata(sym, VariableSource) || hasmetadata(sym, CallWithParent)
+end
+
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
                          expression = Val{true},

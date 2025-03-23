@@ -345,3 +345,10 @@ end
     @test Meta.isexpr(expr, :call) && expr.args[1] == SymbolicUtils.Code.create_array &&
           expr.args[end] isa Symbol && expr.args[end-1] isa Symbol
 end
+
+@testset "CSE with operators" begin
+    @variables t x(t)
+    D = Differential(t)
+    f = build_function(x + D(x), [x, D(x)]; cse = true, expression = Val{false})
+    @test f([1, 2]) == 3
+end
