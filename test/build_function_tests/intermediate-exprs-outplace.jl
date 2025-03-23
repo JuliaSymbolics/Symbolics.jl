@@ -1,6 +1,6 @@
 :(function (u,)
       begin
-          _out = (zeros)(Float64, (map)(length, (Base.OneTo(5), Base.OneTo(5))))
+          _out = (zeros)(Float64, (map)(length, (1:5, 1:5)))
           var"%_out" = begin
                   _out_input_1 = begin
                           _out = (zeros)(Float64, (map)(length, (Base.OneTo(5), Base.OneTo(5))))
