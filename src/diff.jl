@@ -621,8 +621,12 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify::Bool=false, kwargs...)
-    ops = Symbolics.scalarize(ops)
-    vars = Symbolics.scalarize(vars)
+    if any(x -> symbolic_type(x) != ScalarSymbolic(), ops)
+        ops = Symbolics.scalarize(ops)
+    end
+    if any(x -> symbolic_type(x) != ScalarSymbolic(), vars)
+        vars = Symbolics.scalarize(vars)
+    end
     sp = jacobian_sparsity(ops, vars)
     I,J,_ = findnz(sp)
 
@@ -644,10 +648,15 @@ an array of variable expressions given the sparsity structure.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false, kwargs...)
-    ops = Symbolics.scalarize(ops)
-    vars = Symbolics.scalarize(vars)
+    if any(x -> symbolic_type(x) != ScalarSymbolic(), ops)
+        ops = Symbolics.scalarize(ops)
+    end
+    if any(x -> symbolic_type(x) != ScalarSymbolic(), vars)
+        vars = Symbolics.scalarize(vars)
+    end
 
     exprs = Num[]
+    sizehint!(exprs, length(I))
 
     for (i,j) in zip(I, J)
         push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify; kwargs...)))
@@ -681,25 +690,40 @@ julia> Symbolics.jacobian_sparsity(exprs, vars)
 ```
 """
 function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
-    du = map(value, exprs)
-    u = map(value, vars)
+    if any(iswrapped, exprs)
+        du = map(value, exprs)
+    else
+        du = exprs
+    end
+    if any(iswrapped, vars)
+        u = map(value, vars)
+    else
+        u = vars
+    end
     dict = Dict(zip(u, 1:length(u)))
 
     i = Ref(1)
     I = Int[]
     J = Int[]
+    sizehint!(I, 2length(exprs))
+    sizehint!(J, 2length(vars))
 
 
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
 
-    r = @rule ~x::(x->haskey(dict, x)) => begin
-        push!(I, i[])
-        push!(J, dict[~x])
-        nothing
+    function r(x)
+        if iscall(x)
+            for y in arguments(x)
+                r(y)
+            end
+        end
+        j = get(dict, x, -1)
+        if j != -1
+            push!(I, i[])
+            push!(J, j)
+        end
     end
-
-    r =  Rewriters.Postwalk(r)
 
     for ii = 1:length(du)
         i[] = ii
