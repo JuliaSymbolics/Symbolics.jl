@@ -123,9 +123,9 @@ Returns true if the expression or equation `O` contains [`Differential`](@ref) t
 hasderiv(O) = recursive_hasoperator(Differential, O)
 
 
-recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
-recursive_hasoperator(op) = O -> recursive_hasoperator(op, O) # curry version
-recursive_hasoperator(::Type{T}, ::T) where T = true
+_recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
+_recursive_hasoperator(op) = Base.Fix1(recursive_hasoperator, op) # curry version
+_recursive_hasoperator(::Type{T}, ::T) where T = true
 
 
 """
@@ -134,19 +134,23 @@ recursive_hasoperator(::Type{T}, ::T) where T = true
 An internal function that contains the logic for [`hasderiv`](@ref) and [`hasdiff`](@ref).
 Return true if `O` contains a term with `Operator` `op`.
 """
-function recursive_hasoperator(op, O)
+SymbolicUtils.@cache function recursive_hasoperator(op::Any, O::Any)::Bool
+    _recursive_hasoperator(op, O)
+end
+
+function _recursive_hasoperator(op, O)
     iscall(O) || return false
     if operation(O) isa op
         return true
     else
         if isadd(O) || ismul(O)
-            any(recursive_hasoperator(op), keys(O.dict))
+            any(_recursive_hasoperator(op), keys(O.dict))
         elseif ispow(O)
-            recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
+            _recursive_hasoperator(op)(O.base) || _recursive_hasoperator(op)(O.exp)
         elseif isdiv(O)
-            recursive_hasoperator(op)(O.num) || recursive_hasoperator(op)(O.den)
+            _recursive_hasoperator(op)(O.num) || _recursive_hasoperator(op)(O.den)
         else
-            any(recursive_hasoperator(op), arguments(O))
+            any(_recursive_hasoperator(op), arguments(O))
         end
     end
 end
