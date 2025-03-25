@@ -14,7 +14,9 @@ let
     # Simple replacements.
     @test isequal(replacenode(X + X + X, X =>1), 3)
     @test isequal(replacenode(X + X + X, Y => 1), 3X)
-    @test isequal(replacenode(X + X + my_f(X, Z), X => Y), Y^3 + 2Y + 2Z)
+    res = replacenode(X + X + my_f(X, Z), X => Y)
+    @test isequal(res, Y^3 + 2Y + 2Z)
+    @test length(arguments(res)) == 3
     @test isequal(replacenode(X + Y^2 - Z, Y^2 => Z), X)
 
     # When the rule is a function.

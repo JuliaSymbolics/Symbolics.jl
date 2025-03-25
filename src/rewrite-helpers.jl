@@ -24,7 +24,7 @@ replacenode(expr::Number, rules...; fixpoint = false) = expr
 replacenode(expr::Number, r::Pair, rules::Pair...; fixpoint = false) = expr
 
 function _replacenode(expr::Symbolic, rules...; fixpoint = false)
-    rs = map(r -> r isa Pair ? (x -> isequal(x, r[1]) ? r[2] : nothing) : r, rules)
+    rs = map(r -> r isa Pair ? (x -> isequal(x, unwrap(r[1])) ? unwrap(r[2]) : nothing) : r, rules)
     R = Prewalk(Chain(rs))
     if fixpoint
         Fixpoint(R)(expr)
