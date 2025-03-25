@@ -63,7 +63,8 @@ Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Symbolic) = iscall(occ) && _isfalse(operation(occ))
 
-SymbolicUtils.@cache function occursin_info(x::BasicSymbolic, expr::Any, fail::Bool = true)::Union{Bool, BasicSymbolic{Real}}
+
+SymbolicUtils.@cache limit = 500_000 function occursin_info(x::BasicSymbolic, expr::Any, fail::Bool = true)::Bool
     _occursin_info(x, expr, fail)
 end
 
@@ -103,11 +104,7 @@ function _occursin_info(x, expr, fail = true)
     if isequal(x, expr)
         true
     else
-        args = map(a->occursin_info(x, a, operation(expr) !== getindex), arguments(expr))
-        if all(_isfalse, args)
-            return false
-        end
-        Term{Real}(true, args)
+        any(a -> occursin_info(x, a, operation(expr) !== getindex), arguments(expr))
     end
 end
 
@@ -199,13 +196,9 @@ passed differential and not any other Differentials it encounters.
 - `throw_no_derivative=false`: Whether to throw if a function with unknown
     derivative is encountered.
 """
-function executediff(D, arg, simplify=false; occurrences=nothing, throw_no_derivative=false)
-    if occurrences == nothing
-        occurrences = occursin_info(D.x, arg)
-    end
-
-    _isfalse(occurrences) && return 0
-    occurrences isa Bool && return 1 # means it's a `true`
+function executediff(D, arg, simplify=false; throw_no_derivative=false)
+    isequal(arg, D.x) && return 1
+    occursin_info(D.x, arg) || return 0
 
     if !iscall(arg)
         return D(arg) # Cannot expand
@@ -233,8 +226,8 @@ function executediff(D, arg, simplify=false; occurrences=nothing, throw_no_deriv
     elseif op === ifelse
         args = arguments(arg)
         O = op(args[1], 
-            executediff(D, args[2], simplify; occurrences=arguments(occurrences)[2], throw_no_derivative), 
-            executediff(D, args[3], simplify; occurrences=arguments(occurrences)[3], throw_no_derivative))
+            executediff(D, args[2], simplify; throw_no_derivative),
+            executediff(D, args[3], simplify; throw_no_derivative))
         return O
     elseif isa(op, Differential)
         # The recursive expand_derivatives was not able to remove
@@ -281,7 +274,7 @@ function executediff(D, arg, simplify=false; occurrences=nothing, throw_no_deriv
     c = 0
 
     for i in 1:l
-        t2 = executediff(D, inner_args[i],false; occurrences=arguments(occurrences)[i], throw_no_derivative)
+        t2 = executediff(D, inner_args[i],false; throw_no_derivative)
 
         x = if _iszero(t2)
             t2
