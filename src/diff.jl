@@ -63,6 +63,15 @@ Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Symbolic) = iscall(occ) && _isfalse(operation(occ))
 
+"""
+    $(TYPEDSIGNATURES)
+
+Clear caches of all cached functions involved in computing derivatives.
+"""
+function clear_derivative_caches!() # public
+    SymbolicUtils.clear_cache!(occursin_info)
+    SymbolicUtils.clear_cache!(recursive_hasoperator)
+end
 
 SymbolicUtils.@cache limit = 500_000 function occursin_info(x::BasicSymbolic, expr::Any, fail::Bool = true)::Bool
     _occursin_info(x, expr, fail)
