@@ -73,6 +73,26 @@ function clear_derivative_caches!() # public
     SymbolicUtils.clear_cache!(recursive_hasoperator)
 end
 
+"""
+    $(TYPEDSIGNATURES)
+
+Toggle caching in derivative related functions.
+"""
+function toggle_derivative_caching!(value::Bool) # public
+    SymbolicUtils.toggle_caching!(occursin_info, value)
+    SymbolicUtils.toggle_caching!(recursive_hasoperator, value)
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Return a collection of all functions involved in derivative computation
+that are cached.
+"""
+function cached_derivative_functions() # public
+    (occursin_info, recursive_hasoperator)
+end
+
 SymbolicUtils.@cache limit = 500_000 function occursin_info(x::BasicSymbolic, expr::Any, fail::Bool = true)::Bool
     _occursin_info(x, expr, fail)
 end
