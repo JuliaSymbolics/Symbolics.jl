@@ -113,19 +113,20 @@ function _occursin_info(x, expr, fail = true)
          is_scalar_indexed(operation(ex)))
     end
 
+    isix = is_scalar_indexed(x)
+    isie = is_scalar_indexed(expr)
+
     # x[1] == x[1] but not x[2]
-    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
-        isequal(first(arguments(x)), first(arguments(expr)))
+    if isix && isie && isequal(first(arguments(x)), first(arguments(expr)))
         return isequal(operation(x), operation(expr)) &&
                isequal(arguments(x), arguments(expr))
     end
 
-    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
-        !occursin(first(arguments(x)), first(arguments(expr)))
+    if isix && isie && !occursin(first(arguments(x)), first(arguments(expr)))
         return false
     end
 
-    if is_scalar_indexed(expr) && !is_scalar_indexed(x) && !occursin(x, expr)
+    if isie && !isix && !occursin(x, expr)
         return false
     end
 
@@ -133,7 +134,8 @@ function _occursin_info(x, expr, fail = true)
     if isequal(x, expr)
         true
     else
-        any(a -> occursin_info(x, a, operation(expr) !== getindex), arguments(expr))
+        cond = operation(expr) !== getindex
+        any(a -> occursin_info(x, a, cond), arguments(expr))
     end
 end
 
