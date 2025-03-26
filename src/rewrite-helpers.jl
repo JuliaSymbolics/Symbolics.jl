@@ -52,11 +52,11 @@ D = Differential(t)
 hasnode(Symbolics.is_derivative, X + D(X) + D(X^2)) # returns `true`.
 ```
 """
-function hasnode(r::Function, y::Union{Num, Symbolic})
+function hasnode(r::Function, y::Union{Arr, Num, Symbolic})
     _hasnode(r, y)
 end
-hasnode(r::Num, y::Union{Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
-hasnode(r::Symbolic, y::Union{Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
+hasnode(r::Num, y::Union{Arr, Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
+hasnode(r::Symbolic, y::Union{Arr, Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
 hasnode(r::Union{Num, Symbolic, Function}, y::Number) = false
 
 function _hasnode(r, y)
