@@ -74,6 +74,19 @@ let
     @test !hasnode(X, 1)
     @test !hasnode(a, 1)
     @test !hasnode(is_derivative, 1)
+
+    # Array variables.
+    @variables x(t)[1:2] y(t)[1:2, 1:2]
+    @test hasnode(t, x)
+    ex6 = D(x)
+    @test hasnode(is_derivative, ex6)
+    @test hasnode(x, ex6)
+    ex7 = D(x) + log.(y*x)
+    @test hasnode(is_derivative, ex7)
+    @test hasnode(y, ex7)
+    ex8 = log(a^b) + x[1]
+    @test hasnode(a, ex8)
+    @test hasnode(b, ex8)
 end
 
 # Check `filterchildren` function.

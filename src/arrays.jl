@@ -1140,6 +1140,8 @@ function inplace_expr(x::ArrayOp, outsym = :_out, intermediates = nothing)
     return loops
 end
 
+hasnode(r::Function, y::Arr) = _hasnode(r, y)
+hasnode(r::Union{Num, Symbolic, Arr}, y::Arr) = occursin(unwrap(r), unwrap(y))
 
 #=
 """
