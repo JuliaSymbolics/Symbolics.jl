@@ -608,13 +608,14 @@ function jacobian(ops, vars; simplify=false, kwargs...)
     jacobian(ops, vars; simplify=simplify, scalarize=false, kwargs...)
 end
 
-function faster_maybe_scalarize!(arg::AbstractVector)
-    symbolic_type(arg) == ArraySymbolic() && return scalarize(arg)
+function faster_maybe_scalarize!(arg::Vector)
     for (i, x) in enumerate(arg)
         arg[i] = scalarize(x)
     end
     return arg
 end
+
+faster_maybe_scalarize!(arg) = scalarize(arg)
 
 """
 $(SIGNATURES)
