@@ -63,7 +63,37 @@ Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
 _isfalse(occ::Bool) = occ === false
 _isfalse(occ::Symbolic) = iscall(occ) && _isfalse(operation(occ))
 
-SymbolicUtils.@cache function occursin_info(x::BasicSymbolic, expr::Any, fail::Bool = true)::Union{Bool, BasicSymbolic{Real}}
+"""
+    $(TYPEDSIGNATURES)
+
+Clear caches of all cached functions involved in computing derivatives.
+"""
+function clear_derivative_caches!() # public
+    SymbolicUtils.clear_cache!(occursin_info)
+    SymbolicUtils.clear_cache!(recursive_hasoperator)
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Toggle caching in derivative related functions.
+"""
+function toggle_derivative_caching!(value::Bool) # public
+    SymbolicUtils.toggle_caching!(occursin_info, value)
+    SymbolicUtils.toggle_caching!(recursive_hasoperator, value)
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Return a collection of all functions involved in derivative computation
+that are cached.
+"""
+function cached_derivative_functions() # public
+    (occursin_info, recursive_hasoperator)
+end
+
+SymbolicUtils.@cache limit = 500_000 function occursin_info(x::BasicSymbolic, expr::Any, fail::Bool = true)::Bool
     _occursin_info(x, expr, fail)
 end
 
@@ -83,19 +113,20 @@ function _occursin_info(x, expr, fail = true)
          is_scalar_indexed(operation(ex)))
     end
 
+    isix = is_scalar_indexed(x)
+    isie = is_scalar_indexed(expr)
+
     # x[1] == x[1] but not x[2]
-    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
-        isequal(first(arguments(x)), first(arguments(expr)))
+    if isix && isie && isequal(first(arguments(x)), first(arguments(expr)))
         return isequal(operation(x), operation(expr)) &&
                isequal(arguments(x), arguments(expr))
     end
 
-    if is_scalar_indexed(x) && is_scalar_indexed(expr) &&
-        !occursin(first(arguments(x)), first(arguments(expr)))
+    if isix && isie && !occursin(first(arguments(x)), first(arguments(expr)))
         return false
     end
 
-    if is_scalar_indexed(expr) && !is_scalar_indexed(x) && !occursin(x, expr)
+    if isie && !isix && !occursin(x, expr)
         return false
     end
 
@@ -103,11 +134,8 @@ function _occursin_info(x, expr, fail = true)
     if isequal(x, expr)
         true
     else
-        args = map(a->occursin_info(x, a, operation(expr) !== getindex), arguments(expr))
-        if all(_isfalse, args)
-            return false
-        end
-        Term{Real}(true, args)
+        cond = operation(expr) !== getindex
+        any(a -> occursin_info(x, a, cond), arguments(expr))
     end
 end
 
@@ -126,9 +154,9 @@ Returns true if the expression or equation `O` contains [`Differential`](@ref) t
 hasderiv(O) = recursive_hasoperator(Differential, O)
 
 
-recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
-recursive_hasoperator(op) = O -> recursive_hasoperator(op, O) # curry version
-recursive_hasoperator(::Type{T}, ::T) where T = true
+_recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
+_recursive_hasoperator(op) = Base.Fix1(recursive_hasoperator, op) # curry version
+_recursive_hasoperator(::Type{T}, ::T) where T = true
 
 
 """
@@ -137,19 +165,23 @@ recursive_hasoperator(::Type{T}, ::T) where T = true
 An internal function that contains the logic for [`hasderiv`](@ref) and [`hasdiff`](@ref).
 Return true if `O` contains a term with `Operator` `op`.
 """
-function recursive_hasoperator(op, O)
+SymbolicUtils.@cache function recursive_hasoperator(op::Any, O::Any)::Bool
+    _recursive_hasoperator(op, O)
+end
+
+function _recursive_hasoperator(op, O)
     iscall(O) || return false
     if operation(O) isa op
         return true
     else
         if isadd(O) || ismul(O)
-            any(recursive_hasoperator(op), keys(O.dict))
+            any(_recursive_hasoperator(op), keys(O.dict))
         elseif ispow(O)
-            recursive_hasoperator(op)(O.base) || recursive_hasoperator(op)(O.exp)
+            _recursive_hasoperator(op)(O.base) || _recursive_hasoperator(op)(O.exp)
         elseif isdiv(O)
-            recursive_hasoperator(op)(O.num) || recursive_hasoperator(op)(O.den)
+            _recursive_hasoperator(op)(O.num) || _recursive_hasoperator(op)(O.den)
         else
-            any(recursive_hasoperator(op), arguments(O))
+            any(_recursive_hasoperator(op), arguments(O))
         end
     end
 end
@@ -199,13 +231,9 @@ passed differential and not any other Differentials it encounters.
 - `throw_no_derivative=false`: Whether to throw if a function with unknown
     derivative is encountered.
 """
-function executediff(D, arg, simplify=false; occurrences=nothing, throw_no_derivative=false)
-    if occurrences == nothing
-        occurrences = occursin_info(D.x, arg)
-    end
-
-    _isfalse(occurrences) && return 0
-    occurrences isa Bool && return 1 # means it's a `true`
+function executediff(D, arg, simplify=false; throw_no_derivative=false)
+    isequal(arg, D.x) && return 1
+    occursin_info(D.x, arg) || return 0
 
     if !iscall(arg)
         return D(arg) # Cannot expand
@@ -233,8 +261,8 @@ function executediff(D, arg, simplify=false; occurrences=nothing, throw_no_deriv
     elseif op === ifelse
         args = arguments(arg)
         O = op(args[1], 
-            executediff(D, args[2], simplify; occurrences=arguments(occurrences)[2], throw_no_derivative), 
-            executediff(D, args[3], simplify; occurrences=arguments(occurrences)[3], throw_no_derivative))
+            executediff(D, args[2], simplify; throw_no_derivative),
+            executediff(D, args[3], simplify; throw_no_derivative))
         return O
     elseif isa(op, Differential)
         # The recursive expand_derivatives was not able to remove
@@ -281,7 +309,7 @@ function executediff(D, arg, simplify=false; occurrences=nothing, throw_no_deriv
     c = 0
 
     for i in 1:l
-        t2 = executediff(D, inner_args[i],false; occurrences=arguments(occurrences)[i], throw_no_derivative)
+        t2 = executediff(D, inner_args[i],false; throw_no_derivative)
 
         x = if _iszero(t2)
             t2
@@ -580,6 +608,15 @@ function jacobian(ops, vars; simplify=false, kwargs...)
     jacobian(ops, vars; simplify=simplify, scalarize=false, kwargs...)
 end
 
+function faster_maybe_scalarize!(arg::Vector)
+    for (i, x) in enumerate(arg)
+        arg[i] = scalarize(x)
+    end
+    return arg
+end
+
+faster_maybe_scalarize!(arg) = scalarize(arg)
+
 """
 $(SIGNATURES)
 
@@ -593,8 +630,8 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify::Bool=false, kwargs...)
-    ops = Symbolics.scalarize(ops)
-    vars = Symbolics.scalarize(vars)
+    ops = faster_maybe_scalarize!(ops)
+    vars = faster_maybe_scalarize!(vars)
     sp = jacobian_sparsity(ops, vars)
     I,J,_ = findnz(sp)
 
@@ -616,10 +653,11 @@ an array of variable expressions given the sparsity structure.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false, kwargs...)
-    ops = Symbolics.scalarize(ops)
-    vars = Symbolics.scalarize(vars)
+    ops = faster_maybe_scalarize!(ops)
+    vars = faster_maybe_scalarize!(vars)
 
     exprs = Num[]
+    sizehint!(exprs, length(I))
 
     for (i,j) in zip(I, J)
         push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify; kwargs...)))
@@ -653,25 +691,40 @@ julia> Symbolics.jacobian_sparsity(exprs, vars)
 ```
 """
 function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
-    du = map(value, exprs)
-    u = map(value, vars)
+    if any(iswrapped, exprs)
+        du = map(value, exprs)
+    else
+        du = exprs
+    end
+    if any(iswrapped, vars)
+        u = map(value, vars)
+    else
+        u = vars
+    end
     dict = Dict(zip(u, 1:length(u)))
 
     i = Ref(1)
     I = Int[]
     J = Int[]
+    sizehint!(I, 2length(exprs))
+    sizehint!(J, 2length(vars))
 
 
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
 
-    r = @rule ~x::(x->haskey(dict, x)) => begin
-        push!(I, i[])
-        push!(J, dict[~x])
-        nothing
+    function r(x)
+        if iscall(x)
+            for y in arguments(x)
+                r(y)
+            end
+        end
+        j = get(dict, x, -1)
+        if j != -1
+            push!(I, i[])
+            push!(J, j)
+        end
     end
-
-    r =  Rewriters.Postwalk(r)
 
     for ii = 1:length(du)
         i[] = ii
