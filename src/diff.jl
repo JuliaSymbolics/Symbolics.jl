@@ -608,6 +608,10 @@ function jacobian(ops, vars; simplify=false, kwargs...)
     jacobian(ops, vars; simplify=simplify, scalarize=false, kwargs...)
 end
 
+function needs_scalarization(arg)
+    symbolic_type(arg) == ArraySymbolic() || any(x -> symbolic_type(x) != ScalarSymbolic(), arg)
+end
+
 """
 $(SIGNATURES)
 
@@ -621,10 +625,10 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function sparsejacobian(ops::AbstractVector, vars::AbstractVector; simplify::Bool=false, kwargs...)
-    if any(x -> symbolic_type(x) != ScalarSymbolic(), ops)
+    if needs_scalarization(ops)
         ops = Symbolics.scalarize(ops)
     end
-    if any(x -> symbolic_type(x) != ScalarSymbolic(), vars)
+    if needs_scalarization(vars)
         vars = Symbolics.scalarize(vars)
     end
     sp = jacobian_sparsity(ops, vars)
@@ -648,10 +652,10 @@ an array of variable expressions given the sparsity structure.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false, kwargs...)
-    if any(x -> symbolic_type(x) != ScalarSymbolic(), ops)
+    if needs_scalarization(ops)
         ops = Symbolics.scalarize(ops)
     end
-    if any(x -> symbolic_type(x) != ScalarSymbolic(), vars)
+    if needs_scalarization(vars)
         vars = Symbolics.scalarize(vars)
     end
 
