@@ -2175,9 +2175,9 @@ version = "0.2.2"
 
 [[deps.SymbolicUtils]]
 deps = ["AbstractTrees", "ArrayInterface", "Bijections", "ChainRulesCore", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "ExproniconLite", "LinearAlgebra", "MultivariatePolynomials", "NaNMath", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicIndexingInterface", "TaskLocalValues", "TermInterface", "TimerOutputs", "Unityper", "WeakValueDicts"]
-git-tree-sha1 = "e28016d1df9f71d0563dcc0cdbb46ee961479e2c"
+git-tree-sha1 = "9ba49f51bf6c268d988008912cf131c3417ae7a6"
 uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
-version = "3.23.0"
+version = "3.24.0"
 
     [deps.SymbolicUtils.extensions]
     SymbolicUtilsLabelledArraysExt = "LabelledArrays"
