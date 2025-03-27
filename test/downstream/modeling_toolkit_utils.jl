@@ -56,3 +56,6 @@ D = Differential(t)
 Symbolics.diff2term(D(x))
 Symbolics.diff2term(D(sqrt(sqrt(sqrt(+(x, y))))))
 Symbolics.diff2term(D(x + y))
+
+@variables x(t)[1:2] p[1:2, 1:2]
+@test ModelingToolkit.is_diff_equation(D(x) ~ p*x)
