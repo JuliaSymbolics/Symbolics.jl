@@ -13,7 +13,7 @@ using Symbolics.SymbolicUtils
 end
 
 function LuxCore.outputsize(model::SymbolicUtils.BasicSymbolic{<:LuxCore.AbstractLuxLayer}, x::Symbolics.Arr, rng::AbstractRNG)
-    LuxCore.outputsize(Symbolics.getmetadata(model, Symbolics.VariableDefaultValue), x, rng)
+    LuxCore.outputsize(Symbolics.getdefaultval(model), x, rng)
 end
 
 @register_array_symbolic LuxCore.stateless_apply(
