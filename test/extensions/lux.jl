@@ -11,6 +11,7 @@ using ComponentArrays
     Symbolics.@variables sym_ca[1:length(ca)] = ca
     Symbolics.@variables sym_ps::typeof(ps) = ps
     Symbolics.@variables sym_x[1:5] = Float32[1,2,3,4,5]
+    Symbolics.@variables sym_model::typeof(model) = model
 
     out_ref = LuxCore.stateless_apply(model, x, ps)
     @test out_ref isa Vector{Float32}
@@ -40,6 +41,12 @@ using ComponentArrays
     @test out isa Symbolics.Arr
     @test length(out) == 6
     out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ca => ca),)))
+    @test out_sub == out_ref
+
+    out = LuxCore.stateless_apply(sym_model, sym_x, sym_ca)
+    @test out isa Symbolics.Arr
+    @test length(out) == 6
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_model => model, sym_x => x, sym_ca => ca),)))
     @test out_sub == out_ref
 end
 
@@ -53,6 +60,7 @@ end
     Symbolics.@variables sym_ca[1:length(ca)] = ca
     Symbolics.@variables sym_ps::typeof(ps) = ps
     Symbolics.@variables sym_x[1:5] = Float32[1, 2, 3, 4, 5]
+    Symbolics.@variables sym_model::typeof(model) = model
 
     out_ref = LuxCore.stateless_apply(model, x, ps)
     @test out_ref isa Vector{Float32}
@@ -82,5 +90,11 @@ end
     @test out isa Symbolics.Arr
     @test length(out) == 3
     out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ca => ca),)))
+    @test out_sub == out_ref
+
+    out = LuxCore.stateless_apply(sym_model, sym_x, sym_ca)
+    @test out isa Symbolics.Arr
+    @test length(out) == 3
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_model => model, sym_x => x, sym_ca => ca),)))
     @test out_sub == out_ref
 end
