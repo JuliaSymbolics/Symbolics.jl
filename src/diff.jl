@@ -1,6 +1,16 @@
 abstract type Operator end
 propagate_shape(::Operator, x) = axes(x)
 
+struct ZeroOperator <: Operator
+end
+(::ZeroOperator)(x) = wrap(0)
+Base.show(io::IO, D::Differential) = print(io, "ZeroOperator")
+Base.nameof(D::ZeroOperator) = :ZeroOperator
+Base.:*(D1, D2::ZeroOperator) = ZeroOperator()
+Base.:*(D1::ZeroOperator, D2) = ZeroOperator()
+Base.:*(D1::ZeroOperator, D2::ZeroOperator) = ZeroOperator()
+Base.:^(D::ZeroOperator, n::Integer) = ZeroOperator()
+
 """
 $(TYPEDEF)
 
@@ -33,6 +43,7 @@ struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x
     Differential(x) = new(value(x))
+    Differential(x::Union{AbstractFloat, Integer}) = ZeroOperator()
 end
 function (D::Differential)(x)
     x = unwrap(x)
@@ -42,6 +53,8 @@ function (D::Differential)(x)
         term(D, x)
     end
 end
+
+(D::Differential)(x::Union{AbstractFloat, Integers}) = wrap(0)
 (D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
 (D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, T) = T
