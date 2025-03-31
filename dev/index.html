@@ -7,7 +7,7 @@ Pkg.add(&quot;Symbolics&quot;)</code></pre><h2 id="Citation"><a class="docs-head
   year={2021}
 }</code></pre><h2 id="Feature-Summary"><a class="docs-heading-anchor" href="#Feature-Summary">Feature Summary</a><a id="Feature-Summary-1"></a><a class="docs-heading-anchor-permalink" href="#Feature-Summary" title="Permalink"></a></h2><p>Because Symbolics.jl is built into the Julia language and works with its dispatches, generic functions in Base Julia will work with symbolic expressions! Make matrices of symbolic expressions and multiply them: it will just work. Take the LU-factorization. Etc. Thus, see <a href="https://docs.julialang.org/en/v1/">the Julia Documentation</a> for a large list of functionality available in Symbolics.jl.</p><p>A general list of the features is:</p><ul><li>Symbolic arithmetic with type information and multiple dispatch</li><li>Symbolic polynomials and trigonometric functions</li><li>Pattern matching, simplification and substitution</li><li>Differentiation</li><li>Symbolic linear algebra (factorizations, inversion, determinants, eigencomputations, etc.)</li><li>Discrete math (representations of summations, products, binomial coefficients, etc.)</li><li>Logical and Boolean expressions</li><li>Symbolic equation solving and conversion to arbitrary precision</li><li>Support for non-standard algebras (non-commutative symbols and customizable rulesets)</li><li>Special functions (list provided by <a href="https://github.com/JuliaMath/SpecialFunctions.jl">SpecialFunctions.jl</a>)</li><li>Automatic conversion of Julia code to symbolic code</li><li>Generation of (high performance and parallel) functions from symbolic expressions</li><li>Fast automated sparsity detection and generation of sparse Jacobians and Hessians</li></ul><p>and much more.</p><h2 id="Extension-Packages"><a class="docs-heading-anchor" href="#Extension-Packages">Extension Packages</a><a id="Extension-Packages-1"></a><a class="docs-heading-anchor-permalink" href="#Extension-Packages" title="Permalink"></a></h2><p>Below is a list of known extension packages. If you would like your package to be listed here, feel free to open a pull request!</p><ul><li><a href="https://github.com/SciML/ModelingToolkit.jl">ModelingToolkit.jl</a>: Symbolic representations of common numerical systems<ul><li>Ordinary differential equations</li><li>Stochastic differential equations</li><li>Partial differential equations</li><li>Nonlinear systems</li><li>Optimization problems</li><li>Optimal Control</li><li>Causal and acausal modeling (Simulink/Modelica)</li><li>Automated model transformation, simplification, and composition</li></ul></li><li><a href="https://github.com/SciML/Catalyst.jl">Catalyst.jl</a>: Symbolic representations of chemical reactions<ul><li>Symbolically build and represent large systems of chemical reactions</li><li>Generate code for ODEs, SDEs, continuous-time Markov Chains, and more</li><li>Simulate the models using the SciML ecosystem with O(1) Gillespie methods</li></ul></li><li><a href="https://github.com/SciML/DataDrivenDiffEq.jl">DataDrivenDiffEq.jl</a>: Automatic identification of equations from data<ul><li>Automated construction of ODEs and DAEs from data</li><li>Representations of Koopman operators and Dynamic Mode Decomposition (DMD)</li></ul></li><li><a href="https://github.com/MilesCranmer/SymbolicRegression.jl">SymbolicRegression.jl</a>: Distributed High-Performance symbolic regression<ul><li>Parallelized generic algorithms for finding equations from data</li><li>Pareto frontier-based scoring</li></ul></li><li><a href="https://github.com/dpsanders/ReversePropagation.jl">ReversePropagation.jl</a>: Source-to-source reverse mode automatic differentiation<ul><li>Automated tracing of code and construction of backpropagation equations</li><li>Composes with symbolic transformation and simplification functionality</li></ul></li></ul><h2 id="Reproducibility"><a class="docs-heading-anchor" href="#Reproducibility">Reproducibility</a><a id="Reproducibility-1"></a><a class="docs-heading-anchor-permalink" href="#Reproducibility" title="Permalink"></a></h2><details><summary>The documentation of this SciML package was built using these direct dependencies,</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Status `~/work/Symbolics.jl/Symbolics.jl/docs/Project.toml`
   [6e4b80f9] BenchmarkTools v1.6.0
-  [e30172f5] Documenter v1.9.0
+  [e30172f5] Documenter v1.10.0
   [0b43b601] Groebner v0.9.0
   [23fbe1c1] Latexify v0.16.6
 ⌅ [2edaba10] Nemo v0.48.4
@@ -74,7 +74,7 @@ Environment:
   [a0c0ee7d] DifferentiationInterface v0.6.49
   [31c24e10] Distributions v0.25.118
   [ffbed154] DocStringExtensions v0.9.4
-  [e30172f5] Documenter v1.9.0
+  [e30172f5] Documenter v1.10.0
   [5b8099bc] DomainSets v0.7.15
   [7c1d4256] DynamicPolynomials v0.6.1
   [4e289a0a] EnumX v1.0.5
@@ -180,7 +180,7 @@ Environment:
   [fa646aed] OrdinaryDiffEqSymplecticRK v1.3.0
   [b1df2697] OrdinaryDiffEqTsit5 v1.1.0
   [79d7bb75] OrdinaryDiffEqVerner v1.1.1
-  [90014a1f] PDMats v0.11.32
+  [90014a1f] PDMats v0.11.33
   [65ce6f38] PackageExtensionCompat v1.0.2
   [d96e819e] Parameters v0.12.3
   [69de0a69] Parsers v2.8.1
@@ -206,7 +206,7 @@ Environment:
   [79098fc4] Rmath v0.8.0
   [7e49a35a] RuntimeGeneratedFunctions v0.5.13
   [94e857df] SIMDTypes v0.1.0
-  [0bca4576] SciMLBase v2.80.1
+  [0bca4576] SciMLBase v2.81.0
   [19f34311] SciMLJacobianOperators v0.1.1
   [c0aeaf25] SciMLOperators v0.3.13
   [53ae85a6] SciMLStructures v1.7.0
@@ -262,7 +262,7 @@ Environment:
 ⌅ [b22a6f82] FFMPEG_jll v4.4.4+1
   [e134572f] FLINT_jll v300.200.100+0
   [a3f928ae] Fontconfig_jll v2.15.0+0
-  [d7e528f0] FreeType2_jll v2.13.3+1
+  [d7e528f0] FreeType2_jll v2.13.4+0
   [559328eb] FriBidi_jll v1.0.16+0
   [0656b61e] GLFW_jll v3.4.0+2
   [d2c73de3] GR_jll v0.73.13+0
@@ -396,4 +396,4 @@ Environment:
   [8e850b90] libblastrampoline_jll v5.11.0+0
   [8e850ede] nghttp2_jll v1.59.0+0
   [3f19e933] p7zip_jll v17.4.0+2
-Info Packages marked with ⌃ and ⌅ have new versions available. Those with ⌃ may be upgradable, but those with ⌅ are restricted by compatibility constraints from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v6.34/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v6.34/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.9.0 on <span class="colophon-date" title="Saturday 29 March 2025 18:43">Saturday 29 March 2025</span>. Using Julia version 1.11.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Info Packages marked with ⌃ and ⌅ have new versions available. Those with ⌃ may be upgradable, but those with ⌅ are restricted by compatibility constraints from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v6.34/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v6.34/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.10.0 on <span class="colophon-date" title="Monday 31 March 2025 11:42">Monday 31 March 2025</span>. Using Julia version 1.11.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
