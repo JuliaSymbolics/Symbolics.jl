@@ -17,9 +17,9 @@ Dx = Differential(x)
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
 
 @testset "ZeroOperator handling" begin
-    @test_error ErrorException Differential(0.1)(x)
-    @test_error ErrorException Differential(1)(x)
-    @test_error ErrorException Differential(2)(2x)
+    @test_throws ErrorException Differential(0.1)(x)
+    @test_throws ErrorException Differential(1)(x)
+    @test_throws ErrorException Differential(2)(2x)
 end
 
 #@test @macroexpand(@derivatives D'~t D2''~t) == @macroexpand(@derivatives (D'~t), (D2''~t))
