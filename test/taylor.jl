@@ -1,4 +1,4 @@
-using Symbolics
+using Symbolics, Test
 
 # test all variations of series() input
 ns = 0:3
@@ -68,3 +68,9 @@ eqs = substitute(eqs, Dict(sol))
 eq = y ~ 2*Num(π)*x
 eq = taylor(eq, x, 0, 1; rationalize=false, fold=false)
 @test contains(string(eq), "π") # should not turn 2*π into 6.28...
+
+# integral with symbolic limits
+@variables a
+I = Integral(x in (0, 2a))
+@test isequal(taylor_coeff(I(ϵ^2*x+1), ϵ, 1), I(0))
+
