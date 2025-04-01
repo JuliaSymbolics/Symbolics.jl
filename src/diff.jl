@@ -33,6 +33,7 @@ struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x
     Differential(x) = new(value(x))
+    Differential(x::Union{AbstractFloat, Integer}) = error("D(::Number) is not a valid derivative. Derivatives must be taken w.r.t. symbolic variables.")
 end
 function (D::Differential)(x)
     x = unwrap(x)
@@ -42,6 +43,8 @@ function (D::Differential)(x)
         term(D, x)
     end
 end
+
+(D::Differential)(x::Union{AbstractFloat, Integer}) = wrap(0)
 (D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
 (D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, T) = T
@@ -260,7 +263,7 @@ function executediff(D, arg, simplify=false; throw_no_derivative=false)
         return expand_derivatives(c)
     elseif op === ifelse
         args = arguments(arg)
-        O = op(args[1], 
+        O = op(args[1],
             executediff(D, args[2], simplify; throw_no_derivative),
             executediff(D, args[3], simplify; throw_no_derivative))
         return O

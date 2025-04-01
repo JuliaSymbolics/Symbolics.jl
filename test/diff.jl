@@ -16,6 +16,12 @@ Dx = Differential(x)
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
 
+@testset "ZeroOperator handling" begin
+    @test_throws ErrorException Differential(0.1)(x)
+    @test_throws ErrorException Differential(1)(x)
+    @test_throws ErrorException Differential(2)(2x)
+end
+
 #@test @macroexpand(@derivatives D'~t D2''~t) == @macroexpand(@derivatives (D'~t), (D2''~t))
 
 @test isequal(expand_derivatives(D(t)), 1)
@@ -350,7 +356,7 @@ end
 
 # 1262
 #
-let 
+let
     @variables t  b(t)
 	D = Differential(t)
 	expr = b - ((D(b))^2) * D(D(b))
@@ -366,7 +372,7 @@ let
     D = Differential(y)
 
     expr_gen = (fun) -> D(D(((-D(D(fun))) / g(y))))
-    
+
     expr = expr_gen(g(y))
     # just make sure that no errors are thrown in the following, the results are to complicated to compare
     expand_derivatives(expr)
@@ -436,11 +442,11 @@ let
 end
 
 # Hessian sparsity involving unknown functions
-let 
+let
     @variables x₁ x₂ p q[1:1]
     expr = 3x₁^2 + 4x₁ * x₂
     @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
-    
+
     expr = 3x₁^2 + 4x₁ * x₂ + p
     @test Matrix(Symbolics.hessian_sparsity(expr, [x₁, x₂])) == [true true; true false]
 
@@ -499,7 +505,7 @@ let
     @variables p[1:1] x[1:1]
     p = collect(p)
     x = collect(x)
-    @test collect(Symbolics.sparsehessian(p[1] * x[1], x)) == [0;;] 
+    @test collect(Symbolics.sparsehessian(p[1] * x[1], x)) == [0;;]
     @test isequal(collect(Symbolics.sparsehessian(p[1] * x[1]^2, x)), [2p[1];;])
 
     # second example
