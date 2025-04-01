@@ -44,7 +44,7 @@ function (D::Differential)(x)
     end
 end
 
-(D::Differential)(x::Union{AbstractFloat, Integers}) = wrap(0)
+(D::Differential)(x::Union{AbstractFloat, Integer}) = wrap(0)
 (D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
 (D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, T) = T
