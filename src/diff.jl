@@ -145,7 +145,7 @@ function _occursin_info(x, expr, fail = true)
             # check if x is shadowed by integration variable in integrand
             isequal(domain.variables, x) && return false
         end
-        
+
         cond = op !== getindex
         any(a -> occursin_info(x, a, cond), arguments(expr))
     end
@@ -310,7 +310,7 @@ function executediff(D, arg, simplify=false; throw_no_derivative=false)
                 c += t1*t2
             end
             inner = executediff(D, inner_function; throw_no_derivative)
-            !isequal(inner, 0) && (c += op(inner))
+            c += op(inner)
             return value(c)
         end
     end

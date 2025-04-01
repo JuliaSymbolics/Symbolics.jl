@@ -37,11 +37,11 @@ eq_test = I(2D(u(x,y))*u(x,y)) + D(v(x))*u(x, v(x))^2
 # case where limits of integral contain the variable to derive
 # against
 I = Integral(y in ClosedInterval(1, 2x))
-@test isequal(expand_derivatives(D(I(1))), 2)
+@test isequal(expand_derivatives(D(I(1))), 2 + I(0))
 
 # same but case where limit of integral is not a call
 I = Integral(y in ClosedInterval(1, x))
-@test isequal(expand_derivatives(D(I(1))), 1)
+@test isequal(expand_derivatives(D(I(1))), 1 + I(0))
 
 # test shadowing by integration variable 
 # the result of a definite integral over x does not depend on x
