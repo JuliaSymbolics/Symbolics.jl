@@ -116,7 +116,7 @@ end
     env --> :equation
     index --> :subscript
 
-    if eq.lhs isa Connection
+    if !(eq.lhs isa Union{Number, AbstractArray, Symbolic})
         return eq.rhs
     else
         return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
