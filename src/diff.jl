@@ -1,16 +1,6 @@
 abstract type Operator end
 propagate_shape(::Operator, x) = axes(x)
 
-struct ZeroOperator <: Operator
-end
-(::ZeroOperator)(x) = wrap(0)
-Base.show(io::IO, D::Differential) = print(io, "ZeroOperator")
-Base.nameof(D::ZeroOperator) = :ZeroOperator
-Base.:*(D1, D2::ZeroOperator) = ZeroOperator()
-Base.:*(D1::ZeroOperator, D2) = ZeroOperator()
-Base.:*(D1::ZeroOperator, D2::ZeroOperator) = ZeroOperator()
-Base.:^(D::ZeroOperator, n::Integer) = ZeroOperator()
-
 """
 $(TYPEDEF)
 
@@ -43,7 +33,7 @@ struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x
     Differential(x) = new(value(x))
-    Differential(x::Union{AbstractFloat, Integer}) = ZeroOperator()
+    Differential(x::Union{AbstractFloat, Integer}) = error("D(::Number) is not a valid derivative. Derivatives must be taken w.r.t. symbolic variables.")
 end
 function (D::Differential)(x)
     x = unwrap(x)
@@ -273,7 +263,7 @@ function executediff(D, arg, simplify=false; throw_no_derivative=false)
         return expand_derivatives(c)
     elseif op === ifelse
         args = arguments(arg)
-        O = op(args[1], 
+        O = op(args[1],
             executediff(D, args[2], simplify; throw_no_derivative),
             executediff(D, args[3], simplify; throw_no_derivative))
         return O
