@@ -1,6 +1,7 @@
 using Symbolics
 using Test
 using Symbolics: value
+using FiniteDiff
 
 # Derivatives
 @variables t σ ρ β
@@ -603,4 +604,25 @@ let
     @test isequal(expand_derivatives(Dt(y1)), Dt(x) * Dx(y1)) # scalar
     @test isequal(expand_derivatives(Dt(y[1])), Dt(x) * Dx(y[1])) # same for vector var
     @test isequal(expand_derivatives(Dt(Y[1,1])), Dt(x) * Dx(Y[1,1])) # same for matrix arr
+end
+
+@testset "Derivative of mod function" begin
+    @test isnan(derivative(mod, (4, 2), Val(1)))  
+    @test derivative(mod, (5, 2), Val(1)) == 1  
+
+    @test isnan(derivative(mod, (4, 2), Val(2)))  
+    @test derivative(mod, (5, 2), Val(2)) == -floor(5 / 2)  
+end
+
+
+
+@testset "Derivative of mod function" begin
+    f(x, y) = mod(x, y)
+
+    @test isnan(derivative(mod, (4, 2), Val(1)))  
+    @test derivative(mod, (5, 2), Val(1)) == FiniteDiff.finite_difference_derivative(x -> f(x, 2), 5)
+
+    
+    @test isnan(derivative(mod, (4, 2), Val(2)))  
+    @test derivative(mod, (5, 2), Val(2)) == FiniteDiff.finite_difference_derivative(y -> f(5, y), 2)
 end

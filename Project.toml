@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 authors = ["Shashi Gowda <gowda@mit.edu>"]
-version = "6.34"
+version = "6.34.0"
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -68,6 +68,7 @@ Distributions = "0.25"
 DocStringExtensions = "0.9"
 DomainSets = "0.6, 0.7"
 DynamicPolynomials = "0.5, 0.6"
+FiniteDiff = "2"
 ForwardDiff = "0.10.36"
 Groebner = "0.8.2, 0.9"
 LaTeXStrings = "1.3"
@@ -96,10 +97,12 @@ SymbolicUtils = "3.24"
 TermInterface = "2"
 julia = "1.10"
 
+
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
 DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
+FiniteDiff = "6a86dc24-6348-571c-b903-95158fe2bd41"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
 LambertW = "984bce1d-4616-540c-a9ee-88d1112d94c9"
@@ -113,4 +116,4 @@ SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "Random", "LambertW", "Lux", "ComponentArrays", "Nemo", "DynamicQuantities"]
+test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "Random", "LambertW", "Lux", "ComponentArrays", "Nemo", "DynamicQuantities","FiniteDiff"]

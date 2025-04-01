@@ -480,6 +480,9 @@ for (modu, fun, arity) ∈ DiffRules.diffrules(; filter_modules=(:Base, :Special
     end
 end
 
+derivative(::typeof(mod), args::NTuple{2, Any}, ::Val{1}) = ifelse(mod(args...) == 0, NaN, 1)
+derivative(::typeof(mod), args::NTuple{2, Any}, ::Val{2}) = ifelse(mod(args...) == 0, NaN, -floor(args[1] / args[2]))
+
 derivative(::typeof(+), args::NTuple{N,Any}, ::Val) where {N} = 1
 derivative(::typeof(*), args::NTuple{N,Any}, ::Val{i}) where {N,i} = *(deleteat!(collect(args), i)...)
 derivative(::typeof(one), args::Tuple{<:Any}, ::Val) = 0
