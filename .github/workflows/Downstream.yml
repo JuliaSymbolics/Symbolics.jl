@@ -22,7 +22,7 @@ jobs:
           - {user: SciML, repo: ModelingToolkit.jl, group: Initialization}
           - {user: SciML, repo: ModelingToolkit.jl, group: SymbolicIndexingInterface}
           - {user: SciML, repo: Catalyst.jl, group: All}
-          - {user: SciML, repo: CellMLToolkit.jl, group: All}
+          - {user: SciML, repo: CellMLToolkit.jl, group: Core}
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
           - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core}
           - {user: SciML, repo: ModelOrderReduction.jl, group: All}
