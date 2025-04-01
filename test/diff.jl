@@ -607,16 +607,6 @@ let
 end
 
 @testset "Derivative of mod function" begin
-    @test isnan(derivative(mod, (4, 2), Val(1)))  
-    @test derivative(mod, (5, 2), Val(1)) == 1  
-
-    @test isnan(derivative(mod, (4, 2), Val(2)))  
-    @test derivative(mod, (5, 2), Val(2)) == -floor(5 / 2)  
-end
-
-
-
-@testset "Derivative of mod function" begin
     f(x, y) = mod(x, y)
 
     @test isnan(derivative(mod, (4, 2), Val(1)))  
