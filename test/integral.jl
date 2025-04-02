@@ -20,7 +20,7 @@ I = Integral(x in ClosedInterval(a, b))
 @test I(2im) isa Complex{Num}
 @test isequal(I(2im), 2im * (b - a))
 @test isequal(I(1 + 2.1im), (1 + 2.1im)*(b - a))
-@test I(x + imx) isa Complex{Num}
+@test I(x + im*x) isa Complex{Num}
 
 D = Differential(x)
 Dxx = Differential(x)^2
