@@ -61,7 +61,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     end
 
     # y / 0 => Inf
-    if oper === (/) && !isequal(args[1], 0) && isequal(args[2], 0)
+    if oper === (/) && !isequal(numerator(x), 0) && isequal(denominator(x), 0)
         return Inf
     end
 

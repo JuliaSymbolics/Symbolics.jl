@@ -79,15 +79,15 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             end
 
         elseif oper === (/)
-            var_innumerator = any(isequal(x, var) for x in get_variables(args[1]))
+            var_innumerator = any(isequal(x, var) for x in get_variables(numerator(lhs)))
             if var_innumerator
                 # x / 2 = y
-                lhs = args[1]
-                rhs = map(sol -> sol * args[2], rhs)
+                rhs = map(sol -> sol * denominator(lhs), rhs)
+                lhs = unwrap(numerator(lhs))
             else
                 # 2 / x = y
-                lhs = args[2]
-                rhs = map(sol -> term(/, args[1], sol), rhs)
+                rhs = map(sol -> term(/, numerator(lhs), sol), rhs)
+                lhs = unwrap(denominator(lhs))
             end
 
         elseif oper === (^)
