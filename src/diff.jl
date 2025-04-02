@@ -137,7 +137,19 @@ function _occursin_info(x, expr, fail = true)
     if isequal(x, expr)
         true
     else
-        cond = operation(expr) !== getindex
+        op = operation(expr)
+
+        if op isa Integral
+            # check if x occurs in limits
+            domain = op.domain
+            lower, upper = value.(DomainSets.endpoints(domain.domain))
+            occursin_info(x, lower) || occursin_info(x, upper) && return true
+
+            # check if x is shadowed by integration variable in integrand
+            isequal(domain.variables, x) && return false
+        end
+
+        cond = op !== getindex
         any(a -> occursin_info(x, a, cond), arguments(expr))
     end
 end
@@ -287,20 +299,20 @@ function executediff(D, arg, simplify=false; throw_no_derivative=false)
     elseif isa(op, Integral)
         if isa(op.domain.domain, AbstractInterval)
             domain = op.domain.domain
-            a, b = DomainSets.endpoints(domain)
+            a, b = value.(DomainSets.endpoints(domain))
             c = 0
             inner_function = arguments(arg)[1]
-            if iscall(value(a))
-                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(a)))
-                t2 = D(a)
+            if iscall(a) || isequal(a, D.x)
+                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => a))
+                t2 = executediff(D, a, simplify; throw_no_derivative)
                 c -= t1*t2
             end
-            if iscall(value(b))
-                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => value(b)))
-                t2 = D(b)
+            if iscall(b) || isequal(b, D.x)
+                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => b))
+                t2 = executediff(D, b, simplify; throw_no_derivative)
                 c += t1*t2
             end
-            inner = executediff(D, arguments(arg)[1]; throw_no_derivative)
+            inner = executediff(D, inner_function; throw_no_derivative)
             c += op(inner)
             return value(c)
         end
