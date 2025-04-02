@@ -83,8 +83,8 @@ function n_func_occ(expr, var)
 
                 # n(2 / x) = 1; n(x/x^2) = 2?
             elseif oper_arg === (/)
-                n += n_func_occ(args_arg[1], var)
-                n += n_func_occ(args_arg[2], var)
+                n += n_func_occ(numerator(arg), var)
+                n += n_func_occ(denominator(arg), var)
 
                 # multiplication cases
             elseif oper_arg === (*)

@@ -320,9 +320,9 @@ function _linear_expansion(t, x)
         return (0, b₁^b₂, islinear)
     elseif op === (/)
         # (a₁ x + b₁)/(a₂ x + b₂) is linear => a₂ = 0
-        a₂, b₂, islinear = linear_expansion(args[2], x)
+        a₂, b₂, islinear = linear_expansion(denominator(t), x)
         (islinear && _iszero(a₂)) || return (0, 0, false)
-        a₁, b₁, islinear = linear_expansion(args[1], x)
+        a₁, b₁, islinear = linear_expansion(numerator(t), x)
         # (a₁ x + b₁)/b₂
         return islinear ? (a₁ / b₂, b₁ / b₂, islinear) : (0, 0, false)
     elseif op === getindex
