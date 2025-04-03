@@ -428,3 +428,10 @@ end
     @test getdefaultval(y) isa BasicSymbolic
     @test Symbolics.getmetadata(unwrap(y), VariableFoo, nothing) isa Vector{<:BasicSymbolic}
 end
+
+@testset "`hash(::CallWithMetadata)` is consistent with `isequal`" begin
+    @variables f(..)
+    ff = setmetadata(f, Int, 3)
+    @test isequal(f, ff)
+    @test hash(f) == hash(ff)
+end

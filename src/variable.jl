@@ -317,6 +317,7 @@ function (f::CallWithMetadata)(args...)
 end
 
 Base.isequal(a::CallWithMetadata, b::CallWithMetadata) = isequal(a.f,  b.f)
+Base.hash(x::CallWithMetadata, h::UInt) = hash(x.f, h)
 
 function arg_types_from_call_args(call_args)
     if length(call_args) == 1 && only(call_args) == :..
