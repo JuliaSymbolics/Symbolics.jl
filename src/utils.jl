@@ -117,7 +117,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
         inner = arguments(inner)[1]
     end
     if iscall(inner) && operation(inner) == getindex
-        return diff2term(op(arguments(inner)[1]))[arguments(inner)[2:end]...]
+        return diff2term(op(arguments(inner)[1]), O_metadata)[arguments(inner)[2:end]...]
     end
     if is_derivative(O)
         ds = ""
