@@ -544,7 +544,6 @@ function _recursive_unwrap(val)
         if val isa SparseMatrixCSC
             (Is, Js, Vs) = findnz(val)
             Vs = _recursive_unwrap.(Vs)
-            @show Vs
             return sparse(Is, Js, Vs) 
         else
             return _recursive_unwrap.(val)
