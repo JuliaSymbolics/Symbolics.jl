@@ -315,7 +315,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     if rhss isa SubArray
         rhss = copy(rhss)
     end
+    Main.xx[] = rhss
     rhss = _recursive_unwrap(rhss)
+    @show rhss
     states.rewrites[:nanmath] = nanmath
     # We cannot switch to ShardedForm because it deadlocks with
     # RuntimeGeneratedFunctions

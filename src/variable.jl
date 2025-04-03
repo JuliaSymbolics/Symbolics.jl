@@ -541,7 +541,14 @@ function _recursive_unwrap(val)
         if parent(val) !== val
             return Setfield.@set val.parent = _recursive_unwrap(parent(val))
         end
-        return _recursive_unwrap.(val)
+        if val isa SparseMatrixCSC
+            (Is, Js, Vs) = findnz(val)
+            Vs = _recursive_unwrap.(Vs)
+            @show Vs
+            return sparse(Is, Js, Vs) 
+        else
+            return _recursive_unwrap.(val)
+        end
     else
         return unwrap(val)
     end
