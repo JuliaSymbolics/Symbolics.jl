@@ -153,6 +153,15 @@ end
     test_nested_derivative = Dx(Dt(Dt(u)))
     result = diff2term(Symbolics.value(test_nested_derivative))
     @test typeof(result) === Symbolics.BasicSymbolic{Real}
+
+    @testset "staged diff2term on arrays" begin
+        @variables t x(t)[1:2]
+        D = Differential(t)
+        xt = diff2term(unwrap(D(x[1])))
+        xtt = diff2term(D(xt))
+        xtt_true = diff2term(unwrap(D(D(x[1]))))
+        @test isequal(xtt, xtt_true)
+    end
 end
 
 @testset "`fast_substitute` inside array symbolics" begin
