@@ -547,6 +547,18 @@ function _recursive_unwrap(val)
     end
 end
 
+function _recursive_unwrap(val::AbstractSparseArray)
+    if val isa AbstractSparseVector
+        (Is, Vs) = findnz(val)
+        Vs = _recursive_unwrap.(Vs)
+        return SparseVector(length(val), Is, Vs)
+    else
+        (Is, Js, Vs) = findnz(val)
+        Vs = _recursive_unwrap.(Vs)
+        return sparse(Is, Js, Vs, size(val)...) 
+    end
+end
+
 """
     fixpoint_sub(expr, dict; operator = Nothing, maxiters = 1000)
 
