@@ -104,6 +104,7 @@ include("arrays.jl")
 export @register_symbolic, @register_array_symbolic
 include("register.jl")
 
+using SparseArrays
 export @variables, Variable
 include("variable.jl")
 
@@ -112,7 +113,6 @@ include("linearity.jl")
 
 using DiffRules, SpecialFunctions, NaNMath
 
-using SparseArrays
 
 export Differential, expand_derivatives, is_derivative
 
