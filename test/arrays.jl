@@ -39,7 +39,7 @@ end
     v = Symbolics.lower_varname(unwrap(x[2]), unwrap(t), 2)
     @test operation(v) == getindex
     @test arguments(v)[2] == 2
-    @test getname(v) == getname(arguments(v)[1]) == Symbol("x(t)ˍtt")
+    @test getname(v) == getname(arguments(v)[1]) == Symbol("xˍtt")
 end
 
 @testset "getindex" begin

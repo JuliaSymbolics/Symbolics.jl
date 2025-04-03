@@ -12,7 +12,7 @@ Dx = Differential(x)
 
 @test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
 @test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
-@test Symbol(D(v[2])) === Symbol("getindex(var\"v(t)ˍt\", 2)")
+@test Symbol(D(v[2])) === Symbol("getindex(vˍt(t), 2)")
 
 test_equal(a, b) = @test isequal(simplify(a), simplify(b))
 

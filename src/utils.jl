@@ -104,11 +104,21 @@ julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
 uˍtx(x, t)
 
 julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
-var"z(t)[1]ˍt"
+(zˍt(t))[1]
 ```
 """
 function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothing)
     iscall(O) || return O
+
+    inner = O
+    op = identity
+    while is_derivative(inner)
+        op = op ∘ operation(inner)
+        inner = arguments(inner)[1]
+    end
+    if iscall(inner) && operation(inner) == getindex
+        return diff2term(op(arguments(inner)[1]), O_metadata)[arguments(inner)[2:end]...]
+    end
     if is_derivative(O)
         ds = ""
         while is_derivative(O)
@@ -130,10 +140,6 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
             string(nameof(oldop))
         elseif iscall(oldop) && operation(oldop) === getindex
             string(nameof(arguments(oldop)[1]))
-        elseif oldop == getindex
-            args = arguments(O)
-            opname = string(tosymbol(args[1]))
-            return metadata(Sym{symtype(args[1])}(Symbol(opname, d_separator, ds)), metadata(args[1]))[args[2:end]...]
         elseif oldop isa Function
             return nothing
         else
