@@ -609,10 +609,9 @@ end
 @testset "Derivative of mod function" begin
     f(x, y) = mod(x, y)
 
-    @test isnan(Symbolics.derivative(mod, (4, 2), Val(1)))  
-    @test Symbolics.derivative(mod, (5, 2), Val(1)) == FiniteDiff.finite_difference_derivative(x -> f(x, 2), 5)
+   @test isnan(Symbolics.derivative(mod, (4, 2), Val(1)))  
+   @test Symbolics.derivative(mod, (5.0, 2.0), Val(1)) == FiniteDiff.finite_difference_derivative(x -> f(x, 2.0), 5.0)
 
-    
-    @test isnan(Symbolics.derivative(mod, (4, 2), Val(2)))  
-    @test Symbolics.derivative(mod, (5, 2), Val(2)) == FiniteDiff.finite_difference_derivative(y -> f(5, y), 2)
+   @test isnan(Symbolics.derivative(mod, (4, 2), Val(2)))  
+   @test Symbolics.derivative(mod, (5.0, 2.0), Val(2)) == FiniteDiff.finite_difference_derivative(y -> f(5.0, y), 2.0)
 end
