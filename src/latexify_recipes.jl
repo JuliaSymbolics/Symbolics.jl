@@ -52,8 +52,12 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
     cdot --> false
     fmt --> FancyNumberFormatter(5)
     index --> :subscript
-    snakecase --> true
-    safescripts --> true
+
+    # Prevent Latexify.jl from interfering if variable has custom [latex = ...] field (it should escape its own underscores etc.)
+    custom = unwrap(n) isa Symbolic && hasmetadata(unwrap(n), VariableLatex)
+    snakecase --> !custom
+    safescripts --> !custom
+    function_name --> false
 
     return recipe(n)
 end
@@ -191,13 +195,22 @@ function _toexpr(O)
             return frac_expr
         end
     end
-    if issym(O) 
-        sym = string(nameof(O))
-        sym = replace(sym, NAMESPACE_SEPARATOR => ".")
-        if length(sym) > 1
-            sym = string("\\mathtt{", sym, "}")
+    if issym(O)
+        name = string(nameof(O))
+
+        # If given, use custom [latex = ...] option for the variable name (does not affect subsystem names)
+        # Otherwise fall back to a sane default, where multi-letter variables are rendered with a fixed width font
+        name = replace(name, NAMESPACE_SEPARATOR => '.')
+        if hasmetadata(O, VariableLatex)
+            seppos = findlast('.', name)
+            sysname = isnothing(seppos) ? "" : "\\mathtt{$(name[begin:seppos])}" # always \mathtt system names (consistent with multi-letter vars)
+            varname = getmetadata(O, VariableLatex) # override
+            name = string(sysname, varname)
+        elseif length(name) > 1
+            name = "\\mathtt{$name}"
         end
-        return Symbol(sym)
+
+        return Symbol(name)
     end
     !iscall(O) && return O
 
@@ -231,6 +244,10 @@ function _toexpr(O)
         end
         return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), vars, _toexpr(integrand))
     elseif symtype(op) <: FnType
+        # Preserve latex metadata field when `x(t)` becomes `x`
+        if hasmetadata(O, VariableLatex)
+            op = setmetadata(op, VariableLatex, getmetadata(O, VariableLatex))
+        end
         isempty(args) && return nameof(op)
         return Expr(:call, _toexpr(op), _toexpr(args)...)
     elseif op === getindex && symtype(args[1]) <: AbstractArray
