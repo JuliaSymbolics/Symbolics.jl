@@ -5,7 +5,7 @@ using ReferenceTests
 
 using DomainSets: Interval
 
-@variables x y z u(x) dx h[1:10,1:10]
+@variables x y z u(x) dx h[1:10,1:10] hh(x,y)[1:10,1:10] gg(x,y)[1:10,1:10] [latexwrapper = (s -> string(s))]
 Dx = Differential(x)
 Dy = Differential(y)
 
@@ -60,5 +60,10 @@ Dy = Differential(y)
 
 @test_reference "latexify_refs/indices1.txt" latexify(h[10,10])
 @test_reference "latexify_refs/indices2.txt" latexify(h[10,10], index=:bracket)
+
+# test for https://github.com/JuliaSymbolics/Symbolics.jl/issues/1167
+# note these tests need updating if/when https://github.com/korsbo/Latexify.jl/issues/331 is fixed
+@test_reference "latexify_refs/indices3.txt" latexify(hh[10,10])
+@test_reference "latexify_refs/indices4.txt" latexify(gg[10,10])
 
 @test !occursin("identity", latexify(Num(π))) # issue #1254
