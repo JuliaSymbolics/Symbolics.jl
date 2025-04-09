@@ -68,6 +68,7 @@ Dy = Differential(y)
 # note these tests need updating if/when https://github.com/korsbo/Latexify.jl/issues/331 is fixed
 @test_reference "latexify_refs/indices3.txt" latexify(hh[10,10])
 @test_reference "latexify_refs/indices4.txt" latexify(gg[10,10])
+
 @test_reference "latexify_refs/indices5.txt" latexify(a'a)
 
 @test !occursin("identity", latexify(Num(π))) # issue #1254
