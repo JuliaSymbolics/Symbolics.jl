@@ -5,8 +5,8 @@ using ReferenceTests
 
 using DomainSets: Interval
 
-@variables x y z u(x) dx h[1:10,1:10] hh(x,y)[1:10,1:10] gg(x,y)[1:10,1:10] [latexwrapper = (s -> string(s))]
-@variables AA(x) [latexwrapper = (s -> string(s))] X₁(x) [latexwrapper = (s -> string(s))]
+@variables x y z u(x) dx h[1:10,1:10] hh(x,y)[1:10,1:10] gg(x,y)[1:10,1:10] [latexwrapper = string]
+@variables AA(x) [latexwrapper = string] X₁(x) [latexwrapper = string]
 @variables a[1:10]
 Dx = Differential(x)
 Dy = Differential(y)
