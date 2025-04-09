@@ -6,7 +6,7 @@ using ReferenceTests
 using DomainSets: Interval
 
 @variables x y z u(x) dx h[1:10,1:10] hh(x,y)[1:10,1:10] gg(x,y)[1:10,1:10] [latexwrapper = (s -> string(s))]
-@variables AA(x) [latexwrapper = (s -> string(s))]
+@variables AA(x) [latexwrapper = (s -> string(s))] X₁(x) [latexwrapper = (s -> string(s))]
 Dx = Differential(x)
 Dy = Differential(y)
 
@@ -41,7 +41,7 @@ Dy = Differential(y)
 
 @test_reference "latexify_refs/equation1.txt" latexify(x ~ y + z)
 @test_reference "latexify_refs/equation2.txt" latexify(x ~ Dx(y + z))
-@test_reference "latexify_refs/equation5.txt" latexify(AA^2 + AA + 1 + x)
+@test_reference "latexify_refs/equation5.txt" latexify(AA^2 + AA + 1 + X₁)
 
 @test_reference "latexify_refs/equation_vec1.txt" latexify([
     x ~   y +  z
