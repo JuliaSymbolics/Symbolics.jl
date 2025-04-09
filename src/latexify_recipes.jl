@@ -276,12 +276,12 @@ function getindex_to_symbol(t)
         default_latex_wrapper
 
     # this is to ensure X(t)[1] becomes X_1(t) in Latex
-    if iscall(O)
+    if iscall(O) && issym(operation(O))
         oop = operation(O)        
         oargs = sorted_arguments(O)
         return :($(_toexpr(oop; latexwrapper))[$(idxs...)]($(_toexpr(oargs)...)))
     else
-        return :($(_toexpr(args[1]; latexwrapper))[$(idxs...)])
+        return :($(_toexpr(O; latexwrapper))[$(idxs...)])
     end
 end
 

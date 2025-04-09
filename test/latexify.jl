@@ -7,6 +7,7 @@ using DomainSets: Interval
 
 @variables x y z u(x) dx h[1:10,1:10] hh(x,y)[1:10,1:10] gg(x,y)[1:10,1:10] [latexwrapper = (s -> string(s))]
 @variables AA(x) [latexwrapper = (s -> string(s))] X₁(x) [latexwrapper = (s -> string(s))]
+@variables a[1:10]
 Dx = Differential(x)
 Dy = Differential(y)
 
@@ -67,5 +68,6 @@ Dy = Differential(y)
 # note these tests need updating if/when https://github.com/korsbo/Latexify.jl/issues/331 is fixed
 @test_reference "latexify_refs/indices3.txt" latexify(hh[10,10])
 @test_reference "latexify_refs/indices4.txt" latexify(gg[10,10])
+@test_reference "latexify_refs/indices5.txt" latexify(a'a)
 
 @test !occursin("identity", latexify(Num(π))) # issue #1254
