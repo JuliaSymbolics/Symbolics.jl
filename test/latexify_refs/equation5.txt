@@ -1,0 +1,3 @@
+\begin{equation}
+1 + x + AA\left( x \right) + \left( AA\left( x \right) \right)^{2}
+\end{equation}
