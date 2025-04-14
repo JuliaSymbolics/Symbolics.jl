@@ -21,6 +21,7 @@ jobs:
           - {user: SciML, repo: ModelingToolkit.jl, group: InterfaceII}
           - {user: SciML, repo: ModelingToolkit.jl, group: Initialization}
           - {user: SciML, repo: ModelingToolkit.jl, group: SymbolicIndexingInterface}
+          - {user: SciML, repo: ModelingToolkit.jl, group: RegressionI}
           - {user: SciML, repo: Catalyst.jl, group: All}
           - {user: SciML, repo: CellMLToolkit.jl, group: Core}
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE}
