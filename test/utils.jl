@@ -211,19 +211,18 @@ end
 end
 
 @testset "evaluate" begin
+    @variables x y
+    eqn_1 = x ~ y 
+    gtr = x ≳ y
+    ltr = x ≲ y
+
+    @test Symbolics.evaluate(eqn_1, Dict(x => 1, y => 1))
+    @test !Symbolics.evaluate(eqn_1, Dict(x => 1, y => 2))
+    @test !Symbolics.evaluate(gtr, Dict(x => 1, y => 2))
+    @test Symbolics.evaluate(gtr, Dict(x => 2, y => 1))
+    @test Symbolics.evaluate(ltr, Dict(x => 1, y => 2))
+    @test !Symbolics.evaluate(ltr, Dict(x => 2, y => 1))
 end
-@variables x y
-eqn_1 = x ~ y 
-gtr = x ≳ y
-ltr = x ≲ y
-
-@test Symbolics.evaluate(eqn_1, Dict(x => 1, y => 1))
-@test !Symbolics.evaluate(eqn_1, Dict(x => 1, y => 2))
-@test !Symbolics.evaluate(gtr, Dict(x => 1, y => 2))
-@test Symbolics.evaluate(gtr, Dict(x => 2, y => 1))
-@test Symbolics.evaluate(ltr, Dict(x => 1, y => 2))
-@test !Symbolics.evaluate(ltr, Dict(x => 2, y => 1))
-
 
 
 
