@@ -534,3 +534,48 @@ julia> factors(2 * x * y)
 ```
 """
 factors(x) = arguments(x, *)
+
+"""
+    evaluate(eq::Equation, subs)
+    evaluate(ineq::Inequality, subs)
+
+Evaluate the equation `eq` or inequality `ineq`. `subs` is a dictionary of variable to numerical value substitutions. 
+If both sides of the equation or inequality are numeric, then the result is a boolean. 
+
+# Examples
+```julia-repl
+julia> @variables x y
+julia> eq = x ~ y
+julia> evaluate(eq, Dict(x => 1, y => 1))
+true
+
+julia> ltr = x ≲ y
+julia> evaluate(ltr, Dict(x => 1, y => 2))
+true
+
+julia> gtr = x ≳ y
+julia> evaluate(gtr, Dict(x => 1, y => 2))
+false
+```
+"""
+function evaluate end
+
+function evaluate(eq::Equation, subs)
+    lhs = fast_substitute(eq.lhs, subs)
+    rhs = fast_substitute(eq.rhs, subs)
+    return isequal(lhs, rhs)
+end
+
+function evaluate(ineq::Inequality, subs)
+    lhs = fast_substitute(ineq.lhs, subs)
+    rhs = fast_substitute(ineq.rhs, subs)
+    if (ineq.relational_op == geq)
+        return isless(rhs, lhs)
+    elseif (ineq.relational_op == leq)
+        return isless(lhs, rhs)
+    else
+        throw(ArgumentError("Inequality $ineq not supported"))
+    end
+end 
+
+
