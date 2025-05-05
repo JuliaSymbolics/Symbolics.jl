@@ -534,3 +534,23 @@ julia> factors(2 * x * y)
 ```
 """
 factors(x) = arguments(x, *)
+
+function evaluate(eq::Equation, subs)
+    lhs = fast_substitute(eq.lhs, subs)
+    rhs = fast_substitute(eq.rhs, subs)
+    return isequal(lhs, rhs)
+end
+
+function evaluate(ineq::Inequality, subs)
+    lhs = fast_substitute(ineq.lhs, subs)
+    rhs = fast_substitute(ineq.rhs, subs)
+    if (ineq.relational_op == geq)
+        return isless(rhs, lhs)
+    elseif (ineq.relational_op == leq)
+        return isless(lhs, rhs)
+    else
+        throw(ArgumentError("Inequality $ineq not supported"))
+    end
+end 
+
+

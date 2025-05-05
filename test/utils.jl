@@ -4,6 +4,8 @@ import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap,
                   is_singleton, diff2term, tosymbol, lower_varname, 
                   makesubscripts, degree, coeff
 
+using Test
+
 @testset "get_variables" begin
     @variables t x y z(t)
 
@@ -207,3 +209,21 @@ end
     @test Set(terms(x + y + z)) == Set([x, y, z])
     @test Set(terms(-x - y + z)) == Set([-x, -y, z])
 end
+
+@testset "evaluate" begin
+end
+@variables x y
+eqn_1 = x ~ y 
+gtr = x ≳ y
+ltr = x ≲ y
+
+@test Symbolics.evaluate(eqn_1, Dict(x => 1, y => 1))
+@test !Symbolics.evaluate(eqn_1, Dict(x => 1, y => 2))
+@test !Symbolics.evaluate(gtr, Dict(x => 1, y => 2))
+@test Symbolics.evaluate(gtr, Dict(x => 2, y => 1))
+@test Symbolics.evaluate(ltr, Dict(x => 1, y => 2))
+@test !Symbolics.evaluate(ltr, Dict(x => 2, y => 1))
+
+
+
+
