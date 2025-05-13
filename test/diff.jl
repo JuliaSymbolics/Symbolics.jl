@@ -610,3 +610,14 @@ let
     @test isequal(expand_derivatives(Dt(y[1])), Dt(x) * Dx(y[1])) # same for vector var
     @test isequal(expand_derivatives(Dt(Y[1,1])), Dt(x) * Dx(Y[1,1])) # same for matrix arr
 end
+
+@testset "Derivatives of Array Variables" begin
+    @variables p[1:9]
+    vp = collect(p)
+
+    f = - 1.5log(5 + p[3]) - 1.5log(7 + p[1]) - 1.5log(8 - p[2]) - 1.5log(9 - p[4]) + 0.08p[4]*p[9] -1.5log(5 + p[3]) - 1.5log(7 + p[1]) - 1.5log(8 - p[2]) - 1.5log(9 - p[4]) + 0.08p[4]*p[9]
+
+    @test iszero(Symbolics.unwrap.(Symbolics.gradient(f, vp) .- Symbolics.gradient(f, p)))
+    @test iszero(Symbolics.unwrap.(Symbolics.hessian(f, vp) .- Symbolics.hessian(f, p)))
+    @test iszero(Symbolics.unwrap.(Symbolics.jacobian([f], vp) .- Symbolics.jacobian([f], p)))
+end
