@@ -824,6 +824,8 @@ function hessian(O, vars::AbstractVector; simplify=false, kwargs...)
     H
 end
 
+hessian(O, vars::Arr; kwargs...) = hessian(O, collect(vars); kwargs...) 
+
 isidx(x) = x isa TermCombination
 
 basic_mkterm(t, g, args, m) = metadata(Term{Any}(g, args), m)
