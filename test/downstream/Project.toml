@@ -11,7 +11,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 ADTypes = "1"
-DifferentiationInterface = "0.6"
+DifferentiationInterface = "0.6, 0.7"
 DifferentiationInterfaceTest = "0.9"
 KernelAbstractions = "0.9"
 ModelingToolkit = "8.33, 9"
