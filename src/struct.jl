@@ -25,6 +25,11 @@ getelementtypes(s::Type{<:Struct}) = fieldtypes(juliatype(s))
 
 typed_getfield(obj, ::Val{fieldname}) where fieldname = getfield(obj, fieldname)
 
+"""
+    symbolic_getproperty(ss, name::Symbol)
+
+Symbolic term corresponding to accessing the field with name `name`.
+"""
 function symbolic_getproperty(ss, name::Symbol)
     s = symtype(ss)
     idx = findfirst(isequal(name), getelements(s))
@@ -39,6 +44,11 @@ function symbolic_getproperty(s::Union{Arr, Num}, name::Symbol)
     wrap(symbolic_getproperty(unwrap(s), name))
 end
 
+"""
+    symbolic_setproperty!(ss, name::Symbol)
+
+Symbolic term corresponding to modifying the field with name `name` to val `val`.
+"""
 function symbolic_setproperty!(ss, name::Symbol, val)
     s = symtype(ss)
     idx = findfirst(isequal(name), getelements(s))
