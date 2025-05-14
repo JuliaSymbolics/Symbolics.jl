@@ -49,7 +49,7 @@ q = Quaternion(0.5, 0.5, 0.5, 0.5)
 norm_1(q)
 ```
 
-```@docs canonical = false
+```@docs
 Symbolics.symstruct
 Symbolics.juliatype
 Symbolics.symbolic_getproperty
