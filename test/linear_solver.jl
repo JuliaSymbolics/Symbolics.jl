@@ -85,3 +85,22 @@ a, b, islinear = Symbolics.linear_expansion(D(x) - x, x)
     @variables x y
     @test !Symbolics.linear_expansion(x + z([x, y]), y)[3]
 end
+
+@testset "linear_expansion with imaginary numbers" begin
+    @variables x y
+
+    a, b, islin = Symbolics.linear_expansion(1im*x^2 + 1im*x, x)
+    @test !islin
+    a, b, islin = Symbolics.linear_expansion(2im*x + 1im, x)
+    @test islin && isequal(a, 2im) && isequal(b, 1im)
+    a, b, islin = Symbolics.linear_expansion(1im*x + 1im*y, x)
+    @test islin && isequal(a, 1im) #&& isequal(b, 1im*y)
+    a, b, islin = Symbolics.linear_expansion(1im*x - y,x)
+    @test islin && isequal(a, 1im) && isequal(b, -y)
+
+    @variables xx[1:2] yy[1:2] zz(..)
+    a, b, islin = Symbolics.linear_expansion(zz(1im * xx[2]) + 1im*xx[1], xx[1])
+    @test islin && isequal(a, im) && isequal(b, zz(1im * xx[2]))
+    a, b, islin = Symbolics.linear_expansion(1im * yy[1], xx[1])
+    @test islin && isequal(a, 0) # && isequal(b, yy[1])
+end
