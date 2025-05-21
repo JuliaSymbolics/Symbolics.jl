@@ -779,7 +779,7 @@ julia> Symbolics.jacobian_sparsity(f!, output, input)
  1  1
 ```
 """
-function jacobian_sparsity(f!::Function, output::AbstractArray, input::AbstractArray,
+function jacobian_sparsity(f!, output::AbstractArray, input::AbstractArray,
                            args...; kwargs...)
     exprs = similar(output, Num)
     fill!(exprs, false)
