@@ -50,3 +50,56 @@ Base.Experimental.register_error_hint(MethodError) do io, e, args, kwargs
       println(io, FLOAT_NUM_CONVERSION_ERROR)
   end
 end
+
+const SYMBOLIC_BOOLEAN_CONTROL_FLOW = """
+    Symbolic expression found in a control flow expression that requires a boolean. This can occur
+    for example in a function like:
+
+    ```julia
+    f(x) = if x > 1
+        x^2
+    else
+        2x
+    end
+    ```
+
+    Notice that if `x` is symbolic, then `x > 1` is a symbolic expression and `if x > 1`
+    does not know which branch to take without knowing the value of `x`, and thus we
+    cannot know the mathematical expression. Thus instead of using `if/else`, use the
+    function `ifelse(x>1, x^2, 2x)`.
+
+    Sometimes there are functions that are fundamentally incompatible with symbolic tracing.
+    For example:
+
+    ```julia 
+    function factorial(x)
+        out = x
+        while x > 1
+            x -= 1
+            out *= x
+        end
+        out
+    end
+    ```
+
+    In this function, if `x=5` then the expression is ` x*(x-1)*(x-2)*(x-3)*(x-4)`,
+    while if `x=3` then ` x*(x-1)*(x-2)`. Thus the symbolic expression is ill-defined,
+    and Symbolics is not compatible with this function. If you have this case, you
+    may want to register the symbolic function as a primitive, i.e.
+
+    ```julia
+    @register_symbolic f(x)
+    ```
+
+    then makes `f(x)` work by not expanding this function.
+
+    For more information, see https://docs.sciml.ai/Symbolics/stable/manual/faq/ and
+    https://docs.sciml.ai/Symbolics/stable/manual/functions/ .
+"""
+
+Base.Experimental.register_error_hint(TypeError) do io, e
+    if e.expected === Bool && typeof(e.got) <: Union{Symbolics.Arr, Num, Symbolics.BasicSymbolic}
+        println(io, "\n")
+        println(io, SYMBOLIC_BOOLEAN_CONTROL_FLOW)
+    end
+end
