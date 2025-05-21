@@ -84,7 +84,7 @@ const SYMBOLIC_BOOLEAN_CONTROL_FLOW = """
 
     In this function, if `x=5` then the expression is ` x*(x-1)*(x-2)*(x-3)*(x-4)`,
     while if `x=3` then ` x*(x-1)*(x-2)`. Thus the symbolic expression is ill-defined,
-    and thus symbolics is not compatible with this function. If you have this case, you
+    and Symbolics is not compatible with this function. If you have this case, you
     may want to register the symbolic function as a primitive, i.e.
 
     ```julia
