@@ -91,7 +91,7 @@ const SYMBOLIC_BOOLEAN_CONTROL_FLOW = """
     @register_symbolic f(x)
     ```
 
-    then makes `f(x)` work by not expending this function.
+    then makes `f(x)` work by not expanding this function.
 
     For more information, see https://docs.sciml.ai/Symbolics/stable/manual/faq/ and
     https://docs.sciml.ai/Symbolics/stable/manual/functions/ .
