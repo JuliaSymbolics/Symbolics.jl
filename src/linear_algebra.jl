@@ -108,7 +108,11 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
     if eq isa AbstractArray && var isa AbstractArray
         x = _solve(a, -b, simplify)
     else
-        x = a \ -b
+        if (a === wrap(0))
+            x = NaN
+        else
+            x = a \ -b
+        end
     end
     simplify || return x
     if x isa AbstractArray
