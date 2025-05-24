@@ -7,7 +7,7 @@ D = Differential(t)
 
 # Test division by zero gives a NaN
 # https://github.com/JuliaSymbolics/Symbolics.jl/issues/1540
-@test Symbolics.solve_for((x~0), y) == NaN
+@test Symbolics.solve_for((x~0), y) === NaN
 
 expr = x * p + y * (1 - p) ~ 0
 sol = Symbolics.solve_for(expr, p)
