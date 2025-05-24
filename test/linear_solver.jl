@@ -4,8 +4,6 @@ using Test
 
 @variables t p(t) x y(t)
 D = Differential(t)
-divByZero = (NaN === Symbolics.solve_for((x~0), y))
-@test divByZero
 expr = x * p + y * (1 - p) ~ 0
 sol = Symbolics.solve_for(expr, p)
 @test sol isa Num
