@@ -23,6 +23,7 @@ ex = [b ~ a
 
 # Unlike above tests variables need to be defined ahead of time
 # To avoid BoundsError
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1534
 @variables m[1:3]
 ex = [:(m[2] ~ m[1])
       :(m[2] ~ -2m[1] + 3 / m[3])
