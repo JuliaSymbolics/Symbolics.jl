@@ -20,3 +20,16 @@ ex = [b ~ a
       b ~ -2a + 3 / c
       c ~ 2]
 @test_broken all(isequal.(eqs,ex))
+
+# Unlike above tests variables need to be defined ahead of time
+# To avoid BoundsError
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1534
+@variables m[1:3]
+ex = [:(m[2] ~ m[1])
+      :(m[2] ~ -2m[1] + 3 / m[3])
+      :(m[3] ~ 2)]
+eqs = parse_expr_to_symbolic.(ex, (@__MODULE__,))
+ex = [m[2] ~ m[1]
+      m[2] ~ -2m[1] + 3 / m[3]
+      m[3] ~ 2]
+@test all(isequal.(eqs,ex))

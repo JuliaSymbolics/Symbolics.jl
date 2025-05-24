@@ -83,6 +83,10 @@ function parse_expr_to_symbolic(ex, mod::Module)
             ys = parse_expr_to_symbolic.(ex.args[2:end],(mod,))
             return Term{Real}(x,[ys...])
         end
+    elseif ex.head == :ref
+        arr = parse_expr_to_symbolic(ex.args[1], mod)
+        indices = parse_expr_to_symbolic.(ex.args[2:end], (mod,))
+        return arr[indices...]
     end
 end
 
