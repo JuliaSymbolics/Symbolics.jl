@@ -111,7 +111,7 @@ end
 
 @latexrecipe function f(eqs::Vector{Equation})
     index --> :subscript
-    has_connections = any(x->x.lhs isa Connection, eqs)
+    has_connections = any(x -> hide_lhs(x.lhs), eqs)
     if has_connections
         env --> :equation
         return map(first∘first∘Latexify.apply_recipe, eqs)
@@ -125,7 +125,7 @@ end
     env --> :equation
     index --> :subscript
 
-    if !(eq.lhs isa Union{Number, AbstractArray, Symbolic})
+    if hide_lhs(eq.lhs) || !(eq.lhs isa Union{Number, AbstractArray, Symbolic})
         return eq.rhs
     else
         return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
