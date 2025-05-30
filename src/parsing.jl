@@ -76,8 +76,8 @@ function parse_expr_to_symbolic(x::Symbol, mod::Module)
 end
 function parse_expr_to_symbolic(ex, mod::Module)
     if ex.head == :call
-        if isdefined(mod, ex.args[1])
-            return getfield(mod,ex.args[1])(parse_expr_to_symbolic.(ex.args[2:end],(mod,))...)
+        if isdefined(mod, Symbol(ex.args[1]))
+            return getfield(mod,Symbol(ex.args[1]))(parse_expr_to_symbolic.(ex.args[2:end],(mod,))...)
         else
             x = parse_expr_to_symbolic(ex.args[1], mod)
             ys = parse_expr_to_symbolic.(ex.args[2:end],(mod,))
