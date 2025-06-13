@@ -22,3 +22,38 @@ sexpr = symbolics_to_sympy(expr)
 sp = symbolics_to_sympy(p)
 
 @test SymPy.simplify(symbolics_to_sympy(Symbolics.solve_for(expr, p))) == SymPy.solve(sexpr, sp)[1]
+
+@variables x y
+
+# Test 1: Round-trip conversion
+expr = x^2 + y
+sympy_expr = symbolics_to_sympy(expr)
+back_expr = sympy_to_symbolics(sympy_expr, [x, y])
+@test isequal(expr, back_expr)
+
+# Test 2: Linear solver
+A = [1 2; 3 4]
+b = [x, y]
+sol = sympy_linear_solve(A, b)
+@test length(sol) == 2
+
+# Test 3: Algebraic solver
+eq = x^2 - 4
+sol = sympy_algebraic_solve(eq, x)
+@test length(sol) == 2
+@test all(s -> isequal(s, 2) || isequal(s, -2), sol)
+
+# Test 4: Integration
+expr = x^2
+result = sympy_integrate(expr, x)
+@test isequal(result, x^3/3)
+
+# Test 5: Limit
+expr = 1/x
+result = sympy_limit(expr, x, 0)
+@test isequal(result, Symbolics.Infinity())
+
+# Test 6: Simplification
+expr = x^2 + 2x^2
+result = sympy_simplify(expr)
+@test isequal(result, 3x^2)
