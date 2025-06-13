@@ -513,3 +513,21 @@ end
 @testset "Extracted from fuzz testing" begin
     @test verify(2.25(2.0 + 2c)*(c^2), Dict{Any, Any}(c^3 => 4.5, c^2 => 4.5), Num[c, y, z], 0)
 end
+
+@testset "With array variables" begin
+    @register_symbolic foo(x::AbstractArray)
+    @variables t x(t)[1:3]
+    expr = x[2] * 4 + 2x[1] + 2x[3] * x[1] + foo(x)
+    mapping, resid = semipolynomial_form(expr, collect(x), 2)
+    @test mapping[x[2]] == 4
+    @test mapping[x[1]] == 2
+    @test mapping[x[3] * x[1]] == 2
+    @test isequal(resid, foo(x))
+
+    expr = x[2] * 4 + 2x[1] + 2x[3] * x[1] + foo([x[1]])
+    mapping, resid = semipolynomial_form(expr, collect(x), 2)
+    @test mapping[x[2]] == 4
+    @test mapping[x[1]] == 2
+    @test mapping[x[3] * x[1]] == 2
+    @test isequal(resid, foo([x[1]]))
+end
