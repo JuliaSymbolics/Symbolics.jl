@@ -89,7 +89,7 @@ function sympy_linear_solve(A, b)
     A_mat = SymPy.SymMatrix(A_sympy)
     b_vec = SymPy.SymMatrix(b_sympy)
     sol_sympy = A_mat \ b_vec  # SymPy's linear solver
-    vars = unique(vcat(Symbolics.get_variables.(A)..., Symbolics.get_variables.(b)...))
+    vars = unique(vcat(vec(Symbolics.get_variables.(A)), Symbolics.get_variables.(b)))
     return [sympy_to_symbolics(s, vars) for s in sol_sympy]
 end
 
