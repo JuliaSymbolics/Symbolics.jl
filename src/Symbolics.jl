@@ -219,6 +219,7 @@ include("solver/special_cases.jl")
 export symbolic_solve
 
 # Sympy Functions
+function sympy_ode_solve end
 function symbolics_to_sympy end
 function sympy_to_symbolics end
 function sympy_linear_solve end
@@ -228,7 +229,7 @@ function sympy_limit end
 function sympy_simplify end
 
 export symbolics_to_sympy, sympy_to_symbolics
-export sympy_linear_solve, sympy_algebraic_solve, sympy_integrate, sympy_limit, sympy_simplify
+export sympy_linear_solve, sympy_algebraic_solve, sympy_integrate, sympy_limit, sympy_simplify,sympy_ode_solve
 
 function __init__()
     Base.Experimental.register_error_hint(TypeError) do io, exc
