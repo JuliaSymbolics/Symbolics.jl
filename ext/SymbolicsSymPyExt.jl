@@ -198,8 +198,5 @@ function sympy_simplify(expr)
     return sympy_to_symbolics(result_sympy, vars)
 end
 
-# Exports
-export symbolics_to_sympy, sympy_to_symbolics
-export sympy_linear_solve, sympy_algebraic_solve, sympy_integrate, sympy_limit, sympy_simplify
 
 end # module
