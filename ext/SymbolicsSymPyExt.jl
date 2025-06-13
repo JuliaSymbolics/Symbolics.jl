@@ -30,7 +30,6 @@ function Symbolics.symbolics_to_sympy(expr)
     end
 end
 
-# New sympy_to_symbolics function
 """
     sympy_to_symbolics(sympy_expr, vars)
 
