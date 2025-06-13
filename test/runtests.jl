@@ -24,7 +24,7 @@ limit2(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 @register_symbolic limit2(a, N)::Integer
 
 if GROUP == "All" || GROUP == "Core"
-      @testset begin
+    @testset begin
         @safetestset "Struct Test" begin include("struct.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
@@ -88,12 +88,15 @@ end
 
 if GROUP == "All" || GROUP == "Downstream"
     activate_downstream_env()
-    #@time @safetestset "ParameterizedFunctions MATLABDiffEq Regression Test" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
     @safetestset "ModelingToolkit Variable Utils Test" begin include("downstream/modeling_toolkit_utils.jl") end
     @safetestset "DI Test" begin include("downstream/differentiation_interface.jl") end
 end
 
 if GROUP == "All" || GROUP == "SymPy"
     activate_sympy_env()
-    @safetestset "SymPy Test" begin include("sympy.jl") end
+    @safetestset "SymPy Test" begin 
+        include("sympy.jl")
+        using SymbolicsSymPyExt
+        run_sympy_tests()
+    end
 end
