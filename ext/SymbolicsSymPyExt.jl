@@ -12,7 +12,6 @@ using Symbolics: value
 using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Symbolic
 using LinearAlgebra
 
-# Existing symbolics_to_sympy function
 function Symbolics.symbolics_to_sympy(expr)
     expr = value(expr)
     expr isa Symbolic || return expr
