@@ -266,6 +266,13 @@ function _linear_expansion(t::Equation, x)
     # t.rhs - t.lhs = 0
     return (a₂ - a₁, b₂ - b₁, islinear)
 end
+
+"""
+works with t of two types:
+x (variable, type Num)
+or
+b (constant)
+"""
 trivial_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
 
 is_expansion_leaf(t) = !iscall(t) || (operation(t) isa Operator)
@@ -298,6 +305,12 @@ function _linear_expansion(t, x)
             b₁ += b₂
         end
         return (a₁, b₁, true)
+    elseif op === Complex{Real}
+        # x+2im is interpreted as Complex{Real}(x, 2)
+        real_part, im_part = arguments(t)
+        a_real, b_real, islinear_real = linear_expansion(real_part, x)
+        a_im, b_im, islinear_im = linear_expansion(im_part, x)
+        return (a_real + a_im * im, b_real + b_im * im, islinear_real && islinear_im)
     elseif op === (-)
         @assert length(args) == 1
         a, b, islinear = linear_expansion(args[1], x)
