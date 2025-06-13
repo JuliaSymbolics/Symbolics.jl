@@ -94,9 +94,5 @@ end
 
 if GROUP == "All" || GROUP == "SymPy"
     activate_sympy_env()
-    @safetestset "SymPy Test" begin 
-        include("sympy.jl")
-        using SymbolicsSymPyExt
-        run_sympy_tests()
-    end
+    @safetestset "SymPy Test" begin include("sympy.jl") end
 end
