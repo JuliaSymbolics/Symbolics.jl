@@ -117,6 +117,13 @@ function sympy_algebraic_solve(expr, var)
     return [sympy_to_symbolics(s, [var]) for s in sol_sympy]
 end
 
+function sympy_algebraic_solve(expr::AbstractVector, vars::AbstractVector)
+    expr_sympy = symbolics_to_sympy.(expr)
+    vars_sympy = symbolics_to_sympy.(vars)
+    sol_sympy = SymPy.solve(expr_sympy, vars_sympy)
+    return [sympy_to_symbolics(s, vars) for s in sol_sympy]
+end
+
 """
     sympy_integrate(expr, var)
 
