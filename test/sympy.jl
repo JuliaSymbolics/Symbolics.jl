@@ -15,7 +15,6 @@ end
 using Test
 using SymPy
 using Symbolics
-using SymbolicsSymPyExt
 
 @variables t p(t) x y(t)
 expr = x * p + (x^2 - 1 + y) * (p + 2t)
