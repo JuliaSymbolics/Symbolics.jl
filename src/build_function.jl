@@ -171,8 +171,8 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUt
     end
 
     outsym = DEFAULT_OUTSYM
-    body = inplace_expr(op, outsym)
     if iip_config[2]
+        body = inplace_expr(op, outsym)
         iip_expr = wrap_code[2](Func(vcat(outsym, dargs), [], body))
     else
         iip_expr = get_unimplemented_expr([outsym; dargs])
