@@ -56,7 +56,7 @@ result = sympy_integrate(expr, x)
 # Test 6: Limit
 expr = 1/x
 result = sympy_limit(expr, x, 0)
-@test isequal(result, Symbolics.Infinity())
+@test isequal(result, Inf)
 
 # Test 7: Simplification
 expr = x^2 + 2x^2
