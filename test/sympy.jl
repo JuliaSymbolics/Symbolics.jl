@@ -24,7 +24,7 @@ sp = symbolics_to_sympy(p)
 @test SymPy.simplify(symbolics_to_sympy(Symbolics.solve_for(expr, p))) == SymPy.solve(sexpr, sp)[1]
 
 @variables x y
-@syms f(x)
+SymPy.@syms f(x)
 
 # Test 1: Round-trip conversion
 expr = x^2 + y
