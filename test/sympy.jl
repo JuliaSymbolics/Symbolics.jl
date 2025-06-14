@@ -65,6 +65,7 @@ result = sympy_simplify(expr)
 @test isequal(result, 3x^2)
 
 # Test 8: ODE solver
-ode = Symbolics.Derivative(f, x) - 2*f
+D = Differential(x)
+ode = D(f) - 2*f
 sol_ode = sympy_ode_solve(ode, f, x)
 @test isequal(sol_ode, Symbolics.parse("C1*exp(2*x)", Dict("f"=>f, "x"=>x)))
