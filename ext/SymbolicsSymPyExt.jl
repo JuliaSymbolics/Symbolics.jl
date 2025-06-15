@@ -8,7 +8,7 @@ else
     using ..SymPy
 end
 
-using Symbolics: value
+using Symbolics: value, symbolics_to_sympy, sympy_to_symbolics
 using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Symbolic
 using LinearAlgebra
 
@@ -38,7 +38,7 @@ sympy_expr = SymPy.Sym("x")^2 + SymPy.Sym("y")
 symbolics_expr = sympy_to_symbolics(sympy_expr, [x, y])
 ```
 """
-function sympy_to_symbolics(sympy_expr, vars)
+function Symbolics.sympy_to_symbolics(sympy_expr, vars)
     varmap = Dict(string(nameof(v)) => v for v in vars)
     Symbolics.parse(string(sympy_expr), varmap)
 end
@@ -59,7 +59,7 @@ b = [x, y]
 sol = sympy_linear_solve(A, b)
 ```
 """
-function sympy_linear_solve(A, b)
+function Symbolics.sympy_linear_solve(A, b)
     A_sympy = map(symbolics_to_sympy, A)
     b_sympy = map(symbolics_to_sympy, b)
     A_mat = SymPy.SymMatrix(A_sympy)
@@ -89,7 +89,7 @@ eqs = [x^2 + y^2 - 4, x - y]  # Circle and line
 sol = sympy_algebraic_solve(eqs, [x, y])  # Returns [{x=>1, y=>1}, {x=>-1, y=>-1}]
 ```
 """
-function sympy_algebraic_solve(expr, var)
+function Symbolics.sympy_algebraic_solve(expr, var)
     expr_sympy = expr isa AbstractVector ? map(symbolics_to_sympy, expr) : symbolics_to_sympy(expr)
     var_sympy = var isa AbstractVector ? map(symbolics_to_sympy, var) : symbolics_to_sympy(var)
     sol_sympy = SymPy.solve(expr_sympy, var_sympy, dict=true)
@@ -116,7 +116,7 @@ expr = x^2
 result = sympy_integrate(expr, x)
 ```
 """
-function sympy_integrate(expr, var)
+function Symbolics.sympy_integrate(expr, var)
     expr_sympy = symbolics_to_sympy(expr)
     var_sympy = symbolics_to_sympy(var)
     result_sympy = SymPy.integrate(expr_sympy, var_sympy)
@@ -139,7 +139,7 @@ expr = 1/x
 result = sympy_limit(expr, x, 0)
 ```
 """
-function sympy_limit(expr, var, val)
+function Symbolics.sympy_limit(expr, var, val)
     expr_sympy = symbolics_to_sympy(expr)
     var_sympy = symbolics_to_sympy(var)
     val_sympy = symbolics_to_sympy(val)
@@ -161,7 +161,7 @@ expr = x^2 + 2x^2
 result = sympy_simplify(expr)
 ```
 """
-function sympy_simplify(expr)
+function Symbolics.sympy_simplify(expr)
     expr_sympy = symbolics_to_sympy(expr)
     result_sympy = SymPy.simplify(expr_sympy)
     sympy_to_symbolics(result_sympy, Symbolics.get_variables(expr))
@@ -184,14 +184,12 @@ expr = Symbolics.Derivative(f, x) - 2*f
 sol = sympy_ode_solve(expr, f, x)  # Returns C1*exp(2*x)
 ```
 """
-function sympy_ode_solve(expr, func, var)
+function Symbolics.sympy_ode_solve(expr, func, var)
     expr_sympy = symbolics_to_sympy(expr)
     func_sympy = symbolics_to_sympy(func)
     var_sympy = symbolics_to_sympy(var)
     sol_sympy = SymPy.dsolve(expr_sympy, func_sympy)
     sympy_to_symbolics(sol_sympy, [func, var])
 end
-
-export symbolics_to_sympy, sympy_to_symbolics, sympy_linear_solve, sympy_algebraic_solve, sympy_integrate, sympy_limit, sympy_simplify, sympy_ode_solve
 
 end
