@@ -1,6 +1,6 @@
 """
 ```julia
-parse_expr_to_symbolic(ex, mod::Module)
+parse_expr_to_symbolic(ex, mod::Union{Module,AbstractDict})
 ```
 
 Applies the `parse_expr_to_symbolic` function in the current module, i.e.
@@ -10,7 +10,7 @@ caller.
 ## Arguments
 
 * `ex`: the expression to parse
-* `mod`: the module to apply the parsing in. See the limitations section for details.
+* `mod`: the module or dictionary to apply the parsing in. See the limitations section for details.
 
 ## Example
 
@@ -66,7 +66,8 @@ variable defined elsewhere.
 """
 function parse_expr_to_symbolic end
 
-parse_expr_to_symbolic(x::Number, mod::Module) = x
+parse_expr_to_symbolic(x::Number, mod::Union{Module, AbstractDict}) = x
+
 function parse_expr_to_symbolic(x::Symbol, mod::Module)
   if isdefined(mod, x)
     getfield(mod, x)
@@ -74,7 +75,16 @@ function parse_expr_to_symbolic(x::Symbol, mod::Module)
     (@variables $x)[1]
   end
 end
-function parse_expr_to_symbolic(ex, mod::Module)
+
+function parse_expr_to_symbolic(x::Symbol, dict::AbstractDict)
+  if haskey(dict, x)
+    dict[x]
+  else
+    (@variables $x)[1]
+  end
+end
+
+function parse_expr_to_symbolic(ex, mod::Union{Module,AbstractDict})
     if ex.head == :call
         if isdefined(mod, ex.args[1])
             return getfield(mod,ex.args[1])(parse_expr_to_symbolic.(ex.args[2:end],(mod,))...)
