@@ -44,12 +44,12 @@ function Symbolics.sympy_to_symbolics(sympy_expr, vars)
     elseif sympy_expr == -SymPy.oo
         return -Inf
     end
-    mod = Module()
+    dict = Dict{Symbol, Any}()
     for v in vars
-        Core.eval(mod, :($(nameof(v)) = $v))
+        dict[nameof(v)] = v
     end
 
-    Symbolics.parse_expr_to_symbolic(Meta.parse(string(sympy_expr)), mod)
+    Symbolics.parse_expr_to_symbolic(Meta.parse(string(sympy_expr)), dict)
 end
 
 """
