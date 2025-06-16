@@ -9,7 +9,7 @@ else
 end
 
 using Symbolics: value, symbolics_to_sympy, sympy_to_symbolics
-using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Symbolic
+using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Symbolic, Term
 using LinearAlgebra
 
 function Symbolics.symbolics_to_sympy(expr)
@@ -39,8 +39,17 @@ symbolics_expr = sympy_to_symbolics(sympy_expr, [x, y])
 ```
 """
 function Symbolics.sympy_to_symbolics(sympy_expr, vars)
-    varmap = Dict(string(nameof(v)) => v for v in vars)
-    Symbolics.parse(string(sympy_expr), varmap)
+    if sympy_expr == SymPy.oo
+        return Inf
+    elseif sympy_expr == -SymPy.oo
+        return -Inf
+    end
+    mod = Module()
+    for v in vars
+        Core.eval(mod, :($(nameof(v)) = $v))
+    end
+
+    Symbolics.parse_expr_to_symbolic(Meta.parse(string(sympy_expr)), mod)
 end
 
 """
@@ -62,10 +71,11 @@ sol = sympy_linear_solve(A, b)
 function Symbolics.sympy_linear_solve(A, b)
     A_sympy = map(symbolics_to_sympy, A)
     b_sympy = map(symbolics_to_sympy, b)
-    A_mat = SymPy.SymMatrix(A_sympy)
-    b_vec = SymPy.SymMatrix(b_sympy)
+    A_mat = SymPy.Matrix(A_sympy)
+    b_vec = SymPy.Matrix(reshape(b_sympy, length(b_sympy), 1))
     sol_sympy = A_mat \ b_vec
-    vars = unique(vcat(Symbolics.get_variables.(A)..., Symbolics.get_variables.(b)...))
+    all_expressions = vcat(vec(A), b)
+    vars = Symbolics.get_variables(all_expressions)
     [sympy_to_symbolics(s, vars) for s in sol_sympy]
 end
 
@@ -95,9 +105,10 @@ function Symbolics.sympy_algebraic_solve(expr, var)
     sol_sympy = SymPy.solve(expr_sympy, var_sympy, dict=true)
     vars = var isa AbstractVector ? var : [var]
     if expr isa AbstractVector
-        return [Dict(v => sympy_to_symbolics(s[v], vars) for v in keys(s)) for s in sol_sympy]
+        varmap = Dict(string(nameof(v)) => v for v in vars)
+        return [Dict(varmap[string(k)] => sympy_to_symbolics(v, vars) for (k, v) in s) for s in sol_sympy]
     else
-        return [sympy_to_symbolics(s, vars) for s in sol_sympy]
+        return [sympy_to_symbolics(s[var_sympy], vars) for s in sol_sympy]
     end
 end
 
@@ -143,7 +154,7 @@ function Symbolics.sympy_limit(expr, var, val)
     expr_sympy = symbolics_to_sympy(expr)
     var_sympy = symbolics_to_sympy(var)
     val_sympy = symbolics_to_sympy(val)
-    result_sympy = SymPy.limit(expr_sympy, var_sympy, val_sympy)
+    result_sympy = SymPy.limit(expr_sympy, var_sympy => val_sympy)
     sympy_to_symbolics(result_sympy, Symbolics.get_variables(expr))
 end
 
