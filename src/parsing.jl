@@ -86,7 +86,7 @@ end
 
 function parse_expr_to_symbolic(ex, mod::Union{Module,AbstractDict})
     if ex.head == :call
-        if isdefined(mod, ex.args[1])
+        if (mod isa Module && isdefined(mod, ex.args[1])) || (mod isa AbstractDict && haskey(mod, ex.args[1]))
             return getfield(mod,ex.args[1])(parse_expr_to_symbolic.(ex.args[2:end],(mod,))...)
         else
             x = parse_expr_to_symbolic(ex.args[1], mod)
