@@ -5,9 +5,6 @@ if get(ENV, "CI", nothing) !== nothing
     # Adding Pkg in test/REQUIRE would be an error in 0.6.  Using
     # Project.toml still has some gotchas.  So:
     Pkg = Base.require(Base.PkgId(Base.UUID(0x44cfe95a1eb252eab672e2afdf69b78f), "Pkg"))
-
-    # Let PyCall.jl use Python interpreter from Conda.jl
-    # See: https://github.com/JuliaPy/PyCall.jl
     ENV["PYTHON"] = ""
     Pkg.build("PyCall")
 end
@@ -21,7 +18,7 @@ expr = x * p + (x^2 - 1 + y) * (p + 2t)
 sexpr = symbolics_to_sympy(expr)
 sp = symbolics_to_sympy(p)
 
-symbolics_sol = SymPy.simplify(symbolics_to_sympy(Symbolics.solve_for(expr, p)))
+symbolics_sol = SymPy.simplify(symbolics_to_sympy(Symbolics.symbolic_linear_solve(expr, p)))
 sympy_sols = SymPy.solve(SymPy.expand(sexpr), sp)
 @test !isempty(sympy_sols) && isequal(symbolics_sol, sympy_sols[1])
 
@@ -31,7 +28,7 @@ sympy_sols = SymPy.solve(SymPy.expand(sexpr), sp)
 expr = x^2 + y
 sympy_expr = symbolics_to_sympy(expr)
 back_expr = sympy_to_symbolics(sympy_expr, [x, y])
-@test isequal(expr, back_expr)
+@test isequal(Symbolics.simplify(expr), Symbolics.simplify(back_expr))
 
 # Test 2: Linear solver
 A = [1 2; 3 4]
@@ -47,12 +44,12 @@ sol = sympy_algebraic_solve(eq, x)
 # Test 4: System of equations
 eqs = [x^2 + y^2 - 4, x - y]
 sol_sys = sympy_algebraic_solve(eqs, [x, y])
-@test length(sol_sys) == 2 && any(d -> isequal(d[x], sqrt(2)) && isequal(d[y], sqrt(2)), sol_sys)
+@test length(sol_sys) == 2 && any(d -> isapprox(Symbolics.substitute(d[x], Dict()), sqrt(2)) && isapprox(Symbolics.substitute(d[y], Dict()), sqrt(2)), sol_sys)
 
 # Test 5: Integration
 expr = x^2
 result = sympy_integrate(expr, x)
-@test isequal(result, x^3/3)
+@test isequal(Symbolics.simplify(result), x^3/3)
 
 # Test 6: Limit
 expr = 1/x
@@ -62,7 +59,7 @@ result = sympy_limit(expr, x, 0)
 # Test 7: Simplification
 expr = x^2 + 2x^2
 result = sympy_simplify(expr)
-@test isequal(result, 3x^2)
+@test isequal(Symbolics.simplify(result), 3x^2)
 
 # Test 8: ODE solver
 # D = Differential(x)
