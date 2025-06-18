@@ -1,3 +1,3 @@
 \begin{equation}
-\int_{0}^{1)} dx x
+\int_{0}^{1)} \mathtt{dx} x
 \end{equation}

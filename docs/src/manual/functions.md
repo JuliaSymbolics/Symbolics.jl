@@ -103,7 +103,7 @@ differentiated. So for example:
 ```julia
 function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{1})
     x, y = args
-    IfElse.ifelse(x < y, one(x), zero(x))
+    ifelse(x < y, one(x), zero(x))
 end
 ```
 
@@ -151,7 +151,7 @@ Note that at this time array derivatives cannot be defined.
 
 ## Direct Registration API (Advanced, Experimental)
 
-!!! warn
+!!! warning
 
     This is a lower level API which is not as stable as the macro APIs.
 
@@ -188,3 +188,21 @@ function Symbolics.derivative(interp::AbstractInterpolation, args::NTuple{1, Any
     Symbolics.unwrap(derivative(interp, Symbolics.wrap(args[1])))
 end
 ```
+
+## Inverse function registration
+
+Symbolics.jl allows defining and querying the inverses of functions.
+
+```@docs
+inverse
+left_inverse
+right_inverse
+@register_inverse
+has_inverse
+has_left_inverse
+has_right_inverse
+```
+
+Symbolics.jl implements inverses for standard trigonometric and logarithmic functions,
+as well as their variants from `NaNMath`. It also implements inverses of
+`ComposedFunction`s.

@@ -32,5 +32,10 @@ Symbolics.occursin
 Symbolics.filterchildren
 Symbolics.fixpoint_sub
 Symbolics.fast_substitute
+Symbolics.evaluate
 Symbolics.symbolic_to_float
+Symbolics.terms(x)
+Symbolics.factors(x)
+numerator(x::Union{Num, Symbolics.Symbolic})
+denominator(x::Union{Num, Symbolics.Symbolic})
 ```

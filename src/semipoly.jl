@@ -175,6 +175,11 @@ $(TYPEDSIGNATURES)
 Return true if `expr` contains any variables in `vars`.
 """
 function has_vars(expr, vars)::Bool
+    if symbolic_type(expr) == ArraySymbolic() && shape(expr) != Unknown()
+        for i in eachindex(expr)
+            expr[i] in vars && return true
+        end
+    end
     if expr in vars
         return true
     elseif iscall(expr)
@@ -182,6 +187,10 @@ function has_vars(expr, vars)::Bool
             if has_vars(arg, vars)
                 return true
             end
+        end
+    elseif expr isa Array
+        for el in expr
+            has_vars(el, vars) && return true
         end
     end
     return false

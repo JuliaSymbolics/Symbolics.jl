@@ -40,16 +40,15 @@ function clean_f(filtered_expr, var, subs)
     unwrapped_f = unwrap(filtered_expr)
     !iscall(unwrapped_f) && return filtered_expr
     oper = operation(unwrapped_f)
+    assumptions = []
 
     if oper === (/)
-        args = arguments(unwrapped_f)
-        if any(isequal(var, x) for x in get_variables(args[2]))
-            return filtered_expr
+        if !all(isequal(var, x) for x in get_variables(denominator(unwrapped_f)))
+            filtered_expr = numerator(unwrapped_f)
+            push!(assumptions, substitute(denominator(unwrapped_f), subs, fold=false))
         end
-        filtered_expr = args[1]
-        @info "Assuming $(substitute(args[2], subs, fold=false) != 0)"
     end
-    return filtered_expr
+    return filtered_expr, assumptions
 end
 
 """
@@ -116,7 +115,7 @@ function _filter_poly(expr, var)
         return filter_stuff(expr)
     end
 
-    args = arguments(expr)
+    args = copy(parent(arguments(expr)))
     if expr isa ComplexTerm
         subs1, subs2 = Dict(), Dict()
         expr1, expr2 = 0, 0
@@ -135,7 +134,7 @@ function _filter_poly(expr, var)
         subs[i_var] = im
         expr = unwrap(expr1 + i_var * expr2)
 
-        args = arguments(expr)
+        args = map(unwrap, arguments(expr))
         oper = operation(expr)
         return subs, term(oper, args...)
     end
@@ -165,7 +164,7 @@ function _filter_poly(expr, var)
         end
 
         oper = operation(arg)
-        monomial = arguments(arg)
+        monomial = copy(parent(arguments(arg)))
         if oper === (^)
             if any(arg -> isequal(arg, var), monomial)
                 continue
@@ -175,6 +174,7 @@ function _filter_poly(expr, var)
             subs2, monomial[2] = _filter_poly(monomial[2], var)
 
             merge!(subs, merge(subs1, subs2))
+            args[i] = maketerm(typeof(arg), oper, monomial, metadata(arg))
             continue
         end
 
@@ -196,6 +196,7 @@ function _filter_poly(expr, var)
                 merge!(subs_of_monom, new_subs)
             end
             merge!(subs, subs_of_monom)
+            args[i] = maketerm(typeof(arg), oper, monomial, metadata(arg))
             continue
         end
 
@@ -208,9 +209,9 @@ function _filter_poly(expr, var)
         end
     end
 
-    args = arguments(expr)
+    args = map(unwrap, args)
     oper = operation(expr)
-    expr = term(oper, args...)
+    expr = maketerm(typeof(expr), oper, args, metadata(expr))
     return subs, expr
 end
 
@@ -238,15 +239,17 @@ julia> filter_poly((x+1)*term(log, 3), x)
 (Dict{Any, Any}(var"##247" => log(3)), var"##247"*(1 + x))
 ```
 """
-function filter_poly(og_expr, var)
+function filter_poly(og_expr, var; assumptions=false)
     expr = deepcopy(og_expr)
     expr = unwrap(expr)
     vars = get_variables(expr)
 
     # handle edge cases
     if !isequal(vars, []) && isequal(vars[1], expr)
+        assumptions && return Dict{Any, Any}(), expr, []
         return (Dict{Any, Any}(), expr)
     elseif isequal(vars, [])
+        assumptions && return filter_stuff(expr), []
         return filter_stuff(expr)
     end
 
@@ -256,14 +259,16 @@ function filter_poly(og_expr, var)
     # reassemble expr to avoid variables remembering original values issue and clean
     args = arguments(expr)
     oper = operation(expr)
-    new_expr = clean_f(term(oper, args...), var, subs)
+    new_expr, assum_array = clean_f(term(oper, args...), var, subs)
 
+    assumptions && return subs, new_expr, assum_array
     return subs, new_expr
 end
-function filter_poly(og_expr)
+
+function filter_poly(og_expr; assumptions=false)
     new_var = gensym()
     new_var = (@variables $(new_var))[1]
-    return filter_poly(og_expr, new_var)
+    return filter_poly(og_expr, new_var; assumptions=assumptions)
 end
 
 

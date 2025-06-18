@@ -1,7 +1,7 @@
 using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 using Symbolics: value
-using SymbolicUtils.Code: DestructuredArgs, Func
+using SymbolicUtils.Code: DestructuredArgs, Func, NameState, Let, cse
 @variables a b c1 c2 c3 d e g
 oop, iip = Symbolics.build_function([sqrt(a), sin(b)], [a, b], nanmath = true)
 @test all(isnan, eval(oop)([-1, Inf]))
@@ -186,7 +186,7 @@ expr = toexpr(Func([value(D(x))], [], value(D(x))))
 
 a = rand(4)
 @variables x[1:4]
-@test eval(build_function(sin.(cos.(x)), cos.(x))[2])(a) == sin.(a)
+@test eval(build_function(sin.(cos.(x)), cos.(x))[1])(a) == sin.(a)
 
 # more skipzeros
 @variables x,y
@@ -272,6 +272,83 @@ end
 let #658
     using Symbolics
     @variables a, X1[1:3], X2[1:3]
-    k = eval(build_function(a * X1 + X2, X1, X2, a)[2])
+    k = eval(build_function(a * X1 + X2, X1, X2, a)[1])
     @test k(ones(3), ones(3), 1.5) == [2.5, 2.5, 2.5]
+end
+
+@testset "ArrayOp codegen" begin
+    @variables x[1:2]
+    T = value(x .^ 2)
+    @test_nowarn toexpr(T, NameState())
+end
+
+@testset "`similarto` keyword argument" begin
+    @variables x[1:2]
+    T = collect(value(x .^ 2))
+    fn = build_function(T, collect(x); expression = false)[1]
+    @test_throws MethodError fn((1.0, 2.0))
+    fn = build_function(T, collect(x); similarto = Array, expression = false)[1]
+    @test fn((1.0, 2.0)) ≈ [1.0, 4.0]
+end
+
+@testset "`build_function` with array symbolics" begin
+    @variables x[1:4]
+    for var in [x[1:2], x[1:2] .+ 0.0, Symbolics.unwrap(x[1:2])]
+        foop, fiip = build_function(var[1:2], x; expression = false)
+        @test foop(ones(4)) ≈ ones(2)
+        buf = zeros(2)
+        fiip(buf, ones(4))
+        @test buf ≈ ones(2)
+    end
+end
+
+@testset "cse with arrayops" begin
+    @variables x[1:3] y f(..)
+    t = x .+ y
+    t = t .* f(t)
+    res = cse(value(t))
+    @test res isa Let
+    @test !isempty(res.pairs)
+end
+
+@testset "`CallWithMetadata` in `DestructuredArgs` with `create_bindings = false`" begin
+    @variables x f(..)
+    fn = build_function(f(x), DestructuredArgs([f]; create_bindings = false), x; expression = Val{false})
+    @test fn([isodd], 3)
+end
+
+@testset "iip_config with RGF" begin
+    @variables a b
+    oop, iip = build_function([a + b, a - b], a, b; iip_config = (false, false), expression = Val{false})
+    @test_throws ArgumentError oop(1, 2)
+    @test_throws ArgumentError iip(ones(2), 1, 2)
+
+    @variables a[1:2]
+    oop, iip = build_function(a .* 2, a; iip_config = (false, false), expression = Val{false})
+    @test_throws ArgumentError oop(ones(2))
+    @test_throws ArgumentError iip(ones(2), ones(2))
+end
+
+@testset "unwrapping/CSE in array of symbolics codegen" begin
+    @variables a b
+    oop, _ = build_function([a^2 + b^2, a^2 + b^2], a, b; expression = Val{true}, cse = true)
+
+    function find_create_array(expr)
+        while expr isa Expr && (!Meta.isexpr(expr, :call) || expr.args[1] != SymbolicUtils.Code.create_array)
+            expr = expr.args[end]
+        end
+        return expr
+    end
+
+    expr = find_create_array(oop)
+    # CSE works, we just need to test that it's happening and OOP is the easiest way to do it
+    @test Meta.isexpr(expr, :call) && expr.args[1] == SymbolicUtils.Code.create_array &&
+          expr.args[end] isa Symbol && expr.args[end-1] isa Symbol
+end
+
+@testset "CSE with operators" begin
+    @variables t x(t)
+    D = Differential(t)
+    f = build_function(x + D(x), [x, D(x)]; cse = true, expression = Val{false})
+    @test f([1, 2]) == 3
 end

@@ -1,5 +1,6 @@
 """
-replacenode(expr::Symbolic, rules...)
+    replacenode(expr::Symbolic, rules...)
+
 Walk the expression and replacenode subexpressions according to `rules`. `rules`
 could be rules constructed with `@rule`, a function, or a pair where the
 left hand side is matched with equality (using `isequal`) and is replacenoded by the right hand side.
@@ -23,7 +24,7 @@ replacenode(expr::Number, rules...; fixpoint = false) = expr
 replacenode(expr::Number, r::Pair, rules::Pair...; fixpoint = false) = expr
 
 function _replacenode(expr::Symbolic, rules...; fixpoint = false)
-    rs = map(r -> r isa Pair ? (x -> isequal(x, r[1]) ? r[2] : nothing) : r, rules)
+    rs = map(r -> r isa Pair ? (x -> isequal(x, unwrap(r[1])) ? unwrap(r[2]) : nothing) : r, rules)
     R = Prewalk(Chain(rs))
     if fixpoint
         Fixpoint(R)(expr)
@@ -34,7 +35,7 @@ end
 
 """
     hasnode(c, x)
-Returns true if any part of `x` fufills the condition given in c. c can be a function or an expression.
+Returns true if any part of `x` fulfills the condition given in c. c can be a function or an expression.
 If it is a function, returns true if x is true for any part of x. If c is an expression, returns
 true if x contains c.
 
@@ -75,8 +76,9 @@ function _hasnode(r, y)
 end
 
 """
-filterchildren(c, x)
-Returns all parts of `x` that fufills the condition given in c. c can be a function or an expression.
+    filterchildren(c, x)
+
+Returns all parts of `x` that fulfills the condition given in c. c can be a function or an expression.
 If it is a function, returns everything for which the function is `true`. If c is an expression, returns
 all expressions that matches it.
 

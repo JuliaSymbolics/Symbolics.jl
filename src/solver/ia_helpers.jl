@@ -83,8 +83,8 @@ function n_func_occ(expr, var)
 
                 # n(2 / x) = 1; n(x/x^2) = 2?
             elseif oper_arg === (/)
-                n += n_func_occ(args_arg[1], var)
-                n += n_func_occ(args_arg[2], var)
+                n += n_func_occ(numerator(arg), var)
+                n += n_func_occ(denominator(arg), var)
 
                 # multiplication cases
             elseif oper_arg === (*)
@@ -139,4 +139,86 @@ function find_logandexpon(arg, var, oper, poly_index)
 
     !isequal(oper_term, 0) && !isequal(constant_term, 0) && return true
     return false
+end
+
+"""
+    ia_conditions!(f, lhs, rhs::Vector{Any}, conditions::Vector{Tuple})
+
+If `f` is a left-invertible function, `lhs` and `rhs[i]` are univariate functions and
+`f(lhs) ~ rhs[i]` for all `i in eachindex(rhss)`, push to `conditions` all the relevant
+conditions on `lhs` or `rhs[i]`. Each condition is of the form `(sym, op)` where `sym`
+is an expression involving `lhs` and/or `rhs[i]` and `op` is a binary relational operator.
+The condition `op(sym, 0)` is then required to be true for the equation `f(lhs) ~ rhs[i]`
+to be valid.
+
+For example, if `f = log`, `lhs = x` and `rhss = [y, z]` then the condition `x > 0` must
+be true. Thus, `(lhs, >)` is pushed to `conditions`. Similarly, if `f = sqrt`, `rhs[i] >= 0`
+must be true for all `i`, and so `(y, >=)` and `(z, >=)` will be appended to `conditions`. 
+"""
+function ia_conditions!(args...; kwargs...) end
+
+for fn in [log, log2, log10, NaNMath.log, NaNMath.log2, NaNMath.log10, slog]
+    @eval function ia_conditions!(::typeof($fn), lhs, rhs, conditions)
+        push!(conditions, (lhs, >))
+    end
+end
+
+for fn in [log1p, NaNMath.log1p]
+    @eval function ia_conditions!(::typeof($fn), lhs, rhs, conditions)
+        push!(conditions, (lhs - 1, >))
+    end
+end
+
+for fn in [sqrt, NaNMath.sqrt, ssqrt]
+    @eval function ia_conditions!(::typeof($fn), lhs, rhs, conditions)
+        for r in rhs
+            push!(conditions, (r, >=))
+        end
+    end
+end
+
+"""
+    is_periodic(f)
+
+Return `true` if `f` is a single-input single-output periodic function. Return `false` by
+default. If `is_periodic(f) == true`, then `fundamental_period(f)` must also be defined.
+
+See also: [`fundamental_period`](@ref)
+"""
+is_periodic(f) = false
+
+for fn in [
+    sin, cos, tan, csc, sec, cot, NaNMath.sin, NaNMath.cos, NaNMath.tan, sind, cosd, tand,
+    cscd, secd, cotd, cospi
+]
+    @eval is_periodic(::typeof($fn)) = true
+end
+
+"""
+    fundamental_period(f)
+
+Return the fundamental period of periodic function `f`. Must only be called if
+`is_periodic(f) == true`.
+
+see also: [`is_periodic`](@ref)
+"""
+function fundamental_period end
+
+for fn in [sin, cos, csc, sec, NaNMath.sin, NaNMath.cos]
+    @eval fundamental_period(::typeof($fn)) = 2pi
+end
+
+for fn in [sind, cosd, cscd, secd]
+    @eval fundamental_period(::typeof($fn)) = 360.0
+end
+
+fundamental_period(::typeof(cospi)) = 2.0
+
+for fn in [tand, cotd]
+    @eval fundamental_period(::typeof($fn)) = 180.0
+end
+
+for fn in [tan, cot, NaNMath.tan]
+    # `1pi isa Float64` whereas `pi isa Irrational{:π}`
+    @eval fundamental_period(::typeof($fn)) = 1pi
 end

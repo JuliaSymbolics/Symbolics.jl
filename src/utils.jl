@@ -27,7 +27,7 @@ Return a vector of variables appearing in `e`, optionally restricting to variabl
 Note that the returned variables are not wrapped in the `Num` type.
 
 # Examples
-```julia
+```jldoctest
 julia> @variables t x y z(t);
 
 julia> Symbolics.get_variables(x + y + sin(z); sort = true)
@@ -62,7 +62,7 @@ function is_singleton(e)
         op = operation(e)
         op === getindex && return true
         iscall(op) && return is_singleton(op) # recurse to reach getindex for array element variables
-        return issym(op)
+        return issym(op) && !hasmetadata(e, CallWithParent)
     else
         return issym(e)
     end
@@ -76,6 +76,7 @@ function get_variables!(vars, e::Symbolic, varlist=nothing)
             push!(vars, e)
         end
     else
+        get_variables!(vars, operation(e), varlist)
         foreach(x -> get_variables!(vars, x, varlist), arguments(e))
     end
     return (vars isa AbstractVector) ? unique!(vars) : vars
@@ -96,18 +97,28 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 Any upstream metadata can be passed via `x_metadata`
 
-```julia
+```jldoctest
 julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
 uˍtx(x, t)
 
 julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
-var"z(t)[1]ˍt"
+(zˍt(t))[1]
 ```
 """
 function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothing)
     iscall(O) || return O
+
+    inner = O
+    op = identity
+    while is_derivative(inner)
+        op = op ∘ operation(inner)
+        inner = arguments(inner)[1]
+    end
+    if iscall(inner) && operation(inner) == getindex
+        return diff2term(op(arguments(inner)[1]), O_metadata)[arguments(inner)[2:end]...]
+    end
     if is_derivative(O)
         ds = ""
         while is_derivative(O)
@@ -129,10 +140,6 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
             string(nameof(oldop))
         elseif iscall(oldop) && operation(oldop) === getindex
             string(nameof(arguments(oldop)[1]))
-        elseif oldop == getindex
-            args = arguments(O)
-            opname = string(tosymbol(args[1]), "[", map(tosymbol, args[2:end])..., "]")
-            return Sym{symtype(O)}(Symbol(opname, d_separator, ds))
         elseif oldop isa Function
             return nothing
         else
@@ -155,7 +162,7 @@ it will only output `y` instead of `y(t)`.
 
 # Examples
 
-```julia
+```jldoctest
 julia> @variables t z(t)
 2-element Vector{Num}:
     t
@@ -233,7 +240,7 @@ end
 
 function var_from_nested_derivative(x,i=0)
     x = unwrap(x)
-    if issym(x)
+    if issym(x) || x isa CallWithMetadata
         (x, i)
     elseif iscall(x)
         operation(x) isa Differential ?
@@ -250,7 +257,7 @@ Extract the degree of `p` with respect to `sym`.
 
 # Examples
 
-```julia
+```jldoctest
 julia> @variables x;
 
 julia> Symbolics.degree(x^0)
@@ -304,7 +311,7 @@ Note that `p` might need to be expanded and/or simplified with `expand` and/or `
 
 # Examples
 
-```julia
+```jldoctest
 julia> @variables a x y;
 
 julia> Symbolics.coeff(2a, x)
@@ -433,9 +440,142 @@ function symbolic_to_float end
 symbolic_to_float(x::Num) = symbolic_to_float(unwrap(x))
 symbolic_to_float(x::Number) = x
 function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
-    if _x isa Number
-        return _x
-    else
-        substitute(x,Dict())
-    end
+    substitute(x,Dict())
 end
+
+"""
+    numerator(x)
+
+Return the numerator of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> numerator(x/y)
+x
+```
+"""
+function Base.numerator(x::Union{Num, Symbolic})
+    x = unwrap(x)
+    if iscall(x) && operation(x) == /
+        x = arguments(x)[1] # get numerator
+    end
+    return wrap(x)
+end
+
+"""
+    denominator(x)
+
+Return the denominator of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> denominator(x/y)
+y
+```
+"""
+function Base.denominator(x::Union{Num, Symbolic})
+    x = unwrap(x)
+    if iscall(x) && operation(x) == /
+        x = arguments(x)[2] # get denominator
+    else
+        x = 1
+    end
+    return wrap(x)
+end
+
+"""
+    arguments(x, op::Function)
+
+Get the arguments of the symbolic expression `x` with respect to the operation or function `op`.
+"""
+function arguments(x, op::Function)
+    x = unwrap(x)
+    if iscall(x) && operation(x) == op
+        args = [arguments(arg, op) for arg in arguments(x)] # recurse into each argument and obtain its factors
+        args = reduce(vcat, args) # concatenate array of arrays into one array
+    else
+        args = [wrap(x)] # base case
+    end
+    return args
+end
+
+"""
+    terms(x)
+
+Get the terms of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> terms(-x + y - z)
+3-element Vector{Num}:
+ -z
+  y
+ -x
+```
+"""
+terms(x) = arguments(x, +)
+
+"""
+    factors(x)
+
+Get the factors of the symbolic expression `x`.
+
+Examples
+========
+```julia-repl
+julia> factors(2 * x * y)
+3-element Vector{Num}:
+ 2
+ y
+ x
+```
+"""
+factors(x) = arguments(x, *)
+
+"""
+    evaluate(eq::Equation, subs)
+    evaluate(ineq::Inequality, subs)
+
+Evaluate the equation `eq` or inequality `ineq`. `subs` is a dictionary of variable to numerical value substitutions. 
+If both sides of the equation or inequality are numeric, then the result is a boolean. 
+
+# Examples
+```julia-repl
+julia> @variables x y
+julia> eq = x ~ y
+julia> evaluate(eq, Dict(x => 1, y => 1))
+true
+
+julia> ltr = x ≲ y
+julia> evaluate(ltr, Dict(x => 1, y => 2))
+true
+
+julia> gtr = x ≳ y
+julia> evaluate(gtr, Dict(x => 1, y => 2))
+false
+```
+"""
+function evaluate end
+
+function evaluate(eq::Equation, subs)
+    lhs = fast_substitute(eq.lhs, subs)
+    rhs = fast_substitute(eq.rhs, subs)
+    return isequal(lhs, rhs)
+end
+
+function evaluate(ineq::Inequality, subs)
+    lhs = fast_substitute(ineq.lhs, subs)
+    rhs = fast_substitute(ineq.rhs, subs)
+    if (ineq.relational_op == geq)
+        return isless(rhs, lhs)
+    elseif (ineq.relational_op == leq)
+        return isless(lhs, rhs)
+    else
+        throw(ArgumentError("Inequality $ineq not supported"))
+    end
+end 
+
+

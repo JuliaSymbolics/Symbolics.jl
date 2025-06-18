@@ -43,7 +43,7 @@ function turn_to_poly(expr, var)
     expr = unwrap(expr)
     !iscall(expr) && return (expr, Dict())
 
-    args = arguments(expr)
+    args = copy(parent(arguments(expr)))
 
     sub = 0
     broken = Ref(false)
@@ -53,12 +53,12 @@ function turn_to_poly(expr, var)
         arg_oper = operation(arg)
 
         if arg_oper === (^)
-            tp = trav_pow(args, i, var, broken, sub)
+            args[i], tp = trav_pow(args[i], var, broken, sub)
             sub = isequal(tp, false) ? sub : tp
             continue
         end
         if arg_oper === (*)
-            sub = trav_mult(arg, var, broken, sub)
+            args[i], sub = trav_mult(arg, var, broken, sub)
             continue
         end
         isequal(add_sub(sub, arg, var, broken), false) && continue
@@ -77,16 +77,17 @@ function turn_to_poly(expr, var)
 
     new_var = gensym()
     new_var = (@variables $new_var)[1]
+    expr = maketerm(typeof(expr), operation(expr), args, metadata(expr))
     return ssubs(expr, Dict(sub => new_var)), Dict{Any, Any}(new_var => sub)
 end
 
 """
-    trav_pow(args, index, var, broken, sub)
+    trav_pow(arg, var, broken, sub)
 
-Traverses an argument passed from ``turn_to_poly`` if it
-satisfies ``oper === (^)``. Returns sub if changed from 0
-to a new transcendental function or its value is 
-kept the same, and false if these 2 cases do not occur.
+Traverses an argument `arg` passed from ``turn_to_poly`` if it satisfies
+``oper === (^)``. Returns the new `arg` and `sub` if `sub` is changed from 0 to a new
+transcendental function or its value is kept the same, or else `false` if these 2 cases
+do not occur.
 
 # Arguments
 - args: The original arguments array of the expression passed to ``turn_to_poly``
@@ -97,20 +98,20 @@ kept the same, and false if these 2 cases do not occur.
 
 # Examples
 ```jldoctest
-julia> trav_pow([unwrap(9^x)], 1, x, Ref(false), 3^x)
-3^x
+julia> trav_pow(unwrap(9^x), x, Ref(false), 3^x)
+(9^x, 3^x)
 
-julia> trav_pow([unwrap(x^2)], 1, x, Ref(false), 3^x)
-false
+julia> trav_pow(unwrap(x^2), x, Ref(false), 3^x)
+(x^2, false)
 ```
 """
-function trav_pow(args, index, var, broken, sub)
-    args_arg = arguments(args[index])
+function trav_pow(arg, var, broken, sub)
+    args_arg = arguments(arg)
     base = args_arg[1]
     power = args_arg[2]
 
     # case 1: log(x)^2 .... 9^x = 3^2^x = 3^2x = (3^x)^2
-    !isequal(add_sub(sub, base, var, broken), false) && power isa Integer && return base
+    !isequal(add_sub(sub, base, var, broken), false) && power isa Integer && return arg, base
 
     # case 2: int^f(x)
     # n_func_occ may not be strictly 1, we could attempt attracting it after solving
@@ -122,21 +123,20 @@ function trav_pow(args, index, var, broken, sub)
         sub = isequal(sub, 0) ? new_b : sub
         if !isequal(sub, new_b)
             broken[] = true
-            return false
+            return arg, false
         end
         new_b = term(^, new_b, p)
-        args[index] = new_b
-        return sub
+        return new_b, sub
     end
 
-    return false
+    return arg, false
 end
 
 """
     trav_mult(arg, var, broken, sub)
 
 Traverses an argument passed from ``turn_to_poly`` if it
-satisfies ``oper === (*)``. Returns sub whether its changed from 0
+satisfies ``oper === (*)``. Returns the new `arg` and `sub` if its changed from 0
 to a new transcendental function or its value is 
 kept the same, but changes broken if these 2 cases do not occur. It
 traverses the * argument by sub_arg and compares it to sub using
@@ -151,24 +151,24 @@ the function ``add_sub``
 # Examples
 ```jldoctest
 julia> trav_mult(unwrap(9*log(x)), x, Ref(false), log(x))
-log(x)
+(9log(x), log(x))
 
 julia> trav_mult(unwrap(9*log(x)^2), x, Ref(false), log(x))
-log(x)
+(9(log(x)^2), log(x))
 
 # value of broken is changed here to true
 julia> trav_mult(unwrap(9*log(x+1)), x, Ref(false), log(x))
-log(x)
+(9log(x + 1), log(x))
 ```
 """
 function trav_mult(arg, var, broken, sub)
-    args_arg = arguments(arg)
+    args_arg = copy(parent(arguments(arg)))
     for (i, arg2) in enumerate(args_arg)
         !iscall(arg2) && continue
 
         oper = operation(arg2)
         if oper === (^)
-            tp = trav_pow(args_arg, i, var, broken, sub)
+            args_arg[i], tp = trav_pow(args_arg[i], var, broken, sub)
             sub = isequal(tp, false) ? sub : tp
             continue
         end
@@ -176,7 +176,8 @@ function trav_mult(arg, var, broken, sub)
         isequal(add_sub(sub, arg2, var, broken), false) && continue
         sub = arg2
     end
-    return sub
+    arg = maketerm(typeof(arg), operation(arg), args_arg, metadata(arg))
+    return arg, sub
 end
 
 """

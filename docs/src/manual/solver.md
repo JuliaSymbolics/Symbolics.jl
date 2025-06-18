@@ -32,6 +32,15 @@ to `solve_univar`. We can see that essentially, `solve_univar` is the building b
 it to `ia_solve`, which attempts solving by attraction and isolation [^2]. This only works when the input is a single expression
 and the user wants the answer in terms of a single variable. Say `log(x) - a == 0` gives us `[e^a]`.
 
+```@docs
+Symbolics.solve_univar
+Symbolics.solve_multivar
+Symbolics.ia_solve
+Symbolics.ia_conditions!
+Symbolics.is_periodic
+Symbolics.fundamental_period
+```
+
 #### Nice examples
 
 ```@example solver
@@ -60,8 +69,22 @@ Symbolics.symbolic_solve(eqs, [x,y,z])
 - [x] Some transcendental functions
 - [x] Systems of linear equations with parameters (via `symbolic_linear_solve`)
 - [ ] Equations with radicals
-- [ ] Systems of polynomial equations with parameters and positive dimensional systems
+- [x] Systems of polynomial equations with parameters and positive dimensional systems
 - [ ] Inequalities
+
+### Expressions we can not solve (but aim to)
+```
+# Mathematica
+
+In[1]:= Reduce[x^2 - x - 6 > 0, x]
+Out[1]= x < -2 || x > 3
+
+In[2]:= Reduce[x+a > 0, x]
+Out[2]= a \[Element] Reals && x > -a
+
+In[3]:= Solve[x^(x)  + 3 == 0, x]
+Out[3]= {{x -> (I \[Pi] + Log[3])/ProductLog[I \[Pi] + Log[3]]}}
+```
 
 # References
 

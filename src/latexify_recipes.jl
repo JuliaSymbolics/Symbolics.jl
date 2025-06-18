@@ -1,3 +1,12 @@
+# metadata to specify how to format syms
+struct SymLatexWrapper end
+Symbolics.option_to_metadata_type(::Val{:latexwrapper}) = SymLatexWrapper
+
+function default_latex_wrapper(sym)
+    length(sym) <= 1 && return sym
+    return string("\\mathtt{", sym, "}")
+end
+
 prettify_expr(expr) = expr
 prettify_expr(f::Function) = nameof(f)
 prettify_expr(expr::Expr) = Expr(expr.head, prettify_expr.(expr.args)...)
@@ -49,16 +58,18 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 
 @latexrecipe function f(n::Num)
     env --> :equation
-    cdot --> false
+    mult_symbol --> ""
     fmt --> FancyNumberFormatter(5)
     index --> :subscript
+    snakecase --> true
+    safescripts --> true
 
     return recipe(n)
 end
 
 @latexrecipe function f(z::Complex{Num})
     env --> :equation
-    cdot --> false
+    mult_symbol --> ""
     index --> :subscript
 
     iszero(z.im) && return :($(recipe(z.re)))
@@ -68,14 +79,14 @@ end
 
 @latexrecipe function f(n::ArrayOp)
     env --> :equation
-    cdot --> false
+    mult_symbol --> ""
     index --> :subscript
     return recipe(n.term)
 end
 
 @latexrecipe function f(n::Function)
     env --> :equation
-    cdot --> false
+    mult_symbol --> ""
     index --> :subscript
 
     return nameof(n)
@@ -84,7 +95,7 @@ end
 
 @latexrecipe function f(n::Arr)
     env --> :equation
-    cdot --> false
+    mult_symbol --> ""
     index --> :subscript
 
     return unwrap(n)
@@ -92,7 +103,7 @@ end
 
 @latexrecipe function f(n::Symbolic)
     env --> :equation
-    cdot --> false
+    mult_symbol --> ""
     index --> :subscript
 
     return recipe(n)
@@ -100,7 +111,7 @@ end
 
 @latexrecipe function f(eqs::Vector{Equation})
     index --> :subscript
-    has_connections = any(x->x.lhs isa Connection, eqs)
+    has_connections = any(x -> hide_lhs(x.lhs), eqs)
     if has_connections
         env --> :equation
         return map(first∘first∘Latexify.apply_recipe, eqs)
@@ -114,7 +125,7 @@ end
     env --> :equation
     index --> :subscript
 
-    if eq.lhs isa Connection
+    if hide_lhs(eq.lhs) || !(eq.lhs isa Union{Number, AbstractArray, Symbolic})
         return eq.rhs
     else
         return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
@@ -132,10 +143,10 @@ Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexif
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 
-_toexpr(O::ArrayOp) = _toexpr(O.term)
+_toexpr(O::ArrayOp; latexwrapper = default_latex_wrapper) = _toexpr(O.term; latexwrapper)
 
 # `_toexpr` is only used for latexify
-function _toexpr(O)
+function _toexpr(O; latexwrapper = default_latex_wrapper)
     if ismul(O)
         m = O
         numer = Any[]
@@ -183,17 +194,28 @@ function _toexpr(O)
             frac_expr = Expr(:call, :/, numer_expr, denom_expr)
         end
 
-        if isreal(m.coeff) && m.coeff < 0
+        if isreal(m.coeff) && real(m.coeff) < 0
             return Expr(:call, :-, frac_expr)
         else
             return frac_expr
         end
     end
-    issym(O) && return nameof(O)
+    if issym(O) 
+        sym = string(nameof(O))
+        sym = replace(sym, NAMESPACE_SEPARATOR => ".")
+
+        # override if the sym has its own latex wrapper
+        symwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) : 
+            latexwrapper
+        sym = symwrapper(sym)
+        return Symbol(sym)
+    end
     !iscall(O) && return O
 
     op = operation(O)
     args = sorted_arguments(O)
+    latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) : 
+        default_latex_wrapper
 
     if (op===(*)) && (args[1] === -1)
         arg_mul = Expr(:call, :(*), _toexpr(args[2:end])...)
@@ -207,7 +229,7 @@ function _toexpr(O)
         while num isa Term && num.f isa Differential
             deg += 1
             den *= num.f.x
-            num = num.arguments[1]
+            num = first(arguments(num))
         end
         return :(_derivative($(_toexpr(num)), $den, $deg))
     elseif op isa Integral
@@ -218,12 +240,12 @@ function _toexpr(O)
         var = if vars isa Tuple
             Expr(:call, :(*), _toexpr(vars...))
         else
-                _toexpr(vars)
+            _toexpr(vars)
         end
         return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), vars, _toexpr(integrand))
     elseif symtype(op) <: FnType
         isempty(args) && return nameof(op)
-        return Expr(:call, _toexpr(op), _toexpr(args)...)
+        return Expr(:call, _toexpr(op; latexwrapper), _toexpr(args)...)
     elseif op === getindex && symtype(args[1]) <: AbstractArray
         return getindex_to_symbol(O)
     elseif op === (\)
@@ -233,23 +255,34 @@ function _toexpr(O)
     elseif op === identity
         return _toexpr(only(args)) # suppress identity transformations (e.g. "identity(π)" -> "π")
     end
-    return Expr(:call, Symbol(op), _toexpr(args)...)
+    return Expr(:call, Symbol(op), _toexpr(args; latexwrapper)...)
 end
-_toexpr(x::Integer) = x
-_toexpr(x::AbstractFloat) = x
+_toexpr(x::Integer; latexwrapper = default_latex_wrapper) = x
+_toexpr(x::AbstractFloat; latexwrapper = default_latex_wrapper) = x
 
-function _toexpr(eq::Equation)
+function _toexpr(eq::Equation; latexwrapper = default_latex_wrapper)
     Expr(:(=), _toexpr(eq.lhs), _toexpr(eq.rhs))
 end
 
-_toexpr(eqs::AbstractArray) = map(eq->_toexpr(eq), eqs)
-_toexpr(x::Num) = _toexpr(value(x))
+_toexpr(eqs::AbstractArray; latexwrapper = default_latex_wrapper) = map(eq->_toexpr(eq), eqs)
+_toexpr(x::Num; latexwrapper = default_latex_wrapper) = _toexpr(value(x))
 
 function getindex_to_symbol(t)
     @assert iscall(t) && operation(t) === getindex && symtype(sorted_arguments(t)[1]) <: AbstractArray
     args = sorted_arguments(t)
     idxs = args[2:end]
-    return :($(_toexpr(args[1]))[$(idxs...)])
+    O = args[1]
+    latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) : 
+        default_latex_wrapper
+
+    # this is to ensure X(t)[1] becomes X_1(t) in Latex
+    if iscall(O) && issym(operation(O))
+        oop = operation(O)        
+        oargs = sorted_arguments(O)
+        return :($(_toexpr(oop; latexwrapper))[$(idxs...)]($(_toexpr(oargs)...)))
+    else
+        return :($(_toexpr(O; latexwrapper))[$(idxs...)])
+    end
 end
 
 function diffdenom(e)

@@ -3,7 +3,7 @@ module SymbolicsGroebnerExt
 using Groebner
 const Nemo = Groebner.Nemo
 using Symbolics
-using Symbolics: Num, symtype
+using Symbolics: Num, symtype, BasicSymbolic
 import Symbolics.PrecompileTools
 
 """
@@ -33,9 +33,16 @@ julia> @variables x y;
 julia> groebner_basis([x*y^2 + x, x^2*y + y])
 ```
 """
-function Symbolics.groebner_basis(polynomials::Vector{Num}; kwargs...)
+function Symbolics.groebner_basis(polynomials::Vector{Num}; ordering=InputOrdering(), kwargs...)
     polynoms, pvar2sym, sym2term = Symbolics.symbol_to_poly(polynomials)
-    basis = Groebner.groebner(polynoms; kwargs...)
+    sym2term_for_groebner = Dict{Any,Any}(v1 => k for (k, (v1, v2)) in sym2term)
+    all_sym_vars = Groebner.ordering_variables(ordering)
+    missed = setdiff(all_sym_vars, Set(collect(keys(sym2term_for_groebner))))
+    for var in missed
+        sym2term_for_groebner[var] = var
+    end
+    ordering = Groebner.ordering_transform(ordering, sym2term_for_groebner )
+    basis = Groebner.groebner(polynoms; ordering=ordering, kwargs...)
     PolyType = symtype(first(polynomials))
     Symbolics.poly_to_symbol(basis, pvar2sym, sym2term, PolyType)
 end
@@ -61,7 +68,7 @@ julia> @variables x y;
 julia> is_groebner_basis([x^2 - y^2, x*y^2 + x, y^3 + y])
 ```
 """
-function Symbolics.is_groebner_basis(polynomials::Vector{Num}; kwargs...)
+function Symbolics.is_groebner_basis(polynomials::Vector{<:Union{Num, BasicSymbolic{<:Number}}}; kwargs...)
     polynoms, _, _ = Symbolics.symbol_to_poly(polynomials)
     Groebner.isgroebner(polynoms; kwargs...)
 end
@@ -108,6 +115,7 @@ end
 # Given a GB in k[params][vars] produces a GB in k(params)[vars]
 function demote(gb, vars::Vector{Num}, params::Vector{Num})
     isequal(gb, [1]) && return gb 
+
     gb = Symbolics.wrap.(SymbolicUtils.toterm.(gb))
     Symbolics.check_polynomial.(gb)
 
@@ -126,7 +134,7 @@ function demote(gb, vars::Vector{Num}, params::Vector{Num})
     ring_param, params_demoted = Nemo.polynomial_ring(Nemo.base_ring(ring_flat), map(string, nemo_params))
     ring_demoted, vars_demoted = Nemo.polynomial_ring(Nemo.fraction_field(ring_param), map(string, nemo_vars), internal_ordering=:lex)
     varmap = Dict((nemo_vars .=> vars_demoted)..., (nemo_params .=> params_demoted)...)
-    gb_demoted = map(f -> nemo_crude_evaluate(f, varmap), nemo_gb)
+    gb_demoted = map(f -> ring_demoted(nemo_crude_evaluate(f, varmap)), nemo_gb)
     result = empty(gb_demoted)
     while true
         gb_demoted = map(f -> Nemo.map_coefficients(c -> c // Nemo.leading_coefficient(f), f), gb_demoted)
@@ -176,6 +184,7 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
     # Use a new variable to separate the input polynomials (Reference above)
     new_var = gen_separating_var(vars)
     old_len = length(vars)
+    old_vars = deepcopy(vars)
     vars = vcat(vars, new_var)
 
     new_eqs = []
@@ -202,6 +211,13 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
         # handle "unsolvable" case
         if isequal(1, new_eqs[1])
             return []
+        end
+
+        for i in reverse(eachindex(new_eqs))
+            all_present = Symbolics.get_variables(new_eqs[i])
+            if length(intersect(all_present, vars)) < 1
+                deleteat!(new_eqs, i)
+            end
         end
 
         new_eqs = demote(new_eqs, vars, params)
@@ -233,7 +249,10 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
         end
 
         # non-cyclic case
-        n_iterations > 10 && return []
+        if n_iterations > 10 
+            warns && @warn("symbolic_solve can not currently solve this system of polynomials.")
+            return nothing
+        end
 
         n_iterations += 1
     end
@@ -295,27 +314,14 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     isempty(tr_basis) && return nothing
     vars_gen = setdiff(vars, tr_basis)
     sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
+
     for roots in sol
         for x in tr_basis
             roots[x] = x
         end
     end
-    sol
-end
 
-# Helps with precompilation time
-PrecompileTools.@setup_workload begin
-    @variables a b c x y z
-    equation1 = a*log(x)^b + c ~ 0
-    equation_actually_polynomial = sin(x^2 +1)^2 + sin(x^2 + 1) + 3
-    simple_linear_equations = [x - y, y + 2z]
-    equations_intersect_sphere_line = [x^2 + y^2 + z^2 - 9, x - 2y + 3, y - z]
-    PrecompileTools.@compile_workload begin
-        symbolic_solve(equation1, x)
-        symbolic_solve(equation_actually_polynomial)
-        symbolic_solve(simple_linear_equations, [x, y])
-        symbolic_solve(equations_intersect_sphere_line, [x, y, z])
-    end
+    sol
 end
 
 end # module

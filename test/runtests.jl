@@ -9,13 +9,19 @@ function activate_downstream_env()
     Pkg.instantiate()
 end
 
+function activate_sympy_env()
+    Pkg.activate("sympy")
+    Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+    Pkg.instantiate()
+end
+
 if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
 end
 
 # this needs to be defined at top level
-limit(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
-@register_symbolic limit(a, N)::Integer
+limit2(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
+@register_symbolic limit2(a, N)::Integer
 
 if GROUP == "All" || GROUP == "Core"
       @testset begin
@@ -45,7 +51,6 @@ if GROUP == "All" || GROUP == "Core"
         VERSION >= v"1.9" && @safetestset "Build Targets Test" begin include("build_targets.jl") end
         @safetestset "Latexify Test" begin include("latexify.jl") end
         @safetestset "Domain Test" begin include("domains.jl") end
-        @safetestset "SymPy Test" begin include("sympy.jl") end
         @safetestset "Inequality Test" begin include("inequality.jl") end
         @safetestset "Integral Test" begin include("integral.jl") end
         @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
@@ -55,11 +60,18 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Show Test" begin include("show.jl") end
         @safetestset "Utility Function Test" begin include("utils.jl") end
         @safetestset "RootFinding solver" begin include("solver.jl") end
+        @safetestset "Function inverses test" begin include("inverse.jl") end
+        @safetestset "Taylor Series Test" begin include("taylor.jl") end
+        @safetestset "Discontinuity registration test" begin include("discontinuities.jl") end
     end
 end
 
 if GROUP == "All" || GROUP == "GroebnerExt"
     @safetestset "Groebner extension Test" begin include("extensions/groebner.jl") end
+end
+
+if GROUP == "All" || GROUP == "LuxExt"
+    @safetestset "Lux extension Test" begin include("extensions/lux.jl") end
 end
 
 if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
@@ -78,5 +90,10 @@ if GROUP == "All" || GROUP == "Downstream"
     activate_downstream_env()
     #@time @safetestset "ParameterizedFunctions MATLABDiffEq Regression Test" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
     @safetestset "ModelingToolkit Variable Utils Test" begin include("downstream/modeling_toolkit_utils.jl") end
+    @safetestset "DI Test" begin include("downstream/differentiation_interface.jl") end
 end
 
+if GROUP == "All" || GROUP == "SymPy"
+    activate_sympy_env()
+    @safetestset "SymPy Test" begin include("sympy.jl") end
+end

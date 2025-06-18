@@ -51,10 +51,13 @@ truebasis = [
     x5^5 - 1
 ]
 basis = expand.(groebner_basis(system))
-@test isequal(basis, truebasis)
+# monomial order can change, returning different but still valid bases
+@test_broken isequal(basis, truebasis)
+@test Symbolics.is_groebner_basis(basis)
 
 basis = expand.(groebner_basis(system, linalg=:deterministic))
-@test isequal(basis, truebasis)
+@test_broken isequal(basis, truebasis)
+@test Symbolics.is_groebner_basis(basis)
 
 N = 45671930739135174346839766056203605080877915151
 system = [
@@ -69,8 +72,17 @@ truebasis = [
     x3^3 + x3^2 * x4 + x3 * x4^2 + x4^3,
     x4^4 - N
 ]
-basis = groebner_basis(system)
-@test isequal(expand.(basis), truebasis)
+basis = expand.(groebner_basis(system))
+@test_broken isequal(expand.(basis), truebasis)
+@test Symbolics.is_groebner_basis(basis)
+
+# issues/1323
+@variables t S(t) R(t)
+sys = [-12 + 5S, 2 + 5R]
+@test isequal(expand.(groebner_basis(sys, ordering=Lex(S, R))), [2//5 + R, -12//5 + S])
+sys = [S^2 + 2*R^2 - 1, S*R - 1]
+res = [(1//2) - (1//2)*(R^2) + R^4, S - R + (2//1)*(R^3)]
+@test isequal(expand.(groebner_basis(sys, ordering=Lex(S, R))), res)
 
 # Groebner does not yet work with constant ideals
 @test_broken groebner_basis([1])

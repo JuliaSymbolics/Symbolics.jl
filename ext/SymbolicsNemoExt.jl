@@ -57,32 +57,19 @@ function Symbolics.factor_use_nemo(poly::Num)
     return sym_unit, sym_factors
 end
 
-# gcd(x^2 - y^2, x^3 - y^3) -> x - y
-function Symbolics.gcd_use_nemo(poly1::Num, poly2::Num)
-    Symbolics.check_polynomial(poly1)
-    Symbolics.check_polynomial(poly2)
-    vars1 = Symbolics.get_variables(poly1)
-    vars2 = Symbolics.get_variables(poly2)
-    vars = vcat(vars1, vars2)
-    nemo_ring, nemo_vars = Nemo.polynomial_ring(Nemo.QQ, map(string, vars))
-    sym_to_nemo = Dict(vars .=> nemo_vars)
-    nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
-    nemo_poly1 = Symbolics.substitute(poly1, sym_to_nemo)
-    nemo_poly2 = Symbolics.substitute(poly2, sym_to_nemo)
-    nemo_gcd = Nemo.gcd(nemo_poly1, nemo_poly2)
-    sym_gcd = Symbolics.wrap(nemo_crude_evaluate(nemo_gcd, nemo_to_sym))
-    return sym_gcd
-end
-
-
 # Helps with precompilation time
 PrecompileTools.@setup_workload begin
     @variables a b c x y z
     expr_with_params = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
+    equation1 = a*log(x)^b + c ~ 0
+    equation_polynomial = 9^x + 3^x + 2
+    exp_eq = 5*2^(x+1) + 7^(x+3)
     PrecompileTools.@compile_workload begin
+        symbolic_solve(equation1, x)
+        symbolic_solve(equation_polynomial, x)
+        symbolic_solve(exp_eq)
         symbolic_solve(expr_with_params, x, dropmultiplicity=false)
         symbolic_solve(x^10 - a^10, x, dropmultiplicity=false)
-        symbolic_solve([x^2 - a^2, x + a], x)
     end
 end
 

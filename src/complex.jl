@@ -81,3 +81,20 @@ Base.iszero(x::Complex{<:Num}) = iszero(real(x)) && iszero(imag(x))
 Base.isone(x::Complex{<:Num}) = isone(real(x)) && iszero(imag(x))
 _iszero(x::Complex{<:Num}) = _iszero(unwrap(x))
 _isone(x::Complex{<:Num}) = _isone(unwrap(x))
+
+function SymbolicIndexingInterface.hasname(x::ComplexTerm)
+    a = arguments(unwrap(x.im))[1]
+    b = arguments(unwrap(x.re))[1]
+    return isequal(a, b) && hasname(a)
+end
+
+function _getname(x::ComplexTerm, val)
+    a = arguments(unwrap(x.im))[1]
+    b = arguments(unwrap(x.re))[1]
+    if isequal(a, b)
+        return _getname(a, val)
+    end
+    if val == _fail
+        throw(ArgumentError("Variable $x doesn't have a name."))
+    end
+end

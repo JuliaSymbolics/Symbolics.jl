@@ -170,7 +170,6 @@ z2 = c + d * im
 
 @test isequal(ℯ^a, exp(a))
 
-using IfElse: ifelse
 @test isequal(Symbolics.derivative(abs(x), x), ifelse(signbit(x), -1, 1))
 @test isequal(Symbolics.derivative(sign(x), x), 0)
 @test isequal(Symbolics.derivative(signbit(x), x), 0)
@@ -185,6 +184,9 @@ x = Num.(randn(10))
 @test norm(x, Inf) == norm(Symbolics.value.(x), Inf)
 @test norm(x, 1) == norm(Symbolics.value.(x), 1)
 @test norm(x, 1.2) == norm(Symbolics.value.(x), 1.2)
+
+@test clamp.(x, 0, 1) == clamp.(Symbolics.value.(x), 0, 1)
+@test isequal(Symbolics.derivative(clamp(a, 0, 1), a), ifelse(a < 0, 0, ifelse(a>1, 0, 1)))
 
 @variables x[1:2]
 @test isequal(scalarize(norm(x)), sqrt(abs2(x[1]) + abs2(x[2])))

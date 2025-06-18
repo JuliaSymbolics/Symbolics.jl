@@ -199,7 +199,7 @@ end
 # exponentiation #
 #----------------#
 
-for f in (:(Base.:^), :(NaNMath.pow))
+for (f, log) in ((:(Base.:^), :(Base.log)), (:(NaNMath.pow), :(NaNMath.log)))
     @eval begin
         @define_binary_dual_op(
             $f,
@@ -212,7 +212,7 @@ for f in (:(Base.:^), :(NaNMath.pow))
                 elseif iszero(vx) && vy > 0
                     logval = zero(vx)
                 else
-                    logval = expv * log(vx)
+                    logval = expv * ($log)(vx)
                 end
                 new_partials = _mul_partials(partials(x), partials(y), powval, logval)
                 return Dual{Txy}(expv, new_partials)
@@ -230,7 +230,7 @@ for f in (:(Base.:^), :(NaNMath.pow))
             begin
                 v = value(y)
                 expv = ($f)(x, v)
-                deriv = (iszero(x) && v > 0) ? zero(expv) : expv*log(x)
+                deriv = (iszero(x) && v > 0) ? zero(expv) : expv*($log)(x)
                 return Dual{Ty}(expv, deriv * partials(y))
             end,
             $AMBIGUOUS_TYPES

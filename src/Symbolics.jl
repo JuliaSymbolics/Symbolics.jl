@@ -19,11 +19,9 @@ using Primes
 
 using Reexport
 
-using DomainSets
-
 using Setfield
 
-import DomainSets: Domain
+import DomainSets: Domain, DomainSets
 
 using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
@@ -40,7 +38,7 @@ import SymbolicUtils.Code: toexpr
 
 import ArrayInterface
 using RuntimeGeneratedFunctions
-using SciMLBase, IfElse
+using SciMLBase
 import MacroTools
 
 using SymbolicIndexingInterface
@@ -48,6 +46,8 @@ using SymbolicIndexingInterface
 import SymbolicLimits
 
 using ADTypes: ADTypes
+
+import OffsetArrays
 
 @reexport using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
@@ -66,11 +66,12 @@ include("rewrite-helpers.jl")
 include("complex.jl")
 
 """
-    substitute(expr, s)
+    substitute(expr, s; fold=true)
 
 Performs the substitution on `expr` according to rule(s) `s`.
+If `fold=false`, expressions which can be evaluated won't be evaluated.
 # Examples
-```julia
+```jldoctest
 julia> @variables t x y z(t)
 4-element Vector{Num}:
     t
@@ -81,6 +82,8 @@ julia> ex = x + y + sin(z)
 (x + y) + sin(z(t))
 julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
 (z(t) + y) + (z(t) ^ 2)
+julia> substitute(sqrt(2x), Dict([x => 1]); fold=false)
+sqrt(2)
 ```
 """
 substitute
@@ -92,6 +95,7 @@ export Inequality, ≲, ≳
 include("inequality.jl")
 
 import Bijections, DynamicPolynomials
+export tosymbol, terms, factors
 include("utils.jl")
 
 using ConstructionBase
@@ -100,6 +104,7 @@ include("arrays.jl")
 export @register_symbolic, @register_array_symbolic
 include("register.jl")
 
+using SparseArrays
 export @variables, Variable
 include("variable.jl")
 
@@ -108,7 +113,6 @@ include("linearity.jl")
 
 using DiffRules, SpecialFunctions, NaNMath
 
-using SparseArrays
 
 export Differential, expand_derivatives, is_derivative
 
@@ -138,6 +142,9 @@ export symbolic_linear_solve, solve_for
 
 include("groebner_basis.jl")
 export groebner_basis, is_groebner_basis
+
+include("taylor.jl")
+export series, taylor, taylor_coeff
 
 import Libdl
 include("build_function.jl")
@@ -208,6 +215,7 @@ include("solver/polynomialization.jl")
 include("solver/attract.jl")
 include("solver/ia_main.jl")
 include("solver/main.jl")
+include("solver/special_cases.jl")
 export symbolic_solve
 
 function symbolics_to_sympy end
@@ -231,5 +239,11 @@ function __init__()
         end
     end
 end
+
+export inverse, left_inverse, right_inverse, @register_inverse, has_inverse, has_left_inverse, has_right_inverse
+include("inverse.jl")
+
+export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
+include("discontinuities.jl")
 
 end # module

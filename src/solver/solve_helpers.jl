@@ -24,6 +24,7 @@ function ssqrt(n)
     n = unwrap(n)
 
     if n isa Real
+        isnan(n) && return n
         n > 0 && return sqrt(n)
         return sqrt(complex(n))
     end
@@ -37,10 +38,13 @@ function ssqrt(n)
     end
 end
 
+derivative(::typeof(ssqrt), args...) = substitute(derivative(sqrt, args...), sqrt => ssqrt)
+
 function scbrt(n)
     n = unwrap(n)
 
     if n isa Real
+    isnan(n) && return n
         return cbrt(n)
     end
 
@@ -53,10 +57,13 @@ function scbrt(n)
     end
 end
 
+derivative(::typeof(scbrt), args...) = substitute(derivative(cbrt, args...), cbrt => scbrt)
+
 function slog(n)
     n = unwrap(n)
 
     if n isa Real
+        isnan(n) && return n
         return n > 0 ? log(n) : log(complex(n))
     end
 
@@ -66,6 +73,8 @@ function slog(n)
 
     return term(slog, n)
 end
+
+derivative(::typeof(slog), args...) = substitute(derivative(log, args...), log => slog)
 
 const RootsOf = (SymbolicUtils.@syms roots_of(poly,var))[1]
 
@@ -78,7 +87,7 @@ function check_expr_validity(expr)
     valid_type = false
 
     if type_expr <: Number || type_expr == Num || type_expr == SymbolicUtils.BasicSymbolic{Real} ||
-       type_expr == Complex{Num} || type_expr == ComplexTerm{Real}
+       type_expr == Complex{Num} || type_expr == ComplexTerm{Real} || type_expr == SymbolicUtils.BasicSymbolic{Complex{Real}}
         valid_type = true
     end
     iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
@@ -107,10 +116,11 @@ function bigify(n)
 
     if n isa SymbolicUtils.BasicSymbolic
         !iscall(n) && return n
-        args = arguments(n)
+        args = copy(parent(arguments(n)))
         for i in eachindex(args)
             args[i] = bigify(args[i])
         end
+        n = maketerm(typeof(n), operation(n), args, metadata(n))
         return n
     end
 

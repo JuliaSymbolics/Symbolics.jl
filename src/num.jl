@@ -33,7 +33,7 @@ Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
 
-IfElse.ifelse(x::Num,y,z) = Num(IfElse.ifelse(value(x), value(y), value(z)))
+Base.ifelse(x::Num,y,z) = Num(ifelse(value(x), value(y), value(z)))
 
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
 for C in [Complex, Complex{Bool}]
@@ -78,9 +78,18 @@ end
 substitute(expr, s::Pair; kw...) = substituter([s[1] => s[2]])(expr; kw...)
 substitute(expr, s::Vector; kw...) = substituter(s)(expr; kw...)
 
-substituter(pair::Pair) = substituter((pair,))
+function _unwrap_callwithmeta(x)
+    x = value(x)
+    return x isa CallWithMetadata ? x.f : x
+end
+function subrules_to_dict(pairs)
+    if pairs isa Pair
+        pairs = (pairs,)
+    end
+    return Dict(_unwrap_callwithmeta(k) => value(v)  for (k, v) in pairs)
+end
 function substituter(pairs)
-    dict = Dict(value(k) => value(v)  for (k, v) in pairs)
+    dict = subrules_to_dict(pairs)
     (expr; kw...) -> SymbolicUtils.substitute(value(expr), dict; kw...)
 end
 
@@ -168,8 +177,7 @@ Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
 Base.convert(::Type{Num}, x::Number) = Num(x)
 Base.convert(::Type{Num}, x::Num) = x
 
-Base.convert(::Type{<:Array{Num}}, x::AbstractArray) = map(Num, x)
-Base.convert(::Type{<:Array{Num}}, x::AbstractArray{Num}) = x
+Base.convert(::Type{T}, x::AbstractArray{Num}) where T <: Array{Num} = T(map(Num, x))
 Base.convert(::Type{Sym}, x::Num) = value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
 
 LinearAlgebra.lu(x::Union{Adjoint{<:RCNum},Transpose{<:RCNum},Array{<:RCNum}}; check=true, kw...) = sym_lu(x; check=check)

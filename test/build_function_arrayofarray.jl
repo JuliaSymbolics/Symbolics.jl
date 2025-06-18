@@ -195,3 +195,23 @@ h_emptyNested_str = Symbolics.build_function(h_emptyNested, [a, b, c])
 h_emptyNested_ip! = eval(h_emptyNested_str[2])
 out = [[[1 2;3 4]], Array{Array{Int64,2},1}(undef, 0)]
 h_emptyNested_ip!(out, input) # should just not fail
+
+@testset "_recursive_unwrap does not drop non-structural zeros" begin
+    A = sparse([0 1 1 0; 0 0 0 1; 0 1 0 0; 0 1 0 1; 0 0 0 0])
+    @test nnz(A) == 6
+    A[1, 2] = 0
+    A[1, 3] = 0
+    A = Symbolics._recursive_unwrap(A)
+    @test nnz(A) == 6
+    @test size(A) == (5, 4)
+
+    A = sparse([sparse([0, 1, 1, 0]), sparse([0, 0, 0, 1]), sparse([0, 0, 0, 0])])
+    @test nnz(A[1]) == 2
+    @test nnz(A[2]) == 1
+    A[1][2] = 0
+    A[2][4] = 0
+    A = Symbolics._recursive_unwrap(A)
+    @test nnz(A[1]) == 2
+    @test nnz(A[2]) == 1
+    @test length(A[1]) == 4
+end
