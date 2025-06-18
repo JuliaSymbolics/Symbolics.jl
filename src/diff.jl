@@ -499,8 +499,8 @@ derivative(::typeof(+), args::NTuple{N,Any}, ::Val) where {N} = 1
 derivative(::typeof(*), args::NTuple{N,Any}, ::Val{i}) where {N,i} = *(deleteat!(collect(args), i)...)
 derivative(::typeof(one), args::Tuple{<:Any}, ::Val) = 0
 
-derivative(f::Function, x::Num) = derivative(f(x), x)
-derivative(::Function, x::Any) = TypeError(:derivative, "2nd argument", Num, typeof(x)) |> throw
+derivative(f::Function, x::Union{Num, <:BasicSymbolic}) = derivative(f(x), x)
+derivative(::Function, x::Any) = TypeError(:derivative, "2nd argument", Union{Num, <:BasicSymbolic}, x) |> throw
 
 function count_order(x)
     @assert !(x isa Symbol) "The variable $x must have an order of differentiation that is greater or equal to 1!"
