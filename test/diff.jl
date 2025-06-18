@@ -432,6 +432,20 @@ let
     end
 end
 
+# Derivative of a `BasicSymbolic` (#1085)
+let
+    x = Symbolics.Sym{Int}(:x)
+    @testset for f in [sqrt, sin, acos, exp]
+        @test isequal(
+            Symbolics.derivative(f, x),
+            Symbolics.derivative(
+                f,
+                Symbolics.BasicSymbolic(x)
+            )
+        )
+    end
+end
+
 # Check ssqrt, scbrt, slog
 let
     @variables x
