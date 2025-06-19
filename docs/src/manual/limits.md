@@ -7,3 +7,12 @@ information and implementation details.
 ```@docs
 limit
 ```
+
+### SymPy Integration
+
+SymPy also includes limits as well, and the SymPy.jl extensions allow for automatically converting
+Symbolics expressions for use in its solvers.
+
+```@docs
+Symbolics.sympy_limit
+```

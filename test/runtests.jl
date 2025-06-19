@@ -24,7 +24,7 @@ limit2(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 @register_symbolic limit2(a, N)::Integer
 
 if GROUP == "All" || GROUP == "Core"
-      @testset begin
+    @testset begin
         @safetestset "Struct Test" begin include("struct.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end

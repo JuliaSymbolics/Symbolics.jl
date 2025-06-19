@@ -36,21 +36,32 @@ makedocs(
             "tutorials/perturbation.md"
         ],
         "Manual" => Any[
-            "manual/variables.md",
-            "manual/expression_manipulation.md",
-            "manual/derivatives.md",
-            "manual/taylor.md",
-            "manual/groebner.md",
-            "manual/solver.md",
-            "manual/arrays.md",
-            "manual/build_function.md",
-            "manual/functions.md",
-            "manual/parsing.md",
-            "manual/io.md",
-            "manual/sparsity_detection.md",
-            "manual/types.md",
-            "manual/faq.md",
-            "manual/limits.md",
+            "Basics" => [
+                "manual/variables.md",
+                "manual/expression_manipulation.md",
+                "manual/faq.md",
+                "manual/external.md",
+                "manual/arrays.md",
+                "manual/build_function.md",
+                "manual/functions.md",
+                "manual/parsing.md",
+                "manual/io.md",
+                "manual/types.md",
+            ],
+
+            "Algebra" => [
+                "manual/solver.md",
+                "manual/groebner.md",
+            ],
+
+            "Calculus" => [
+                "manual/derivatives.md",
+                "manual/integration.md",
+                "manual/ode.md",
+                "manual/taylor.md",
+                "manual/sparsity_detection.md",
+                "manual/limits.md",
+            ],  
         ],
         "Comparison Against SymPy" => "comparison.md",
     ]

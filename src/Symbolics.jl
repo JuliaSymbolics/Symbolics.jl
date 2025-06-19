@@ -218,8 +218,159 @@ include("solver/main.jl")
 include("solver/special_cases.jl")
 export symbolic_solve
 
+# Sympy Functions
+
+"""
+    symbolics_to_sympy(expr)
+
+Converts a Symbolics.jl expression to a SymPy expression. It is represented in
+[SymPy.jl](https://juliapy.github.io/SymPy.jl/dev/) format and thus can use all
+of the wrapped functionality from SymPy.jl.
+
+For conversion back to Symbolics, see `sympy_to_symbolics`.
+
+# Arguments
+
+- `expr`: A Symbolics.jl expression
+
+# Example
+
+```julia
+using Symbolics
+@variables x y
+expr = x^2 + y
+sympy_expr = symbolics_to_sympy(expr)
+```
+"""
 function symbolics_to_sympy end
-export symbolics_to_sympy
+
+"""
+    sympy_to_symbolics(sympy_expr, vars)
+Converts a SymPy expression to Symbolics.jl.
+# Arguments
+- `sympy_expr`: SymPy expression.
+- `vars`: List or dictionary of Symbolics variables.
+# Example
+```julia
+@variables x y
+sympy_expr = SymPy.Sym("x")^2 + SymPy.Sym("y")
+symbolics_expr = sympy_to_symbolics(sympy_expr, [x, y])
+```
+"""
+function sympy_to_symbolics end
+
+"""
+    sympy_linear_solve(A, b)
+Solves linear system Ax = b using SymPy.
+# Arguments
+- `A`: Matrix of Symbolics expressions.
+- `b`: Vector of Symbolics expressions.
+# Returns
+Vector of Symbolics solutions.
+# Example
+```julia
+@variables x y
+A = [1 2; 3 4]
+b = [x, y]
+sol = sympy_linear_solve(A, b)
+```
+"""
+function sympy_linear_solve end
+
+"""
+    sympy_algebraic_solve(expr, var)
+Solves algebraic equation(s) expr = 0 for var(s) using SymPy.
+# Arguments
+- `expr`: Symbolics expression or vector of expressions for a system of equations (linear or nonlinear).
+- `var`: Symbolics variable or vector of variables to solve for.
+# Returns
+- For a single equation: List of Symbolics solutions.
+- For a system: List of dictionaries mapping variables to solutions.
+# Example
+```julia
+@variables x y
+# Single equation
+expr = x^2 - 4
+sol = sympy_algebraic_solve(expr, x)  # Returns [2, -2]
+# Nonlinear system
+eqs = [x^2 + y^2 - 4, x - y]  # Circle and line
+sol = sympy_algebraic_solve(eqs, [x, y])  # Returns [{x=>1, y=>1}, {x=>-1, y=>-1}]
+```
+"""
+function sympy_algebraic_solve end
+
+"""
+    sympy_integrate(expr, var)
+Computes indefinite integral of expr w.r.t. var using SymPy.
+# Arguments
+- `expr`: Symbolics expression.
+- `var`: Symbolics variable.
+# Returns
+Symbolics integral.
+# Example
+```julia
+@variables x
+expr = x^2
+result = sympy_integrate(expr, x)
+```
+"""
+function sympy_integrate end
+
+"""
+    sympy_limit(expr, var, val)
+Computes limit of expr as var approaches val using SymPy.
+# Arguments
+- `expr`: Symbolics expression.
+- `var`: Symbolics variable.
+- `val`: Symbolics expression or number.
+# Returns
+Symbolics limit.
+# Example
+```julia
+@variables x
+expr = 1/x
+result = sympy_limit(expr, x, 0)
+```
+"""
+function sympy_limit end
+
+"""
+    sympy_simplify(expr)
+Simplifies a Symbolics expression using SymPy.
+# Arguments
+- `expr`: Symbolics expression.
+# Returns
+Simplified Symbolics expression.
+# Example
+```julia
+@variables x
+expr = x^2 + 2x^2
+result = sympy_simplify(expr)
+```
+"""
+function sympy_simplify end
+
+"""
+    sympy_ode_solve(expr, func, var)
+Solves ODE expr = 0 for function func w.r.t. var using SymPy.
+# Arguments
+- `expr`: Symbolics expression representing ODE (set to 0).
+- `func`: Symbolics function (e.g., f(x)).
+- `var`: Independent Symbolics variable.
+# Returns
+Symbolics solution(s).
+# Example
+```julia
+@variables x
+@syms f(x)
+expr = Symbolics.Derivative(f, x) - 2*f
+sol = sympy_ode_solve(expr, f, x)  # Returns C1*exp(2*x)
+```
+"""
+function sympy_ode_solve end
+
+export symbolics_to_sympy, sympy_to_symbolics
+export sympy_linear_solve, sympy_algebraic_solve, sympy_integrate, sympy_limit, sympy_simplify,sympy_ode_solve
 
 function __init__()
     Base.Experimental.register_error_hint(TypeError) do io, exc

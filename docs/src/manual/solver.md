@@ -9,6 +9,7 @@ Symbolics.symbolic_solve
 
 One other symbolic solver is `symbolic_linear_solve` which is limited compared to 
 `symbolic_solve` as it only solves linear equations.
+
 ```@docs
 Symbolics.symbolic_linear_solve
 ```
@@ -60,6 +61,16 @@ using Groebner;
 
 eqs = [x^2 + y + z - 1, x + y^2 + z - 1, x + y + z^2 - 1]
 Symbolics.symbolic_solve(eqs, [x,y,z])
+```
+
+### SymPy Integration
+
+SymPy also includes solves as well, and the SymPy.jl extensions allow for automatically converting
+Symbolics expressions for use in its solvers.
+
+```@docs
+Symbolics.sympy_linear_solve
+Symbolics.sympy_algebraic_solve
 ```
 
 ### Feature completeness
