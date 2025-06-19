@@ -17,6 +17,15 @@ SymbolicUtils.simplify
 ```
 Documentation for `rewriter` can be found [here](https://symbolicutils.juliasymbolics.org/rewrite/), using the `@rule` macro or the `@acrule` macro from SymbolicUtils.jl.
 
+## Functionality Provided by SymPy.jl Integration
+
+SymPy also includes solves as well, and the SymPy.jl extensions allow for automatically converting
+Symbolics expressions for use in its simplifier.
+
+```@docs
+Symbolics.sympy_simplify
+```
+
 ## Additional Manipulation Functions
 
 Other additional manipulation functions are given below.
