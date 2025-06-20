@@ -35,7 +35,7 @@ differentiation to prove the correctness of the result. While this technique is 
 very differently from the purely symbolic methods, and thus the problems which it finds hard can
 be entirely different from ones which the purely symbolic methods find hard. That is, while purely
 symbolic methods have difficulty depending on the complexity of the expression, this method has
-difficulty depending on the uniquness of the numerical solution of the expression, and there are many
+difficulty depending on the uniqueness of the numerical solution of the expression, and there are many
 complex expressions which have a very distinct solution behavior and thus can be easy to solve through
 this method.
 
