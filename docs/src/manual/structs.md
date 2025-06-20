@@ -5,7 +5,7 @@ to write expressions that involve accessing fields of structs, e.g. `A.x + A.y -
 can be useful when building functions whose arguments are more complicated structs, as 
 opposed to vectors or numberse. As an example, let's take the following representation of 
 [quaternions](https://en.wikipedia.org/wiki/Quaternion):
-```julia
+```@example struct
 using Symbolics
 struct Quaternion
     a::Real
