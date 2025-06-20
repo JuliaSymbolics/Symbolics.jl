@@ -1,6 +1,6 @@
 # Symbolic ODE Solving
 
-While not all ODEs have an analyitcal solution, symbolic ODE solving is provided by Symbolics.jl for 
+While not all ODEs have an analytical solution, symbolic ODE solving is provided by Symbolics.jl for 
 subsets of cases for which known analytical solutions can be obtained. These expressions can then
 be merged with other techniques in order to accelerate code or gain a deeper understanding of real-world
 systems.
@@ -19,7 +19,7 @@ some parts of an ODE analytically, we recommend allowing ModelingToolkit.jl to d
 
 Note that if ModelingToolkit is able to analytically solve the equation, it will give an `ODEProblem`
 where `prob.u0 === nothing`, and then running `solve` on the `ODEProblem` will give a numerical
-`ODESolution` object that on-demand uses the analyitcal solution to generate any plots or other artifacts.
+`ODESolution` object that on-demand uses the analytical solution to generate any plots or other artifacts.
 The analytical solution can be investigated symbolically using `observed(sys)`.
 
 ## Symbolically Solving ODEs
