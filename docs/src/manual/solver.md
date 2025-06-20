@@ -1,4 +1,4 @@
-# Solver
+# [Solving Symbolic Equations](@id symbolic_solver)
 
 The main symbolic solver for Symbolics.jl is `symbolic_solve`. Symbolic solving
 means that it only uses symbolic (algebraic) methods and outputs exact solutions.
