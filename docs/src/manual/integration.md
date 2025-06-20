@@ -1,7 +1,7 @@
 # Symbolic Integrals
 
 Symbolics.jl provides a the `Integral` operator for defining integrals. These can be used with
-various functionalities in order to represent integro-differential equations and as a reprsentation
+various functionalities in order to represent integro-differential equations and as a representation
 for symbolic solving of integrals.
 
 !!! note
