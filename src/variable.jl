@@ -589,6 +589,12 @@ function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000)
 
     return x
 end
+function fixpoint_sub(x::SparseMatrixCSC, dict; operator = Nothing, maxiters = 1000)
+    I, J, V = findnz(x)
+    V = fixpoint_sub(V, dict; operator, maxiters)
+    m, n = size(x)
+    return sparse(I, J, V, m, n)
+end
 
 const Eq = Union{Equation, Inequality}
 """
@@ -619,6 +625,12 @@ function fast_substitute(eqs::AbstractArray, subs; operator = Nothing)
 end
 function fast_substitute(eqs::AbstractArray, subs::Pair; operator = Nothing)
     fast_substitute.(eqs, (subs,); operator)
+end
+function fast_substitute(eqs::SparseMatrixCSC, subs; operator = Nothing)
+    I, J, V = findnz(eqs)
+    V = fast_substitute(V, subs; operator)
+    m, n = size(eqs)
+    return sparse(I, J, V, m, n)
 end
 for (exprType, subsType) in Iterators.product((Num, Symbolics.Arr), (Any, Pair))
     @eval function fast_substitute(expr::$exprType, subs::$subsType; operator = Nothing)
