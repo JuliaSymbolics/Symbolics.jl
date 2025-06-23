@@ -3,7 +3,7 @@ import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap,
                   isblock, flatten_expr!, build_expr, get_variables, 
                   is_singleton, diff2term, tosymbol, lower_varname, 
                   makesubscripts, degree, coeff
-
+using SparseArrays
 using Test
 
 @testset "get_variables" begin
@@ -186,6 +186,17 @@ end
     @variables x[1:3]
     @test isequal(Symbolics.fast_substitute(x[1], Dict(unwrap(x) => collect(unwrap(x)))), x[1])
     @test isequal(Symbolics.fast_substitute(x[1], unwrap(x) => collect(unwrap(x))), x[1])
+end
+
+@testset "`fixpoint_sub` and `fast_substitute` on sparse arrays" begin
+    @variables x y z
+    mat = Num[x 0 0; 0 y 0; 0 0 z]
+    mat = sparse(mat)
+    mat = unwrap.(mat)
+    rules = Dict(x => y, y => z, z => 1)
+    res = Symbolics.fixpoint_sub(mat, rules)
+    @test res isa SparseMatrixCSC
+    @test res[1, 1] == res[2, 2] == res[3, 3] == 1
 end
 
 @testset "numerator and denominator" begin
