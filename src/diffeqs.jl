@@ -49,7 +49,7 @@ function solve_linear_system(A::Matrix{<:Number}, x0::Vector{<:Number}, t::Num)
 
     S, D = diagonalize(A)
 
-    return simplify.(S * evo_mat(D, t) * S^-1 * x0)
+    return simplify.(S * evo_mat(D, t) * rationalize.(S^-1) * x0)
 end
 
 """
@@ -91,7 +91,7 @@ function symbolic_eigen(A::Matrix{<:Number})
     values = symbolic_solve(p, λ) # solve polynomial
     
     # then, find eigenvectors
-    S::Matrix{Num} = Matrix(I, size(A, 1), 0) # matrix storing vertical eigenvectors
+    S::Matrix{Number} = Matrix(I, size(A, 1), 0) # matrix storing vertical eigenvectors
     
     for value in values
         eqs = (value*I - A) * v# .~ zeros(size(A, 1)) # equations to give eigenvectors
@@ -103,7 +103,7 @@ function symbolic_eigen(A::Matrix{<:Number})
         if sol[1] isa Dict
             sol = [sol[1][var] for var in v[2:end]]
         end
-        vec::Vector{Num} = prepend!(sol, [1]) # add back the 1 (representing v_1) from substitution
+        vec::Vector{Number} = prepend!(sol, [1]) # add back the 1 (representing v_1) from substitution
         S = [S vec] # add vec to matrix
     end
 
