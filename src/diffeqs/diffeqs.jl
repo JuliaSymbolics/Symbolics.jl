@@ -10,14 +10,15 @@ struct LinearODE
     q # right hand side function of t, without any x
     Dt::Differential
     order::Int
+    C::Vector{Num} # constants
 
-    LinearODE(x::Num, t::Num, p, q) = new(value(x), value(t), p, q, Differential(t), length(p)+1)
-    LinearODE(x, t, p, q) = new(x, t, p, q, Differential(t), length(p)+1)
+    LinearODE(x::Num, t::Num, p, q) = new(value(x), value(t), p, q, Differential(t), length(p), variables(:C, 1:length(p)))
+    LinearODE(x, t, p, q) = new(x, t, p, q, Differential(t), length(p), variables(:C, 1:length(p)))
 end
 
-get_expression(eq::LinearODE) = (eq.Dt^eq.order)(eq.x) + sum([(eq.p[n])*(eq.Dt^n)(eq.x) for n = 1:length(eq.p)]) ~ eq.q
+get_expression(eq::LinearODE) = (eq.Dt^eq.order)(eq.x) + sum([(eq.p[n])*(eq.Dt^(n-1))(eq.x) for n = 1:length(eq.p)]) ~ eq.q
 
-Base.print(io::IO, eq::LinearODE) = print(io, "(D$(eq.t)^$(eq.order))$(eq.x) + " * join(["($(eq.p[length(eq.p)-n]))(D$(eq.t)^$(length(eq.p)-n))$(eq.x)" for n = 0:(eq.order-2)], " + ") * " ~ $(eq.q)")
+Base.print(io::IO, eq::LinearODE) = print(io, "(D$(eq.t)^$(eq.order))$(eq.x) + " * join(["($(eq.p[length(eq.p)-n]))(D$(eq.t)^$(length(eq.p)-n-1))$(eq.x)" for n = 0:(eq.order-1)], " + ") * " ~ $(eq.q)")
 Base.show(io::IO, eq::LinearODE) = print(io, eq)
 
 is_homogeneous(eq::LinearODE) = isempty(Symbolics.get_variables(eq.q))
@@ -36,25 +37,45 @@ function characteristic_polynomial(eq::LinearODE, r)
     return poly
 end
 
-function homogeneous_solve(eq::LinearODE)
+"""
+Symbolically solve a linear ODE
+
+Cases handled:
+- ☑ first order
+- ☑ homogeneous with constant coefficients
+- ▢ nonhomogeneous with constant coefficients
+- ▢ particular solutions (variation of parameters? undetermined coefficients?)
+- ▢ [Differential transform method](https://www.researchgate.net/publication/267767445_A_New_Algorithm_for_Solving_Linear_Ordinary_Differential_Equations)
+"""
+function symbolic_solve_ode(eq::LinearODE)
+    if eq.order == 1
+        return integrating_factor_solve(eq)
+    end
+
+    if is_homogeneous(eq)
+        if has_const_coeffs(eq)
+            return const_coeff_solve
+        end
+    end
+end
+
+function const_coeff_solve(eq::LinearODE)
     @variables r
     p = characteristic_polynomial(eq, r)
     roots = symbolic_solve(p, r, dropmultiplicity=false)
-    @variables C[1:degree(p, r)]
-    return sum(Symbolics.scalarize(C) .* exp.(roots*eq.t))
+    return sum(eq.C .* exp.(roots*eq.t))
 end
 
 """
-Solve first order separable ODE
-
-(mostly me getting used to Symbolics, not super useful in practice)
-
-For example, dx/dt + p(t)x ~ 0
+Solve almost any first order ODE using an integrating factor
 """
-function firstorder_separable_ode_solve(ex, x, t)
-    x, t = Symbolics.value(x), Symbolics.value(t)
-    p = Symbolics.coeff(ex.lhs, x) # function of t
-    P = Symbolics.sympy_integrate(p, t)
-    @variables C
-    return simplify(C * exp(-P))
+function integrating_factor_solve(eq::LinearODE)
+    p = eq.p[1] # only p
+    v = 0 # integrating factor
+    if isempty(Symbolics.get_variables(p))
+        v = exp(p*eq.t)
+    else
+        v = exp(sympy_integrate(p, eq.t))
+    end
+    return Symbolics.sympy_simplify((1/v) * (sympy_integrate(eq.q*v, eq.t) + eq.C[1]))
 end
