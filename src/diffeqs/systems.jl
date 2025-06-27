@@ -1,19 +1,4 @@
-using Groebner, Nemo
-
-"""
-Solve first order separable ODE
-
-(mostly me getting used to Symbolics, not super useful in practice)
-
-For example, dx/dt + p(t)x ~ 0
-"""
-function firstorder_separable_ode_solve(ex, x, t)
-    x, t = Symbolics.value(x), Symbolics.value(t)
-    p = Symbolics.coeff(ex.lhs, x) # function of t
-    P = sympy_integrate(p, t)
-    @variables C
-    return simplify(C * exp(-P))
-end
+# import Symbolics: symbolic_solve
 
 """
 Returns evolution matrix e^(tD)
@@ -84,7 +69,7 @@ Replacement for `LinearAlgebra.eigen` function that uses symbolic functions to a
 """
 function symbolic_eigen(A::Matrix{<:Number})
     @variables λ # eigenvalue
-    v = Symbolics.variables(:v, 1:size(A, 1)) # vector of subscripted variables to represent eigenvector
+    v = variables(:v, 1:size(A, 1)) # vector of subscripted variables to represent eigenvector
     
     # find eigenvalues first
     p = det(λ*I - A) ~ 0 # polynomial to solve
@@ -109,37 +94,3 @@ function symbolic_eigen(A::Matrix{<:Number})
 
     return Eigen(values, S)
 end
-
-# tests
-@variables x, t
-
-Dt = Differential(t)
-ex = Dt(x) + 2 * t * x ~ 0
-println(firstorder_separable_ode_solve(ex, x, t))
-println()
-
-A = [1 0; 0 -1]
-x0 = [1, -1]
-println(solve_uncoupled_system(A, x0, t))
-println()
-
-# commented out below because currently can't handle complex eigenvalues
-# A = [-1 -2; 2 -1]
-# x0 = [1, -1]
-# println(solve_linear_system(A, x0, t))
-
-# println()
-# println(symbolic_eigen([-3 4; -2 3])) # should be [1, -1] and [1 2; 1 1] (or equivalent)
-# println()
-# println(symbolic_eigen([4 -3; 8 -6])) # should be [-2, 0] and [1 2; 3 4] (or equivalent)
-# println()
-# println(symbolic_eigen([1 -1 0; 1 2 1; -2 1 -1])) # should be [-1, 1, 2] and [-1 -1 -1; -2 0 1; 7 1 1] (or equivalent)
-# println()
-
-println(solve_linear_system([-3 4; -2 3], [7, 2], t))
-println()
-println(solve_linear_system([4 -3; 8 -6], [7, 2], t))
-println()
-# println(inv(diagonalize([1 -1 0; 1 2 1; -2 1 -1])[1])) --- shows that inv isn't maintaining symbolics
-println(solve_linear_system([1 -1 0; 1 2 1; -2 1 -1], [7, 2, 3], t))
-println()
