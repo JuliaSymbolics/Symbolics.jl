@@ -50,3 +50,4 @@ C = Symbolics.variables(:C, 1:5)
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [0, 0, 0, 4, -4], 0)), C[1] + C[2]*t + C[3]*t^2 + C[4]*exp(2t) + C[5]*t*exp(2t))
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [8, 12, 6], 0)), C[1]*exp(-2t) + C[2]*t*exp(-2t) + C[3]*t^2*exp(-2t))
 
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [9, -6], 4exp(3t))), C[1]*exp(3t) + C[2]*t*exp(3t) + 2(t^2)*exp(3t))
