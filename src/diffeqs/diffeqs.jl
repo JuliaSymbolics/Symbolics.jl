@@ -54,7 +54,7 @@ function symbolic_solve_ode(eq::LinearODE)
 
     if is_homogeneous(eq)
         if has_const_coeffs(eq)
-            return const_coeff_solve
+            return const_coeff_solve(eq)
         end
     end
 end
@@ -63,7 +63,18 @@ function const_coeff_solve(eq::LinearODE)
     @variables r
     p = characteristic_polynomial(eq, r)
     roots = symbolic_solve(p, r, dropmultiplicity=false)
-    return sum(eq.C .* exp.(roots*eq.t))
+
+    # Handle repeated roots
+    solutions = exp.(roots*eq.t)
+    for i in eachindex(solutions)[1:end-1]
+        j = i+1
+        while j <= length(solutions) && isequal(solutions[i], solutions[j])
+            solutions[j] *= eq.t^(j-i) # multiply by t for each repetition
+            j+=1
+        end
+    end
+
+    return sum(eq.C .* solutions)
 end
 
 """
@@ -77,5 +88,5 @@ function integrating_factor_solve(eq::LinearODE)
     else
         v = exp(sympy_integrate(p, eq.t))
     end
-    return Symbolics.sympy_simplify((1/v) * (sympy_integrate(eq.q*v, eq.t) + eq.C[1]))
+    return Symbolics.sympy_simplify((1/v) * ((isequal(eq.q, 0) ? 0 : sympy_integrate(eq.q*v, eq.t)) + eq.C[1]))
 end

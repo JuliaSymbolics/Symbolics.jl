@@ -42,5 +42,11 @@ C = Symbolics.variables(:C, 1:5)
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [cos(t)], cos(t))), 1 + C[1]*exp(-sin(t)))
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [-(1+t)], 1+t)), Symbolics.sympy_simplify(C[1]*exp((1//2)t^2 + t) - 1))
 # SymPy is being weird and not simplifying correctly (and some symbols are wrong, like pi and erf being syms), but these otherwise work
-@test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [-2t], 1)), Symbolics.sympy_simplify(exp(t^2)*sqrt(Symbolics.variable(:pi))*((@syms erf(z))[1])(t)/2 + C[1]*exp(t^2)))
+@test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [-2t], 1)), Symbolics.sympy_simplify(exp(t^2)*sqrt(Symbolics.variable(:pi))*erf(t)/2 + C[1]*exp(t^2)))
 @test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [1], 2sin(t))), C[1]*exp(-t) + sin(t) - cos(t))
+
+## repeated characteristic roots
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [1, 2], 0)), C[1]*exp(-t) + C[2]*t*exp(-t))
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [0, 0, 0, 4, -4], 0)), C[1] + C[2]*t + C[3]*t^2 + C[4]*exp(2t) + C[5]*t*exp(2t))
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [8, 12, 6], 0)), C[1]*exp(-2t) + C[2]*t*exp(-2t) + C[3]*t^2*exp(-2t))
+
