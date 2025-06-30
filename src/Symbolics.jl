@@ -221,7 +221,7 @@ export symbolic_solve
 # Diff Eq Solver
 include("diffeqs/diffeqs.jl")
 include("diffeqs/systems.jl")
-export symbolic_solve_ode, solve_linear_system
+export LinearODE, symbolic_solve_ode, solve_linear_system
 
 # Sympy Functions
 

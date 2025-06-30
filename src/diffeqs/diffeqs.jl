@@ -1,45 +1,71 @@
 using Symbolics
 import Symbolics: value, coeff, sympy_integrate
 
+"""
+Represents a linear ordinary differential equation of the form:
+
+dⁿx/dtⁿ + pₙ(t)(dⁿ⁻¹x/dtⁿ⁻¹) + ... + p₂(t)(dx/dt) + p₁(t)x = q(t)
+
+# Fields
+- `x`: dependent variable
+- `t`: independent variable
+- `p`: coefficient functions of `t` ordered in increasing order (p₁, p₂, ...)
+- `q`: right hand side function of `t`, without any `x`
+
+# Examples
+```jldoctest
+julia> using Symbolics
+
+julia> @variables x, t
+2-element Vector{Num}:
+ x
+ t
+
+julia> eq = LinearODE(x, t, [1, 2, 3], 3exp(4t))
+(Dt^3)x + (3)(Dt^2)x + (2)(Dt^1)x + (1)(Dt^0)x ~ 3exp(4t)
+```
+"""
 struct LinearODE
-    # dⁿx/dtⁿ + pₙ(t)(dⁿ⁻¹x/dtⁿ⁻¹) + ... + p₂(t)(dx/dt) + p₁(t)x = q(t)
+    x::Num
+    t::Num
+    p::AbstractArray
+    q::Any
+    C::Vector{Num}
 
-    x::Num # dependent variable
-    t::Num # independent variable
-    p::AbstractArray # coefficient functions of t ordered in increasing order (p₁, p₂, ...)
-    q::Any # right hand side function of t, without any x
-    Dt::Differential
-    order::Int
-    C::Vector{Num} # constants
-
-    function LinearODE(x::Num, t::Num, p, q)
-        new(value(x), value(t), p, q, Differential(t),
-            length(p), variables(:C, 1:length(p)))
-    end
-    function LinearODE(x, t, p, q)
-        new(x, t, p, q, Differential(t), length(p), variables(:C, 1:length(p)))
-    end
+    LinearODE(x, t, p, q) = new(x, t, p, q, variables(:C, 1:length(p)))
 end
 
+Dt(eq::LinearODE) = Differential(eq.t)
+order(eq::LinearODE) = length(eq.p)
+
+"""Generates symbolic expression to represent `LinearODE`"""
 function get_expression(eq::LinearODE)
-    (eq.Dt^eq.order)(eq.x) + sum([(eq.p[n]) * (eq.Dt^(n - 1))(eq.x) for n in 1:length(eq.p)]) ~ eq.q
+    (Dt(eq)^order(eq))(eq.x) + sum([(eq.p[n]) * (Dt(eq)^(n - 1))(eq.x) for n in 1:length(eq.p)]) ~ eq.q
 end
 
-function Base.print(io::IO, eq::LinearODE)
-    print(io,
-        "(D$(eq.t)^$(eq.order))$(eq.x) + " *
-        join(
-            ["($(eq.p[length(eq.p)-n]))(D$(eq.t)^$(length(eq.p)-n-1))$(eq.x)"
-             for n in 0:(eq.order - 1)],
-            " + ") * " ~ $(eq.q)")
+function Base.string(eq::LinearODE)
+    "(D$(eq.t)^$(order(eq)))$(eq.x) + " *
+    join(
+        ["($(eq.p[length(eq.p)-n]))(D$(eq.t)^$(length(eq.p)-n-1))$(eq.x)"
+         for n in 0:(order(eq) - 1)],
+        " + ") * " ~ $(eq.q)"
 end
+
+Base.print(io::IO, eq::LinearODE) = print(io, string(eq))
 Base.show(io::IO, eq::LinearODE) = print(io, eq)
 
+"""Returns true if q(t) = 0 for linear ODE `eq`"""
 is_homogeneous(eq::LinearODE) = isempty(Symbolics.get_variables(eq.q))
+"""Returns true if all coefficient functions p(t) of `eq` are constant"""
 has_const_coeffs(eq::LinearODE) = all(isempty.(Symbolics.get_variables.(eq.p)))
-
+"""Returns homgeneous version of `eq` where q(t) = 0"""
 to_homogeneous(eq::LinearODE) = LinearODE(eq.x, eq.t, eq.p, 0)
 
+"""
+Returns the characteristic polynomial p of `eq` (must have constant coefficients) in terms of variable `r`
+
+p(D) = Dⁿ + aₙ₋₁Dⁿ⁻¹ + ... + a₁D + a₀I
+"""
 function characteristic_polynomial(eq::LinearODE, r)
     poly = 0
     @assert has_const_coeffs(eq) "ODE must have constant coefficients to generate characteristic polynomial"
@@ -63,30 +89,64 @@ Cases handled:
 - ▢ [Differential transform method](https://www.researchgate.net/publication/267767445_A_New_Algorithm_for_Solving_Linear_Ordinary_Differential_Equations)
 - ▢ Laplace Transform
 - ▢ Expression parsing
+
+Uses methods: [`integrating_factor_solve`](@ref), [`find_homogeneous_solutions`](@ref), [`find_particular_solution`](@ref)
+
 """
 function symbolic_solve_ode(eq::LinearODE)
-    if eq.order == 1
+    if order(eq) == 1
         return integrating_factor_solve(eq)
     end
 
+    homogeneous_solutions = find_homogeneous_solutions(eq)
+
     if is_homogeneous(eq)
-        if has_const_coeffs(eq)
-            return const_coeff_solve(eq)
-        end
+        return homogeneous_solutions
+    end
+
+    return homogeneous_solutions + find_particular_solution(eq)
+end
+
+"""
+Find homogeneous solutions of linear ODE `eq` with integration constants of `eq.C`
+
+Currently only works for constant coefficient ODEs
+"""
+function find_homogeneous_solutions(eq::LinearODE)
+    if has_const_coeffs(eq)
+        return const_coeff_solve(to_homogeneous(eq))
+    end
+end
+
+"""
+Find a particular solution to linear ODE `eq`
+
+Currently works for any linear combination of exponentials, sin, cos, or an exponential times sin or cos (e.g. e^2t * cos(-t) + e^-3t + sin(5t))
+"""
+function find_particular_solution(eq::LinearODE)
+    # if q has multiple terms, find a particular solution for each and sum together
+    terms = Symbolics.terms(eq.q)
+    if length(terms) != 1
+        return sum(find_particular_solution.(terms))
     end
 
     if has_const_coeffs(eq)
         rrf = resonant_response_formula(eq)
         if rrf !== nothing
-            return const_coeff_solve(to_homogeneous(eq)) + rrf
+            return rrf
         end
         rrf_trig = exp_trig_particular_solution(eq)
         if rrf_trig !== nothing
-            return const_coeff_solve(to_homogeneous(eq)) + rrf_trig
+            return rrf_trig
         end
     end
 end
 
+"""
+Returns homogeneous solutions to linear ODE `eq` with constant coefficients
+
+xₕ(t) = C₁e^(r₁t) + C₂e^(r₂t) + ... + Cₙe^(rₙt)
+"""
 function const_coeff_solve(eq::LinearODE)
     @variables r
     p = characteristic_polynomial(eq, r)
@@ -96,14 +156,14 @@ function const_coeff_solve(eq::LinearODE)
     solutions = exp.(roots * eq.t)
     for i in eachindex(solutions)[1:(end - 1)]
         j = i + 1
-        
+
         if imag(roots[i]) != 0 && roots[i] == conj(roots[j])
-            solutions[i] = exp(real(roots[i]*eq.t))*cos(imag(roots[i]*eq.t))
-            solutions[j] = exp(real(roots[i]*eq.t))*sin(imag(roots[i]*eq.t))
+            solutions[i] = exp(real(roots[i] * eq.t)) * cos(imag(roots[i] * eq.t))
+            solutions[j] = exp(real(roots[i] * eq.t)) * sin(imag(roots[i] * eq.t))
         end
 
         while j <= length(solutions) && isequal(roots[i], roots[j])
-            solutions[j] *= eq.t^(j - i) # multiply by t for each repetition
+            solutions[j] *= eq.t # multiply by t for each repetition
             j += 1
         end
     end

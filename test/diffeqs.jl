@@ -40,7 +40,7 @@ C = Symbolics.variables(:C, 1:5)
 ## first order
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [5/t], 7t)), Symbolics.sympy_simplify(C[1]*t^(-5) + t^2))
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [cos(t)], cos(t))), 1 + C[1]*exp(-sin(t)))
-@test isequal(symbolic_solve_ode(LinearODE(x, t, [-(1+t)], 1+t)), Symbolics.sympy_simplify(C[1]*exp((1//2)t^2 + t) - 1))
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [-(1+t)], 1+t)), expand(Symbolics.sympy_simplify(C[1]*exp((1//2)t^2 + t) - 1)))
 # SymPy is being weird and not simplifying correctly (and some symbols are wrong, like pi and erf being syms), but these otherwise work
 @test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [-2t], 1)), Symbolics.sympy_simplify(exp(t^2)*sqrt(Symbolics.variable(:pi))*erf(t)/2 + C[1]*exp(t^2)))
 @test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [1], 2sin(t))), C[1]*exp(-t) + sin(t) - cos(t))
