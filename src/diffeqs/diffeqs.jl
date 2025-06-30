@@ -92,17 +92,28 @@ function const_coeff_solve(eq::LinearODE)
     p = characteristic_polynomial(eq, r)
     roots = symbolic_solve(p, r, dropmultiplicity = false)
 
-    # Handle repeated roots
+    # Handle complex + repeated roots
     solutions = exp.(roots * eq.t)
     for i in eachindex(solutions)[1:(end - 1)]
         j = i + 1
-        while j <= length(solutions) && isequal(solutions[i], solutions[j])
+        
+        if imag(roots[i]) != 0 && roots[i] == conj(roots[j])
+            solutions[i] = exp(real(roots[i]*eq.t))*cos(imag(roots[i]*eq.t))
+            solutions[j] = exp(real(roots[i]*eq.t))*sin(imag(roots[i]*eq.t))
+        end
+
+        while j <= length(solutions) && isequal(roots[i], roots[j])
             solutions[j] *= eq.t^(j - i) # multiply by t for each repetition
             j += 1
         end
     end
 
-    return sum(eq.C .* solutions)
+    solution = sum(eq.C .* solutions)
+    if solution isa Complex && isequal(imag(solution), 0)
+        solution = real(solution)
+    end
+
+    return solution
 end
 
 """
@@ -117,7 +128,7 @@ function integrating_factor_solve(eq::LinearODE)
         v = exp(sympy_integrate(p, eq.t))
     end
     return expand(Symbolics.sympy_simplify((1 / v) * ((isequal(eq.q, 0) ? 0 :
-                                      sympy_integrate(eq.q * v, eq.t)) + eq.C[1])))
+                                             sympy_integrate(eq.q * v, eq.t)) + eq.C[1])))
 end
 
 """
@@ -191,13 +202,14 @@ function exp_trig_particular_solution(eq::LinearODE)
     r = nothing
     b = nothing
     is_sin = false
-    
+
     if length(not_a) == 1 && _parse_trig(not_a[1], eq.t) !== nothing
         r = 0
         b, is_sin = _parse_trig(not_a[1], eq.t)
     elseif length(not_a) != 2
         return nothing
-    elseif get_rrf_coeff(not_a[1], eq.t) !== nothing && _parse_trig(not_a[2], eq.t) !== nothing
+    elseif get_rrf_coeff(not_a[1], eq.t) !== nothing &&
+           _parse_trig(not_a[2], eq.t) !== nothing
         r = get_rrf_coeff(not_a[1], eq.t)[2]
         b, is_sin = _parse_trig(not_a[2], eq.t)
     elseif get_rrf_coeff(not_a[2], eq.t) !== nothing &&
@@ -241,5 +253,5 @@ function resonant_response_formula(eq::LinearODE)
     end
 
     return expand(simplify(a * exp(r * eq.t) * eq.t^k /
-           (substitute(expand_derivatives((Ds^k)(p)), Dict(s => r)))))
+                           (substitute(expand_derivatives((Ds^k)(p)), Dict(s => r)))))
 end
