@@ -218,6 +218,11 @@ include("solver/main.jl")
 include("solver/special_cases.jl")
 export symbolic_solve
 
+# Diff Eq Solver
+include("diffeqs/diffeqs.jl")
+include("diffeqs/systems.jl")
+export symbolic_solve_ode, solve_linear_system
+
 # Sympy Functions
 
 """
