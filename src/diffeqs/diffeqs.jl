@@ -452,3 +452,41 @@ function is_solution(solution, eq)
     @show expr = expand(expand_derivatives(expr.lhs - expr.rhs))
     return isequal(expr, 0)
 end
+
+"""
+Initial value problem (IVP) for a linear ODE
+"""
+struct IVP
+    eq::LinearODE
+    initial_conditions::Vector{Num} # values at t = 0 of nth derivative of x
+
+    function IVP(eq::LinearODE, initial_conditions::Vector{<:Number})
+        @assert length(initial_conditions) == order(eq) "# of Initial conditions must match order of ODE"
+        new(eq, initial_conditions)
+    end
+end
+
+
+function solve_IVP(ivp::IVP)
+    general_solution = symbolic_solve_ode(ivp.eq)
+    if general_solution === nothing
+        return nothing
+    end
+
+    eqs = []
+    for i in eachindex(ivp.initial_conditions)
+        eq::Num = expand_derivatives((Dt(ivp.eq)^(i-1))(general_solution)) - ivp.initial_conditions[i]
+
+        eq = substitute(eq, Dict(ivp.eq.t => 0), fold=false)
+        
+        # make sure exp, sin, and cos don't evaluate to floats
+        exp0 = substitute(exp(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
+        sin0 = substitute(sin(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
+        cos0 = substitute(cos(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
+
+        eq = expand(simplify(substitute(eq, Dict(exp0 => 1, sin0 => 0, cos0 => 1), fold=false)))
+        push!(eqs, eq)
+    end
+
+    return expand(simplify(substitute(general_solution, symbolic_solve(eqs, ivp.eq.C)[1])))
+end

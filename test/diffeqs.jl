@@ -1,5 +1,5 @@
 using Symbolics
-using Symbolics: solve_linear_system, LinearODE, is_homogeneous, has_const_coeffs, to_homogeneous, symbolic_solve_ode, find_particular_solution
+using Symbolics: solve_linear_system, LinearODE, is_homogeneous, has_const_coeffs, to_homogeneous, symbolic_solve_ode, find_particular_solution, IVP, solve_IVP
 import Groebner, Nemo, SymPy
 using Test
 
@@ -67,3 +67,7 @@ C = Symbolics.variables(:C, 1:5)
 Dt = Differential(t)
 @test isequal(LinearODE(x, t, [1], 0), LinearODE(Dt(x) + x ~ 0, x, t))
 @test isequal(LinearODE(x, t, [sin(t), 0, 3t^2], exp(2t) + 2cos(t)), LinearODE(6t^2*(Dt^2)(x) + 2sin(t)*x - 2exp(2t) + 2(Dt^3)(x) ~ 4cos(t), x, t))
+
+# IVP
+@test isequal(solve_IVP(IVP(LinearODE(x, t, [-3, 2], 0), [1, -1])), (1//2)exp(-3t) + (1//2)exp(t))
+@test isequal(solve_IVP(IVP(LinearODE(x, t, [9, -6], 4exp(3t)), [5, 6])), 5exp(3t) - 9t*exp(3t) + 2(t^2)*exp(3t))
