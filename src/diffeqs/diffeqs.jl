@@ -33,6 +33,57 @@ struct LinearODE
     C::Vector{Num}
 
     LinearODE(x, t, p, q) = new(x, t, p, q, variables(:C, 1:length(p)))
+
+    function LinearODE(expr, x, t)
+        if expr isa Equation
+            epxr = expr.lhs - expr.rhs
+        end
+
+        expr = expand(simplify(expr))
+        terms = Symbolics.terms(epxr)
+        p::Vector{Num} = []
+        q = 0
+        order = 0
+        for term in terms
+            if isequal(Symbolics.get_variables(term, [x]), [x])
+                facs = factors(term)
+                deriv = filter(fac -> Symbolics.hasderiv(Symbolics.value(fac)), facs)
+                p_n = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
+                if isempty(deriv)
+                    p[1] = p_n/x
+                    continue
+                end
+                
+                @assert length(deriv) == 1 "Expected linear term: $term"
+                n = _get_der_order(deriv[1], x, t)
+                if n+1 > length(p)
+                    append!(p, zeros(Int, n-length(p) + 1))
+                end
+                p[n + 1] = p_n
+                order = max(order, n)
+                
+            elseif isempty(Symbolics.get_variables(term, [x]))
+                q -= term
+            else
+                @error "Invalid term in LinearODE: $term"
+            end
+        end
+        
+        # normalize leading coefficient to 1
+        leading_coeff = p[order + 1]
+        p = expand.(p .// leading_coeff)
+        q = expand(q // leading_coeff)
+
+        new(x, t, p[1:order], q)
+    end
+end
+
+function _get_der_order(expr, x, t)
+    if isequal(expr, x)
+        return 0
+    end
+
+    return _get_der_order(substitute(expr, Dict(Differential(t)(x) => x)), x, t) + 1
 end
 
 Dt(eq::LinearODE) = Differential(eq.t)
@@ -53,6 +104,9 @@ end
 
 Base.print(io::IO, eq::LinearODE) = print(io, string(eq))
 Base.show(io::IO, eq::LinearODE) = print(io, eq)
+Base.isequal(eq1::LinearODE, eq2::LinearODE) =
+    isequal(eq1.x, eq2.x) && isequal(eq1.t, eq2.t) &&
+    isequal(eq1.p, eq2.p) && isequal(eq1.q, eq2.q)
 
 """Returns true if q(t) = 0 for linear ODE `eq`"""
 is_homogeneous(eq::LinearODE) = isempty(Symbolics.get_variables(eq.q))

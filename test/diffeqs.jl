@@ -62,3 +62,8 @@ C = Symbolics.variables(:C, 1:5)
 ## undetermined coefficients
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [-3, 2], 2t - 5)), C[1]exp(t) + C[2]exp(-3t) - (2//3)t + 11//9)
 @test isequal(find_particular_solution(LinearODE(x, t, [1, 0], t^2)), t^2 - 2)
+
+# Parsing
+Dt = Differential(t)
+@test isequal(LinearODE(x, t, [1], 0), LinearODE(Dt(x) + x ~ 0, x, t))
+@test isequal(LinearODE(x, t, [sin(t), 0, 3t^2], exp(2t) + 2cos(t)), LinearODE(6t^2*(Dt^2)(x) + 2sin(t)*x - 2exp(2t) + 2(Dt^3)(x) ~ 4cos(t), x, t))
