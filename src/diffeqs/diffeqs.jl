@@ -127,7 +127,7 @@ function find_particular_solution(eq::LinearODE)
     # if q has multiple terms, find a particular solution for each and sum together
     terms = Symbolics.terms(eq.q)
     if length(terms) != 1
-        return sum(find_particular_solution.(terms))
+        return sum(find_particular_solution(LinearODE(eq.x, eq.t, eq.p, term)) for term in terms)
     end
 
     if has_const_coeffs(eq)
@@ -139,6 +139,11 @@ function find_particular_solution(eq::LinearODE)
         if rrf_trig !== nothing
             return rrf_trig
         end
+    end
+
+    undetermined_coeff = method_of_undetermined_coefficients(eq)
+    if undetermined_coeff !== nothing
+        return undetermined_coeff
     end
 end
 
@@ -187,8 +192,12 @@ function integrating_factor_solve(eq::LinearODE)
     else
         v = exp(sympy_integrate(p, eq.t))
     end
-    return expand(Symbolics.sympy_simplify((1 / v) * ((isequal(eq.q, 0) ? 0 :
-                                             sympy_integrate(eq.q * v, eq.t)) + eq.C[1])))
+    solution = (1 / v) * ((isequal(eq.q, 0) ? 0 : sympy_integrate(eq.q * v, eq.t)) + eq.C[1])
+    @variables Integral
+    if !isempty(Symbolics.get_variables(solution, Integral))
+        return nothing
+    end
+    return expand(Symbolics.sympy_simplify(solution))
 end
 
 """
@@ -314,4 +323,76 @@ function resonant_response_formula(eq::LinearODE)
 
     return expand(simplify(a * exp(r * eq.t) * eq.t^k /
                            (substitute(expand_derivatives((Ds^k)(p)), Dict(s => r)))))
+end
+
+function method_of_undetermined_coefficients(eq::LinearODE)
+    # constant
+    p = eq.p[1]
+    if isempty(Symbolics.get_variables(p, eq.t)) && isempty(Symbolics.get_variables(eq.q, eq.t))
+        return eq.q // p
+    end
+
+    # polynomial
+    degree = Symbolics.degree(eq.q, eq.t) # just a starting point
+    a = Symbolics.variables(:a, 1:degree+1)
+    form = sum(a[n]*eq.t^(n-1) for n = 1:degree+1)
+    eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+    eq_subbed = expand_derivatives(eq_subbed)
+    try
+        coeff_solution = symbolic_solve(eq_subbed, length(a) == 1 ? a[1] : a)
+    catch
+        coeff_solution = nothing
+    end
+    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution)
+        return substitute(form, coeff_solution[1])
+    end
+
+    # exponential
+    @variables a
+    coeff = get_rrf_coeff(eq.q, eq.t)
+    if coeff !== nothing
+        r = coeff[2]
+        form = a*exp(r*eq.t)
+        eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+        eq_subbed = expand_derivatives(eq_subbed)
+        @show coeff_solution = symbolic_solve(eq_subbed, a)
+        
+        if coeff_solution !== nothing && !isempty(coeff_solution)
+            return substitute(form, coeff_solution[1])
+        end
+    end
+
+    # sin and cos
+    # this is a hacky way of doing things
+    @variables a, b
+    @variables cs, sn
+    parsed = _parse_trig(factors(eq.q)[end], eq.t)
+    if parsed !== nothing
+        ω = parsed[1]
+        form = a*cos(ω*eq.t) + b*sin(ω*eq.t)
+        eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+        eq_subbed = expand_derivatives(eq_subbed)
+        eq_subbed = expand(substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>cs, sin(ω*eq.t)=>sn)))
+        cos_eq = simplify(sum(terms_with(eq_subbed, cs))/cs)
+        sin_eq = simplify(sum(terms_with(eq_subbed, sn))/sn)
+        if !isempty(Symbolics.get_variables(cos_eq, [eq.t,sn,cs])) || !isempty(Symbolics.get_variables(sin_eq, [eq.t,sn,cs]))
+            coeff_solution = nothing
+        else
+            coeff_solution = symbolic_solve([cos_eq, sin_eq], [a,b])
+        end
+        
+        if coeff_solution !== nothing && !isempty(coeff_solution)
+            return substitute(form, coeff_solution[1])
+        end
+    end
+end
+
+function is_solution(solution, eq)
+    if solution === nothing
+        return false
+    end
+
+    expr = substitute(get_expression(eq), Dict(eq.x => solution))
+    @show expr = expand(expand_derivatives(expr.lhs - expr.rhs))
+    return isequal(expr, 0)
 end
