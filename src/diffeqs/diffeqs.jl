@@ -137,12 +137,14 @@ Symbolically solve a linear ODE
 Cases handled:
 - ☑ first order
 - ☑ homogeneous with constant coefficients
-- ◩ particular solutions (variation of parameters? undetermined coefficients?)
+- ◩ particular solutions
     - ☑ ERF + RRF
     - ☑ complex ERF + RRF to handle sin/cos
+    - ☑ method of undetermined coefficients
+    - ▢ variation of parameters
 - ▢ [Differential transform method](https://www.researchgate.net/publication/267767445_A_New_Algorithm_for_Solving_Linear_Ordinary_Differential_Equations)
 - ▢ Laplace Transform
-- ▢ Expression parsing
+- ☑ Expression parsing
 
 Uses methods: [`integrating_factor_solve`](@ref), [`find_homogeneous_solutions`](@ref), [`find_particular_solution`](@ref)
 
