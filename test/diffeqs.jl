@@ -71,3 +71,8 @@ Dt = Differential(t)
 # IVP
 @test isequal(solve_IVP(IVP(LinearODE(x, t, [-3, 2], 0), [1, -1])), (1//2)exp(-3t) + (1//2)exp(t))
 @test isequal(solve_IVP(IVP(LinearODE(x, t, [9, -6], 4exp(3t)), [5, 6])), 5exp(3t) - 9t*exp(3t) + 2(t^2)*exp(3t))
+
+# Other methods
+@variables C
+@test isequal(symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t), C*t - C^3)
+@test isequal(symbolic_solve_ode(x ~ Dt(x)*t + (Dt(x))^2 - sin(Dt(x)) + 2, x, t), C*t + C^2 - sin(C) + 2)

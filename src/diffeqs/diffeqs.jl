@@ -65,7 +65,8 @@ struct LinearODE
             elseif isempty(Symbolics.get_variables(term, [x]))
                 q -= term
             else
-                @error "Invalid term in LinearODE: $term"
+                # throw assertion error for invalid term so it can be easily caught
+                @assert false "Invalid term in LinearODE: $term"
             end
         end
         
@@ -135,7 +136,9 @@ end
 Symbolically solve a linear ODE
 
 Cases handled:
-- ☑ first order
+- ☑ first order linear
+- ☑ Clairaut's equation
+- ◩ bernoulli equations
 - ☑ homogeneous with constant coefficients
 - ◩ particular solutions
     - ☑ ERF + RRF
@@ -161,6 +164,23 @@ function symbolic_solve_ode(eq::LinearODE)
     end
 
     return homogeneous_solutions + find_particular_solution(eq)
+end
+
+function symbolic_solve_ode(expr::Equation, x, t)
+    if solve_clairaut(expr, x, t) !== nothing
+        return solve_clairaut(expr, x, t)
+    end
+
+    try
+        eq = LinearODE(expr, x, t)
+        return symbolic_solve_ode(eq)
+    catch e
+        if e isa AssertionError
+            return nothing
+        else
+            throw(e)
+        end
+    end
 end
 
 """
@@ -489,4 +509,46 @@ function solve_IVP(ivp::IVP)
     end
 
     return expand(simplify(substitute(general_solution, symbolic_solve(eqs, ivp.eq.C)[1])))
+end
+
+"""
+Solve Clairaut's equation of the form x = x'*t + f(x').
+
+Returns solution of the form x = C*t + f(C) where C is a constant.
+"""
+function solve_clairaut(expr, x, t)
+    Dt = Differential(t)
+    rhs = 0
+    if isequal(expr.rhs, x)
+        rhs = expr.lhs
+    elseif isequal(expr.lhs, x)
+        rhs = expr.rhs
+    else
+        return nothing
+    end
+
+    terms = Symbolics.terms(rhs)
+    matched = false # if expr contains term Dt(x)*t
+    f = 0
+    for term in terms
+        if isequal(term, Dt(x)*t)
+            matched = true
+        elseif !isempty(Symbolics.get_variables(term, [t]))
+            return nothing
+        else
+            f += term
+        end
+    end
+
+    if !matched
+        return nothing
+    end
+
+    @variables C
+    f = substitute(f, Dict(Dt(x) => C))
+    if !isempty(Symbolics.get_variables(f, [x]))
+        return nothing
+    end
+
+    return C*t + f
 end
