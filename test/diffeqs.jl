@@ -43,7 +43,7 @@ C = Symbolics.variables(:C, 1:5)
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [-(1+t)], 1+t)), expand(Symbolics.sympy_simplify(C[1]*exp((1//2)t^2 + t) - 1)))
 # SymPy is being weird and not simplifying correctly (and some symbols are wrong, like pi and erf being syms), but these otherwise work
 @test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [-2t], 1)), Symbolics.sympy_simplify(exp(t^2)*sqrt(Symbolics.variable(:pi))*erf(t)/2 + C[1]*exp(t^2)))
-@test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [1], 2sin(t))), C[1]*exp(-t) + sin(t) - cos(t))
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [1], 2sin(t))), C[1]*exp(-t) + sin(t) - cos(t))
 
 ## repeated characteristic roots
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [1, 2], 0)), C[1]*exp(-t) + C[2]*t*exp(-t))
@@ -73,6 +73,11 @@ Dt = Differential(t)
 @test isequal(solve_IVP(IVP(LinearODE(x, t, [9, -6], 4exp(3t)), [5, 6])), 5exp(3t) - 9t*exp(3t) + 2(t^2)*exp(3t))
 
 # Other methods
-@variables C
-@test isequal(symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t), C*t - C^3)
-@test isequal(symbolic_solve_ode(x ~ Dt(x)*t + (Dt(x))^2 - sin(Dt(x)) + 2, x, t), C*t + C^2 - sin(C) + 2)
+
+## Clairaut's equation
+@test isequal(symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t), C[1]*t - C[1]^3)
+@test isequal(symbolic_solve_ode(x ~ Dt(x)*t + (Dt(x))^2 - sin(Dt(x)) + 2, x, t), C[1]*t + C[1]^2 - sin(C[1]) + 2)
+
+## Bernoulli equations
+@test isequal(symbolic_solve_ode(Dt(x) - 5x ~ exp(-2t)*x^(-2), x, t), (C[1]exp(15t) - (3//17)exp(-2t))^(1//3))
+@test isequal(symbolic_solve_ode(Dt(x) + (4//t)*x ~ t^3 * x^2, x, t), 1/(C[1]t^4 - t^4 * log(t)))

@@ -46,11 +46,16 @@ struct LinearODE
         order = 0
         for term in terms
             if isequal(Symbolics.get_variables(term, [x]), [x])
-                facs = factors(term)
+                facs = _true_factors(term)
                 deriv = filter(fac -> Symbolics.hasderiv(Symbolics.value(fac)), facs)
                 p_n = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
                 if isempty(deriv)
-                    p[1] = p_n/x
+                    @assert Symbolics.degree(term, x) == 1 "Expected linear term: $term"
+                    if isempty(p)
+                        p = [p_n/x]
+                    else
+                        p[1] = p_n/x
+                    end
                     continue
                 end
                 
@@ -153,22 +158,31 @@ Uses methods: [`integrating_factor_solve`](@ref), [`find_homogeneous_solutions`]
 
 """
 function symbolic_solve_ode(eq::LinearODE)
+    homogeneous_solutions = find_homogeneous_solutions(eq)
+    
+    if is_homogeneous(eq) && homogeneous_solutions !== nothing
+        return homogeneous_solutions
+    end
+    
+    particular_solution = find_particular_solution(eq)
+    if homogeneous_solutions !== nothing && particular_solution !== nothing
+        return homogeneous_solutions + particular_solution
+    end
+    
     if order(eq) == 1
         return integrating_factor_solve(eq)
     end
-
-    homogeneous_solutions = find_homogeneous_solutions(eq)
-
-    if is_homogeneous(eq)
-        return homogeneous_solutions
-    end
-
-    return homogeneous_solutions + find_particular_solution(eq)
 end
 
 function symbolic_solve_ode(expr::Equation, x, t)
-    if solve_clairaut(expr, x, t) !== nothing
-        return solve_clairaut(expr, x, t)
+    clairaut = solve_clairaut(expr, x, t)
+    if clairaut !== nothing
+        return clairaut
+    end
+
+    bernoulli = solve_bernoulli(expr, x, t)
+    if bernoulli !== nothing
+        return bernoulli
     end
 
     try
@@ -176,6 +190,7 @@ function symbolic_solve_ode(expr::Equation, x, t)
         return symbolic_solve_ode(eq)
     catch e
         if e isa AssertionError
+            @warn e
             return nothing
         else
             throw(e)
@@ -203,7 +218,11 @@ function find_particular_solution(eq::LinearODE)
     # if q has multiple terms, find a particular solution for each and sum together
     terms = Symbolics.terms(eq.q)
     if length(terms) != 1
-        return sum(find_particular_solution(LinearODE(eq.x, eq.t, eq.p, term)) for term in terms)
+        solutions = find_particular_solution.(LinearODE.(Ref(eq.x), Ref(eq.t), Ref(eq.p), terms))
+        if any(s -> s === nothing, solutions)
+            return nothing
+        end
+        return sum(solutions)
     end
 
     if has_const_coeffs(eq)
@@ -280,7 +299,7 @@ end
 Returns a, r from q(t)=a*e^(rt) if it is of that form. If not, returns `nothing`
 """
 function get_rrf_coeff(q, t)
-    facs = factors(q)
+    facs = _true_factors(q)
 
     # handle complex r
     # very convoluted, could probably be improved (possibly by making heavier use of @rule)
@@ -338,7 +357,7 @@ end
 For finding particular solution when q(t) = a*e^(rt)*cos(bt) (or sin(bt))
 """
 function exp_trig_particular_solution(eq::LinearODE)
-    facs = factors(eq.q)
+    facs = _true_factors(eq.q)
 
     a = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [eq.t])), facs))
 
@@ -431,7 +450,7 @@ function method_of_undetermined_coefficients(eq::LinearODE)
         form = a*exp(r*eq.t)
         eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
-        @show coeff_solution = symbolic_solve(eq_subbed, a)
+        coeff_solution = symbolic_solve(eq_subbed, a)
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
             return substitute(form, coeff_solution[1])
@@ -442,15 +461,15 @@ function method_of_undetermined_coefficients(eq::LinearODE)
     # this is a hacky way of doing things
     @variables a, b
     @variables cs, sn
-    parsed = _parse_trig(factors(eq.q)[end], eq.t)
+    parsed = _parse_trig(_true_factors(eq.q)[end], eq.t)
     if parsed !== nothing
         ω = parsed[1]
         form = a*cos(ω*eq.t) + b*sin(ω*eq.t)
         eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
         eq_subbed = expand(substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>cs, sin(ω*eq.t)=>sn)))
-        cos_eq = simplify(sum(terms_with(eq_subbed, cs))/cs)
-        sin_eq = simplify(sum(terms_with(eq_subbed, sn))/sn)
+        cos_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, cs)), terms(eq_subbed)))/cs)
+        sin_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, sn)), terms(eq_subbed)))/sn)
         if !isempty(Symbolics.get_variables(cos_eq, [eq.t,sn,cs])) || !isempty(Symbolics.get_variables(sin_eq, [eq.t,sn,cs]))
             coeff_solution = nothing
         else
@@ -469,7 +488,7 @@ function is_solution(solution, eq)
     end
 
     expr = substitute(get_expression(eq), Dict(eq.x => solution))
-    @show expr = expand(expand_derivatives(expr.lhs - expr.rhs))
+    expr = expand(expand_derivatives(expr.lhs - expr.rhs))
     return isequal(expr, 0)
 end
 
@@ -544,11 +563,103 @@ function solve_clairaut(expr, x, t)
         return nothing
     end
 
-    @variables C
+    C = Symbolics.variable(:C, 1) # constant of integration
     f = substitute(f, Dict(Dt(x) => C))
     if !isempty(Symbolics.get_variables(f, [x]))
         return nothing
     end
 
     return C*t + f
+end
+
+"""
+Linearize a Bernoulli equation of the form dx/dt + p(t)x = q(t)x^n into a `LinearODE` of the form dv/dt + (1-n)p(t)v = (1-n)q(t) where v = x^(1-n)
+"""
+function linearize_bernoulli(expr, x, t, v)
+    Dt = Differential(t)
+
+    if expr isa Equation
+        expr = expr.lhs - expr.rhs
+    end
+
+    terms = Symbolics.terms(expr)
+
+    p = 0
+    q = 0
+    n = 0
+    leading_coeff = 1
+    for term in terms
+        if Symbolics.hasderiv(Symbolics.value(term))
+            facs = _true_factors(term)
+            leading_coeff = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
+            @assert _get_der_order(term//leading_coeff, x, t) == 1 "Expected linear term in $term"
+        elseif !isempty(Symbolics.get_variables(term, [x]))
+            facs = _true_factors(term)
+            x_fac = filter(fac -> !isempty(Symbolics.get_variables(fac, [x])), facs)
+            @assert length(x_fac) == 1 "Expected linear term in $term"
+
+            if isequal(x_fac[1], x)
+                p = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs))
+            else
+                n = degree(x_fac[1])
+                q = -prod(filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs))
+            end
+        end
+    end
+    
+    p //= leading_coeff
+    q //= leading_coeff
+    
+    return LinearODE(v, t, [p*(1-n)], q*(1-n)), n
+end
+
+"""
+Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n
+"""
+function solve_bernoulli(expr, x, t)
+    @variables v
+    eq, n = linearize_bernoulli(expr, x, t, v)
+
+    solution = symbolic_solve_ode(eq)
+    if solution === nothing
+        return nothing
+    end
+
+    return simplify(solution^(1//(1-n)))
+end
+
+"""
+Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n with initial condition x(0) = x0
+"""
+function solve_bernoulli(expr, x, t, x0)
+    @variables v
+    eq, n = linearize_bernoulli(expr, x, t, v)
+
+    v0 = x0^(1-n) # convert initial condition from x(0) to v(0)
+
+    ivp = IVP(eq, [v0])
+    solution = solve_IVP(ivp)
+    if solution === nothing
+        return nothing
+    end
+
+    return symbolic_solve(solution ~ x^(1-n), x)
+end
+
+# takes into account fractions
+function _true_factors(expr)
+    facs = factors(expr)
+    true_facs::Vector{Number} = []
+    frac_rule = @rule (~x)/(~y) => [~x, 1/~y]
+    for fac in facs
+        frac = frac_rule(fac)
+        if frac !== nothing && !isequal(frac[1], 1)
+            append!(true_facs, _true_factors(frac[1]))
+            append!(true_facs, _true_factors(frac[2]))
+        else
+            push!(true_facs, fac)
+        end
+    end
+
+    return true_facs
 end
