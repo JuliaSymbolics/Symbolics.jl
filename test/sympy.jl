@@ -65,7 +65,12 @@ result = sympy_simplify(expr)
 @test isequal(Symbolics.simplify(result), 3x^2)
 
 # Test 8: ODE solver
-# D = Differential(x)
-# ode = D(f) - 2*f
-# sol_ode = sympy_ode_solve(ode, f, x)
-# @test isequal(sol_ode, Symbolics.parse("C1*exp(2*x)", Dict("f"=>f, "x"=>x)))
+D = Symbolics.Differential(x)
+@variables C1 
+ode = D(f) - 2*f
+sol_ode = sympy_ode_solve(ode, f, x)
+sol_vars = Symbolics.get_variables(sol_ode)
+const_sym = only(filter(v -> startswith(string(Symbolics.nameof(v)), "C"), sol_vars))
+expected_sol = C1 * exp(2 * x)
+canonical_sol_ode = Symbolics.substitute(sol_ode, Dict(const_sym => C1))
+@test isequal(canonical_sol_ode, expected_sol)
