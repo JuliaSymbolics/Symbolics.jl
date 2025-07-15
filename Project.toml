@@ -93,6 +93,7 @@ RuntimeGeneratedFunctions = "0.5.9"
 SafeTestsets = "0.1.0"
 SciMLBase = "2"
 Setfield = "1"
+SnoopCompile = "3.1"
 SpecialFunctions = "1.8, 2"
 StaticArraysCore = "1.4"
 SymPy = "2.2"
@@ -116,7 +117,8 @@ PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 ReferenceTests = "324d217c-45ce-50fc-942e-d289b448e8cf"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SnoopCompile = "aa65fe97-06da-5843-b5b1-d5d13cad87d2"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "Random", "LambertW", "Lux", "ComponentArrays", "Nemo", "DynamicQuantities"]
+test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "Random", "LambertW", "Lux", "ComponentArrays", "Nemo", "DynamicQuantities", "SnoopCompile"]
