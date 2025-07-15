@@ -260,6 +260,14 @@ function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
 
+# add enough additional methods that the compiler gives up on specializing this
+# and downstream definitions don't cause massive invalidation.
+option_to_metadata_type(::Val{:_____!_internal_1}) = error("Invalid option")
+option_to_metadata_type(::Val{:_____!_internal_2}) = error("Invalid option")
+option_to_metadata_type(::Val{:_____!_internal_3}) = error("Invalid option")
+option_to_metadata_type(::Val{:_____!_internal_4}) = error("Invalid option")
+option_to_metadata_type(::Val{:_____!_internal_5}) = error("Invalid option")
+
 function setprops_expr(expr, props, macroname, varname)
     expr = :($setmetadata($expr, $VariableSource, ($(Meta.quot(macroname)), $varname,)))
     isnothing(props) && return expr
