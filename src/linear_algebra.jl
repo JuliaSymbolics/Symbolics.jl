@@ -1,5 +1,5 @@
 function nterms(t)
-    if istree(t)
+    if iscall(t)
         return reduce(+, map(nterms, arguments(t)), init=0)
     else
         return 1
@@ -67,6 +67,11 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
     A, b
 end
 
+function solve_for(eq::Any, var::Any; simplify=false, check=true)
+    Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for, force=true)
+    return symbolic_linear_solve(eq, var; simplify=simplify, check=check)
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -78,22 +83,22 @@ Currently only works if all equations are linear. `check` if the expr is linear
 w.r.t `vars`.
 
 # Examples
-```julia
+```jldoctest
 julia> @variables x y
 2-element Vector{Num}:
  x
  y
 
-julia> Symbolics.solve_for(x + y ~ 0, x)
+julia> Symbolics.symbolic_linear_solve(x + y ~ 0, x)
 -y
 
-julia> Symbolics.solve_for([x + y ~ 0, x - y ~ 2], [x, y])
+julia> Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])
 2-element Vector{Float64}:
   1.0
  -1.0
 ```
 """
-function solve_for(eq, var; simplify=false, check=true) # scalar case
+function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar case
     # simplify defaults for `false` as canonicalization should handle most of
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
@@ -103,7 +108,11 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
     if eq isa AbstractArray && var isa AbstractArray
         x = _solve(a, -b, simplify)
     else
-        x = a \ -b
+        if (a === wrap(0))
+            x = NaN
+        else
+            x = a \ -b
+        end
     end
     simplify || return x
     if x isa AbstractArray
@@ -112,8 +121,9 @@ function solve_for(eq, var; simplify=false, check=true) # scalar case
         SymbolicUtils.simplify(simplify_fractions(x))
     end
 end
-solve_for(eq::Equation, var::T; x...) where {T<:AbstractArray} = solve_for([eq],var, x...)
-solve_for(eq::T, var::Num; x...) where {T<:AbstractArray} = first(solve_for(eq,[var], x...))
+symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq], var; x...)
+symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq, [var]; x...))
+
 
 function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     A = Num.(SymbolicUtils.quick_cancel.(A))
@@ -258,8 +268,8 @@ function _linear_expansion(t::Equation, x)
 end
 trivial_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
 
-is_expansion_leaf(t) = !istree(t) || (operation(t) isa Differential)
-@noinline expansion_check(op) = op isa Differential && error("The operation is a Differential. This should never happen.")
+is_expansion_leaf(t) = !iscall(t) || (operation(t) isa Operator)
+@noinline expansion_check(op) = op isa Operator && error("The operation is an Operator. This should never happen.")
 function _linear_expansion(t, x)
     t = value(t)
     t isa Symbolic || return (0, t, true)
@@ -269,6 +279,13 @@ function _linear_expansion(t, x)
 
     op, args = operation(t), arguments(t)
     expansion_check(op)
+
+    if iscall(x) && operation(x) == getindex
+        arrx, idxsx... = arguments(x)
+    else
+        arrx = nothing
+        idxsx = nothing
+    end
 
     if op === (+)
         a₁ = b₁ = 0
@@ -307,18 +324,54 @@ function _linear_expansion(t, x)
         return (0, b₁^b₂, islinear)
     elseif op === (/)
         # (a₁ x + b₁)/(a₂ x + b₂) is linear => a₂ = 0
-        a₂, b₂, islinear = linear_expansion(args[2], x)
+        a₂, b₂, islinear = linear_expansion(denominator(t), x)
         (islinear && _iszero(a₂)) || return (0, 0, false)
-        a₁, b₁, islinear = linear_expansion(args[1], x)
+        a₁, b₁, islinear = linear_expansion(numerator(t), x)
         # (a₁ x + b₁)/b₂
         return islinear ? (a₁ / b₂, b₁ / b₂, islinear) : (0, 0, false)
+    elseif op === getindex
+        arrt, idxst... = arguments(t)
+        isequal(arrt, arrx) && return (0, t, true)
+        shape(arrt) == Unknown() && return (0, t, true)
+
+        indexed_t = OffsetArrays.Origin(map(first, axes(arrt)))(Symbolics.scalarize(arrt))[idxst...]
+        # when indexing a registered function/callable symbolic
+        # scalarizing and indexing leads to the same symbolic variable
+        # which causes a StackOverflowError without this
+        isequal(t, indexed_t) && return (0, t, true)
+        return linear_expansion(Symbolics.scalarize(arrt)[idxst...], x)
     else
         for (i, arg) in enumerate(args)
+            isequal(arg, arrx) && return (0, 0, false)
+            if symbolic_type(arg) == NotSymbolic()
+                arg isa AbstractArray || continue
+                _occursin_array(x, arrx, arg) && return (0, 0, false)
+                continue
+            end
             a, b, islinear = linear_expansion(arg, x)
             (_iszero(a) && islinear) || return (0, 0, false)
         end
         return (0, t, true)
     end
+end
+
+"""
+    _occursin_array(sym, arrsym, arr)
+
+Check if `sym` (or, if `sym` is an element of an array symbolic, the array symbolic
+`arrsym`) occursin in the non-symbolic array `arr`.
+"""
+function _occursin_array(sym, arrsym, arr)
+    for el in arr
+        if symbolic_type(el) == NotSymbolic()
+            return el isa AbstractArray && _occursin_array(sym, arrsym, el)
+        else
+            if sym !== nothing && occursin(sym, el) || arrsym !== nothing && occursin(arrsym, el)
+                return true
+            end
+        end
+    end
+    return false
 end
 
 ###

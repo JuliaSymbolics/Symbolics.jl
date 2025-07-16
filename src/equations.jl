@@ -1,9 +1,17 @@
 const NAMESPACE_SEPARATOR = '₊'
 
+hide_lhs(_) = false
+
+###
+### Connection
+###
 struct Connection
     systems
 end
+Base.broadcastable(x::Connection) = Ref(x)
 Connection() = Connection(nothing)
+Base.hash(c::Connection, seed::UInt) = hash(c.systems, (0xc80093537bdc1311 % UInt) ⊻ seed)
+hide_lhs(_::Connection) = true
 
 function connect(sys1, sys2, syss...)
     syss = (sys1, sys2, syss...)
@@ -13,13 +21,82 @@ end
 
 function Base.show(io::IO, c::Connection)
     print(io, "connect(")
-    n = length(c.systems)
-    for (i, s) in enumerate(c.systems)
-        str = join(split(string(nameof(s)), NAMESPACE_SEPARATOR), '.')
-        print(io, str)
-        i != n && print(io, ", ")
+    if c.systems isa AbstractArray || c.systems isa Tuple
+        n = length(c.systems)
+        for (i, s) in enumerate(c.systems)
+            str = join(split(string(nameof(s)), NAMESPACE_SEPARATOR), '.')
+            print(io, str)
+            i != n && print(io, ", ")
+        end
     end
     print(io, ")")
+end
+
+###
+### State machine
+###
+_nameof(s) = nameof(s)
+_nameof(s::Union{Int, Symbol}) = s
+abstract type StateMachineOperator end
+Base.broadcastable(x::StateMachineOperator) = Ref(x)
+hide_lhs(_::StateMachineOperator) = true
+struct InitialState <: StateMachineOperator
+    s
+end
+Base.show(io::IO, s::InitialState) = print(io, "initial_state(", _nameof(s.s), ")")
+initial_state(s) = Equation(InitialState(nothing), InitialState(s))
+
+Base.@kwdef struct Transition{A, B, C} <: StateMachineOperator
+    from::A = nothing
+    to::B = nothing
+    cond::C = nothing
+    immediate::Bool = true
+    reset::Bool = true
+    synchronize::Bool = false
+    priority::Int = 1
+    function Transition(from, to, cond, immediate, reset, synchronize, priority)
+        cond = unwrap(cond)
+        new{typeof(from), typeof(to), typeof(cond)}(from, to, cond, immediate,
+                                                    reset, synchronize,
+                                                    priority)
+    end
+end
+function Base.:(==)(transition1::Transition, transition2::Transition)
+    transition1.from == transition2.from &&
+    transition1.to == transition2.to &&
+    isequal(transition1.cond, transition2.cond) &&
+    transition1.immediate == transition2.immediate &&
+    transition1.reset == transition2.reset &&
+    transition1.synchronize == transition2.synchronize &&
+    transition1.priority == transition2.priority
+end
+
+"""
+    transition(from, to, cond; immediate::Bool = true, reset::Bool = true, synchronize::Bool = false, priority::Int = 1)
+
+Create a transition from state `from` to state `to` that is enabled when transitioncondition `cond` evaluates to `true`.
+
+# Arguments:
+- `from`: The source state of the transition.
+- `to`: The target state of the transition.
+- `cond`: A transition condition that evaluates to a Bool, such as `ticksInState() >= 2`.
+- `immediate`: If `true`, the transition will fire at the same tick as it becomes true, if `false`, the actions of the state are evaluated first, and the transition fires during the next tick.
+- `reset`: If true, the destination state `to` is reset to its initial condition when the transition fires.
+- `synchronize`: If true, the transition will only fire if all sub-state machines in the source state are in their final (terminal) state. A final state is one that has no outgoing transitions.
+- `priority`: If a state has more than one outgoing transition, all outgoing transitions must have a unique priority. The transitions are evaluated in priority order, i.e., the transition with priority 1 is evaluated first.
+"""
+function transition(from, to, cond;
+        immediate::Bool = true, reset::Bool = true, synchronize::Bool = false,
+        priority::Int = 1)
+    Equation(Transition(), Transition(; from, to, cond, immediate, reset,
+                                      synchronize, priority))
+end
+function Base.show(io::IO, s::Transition)
+    print(io, _nameof(s.from), " → ", _nameof(s.to), " if (", s.cond, ") [")
+    print(io, "immediate: ", Int(s.immediate), ", ")
+    print(io, "reset: ", Int(s.reset), ", ")
+    print(io, "sync: ", Int(s.synchronize), ", ")
+    print(io, "prio: ", s.priority, "]")
 end
 
 """
@@ -43,14 +120,14 @@ Base.:(==)(a::Equation, b::Equation) = all(isequal.((a.lhs, a.rhs), (b.lhs, b.rh
 Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 
 function Base.show(io::IO, eq::Equation)
-    if eq.lhs isa Connection
+    if hide_lhs(eq.lhs)
         show(io, eq.rhs)
     else
         print(io, eq.lhs, " ~ ", eq.rhs)
     end
 end
 
-scalarize(eq::Equation) = scalarize(eq.lhs) ~ scalarize(eq.rhs)
+scalarize(eq::Equation) = scalarize(eq.lhs) .~ scalarize(eq.rhs)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
 # ambiguity
 for T in [:Pair, :Any]
@@ -99,12 +176,8 @@ julia> A .~ 3x
 ```
 """
 function Base.:~(lhs, rhs)
-    if isarraysymbolic(lhs) || isarraysymbolic(rhs)
-        if isarraysymbolic(lhs) && isarraysymbolic(rhs)
-            lhs .~ rhs
-        else
-            throw(ArgumentError("Cannot equate an array with a scalar. Please use broadcast `.~`."))
-        end
+    if (isarraysymbolic(lhs) || isarraysymbolic(rhs)) && ((sl = size(lhs)) != (sr = size(rhs)))
+        throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
     else
         Equation(lhs, rhs)
     end

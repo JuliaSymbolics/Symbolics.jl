@@ -1,61 +1,45 @@
 using SpecialFunctions
 import Base.Broadcast
 
-
-const linearity_known_1 = IdDict{Function,Bool}()
-const linearity_known_2 = IdDict{Function,Bool}()
-
 const linearity_map_1 = IdDict{Function, Bool}()
 const linearity_map_2 = IdDict{Function, Tuple{Bool, Bool, Bool}}()
 
 # 1-arg
-
 const monadic_linear = [deg2rad, +, rad2deg, transpose, -, conj]
 
-const monadic_nonlinear = [asind, log1p, acsch, erfc, digamma, acos, asec, acosh, airybiprime, acsc, cscd, log, tand, log10, csch, asinh, airyai, abs2, gamma, lgamma, erfcx, bessely0, cosh, sin, cos, atan, cospi, cbrt, acosd, bessely1, acoth, erfcinv, erf, dawson, inv, acotd, airyaiprime, erfinv, trigamma, asecd, besselj1, exp, acot, sqrt, sind, sinpi, asech, log2, tan, invdigamma, airybi, exp10, sech, erfi, coth, asin, cotd, cosd, sinh, abs, besselj0, csc, tanh, secd, atand, sec, acscd, cot, exp2, expm1, atanh]
+const monadic_nonlinear = [asind, log1p, acsch, erfc, digamma, acos, asec, acosh, airybiprime, acsc, cscd, log, tand, log10, csch, asinh, airyai, abs2, gamma, lgamma, erfcx, bessely0, cosh, sin, cos, atan, cospi, cbrt, acosd, bessely1, acoth, erfcinv, erf, dawson, inv, acotd, airyaiprime, erfinv, trigamma, asecd, besselj1, exp, acot, sqrt, sind, sinpi, asech, log2, tan, invdigamma, airybi, exp10, sech, erfi, coth, asin, cotd, cosd, sinh, abs, besselj0, csc, tanh, secd, atand, sec, acscd, cot, exp2, expm1, atanh, slog, ssqrt, scbrt]
 
-# We store 3 bools even for 1-arg functions for type stability
-const three_trues = (true, true, true)
 for f in monadic_linear
-    linearity_known_1[f] = true
     linearity_map_1[f] = true
 end
 
 for f in monadic_nonlinear
-    linearity_known_1[f] = true
     linearity_map_1[f] = false
 end
 
 # 2-arg
 for f in [+, rem2pi, -, >, isless, <, isequal, max, min, convert, <=, >=]
-    linearity_known_2[f] = true
     linearity_map_2[f] = (true, true, true)
 end
 
 for f in [*]
-    linearity_known_2[f] = true
     linearity_map_2[f] = (true, true, false)
 end
 
 for f in [/]
-    linearity_known_2[f] = true
     linearity_map_2[f] = (true, false, false)
 end
 for f in [\]
-    linearity_known_2[f] = true
     linearity_map_2[f] = (false, true, false)
 end
 
 for f in [hypot, atan, mod, rem, lbeta, ^, beta]
-    linearity_known_2[f] = true
     linearity_map_2[f] = (false, false, false)
 end
 
-haslinearity_1(@nospecialize(f)) = get(linearity_known_1, f, false)
-haslinearity_2(@nospecialize(f)) = get(linearity_known_2, f, false)
-
-linearity_1(@nospecialize(f)) = linearity_map_1[f]
-linearity_2(@nospecialize(f)) = linearity_map_2[f]
+# Fallback assumption: Function is not linear, i.e., derivatives are non-zero 
+linearity_1(@nospecialize(f)) = get(linearity_map_1, f, false)
+linearity_2(@nospecialize(f)) = get(linearity_map_2, f, (false, false, false))
 
 # TermCombination datastructure
 

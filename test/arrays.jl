@@ -1,9 +1,10 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, arrterm, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
+using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, array_term, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
 import LinearAlgebra: dot
+import ..limit2
 
 struct TestMetaT end
 Symbolics.option_to_metadata_type(::Val{:test_meta}) = TestMetaT
@@ -36,7 +37,9 @@ end
 @testset "getname" begin
     @variables t x(t)[1:4]
     v = Symbolics.lower_varname(unwrap(x[2]), unwrap(t), 2)
-    @test getname(v) == Symbol("x(t)[2]ˍtt")
+    @test operation(v) == getindex
+    @test arguments(v)[2] == 2
+    @test getname(v) == getname(arguments(v)[1]) == Symbol("xˍtt")
 end
 
 @testset "getindex" begin
@@ -73,6 +76,19 @@ end
     @test getmetadata(unwrap(v[1]), TestMetaT) == 4
 end
 
+@testset "maketerm" begin
+    @variables A[1:5, 1:5] B[1:5, 1:5] C
+
+    T = unwrap(3A)
+    @test isequal(T, Symbolics.maketerm(typeof(T), operation(T), arguments(T), nothing))
+    T2 = unwrap(3B)
+    @test isequal(T2, Symbolics.maketerm(typeof(T), operation(T), [*, 3, unwrap(B)], nothing))
+    T3 = unwrap(A .^ 2)
+    @test isequal(T3, Symbolics.maketerm(typeof(T3), operation(T3), arguments(T3), nothing))
+    T4 = unwrap(A .* C)
+    @test isequal(T4, Symbolics.maketerm(typeof(T4), operation(T4), arguments(T4), nothing))
+end
+
 getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
 @testset "broadcast & scalarize" begin
     @variables A[1:5,1:3]=42 b[1:3]=[2, 3, 5] t x(t)[1:4] u[1:1]
@@ -93,8 +109,12 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
                        b[3] * A[1, 3])))
 
     D = Differential(t)
-    @test isequal(collect(D.(x) ~ x), map(i -> D(x[i]) ~ x[i], eachindex(x)))
+    @test isequal(collect(D.(x) .~ x), map(i -> D(x[i]) ~ x[i], eachindex(x)))
     @test_throws ArgumentError A ~ t
+    @test isequal(D(x[1]), D(x)[1])
+    a = Symbolics.unwrap(D(x)[1])
+    @test Symbolics.operation(a) == D
+    @test isequal(only(Symbolics.arguments(a)), Symbolics.unwrap(x[1]))
 
     # #448
     @test isequal(Symbolics.scalarize(u + u), [2u[1]])
@@ -166,15 +186,10 @@ end
 n = 2
 A = randn(n, n)
 foo(x) = A * x # a function to represent symbolically, note, if this function is defined inside the testset, it's not found by the function fun_eval = eval(fun_ex)
-function Symbolics.propagate_ndims(::typeof(foo), x)
-    ndims(x)
-end
-function Symbolics.propagate_shape(::typeof(foo), x)
-    shape(x)
-end
-@wrapped function foo(x::AbstractVector)
-    t = arrterm(foo, x)
-    setmetadata(t, Symbolics.ScalarizeCache, Ref{Any}(nothing))
+@register_array_symbolic foo(x::Vector{Real}) begin
+    size = (n,)
+    eltype = eltype(x)
+    ndims = 1
 end
 
 #=
@@ -184,33 +199,17 @@ The following two testsets test jacobians for symbolic functions of symbolic arr
 @testset "Functions and Jacobians using @syms" begin
     @variables x[1:n]
 
-    function symbolic_call(x)
-        @syms foo(x::Symbolics.Arr{Num,1})::Symbolics.Arr{Num,1} # symbolic foo can not be created in global scope due to conflict with function foo
-        foo(x) # return a symbolic call to foo
-    end
-
     x0 = randn(n)
     @test foo(x0) == A * x0
-    ex = symbolic_call(x)
+    ex = foo(x)
 
-    fun_genf = build_function(ex, x, expression=Val{false})
-    @test_broken fun_genf(x0) == A * x0# UndefVarError: foo not defined
+    fun_oop, fun_iip = build_function(ex, x, expression=Val{false})
+    @test fun_oop(x0) == A * x0# UndefVarError: foo not defined
 
     # Generate an expression instead and eval it manually
-    fun_ex = build_function(ex, x, expression=Val{true})
-    fun_eval = eval(fun_ex)
+    fun_ex_oop, fun_ex_iip = build_function(ex, x, expression=Val{true})
+    fun_eval = eval(fun_ex_oop)
     @test fun_eval(x0) == foo(x0)
-
-    # Try to provide the hidden argument `expression_module` to solve the scoping issue
-    @test_skip begin
-        fun_genf = build_function(ex, x, expression=Val{false}, expression_module=Main) # UndefVarError: #_RGF_ModTag not defined
-        fun_genf(x0) == A * x0
-    end
-
-    ## Jacobians
-    @test_broken Symbolics.value.(Symbolics.jacobian(foo(x), x)) == A
-    @test_throws ErrorException Symbolics.value.(Symbolics.jacobian(ex , x))
-
 end
 
 
@@ -223,11 +222,11 @@ end
 
     @test shape(ex) == shape(x)
 
-    fun_iip, fun_genf = build_function(ex, x, expression=Val{false})
-    @test fun_genf(x0) == A * x0
+    fun_oop, fun_iip = build_function(ex, x, expression=Val{false})
+    @test fun_oop(x0) == A * x0
 
     # Generate an expression instead and eval it manually
-    fun_ex_ip, fun_ex_oop = build_function(ex, x, expression=Val{true})
+    fun_ex_oop, fun_ex_ip = build_function(ex, x, expression=Val{true})
     fun_eval = eval(fun_ex_oop)
     @test fun_eval(x0) == foo(x0)
 
@@ -338,29 +337,28 @@ end
     A = 3.4
     alpha = 10.0
 
-    limit = Main.limit
-    dtu = @arrayop (i, j) alpha * (u[limit(i - 1, n), j] +
-                                   u[limit(i + 1, n), j] +
-                                   u[i, limit(j + 1, n)] +
-                                   u[i, limit(j - 1, n)] -
+    dtu = @arrayop (i, j) alpha * (u[limit2(i - 1, n), j] +
+                                   u[limit2(i + 1, n), j] +
+                                   u[i, limit2(j + 1, n)] +
+                                   u[i, limit2(j - 1, n)] -
                                    4u[i, j]) +
                           1.0 + u[i, j]^2 * v[i, j] - (A + 1) *
                             u[i, j] + brusselator_f(x[i], y[j], t) i in 1:n j in 1:n
-    dtv = @arrayop (i, j) alpha * (v[limit(i - 1, n), j] +
-                                   v[limit(i + 1, n), j] +
-                                   v[i, limit(j + 1, n)] +
-                                   v[i, limit(j - 1, n)] -
+    dtv = @arrayop (i, j) alpha * (v[limit2(i - 1, n), j] +
+                                   v[limit2(i + 1, n), j] +
+                                   v[i, limit2(j + 1, n)] +
+                                   v[i, limit2(j - 1, n)] -
                                    4v[i, j]) -
                           u[i, j]^2 * v[i, j] + A * u[i, j] i in 1:n j in 1:n
-    lapu = @arrayop (i, j) (u[limit(i - 1, n), j] +
-                            u[limit(i + 1, n), j] +
-                            u[i, limit(j + 1, n)] +
-                            u[i, limit(j - 1, n)] -
+    lapu = @arrayop (i, j) (u[limit2(i - 1, n), j] +
+                            u[limit2(i + 1, n), j] +
+                            u[i, limit2(j + 1, n)] +
+                            u[i, limit2(j - 1, n)] -
                             4u[i, j]) i in 1:n j in 1:n
-    lapv = @arrayop (i, j) (v[limit(i - 1, n), j] +
-                            v[limit(i + 1, n), j] +
-                            v[i, limit(j + 1, n)] +
-                            v[i, limit(j - 1, n)] -
+    lapv = @arrayop (i, j) (v[limit2(i - 1, n), j] +
+                            v[limit2(i + 1, n), j] +
+                            v[i, limit2(j + 1, n)] +
+                            v[i, limit2(j - 1, n)] -
                             4v[i, j]) i in 1:n j in 1:n
     s = brusselator_f.(x, y', t)
 
@@ -369,13 +367,35 @@ end
     lapu = wrap(lapu)
     lapv = wrap(lapv)
 
-    f, g = build_function(dtu, u, v, t, expression=Val{false})
+    g, f = build_function(dtu, u, v, t, expression=Val{false}, nanmath = false)
     du = zeros(Num, 8, 8)
     f(du, u,v,t)
     @test isequal(collect(du), collect(dtu))
 
     @test isequal(collect(dtu), collect(1 .+ v .* u.^2 .- (A + 1) .* u .+ alpha .* lapu .+ s))
     @test isequal(collect(dtv), collect(A .* u .- u.^2 .* v .+ alpha .* lapv))
+end
+
+@testset "Unwrapped array equality" begin
+    @variables x[1:3]
+    ux = unwrap(x)
+    @test isequal(x, x)
+    @test isequal(x, ux)
+    @test isequal(ux, x)
+end
+
+@testset "Array expression substitution" begin
+    @variables x[1:3] p[1:3, 1:3]
+    bar(x, p) = p * x
+    @register_array_symbolic bar(x::AbstractVector, p::AbstractMatrix) begin
+        size = size(x)
+        eltype = promote_type(eltype(x), eltype(p))
+        ndims = 1
+    end
+
+    @test isequal(substitute(bar(x, p), x => ones(3)), bar(ones(3), p))
+    @test isequal(substitute(bar(x, p), Dict(x => ones(3), p => ones(3, 3))), wrap(3ones(3)))
+    @test isequal(substitute(bar(x, p), [x => ones(3), p => ones(3, 3)]), wrap(3ones(3)))
 end
 
 @testset "Partial array substitution" begin
@@ -408,4 +428,10 @@ end
 
     @test_throws BoundsError k[-1]
     @test_throws BoundsError k[4]
+end
+
+@testset "Arrayop sorted_arguments" begin
+    @variables x[1:3] y[1:3]
+    sym = unwrap(x + y)
+    @test all(splat(isequal), zip(SymbolicUtils.sorted_arguments(sym), [+, x, y]))
 end

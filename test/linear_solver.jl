@@ -4,6 +4,11 @@ using Test
 
 @variables t p(t) x y(t)
 D = Differential(t)
+
+# Test division by zero gives a NaN
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1540
+@test Symbolics.solve_for((x~0), y) === NaN
+
 expr = x * p + y * (1 - p) ~ 0
 sol = Symbolics.solve_for(expr, p)
 @test sol isa Num
@@ -52,3 +57,36 @@ eqs = [
 @test isequal(Symbolics.solve_for(x + y ~ 0, x), Symbolics.solve_for([x + y ~ 0], x))
 @test isequal(Symbolics.solve_for([x + y ~ 0], [x]), Symbolics.solve_for(x + y ~ 0, [x]))
 @test isequal(Symbolics.solve_for(2x/z + sin(z), x), sin(z) / (-2 / z))
+
+@variables t x
+D = Symbolics.Difference(t; dt=1)
+a, b, islinear = Symbolics.linear_expansion(D(x) - x, x)
+@test islinear
+@test isequal(a, -1)
+@test isequal(b, D(x))
+
+@testset "linear_expansion with array variables" begin
+    @variables x[1:2] y[1:2] z(..)
+    @test !Symbolics.linear_expansion(z(x) + x[1], x[1])[3]
+    @test !Symbolics.linear_expansion(z(x[1]) + x[1], x[1])[3]
+    a, b, islin = Symbolics.linear_expansion(z(x[2]) + x[1], x[1])
+    @test islin && isequal(a, 1) && isequal(b, z(x[2]))
+    a, b, islin = Symbolics.linear_expansion((x + x)[1], x[1])
+    @test islin && isequal(a, 2) && isequal(b, 0)
+    a, b, islin = Symbolics.linear_expansion(y[1], x[1])
+    @test islin && isequal(a, 0) && isequal(b, y[1])
+    @test !Symbolics.linear_expansion(z([x...]), x[1])[3]
+    @test !Symbolics.linear_expansion(z(collect(Symbolics.unwrap(x))), x[1])[3]
+    @test !Symbolics.linear_expansion(z([x, 2x]), x[1])[3]
+
+    @variables x[0:2]
+    a, b, islin = Symbolics.linear_expansion(x[0] - z(x[1]), z(x[1]))
+    @test islin && isequal(a, -1) && isequal(b, x[0])
+
+    @variables x::Vector{Real}
+    a, b, islin = Symbolics.linear_expansion(x[0] - z(x[1]), z(x[1]))
+    @test islin && isequal(a, -1) && isequal(b, x[0])
+
+    @variables x y
+    @test !Symbolics.linear_expansion(x + z([x, y]), y)[3]
+end

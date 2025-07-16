@@ -17,9 +17,7 @@ function set_where(subt, supert)
     Expr(:where, supert, Ts...)
 end
 
-getname(x::Symbol) = x
-
-function getname(x::Expr)
+function SymbolicIndexingInterface.getname(x::Expr)
     @assert x.head == :curly
     return x.args[1]
 end
@@ -57,7 +55,7 @@ function wraps_type end
 has_symwrapper(::Type) = false
 is_wrapper_type(::Type) = false
 
-function wrap_func_expr(mod, expr)
+function wrap_func_expr(mod, expr, wrap_arrays = true)
     @assert expr.head == :function || (expr.head == :(=) &&
                                        expr.args[1] isa Expr &&
                                        expr.args[1].head == :call)
@@ -71,6 +69,11 @@ function wrap_func_expr(mod, expr)
     args = get(def, :args, [])
     kwargs = get(def, :kwargs, [])
 
+    if fname isa Expr && fname.head == :(::) && length(fname.args) > 1
+        self = fname.args[1]
+    else
+        self = :nothing # LOL -- in this case the argument named nothing is passed nothing
+    end
     impl_name = Symbol(fname,"_", hash(string(args)*string(kwargs)))
 
     function kwargname(kwarg)
@@ -96,10 +99,36 @@ function wrap_func_expr(mod, expr)
     names = vcat(argname.(args), kwargname.(kwargs))
 
     function type_options(arg)
+        # for every argument find the types that
+        # should be allowed as argument. These are:
+        #
+        # (1) T    (2) wrapper_type(T)    (3) Symbolic{T}
+        #
+        # However later while emitting methods we omit the one
+        # method where all arguments are (1) since those are
+        # expected to be defined outside Symbolics
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
-            has_symwrapper(T) ? (T, :(SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
-                                (T,:(SymbolicUtils.Symbolic{<:$T}))
+            Ts = has_symwrapper(T) ? (T, :(Symbolics.SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
+                                (T,:(Symbolics.SymbolicUtils.Symbolic{<:$T}))
+            if T <: AbstractArray && wrap_arrays
+                eT = eltype(T)
+                if eT == Any
+                    eT = Real
+                end
+                _arr_type_fn = if hasmethod(ndims, Tuple{Type{T}})
+                    (elT) -> :(AbstractArray{T, $(ndims(T))} where {T <: $elT})
+                else
+                    (elT) -> :(AbstractArray{T} where {T <: $elT})
+                end
+                if has_symwrapper(eT)
+                    Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})), 
+                    _arr_type_fn(wrapper_type(eT)))
+                else
+                    Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})))
+                end
+            end
+            Ts
         elseif arg isa Expr && arg.head == :(...)
             Ts = type_options(arg.args[1])
             map(x->Vararg{x},Ts)
@@ -110,7 +139,7 @@ function wrap_func_expr(mod, expr)
 
     types = map(type_options, args)
 
-    impl = :(function $impl_name($(names...))
+    impl = :(function $impl_name($self, $(names...))
         $body
     end)
     # TODO: maybe don't drop first lol
@@ -120,9 +149,9 @@ function wrap_func_expr(mod, expr)
         end
 
         fbody = :(if any($iswrapped, ($(names...),))
-                      $wrap($impl_name($([:($unwrap($arg)) for arg in names]...)))
+                      $wrap($impl_name($self, $([:($unwrap($arg)) for arg in names]...)))
                   else
-                      $impl_name($(names...))
+                      $impl_name($self, $(names...))
                   end)
 
         if isempty(kwargs)
@@ -142,6 +171,6 @@ function wrap_func_expr(mod, expr)
     end |> esc
 end
 
-macro wrapped(expr)
-    wrap_func_expr(__module__, expr)
+macro wrapped(expr, wrap_arrays = true)
+    wrap_func_expr(__module__, expr, wrap_arrays)
 end

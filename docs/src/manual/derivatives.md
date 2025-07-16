@@ -13,7 +13,13 @@ the differentials down to basic one-variable expressions.
 ```@docs
 Differential
 expand_derivatives
+is_derivative
 ```
+
+!!! note
+    For symbolic differentiation, all registered functions in the symbolic expression
+    need a registered derivative. For more information, see the
+    [function registration](@ref function_registration) page.
 
 ## High-Level Differentiation Functions
 

@@ -170,7 +170,6 @@ z2 = c + d * im
 
 @test isequal(ℯ^a, exp(a))
 
-using IfElse: ifelse
 @test isequal(Symbolics.derivative(abs(x), x), ifelse(signbit(x), -1, 1))
 @test isequal(Symbolics.derivative(sign(x), x), 0)
 @test isequal(Symbolics.derivative(signbit(x), x), 0)
@@ -185,6 +184,9 @@ x = Num.(randn(10))
 @test norm(x, Inf) == norm(Symbolics.value.(x), Inf)
 @test norm(x, 1) == norm(Symbolics.value.(x), 1)
 @test norm(x, 1.2) == norm(Symbolics.value.(x), 1.2)
+
+@test clamp.(x, 0, 1) == clamp.(Symbolics.value.(x), 0, 1)
+@test isequal(Symbolics.derivative(clamp(a, 0, 1), a), ifelse(a < 0, 0, ifelse(a>1, 0, 1)))
 
 @variables x[1:2]
 @test isequal(scalarize(norm(x)), sqrt(abs2(x[1]) + abs2(x[2])))
@@ -238,5 +240,25 @@ end
 
 @test_nowarn binomial(t, 1)
 
-using RecursiveArrayTools
-@test RecursiveArrayTools.issymbollike(t)
+# test for https://github.com/JuliaSymbolics/Symbolics.jl/issues/1028
+let
+    @variables t A(t) B
+    @test try binomial(A, 2*B^2)
+        true
+    catch
+        false
+    end
+    @test try binomial(Symbolics.value(A), Symbolics.value(2*B^2))
+        true
+    catch
+        false
+    end
+end
+
+using Symbolics: scalarize
+@variables X[1:3, 1:3] x
+sX = fill(x, 3, 3)
+sx = fill(x, 3)
+@test isequal(scalarize(X + sX), scalarize(X) + sX)
+@test isequal(scalarize(X * sX), scalarize(X) * sX)
+@test isequal(scalarize(X * sx), scalarize(X) * sx)

@@ -7,7 +7,7 @@ struct ComplexTerm{T} <: AbstractComplexTerm{T}
 end
 
 Base.imag(c::Symbolic{Complex{T}}) where {T} = term(imag, c)
-SymbolicUtils.promote_type(::typeof(imag), ::Type{Complex{T}}) where {T} = T
+SymbolicUtils.promote_symtype(::typeof(imag), ::Type{Complex{T}}) where {T} = T
 Base.promote_rule(::Type{Complex{T}}, ::Type{S}) where {T<:Real, S<:Num} =  Complex{S} # 283
 
 has_symwrapper(::Type{<:Complex{T}}) where {T<:Real} = true
@@ -18,16 +18,16 @@ function wrapper_type(::Type{Complex{T}}) where T
 end
 
 symtype(a::ComplexTerm{T}) where T = Complex{T}
-istree(a::ComplexTerm) = true
+iscall(a::ComplexTerm) = true
 operation(a::ComplexTerm{T}) where T = Complex{T}
 arguments(a::ComplexTerm) = [a.re, a.im]
-metadata(a::ComplexTerm) = a.re.metadata
+metadata(a::ComplexTerm) = metadata(a.re)
 
-function similarterm(t::ComplexTerm, f, args, symtype; metadata=nothing)
+function maketerm(T::Type{<:ComplexTerm}, f, args, metadata)
     if f <: Complex
         ComplexTerm{real(f)}(args...)
     else
-        similarterm(first(args), f, args, symtype; metadata=metadata)
+        maketerm(typeof(first(args)), f, args, metadata)
     end
 end
 
@@ -41,8 +41,8 @@ function Base.show(io::IO, a::Complex{Num})
     rr = unwrap(real(a))
     ii = unwrap(imag(a))
 
-    if istree(rr) && (operation(rr) === real) &&
-        istree(ii) && (operation(ii) === imag) &&
+    if iscall(rr) && (operation(rr) === real) &&
+        iscall(ii) && (operation(ii) === imag) &&
         isequal(arguments(rr)[1], arguments(ii)[1])
 
         return print(io, arguments(rr)[1])
@@ -81,3 +81,20 @@ Base.iszero(x::Complex{<:Num}) = iszero(real(x)) && iszero(imag(x))
 Base.isone(x::Complex{<:Num}) = isone(real(x)) && iszero(imag(x))
 _iszero(x::Complex{<:Num}) = _iszero(unwrap(x))
 _isone(x::Complex{<:Num}) = _isone(unwrap(x))
+
+function SymbolicIndexingInterface.hasname(x::ComplexTerm)
+    a = arguments(unwrap(x.im))[1]
+    b = arguments(unwrap(x.re))[1]
+    return isequal(a, b) && hasname(a)
+end
+
+function _getname(x::ComplexTerm, val)
+    a = arguments(unwrap(x.im))[1]
+    b = arguments(unwrap(x.re))[1]
+    if isequal(a, b)
+        return _getname(a, val)
+    end
+    if val == _fail
+        throw(ArgumentError("Variable $x doesn't have a name."))
+    end
+end

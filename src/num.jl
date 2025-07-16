@@ -19,9 +19,6 @@ Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value,args)...))
 value(x) = unwrap(x)
 
-SciMLBase.issymbollike(::Num) = true
-SciMLBase.issymbollike(::SymbolicUtils.Symbolic) = true
-
 SymbolicUtils.@number_methods(
                               Num,
                               Num(f(value(a))),
@@ -36,7 +33,7 @@ Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
 
-IfElse.ifelse(x::Num,y,z) = Num(IfElse.ifelse(value(x), value(y), value(z)))
+Base.ifelse(x::Num,y,z) = Num(ifelse(value(x), value(y), value(z)))
 
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
 for C in [Complex, Complex{Bool}]
@@ -81,10 +78,19 @@ end
 substitute(expr, s::Pair; kw...) = substituter([s[1] => s[2]])(expr; kw...)
 substitute(expr, s::Vector; kw...) = substituter(s)(expr; kw...)
 
-substituter(pair::Pair) = substituter((pair,))
+function _unwrap_callwithmeta(x)
+    x = value(x)
+    return x isa CallWithMetadata ? x.f : x
+end
+function subrules_to_dict(pairs)
+    if pairs isa Pair
+        pairs = (pairs,)
+    end
+    return Dict(_unwrap_callwithmeta(k) => value(v)  for (k, v) in pairs)
+end
 function substituter(pairs)
-    dict = Dict(value(k) => value(v)  for (k, v) in pairs)
-    (expr; kw...) -> SymbolicUtils.substitute(expr, dict; kw...)
+    dict = subrules_to_dict(pairs)
+    (expr; kw...) -> SymbolicUtils.substitute(value(expr), dict; kw...)
 end
 
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
@@ -98,6 +104,7 @@ import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
 Base.show(io::IO, n::Num) = show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
 
 Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
+Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{<:Symbolic{<:Number}}, ::Type{<:Num}) = Num
 function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
     if f === :op
@@ -170,8 +177,7 @@ Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
 Base.convert(::Type{Num}, x::Number) = Num(x)
 Base.convert(::Type{Num}, x::Num) = x
 
-Base.convert(::Type{<:Array{Num}}, x::AbstractArray) = map(Num, x)
-Base.convert(::Type{<:Array{Num}}, x::AbstractArray{Num}) = x
+Base.convert(::Type{T}, x::AbstractArray{Num}) where T <: Array{Num} = T(map(Num, x))
 Base.convert(::Type{Sym}, x::Num) = value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
 
 LinearAlgebra.lu(x::Union{Adjoint{<:RCNum},Transpose{<:RCNum},Array{<:RCNum}}; check=true, kw...) = sym_lu(x; check=check)
@@ -198,5 +204,19 @@ function Base.Docs.getdoc(x::Num)
     Markdown.parse(join(strings, "\n\n  "))
 end
 
-using RecursiveArrayTools
-RecursiveArrayTools.issymbollike(::Union{BasicSymbolic,Num}) = true
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1206#issuecomment-2271847091
+"""
+$(TYPEDSIGNATURES)
+
+Return the alignment of printing `x` of type `Num`.
+
+The alignment is a tuple `(left, right)` showing how many characters are needed 
+on either side of an alignment feature. This function returns the text width
+of `x` and `0` to avoid matching special characters, such as `e`and `f`, with 
+the alignment algorithm in Julia Base, which leads to extra white spaces on the 
+left of the characters when displaying array of symbolic variables.
+"""
+function Base.alignment(io::IO, x::Num)
+    s = sprint(show, x, context = Base.nocolor(io), sizehint = 0)
+    textwidth(s), 0
+end

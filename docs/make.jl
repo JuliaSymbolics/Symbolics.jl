@@ -23,7 +23,7 @@ makedocs(
     authors="Chris Rackauckas",
     modules=[Symbolics,SymbolicUtils],
     clean=true, doctest=false, linkcheck = true,
-    warnonly = [:docs_block, :missing_docs, :cross_references],
+    warnonly = [:docs_block, :missing_docs, :cross_references, :linkcheck],
     format = Documenter.HTML(assets = ["assets/favicon.ico"],
                              mathengine = mathengine,
                              canonical="https://docs.sciml.ai/Symbolics/stable/"),
@@ -32,24 +32,36 @@ makedocs(
         "getting_started.md",
         "Tutorials" => Any[
             "tutorials/auto_parallel.md",
-            "tutorials/converting_to_C.md"
-        ],
-        "Examples" => Any[
-            "examples/perturbation.md"
+            "tutorials/converting_to_C.md",
+            "tutorials/perturbation.md"
         ],
         "Manual" => Any[
-            "manual/variables.md",
-            "manual/expression_manipulation.md",
-            "manual/derivatives.md",
-            "manual/groebner.md",
-            "manual/arrays.md",
-            "manual/build_function.md",
-            "manual/functions.md",
-            "manual/parsing.md",
-            "manual/io.md",
-            "manual/sparsity_detection.md",
-            "manual/types.md",
-            "manual/faq.md"
+            "Basics" => [
+                "manual/variables.md",
+                "manual/expression_manipulation.md",
+                "manual/faq.md",
+                "manual/external.md",
+                "manual/arrays.md",
+                "manual/build_function.md",
+                "manual/functions.md",
+                "manual/parsing.md",
+                "manual/io.md",
+                "manual/types.md",
+            ],
+
+            "Algebra" => [
+                "manual/solver.md",
+                "manual/groebner.md",
+            ],
+
+            "Calculus" => [
+                "manual/derivatives.md",
+                "manual/integration.md",
+                "manual/ode.md",
+                "manual/taylor.md",
+                "manual/sparsity_detection.md",
+                "manual/limits.md",
+            ],  
         ],
         "Comparison Against SymPy" => "comparison.md",
     ]

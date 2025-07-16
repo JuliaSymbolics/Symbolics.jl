@@ -3,8 +3,8 @@
 [![Github Action CI](https://github.com/JuliaSymbolics/Symbolics.jl/workflows/CI/badge.svg)](https://github.com/JuliaSymbolics/Symbolics.jl/actions)
 [![codecov](https://codecov.io/gh/JuliaSymbolics/Symbolics.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaSymbolics/Symbolics.jl)
 [![Build Status](https://github.com/JuliaSymbolics/Symbolics.jl/workflows/CI/badge.svg)](https://github.com/JuliaSymbolics/Symbolics.jl/actions?query=workflow%3ACI)
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://symbolics.juliasymbolics.org/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://symbolics.juliasymbolics.org/dev/)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://docs.sciml.ai/Symbolics/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://docs.sciml.ai/Symbolics/dev/)
 
 Symbolics.jl is a fast and modern Computer Algebra System (CAS) for a fast and modern
 programming language (Julia). The goal is to have a high-performance and parallelized

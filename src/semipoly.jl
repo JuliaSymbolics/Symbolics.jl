@@ -23,8 +23,8 @@ function Base.:+(a::SemiMonomial, b::SemiMonomial)
     Term(+, [a, b])
 end
 function Base.:+(m::SemiMonomial, t)
-    if istree(t) && operation(t) == (+)
-        return Term(+, [unsorted_arguments(t); m])
+    if iscall(t) && operation(t) == (+)
+        return Term(+, [arguments(t); m])
     end
     Term(+, [m, t])
 end
@@ -36,13 +36,13 @@ function Base.:*(a::SemiMonomial, b::SemiMonomial)
 end
 Base.:*(m::SemiMonomial, n::Number) = SemiMonomial(m.p, m.coeff * n)
 function Base.:*(m::SemiMonomial, t::Symbolic)
-    if istree(t)
+    if iscall(t)
         op = operation(t)
         if op == (+)
             args = collect(all_terms(t))
             return Term(+, (m,) .* args)
         elseif op == (*)
-            return Term(*, [unsorted_arguments(t); m])
+            return Term(*, [arguments(t); m])
         end
     end
     Term(*, [t, m])
@@ -70,7 +70,7 @@ function pdegrees(x)
         dict = pdegrees(x.base)
         degrees = map(degree -> degree * x.exp, values(dict))
         Dict(keys(dict) .=> degrees)
-    elseif issym(x) || istree(x)
+    elseif issym(x) || iscall(x)
         return Dict(x=>1)
     elseif x isa Number
         return Dict()
@@ -133,10 +133,10 @@ issym(::SemiMonomial) = true
 
 Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.p, m.coeff)
 
-isop(x, op) = istree(x) && operation(x) === op
+isop(x, op) = iscall(x) && operation(x) === op
 isop(op) = Base.Fix2(isop, op)
 
-bareterm(x, f, args; kw...) = Term{symtype(x)}(f, args)
+simpleterm(T, f, args, m) = Term{SymbolicUtils._promote_symtype(f, args)}(f, args)
 
 function mark_and_exponentiate(expr, vars)
     # Step 1
@@ -151,14 +151,14 @@ function mark_and_exponentiate(expr, vars)
              @rule (~a::isop(+))^(~b::isreal) => expand(Pow((~a), real(~b)))
              @rule *(~~xs::(xs -> all(issemimonomial, xs))) => *(~~xs...)
              @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
-             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, unsorted_arguments(~a))...)
+             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, arguments(~a))...)
              @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
-    expr′ = Postwalk(RestartedChain(rules), similarterm = bareterm)(expr′)
+    expr′ = Postwalk(RestartedChain(rules), maketerm = simpleterm)(expr′)
 end
 
 function semipolyform_terms(expr, vars)
     expr = mark_and_exponentiate(expr, vars)
-    if istree(expr) && operation(expr) == (+)
+    if iscall(expr) && operation(expr) == (+)
         args = collect(all_terms(expr))
         return args
     elseif isreal(expr) && iszero(real(expr)) # when `expr` is just a 0
@@ -175,13 +175,22 @@ $(TYPEDSIGNATURES)
 Return true if `expr` contains any variables in `vars`.
 """
 function has_vars(expr, vars)::Bool
+    if symbolic_type(expr) == ArraySymbolic() && shape(expr) != Unknown()
+        for i in eachindex(expr)
+            expr[i] in vars && return true
+        end
+    end
     if expr in vars
         return true
-    elseif istree(expr)
-        for arg in unsorted_arguments(expr)
+    elseif iscall(expr)
+        for arg in arguments(expr)
             if has_vars(arg, vars)
                 return true
             end
+        end
+    elseif expr isa Array
+        for el in expr
+            has_vars(el, vars) && return true
         end
     end
     return false
@@ -190,7 +199,7 @@ end
 function mark_vars(expr, vars)
     if expr in vars
         return SemiMonomial(expr, 1)
-    elseif !istree(expr)
+    elseif !iscall(expr)
         return SemiMonomial(1, expr)
     end
     op = operation(expr)
@@ -199,7 +208,7 @@ function mark_vars(expr, vars)
         @assert length(args) == 2
         return Term{symtype(expr)}(op, map(mark_vars(vars), args))
     end
-    args = unsorted_arguments(expr)
+    args = arguments(expr)
     if op === (+) || op === (*)
         return Term{symtype(expr)}(op, map(mark_vars(vars), args))
     elseif length(args) == 1
@@ -375,7 +384,7 @@ function semiquadratic_form(exprs, vars)
                     push!(V2, v)
                 else
                     @assert isop(k, *)
-                    a, b = unsorted_arguments(k)
+                    a, b = arguments(k)
                     p, q = extrema((idxmap[a], idxmap[b]))
                     j = div(q*(q-1), 2) + p
                     push!(J2, j)
@@ -403,7 +412,7 @@ end
 
 ## Utilities
 
-all_terms(x) = istree(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, unsorted_arguments(x)))) : (x,)
+all_terms(x) = iscall(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, arguments(x)))) : (x,)
 
 function unwrap_sp(m::SemiMonomial)
     degree_dict = pdegrees(m.p)
@@ -424,7 +433,9 @@ function unwrap_sp(m::SemiMonomial)
 end
 function unwrap_sp(x)
     x = unwrap(x)
-    istree(x) ? similarterm(x, operation(x), map(unwrap_sp, unsorted_arguments(x))) : x
+    iscall(x) ? maketerm(typeof(x),
+                         TermInterface.head(x), map(unwrap_sp,
+                                                    TermInterface.children(x)), nothing) : x
 end
 
 function cautious_sum(nls)

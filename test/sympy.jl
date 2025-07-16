@@ -22,3 +22,57 @@ sexpr = symbolics_to_sympy(expr)
 sp = symbolics_to_sympy(p)
 
 @test SymPy.simplify(symbolics_to_sympy(Symbolics.solve_for(expr, p))) == SymPy.simplify(SymPy.solve(sexpr, sp)[1])
+ 
+symbolics_sol = SymPy.simplify(symbolics_to_sympy(Symbolics.symbolic_linear_solve(expr, p)))
+sympy_sols = SymPy.solve(SymPy.expand(sexpr), sp)
+@test !isempty(sympy_sols) && isequal(symbolics_sol, sympy_sols[1])
+
+@variables x y f(x)
+
+# Test 1: Round-trip conversion
+expr = x^2 + y
+sympy_expr = symbolics_to_sympy(expr)
+back_expr = sympy_to_symbolics(sympy_expr, [x, y])
+@test isequal(Symbolics.simplify(expr), Symbolics.simplify(back_expr))
+
+# Test 2: Linear solver
+A = [1 2; 3 4]
+b = [x, y]
+sol = sympy_linear_solve(A, b)
+@test length(sol) == 2
+
+# Test 3: Algebraic solver
+eq = x^2 - 4
+sol = sympy_algebraic_solve(eq, x)
+@test length(sol) == 2 && all(s -> isequal(s, 2) || isequal(s, -2), sol)
+
+# Test 4: System of equations
+eqs = [x^2 + y^2 - 4, x - y]
+sol_sys = sympy_algebraic_solve(eqs, [x, y])
+@test length(sol_sys) == 2 && any(d -> isapprox(Symbolics.substitute(d[x], Dict()), sqrt(2)) && isapprox(Symbolics.substitute(d[y], Dict()), sqrt(2)), sol_sys)
+
+# Test 5: Integration
+expr = x^2
+result = sympy_integrate(expr, x)
+@test isequal(Symbolics.simplify(result), x^3/3)
+
+# Test 6: Limit
+expr = 1/x
+result = sympy_limit(expr, x, 0)
+@test isequal(result, Inf)
+
+# Test 7: Simplification
+expr = x^2 + 2x^2
+result = sympy_simplify(expr)
+@test isequal(Symbolics.simplify(result), 3x^2)
+
+# Test 8: ODE solver
+D = Symbolics.Differential(x)
+@variables C1 
+ode = D(f) - 2*f
+sol_ode = sympy_ode_solve(ode, f, x)
+sol_vars = Symbolics.get_variables(sol_ode)
+const_sym = only(filter(v -> startswith(string(Symbolics.nameof(v)), "C"), sol_vars))
+expected_sol = C1 * exp(2 * x)
+canonical_sol_ode = Symbolics.substitute(sol_ode, Dict(const_sym => C1))
+@test isequal(canonical_sol_ode, expected_sol)

@@ -1,6 +1,6 @@
 """
 ```julia
-parse_expr_to_symbolic(ex, mod::Module)
+parse_expr_to_symbolic(ex, mod::Union{Module,AbstractDict})
 ```
 
 Applies the `parse_expr_to_symbolic` function in the current module, i.e.
@@ -10,7 +10,7 @@ caller.
 ## Arguments
 
 * `ex`: the expression to parse
-* `mod`: the module to apply the parsing in. See the limitations section for details.
+* `mod`: the module or dictionary to apply the parsing in. See the limitations section for details.
 
 ## Example
 
@@ -66,25 +66,71 @@ variable defined elsewhere.
 """
 function parse_expr_to_symbolic end
 
-parse_expr_to_symbolic(x::Number, mod::Module) = x
+parse_expr_to_symbolic(x::Number, mod::Union{Module, AbstractDict}) = x
+
 function parse_expr_to_symbolic(x::Symbol, mod::Module)
-  if isdefined(mod, x)
-    getfield(mod, x)
-  else
-    (@variables $x)[1]
-  end
-end
-function parse_expr_to_symbolic(ex, mod::Module)
-    if ex.head == :call
-        if isdefined(mod, ex.args[1])
-            return getfield(mod,ex.args[1])(parse_expr_to_symbolic.(ex.args[2:end],(mod,))...)
-        else
-            x = parse_expr_to_symbolic(ex.args[1], mod)
-            ys = parse_expr_to_symbolic.(ex.args[2:end],(mod,))
-            return Term{Real}(x,[ys...])
-        end
+    if isdefined(mod, x)
+        getfield(mod, x)
+    else
+        (@variables $x)[1]
     end
 end
+
+function parse_expr_to_symbolic(x::Symbol, dict::AbstractDict)
+    if haskey(dict, x)
+        dict[x]
+    else
+        (@variables $x)[1]
+    end
+end
+
+function parse_expr_to_symbolic(ex::Expr, mod::Union{Module,AbstractDict})
+    if ex.head == :call
+        op = ex.args[1]
+        args = ex.args[2:end]
+        parsed_args = parse_expr_to_symbolic.(args, Ref(mod))
+        
+        # Handle built-in operators
+        if op in (:+, :-, :*, :/, :^)
+            if op == :- && length(args) == 1  # Unary minus
+                return -parsed_args[1]
+            end
+            return getfield(Base, op)(parsed_args...)
+        end
+        
+        # Handle common mathematical functions
+        math_functions = Dict(
+            :sqrt => Base.sqrt,
+            :sin => Base.sin,
+            :cos => Base.cos,
+            :tan => Base.tan,
+            :exp => Base.exp,
+            :log => Base.log
+        )
+        if op in keys(math_functions)
+            return math_functions[op](parsed_args...)
+        end
+        
+        # Handle oth defined functions or symbols
+        if (mod isa Module && isdefined(mod, op)) || (mod isa AbstractDict && haskey(mod, op))
+            func = mod isa Module ? getfield(mod, op) : mod[op]
+            return func(parsed_args...)
+        else
+            # Treat as symbolic function or term
+            x = parse_expr_to_symbolic(op, mod)
+            return Term{Real}(x, parsed_args)
+        end
+    elseif ex.head == :ref
+        arr = parse_expr_to_symbolic(ex.args[1], mod)
+        indices = parse_expr_to_symbolic.(ex.args[2:end], Ref(mod))
+        return arr[indices...]
+    else
+        error("Unsupported expression head: $(ex.head)")
+    end
+end
+
+# Handle non-Expr inputs
+parse_expr_to_symbolic(ex, mod::Union{Module,AbstractDict}) = ex
 
 """
 ```julia
