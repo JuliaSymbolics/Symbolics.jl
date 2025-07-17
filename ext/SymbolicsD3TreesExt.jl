@@ -3,7 +3,7 @@ module SymbolicsD3TreesExt
 using Symbolics
 using SymbolicUtils
 using D3Trees
-using AbstractTrees
+using D3Trees.AbstractTrees
 
 function sym_nodelabel(x)
     if x isa SymbolicUtils.BasicSymbolic
