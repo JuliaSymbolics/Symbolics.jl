@@ -941,7 +941,7 @@ $(SIGNATURES)
 Check if an expression is affine with respect to a list of variable expressions.
 """
 function isaffine(ex, u)
-    isempty(hessian_sparsity(ex, u).nzval)
+    isempty(hessian_sparsity(ex, u; linearity_propagator = affine_linearity_propagator).nzval)
 end
 
 """
