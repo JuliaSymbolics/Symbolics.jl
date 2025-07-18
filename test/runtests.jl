@@ -25,6 +25,7 @@ limit2(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 
 if GROUP == "All" || GROUP == "Core"
     @testset begin
+        @safetestset "Invalidations Test" begin include("invalidations.jl") end
         @safetestset "Struct Test" begin include("struct.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
