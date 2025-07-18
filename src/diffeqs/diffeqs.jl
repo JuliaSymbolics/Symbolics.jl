@@ -1,6 +1,3 @@
-using Symbolics
-import Symbolics: value, coeff, sympy_integrate
-
 """
 Represents a linear ordinary differential equation of the form:
 
@@ -138,24 +135,47 @@ function characteristic_polynomial(eq::LinearODE, r)
 end
 
 """
-Symbolically solve a linear ODE
+    symbolic_solve_ode(eq::LinearODE)
+Symbolically solve a linear ordinary differential equation
 
-Cases handled:
-- ☑ first order linear
-- ☑ Clairaut's equation
-- ◩ bernoulli equations
-- ☑ homogeneous with constant coefficients
-- ◩ particular solutions
-    - ☑ ERF + RRF
-    - ☑ complex ERF + RRF to handle sin/cos
-    - ☑ method of undetermined coefficients
-    - ▢ variation of parameters
-- ▢ [Differential transform method](https://www.researchgate.net/publication/267767445_A_New_Algorithm_for_Solving_Linear_Ordinary_Differential_Equations)
-- ▢ Laplace Transform
-- ☑ Expression parsing
+# Arguments
+- eq: a `LinearODE` to solve
 
-Uses methods: [`integrating_factor_solve`](@ref), [`find_homogeneous_solutions`](@ref), [`find_particular_solution`](@ref)
+# Returns
+Symbolic solution to the ODE
 
+# Supported Methods
+- first-order integrating factor
+- constant coefficient homogeneous solutions (can handle repeated and complex characteristic roots)
+- exponential and resonant response formula particular solutions (for any linear combination of `exp`, `sin`, `cos`, or `exp` times `sin` or `cos` (e.g. `e^2t * cos(-t) + e^-3t + sin(5t))`)
+- method of undetermined coefficients particular solutions
+- linear combinations of above particular solutions
+
+# Examples
+
+```jldoctest
+julia> using Symbolics; import Nemo, SymPy
+
+julia> @variables x, t
+2-element Vector{Num}:
+ x
+ t
+
+# Integrating Factor (note that SymPy is required for integration)
+julia> symbolic_solve_ode(LinearODE(x, t, [5/t], 7t))
+(C₁ + t^7) / (t^5)
+
+# Constant Coefficients and RRF (note that Nemo is required to find characteristic roots)
+julia> symbolic_solve_ode(LinearODE(x, t, [9, -6], 4exp(3t)))
+C₁*exp(3t) + C₂*t*exp(3t) + (2//1)*(t^2)*exp(3t)
+
+julia> symbolic_solve_ode(LinearODE(x, t, [6, 5], 2exp(-t)*cos(t)))
+C₁*exp(-2t) + C₂*exp(-3t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
+
+# Method of Undetermined Coefficients
+julia> symbolic_solve_ode(LinearODE(x, t, [-3, 2], 2t - 5))
+(11//9) - (2//3)*t + C₁*exp(t) + C₂*exp(-3t)
+```
 """
 function symbolic_solve_ode(eq::LinearODE)
     homogeneous_solutions = find_homogeneous_solutions(eq)
@@ -174,6 +194,46 @@ function symbolic_solve_ode(eq::LinearODE)
     end
 end
 
+"""
+    symbolic_solve_ode(expr::Equation, x, t)
+Symbolically solve an ODE
+
+# Arguments
+- expr: a symbolic ODE
+- x: dependent variable
+- t: independent variable
+
+# Supported Methods
+- all methods of solving linear ODEs mentioend for `symbolic_solve_ode(eq::LinearODE)`
+- Clairaut's equation
+- Bernoulli equations
+
+# Examples
+
+```jldoctest
+julia> using Symbolics; import Nemo
+
+julia> @variables x, t
+2-element Vector{Num}:
+ x
+ t
+
+julia> Dt = Differential(t)
+Differential(t)
+
+# LinearODE (via constant coefficients and RRF)
+julia> symbolic_solve_ode(9t*x - 6*Dt(x) ~ 4exp(3t), x, t)
+C₁*exp(3t) + C₂*t*exp(3t) + (2//1)*(t^2)*exp(3t)
+
+# Clairaut's equation
+julia> symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t)
+C₁*t - (C₁^3)
+
+# Bernoulli equations
+julia> symbolic_solve_ode(Dt(x) + (4//t)*x ~ t^3 * x^2, x, t)
+1 / (C₁*(t^4) - (t^4)*log(t))
+```
+"""
 function symbolic_solve_ode(expr::Equation, x, t)
     clairaut = solve_clairaut(expr, x, t)
     if clairaut !== nothing
@@ -592,11 +652,15 @@ function linearize_bernoulli(expr, x, t, v)
         if Symbolics.hasderiv(Symbolics.value(term))
             facs = _true_factors(term)
             leading_coeff = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
-            @assert _get_der_order(term//leading_coeff, x, t) == 1 "Expected linear term in $term"
+            if _get_der_order(term//leading_coeff, x, t) != 1
+                return nothing
+            end
         elseif !isempty(Symbolics.get_variables(term, [x]))
             facs = _true_factors(term)
             x_fac = filter(fac -> !isempty(Symbolics.get_variables(fac, [x])), facs)
-            @assert length(x_fac) == 1 "Expected linear term in $term"
+            if length(x_fac) != 1
+                return nothing
+            end
 
             if isequal(x_fac[1], x)
                 p = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs))
@@ -618,7 +682,12 @@ Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n
 """
 function solve_bernoulli(expr, x, t)
     @variables v
-    eq, n = linearize_bernoulli(expr, x, t, v)
+    linearized = linearize_bernoulli(expr, x, t, v)
+    if linearized === nothing
+        return nothing
+    end
+
+    eq, n = linearized
 
     solution = symbolic_solve_ode(eq)
     if solution === nothing
