@@ -90,3 +90,24 @@ a, b, islinear = Symbolics.linear_expansion(D(x) - x, x)
     @variables x y
     @test !Symbolics.linear_expansion(x + z([x, y]), y)[3]
 end
+
+@testset "linear_expansion of ifelse" begin
+    @variables p
+    a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p + 1, 3p + 2), p)
+    @test islin
+    @test isequal(a, ifelse(p < 1, 2, 3))
+    @test isequal(b, ifelse(p < 1, 1, 2))
+
+    a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p, 3p), p)
+    @test islin
+    @test isequal(a, ifelse(p < 1, 2, 3))
+    @test isequal(b, 0)
+
+    a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p, 2p + 1), p)
+    @test islin
+    @test isequal(a, 2)
+    @test isequal(b, ifelse(p < 1, 0, 1))
+
+    @test !Symbolics.linear_expansion(ifelse(p < 1, p^2, 2p), p)[3]
+    @test !Symbolics.linear_expansion(ifelse(p < 1, 2p, p^2), p)[3]
+end

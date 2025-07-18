@@ -16,3 +16,6 @@ using Symbolics, Test
 @test Symbolics.islinear(z * x + z * y,[x,y])
 @test Symbolics.islinear(z * (x + y),[x,y])
 @test Symbolics.isaffine(z * (x + y),[x,y])
+
+@test Symbolics.isaffine(ifelse(x < 1, y, z), [z])
+@test !Symbolics.isaffine(ifelse(x < 1, x, z), [x])
