@@ -19,15 +19,16 @@ end
 
 function D3Trees.D3Tree(t::Symbolics.Num; kwargs...)
     symbolic = Symbolics.unwrap(t)
-    nodes = collect(AbstractTrees.PreOrderDFS(symbolic))
+
     merged_kwargs = merge(
         (
-            text = sym_nodelabel.(nodes),
-            tooltip = string.(nodes),
-            init_expand = 3
+            detect_repeat = false,
+            text = sym_nodelabel, tooltip = string,
+            lazy_expand_after_depth = 8, lazy_subtree_depth = 4, init_expand = 8
         ),
         kwargs
     )
+
     D3Tree(symbolic; merged_kwargs...)
 end
 
