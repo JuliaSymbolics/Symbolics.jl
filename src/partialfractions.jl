@@ -25,8 +25,23 @@ Performs partial fraction decomposition for expressions with linear, reapeated, 
 """
 function partial_frac_decomposition(expr, x)
     A, B = numerator(expr), denominator(expr)
+
+    # check if both numerator and denominator are polynomials
+    if !isequal(polynomial_coeffs(A, [x])[2], 0) || !isequal(polynomial_coeffs(B, [x])[2], 0)
+        return nothing
+    end
+
+    if degree(A) >= degree(B)
+        return nothing
+    end
     
-    facs = factorize(B, x)
+    facs = 0
+    try
+        facs = factorize(B, x)
+    catch AssertionError
+        return nothing
+    end
+
     v = simplify(B / prod((f -> f.expr^f.multiplicity).(facs)))
     
     if length(facs) == 1 && only(facs).multiplicity == 1 && degree(A) <= 1
@@ -134,8 +149,9 @@ function factorize(expr, x)::Set{Factor}
 
     for root in keys(counts)
         if !isequal(abs(imag(root)), 0)
-            fac_expr = real(expand(real((x - root)*(x - conj(root)))))
-            push!(facs, Factor(fac_expr, counts[root], x))
+            fac_expr = expand((x - root)*(x - conj(root)))
+            @assert isequal(imag(fac_expr), 0) "Encountered issue with complex irrational roots"
+            push!(facs, Factor(real(fac_expr), counts[root], x))
             continue
         end
 
