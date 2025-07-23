@@ -16,4 +16,7 @@ import Nemo, Groebner
 
 # https://www.math.lsu.edu/~adkins/m2065/2065s08review2a.pdf
 @test isequal(inverse_laplace(7/(s+3)^3, F, t, s, f), (7//2)t^2 * exp(-3t))
-@test_broken isequal(inverse_laplace((s+2)/(s^2 - 3s - 4), F, t, s, f), (7//2)t^2 * exp(-3t)) # partial fraction decomposition
+@test isequal(inverse_laplace((s-9)/(s^2 + 9), F, t, s, f), cos(3t) - 3sin(3t))
+# partial fraction decomposition
+@test isequal(inverse_laplace((s+2)/(s^2 - 3s - 4), F, t, s, f), (6//5)*exp(4t) - (1//5)*exp(-t))
+@test isequal(inverse_laplace(1/(s^2 - 10s + 9), F, t, s, f), (1//8)*exp(9t) - (1//8)*exp(t))
