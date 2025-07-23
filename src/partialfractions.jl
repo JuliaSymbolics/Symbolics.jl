@@ -81,7 +81,11 @@ function partial_frac_decomposition(expr, x)
     end
 
     if isequal(get_variables(result), [x])
-        return expand(result/v)
+        distributed = 0
+        for term in terms(result)
+            distributed += term/v
+        end
+        return distributed
     end
         
     lhs::Vector{Rational} = coeff_vector(numerator(expr), x)
@@ -104,7 +108,11 @@ function partial_frac_decomposition(expr, x)
         solution = Dict(variable(:C, 1) => solution)
     end
     
-    return expand(substitute(result, solution)/v)
+    distributed = 0
+    for term in terms(substitute(result, solution))
+        distributed += term/v
+    end
+    return distributed
 end
 
 # increasing from 0 to degree n

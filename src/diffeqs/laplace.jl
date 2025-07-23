@@ -10,7 +10,7 @@ function laplace(expr, f, t, s, F)
         @rule exp(~a * t) => 1/(-~a + s)
         @rule t => 1/s^2
         @rule t^~n => factorial(~n)/s^(~n + 1)
-        @rule sqrt(t) => sqrt(pi)/(2 * s^(3/2))
+        @rule sqrt(t) => term(sqrt, pi)/(2 * s^(3/2))
         @rule sin(t) => 1/(1 + s^2)
         @rule sin(~a * t) => ~a/((~a)^2 + s^2)
         @rule cos(t) => s/(1 + s^2)
@@ -81,20 +81,26 @@ function laplace(expr::Equation, f, t, s, F)
 end
 
 function inverse_laplace(expr, F, t, s, f)
+    # check for partial fractions
+    partial_fractions = partial_frac_decomposition(expr, s)
+    if partial_fractions !== nothing && !isequal(partial_fractions, expr)
+        return inverse_laplace(partial_fractions, F, t, s, f)
+    end
+
     inverse_transform_rules = Symbolics.Chain([
         @rule 1/s => 1
-        @rule 1/(~a + s) => exp(~a * t)
+        @rule 1/(~a + s) => exp(-~a * t)
         @rule 1/s^(~n) => t^(~n-1) / factorial(~n-1)
-        @rule 1/(2 * s^(3/2)) => sqrt(t)/sqrt(pi)
-        @rule 1/((~a)^2 + s^2) => sin(~a * t)/~a
-        @rule s/((~a)^2 + s^2) => cos(~a * t)
-        @rule s / ((~a)^2 + s^2)^2 => t*sin(~a * t)/(2*~a)
-        @rule (-(~a)^2 + s^2) / ((~a)^2 + s^2)^2 => t*cos(~a * t)
-        @rule 1 / ((~a)^2 + s^2)^2 => (sin(~a*t) - ~a*t*cos(~a*t))/ (2*(~a)^3)
-        @rule s^2 / ((~a)^2 + s^2)^2 => (sin(~a*t) + ~a*t*cos(~a*t)) / (2*~a)
-        @rule s*((~a)^2 + s^2) / ((~a)^2 + s^2)^2 => cos(~a*t) - ~a*t*sin(~a*t)
-        @rule s*(3*(~a)^2 + s^2) / ((~a)^2 + s^2)^2 => cos(~a*t) + ~a*t*sin(~a*t)
-        @rule (s*sin(~b) + ~a*cos(~b)) / ((~a)^2 + s^2) => sin(~b + ~a*t)
+        @rule 1/(2 * s^(3/2)) => sqrt(t)/term(term(sqrt, pi))
+        @rule 1/(~a + s^2) => sin(postprocess_root(term(sqrt, ~a)) * t)/postprocess_root(term(sqrt, ~a))
+        @rule s/(~a + s^2) => cos(postprocess_root(term(sqrt, ~a)) * t)
+        @rule s / (~a + s^2)^2 => t*sin(postprocess_root(term(sqrt, ~a)) * t)/(2*postprocess_root(term(sqrt, ~a)))
+        @rule (-~a + s^2) / (~a + s^2)^2 => t*cos(postprocess_root(term(sqrt, ~a)) * t)
+        @rule 1 / (~a + s^2)^2 => (sin(postprocess_root(term(sqrt, ~a))*t) - postprocess_root(term(sqrt, ~a))*t*cos(postprocess_root(term(sqrt, ~a))*t))/ (2*postprocess_root(term(sqrt, ~a))^3)
+        @rule s^2 / (~a + s^2)^2 => (sin(postprocess_root(term(sqrt, ~a))*t) + postprocess_root(term(sqrt, ~a))*t*cos(postprocess_root(term(sqrt, ~a))*t)) / (2*postprocess_root(term(sqrt, ~a)))
+        @rule s*(~a + s^2) / (~a + s^2)^2 => cos(postprocess_root(term(sqrt, ~a))*t) - postprocess_root(term(sqrt, ~a))*t*sin(postprocess_root(term(sqrt, ~a))*t)
+        @rule s*(3*~a + s^2) / (~a + s^2)^2 => cos(postprocess_root(term(sqrt, ~a))*t) + postprocess_root(term(sqrt, ~a))*t*sin(postprocess_root(term(sqrt, ~a))*t)
+        @rule (s*sin(~b) + ~a*cos(~b)) / (~a + s^2) => sin(~b + postprocess_root(term(sqrt, ~a))*t)
         @rule (s*cos(~b) - ~a*sin(~b)) / ((~a)^2 + s^2) => cos(~b + ~a*t)
         @rule 1/(s^2 - (~b)^2) => sinh(~b * t)/~b
         @rule s/(s^2 - (~b)^2) => cosh(~b * t)
@@ -110,17 +116,20 @@ function inverse_laplace(expr, F, t, s, f)
         return transformed
     end
 
-    terms = Symbolics.terms(expr)
+    _terms = terms(numerator(expr)) ./ denominator(expr)
+    
     result = 0
-    if length(terms) == 1 && length(_true_factors(terms[1])) == 1
-        return f
+    if length(_terms) == 1 && length(filter(x -> isempty(get_variables(x)), _true_factors(_terms[1]))) == 0
+        return nothing # no result
     end
-    for term in terms
+
+    # apply linearity
+    for term in _terms
         factors = _true_factors(term)
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
         if !isempty(constant)
             result += inverse_laplace(term / constant[1], F, t, s, f) * constant[1]
-        else 
+        else
             result += inverse_laplace(term, F, t, s, f)
         end
     end
