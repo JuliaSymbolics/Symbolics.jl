@@ -649,7 +649,7 @@ end
 # takes into account fractions
 function _true_factors(expr)
     facs = factors(expr)
-    true_facs::Vector{Number} = []
+    true_facs::Vector{Union{Number, Symbolics.BasicSymbolic}} = []
     frac_rule = @rule (~x)/(~y) => [~x, 1/~y]
     for fac in facs
         frac = frac_rule(fac)
