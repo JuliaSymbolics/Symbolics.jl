@@ -1,5 +1,4 @@
-using Symbolics
-import Symbolics: get_variables, coeff, sympy_integrate
+import DomainSets.ClosedInterval
 
 function laplace(expr, f, t, s, F)
     Dt = Differential(t)
@@ -35,7 +34,7 @@ function laplace(expr, f, t, s, F)
         @rule exp(~a*t) * sinh(~b * t) => ~b / (-(~b)^2 + (-~a+s)^2)
         @rule exp(~a*t) * cosh(~b * t) => (-~a+s) / (-(~b)^2 + (-~a+s)^2)
         @rule t^~n * exp(~a * t) => factorial(~n) / (-~a + s)^(~n + 1)
-        @rule exp(~c*t) * ~g => laplace(~g, f, t, s - ~c, F) # s-shift rule
+        @rule ~g * exp(~c*t) => laplace(~g, f, t, s - ~c, F) # s-shift rule
         @rule t*f(t) => -Ds(F(s)) # s-derivative rule
         @rule t^(~n)*f(t) => (-1)^(~n) * (Ds^~n)(F(s)) # s-derivative rule
         @rule f(~a + t) => exp(~a*s)*F(s) # t-shift rule
@@ -62,7 +61,7 @@ function laplace(expr, f, t, s, F)
     terms = Symbolics.terms(expr)
     result = 0
     if length(terms) == 1 && length(filter(x->isempty(Symbolics.get_variables(x)), _true_factors(terms[1]))) == 0
-        return Integral(t in 0..Inf)(expr*exp(-s*t))
+        return Integral(t in ClosedInterval(0, Inf))(expr*exp(-s*t))
     end
     for term in terms
         factors = _true_factors(term)
@@ -120,9 +119,9 @@ function inverse_laplace(expr, F, t, s, f)
         factors = _true_factors(term)
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
         if !isempty(constant)
-            result += inverse_laplace(term / constant[1], t, s) * constant[1]
+            result += inverse_laplace(term / constant[1], F, t, s, f) * constant[1]
         else 
-            result += inverse_laplace(term, t, s)
+            result += inverse_laplace(term, F, t, s, f)
         end
     end
 
@@ -142,22 +141,4 @@ function unwrap_der(expr, Dt)
 
     order, expr = unwrap_der(reduce_rule(expr), Dt)
     return order + 1, expr
-end
-
-# takes into account fractions
-function _true_factors(expr)
-    facs = Symbolics.factors(expr)
-    true_facs::Vector{Union{Number, Symbolics.BasicSymbolic}} = []
-    frac_rule = @rule (~x)/(~y) => [~x, 1/~y]
-    for fac in facs
-        frac = frac_rule(fac)
-        if frac !== nothing && !isequal(frac[1], 1)
-            append!(true_facs, _true_factors(frac[1]))
-            append!(true_facs, _true_factors(frac[2]))
-        else
-            push!(true_facs, fac)
-        end
-    end
-
-    return true_facs
 end

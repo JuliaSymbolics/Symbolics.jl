@@ -703,3 +703,39 @@ function solve_bernoulli(expr, x, t)
 
     return simplify(solution^(1//(1-n)))
 end
+
+"""
+Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n with initial condition x(0) = x0
+"""
+function solve_bernoulli(expr, x, t, x0)
+    @variables v
+    eq, n = linearize_bernoulli(expr, x, t, v)
+
+    v0 = x0^(1-n) # convert initial condition from x(0) to v(0)
+
+    ivp = IVP(eq, [v0])
+    solution = solve_IVP(ivp)
+    if solution === nothing
+        return nothing
+    end
+
+    return symbolic_solve(solution ~ x^(1-n), x)
+end
+
+# takes into account fractions
+function _true_factors(expr)
+    facs = factors(expr)
+    true_facs::Vector{Union{Number, Symbolics.BasicSymbolic}} = []
+    frac_rule = @rule (~x)/(~y) => [~x, 1/~y]
+    for fac in facs
+        frac = frac_rule(fac)
+        if frac !== nothing && !isequal(frac[1], 1)
+            append!(true_facs, _true_factors(frac[1]))
+            append!(true_facs, _true_factors(frac[2]))
+        else
+            push!(true_facs, fac)
+        end
+    end
+
+    return true_facs
+end
