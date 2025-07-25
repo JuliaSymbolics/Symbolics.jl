@@ -33,8 +33,11 @@ function laplace(expr, f, t, s, F)
         @rule exp(~a*t) * cos(~b * t) => (-~a+s) / ((~b)^2 + (-~a+s)^2)
         @rule exp(~a*t) * sinh(~b * t) => ~b / (-(~b)^2 + (-~a+s)^2)
         @rule exp(~a*t) * cosh(~b * t) => (-~a+s) / (-(~b)^2 + (-~a+s)^2)
-        @rule t^~n * exp(~a * t) => factorial(~n) / (-~a + s)^(~n + 1)
-        @rule ~g * exp(~c*t) => laplace(~g, f, t, s - ~c, F) # s-shift rule
+        @rule exp(~a * t) * t^~n => factorial(~n) / (-~a + s)^(~n + 1)
+        @rule exp(~a * t) * t => 1 / (-~a + s)^(2)
+        @rule exp(t) * t^~n => factorial(~n) / (s)^(~n + 1)
+        @rule exp(t) * t => 1 / (s)^(2)
+        @rule exp(~c*t) * ~g => laplace(~g, f, t, s - ~c, F) # s-shift rule
         @rule t*f(t) => -Ds(F(s)) # s-derivative rule
         @rule t^(~n)*f(t) => (-1)^(~n) * (Ds^~n)(F(s)) # s-derivative rule
         @rule f(~a + t) => exp(~a*s)*F(s) # t-shift rule
@@ -82,6 +85,10 @@ end
 
 function inverse_laplace(expr, F, t, s, f)
     # check for partial fractions
+    if isequal(expr, 1/((3+s)*(s^2)))
+        s
+        partial_frac_decomposition(1/((3+s)*(s^2)), s)
+    end
     partial_fractions = partial_frac_decomposition(expr, s)
     if partial_fractions !== nothing && !isequal(partial_fractions, expr)
         return inverse_laplace(partial_fractions, F, t, s, f)
@@ -120,6 +127,7 @@ function inverse_laplace(expr, F, t, s, f)
     
     result = 0
     if length(_terms) == 1 && length(filter(x -> isempty(get_variables(x)), _true_factors(_terms[1]))) == 0
+        println("Inverse laplace failed: $expr")
         return nothing # no result
     end
 
@@ -150,4 +158,27 @@ function unwrap_der(expr, Dt)
 
     order, expr = unwrap_der(reduce_rule(expr), Dt)
     return order + 1, expr
+end
+
+function laplace_solve_ode(eq, f, t, f0)
+    @variables s
+    @syms F(s)
+    transformed_eq = laplace(eq, f, t, s, F)
+    transformed_eq = substitute(transformed_eq, Dict(F(s) => variable(:F), [variable(:f0, i-1) => f0[i] for i=1:length(f0)]...))
+    transformed_eq = transformed_eq.lhs - transformed_eq.rhs
+    # transformed_soln = symbolic_solve(transformed_eq, variable(:F))
+
+    F_terms = 0
+    other_terms = []
+    for term in terms(transformed_eq)
+        if isempty(get_variables(term, [variable(:F)]))
+            push!(other_terms, term)
+        else
+            F_terms += term/variable(:F) # assumes term is something times F
+        end
+    end
+
+    transformed_soln = sum(other_terms ./ F_terms)
+
+    return inverse_laplace(transformed_soln, F, t, s, f)
 end
