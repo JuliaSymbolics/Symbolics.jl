@@ -225,7 +225,7 @@ export symbolic_solve
 include("diffeqs/diffeqs.jl")
 include("diffeqs/systems.jl")
 include("diffeqs/laplace.jl")
-export LinearODE, IVP, symbolic_solve_ode, solve_linear_system, solve_IVP, laplace, inverse_laplace
+export LinearODE, IVP, symbolic_solve_ode, solve_linear_system, solve_IVP, laplace, inverse_laplace, laplace_solve_ode
 
 # Sympy Functions
 
