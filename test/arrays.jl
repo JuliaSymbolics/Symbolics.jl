@@ -100,6 +100,17 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     @test isequal(Symbolics.scalarize(b .^ 1), bb)
     c = A * b
 
+    # Test for issue #575: adjoint multiplication with Symbolics.Arr should not be ambiguous
+    @variables d[1:3] E[1:3, 1:3]
+    d_vec = collect(d)  # Convert to Vector{Num}
+    # These should work without MethodError due to ambiguity
+    @test d' isa Adjoint{Num, Vector{Num}}
+    @test E isa Symbolics.Arr{Num, 2}
+    result1 = d' * E  # This was causing ambiguity error
+    result2 = d' * inv(E) * d  # The original failing expression from issue #575
+    @test size(result1) == (1, 3)
+    @test size(result2) == (1, 1)
+
     @test isequal(collect(sin.(x)),
         sin.([x[i] for i in 1:4]))
 
