@@ -97,9 +97,34 @@ const SYMBOLIC_BOOLEAN_CONTROL_FLOW = """
     https://docs.sciml.ai/Symbolics/stable/manual/functions/ .
 """
 
-Base.Experimental.register_error_hint(TypeError) do io, e
+const SYMBOLIC_ARRAY_BOUNDS_ERROR = """
+    A symbolic variable was used in array bounds or range construction. This commonly occurs when:
+    
+    1. Trying to create arrays with symbolic dimensions:
+    
+    ```julia
+    @variables n
+    @variables X[1:n]  # Error: n is symbolic, array size must be concrete
+    ```
+    
+    To fix this, use concrete (numerical) values for array bounds:
+    
+    ```julia
+    @variables X[1:10]  # Works: concrete size
+    ```
+    
+    If you need variable-sized arrays, consider using a vector of variables or working 
+    with symbolic indexing at runtime rather than at variable declaration time.
+    
+    For more information about array variables, see https://docs.sciml.ai/Symbolics/stable/manual/variables/
+"""
+
+Base.Experimental.register_error_hint(TypeError) do io, e, args, kwargs
     if e.expected === Bool && typeof(e.got) <: Union{Symbolics.Arr, Num, Symbolics.BasicSymbolic}
         println(io, "\n")
         println(io, SYMBOLIC_BOOLEAN_CONTROL_FLOW)
+        # Also show array bounds hint as this is a common case
+        println(io, "\n") 
+        println(io, SYMBOLIC_ARRAY_BOUNDS_ERROR)
     end
 end
