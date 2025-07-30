@@ -101,4 +101,5 @@ end
 if GROUP == "All" || GROUP == "SymPy"
     activate_sympy_env()
     @safetestset "SymPy Test" begin include("sympy.jl") end
+    @safetestset "SymPyPythonCall Test" begin include("sympy_pythoncall.jl") end
 end
