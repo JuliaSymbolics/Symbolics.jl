@@ -75,6 +75,10 @@ if GROUP == "All" || GROUP == "LuxExt"
     @safetestset "Lux extension Test" begin include("extensions/lux.jl") end
 end
 
+if GROUP == "All" || GROUP == "D3TreesExt"
+    @safetestset "D3Trees extension Test" begin include("extensions/d3trees.jl") end
+end
+
 if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
     @safetestset "SymbolicIndexingInterface Trait Test" begin
         include("symbolic_indexing_interface_trait.jl")

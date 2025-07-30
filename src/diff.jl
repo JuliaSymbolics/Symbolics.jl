@@ -830,68 +830,82 @@ isidx(x) = x isa TermCombination
 
 basic_mkterm(t, g, args, m) = metadata(Term{Any}(g, args), m)
 
-let
-    # we do this in a let block so that Revise works on the list of rules
+const _scalar = one(TermCombination)
 
-    _scalar = one(TermCombination)
+const linearity_rules = [
+      @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
+      @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
 
-    linearity_rules = [
-          @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
-          @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
+      @rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar
+      @rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)
+      @rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)
 
-          @rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar
-          @rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)
-          @rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)
+      @rule ~x::issym => 0
 
-          @rule ~x::issym => 0
+      # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
+      # where condition `cond` is considered constant in differentiation
+      @rule ifelse(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)
 
-          # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
-          # where condition `cond` is considered constant in differentiation
-          @rule ifelse(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)
+      # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
+      # Functions with 1 and 2 arguments are already handled above
+      @rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2
+]
+const linearity_rules_affine = [
+      @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
+      @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
 
-          # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
-          # Functions with 1 and 2 arguments are already handled above
-          @rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2
-    ]
-    linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
+      @rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar
+      @rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)
+      @rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)
 
-    global hessian_sparsity
+      @rule ~x::issym => 0
+      # if the condition is dependent on the variable, do not consider this as affine
+      @rule ifelse(~cond::isidx, ~x, ~y) => (~cond)^2
+      # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
+      # where condition `cond` is considered constant in differentiation
+      @rule ifelse(~cond::(!isidx), ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)
+      # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
+      # Functions with 1 and 2 arguments are already handled above
+      @rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2
+]
+const linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
+const affine_linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules_affine); maketerm=basic_mkterm))
 
-    @doc """
-    $(TYPEDSIGNATURES)
+"""
+$(TYPEDSIGNATURES)
 
-    Return the sparsity pattern of the Hessian of an expression with respect to
-    an array of variable expressions.
+Return the sparsity pattern of the Hessian of an expression with respect to
+an array of variable expressions.
 
-    # Arguments
-    - `expr`: a symbolic expression.
-    - `vars`: a vector of symbolic variables.
+# Arguments
+- `expr`: a symbolic expression.
+- `vars`: a vector of symbolic variables.
 
-    # Examples
-    ```jldoctest
-    julia> using Symbolics
+# Examples
+```jldoctest
+julia> using Symbolics
 
-    julia> vars = @variables x₁ x₂;
+julia> vars = @variables x₁ x₂;
 
-    julia> expr = 3x₁^2 + 4x₁ * x₂;
+julia> expr = 3x₁^2 + 4x₁ * x₂;
 
-    julia> Symbolics.hessian_sparsity(expr, vars)
-    2×2 SparseArrays.SparseMatrixCSC{Bool, Int64} with 3 stored entries:
-     1  1
-     1  ⋅
-    ```
-    """
-    function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true)
-        @assert !(expr isa AbstractArray)
-        expr = value(expr)
-        u = map(value, vars)
-        dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
-        f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
-        lp = linearity_propagator(f)
-        S = _sparse(lp, length(u))
-        S = full ? S : tril(S)
-    end
+julia> Symbolics.hessian_sparsity(expr, vars)
+2×2 SparseArrays.SparseMatrixCSC{Bool, Int64} with 3 stored entries:
+ 1  1
+ 1  ⋅
+```
+"""
+function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity_propagator = linearity_propagator)
+    @assert !(expr isa AbstractArray)
+    expr = value(expr)
+    u = map(value, vars)
+    dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
+    f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
+    lp = linearity_propagator(f)
+    S = _sparse(lp, length(u))
+    S = full ? S : tril(S)
 end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -927,7 +941,7 @@ $(SIGNATURES)
 Check if an expression is affine with respect to a list of variable expressions.
 """
 function isaffine(ex, u)
-    isempty(hessian_sparsity(ex, u).nzval)
+    isempty(hessian_sparsity(ex, u; linearity_propagator = affine_linearity_propagator).nzval)
 end
 
 """

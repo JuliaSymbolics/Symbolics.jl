@@ -340,6 +340,15 @@ function _linear_expansion(t, x)
         # which causes a StackOverflowError without this
         isequal(t, indexed_t) && return (0, t, true)
         return linear_expansion(Symbolics.scalarize(arrt)[idxst...], x)
+    elseif op === ifelse
+        cond, iftrue, iffalse = arguments(t)
+        truea, trueb, istruelinear = linear_expansion(iftrue, x)
+        istruelinear || return (0, t, false)
+        falsea, falseb, isfalselinear = linear_expansion(iffalse, x)
+        isfalselinear || return (0, t, false)
+        a = isequal(truea, falsea) ? truea : ifelse(cond, truea, falsea)
+        b = isequal(trueb, falseb) ? trueb : ifelse(cond, trueb, falseb)
+        return (a, b, true)
     else
         for (i, arg) in enumerate(args)
             isequal(arg, arrx) && return (0, 0, false)
