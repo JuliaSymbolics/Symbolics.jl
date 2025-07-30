@@ -44,7 +44,10 @@ function Symbolics.sympy_to_symbolics(sympy_expr, vars)
         dict[nameof(v)] = v
     end
 
-    Symbolics.parse_expr_to_symbolic(Meta.parse(string(sympy_expr)), dict)
+    # Convert Python/SymPy notation to Julia notation
+    expr_str = string(sympy_expr)
+    expr_str = replace(expr_str, "**" => "^")  # Convert exponentiation
+    Symbolics.parse_expr_to_symbolic(Meta.parse(expr_str), dict)
 end
 
 function Symbolics.sympy_linear_solve(A, b)
