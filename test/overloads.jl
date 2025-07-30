@@ -218,6 +218,14 @@ B = [x[1] 1.0
 
 @test isequal(simplify(cos(x)^2 + sin(x)^2 + im * x), 1 + x*im)
 
+# Test for issue #1583: rational number simplification bug
+@variables x y z
+rational_expr = (1//2 * x + 1//3 * y + 1//2 * z) / (2 * z)
+simplified_rational = simplify(rational_expr)
+# Test that simplified expression is mathematically equivalent
+test_vals = Dict(x => 6, y => 9, z => 3)
+@test substitute(rational_expr, test_vals) == substitute(simplified_rational, test_vals)
+
 using Base.MathConstants: catalan, γ, π, φ, ℯ
 for q in (catalan, γ, π, φ, ℯ)
     nq = Num(q)

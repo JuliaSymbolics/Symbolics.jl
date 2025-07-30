@@ -176,11 +176,88 @@ export limit
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
 (::Type{T})(x::SymbolicUtils.Symbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
+
+"""
+    _safe_rational_simplify(expr; kw...)
+
+A wrapper around SymbolicUtils.simplify that validates the result when dealing with 
+rational coefficients to work around known bugs in polynomial simplification.
+See issue #1583.
+"""
+function _safe_rational_simplify(expr::Union{Num, Complex{Num}}; kw...)
+    original = expr
+    simplified = wrap(SymbolicUtils.simplify(unwrap(expr); kw...))
+    
+    # Check if the expression involves rational coefficients
+    if _has_rational_coeffs(unwrap(original))
+        # Validate the simplification by testing with sample values
+        if !_validate_simplification(original, simplified)
+            # If validation fails, return the original expression
+            return original
+        end
+    end
+    
+    return simplified
+end
+
+"""
+    _has_rational_coeffs(expr)
+
+Check if an expression contains rational number coefficients (///).
+"""
+function _has_rational_coeffs(expr)
+    if isa(expr, Rational)
+        return true
+    elseif iscall(expr)
+        return any(_has_rational_coeffs, arguments(expr))
+    else
+        return false
+    end
+end
+
+"""
+    _validate_simplification(original, simplified)
+
+Validate that a simplification is mathematically correct by testing with random values.
+"""
+function _validate_simplification(original::Union{Num, Complex{Num}}, simplified::Union{Num, Complex{Num}})
+    try
+        # Get all variables in both expressions
+        orig_vars = get_variables(original)
+        simp_vars = get_variables(simplified)
+        all_vars = unique([orig_vars; simp_vars])
+        
+        # If no variables, compare directly
+        if isempty(all_vars)
+            return isequal(original, simplified)
+        end
+        
+        # Test with a few random values to check mathematical equivalence
+        for _ in 1:3
+            test_vals = Dict(var => rand(1:10) for var in all_vars)
+            
+            # Evaluate both expressions
+            orig_val = substitute(original, test_vals)
+            simp_val = substitute(simplified, test_vals)
+            
+            # Check if values are approximately equal (allowing for floating point errors)
+            if !isapprox(Float64(orig_val), Float64(simp_val), rtol=1e-10)
+                return false
+            end
+        end
+        
+        return true
+    catch
+        # If validation fails for any reason, be conservative and reject the simplification
+        return false
+    end
+end
+
 for T in [Num, Complex{Num}]
     @eval begin
         #(::Type{S})(x::$T) where {S<:Union{NumberTypes,AbstractArray}} = S(Symbolics.unwrap(x))::S
 
-        SymbolicUtils.simplify(n::$T; kw...) = wrap(SymbolicUtils.simplify(unwrap(n); kw...))
+        SymbolicUtils.simplify(n::$T; kw...) = _safe_rational_simplify(n; kw...)
         SymbolicUtils.simplify_fractions(n::$T; kw...) = wrap(SymbolicUtils.simplify_fractions(unwrap(n); kw...))
         SymbolicUtils.expand(n::$T) = wrap(SymbolicUtils.expand(unwrap(n)))
         substitute(expr::$T, s::Pair; kw...) = wrap(substituter(s)(unwrap(expr); kw...)) # backward compat
