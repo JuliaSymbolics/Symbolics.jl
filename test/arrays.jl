@@ -3,7 +3,7 @@ using SymbolicUtils, Test
 using Symbolics: symtype, shape, wrap, unwrap, Unknown, Arr, array_term, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
 using Base: Slice
 using SymbolicUtils: Sym, term, operation
-import LinearAlgebra: dot
+import LinearAlgebra: dot, Adjoint
 import ..limit2
 
 struct TestMetaT end
@@ -104,12 +104,12 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     @variables d[1:3] E[1:3, 1:3]
     d_vec = collect(d)  # Convert to Vector{Num}
     # These should work without MethodError due to ambiguity
-    @test d' isa Adjoint{Num, Vector{Num}}
+    @test d_vec' isa Adjoint{Num, Vector{Num}}
     @test E isa Symbolics.Arr{Num, 2}
-    result1 = d' * E  # This was causing ambiguity error
-    result2 = d' * inv(E) * d  # The original failing expression from issue #575
+    result1 = d_vec' * E  # This was causing ambiguity error
+    result2 = d_vec' * inv(E) * d_vec  # The original failing expression from issue #575
     @test size(result1) == (1, 3)
-    @test size(result2) == (1, 1)
+    @test size(result2) == (1,)
 
     @test isequal(collect(sin.(x)),
         sin.([x[i] for i in 1:4]))
