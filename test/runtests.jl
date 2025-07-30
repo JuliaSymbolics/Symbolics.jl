@@ -15,6 +15,12 @@ function activate_sympy_env()
     Pkg.instantiate()
 end
 
+function activate_sympy_pythoncall_env()
+    Pkg.activate("sympy_pythoncall")
+    Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+    Pkg.instantiate()
+end
+
 if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
 end
@@ -101,4 +107,9 @@ end
 if GROUP == "All" || GROUP == "SymPy"
     activate_sympy_env()
     @safetestset "SymPy Test" begin include("sympy.jl") end
+end
+
+if GROUP == "All" || GROUP == "SymPyPythonCall"
+    activate_sympy_pythoncall_env()
+    @safetestset "SymPyPythonCall Test" begin include("sympy_pythoncall.jl") end
 end
