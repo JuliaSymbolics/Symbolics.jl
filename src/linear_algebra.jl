@@ -68,7 +68,7 @@ function A_b(eqs::AbstractArray, vars::AbstractArray, check)
 end
 
 function solve_for(eq::Any, var::Any; simplify=false, check=true)
-    Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for, force=true)
+    Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for)
     return symbolic_linear_solve(eq, var; simplify=simplify, check=check)
 end
 
