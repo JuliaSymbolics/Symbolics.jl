@@ -1,3 +1,5 @@
 [deps]
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
+SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+
