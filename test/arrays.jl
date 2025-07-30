@@ -176,6 +176,12 @@ getdef(v) = getmetadata(v, Symbolics.VariableDefaultValue)
     symvec = [sym3(symT), sym4(symT)]
     @test isequal(symvec'weights, weights'symvec)
 
+    # Issue #575: test adjoint multiplication with Symbolics.Arr to resolve method ambiguity
+    @variables d[1:2] E[1:2, 1:2]
+    # This should not throw a method ambiguity error
+    result = d' * E
+    @test isa(result, Symbolics.Arr)
+
     # ModelingToolkit.jl#1736
     #
     @variables t F(t)[1:1]

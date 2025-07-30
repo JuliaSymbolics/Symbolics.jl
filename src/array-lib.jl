@@ -315,6 +315,7 @@ function _matvec(A, b)
     end
 end
 @wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b) false
+@wrapped (*)(x::Adjoint{T, <:AbstractVector} where {T}, A::Symbolics.Arr{<:Any, 2}) = _matmul(x, A) false
 
 # specialize `dot` to dispatch on `Symbolic{<:Number}` to eventually work for
 # arrays of (possibly unwrapped) Symbolic types, see issue #831
