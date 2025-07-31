@@ -110,11 +110,11 @@ Base.promote_rule(::Type{<:Symbolic{<:Number}}, ::Type{<:Num}) = Num
 function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
     if f === :op
         Base.depwarn(
-            "`x.op` is deprecated, use `operation(x)` instead", :getproperty, force = true)
+            "`x.op` is deprecated, use `operation(x)` instead", :getproperty)
         operation(t)
     elseif f === :args
         Base.depwarn("`x.args` is deprecated, use `arguments(x)` instead",
-            :getproperty, force = true)
+            :getproperty)
         arguments(t)
     else
         getfield(t, f)

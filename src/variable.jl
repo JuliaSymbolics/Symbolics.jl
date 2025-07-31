@@ -846,14 +846,14 @@ end
 struct Variable{T} end
 
 function (::Type{Variable{T}})(s, i...) where {T}
-    Base.depwarn("Variable{T}(name, idx...) is deprecated, use variable(name, idx...; T=T)", :Variable, force=true)
+    Base.depwarn("Variable{T}(name, idx...) is deprecated, use variable(name, idx...; T=T)", :Variable)
     variable(s, i...; T=T)
 end
 
 (::Type{Variable})(s, i...) = Variable{Real}(s, i...)
 
 function (::Type{Sym{T}})(s, x, i...) where {T}
-    Base.depwarn("Sym{T}(name, x, idx...) is deprecated, use variable(name, x, idx...; T=T)", :Variable, force=true)
+    Base.depwarn("Sym{T}(name, x, idx...) is deprecated, use variable(name, x, idx...; T=T)", :Variable)
     variable(s, x, i...; T=T)
 end
 (::Type{Sym})(s, x, i...) = Sym{Real}(s, x, i...)
