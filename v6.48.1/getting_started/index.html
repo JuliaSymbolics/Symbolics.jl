@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Getting Started with Symbolics.jl · Symbolics.jl</title><meta name="title" content="Getting Started with Symbolics.jl · Symbolics.jl"/><meta property="og:title" content="Getting Started with Symbolics.jl · Symbolics.jl"/><meta property="twitter:title" content="Getting Started with Symbolics.jl · Symbolics.jl"/><meta name="description" content="Documentation for Symbolics.jl."/><meta property="og:description" content="Documentation for Symbolics.jl."/><meta property="twitter:description" content="Documentation for Symbolics.jl."/><meta property="og:url" content="https://docs.sciml.ai/Symbolics/stable/getting_started/"/><meta property="twitter:url" content="https://docs.sciml.ai/Symbolics/stable/getting_started/"/><link rel="canonical" href="https://docs.sciml.ai/Symbolics/stable/getting_started/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/favicon.ico" rel="icon" type="image/x-icon"/></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../"><img class="docs-light-only" src="../assets/logo.svg" alt="Symbolics.jl logo"/><img class="docs-dark-only" src="../assets/logo-dark.svg" alt="Symbolics.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../">Symbolics.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Getting Started with Symbolics.jl</a><ul class="internal"><li><a class="tocitem" href="#Installing-Symbolics.jl"><span>Installing Symbolics.jl</span></a></li><li><a class="tocitem" href="#Building-Symbolic-Expressions"><span>Building Symbolic Expressions</span></a></li><li><a class="tocitem" href="#Derivatives"><span>Derivatives</span></a></li><li><a class="tocitem" href="#Simplification-and-Substitution"><span>Simplification and Substitution</span></a></li><li><a class="tocitem" href="#Non-Interactive-Development"><span>Non-Interactive Development</span></a></li><li><a class="tocitem" href="#Syms-and-callable-Syms"><span><code>Sym</code>s and callable <code>Sym</code>s</span></a></li><li><a class="tocitem" href="#Registering-Functions"><span>Registering Functions</span></a></li><li><a class="tocitem" href="#Building-Functions"><span>Building Functions</span></a></li><li><a class="tocitem" href="#Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices"><span>Building Non-Allocating Parallel Functions for Sparse Matrices</span></a></li></ul></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing</a></li><li><a class="tocitem" href="../tutorials/converting_to_C/">Automatic Conversion of Julia Code to C Functions</a></li><li><a class="tocitem" href="../tutorials/perturbation/">Mixed Symbolic-Numeric Perturbation Theory</a></li></ul></li><li><span class="tocitem">Manual</span><ul><li><input class="collapse-toggle" id="menuitem-4-1" type="checkbox"/><label class="tocitem" for="menuitem-4-1"><span class="docs-label">Basics</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../manual/variables/">Variable and Equation Types</a></li><li><a class="tocitem" href="../manual/expression_manipulation/">Expression Manipulation</a></li><li><a class="tocitem" href="../manual/faq/">Frequently Asked Questions</a></li><li><a class="tocitem" href="../manual/external/">Working with External Symbolics Packages: SymPy, Mathematica, Oscar, and Beyond</a></li><li><a class="tocitem" href="../manual/arrays/">Symbolic Arrays</a></li><li><a class="tocitem" href="../manual/build_function/">Function Building and Compilation (build_function)</a></li><li><a class="tocitem" href="../manual/functions/">Function Registration and Tracing</a></li><li><a class="tocitem" href="../manual/parsing/">Parsing Julia Expressions to Symbolic Expressions</a></li><li><a class="tocitem" href="../manual/io/">I/O, Saving, and Latex</a></li><li><a class="tocitem" href="../manual/types/">Supported types and dispatch in Symbolics</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-2" type="checkbox"/><label class="tocitem" for="menuitem-4-2"><span class="docs-label">Algebra</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../manual/solver/">Solving Symbolic Equations</a></li><li><a class="tocitem" href="../manual/groebner/">Groebner bases</a></li></ul></li><li><input class="collapse-toggle" id="menuitem-4-3" type="checkbox"/><label class="tocitem" for="menuitem-4-3"><span class="docs-label">Calculus</span><i class="docs-chevron"></i></label><ul class="collapsed"><li><a class="tocitem" href="../manual/derivatives/">Derivatives and Differentials</a></li><li><a class="tocitem" href="../manual/integration/">Symbolic Integrals</a></li><li><a class="tocitem" href="../manual/ode/">Symbolic ODE Solving</a></li><li><a class="tocitem" href="../manual/taylor/">Taylor Series</a></li><li><a class="tocitem" href="../manual/sparsity_detection/">Structure and Sparsity Detection</a></li><li><a class="tocitem" href="../manual/limits/">Symbolic Limits</a></li></ul></li></ul></li><li><a class="tocitem" href="../comparison/">Comparison Against SymPy</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Getting Started with Symbolics.jl</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Getting Started with Symbolics.jl</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/JuliaSymbolics/Symbolics.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/JuliaSymbolics/Symbolics.jl/blob/master/docs/src/getting_started.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Getting-Started-with-Symbolics.jl"><a class="docs-heading-anchor" href="#Getting-Started-with-Symbolics.jl">Getting Started with Symbolics.jl</a><a id="Getting-Started-with-Symbolics.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Getting-Started-with-Symbolics.jl" title="Permalink"></a></h1><p>Symbolics.jl is a symbolic modeling language. In this tutorial, we will walk you through the process of getting Symbolics.jl up and running, and start doing our first symbolic calculations.</p><h2 id="Installing-Symbolics.jl"><a class="docs-heading-anchor" href="#Installing-Symbolics.jl">Installing Symbolics.jl</a><a id="Installing-Symbolics.jl-1"></a><a class="docs-heading-anchor-permalink" href="#Installing-Symbolics.jl" title="Permalink"></a></h2><p>Installing Symbolics.jl is as simple as using the Julia package manager. This is done via the command <code>]add Symbolics</code>. After precompilation is complete, do <code>using Symbolics</code> in the terminal (REPL) and when that command is completed, you&#39;re ready to start!</p><h2 id="Building-Symbolic-Expressions"><a class="docs-heading-anchor" href="#Building-Symbolic-Expressions">Building Symbolic Expressions</a><a id="Building-Symbolic-Expressions-1"></a><a class="docs-heading-anchor-permalink" href="#Building-Symbolic-Expressions" title="Permalink"></a></h2><p>The way to define symbolic variables is via the <code>@variables</code> macro:</p><pre><code class="language-julia hljs">using Symbolics
+@variables x y</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{c}
+x \\
+y \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><p>After defining variables as symbolic, symbolic expressions, which we call a <code>iscall</code> object, can be generated by utilizing Julia expressions. For example:</p><pre><code class="language-julia hljs">z = x^2 + y</code></pre><p class="math-container">\[ \begin{equation}
+y + x^{2}
+\end{equation}
+ \]</p><p>Here, <code>z</code> is an expression tree for “square <code>x</code> and add <code>y</code>”. To make an array of symbolic expressions, simply make an array of symbolic expressions:</p><pre><code class="language-julia hljs">A = [x^2 + y 0 2x
+     0       0 2y
+     y^2 + x 0 0]</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{ccc}
+y + x^{2} &amp; 0 &amp; 2 x \\
+0 &amp; 0 &amp; 2 y \\
+x + y^{2} &amp; 0 &amp; 0 \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><p>Note that by default, <code>@variables</code> returns <code>Sym</code> or <code>iscall</code> objects wrapped in <code>Num</code> to make them behave like subtypes of <code>Real</code>. Any operation on these <code>Num</code> objects will return a new <code>Num</code> object, wrapping the result of computing symbolically on the underlying values.</p><p>If you are following this tutorial in the Julia REPL, <code>A</code> will not be shown with LaTeX equations. To get these equations, we can use <a href="https://github.com/korsbo/Latexify.jl">Latexify.jl</a>. Symbolics.jl comes with Latexify recipes, so it works automatically:</p><pre><code class="language-julia hljs">using Latexify
+latexify(A)</code></pre><p>\begin{equation} \left[ \begin{array}{ccc} y + x^{2} &amp; 0 &amp; 2 x \
+0 &amp; 0 &amp; 2 y \
+x + y^{2} &amp; 0 &amp; 0 \
+\end{array} \right] \end{equation}</p><p>Normal Julia functions work on Symbolics expressions, so if we want to create the sparse version of <code>A</code> we would just call <code>sparse</code>:</p><pre><code class="language-julia hljs">using SparseArrays
+spA = sparse(A)
+latexify(A)</code></pre><p>\begin{equation} \left[ \begin{array}{ccc} y + x^{2} &amp; 0 &amp; 2 x \
+0 &amp; 0 &amp; 2 y \
+x + y^{2} &amp; 0 &amp; 0 \
+\end{array} \right] \end{equation}</p><p>We can thus use normal Julia functions as generators for sparse expressions. For example, here we will define</p><pre><code class="language-julia hljs">function f(u)
+  [u[1] - u[3], u[1]^2 - u[2], u[3] + u[2]]
+end
+f([x, y, z]) # Recall that z = x^2 + y</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{c}
+x - y - x^{2} \\
+ - y + x^{2} \\
+2 y + x^{2} \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><p>Or we can build an array of variables and use it to trace the function:</p><pre><code class="language-julia hljs">u = Symbolics.variables(:u, 1:5)
+f(u)</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{c}
+\mathtt{u{_1}} - \mathtt{u{_3}} \\
+ - \mathtt{u{_2}} + \mathtt{u{_1}}^{2} \\
+\mathtt{u{_2}} + \mathtt{u{_3}} \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><div class="admonition is-info" id="Note-8d008d6f4df7f659"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-8d008d6f4df7f659" title="Permalink"></a></header><div class="admonition-body"><p><code>Symbolics.variables(:u, 1:5)</code> creates a Julia array of symbolic variables. This uses O(n) compute and memory but is a very general representation. Symbolics.jl also has the ability to represent symbolic arrays which gives an O(1) representation but is more limited in its functionality. For more information, see the <a href="../manual/arrays/#symbolic_arrays">Symbolic Arrays</a> page.</p></div></div><h2 id="Derivatives"><a class="docs-heading-anchor" href="#Derivatives">Derivatives</a><a id="Derivatives-1"></a><a class="docs-heading-anchor-permalink" href="#Derivatives" title="Permalink"></a></h2><p>One common thing to compute in a symbolic system is derivatives. In Symbolics.jl, derivatives are represented lazily via operations, just like any other function. To build a differential operator, use <code>Differential</code> like:</p><pre><code class="language-julia hljs">@variables t
+D = Differential(t)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Differential(t)</code></pre><p>This is the differential operator <span>$D = \frac{\partial}{\partial t}$</span>. We can compose the differential operator by <code>*</code>, e.g. <code>Differential(t) * Differential(x)</code> or <code>Differential(t)^2</code>. Now let&#39;s write down the derivative of some expression:</p><pre><code class="language-julia hljs">z = t + t^2
+D(z)</code></pre><p class="math-container">\[ \begin{equation}
+\frac{\mathrm{d}}{\mathrm{d}t} \left( t + t^{2} \right)
+\end{equation}
+ \]</p><p>Notice that this hasn&#39;t computed anything yet: <code>D</code> is a lazy operator because it lets us symbolically represent “The derivative of <span>$z$</span> with respect to <span>$t$</span>”, which is useful for example when representing our favorite thing in the world, differential equations. However, if we want to expand the derivative operators, we&#39;d use <code>expand_derivatives</code>:</p><pre><code class="language-julia hljs">expand_derivatives(D(z))</code></pre><p class="math-container">\[ \begin{equation}
+1 + 2 t
+\end{equation}
+ \]</p><p>The variable, that you are taking the derivative with respect to, is accessed with:</p><pre><code class="language-julia hljs">D.x</code></pre><p class="math-container">\[ \begin{equation}
+t
+\end{equation}
+ \]</p><p>We can also have simplified functions for multivariable calculus. For example, we can compute the Jacobian of an array of expressions like:</p><pre><code class="language-julia hljs">Symbolics.jacobian([x + x*y, x^2 + y], [x, y])</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{cc}
+1 + y &amp; x \\
+2 x &amp; 1 \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><p>and similarly we can do Hessians, gradients, and define whatever other derivatives you want.</p><h2 id="Simplification-and-Substitution"><a class="docs-heading-anchor" href="#Simplification-and-Substitution">Simplification and Substitution</a><a id="Simplification-and-Substitution-1"></a><a class="docs-heading-anchor-permalink" href="#Simplification-and-Substitution" title="Permalink"></a></h2><p>Symbolics interfaces with <a href="https://github.com/JuliaSymbolics/SymbolicUtils.jl">SymbolicUtils.jl</a> to allow for simplifying symbolic expressions. This is done simply through the <code>simplify</code> command:</p><pre><code class="language-julia hljs">simplify(2x + 2y)</code></pre><p class="math-container">\[ \begin{equation}
+2 \left( x + y \right)
+\end{equation}
+ \]</p><p>This can be applied to arrays by using Julia&#39;s broadcast mechanism:</p><pre><code class="language-julia hljs">B = simplify.([t + t^2 + t + t^2  2t + 4t
+               x + y + y + 2t     x^2 - x^2 + y^2])</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{cc}
+2 \left( t + t^{2} \right) &amp; 6 t \\
+2 \left( t + y \right) + x &amp; y^{2} \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><p>We can then use <code>substitute</code> to change values of an expression around:</p><pre><code class="language-julia hljs">simplify.(substitute.(B, (Dict(x =&gt; y^2),)))</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{cc}
+2 \left( t + t^{2} \right) &amp; 6 t \\
+2 \left( t + y \right) + y^{2} &amp; y^{2} \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><p>and we can use this to interactively evaluate expressions without generating and compiling Julia functions:</p><pre><code class="language-julia hljs">V = substitute.(B, (Dict(x =&gt; 2.0, y =&gt; 3.0, t =&gt; 4.0),))</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{cc}
+40 &amp; 24 \\
+16 &amp; 9 \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><p>Where we can reference the values via:</p><pre><code class="language-julia hljs">Symbolics.value.(V)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2×2 Matrix{Float64}:
+ 40.0  24.0
+ 16.0   9.0</code></pre><h2 id="Non-Interactive-Development"><a class="docs-heading-anchor" href="#Non-Interactive-Development">Non-Interactive Development</a><a id="Non-Interactive-Development-1"></a><a class="docs-heading-anchor-permalink" href="#Non-Interactive-Development" title="Permalink"></a></h2><p>Note that the macros are for the high-level case where you&#39;re doing symbolic computation on your own code. If you want to do symbolic computation on someone else&#39;s code, like in a macro, you may not want to do <code>@variables x</code> because you might want the name “x” to come from the user&#39;s code. For these cases, you can use the interpolation operator to interpolate the runtime value of <code>x</code>, i.e. <code>@variables $x</code>. Check the documentation of <code>@variables</code> for more details.</p><pre><code class="language-julia hljs">a, b, c = :runtime_symbol_value, :value_b, :value_c</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(:runtime_symbol_value, :value_b, :value_c)</code></pre><pre><code class="language-julia hljs">vars = @variables t $a $b(t) $c(t)[1:3]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Any}:
+                    t
+ runtime_symbol_value
+           value_b(t)
+                     (value_c(t))[1:3]</code></pre><pre><code class="language-julia hljs">(t, a, b, c)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(t, :runtime_symbol_value, :value_b, :value_c)</code></pre><p>One could also use <code>variable</code> and <code>variables</code>. Read their documentation for more details.</p><p>If we need to use this to generate new Julia code, we can simply convert the output to an <code>Expr</code>:</p><pre><code class="language-julia hljs">Symbolics.toexpr(x + y^2)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">:((+)(x, (^)(y, 2)))</code></pre><p>The other way around is also possible, parsing Julia expressions into symbolic expressions</p><pre><code class="language-julia hljs">ex = [:(v ~ w)
+      :(w ~ -v)]
+eqs = parse_expr_to_symbolic.(ex, (Main,))
+eqs_lhs = [eq.lhs for eq in eqs]
+eqs_rhs = [eq.rhs for eq in eqs]
+Symbolics.jacobian(eqs_rhs, eqs_lhs)</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{cc}
+0 &amp; 1 \\
+-1 &amp; 0 \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><h2 id="Syms-and-callable-Syms"><a class="docs-heading-anchor" href="#Syms-and-callable-Syms"><code>Sym</code>s and callable <code>Sym</code>s</a><a id="Syms-and-callable-Syms-1"></a><a class="docs-heading-anchor-permalink" href="#Syms-and-callable-Syms" title="Permalink"></a></h2><p>In the definition</p><pre><code class="language-julia hljs">@variables t x(t) y(t)</code></pre><p class="math-container">\[ \begin{equation}
+\left[
+\begin{array}{c}
+t \\
+x\left( t \right) \\
+y\left( t \right) \\
+\end{array}
+\right]
+\end{equation}
+ \]</p><p><code>t</code> is of type <code>Sym{Real}</code>, but the name <code>x</code> refers to an object that represents the <code>Term</code> <code>x(t)</code>. The operation of this expression is itself the object <code>Sym{FnType{Tuple{Real}, Real}}(:x)</code>. The type <code>Sym{FnType{...}}</code> represents a callable object. In this case specifically, it&#39;s a function that takes 1 Real argument (noted by <code>Tuple{Real}</code>) and returns a <code>Real</code> result. You can call such a callable <code>Sym</code> with either a number or a symbolic expression of a permissible type.</p><p>This expression also defines <code>t</code> as an independent variable, while <code>x(t)</code> and <code>y(t)</code> are dependent variables. This is accounted for in differentiation:</p><pre><code class="language-julia hljs">z = x + y*t
+expand_derivatives(D(z))</code></pre><p class="math-container">\[ \begin{equation}
+y\left( t \right) + \frac{\mathrm{d} x\left( t \right)}{\mathrm{d}t} + t \frac{\mathrm{d} y\left( t \right)}{\mathrm{d}t}
+\end{equation}
+ \]</p><p>Since <code>x</code> and <code>y</code> are time-dependent, they are not automatically eliminated from the expression, and thus the <code>D(x)</code> and <code>D(y)</code> operations still exist in the expanded derivatives for correctness.</p><p>We can also define unrestricted functions:</p><pre><code class="language-julia hljs">@variables g(..)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1-element Vector{Symbolics.CallWithMetadata{SymbolicUtils.FnType{Tuple, Real}, Base.ImmutableDict{DataType, Any}}}:
+ g⋆</code></pre><p>Here, <code>g</code> is a variable that is a function of other variables. Any time that we reference <code>g</code> we have to utilize it as a function:</p><pre><code class="language-julia hljs">z = g(x) + g(y)</code></pre><p class="math-container">\[ \begin{equation}
+g\left( y\left( t \right) \right) + g\left( x\left( t \right) \right)
+\end{equation}
+ \]</p><h2 id="Registering-Functions"><a class="docs-heading-anchor" href="#Registering-Functions">Registering Functions</a><a id="Registering-Functions-1"></a><a class="docs-heading-anchor-permalink" href="#Registering-Functions" title="Permalink"></a></h2><p>One of the benefits of a one-language Julia symbolic stack is that the primitives are all written in Julia, and therefore it&#39;s trivially extendable from Julia itself. By default, new functions are traced to the primitives and the symbolic expressions are written on the primitives. However, we can expand the allowed primitives by registering new functions. For example, let&#39;s register a new function <code>h</code>:</p><pre><code class="language-julia hljs">h(x, y) = x^2 + y
+@register_symbolic h(x, y)</code></pre><p>When we use <code>h(x, y)</code>, it is a symbolic expression and doesn&#39;t expand:</p><pre><code class="language-julia hljs">h(x, y) + y^2</code></pre><p class="math-container">\[ \begin{equation}
+h\left( x\left( t \right), y\left( t \right) \right) + \left( y\left( t \right) \right)^{2}
+\end{equation}
+ \]</p><p>To use it with the differentiation system, we need to register its derivatives. We would do it like this:</p><pre><code class="language-julia hljs"># Derivative w.r.t. the first argument
+Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{1}) = 2args[1]
+# Derivative w.r.t. the second argument
+Symbolics.derivative(::typeof(h), args::NTuple{2,Any}, ::Val{2}) = 1</code></pre><p>and now it works with the rest of the system:</p><pre><code class="language-julia hljs">Symbolics.derivative(h(x, y) + y^2, x)</code></pre><p class="math-container">\[ \begin{equation}
+2 x\left( t \right)
+\end{equation}
+ \]</p><pre><code class="language-julia hljs">Symbolics.derivative(h(x, y) + y^2, y)</code></pre><p class="math-container">\[ \begin{equation}
+1 + 2 y\left( t \right)
+\end{equation}
+ \]</p><div class="admonition is-info" id="Note-2dc382da3d7373d9"><header class="admonition-header">Note<a class="admonition-anchor" href="#Note-2dc382da3d7373d9" title="Permalink"></a></header><div class="admonition-body"><p><code>@register_symbolic</code> only allows for scalar outputs. If full array functions are needed, then see <code>@register_array_symbolic</code> for registering functions of symbolic arrays.</p></div></div><h2 id="Building-Functions"><a class="docs-heading-anchor" href="#Building-Functions">Building Functions</a><a id="Building-Functions-1"></a><a class="docs-heading-anchor-permalink" href="#Building-Functions" title="Permalink"></a></h2><p>The function for building functions from symbolic expressions is the aptly-named <code>build_function</code>. The first argument is the symbolic expression or the array of symbolic expressions to compile, and the trailing arguments are the arguments for the function. For example:</p><pre><code class="language-julia hljs">to_compute = [x^2 + y, y^2 + x]
+f_expr = build_function(to_compute, [x, y])
+Base.remove_linenums!.(f_expr)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(:(function (ˍ₋arg1,)
+      <span class="sgr90">#= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#</span> @inbounds begin
+              begin
+                  begin
+                      begin
+                          (SymbolicUtils.Code.create_array)(typeof(ˍ₋arg1), nothing, Val{1}(), Val{(2,)}(), (+)(ˍ₋arg1[2], (^)(ˍ₋arg1[1], 2)), (+)(ˍ₋arg1[1], (^)(ˍ₋arg1[2], 2)))
+                      end
+                  end
+              end
+          end
+  end), :(function (ˍ₋out, ˍ₋arg1)
+      <span class="sgr90">#= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:368 =#</span> @inbounds begin
+              begin
+                  begin
+                      <span class="sgr90">#= /home/runner/.julia/packages/SymbolicUtils/aooYZ/src/code.jl:464 =#</span> @inbounds begin
+                              ˍ₋out[1] = (+)(ˍ₋arg1[2], (^)(ˍ₋arg1[1], 2))
+                              ˍ₋out[2] = (+)(ˍ₋arg1[1], (^)(ˍ₋arg1[2], 2))
+                              ˍ₋out
+                          end
+                  end
+              end
+          end
+  end))</code></pre><p>gives back two codes. The first is a function <code>f([x, y])</code> that computes and builds an output vector <code>[x^2 + y, y^2 + x]</code>. Because this tool was made to be used by all the cool kids writing fast Julia codes, it is specialized to Julia and supports features like StaticArrays. For example:</p><pre><code class="language-julia hljs">using StaticArrays
+myf = eval(f_expr[1])
+myf(SA[2.0, 3.0])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element StaticArraysCore.SVector{2, Float64} with indices SOneTo(2):
+  7.0
+ 11.0</code></pre><p>The second function is an in-place non-allocating mutating function which mutates its first value. Thus, we&#39;d use it like the following:</p><pre><code class="language-julia hljs">myf! = eval(f_expr[2])
+out = zeros(2)
+myf!(out, [2.0, 3.0])
+out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+  7.0
+ 11.0</code></pre><p>To save the symbolic calculations for later, we can take this expression and save it out to a file:</p><pre><code class="language-julia hljs">write(&quot;function.jl&quot;, string(f_expr[2]))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">554</code></pre><p>Note that if we need to avoid <code>eval</code>, for example to avoid world-age issues, one could do <code>expression = Val{false}</code>:</p><pre><code class="language-julia hljs">Base.remove_linenums!(build_function(to_compute, [x, y], expression=Val{false})[1])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">RuntimeGeneratedFunction(#=in Symbolics=#, #=using Symbolics=#, :((ˍ₋arg1,)-&gt;#= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =# @inbounds(begin
+              #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:366 =#
+              begin
+                  #= /home/runner/.julia/packages/SymbolicUtils/aooYZ/src/code.jl:409 =#
+                  #= /home/runner/.julia/packages/SymbolicUtils/aooYZ/src/code.jl:410 =#
+                  #= /home/runner/.julia/packages/SymbolicUtils/aooYZ/src/code.jl:411 =#
+                  begin
+                      begin
+                          #= /home/runner/.julia/packages/SymbolicUtils/aooYZ/src/code.jl:510 =#
+                          (SymbolicUtils.Code.create_array)(typeof(ˍ₋arg1), nothing, Val{1}(), Val{(2,)}(), (+)(ˍ₋arg1[2], (^)(ˍ₋arg1[1], 2)), (+)(ˍ₋arg1[1], (^)(ˍ₋arg1[2], 2)))
+                      end
+                  end
+              end
+          end)))</code></pre><p>which will use <a href="https://github.com/SciML/RuntimeGeneratedFunctions.jl">RuntimeGeneratedFunctions.jl</a> to build Julia functions which avoid world-age issues.</p><h2 id="Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices"><a class="docs-heading-anchor" href="#Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices">Building Non-Allocating Parallel Functions for Sparse Matrices</a><a id="Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices-1"></a><a class="docs-heading-anchor-permalink" href="#Building-Non-Allocating-Parallel-Functions-for-Sparse-Matrices" title="Permalink"></a></h2><p>Now let&#39;s show off a little bit. <code>build_function</code> is kind of like if <a href="https://docs.sympy.org/latest/modules/utilities/lambdify.html"><code>lambdify</code></a> ate its spinach. To show this, <strong>let&#39;s build a non-allocating function that fills sparse matrices in a multithreaded manner</strong>. To do this, we just have to represent the operation that we&#39;re turning into a function via a sparse matrix. For example:</p><pre><code class="language-julia hljs">using LinearAlgebra
+N = 8
+A = sparse(Tridiagonal([x^i for i in 1:N-1], [x^i * y^(8-i) for i in 1:N], [y^i for i in 1:N-1]))
+show(A)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">sparse([1, 2, 1, 2, 3, 2, 3, 4, 3, 4, 5, 4, 5, 6, 5, 6, 7, 6, 7, 8, 7, 8], [1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8], Num[x(t)*(y(t)^7), x(t), y(t), (x(t)^2)*(y(t)^6), x(t)^2, y(t)^2, (x(t)^3)*(y(t)^5), x(t)^3, y(t)^3, (x(t)^4)*(y(t)^4), x(t)^4, y(t)^4, (x(t)^5)*(y(t)^3), x(t)^5, y(t)^5, (x(t)^6)*(y(t)^2), x(t)^6, y(t)^6, (x(t)^7)*y(t), x(t)^7, y(t)^7, x(t)^8], 8, 8)</code></pre><p>Now we call <code>build_function</code>:</p><pre><code class="language-julia hljs">Base.remove_linenums!(build_function(A,[x,y],parallel=Symbolics.MultithreadedForm())[2])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">:(function (ˍ₋out, ˍ₋arg1)
+      <span class="sgr90">#= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:368 =#</span> @inbounds begin
+              begin
+                  begin
+                      begin
+                          var&quot;##out#236&quot; = ˍ₋out.nzval
+                          begin
+                              (Symbolics.var&quot;#noop#469&quot;())(map(fetch, (begin
+                                              let
+                                                  task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#236&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x3f24b590, 0x61897817, 0xcc2cfa27, 0x42337fd3, 0x4c865579), Nothing}(nothing), (var&quot;##out#236&quot;, ˍ₋arg1)))
+                                                  task.sticky = false
+                                                  Base.schedule(task)
+                                                  task
+                                              end
+                                          end, begin
+                                              let
+                                                  task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#236&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x5e744726, 0xe4ef0193, 0x5e76afb0, 0x5d11e51a, 0x74d7ae50), Nothing}(nothing), (var&quot;##out#236&quot;, ˍ₋arg1)))
+                                                  task.sticky = false
+                                                  Base.schedule(task)
+                                                  task
+                                              end
+                                          end))...)
+                          end
+                      end
+                  end
+              end
+          end
+  end)</code></pre><p>Let&#39;s unpack what that&#39;s doing. It&#39;s using <code>A.nzval</code> to linearly index through the sparse matrix, avoiding the <code>A[i,j]</code> form because that is a more expensive way to index a sparse matrix if you know exactly the order that the data is stored. Then, it&#39;s splitting up the calculation into Julia threads, so they can be operated on in parallel. It synchronizes after spawning all the tasks, so the computation is ensured to be complete before moving on. And it does this with all in-place operations to the original matrix instead of generating arrays. This is the fanciest way you could fill a sparse matrix, and Symbolics makes this dead simple.</p><p>(Note: this example may be slower with multithreading due to the thread spawning overhead, but the full version was not included in the documentation for brevity. It will be the faster version if <code>N</code> is sufficiently large!)</p><p>Importantly, when using the in-place functions generated by <a href="../manual/build_function/#build_function"><code>build_function</code></a>, it is important that the mutating argument matches the sparse structure of the original function, as demonstrated below.</p><pre><code class="language-julia hljs">using Symbolics, SparseArrays, LinearAlgebra
+
+N = 10
+_S = sprand(N, N, 0.1)
+_Q = sprand(N, N, 0.1)
+
+F(z) = [ # some complicated sparse amenable function
+    _S * z
+    _Q * z.^2
+]
+
+Symbolics.@variables z[1:N]
+
+sj = Symbolics.sparsejacobian(F(z), z) # sparse jacobian
+
+f_expr = build_function(sj, z)
+
+rows, cols, _ = findnz(sj)
+out = sparse(rows, cols, zeros(length(cols)), size(sj)...) # pre-allocate, and correct structure
+myf = eval(last(f_expr))
+myf(out, rand(N)) # note that out matches the sparsity structure of sj
+out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 31 stored entries:
+⎡⣘⠦⠑⠀⢒⎤
+⎢⠈⡠⢀⠀⠠⎥
+⎢⠐⠀⡀⡀⠘⎥
+⎢⠀⠢⠀⢁⠠⎥
+⎣⠀⠀⣁⠐⠀⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.14.1 on <span class="colophon-date" title="Thursday 31 July 2025 17:13">Thursday 31 July 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
