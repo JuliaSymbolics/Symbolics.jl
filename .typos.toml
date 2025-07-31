@@ -2,7 +2,6 @@
 # Symbolics-Specific
 numer = "numer"
 Commun = "Commun"
-nd = "nd"
 assum = "assum"
 Comput = "Comput"
 
