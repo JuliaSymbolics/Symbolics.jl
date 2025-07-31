@@ -303,7 +303,7 @@ end
 @wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B) false
 @wrapped (*)(A::AbstractVector, B::AbstractMatrix) = _matmul(A, B) false
 # Resolve ambiguity with Base.*(::Adjoint{T, <:AbstractVector} where T, ::AbstractMatrix)
-@wrapped (*)(x::Adjoint{T, <:AbstractVector} where {T}, A::Symbolics.Arr{<:Any, 2}) = _matmul(x, A) false
+(*)(x::Adjoint{T, <:AbstractVector} where {T}, A::Symbolics.Arr{<:Any, 2}) = wrap(_matmul(unwrap(x), unwrap(A)))
 
 function _matvec(A, b)
     A = inner_unwrap(A)
