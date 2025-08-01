@@ -26,7 +26,7 @@ function Symbolics.symbolics_to_sympy(expr)
 
         sop = symbolics_to_sympy(op)
         sargs = map(symbolics_to_sympy, args)
-        return sop === (^) && length(sargs) == 2 && sargs[2] isa Number ? Base.literal_pow(^, sargs[1], Val(sargs[2])) : sop(sargs...)
+        return sop === (^) && length(sargs) == 2 ? sargs[1]^sargs[2] : sop(sargs...)
     else
         name = string(nameof(expr))
         return symtype(expr) <: FnType ? SymPy.SymFunction(name) : SymPy.Sym(name)
@@ -62,13 +62,16 @@ function Symbolics.sympy_linear_solve(A, b)
 end
 
 function Symbolics.sympy_algebraic_solve(expr, var)
-    expr_sympy = expr isa AbstractVector ? map(symbolics_to_sympy, expr) : symbolics_to_sympy(expr)
-    var_sympy = var isa AbstractVector ? map(symbolics_to_sympy, var) : symbolics_to_sympy(var)
-    sol_sympy = SymPy.solve(expr_sympy, var_sympy, dict=true)
+    expr_sympy = expr isa AbstractVector ? map(symbolics_to_sympy, expr) :
+                 symbolics_to_sympy(expr)
+    var_sympy = var isa AbstractVector ? map(symbolics_to_sympy, var) :
+                symbolics_to_sympy(var)
+    sol_sympy = SymPy.solve(expr_sympy, var_sympy, dict = true)
     vars = var isa AbstractVector ? var : [var]
     if expr isa AbstractVector
         varmap = Dict(string(nameof(v)) => v for v in vars)
-        return [Dict(varmap[string(k)] => sympy_to_symbolics(v, vars) for (k, v) in s) for s in sol_sympy]
+        return [Dict(varmap[string(k)] => sympy_to_symbolics(v, vars) for (k, v) in s)
+                for s in sol_sympy]
     else
         return [sympy_to_symbolics(s[var_sympy], vars) for s in sol_sympy]
     end

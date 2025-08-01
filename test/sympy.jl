@@ -1,7 +1,6 @@
 if get(ENV, "CI", nothing) !== nothing
     # copied and modified from https://github.com/tkf/IPython.jl/blob/master/test/install_dependencies.jl
 
-
     # Adding Pkg in test/REQUIRE would be an error in 0.6.  Using
     # Project.toml still has some gotchas.  So:
     Pkg = Base.require(Base.PkgId(Base.UUID(0x44cfe95a1eb252eab672e2afdf69b78f), "Pkg"))
@@ -21,8 +20,9 @@ expr = x * p + (x^2 - 1 + y) * (p + 2t)
 sexpr = symbolics_to_sympy(expr)
 sp = symbolics_to_sympy(p)
 
-@test SymPy.simplify(symbolics_to_sympy(Symbolics.symbolic_linear_solve(expr, p))) == SymPy.simplify(SymPy.solve(sexpr, sp)[1])
- 
+@test SymPy.simplify(symbolics_to_sympy(Symbolics.symbolic_linear_solve(expr, p))) ==
+      SymPy.simplify(SymPy.solve(sexpr, sp)[1])
+
 symbolics_sol = SymPy.simplify(symbolics_to_sympy(Symbolics.symbolic_linear_solve(expr, p)))
 sympy_sols = SymPy.solve(SymPy.expand(sexpr), sp)
 @test !isempty(sympy_sols) && isequal(symbolics_sol, sympy_sols[1])
@@ -49,7 +49,10 @@ sol = sympy_algebraic_solve(eq, x)
 # Test 4: System of equations
 eqs = [x^2 + y^2 - 4, x - y]
 sol_sys = sympy_algebraic_solve(eqs, [x, y])
-@test length(sol_sys) == 2 && any(d -> isapprox(Symbolics.substitute(d[x], Dict()), sqrt(2)) && isapprox(Symbolics.substitute(d[y], Dict()), sqrt(2)), sol_sys)
+@test length(sol_sys) == 2 && any(
+    d -> isapprox(Symbolics.substitute(d[x], Dict()), sqrt(2)) &&
+         isapprox(Symbolics.substitute(d[y], Dict()), sqrt(2)),
+    sol_sys)
 
 # Test 5: Integration
 expr = x^2
@@ -68,7 +71,7 @@ result = sympy_simplify(expr)
 
 # Test 8: ODE solver
 D = Symbolics.Differential(x)
-@variables C1 
+@variables C1
 ode = D(f) - 2*f
 sol_ode = sympy_ode_solve(ode, f, x)
 sol_vars = Symbolics.get_variables(sol_ode)
@@ -76,3 +79,10 @@ const_sym = only(filter(v -> startswith(string(Symbolics.nameof(v)), "C"), sol_v
 expected_sol = C1 * exp(2 * x)
 canonical_sol_ode = Symbolics.substitute(sol_ode, Dict(const_sym => C1))
 @test isequal(canonical_sol_ode, expected_sol)
+
+# Test issue #1605: Power with symbolic exponent
+@variables x y
+expr_power = x^y
+sympy_expr_power = symbolics_to_sympy(expr_power)
+back_expr_power = sympy_to_symbolics(sympy_expr_power, [x, y])
+@test isequal(Symbolics.simplify(expr_power), Symbolics.simplify(back_expr_power))
