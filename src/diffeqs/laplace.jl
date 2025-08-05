@@ -172,13 +172,13 @@ function laplace_solve_ode(eq, f, t, f0)
     other_terms = []
     for term in terms(transformed_eq)
         if isempty(get_variables(term, [variable(:F)]))
-            push!(other_terms, term)
+            push!(other_terms, -1*term)
         else
             F_terms += term/variable(:F) # assumes term is something times F
         end
     end
 
-    transformed_soln = sum(other_terms ./ F_terms)
+    @show transformed_soln = sum(other_terms ./ F_terms)
 
     return inverse_laplace(transformed_soln, F, t, s, f)
 end
