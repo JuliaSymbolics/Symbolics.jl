@@ -498,7 +498,7 @@ function method_of_undetermined_coefficients(eq::LinearODE)
     catch
         coeff_solution = nothing
     end
-    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution)
+    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution) && evaluate(eq_subbed, coeff_solution[1])
         return substitute(form, coeff_solution[1])
     end
 
@@ -730,5 +730,5 @@ function _true_factors(expr)
         end
     end
 
-    return true_facs
+    return convert(Vector{Num}, true_facs)
 end
