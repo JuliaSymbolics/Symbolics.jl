@@ -1,6 +1,7 @@
 import DomainSets.ClosedInterval
 
 function laplace(expr, f, t, s, F)
+    expr = expand(expr)
     Dt = Differential(t)
     Ds = Differential(s)
     # from https://tutorial.math.lamar.edu/Classes/DE/Laplace_Table.aspx
@@ -33,10 +34,10 @@ function laplace(expr, f, t, s, F)
         @rule exp(~a*t) * cos(~b * t) => (-~a+s) / ((~b)^2 + (-~a+s)^2)
         @rule exp(~a*t) * sinh(~b * t) => ~b / (-(~b)^2 + (-~a+s)^2)
         @rule exp(~a*t) * cosh(~b * t) => (-~a+s) / (-(~b)^2 + (-~a+s)^2)
-        @rule exp(~a * t) * t^~n => factorial(~n) / (-~a + s)^(~n + 1)
-        @rule exp(~a * t) * t => 1 / (-~a + s)^(2)
-        @rule exp(t) * t^~n => factorial(~n) / (s)^(~n + 1)
-        @rule exp(t) * t => 1 / (s)^(2)
+        @rule t^~n * exp(~a * t) => factorial(~n) / (-~a + s)^(~n + 1)
+        @rule t*exp(~a * t) => 1 / (-~a + s)^(2)
+        @rule t^~n * exp(t) => factorial(~n) / (s)^(~n + 1)
+        @rule t*exp(t) => 1 / (s)^(2)
         @rule exp(~c*t) * ~g => laplace(~g, f, t, s - ~c, F) # s-shift rule
         @rule t*f(t) => -Ds(F(s)) # s-derivative rule
         @rule t^(~n)*f(t) => (-1)^(~n) * (Ds^~n)(F(s)) # s-derivative rule
@@ -84,11 +85,11 @@ function laplace(expr::Equation, f, t, s, F)
 end
 
 function inverse_laplace(expr, F, t, s, f)
-    # check for partial fractions
-    if isequal(expr, 1/((3+s)*(s^2)))
-        s
-        partial_frac_decomposition(1/((3+s)*(s^2)), s)
+    if isequal(expr, 0)
+        return 0
     end
+    
+    # check for partial fractions
     partial_fractions = partial_frac_decomposition(expr, s)
     if partial_fractions !== nothing && !isequal(partial_fractions, expr)
         return inverse_laplace(partial_fractions, F, t, s, f)
@@ -165,7 +166,7 @@ function laplace_solve_ode(eq, f, t, f0)
     @syms F(s)
     transformed_eq = laplace(eq, f, t, s, F)
     transformed_eq = substitute(transformed_eq, Dict(F(s) => variable(:F), [variable(:f0, i-1) => f0[i] for i=1:length(f0)]...))
-    transformed_eq = transformed_eq.lhs - transformed_eq.rhs
+    transformed_eq = expand(transformed_eq.lhs - transformed_eq.rhs)
     # transformed_soln = symbolic_solve(transformed_eq, variable(:F))
 
     F_terms = 0
@@ -178,7 +179,11 @@ function laplace_solve_ode(eq, f, t, f0)
         end
     end
 
-    @show transformed_soln = sum(other_terms ./ F_terms)
+    if isempty(other_terms)
+        other_terms = 0
+    end
 
-    return inverse_laplace(transformed_soln, F, t, s, f)
+    transformed_soln = simplify(sum(other_terms ./ F_terms))
+
+    return expand(inverse_laplace(transformed_soln, F, t, s, f))
 end
