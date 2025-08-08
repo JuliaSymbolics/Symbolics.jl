@@ -308,9 +308,9 @@ Returns homogeneous solutions to linear ODE `eq` with constant coefficients
 xₕ(t) = C₁e^(r₁t) + C₂e^(r₂t) + ... + Cₙe^(rₙt)
 """
 function const_coeff_solve(eq::LinearODE)
-    @variables r
-    p = characteristic_polynomial(eq, r)
-    roots = symbolic_solve(p, r, dropmultiplicity = false)
+    @variables 𝓇
+    p = characteristic_polynomial(eq, 𝓇)
+    roots = symbolic_solve(p, 𝓇, dropmultiplicity = false)
 
     # Handle complex + repeated roots
     solutions = exp.(roots * eq.t)
@@ -348,8 +348,8 @@ function integrating_factor_solve(eq::LinearODE)
         v = exp(sympy_integrate(p, eq.t))
     end
     solution = (1 / v) * ((isequal(eq.q, 0) ? 0 : sympy_integrate(eq.q * v, eq.t)) + eq.C[1])
-    @variables Integral
-    if !isempty(Symbolics.get_variables(solution, Integral))
+
+    if !isempty(Symbolics.get_variables(solution, variable(:Integral)))
         return nothing
     end
     return expand(Symbolics.sympy_simplify(solution))
@@ -444,8 +444,18 @@ function exp_trig_particular_solution(eq::LinearODE)
         return nothing
     end
 
-    combined_eq = LinearODE(eq.x, eq.t, eq.p, a * exp((r + b * im)eq.t))
-    rrf = resonant_response_formula(combined_eq)
+    # do complex rrf
+    # figure out how many times p needs to be differentiated before denominator isn't 0
+    k = 0
+    @variables 𝓈
+    p = characteristic_polynomial(eq, 𝓈)
+    Ds = Differential(𝓈)
+    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)), 0)
+        k += 1
+    end
+
+    rrf = expand(simplify(a * exp((r + b * im) * eq.t) * eq.t^k /
+                           (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
 
     return is_sin ? imag(rrf) : real(rrf)
 end
@@ -469,15 +479,15 @@ function resonant_response_formula(eq::LinearODE)
 
     # figure out how many times p needs to be differentiated before denominator isn't 0
     k = 0
-    @variables s
-    p = characteristic_polynomial(eq, s)
-    Ds = Differential(s)
-    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(s => r)), 0)
+    @variables 𝓈
+    p = characteristic_polynomial(eq, 𝓈)
+    Ds = Differential(𝓈)
+    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)), 0)
         k += 1
     end
 
     return expand(simplify(a * exp(r * eq.t) * eq.t^k /
-                           (substitute(expand_derivatives((Ds^k)(p)), Dict(s => r)))))
+                           (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)))))
 end
 
 function method_of_undetermined_coefficients(eq::LinearODE)
@@ -489,28 +499,31 @@ function method_of_undetermined_coefficients(eq::LinearODE)
 
     # polynomial
     degree = Symbolics.degree(eq.q, eq.t) # just a starting point
-    a = Symbolics.variables(:a, 1:degree+1)
-    form = sum(a[n]*eq.t^(n-1) for n = 1:degree+1)
+    𝒶 = Symbolics.variables(:a, 1:degree+1)
+    form = sum(𝒶[n]*eq.t^(n-1) for n = 1:degree+1)
     eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+    eq_subbed = eq_subbed.lhs - eq_subbed.rhs
     eq_subbed = expand_derivatives(eq_subbed)
+    
     try
-        coeff_solution = symbolic_solve(eq_subbed, length(a) == 1 ? a[1] : a)
+        coeff_solution = solve_interms_ofvar(eq_subbed, eq.t)
     catch
         coeff_solution = nothing
     end
-    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution) && evaluate(eq_subbed, coeff_solution[1])
+    
+    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution) && isequal(expand(substitute(eq_subbed, coeff_solution[1])), 0)
         return substitute(form, coeff_solution[1])
     end
 
     # exponential
-    @variables a
+    @variables 𝒶
     coeff = get_rrf_coeff(eq.q, eq.t)
     if coeff !== nothing
         r = coeff[2]
-        form = a*exp(r*eq.t)
+        form = 𝒶*exp(r*eq.t)
         eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
-        coeff_solution = symbolic_solve(eq_subbed, a)
+        coeff_solution = symbolic_solve(eq_subbed, 𝒶)
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
             return substitute(form, coeff_solution[1])
@@ -519,21 +532,21 @@ function method_of_undetermined_coefficients(eq::LinearODE)
 
     # sin and cos
     # this is a hacky way of doing things
-    @variables a, b
-    @variables cs, sn
+    @variables 𝒶, 𝒷
+    @variables 𝒸𝓈, 𝓈𝓃
     parsed = _parse_trig(_true_factors(eq.q)[end], eq.t)
     if parsed !== nothing
         ω = parsed[1]
-        form = a*cos(ω*eq.t) + b*sin(ω*eq.t)
+        form = 𝒶*cos(ω*eq.t) + 𝒷*sin(ω*eq.t)
         eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
-        eq_subbed = expand(substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>cs, sin(ω*eq.t)=>sn)))
-        cos_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, cs)), terms(eq_subbed)))/cs)
-        sin_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, sn)), terms(eq_subbed)))/sn)
-        if !isempty(Symbolics.get_variables(cos_eq, [eq.t,sn,cs])) || !isempty(Symbolics.get_variables(sin_eq, [eq.t,sn,cs]))
+        eq_subbed = expand(substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>𝒸𝓈, sin(ω*eq.t)=>𝓈𝓃)))
+        cos_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, 𝒸𝓈)), terms(eq_subbed)))/𝒸𝓈)
+        sin_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, 𝓈𝓃)), terms(eq_subbed)))/𝓈𝓃)
+        if !isempty(Symbolics.get_variables(cos_eq, [eq.t,𝓈𝓃,𝒸𝓈])) || !isempty(Symbolics.get_variables(sin_eq, [eq.t,𝓈𝓃,𝒸𝓈]))
             coeff_solution = nothing
         else
-            coeff_solution = symbolic_solve([cos_eq, sin_eq], [a,b])
+            coeff_solution = symbolic_solve([cos_eq, sin_eq], [𝒶,𝒷])
         end
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
@@ -681,8 +694,8 @@ end
 Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n
 """
 function solve_bernoulli(expr, x, t)
-    @variables v
-    linearized = linearize_bernoulli(expr, x, t, v)
+    @variables 𝓋
+    linearized = linearize_bernoulli(expr, x, t, 𝓋)
     if linearized === nothing
         return nothing
     end
@@ -701,8 +714,8 @@ end
 Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n with initial condition x(0) = x0
 """
 function solve_bernoulli(expr, x, t, x0)
-    @variables v
-    eq, n = linearize_bernoulli(expr, x, t, v)
+    @variables 𝓋
+    eq, n = linearize_bernoulli(expr, x, t, 𝓋)
 
     v0 = x0^(1-n) # convert initial condition from x(0) to v(0)
 
