@@ -47,6 +47,7 @@ makedocs(
                 "manual/parsing.md",
                 "manual/io.md",
                 "manual/types.md",
+                "manual/metadata.md",
             ],
 
             "Algebra" => [
@@ -61,9 +62,10 @@ makedocs(
                 "manual/taylor.md",
                 "manual/sparsity_detection.md",
                 "manual/limits.md",
-            ],  
+            ],
+            
+            "manual/misc.md",
         ],
-        "API Reference" => "manual/api.md",
         "Comparison Against SymPy" => "comparison.md",
     ]
 )
