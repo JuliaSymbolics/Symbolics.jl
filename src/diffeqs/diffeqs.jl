@@ -81,9 +81,22 @@ struct LinearODE
     end
 end
 
+function is_linear(eq::Equation, x, t)
+    all(isempty.(get_variables.(sparse_jacobian_ode(eq, x, t), x)))
+end
+
+# recursively find highest derivative order in `expr`
 function _get_der_order(expr, x, t)
-    if isequal(expr, x)
+    if !hasderiv(unwrap(expr))
         return 0
+    end
+
+    if length(terms(expr)) > 1
+        return maximum(_get_der_order.(terms(expr), Ref(x), Ref(t)))
+    end
+
+    if length(factors(expr)) > 1
+        return maximum(_get_der_order.(factors(expr), Ref(x), Ref(t)))
     end
 
     return _get_der_order(substitute(expr, Dict(Differential(t)(x) => x)), x, t) + 1
@@ -744,4 +757,35 @@ function _true_factors(expr)
     end
 
     return convert(Vector{Num}, true_facs)
+end
+
+function sparse_jacobian_ode(eq, x, t)
+    Dt = Differential(t)
+    n = _get_der_order(eq, x, t)
+    @assert n >= 1 "ODE must have at least one derivative"
+    
+    # reduction of order
+    y = variables(:y, 1:n)
+    y_sub = Dict([[(Dt^i)(x) => y[i+1] for i=0:n-1]; (Dt^n)(x) => variable(:y, n+1)])
+    eq = substitute(eq, y_sub)
+    
+    if !check_polynomial(eq, strict=false)
+        @warn "Equation is not in a polynomial form"
+        return nothing
+    end
+    
+    f = symbolic_linear_solve(eq, variable(:y, n+1))
+    @assert f !== nothing "Failed to isolate highest order derivative term"
+    f = f[1]
+    funcs = [y[2:n]; f]
+
+    result = sparsejacobian(funcs, y)
+    if all(iszero, result)
+        return result
+    end
+
+    rev_y_sub = Dict(val => key for (key, val) in y_sub)
+    sparse_jacobian::SparseMatrixCSC{Num, <:Integer} = substitute.(result, Ref(rev_y_sub))
+    
+    return sparse_jacobian
 end
