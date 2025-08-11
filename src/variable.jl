@@ -101,6 +101,8 @@ macro. `transform` is an optional function that takes constructed variables and 
 custom postprocessing to them, returning the created variables. This function returns the
 `Expr` for constructing the parsed variables.
 """
+parse_vars(macroname, type, x, transform=identity) = _parse_vars(macroname, type, x, transform=identity)
+
 function _parse_vars(macroname, type, x, transform=identity)
     ex = Expr(:block)
     var_names = Symbol[]
