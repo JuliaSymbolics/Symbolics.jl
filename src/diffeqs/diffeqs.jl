@@ -33,56 +33,47 @@ struct LinearODE
 
     function LinearODE(expr, x, t)
         if expr isa Equation
-            epxr = expr.lhs - expr.rhs
+            expr = expr.lhs - expr.rhs
         end
 
         expr = expand(simplify(expr))
-        terms = Symbolics.terms(epxr)
-        p::Vector{Num} = []
-        q = 0
-        order = 0
-        for term in terms
-            if isequal(Symbolics.get_variables(term, [x]), [x])
-                facs = _true_factors(term)
-                deriv = filter(fac -> Symbolics.hasderiv(Symbolics.value(fac)), facs)
-                p_n = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
-                if isempty(deriv)
-                    @assert Symbolics.degree(term, x) == 1 "Expected linear term: $term"
-                    if isempty(p)
-                        p = [p_n/x]
-                    else
-                        p[1] = p_n/x
-                    end
-                    continue
-                end
-                
-                @assert length(deriv) == 1 "Expected linear term: $term"
-                n = _get_der_order(deriv[1], x, t)
-                if n+1 > length(p)
-                    append!(p, zeros(Int, n-length(p) + 1))
-                end
-                p[n + 1] = p_n
-                order = max(order, n)
-                
-            elseif isempty(Symbolics.get_variables(term, [x]))
-                q -= term
-            else
-                # throw assertion error for invalid term so it can be easily caught
-                @assert false "Invalid term in LinearODE: $term"
-            end
-        end
-        
-        # normalize leading coefficient to 1
-        leading_coeff = p[order + 1]
-        p = expand.(p .// leading_coeff)
-        q = expand(q // leading_coeff)
 
-        new(x, t, p[1:order], q)
+        @assert is_linear_ode(expr, x, t) "Equation must be linear in $x and $t"
+
+        n = _get_der_order(expr, x, t)
+
+        ys = variables(:𝓎, 1:n)
+        A, b, islinear = linear_expansion(reduce_order(expr, x, t, ys), ys)
+
+        p = expand.(simplify.(-A[end, 1:end]))
+        q = b[end]
+
+        new(x, t, p, q)
     end
 end
 
-function is_linear(eq::Equation, x, t)
-    all(isempty.(get_variables.(sparse_jacobian_ode(eq, x, t), x)))
+function is_linear_ode(expr, x, t)
+    Dt = Differential(t)
+    ys = variables(:𝓎, 1:_get_der_order(expr, x, t))
+    n = _get_der_order(expr, x, t)
+    @assert n >= 1 "ODE must have at least one derivative"
+    
+    y_sub = Dict([[(Dt^i)(x) => ys[i+1] for i=0:n-1]; (Dt^n)(x) => variable(:𝒴)])
+    expr = substitute(expr, y_sub)
+
+    # isolate (Dt^n)(x)
+    f = symbolic_linear_solve(expr, variable(:𝒴), check=false)
+
+    # couldn't isolate
+    if f === nothing
+        return false
+    end
+
+    f = f[1]
+    system = [ys[2:n]; f]
+
+    A, b, islinear = linear_expansion(system, ys)
+    return islinear && all(isempty.(get_variables.(A, x)))
 end
 
 # recursively find highest derivative order in `expr`
@@ -258,16 +249,9 @@ function symbolic_solve_ode(expr::Equation, x, t)
         return bernoulli
     end
 
-    try
+    if is_linear_ode(expr, x, t)
         eq = LinearODE(expr, x, t)
         return symbolic_solve_ode(eq)
-    catch e
-        if e isa AssertionError
-            @warn e
-            return nothing
-        else
-            throw(e)
-        end
     end
 end
 
@@ -512,8 +496,8 @@ function method_of_undetermined_coefficients(eq::LinearODE)
 
     # polynomial
     degree = Symbolics.degree(eq.q, eq.t) # just a starting point
-    𝒶 = Symbolics.variables(:a, 1:degree+1)
-    form = sum(𝒶[n]*eq.t^(n-1) for n = 1:degree+1)
+    a = Symbolics.variables(:𝒶, 1:degree+1)
+    form = sum(a[n]*eq.t^(n-1) for n = 1:degree+1)
     eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
     eq_subbed = eq_subbed.lhs - eq_subbed.rhs
     eq_subbed = expand_derivatives(eq_subbed)
@@ -759,33 +743,32 @@ function _true_factors(expr)
     return convert(Vector{Num}, true_facs)
 end
 
-function sparse_jacobian_ode(eq, x, t)
+"""
+    reduce_order(eq, x, t, ys)
+
+Reduce order of an ODE by substituting variables for derivatives to form a system of first order ODEs
+"""
+function reduce_order(eq, x, t, ys)
     Dt = Differential(t)
     n = _get_der_order(eq, x, t)
     @assert n >= 1 "ODE must have at least one derivative"
     
     # reduction of order
-    y = variables(:y, 1:n)
-    y_sub = Dict([[(Dt^i)(x) => y[i+1] for i=0:n-1]; (Dt^n)(x) => variable(:y, n+1)])
+    y_sub = Dict([[(Dt^i)(x) => ys[i+1] for i=0:n-1]; (Dt^n)(x) => variable(:𝒴)])
     eq = substitute(eq, y_sub)
     
-    if !check_polynomial(eq, strict=false)
-        @warn "Equation is not in a polynomial form"
-        return nothing
-    end
-    
-    f = symbolic_linear_solve(eq, variable(:y, n+1))
+    # isolate (Dt^n)(x)
+    f = symbolic_linear_solve(eq, variable(:𝒴), check=false)
     @assert f !== nothing "Failed to isolate highest order derivative term"
     f = f[1]
-    funcs = [y[2:n]; f]
+    system = [ys[2:n]; f]
 
-    result = sparsejacobian(funcs, y)
-    if all(iszero, result)
-        return result
-    end
+    return system
+end
 
-    rev_y_sub = Dict(val => key for (key, val) in y_sub)
-    sparse_jacobian::SparseMatrixCSC{Num, <:Integer} = substitute.(result, Ref(rev_y_sub))
-    
-    return sparse_jacobian
+function unreduce_order(expr, x, t, ys)
+    Dt = Differential(t)
+    rev_y_sub = Dict(ys[i] => (Dt^(i-1))(x) for i in 1:length(ys))
+
+    return substitute(expr, rev_y_sub)
 end
