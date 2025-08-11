@@ -52,6 +52,8 @@ import OffsetArrays
 @reexport using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
+import SciMLPublic: @public
+
 # re-export
 
 export simplify, substitute
