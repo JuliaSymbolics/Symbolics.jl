@@ -15,6 +15,11 @@ const IndexMap = Dict{Char,Char}(
             '9' => '₉')
 
 abstract type AbstractVariableMetadata end
+"""
+    $TYPEDEF
+
+Symbolic metadata key for storing the default value of a symbolic variable.
+"""
 struct VariableDefaultValue <: AbstractVariableMetadata end
 struct VariableSource <: AbstractVariableMetadata end
 
