@@ -15,7 +15,17 @@ const IndexMap = Dict{Char,Char}(
             '9' => '₉')
 
 abstract type AbstractVariableMetadata end
+"""
+    $TYPEDEF
+
+Symbolic metadata key for storing the default value of a symbolic variable.
+"""
 struct VariableDefaultValue <: AbstractVariableMetadata end
+"""
+    $TYPEDEF
+
+Symbolic metadata key for storing the macro used to create a symbolic variable.
+"""
 struct VariableSource <: AbstractVariableMetadata end
 
 function recurse_and_apply(f, x)
@@ -80,6 +90,19 @@ function unwrap_runtime_var(v)
 end
 
 # Build variables more easily
+"""
+    $(TYPEDSIGNATURES)
+
+Parse variables using the syntax expected by `@variables`. Used for implementing custom
+macros similar to `@variables`. `macroname` refers to the name of the macro creating the
+variables. This is stored in the `VariableSource` metadata of created variables. `type`
+is the default type of created variables. `x` is the tuple of expressions passed to the
+macro. `transform` is an optional function that takes constructed variables and performs
+custom postprocessing to them, returning the created variables. This function returns the
+`Expr` for constructing the parsed variables.
+"""
+parse_vars(macroname, type, x, transform=identity) = _parse_vars(macroname, type, x, transform=identity)
+
 function _parse_vars(macroname, type, x, transform=identity)
     ex = Expr(:block)
     var_names = Symbol[]
@@ -258,6 +281,26 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
     lhs, :($lhs = $rhs)
 end
 
+"""
+    $(TYPEDSIGNATURES)
+
+Define a new metadata key assignable in `@variables`. This function should take `Val{name}`
+where `name` is a `Symbol`, and return the key type for the given metadata name `name`. For
+example,
+
+```julia
+Symbolics.option_to_metadata_type(::Val{:custom_name}) = CustomType
+```
+
+Allows the following syntax:
+
+```julia
+@variables x [custom_name = 1]
+```
+
+And stores `1` as the value associated with the `CustomType` key in the symbolic metadata
+of `x`.
+"""
 function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
@@ -713,6 +756,11 @@ function is_array_of_symbolics(x)
         any(y -> symbolic_type(y) != NotSymbolic() || is_array_of_symbolics(y), x)
 end
 
+"""
+    $(TYPEDSIGNATURES)
+
+Return the array variable that was indexed to obtain symbolic variable `x`.
+"""
 function getparent(x, val=_fail)
     maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
     if maybe_parent !== nothing
