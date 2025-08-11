@@ -540,6 +540,6 @@ export rootfunction, left_continuous_function, right_continuous_function, @regis
 include("discontinuities.jl")
 
 @public Arr, CallWithMetadata, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
-@public _parse_vars
+@public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 
 end # module
