@@ -539,6 +539,6 @@ include("inverse.jl")
 export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
 include("discontinuities.jl")
 
-@public Arr, CallWithMetadata, NAMESPACE_SEPARATOR
+@public Arr, CallWithMetadata, NAMESPACE_SEPARATOR, Unknown
 
 end # module
