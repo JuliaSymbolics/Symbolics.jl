@@ -279,6 +279,26 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
     lhs, :($lhs = $rhs)
 end
 
+"""
+    $(TYPEDSIGNATURES)
+
+Define a new metadata key assignable in `@variables`. This function should take `Val{name}`
+where `name` is a `Symbol`, and return the key type for the given metadata name `name`. For
+example,
+
+```julia
+Symbolics.option_to_metadata_type(::Val{:custom_name}) = CustomType
+```
+
+Allows the following syntax:
+
+```julia
+@variables x [custom_name = 1]
+```
+
+And stores `1` as the value associated with the `CustomType` key in the symbolic metadata
+of `x`.
+"""
 function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
