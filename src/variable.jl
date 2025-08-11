@@ -21,6 +21,11 @@ abstract type AbstractVariableMetadata end
 Symbolic metadata key for storing the default value of a symbolic variable.
 """
 struct VariableDefaultValue <: AbstractVariableMetadata end
+"""
+    $TYPEDEF
+
+Symbolic metadata key for storing the macro used to create a symbolic variable.
+"""
 struct VariableSource <: AbstractVariableMetadata end
 
 function recurse_and_apply(f, x)
