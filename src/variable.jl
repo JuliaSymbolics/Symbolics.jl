@@ -90,6 +90,17 @@ function unwrap_runtime_var(v)
 end
 
 # Build variables more easily
+"""
+    $(TYPEDSIGNATURES)
+
+Parse variables using the syntax expected by `@variables`. Used for implementing custom
+macros similar to `@variables`. `macroname` refers to the name of the macro creating the
+variables. This is stored in the `VariableSource` metadata of created variables. `type`
+is the default type of created variables. `x` is the tuple of expressions passed to the
+macro. `transform` is an optional function that takes constructed variables and performs
+custom postprocessing to them, returning the created variables. This function returns the
+`Expr` for constructing the parsed variables.
+"""
 function _parse_vars(macroname, type, x, transform=identity)
     ex = Expr(:block)
     var_names = Symbol[]
