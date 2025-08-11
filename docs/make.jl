@@ -63,6 +63,7 @@ makedocs(
                 "manual/limits.md",
             ],  
         ],
+        "API Reference" => "manual/api.md",
         "Comparison Against SymPy" => "comparison.md",
     ]
 )
