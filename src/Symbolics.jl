@@ -175,6 +175,9 @@ include("operators.jl")
 include("limits.jl")
 export limit
 
+include("partialfractions.jl")
+export partial_frac_decomposition
+
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
 (::Type{T})(x::SymbolicUtils.Symbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
@@ -219,6 +222,12 @@ include("solver/ia_main.jl")
 include("solver/main.jl")
 include("solver/special_cases.jl")
 export symbolic_solve
+
+# Diff Eq Solver
+include("diffeqs/diffeqs.jl")
+include("diffeqs/systems.jl")
+include("diffeqs/laplace.jl")
+export LinearODE, IVP, symbolic_solve_ode, solve_linear_system, solve_IVP, laplace, inverse_laplace, laplace_solve_ode
 
 # Sympy Functions
 
