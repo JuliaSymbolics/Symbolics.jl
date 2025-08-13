@@ -24,10 +24,21 @@ The analytical solution can be investigated symbolically using `observed(sys)`.
 
 ## Symbolically Solving ODEs
 
-Currently there is no native symbolic ODE solver. Though there are bindings to SymPy
-
 !!! note
     This area is currently under heavy development. More solvers will be available in the near future.
+
+```@docs
+Symbolics.LinearODE
+```
+
+```@docs
+Symbolics.symbolic_solve_ode
+```
+
+### Continuous Dynamical Systems
+```@docs
+Symbolics.solve_linear_system
+```
 
 ### SymPy 
 
