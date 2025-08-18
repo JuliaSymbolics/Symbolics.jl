@@ -46,7 +46,7 @@ struct LinearODE
         A, b, islinear = linear_expansion(reduce_order(expr, x, t, ys), ys)
 
         p = expand.(simplify.(-A[end, 1:end]))
-        q = b[end]
+        q = expand(simplify(b[end]))
 
         new(x, t, p, q)
     end
