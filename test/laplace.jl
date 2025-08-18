@@ -4,7 +4,7 @@ using Symbolics: laplace, inverse_laplace
 import Nemo, Groebner
 
 @variables t, s
-@syms f(t) F(s)
+@syms f(t)::Real F(s)::Real
 
 # https://sites.math.washington.edu/~aloveles/Math307Fall2019/m307LaplacePractice.pdf
 @test isequal(laplace(exp(4t) + 5, f, t, s, F), 1/(s-4) + 5/s)

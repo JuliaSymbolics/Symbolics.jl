@@ -6,6 +6,7 @@ Returns evolution matrix e^(tD)
 evo_mat(D::Matrix{<:Number}, t::Num) = diagm(exp.(t .* diag(D)))
 
 """
+    solve_linear_system(A::Matrix{<:Number}, x0::Vector{<:Number}, t::Num)
 Solve linear continuous dynamical system of differential equations of the form Ax = x' with initial condition x0
 
 # Arguments
@@ -14,7 +15,25 @@ Solve linear continuous dynamical system of differential equations of the form A
 - `t`: independent variable
 
 # Returns
-- vector of symbolic solutions
+vector of symbolic solutions
+
+# Examples
+!!! note uses method `symbolic_solve`, so packages `Nemo` and `Groebner` are often required
+```jldoctest
+julia> @variables t
+1-element Vector{Num}:
+ t
+
+julia> solve_linear_system([1 0; 0 -1], [1, -1], t) # requires Nemo
+2-element Vector{Num}:
+   exp(t)
+ -exp(-t)
+
+julia> solve_linear_system([-3 4; -2 3], [7, 2], t) # requires Groebner
+2-element Vector{Num}:
+ (10//1)*exp(-t) - (3//1)*exp(t)
+  (5//1)*exp(-t) - (3//1)*exp(t)
+```
 """
 function solve_linear_system(A::Matrix{<:Number}, x0::Vector{<:Number}, t::Num)
     # Check A is square

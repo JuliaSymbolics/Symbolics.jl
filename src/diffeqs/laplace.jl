@@ -68,7 +68,7 @@ function laplace(expr, f, t, s, F)
         return Integral(t in ClosedInterval(0, Inf))(expr*exp(-s*t))
     end
     for term in terms
-        factors = _true_factors(term)
+        factors = _true_factors(wrap(term))
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
         if !isempty(constant)
             result += laplace(term / constant[1], f, t, s, F) * constant[1]

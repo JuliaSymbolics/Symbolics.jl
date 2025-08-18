@@ -1,6 +1,3 @@
-using Symbolics
-import Symbolics: value, coeff, sympy_integrate
-
 """
 Represents a linear ordinary differential equation of the form:
 
@@ -36,60 +33,47 @@ struct LinearODE
 
     function LinearODE(expr, x, t)
         if expr isa Equation
-            epxr = expr.lhs - expr.rhs
+            expr = expr.lhs - expr.rhs
         end
 
         expr = expand(simplify(expr))
-        terms = Symbolics.terms(epxr)
-        p::Vector{Num} = []
-        q = 0
-        order = 0
-        for term in terms
-            if isequal(Symbolics.get_variables(term, [x]), [x])
-                facs = _true_factors(term)
-                deriv = filter(fac -> Symbolics.hasderiv(Symbolics.value(fac)), facs)
-                p_n = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
-                if isempty(deriv)
-                    @assert Symbolics.degree(term, x) == 1 "Expected linear term: $term"
-                    if isempty(p)
-                        p = [p_n/x]
-                    else
-                        p[1] = p_n/x
-                    end
-                    continue
-                end
-                
-                @assert length(deriv) == 1 "Expected linear term: $term"
-                n = _get_der_order(deriv[1], x, t)
-                if n+1 > length(p)
-                    append!(p, zeros(Int, n-length(p) + 1))
-                end
-                p[n + 1] = p_n
-                order = max(order, n)
-                
-            elseif isempty(Symbolics.get_variables(term, [x]))
-                q -= term
-            else
-                # throw assertion error for invalid term so it can be easily caught
-                @assert false "Invalid term in LinearODE: $term"
-            end
-        end
-        
-        # normalize leading coefficient to 1
-        leading_coeff = p[order + 1]
-        p = expand.(p .// leading_coeff)
-        q = expand(q // leading_coeff)
 
-        new(x, t, p[1:order], q)
+        @assert is_linear_ode(expr, x, t) "Equation must be linear in $x and $t"
+
+        n = _get_der_order(expr, x, t)
+
+        ys = variables(:𝓎, 1:n)
+        A, b, islinear = linear_expansion(reduce_order(expr, x, t, ys), ys)
+
+        p = expand.(simplify.(-A[end, 1:end]))
+        q = expand(simplify(b[end]))
+
+        new(x, t, p, q)
     end
 end
 
-function _get_der_order(expr, x, t)
-    if isequal(expr, x)
-        return 0
+function is_linear_ode(expr, x, t)
+    Dt = Differential(t)
+    ys = variables(:𝓎, 1:_get_der_order(expr, x, t))
+    n = _get_der_order(expr, x, t)
+    @assert n >= 1 "ODE must have at least one derivative"
+    
+    y_sub = Dict([[(Dt^i)(x) => ys[i+1] for i=0:n-1]; (Dt^n)(x) => variable(:𝒴)])
+    expr = substitute(expr, y_sub)
+
+    # isolate (Dt^n)(x)
+    f = symbolic_linear_solve(expr, variable(:𝒴), check=false)
+
+    # couldn't isolate
+    if f === nothing
+        return false
     end
 
-    return _get_der_order(substitute(expr, Dict(Differential(t)(x) => x)), x, t) + 1
+    f = f[1]
+    system = [ys[2:n]; f]
+
+    A, b, islinear = linear_expansion(system, ys)
+    return islinear && all(isempty.(get_variables.(A, x)))
 end
 
 Dt(eq::LinearODE) = Differential(eq.t)
@@ -138,24 +122,47 @@ function characteristic_polynomial(eq::LinearODE, r)
 end
 
 """
-Symbolically solve a linear ODE
+    symbolic_solve_ode(eq::LinearODE)
+Symbolically solve a linear ordinary differential equation
 
-Cases handled:
-- ☑ first order linear
-- ☑ Clairaut's equation
-- ◩ bernoulli equations
-- ☑ homogeneous with constant coefficients
-- ◩ particular solutions
-    - ☑ ERF + RRF
-    - ☑ complex ERF + RRF to handle sin/cos
-    - ☑ method of undetermined coefficients
-    - ▢ variation of parameters
-- ▢ [Differential transform method](https://www.researchgate.net/publication/267767445_A_New_Algorithm_for_Solving_Linear_Ordinary_Differential_Equations)
-- ▢ Laplace Transform
-- ☑ Expression parsing
+# Arguments
+- eq: a `LinearODE` to solve
 
-Uses methods: [`integrating_factor_solve`](@ref), [`find_homogeneous_solutions`](@ref), [`find_particular_solution`](@ref)
+# Returns
+Symbolic solution to the ODE
 
+# Supported Methods
+- first-order integrating factor
+- constant coefficient homogeneous solutions (can handle repeated and complex characteristic roots)
+- exponential and resonant response formula particular solutions (for any linear combination of `exp`, `sin`, `cos`, or `exp` times `sin` or `cos` (e.g. `e^2t * cos(-t) + e^-3t + sin(5t))`)
+- method of undetermined coefficients particular solutions
+- linear combinations of above particular solutions
+
+# Examples
+
+```jldoctest
+julia> using Symbolics; import Nemo, SymPy
+
+julia> @variables x, t
+2-element Vector{Num}:
+ x
+ t
+
+# Integrating Factor (note that SymPy is required for integration)
+julia> symbolic_solve_ode(LinearODE(x, t, [5/t], 7t))
+(C₁ + t^7) / (t^5)
+
+# Constant Coefficients and RRF (note that Nemo is required to find characteristic roots)
+julia> symbolic_solve_ode(LinearODE(x, t, [9, -6], 4exp(3t)))
+C₁*exp(3t) + C₂*t*exp(3t) + (2//1)*(t^2)*exp(3t)
+
+julia> symbolic_solve_ode(LinearODE(x, t, [6, 5], 2exp(-t)*cos(t)))
+C₁*exp(-2t) + C₂*exp(-3t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
+
+# Method of Undetermined Coefficients
+julia> symbolic_solve_ode(LinearODE(x, t, [-3, 2], 2t - 5))
+(11//9) - (2//3)*t + C₁*exp(t) + C₂*exp(-3t)
+```
 """
 function symbolic_solve_ode(eq::LinearODE)
     homogeneous_solutions = find_homogeneous_solutions(eq)
@@ -174,6 +181,46 @@ function symbolic_solve_ode(eq::LinearODE)
     end
 end
 
+"""
+    symbolic_solve_ode(expr::Equation, x, t)
+Symbolically solve an ODE
+
+# Arguments
+- expr: a symbolic ODE
+- x: dependent variable
+- t: independent variable
+
+# Supported Methods
+- all methods of solving linear ODEs mentioend for `symbolic_solve_ode(eq::LinearODE)`
+- Clairaut's equation
+- Bernoulli equations
+
+# Examples
+
+```jldoctest
+julia> using Symbolics; import Nemo
+
+julia> @variables x, t
+2-element Vector{Num}:
+ x
+ t
+
+julia> Dt = Differential(t)
+Differential(t)
+
+# LinearODE (via constant coefficients and RRF)
+julia> symbolic_solve_ode(9t*x - 6*Dt(x) ~ 4exp(3t), x, t)
+C₁*exp(3t) + C₂*t*exp(3t) + (2//1)*(t^2)*exp(3t)
+
+# Clairaut's equation
+julia> symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t)
+C₁*t - (C₁^3)
+
+# Bernoulli equations
+julia> symbolic_solve_ode(Dt(x) + (4//t)*x ~ t^3 * x^2, x, t)
+1 / (C₁*(t^4) - (t^4)*log(t))
+```
+"""
 function symbolic_solve_ode(expr::Equation, x, t)
     clairaut = solve_clairaut(expr, x, t)
     if clairaut !== nothing
@@ -185,16 +232,9 @@ function symbolic_solve_ode(expr::Equation, x, t)
         return bernoulli
     end
 
-    try
+    if is_linear_ode(expr, x, t)
         eq = LinearODE(expr, x, t)
         return symbolic_solve_ode(eq)
-    catch e
-        if e isa AssertionError
-            @warn e
-            return nothing
-        else
-            throw(e)
-        end
     end
 end
 
@@ -248,9 +288,9 @@ Returns homogeneous solutions to linear ODE `eq` with constant coefficients
 xₕ(t) = C₁e^(r₁t) + C₂e^(r₂t) + ... + Cₙe^(rₙt)
 """
 function const_coeff_solve(eq::LinearODE)
-    @variables r
-    p = characteristic_polynomial(eq, r)
-    roots = symbolic_solve(p, r, dropmultiplicity = false)
+    @variables 𝓇
+    p = characteristic_polynomial(eq, 𝓇)
+    roots = symbolic_solve(p, 𝓇, dropmultiplicity = false)
 
     # Handle complex + repeated roots
     solutions = exp.(roots * eq.t)
@@ -288,8 +328,8 @@ function integrating_factor_solve(eq::LinearODE)
         v = exp(sympy_integrate(p, eq.t))
     end
     solution = (1 / v) * ((isequal(eq.q, 0) ? 0 : sympy_integrate(eq.q * v, eq.t)) + eq.C[1])
-    @variables Integral
-    if !isempty(Symbolics.get_variables(solution, Integral))
+
+    if !isempty(Symbolics.get_variables(solution, variable(:Integral)))
         return nothing
     end
     return expand(Symbolics.sympy_simplify(solution))
@@ -338,21 +378,6 @@ function get_rrf_coeff(q, t)
     return a, r
 end
 
-function _parse_trig(expr, t)
-    parse_sin = Symbolics.Chain([(@rule sin(t) => 1), (@rule sin(~x * t) => ~x)])
-    parse_cos = Symbolics.Chain([(@rule cos(t) => 1), (@rule cos(~x * t) => ~x)])
-
-    if !isequal(parse_sin(expr), expr)
-        return parse_sin(expr), true
-    end
-
-    if !isequal(parse_cos(expr), expr)
-        return parse_cos(expr), false
-    end
-
-    return nothing
-end
-
 """
 For finding particular solution when q(t) = a*e^(rt)*cos(bt) (or sin(bt))
 """
@@ -384,8 +409,18 @@ function exp_trig_particular_solution(eq::LinearODE)
         return nothing
     end
 
-    combined_eq = LinearODE(eq.x, eq.t, eq.p, a * exp((r + b * im)eq.t))
-    rrf = resonant_response_formula(combined_eq)
+    # do complex rrf
+    # figure out how many times p needs to be differentiated before denominator isn't 0
+    k = 0
+    @variables 𝓈
+    p = characteristic_polynomial(eq, 𝓈)
+    Ds = Differential(𝓈)
+    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)), 0)
+        k += 1
+    end
+
+    rrf = expand(simplify(a * exp((r + b * im) * eq.t) * eq.t^k /
+                           (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
 
     return is_sin ? imag(rrf) : real(rrf)
 end
@@ -409,15 +444,15 @@ function resonant_response_formula(eq::LinearODE)
 
     # figure out how many times p needs to be differentiated before denominator isn't 0
     k = 0
-    @variables s
-    p = characteristic_polynomial(eq, s)
-    Ds = Differential(s)
-    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(s => r)), 0)
+    @variables 𝓈
+    p = characteristic_polynomial(eq, 𝓈)
+    Ds = Differential(𝓈)
+    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)), 0)
         k += 1
     end
 
     return expand(simplify(a * exp(r * eq.t) * eq.t^k /
-                           (substitute(expand_derivatives((Ds^k)(p)), Dict(s => r)))))
+                           (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)))))
 end
 
 function method_of_undetermined_coefficients(eq::LinearODE)
@@ -429,28 +464,31 @@ function method_of_undetermined_coefficients(eq::LinearODE)
 
     # polynomial
     degree = Symbolics.degree(eq.q, eq.t) # just a starting point
-    a = Symbolics.variables(:a, 1:degree+1)
+    a = Symbolics.variables(:𝒶, 1:degree+1)
     form = sum(a[n]*eq.t^(n-1) for n = 1:degree+1)
     eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+    eq_subbed = eq_subbed.lhs - eq_subbed.rhs
     eq_subbed = expand_derivatives(eq_subbed)
+    
     try
-        coeff_solution = symbolic_solve(eq_subbed, length(a) == 1 ? a[1] : a)
+        coeff_solution = solve_interms_ofvar(eq_subbed, eq.t)
     catch
         coeff_solution = nothing
     end
-    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution)
+    
+    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution) && isequal(expand(substitute(eq_subbed, coeff_solution[1])), 0)
         return substitute(form, coeff_solution[1])
     end
 
     # exponential
-    @variables a
+    @variables 𝒶
     coeff = get_rrf_coeff(eq.q, eq.t)
     if coeff !== nothing
         r = coeff[2]
-        form = a*exp(r*eq.t)
+        form = 𝒶*exp(r*eq.t)
         eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
-        coeff_solution = symbolic_solve(eq_subbed, a)
+        coeff_solution = symbolic_solve(eq_subbed, 𝒶)
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
             return substitute(form, coeff_solution[1])
@@ -459,37 +497,27 @@ function method_of_undetermined_coefficients(eq::LinearODE)
 
     # sin and cos
     # this is a hacky way of doing things
-    @variables a, b
-    @variables cs, sn
+    @variables 𝒶, 𝒷
+    @variables 𝒸𝓈, 𝓈𝓃
     parsed = _parse_trig(_true_factors(eq.q)[end], eq.t)
     if parsed !== nothing
         ω = parsed[1]
-        form = a*cos(ω*eq.t) + b*sin(ω*eq.t)
+        form = 𝒶*cos(ω*eq.t) + 𝒷*sin(ω*eq.t)
         eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
-        eq_subbed = expand(substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>cs, sin(ω*eq.t)=>sn)))
-        cos_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, cs)), terms(eq_subbed)))/cs)
-        sin_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, sn)), terms(eq_subbed)))/sn)
-        if !isempty(Symbolics.get_variables(cos_eq, [eq.t,sn,cs])) || !isempty(Symbolics.get_variables(sin_eq, [eq.t,sn,cs]))
+        eq_subbed = expand(substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>𝒸𝓈, sin(ω*eq.t)=>𝓈𝓃)))
+        cos_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, 𝒸𝓈)), terms(eq_subbed)))/𝒸𝓈)
+        sin_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, 𝓈𝓃)), terms(eq_subbed)))/𝓈𝓃)
+        if !isempty(Symbolics.get_variables(cos_eq, [eq.t,𝓈𝓃,𝒸𝓈])) || !isempty(Symbolics.get_variables(sin_eq, [eq.t,𝓈𝓃,𝒸𝓈]))
             coeff_solution = nothing
         else
-            coeff_solution = symbolic_solve([cos_eq, sin_eq], [a,b])
+            coeff_solution = symbolic_solve([cos_eq, sin_eq], [𝒶,𝒷])
         end
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
             return substitute(form, coeff_solution[1])
         end
     end
-end
-
-function is_solution(solution, eq)
-    if solution === nothing
-        return false
-    end
-
-    expr = substitute(get_expression(eq), Dict(eq.x => solution))
-    expr = expand(expand_derivatives(expr.lhs - expr.rhs))
-    return isequal(expr, 0)
 end
 
 """
@@ -504,7 +532,6 @@ struct IVP
         new(eq, initial_conditions)
     end
 end
-
 
 function solve_IVP(ivp::IVP)
     general_solution = symbolic_solve_ode(ivp.eq)
@@ -592,11 +619,15 @@ function linearize_bernoulli(expr, x, t, v)
         if Symbolics.hasderiv(Symbolics.value(term))
             facs = _true_factors(term)
             leading_coeff = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
-            @assert _get_der_order(term//leading_coeff, x, t) == 1 "Expected linear term in $term"
+            if _get_der_order(term//leading_coeff, x, t) != 1
+                return nothing
+            end
         elseif !isempty(Symbolics.get_variables(term, [x]))
             facs = _true_factors(term)
             x_fac = filter(fac -> !isempty(Symbolics.get_variables(fac, [x])), facs)
-            @assert length(x_fac) == 1 "Expected linear term in $term"
+            if length(x_fac) != 1
+                return nothing
+            end
 
             if isequal(x_fac[1], x)
                 p = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs))
@@ -617,8 +648,13 @@ end
 Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n
 """
 function solve_bernoulli(expr, x, t)
-    @variables v
-    eq, n = linearize_bernoulli(expr, x, t, v)
+    @variables 𝓋
+    linearized = linearize_bernoulli(expr, x, t, 𝓋)
+    if linearized === nothing
+        return nothing
+    end
+
+    eq, n = linearized
 
     solution = symbolic_solve_ode(eq)
     if solution === nothing
@@ -632,8 +668,8 @@ end
 Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n with initial condition x(0) = x0
 """
 function solve_bernoulli(expr, x, t, x0)
-    @variables v
-    eq, n = linearize_bernoulli(expr, x, t, v)
+    @variables 𝓋
+    eq, n = linearize_bernoulli(expr, x, t, 𝓋)
 
     v0 = x0^(1-n) # convert initial condition from x(0) to v(0)
 
@@ -644,22 +680,4 @@ function solve_bernoulli(expr, x, t, x0)
     end
 
     return symbolic_solve(solution ~ x^(1-n), x)
-end
-
-# takes into account fractions
-function _true_factors(expr)
-    facs = factors(expr)
-    true_facs::Vector{Num} = []
-    frac_rule = @rule (~x)/(~y) => [~x, 1/~y]
-    for fac in facs
-        frac = frac_rule(fac)
-        if frac !== nothing && !isequal(frac[1], 1)
-            append!(true_facs, _true_factors(frac[1]))
-            append!(true_facs, _true_factors(frac[2]))
-        else
-            push!(true_facs, wrap(fac))
-        end
-    end
-
-    return true_facs
 end
