@@ -69,3 +69,14 @@ result = sympy_simplify(expr)
 # ode = D(f) - 2*f
 # sol_ode = sympy_ode_solve(ode, f, x)
 # @test isequal(sol_ode, Symbolics.parse("C1*exp(2*x)", Dict("f"=>f, "x"=>x)))
+@variables x, t
+Dt = Differential(t)
+
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [5/t], 7t)), Symbolics.sympy_simplify(C[1]*t^(-5) + t^2))
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [cos(t)], cos(t))), 1 + C[1]*exp(-sin(t)))
+@test isequal(symbolic_solve_ode(LinearODE(x, t, [-(1+t)], 1+t)), Symbolics.expand(Symbolics.sympy_simplify(C[1]*exp((1//2)t^2 + t) - 1)))
+# SymPy is being weird and not simplifying correctly (and some symbols are wrong, like pi and erf being syms), but these otherwise work
+@test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [-2t], 1)), Symbolics.sympy_simplify(exp(t^2)*sqrt(Symbolics.variable(:pi))*erf(t)/2 + C[1]*exp(t^2)))
+
+## Bernoulli equations
+@test isequal(symbolic_solve_ode(Dt(x) + (4//t)*x ~ t^3 * x^2, x, t), 1/(C[1]t^4 - t^4 * log(t)))
