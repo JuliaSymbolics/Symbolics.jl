@@ -21,7 +21,7 @@ Symbolics.Integral
 Symbolics.jl currently has the following options for solving integrals symbolically:
 
 | Option    | Description | Pros | Cons |
-| -------- | ------- | ------- |
+| -------- | ------- | ------- | ------- |
 | SymbolicNumericIntegration.jl  | Uses numeric integrators with symbolic regression machine learning methods | Can solve some hard integrals very fast and easily | Can be unreliable in easy cases, will give floats (0.5) instead of rational values (1//2) |
 | SymPy's Integrate | Uses SymPy (through SymPy.jl) to integrate the expression | Reasonably robust and tested solution | Extremely slow |
 

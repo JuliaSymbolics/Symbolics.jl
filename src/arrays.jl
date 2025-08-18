@@ -750,6 +750,12 @@ eval_array_term(op::typeof(inv), arr) = inv(scalarize(wrap(arguments(arr)[1]))) 
 eval_array_term(op::Arr) = wrap(eval_array_term(unwrap(op)))
 eval_array_term(op) = eval_array_term(operation(op), op)
 
+"""
+    $(TYPEDSIGNATURES)
+
+Replace all occurrences of array symbolics (variables and subexpressions) in expression
+`arr` with scalarized variants.
+"""
 function scalarize(arr)
     if arr isa Arr || arr isa Symbolic{<:AbstractArray}
         if iscall(arr)

@@ -52,6 +52,8 @@ import OffsetArrays
 @reexport using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
+import SciMLPublic: @public
+
 # re-export
 
 export simplify, substitute
@@ -378,6 +380,146 @@ function sympy_ode_solve end
 export symbolics_to_sympy, sympy_to_symbolics
 export sympy_linear_solve, sympy_algebraic_solve, sympy_integrate, sympy_limit, sympy_simplify,sympy_ode_solve
 
+"""
+    symbolics_to_sympy_pythoncall(expr)
+Converts a Symbolics expression to SymPyPythonCall.
+For conversion back to Symbolics, see `sympy_pythoncall_to_symbolics`.
+# Arguments
+- `expr`: Symbolics expression.
+# Example
+```julia
+@variables x
+expr = x^2 + 1
+sympy_expr = symbolics_to_sympy_pythoncall(expr)
+```
+"""
+function symbolics_to_sympy_pythoncall end
+
+"""
+    sympy_pythoncall_to_symbolics(sympy_expr, vars)
+Converts a SymPyPythonCall expression to Symbolics.jl.
+# Arguments
+- `sympy_expr`: SymPyPythonCall expression.
+- `vars`: List or dictionary of Symbolics variables.
+# Example
+```julia
+@variables x y
+# Assuming sympy_expr is a SymPyPythonCall expression
+symbolics_expr = sympy_pythoncall_to_symbolics(sympy_expr, [x, y])
+```
+"""
+function sympy_pythoncall_to_symbolics end
+
+"""
+    sympy_pythoncall_linear_solve(A, b)
+Solves linear system Ax = b using SymPyPythonCall.
+# Arguments
+- `A`: Matrix of Symbolics expressions.
+- `b`: Vector of Symbolics expressions.
+# Returns
+Vector of Symbolics solutions.
+# Example
+```julia
+@variables x y
+A = [1 2; 3 4]
+b = [x, y]
+sol = sympy_pythoncall_linear_solve(A, b)
+```
+"""
+function sympy_pythoncall_linear_solve end
+
+"""
+    sympy_pythoncall_algebraic_solve(expr, var)
+Solves algebraic equations using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression or vector of expressions.
+- `var`: Variable or vector of variables to solve for.
+# Returns
+Symbolics solution(s).
+# Example
+```julia
+@variables x y
+expr = x^2 - 4
+sol = sympy_pythoncall_algebraic_solve(expr, x)  # Returns [2, -2]
+eqs = [x^2 + y^2 - 2, x - y]
+sol = sympy_pythoncall_algebraic_solve(eqs, [x, y])  # Returns [{x=>1, y=>1}, {x=>-1, y=>-1}]
+```
+"""
+function sympy_pythoncall_algebraic_solve end
+
+"""
+    sympy_pythoncall_integrate(expr, var)
+Performs symbolic integration using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression to integrate.
+- `var`: Variable of integration.
+# Returns
+Symbolics expression representing the integral.
+# Example
+```julia
+@variables x
+expr = x^2
+result = sympy_pythoncall_integrate(expr, x)
+```
+"""
+function sympy_pythoncall_integrate end
+
+"""
+    sympy_pythoncall_limit(expr, var, val)
+Computes symbolic limits using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression.
+- `var`: Variable approaching the limit.
+- `val`: Value the variable approaches.
+# Returns
+Symbolics expression representing the limit.
+# Example
+```julia
+@variables x
+expr = sin(x)/x
+result = sympy_pythoncall_limit(expr, x, 0)
+```
+"""
+function sympy_pythoncall_limit end
+
+"""
+    sympy_pythoncall_simplify(expr)
+Simplifies symbolic expressions using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression to simplify.
+# Returns
+Simplified Symbolics expression.
+# Example
+```julia
+@variables x
+expr = (x^2 - 1)/(x - 1)
+result = sympy_pythoncall_simplify(expr)
+```
+"""
+function sympy_pythoncall_simplify end
+
+"""
+    sympy_pythoncall_ode_solve(expr, func, var)
+Solves ordinary differential equations using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression representing the ODE.
+- `func`: Function to solve for.
+- `var`: Independent variable.
+# Returns
+Symbolics solution(s).
+# Example
+```julia
+@variables x
+@syms f(x)
+expr = Symbolics.Derivative(f, x) - 2*f
+sol = sympy_pythoncall_ode_solve(expr, f, x)  # Returns C1*exp(2*x)
+```
+"""
+function sympy_pythoncall_ode_solve end
+
+export symbolics_to_sympy_pythoncall, sympy_pythoncall_to_symbolics
+export sympy_pythoncall_linear_solve, sympy_pythoncall_algebraic_solve, sympy_pythoncall_integrate, sympy_pythoncall_limit, sympy_pythoncall_simplify, sympy_pythoncall_ode_solve
+
 function __init__()
     Base.Experimental.register_error_hint(TypeError) do io, exc
         if exc.expected == Bool && exc.got isa Num
@@ -402,5 +544,10 @@ include("inverse.jl")
 
 export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
 include("discontinuities.jl")
+
+@public Arr, CallWithMetadata, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
+@public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
+@public get_variables, get_variables!, getparent, option_to_metadata_type, scalarize, shape
+@public unwrap, variable, wrap
 
 end # module
