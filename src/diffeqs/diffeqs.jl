@@ -317,7 +317,7 @@ function const_coeff_solve(eq::LinearODE)
 end
 
 """
-Solve almost any first order ODE using an integrating factor
+Solve almost any first order ODE using an integrating factor. Requires SymPy!
 """
 function integrating_factor_solve(eq::LinearODE)
     p = eq.p[1] # only p
@@ -645,7 +645,7 @@ function linearize_bernoulli(expr, x, t, v)
 end
 
 """
-Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n
+Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n. May require SymPy to solve using integrating factor
 """
 function solve_bernoulli(expr, x, t)
     @variables 𝓋

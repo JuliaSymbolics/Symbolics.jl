@@ -356,10 +356,10 @@ function coeff(p, sym=nothing)
     elseif ismul(p)
         args = arguments(p)
         coeffs = map(a->coeff(a, sym), args)
-        if all(iszero, coeffs)
+        if all(_iszero, coeffs)
             return 0
         else
-            @views prod(Iterators.flatten((coeffs[findall(!iszero, coeffs)], args[findall(iszero, coeffs)])))
+            @views prod(Iterators.flatten((coeffs[findall(!_iszero, coeffs)], args[findall(_iszero, coeffs)])))
         end
     elseif isdiv(p)
         numerator, denominator = arguments(p)

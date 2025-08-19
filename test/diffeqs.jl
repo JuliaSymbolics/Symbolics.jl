@@ -1,6 +1,6 @@
 using Symbolics
 using Symbolics: solve_linear_system, LinearODE, has_const_coeffs, to_homogeneous, symbolic_solve_ode, find_particular_solution, IVP, solve_IVP
-using Groebner, Nemo, SymPy
+using Groebner, Nemo
 using Test
 
 @variables x, y, t
@@ -36,12 +36,7 @@ C = Symbolics.variables(:C, 1:5)
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [-1], 0)), C[1]*exp(t))
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [-4, 3], 0)), C[1]*exp(-4t) + C[2]*exp(t))
 
-## first order
-@test isequal(symbolic_solve_ode(LinearODE(x, t, [5/t], 7t)), Symbolics.sympy_simplify(C[1]*t^(-5) + t^2))
-@test isequal(symbolic_solve_ode(LinearODE(x, t, [cos(t)], cos(t))), 1 + C[1]*exp(-sin(t)))
-@test isequal(symbolic_solve_ode(LinearODE(x, t, [-(1+t)], 1+t)), Symbolics.expand(Symbolics.sympy_simplify(C[1]*exp((1//2)t^2 + t) - 1)))
-# SymPy is being weird and not simplifying correctly (and some symbols are wrong, like pi and erf being syms), but these otherwise work
-@test_broken isequal(symbolic_solve_ode(LinearODE(x, t, [-2t], 1)), Symbolics.sympy_simplify(exp(t^2)*sqrt(Symbolics.variable(:pi))*erf(t)/2 + C[1]*exp(t^2)))
+## first order (solving via integrating factor can be found in test/sympy.jl)
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [1], 2sin(t))), C[1]*exp(-t) + sin(t) - cos(t))
 
 ## repeated characteristic roots
@@ -77,6 +72,5 @@ Dt = Symbolics.Differential(t)
 @test isequal(symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t), C[1]*t - C[1]^3)
 @test isequal(symbolic_solve_ode(x ~ Dt(x)*t + (Dt(x))^2 - sin(Dt(x)) + 2, x, t), C[1]*t + C[1]^2 - sin(C[1]) + 2)
 
-## Bernoulli equations
+## Bernoulli equations (integrating factor solve in test/sympy.jl)
 @test isequal(symbolic_solve_ode(Dt(x) - 5x ~ exp(-2t)*x^(-2), x, t), (C[1]exp(15t) - (3//17)exp(-2t))^(1//3))
-@test isequal(symbolic_solve_ode(Dt(x) + (4//t)*x ~ t^3 * x^2, x, t), 1/(C[1]t^4 - t^4 * log(t)))

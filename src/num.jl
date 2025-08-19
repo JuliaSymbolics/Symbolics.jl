@@ -1,5 +1,5 @@
 @symbolic_wrap struct Num <: Real
-    val
+    val::Any
 end
 
 const RCNum = Union{Num, Complex{Num}}
@@ -16,15 +16,13 @@ Num
 const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
-(n::Num)(args...) = Num(value(n)(map(value,args)...))
+(n::Num)(args...) = Num(value(n)(map(value, args)...))
 value(x) = unwrap(x)
 
-SymbolicUtils.@number_methods(
-                              Num,
-                              Num(f(value(a))),
-                              Num(f(value(a), value(b))),
-                              [conj, real, transpose]
-                             )
+SymbolicUtils.@number_methods(Num,
+    Num(f(value(a))),
+    Num(f(value(a), value(b))),
+    [conj, real, transpose])
 Base.conj(x::Num) = x
 Base.transpose(x::Num) = x
 
@@ -33,16 +31,17 @@ Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
 
-Base.ifelse(x::Num,y,z) = Num(ifelse(value(x), value(y), value(z)))
+Base.ifelse(x::Num, y, z) = Num(ifelse(value(x), value(y), value(z)))
 
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
 for C in [Complex, Complex{Bool}]
     @eval begin
         Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
         Base.:*(z::$C, x::Num) = Complex(real(z) * x, imag(z) * x)
-        Base.:/(x::Num, z::$C) = let (a, b) = reim(z), den = a^2 + b^2
-            Complex(x * a / den, -x * b / den)
-        end
+        Base.:/(x::Num, z::$C) =
+            let (a, b) = reim(z), den = a^2 + b^2
+                Complex(x * a / den, -x * b / den)
+            end
         Base.:/(z::$C, x::Num) = Complex(real(z) / x, imag(z) / x)
         Base.:+(x::Num, z::$C) = Complex(x + real(z), imag(z))
         Base.:+(z::$C, x::Num) = Complex(real(z) + x, imag(z))
@@ -86,7 +85,7 @@ function subrules_to_dict(pairs)
     if pairs isa Pair
         pairs = (pairs,)
     end
-    return Dict(_unwrap_callwithmeta(k) => value(v)  for (k, v) in pairs)
+    return Dict(_unwrap_callwithmeta(k) => value(v) for (k, v) in pairs)
 end
 function substituter(pairs)
     dict = subrules_to_dict(pairs)
@@ -101,17 +100,21 @@ Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
 
 import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
 
-Base.show(io::IO, n::Num) = show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
+function Base.show(io::IO, n::Num)
+    show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
+end
 
 Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{<:Symbolic{<:Number}}, ::Type{<:Num}) = Num
 function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
     if f === :op
-        Base.depwarn("`x.op` is deprecated, use `operation(x)` instead", :getproperty, force=true)
+        Base.depwarn(
+            "`x.op` is deprecated, use `operation(x)` instead", :getproperty)
         operation(t)
     elseif f === :args
-        Base.depwarn("`x.args` is deprecated, use `arguments(x)` instead", :getproperty, force=true)
+        Base.depwarn("`x.args` is deprecated, use `arguments(x)` instead",
+            :getproperty)
         arguments(t)
     else
         getfield(t, f)
@@ -127,7 +130,7 @@ for T in (Integer, Rational)
     @eval Base.:(^)(n::Num, i::$T) = Num(value(n)^i)
 end
 
-macro num_method(f, expr, Ts=nothing)
+macro num_method(f, expr, Ts = nothing)
     if Ts === nothing
         Ts = [Any]
     else
@@ -139,7 +142,8 @@ macro num_method(f, expr, Ts=nothing)
     ms = [quote
               $f(a::$T, b::$Num) = $expr
               $f(a::$Num, b::$T) = $expr
-          end for T in Ts]
+          end
+          for T in Ts]
     quote
         $f(a::$Num, b::$Num) = $expr
         $(ms...)
@@ -147,12 +151,13 @@ macro num_method(f, expr, Ts=nothing)
 end
 
 # Boolean operations
-for (f, Domain) in [:(==) => :((AbstractFloat, Number)), :(!=) => :((AbstractFloat, Number)),
-                    :(<=) => :((Real,)),   :(>=) => :((Real,)),
-                    :(isless) => :((Real, AbstractFloat)),
-                    :(<) => :((Real,)),   :(> ) => :((Real,)),
-                    :(& )=> :((Bool,)),  :(| ) => :((Bool,)),
-                    :xor => :((Bool,))]
+for (f, Domain) in
+    [:(==) => :((AbstractFloat, Number)), :(!=) => :((AbstractFloat, Number)),
+    :(<=) => :((Real,)), :(>=) => :((Real,)),
+    :(isless) => :((Real, AbstractFloat)),
+    :(<) => :((Real,)), :(>) => :((Real,)),
+    :(&) => :((Bool,)), :(|) => :((Bool,)),
+    :xor => :((Bool,))]
     @eval @num_method Base.$f (val = $f(value(a), value(b)); val isa Bool ? val : Num(val)) $Domain
 end
 
@@ -160,14 +165,75 @@ for f in [:!, :~]
     @eval Base.$f(x::Num) = (val = $f(value(x)); val isa Bool ? val : Num(val))
 end
 @num_method Base.isequal begin
-  va = value(a)
-  vb = value(b)
-  if va isa SymbolicUtils.BasicSymbolic{Real} && vb isa SymbolicUtils.BasicSymbolic{Real}
-    isequal(va, vb)::Bool
-  else
-    isequal(va, vb)::Bool
-  end
+    va = value(a)
+    vb = value(b)
+    if va isa SymbolicUtils.BasicSymbolic{Real} && vb isa SymbolicUtils.BasicSymbolic{Real}
+        isequal(va, vb)::Bool
+    else
+        isequal(va, vb)::Bool
+    end
 end (AbstractFloat, Number, Symbolic)
+
+# Provide better error message for symbolic variables in ranges
+function Base.:(:)(a::Integer, b::Num)
+    error("""
+Array bounds must be concrete (non-symbolic) values.
+
+You attempted to create a range like $a:$b where '$b' is a symbolic variable.
+
+This error commonly occurs when trying to create array variables with symbolic dimensions:
+
+@variables n
+@variables X[1:n]  # Error: n is symbolic
+
+To fix this:
+1. Use concrete numbers for array bounds: @variables X[1:10]
+2. If you need variable-sized arrays, consider creating individual variables 
+   or use symbolic indexing at runtime rather than at declaration time
+
+For more information about array variables, see the Symbolics.jl documentation.
+""")
+end
+
+function Base.:(:)(a::Num, b::Integer)
+    error("""
+Array bounds must be concrete (non-symbolic) values.
+
+You attempted to create a range like $a:$b where '$a' is a symbolic variable.
+
+This error commonly occurs when trying to create array variables with symbolic dimensions:
+
+@variables n
+@variables X[n:10]  # Error: n is symbolic
+
+To fix this:
+1. Use concrete numbers for array bounds: @variables X[1:10]
+2. If you need variable-sized arrays, consider creating individual variables 
+   or use symbolic indexing at runtime rather than at declaration time
+
+For more information about array variables, see the Symbolics.jl documentation.
+""")
+end
+
+function Base.:(:)(a::Num, b::Num)
+    error("""
+Array bounds must be concrete (non-symbolic) values.
+
+You attempted to create a range like $a:$b where both '$a' and '$b' are symbolic variables.
+
+This error commonly occurs when trying to create array variables with symbolic dimensions:
+
+@variables n m
+@variables X[n:m]  # Error: both n and m are symbolic
+
+To fix this:
+1. Use concrete numbers for array bounds: @variables X[1:10]
+2. If you need variable-sized arrays, consider creating individual variables 
+   or use symbolic indexing at runtime rather than at declaration time
+
+For more information about array variables, see the Symbolics.jl documentation.
+""")
+end
 
 Base.to_index(x::Num) = Base.to_index(value(x))
 
@@ -177,10 +243,15 @@ Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
 Base.convert(::Type{Num}, x::Number) = Num(x)
 Base.convert(::Type{Num}, x::Num) = x
 
-Base.convert(::Type{T}, x::AbstractArray{Num}) where T <: Array{Num} = T(map(Num, x))
-Base.convert(::Type{Sym}, x::Num) = value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
+Base.convert(::Type{T}, x::AbstractArray{Num}) where {T <: Array{Num}} = T(map(Num, x))
+function Base.convert(::Type{Sym}, x::Num)
+    value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
+end
 
-LinearAlgebra.lu(x::Union{Adjoint{<:RCNum},Transpose{<:RCNum},Array{<:RCNum}}; check=true, kw...) = sym_lu(x; check=check)
+function LinearAlgebra.lu(
+        x::Union{Adjoint{<:RCNum}, Transpose{<:RCNum}, Array{<:RCNum}}; check = true, kw...)
+    sym_lu(x; check = check)
+end
 
 _iszero(x::Number) = iszero(x)
 _isone(x::Number) = isone(x)
@@ -195,9 +266,8 @@ Code.cse(x::Num) = Code.cse(unwrap(x))
 # This method makes the docstring show all entries in the metadata dict associated with an instance of Num
 function Base.Docs.getdoc(x::Num)
     x = unwrap(x)
-    strings =
-        ["A variable of type Symbolics.Num (Num wraps anything in a type that is a subtype of Real)";
-        "# Metadata"]
+    strings = ["A variable of type Symbolics.Num (Num wraps anything in a type that is a subtype of Real)";
+               "# Metadata"]
     for (key, val) in collect(pairs(x.metadata))
         push!(strings, string(string(key), ": ", string(val)))
     end

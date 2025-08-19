@@ -1,0 +1,5 @@
+[deps]
+SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
+Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

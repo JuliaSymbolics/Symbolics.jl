@@ -22,6 +22,8 @@ jobs:
           - GroebnerExt
           - LuxExt
           - SymPy
+          - SymPyPythonCall
+          - D3TreesExt
         version:
           - '1'
     steps:

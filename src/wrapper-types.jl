@@ -41,8 +41,18 @@ macro symbolic_wrap(expr)
 end
 
 iswrapped(x) = false
+"""
+    $(TYPEDSIGNATURES)
+
+Return the symbolic or non-symbolic value wrapped by a type such as `Num`.
+"""
 unwrap(x) = x
 
+"""
+    $(TYPEDSIGNATURES)
+
+Wrap the symbolic or non-symbolic value `x` in the appropriate wrapper type.
+"""
 function wrap(x)
     T = SymbolicUtils.symtype(x)
     Symbolics.has_symwrapper(T) ?

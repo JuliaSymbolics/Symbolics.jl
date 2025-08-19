@@ -208,3 +208,11 @@ In general, any scalar expression which is derived from array expressions can be
 ```julia
 Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
 ```
+
+## Array API Reference
+
+```@docs
+Symbolics.Arr
+Symbolics.scalarize
+Symbolics.shape
+```
