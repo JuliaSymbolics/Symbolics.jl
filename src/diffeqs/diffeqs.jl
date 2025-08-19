@@ -191,7 +191,7 @@ Symbolically solve an ODE
 - t: independent variable
 
 # Supported Methods
-- all methods of solving linear ODEs mentioend for `symbolic_solve_ode(eq::LinearODE)`
+- all methods of solving linear ODEs mentioned for `symbolic_solve_ode(eq::LinearODE)`
 - Clairaut's equation
 - Bernoulli equations
 
