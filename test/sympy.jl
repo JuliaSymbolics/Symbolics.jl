@@ -82,7 +82,8 @@ canonical_sol_ode = Symbolics.substitute(sol_ode, Dict(const_sym => C1))
 
 ## Native ODE solver, but using sympy_integrate
 @variables x, t
-Dt = Differential(t)
+Dt = Symbolics.Differential(t)
+C = Symbolics.variables(:C, 1:5)
 
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [5/t], 7t)), Symbolics.sympy_simplify(C[1]*t^(-5) + t^2))
 @test isequal(symbolic_solve_ode(LinearODE(x, t, [cos(t)], cos(t))), 1 + C[1]*exp(-sin(t)))
