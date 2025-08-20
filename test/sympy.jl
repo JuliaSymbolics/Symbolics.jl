@@ -93,6 +93,7 @@ C = Symbolics.variables(:C, 1:5)
 
 ## Bernoulli equations
 @test isequal(symbolic_solve_ode(Dt(x) + (4//t)*x ~ t^3 * x^2, x, t), 1/(C[1]t^4 - t^4 * log(t)))
+@test isnothing(symbolic_solve_ode(Dt(x) + sqrt(t)*x ~ sin(4t)*x^3, x, t))
 
 # Test issue #1605: Power with symbolic exponent
 @variables x y
