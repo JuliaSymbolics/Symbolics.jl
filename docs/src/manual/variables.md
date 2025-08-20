@@ -83,3 +83,18 @@ SymbolicUtils.iscall
 SymbolicUtils.operation
 SymbolicUtils.arguments
 ```
+
+## Variable Utilities
+
+```@docs
+Symbolics.get_variables!
+Symbolics.getparent
+```
+
+## Variable Parsing
+
+For implementing custom variable-creating macros:
+
+```@docs
+Symbolics._parse_vars
+```

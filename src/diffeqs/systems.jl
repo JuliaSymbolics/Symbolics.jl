@@ -11,7 +11,7 @@ Solve linear continuous dynamical system of differential equations of the form A
 
 # Arguments
 - `A`: matrix of coefficients
-- `x0`: intial conditions vector
+- `x0`: initial conditions vector
 - `t`: independent variable
 
 # Returns

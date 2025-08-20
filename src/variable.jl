@@ -15,7 +15,17 @@ const IndexMap = Dict{Char,Char}(
             '9' => '₉')
 
 abstract type AbstractVariableMetadata end
+"""
+    $TYPEDEF
+
+Symbolic metadata key for storing the default value of a symbolic variable.
+"""
 struct VariableDefaultValue <: AbstractVariableMetadata end
+"""
+    $TYPEDEF
+
+Symbolic metadata key for storing the macro used to create a symbolic variable.
+"""
 struct VariableSource <: AbstractVariableMetadata end
 
 function recurse_and_apply(f, x)
@@ -80,6 +90,19 @@ function unwrap_runtime_var(v)
 end
 
 # Build variables more easily
+"""
+    $(TYPEDSIGNATURES)
+
+Parse variables using the syntax expected by `@variables`. Used for implementing custom
+macros similar to `@variables`. `macroname` refers to the name of the macro creating the
+variables. This is stored in the `VariableSource` metadata of created variables. `type`
+is the default type of created variables. `x` is the tuple of expressions passed to the
+macro. `transform` is an optional function that takes constructed variables and performs
+custom postprocessing to them, returning the created variables. This function returns the
+`Expr` for constructing the parsed variables.
+"""
+parse_vars(macroname, type, x, transform=identity) = _parse_vars(macroname, type, x, transform=identity)
+
 function _parse_vars(macroname, type, x, transform=identity)
     ex = Expr(:block)
     var_names = Symbol[]
@@ -152,6 +175,8 @@ function _parse_vars(macroname, type, x, transform=identity)
             isruntime, fname = unwrap_runtime_var(v.args[1])
             call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
             var_name, expr = construct_vars(macroname, fname, type′, call_args, val, options, transform, isruntime)
+        elseif isarray
+            var_name, expr = construct_vars(macroname, v, type′, nothing, val, options, transform, isruntime)
         else
             var_name, expr = construct_vars(macroname, v, type′, nothing, val, options, transform, isruntime)
         end
@@ -256,9 +281,37 @@ function construct_vars(macroname, v, type, call_args, val, prop, transform, isr
     lhs, :($lhs = $rhs)
 end
 
+"""
+    $(TYPEDSIGNATURES)
+
+Define a new metadata key assignable in `@variables`. This function should take `Val{name}`
+where `name` is a `Symbol`, and return the key type for the given metadata name `name`. For
+example,
+
+```julia
+Symbolics.option_to_metadata_type(::Val{:custom_name}) = CustomType
+```
+
+Allows the following syntax:
+
+```julia
+@variables x [custom_name = 1]
+```
+
+And stores `1` as the value associated with the `CustomType` key in the symbolic metadata
+of `x`.
+"""
 function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
+
+# add enough additional methods that the compiler gives up on specializing this
+# and downstream definitions don't cause massive invalidation.
+option_to_metadata_type(::Val{:_____!_internal_1}) = error("Invalid option")
+option_to_metadata_type(::Val{:_____!_internal_2}) = error("Invalid option")
+option_to_metadata_type(::Val{:_____!_internal_3}) = error("Invalid option")
+option_to_metadata_type(::Val{:_____!_internal_4}) = error("Invalid option")
+option_to_metadata_type(::Val{:_____!_internal_5}) = error("Invalid option")
 
 function setprops_expr(expr, props, macroname, varname)
     expr = :($setmetadata($expr, $VariableSource, ($(Meta.quot(macroname)), $varname,)))
@@ -703,6 +756,11 @@ function is_array_of_symbolics(x)
         any(y -> symbolic_type(y) != NotSymbolic() || is_array_of_symbolics(y), x)
 end
 
+"""
+    $(TYPEDSIGNATURES)
+
+Return the array variable that was indexed to obtain symbolic variable `x`.
+"""
 function getparent(x, val=_fail)
     maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
     if maybe_parent !== nothing
@@ -836,14 +894,14 @@ end
 struct Variable{T} end
 
 function (::Type{Variable{T}})(s, i...) where {T}
-    Base.depwarn("Variable{T}(name, idx...) is deprecated, use variable(name, idx...; T=T)", :Variable, force=true)
+    Base.depwarn("Variable{T}(name, idx...) is deprecated, use variable(name, idx...; T=T)", :Variable)
     variable(s, i...; T=T)
 end
 
 (::Type{Variable})(s, i...) = Variable{Real}(s, i...)
 
 function (::Type{Sym{T}})(s, x, i...) where {T}
-    Base.depwarn("Sym{T}(name, x, idx...) is deprecated, use variable(name, x, idx...; T=T)", :Variable, force=true)
+    Base.depwarn("Sym{T}(name, x, idx...) is deprecated, use variable(name, x, idx...; T=T)", :Variable)
     variable(s, x, i...; T=T)
 end
 (::Type{Sym})(s, x, i...) = Sym{Real}(s, x, i...)
