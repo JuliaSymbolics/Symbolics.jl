@@ -40,72 +40,65 @@ function partial_frac_decomposition(expr, x)
         return nothing
     end
 
-    leading_coeff = coeff_vector(expand(B), x)[end] #simplify(B / prod((f -> f.expr^f.multiplicity).(facs)))
+    leading_coeff = coeff_vector(expand(B), x)[end] # of denominator
     
+    # already in partial fraction form
     if length(facs) == 1 && only(facs).multiplicity == 1 && degree(A) <= 1
         return expr
     end
 
     result = []
-    c_idx = 0
+    c_idx = 0 # index to keep track of which C subscript to use
     if length(facs) == 1
         fac = only(facs)
-        if fac.root === nothing
+
+        if fac.root === nothing # irreducible quadratic factor
             for i = 1:fac.multiplicity
-                push!(result, (variable(:C, c_idx+=1)*x + variable(:C, c_idx+=1))/(fac.expr^i))
+                push!(result, (variable(:𝒞, c_idx+=1)*x + variable(:𝒞, c_idx+=1))/(fac.expr^i)) # (Ax + B)/(x-r)^i
             end
         else
-            append!(result, variables(:C, (c_idx+1):(c_idx+=fac.multiplicity)) ./ fac.expr.^(1:fac.multiplicity))
+            append!(result, variables(:𝒞, (c_idx+1):(c_idx+=fac.multiplicity)) ./ fac.expr.^(1:fac.multiplicity)) # C1/(x-r) + C2/(x-2)^2 ...
         end
     else
         for fac in facs
-            if fac.root === nothing
+            if fac.root === nothing # irreducible quadratic factor
                 for i = 1:fac.multiplicity
-                    push!(result, (variable(:C, c_idx+=1)*x + variable(:C, c_idx+=1))/(fac.expr^i))
+                    push!(result, (variable(:𝒞, c_idx+=1)*x + variable(:𝒞, c_idx+=1))/(fac.expr^i)) # (Ax + B)/(x-r)^i
                 end
                 continue
             end
 
+            # cover up method
             other_facs = filter(f -> !isequal(f, fac), facs)
             
-            numerator = rationalize(unwrap(substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root))))
+            numerator = rationalize(unwrap(substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root)))) # plug in root to expression without its factor in denominator
             push!(result, numerator / fac.expr^fac.multiplicity)
 
             if fac.multiplicity > 1
-                append!(result, variables(:C, (c_idx+1):(c_idx+=fac.multiplicity-1)) ./ fac.expr.^(1:fac.multiplicity-1))
+                append!(result, variables(:𝒞, (c_idx+1):(c_idx+=fac.multiplicity-1)) ./ fac.expr.^(1:fac.multiplicity-1)) # C1/(x-r) + C2/(x-2)^2 ...
             end
         end
     end
-    result
+
+    # no unknowns, so just return
     if isequal(get_variables(sum(result)), [x])
         return sum(result ./ leading_coeff)
     end
         
-    lhs::Vector{Rational} = coeff_vector(numerator(expr), x)
-    rhs = coeff_vector(expand(sum(simplify.(numerator.(result) .* ((B/leading_coeff) ./ denominator.(result))))), x)
-    # rhs = 
-    coeff_vector(numerator(simplify(sum(result))), x)
+    lhs = numerator(expr)
+    rhs = expand(sum(simplify.(numerator.(result) .* ((B/leading_coeff) ./ denominator.(result))))) # multiply each numerator by the common denominator/its denominator, and sum to get numerator of whole expression
 
-    if length(lhs) > length(rhs)
-        rhs = [rhs; zeros(length(lhs)-length(rhs))]
-    elseif length(rhs) > length(lhs)
-        lhs = [lhs; zeros(length(rhs)-length(lhs))]
-    end
+    solution = solve_interms_ofvar(lhs - rhs, x)[1] # solve for unknowns (C's) by looking at coefficients of the polynomial
 
-    eqs = []
-    for i = 1:length(lhs)
-        push!(eqs, lhs[i] ~ rhs[i])
-    end
-    solution = symbolic_solve(eqs, Symbolics.variables(:C, 1:c_idx))[1]
-
+    # single unknown
     if !(solution isa Dict)
-        solution = Dict(variable(:C, 1) => solution)
+        solution = Dict(variable(:𝒞, 1) => solution)
     end
-    substitute.(result, Ref(solution))
-    return sum(substitute.(result, Ref(solution)) ./ leading_coeff)
+    
+    return sum(substitute.(result, Ref(solution)) ./ leading_coeff) # substitute solutions back in and sum
 end
 
-# increasing from 0 to degree n
+# increasing from 0 to degree n. doesn't skip powers of x like polynomial_coeffs
 function coeff_vector(poly, x, n)
     coeff_dict = polynomial_coeffs(poly, [x])[1]
     vec = []
@@ -139,7 +132,7 @@ function count_multiplicities(facs)
 end
 
 # for partial fractions, into linear and irreducible quadratic factors
-function factorize(expr, x)::Set{Factor}
+function factorize(expr, x)
     roots = symbolic_solve(expr, x, dropmultiplicity=false)
 
     counts = count_multiplicities(roots)
