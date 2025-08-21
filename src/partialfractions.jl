@@ -35,36 +35,33 @@ function partial_frac_decomposition(expr, x)
         return nothing
     end
     
-    facs = 0
-    try
-        facs = factorize(B, x)
-    catch AssertionError
+    facs = factorize(B, x)
+    if facs === nothing
         return nothing
     end
 
-    v = simplify(B / prod((f -> f.expr^f.multiplicity).(facs)))
+    leading_coeff = coeff_vector(expand(B), x)[end] #simplify(B / prod((f -> f.expr^f.multiplicity).(facs)))
     
     if length(facs) == 1 && only(facs).multiplicity == 1 && degree(A) <= 1
         return expr
     end
 
-    result = 0
-
+    result = []
     c_idx = 0
     if length(facs) == 1
         fac = only(facs)
         if fac.root === nothing
             for i = 1:fac.multiplicity
-                result += (variable(:C, c_idx+=1)*x + variable(:C, c_idx+=1))/(fac.expr^i)
+                push!(result, (variable(:C, c_idx+=1)*x + variable(:C, c_idx+=1))/(fac.expr^i))
             end
         else
-            result += sum(variables(:C, (c_idx+1):(c_idx+=fac.multiplicity)) ./ fac.expr.^(1:fac.multiplicity))
+            append!(result, variables(:C, (c_idx+1):(c_idx+=fac.multiplicity)) ./ fac.expr.^(1:fac.multiplicity))
         end
     else
         for fac in facs
             if fac.root === nothing
                 for i = 1:fac.multiplicity
-                    result += (variable(:C, c_idx+=1)*x + variable(:C, c_idx+=1))/(fac.expr^i)
+                    push!(result, (variable(:C, c_idx+=1)*x + variable(:C, c_idx+=1))/(fac.expr^i))
                 end
                 continue
             end
@@ -72,20 +69,22 @@ function partial_frac_decomposition(expr, x)
             other_facs = filter(f -> !isequal(f, fac), facs)
             
             numerator = rationalize(unwrap(substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root))))
-            result += numerator / fac.expr^fac.multiplicity
+            push!(result, numerator / fac.expr^fac.multiplicity)
 
             if fac.multiplicity > 1
-                result += sum(variables(:C, (c_idx+1):(c_idx+=fac.multiplicity-1)) ./ fac.expr.^(1:fac.multiplicity-1))
+                append!(result, variables(:C, (c_idx+1):(c_idx+=fac.multiplicity-1)) ./ fac.expr.^(1:fac.multiplicity-1))
             end
         end
     end
-
-    if isequal(get_variables(result), [x])
-        return expand(result/v)
+    result
+    if isequal(get_variables(sum(result)), [x])
+        return sum(result ./ leading_coeff)
     end
         
     lhs::Vector{Rational} = coeff_vector(numerator(expr), x)
-    rhs = coeff_vector(numerator(simplify(result)), x)
+    rhs = coeff_vector(expand(sum(simplify.(numerator.(result) .* ((B/leading_coeff) ./ denominator.(result))))), x)
+    # rhs = 
+    coeff_vector(numerator(simplify(sum(result))), x)
 
     if length(lhs) > length(rhs)
         rhs = [rhs; zeros(length(lhs)-length(rhs))]
@@ -97,14 +96,13 @@ function partial_frac_decomposition(expr, x)
     for i = 1:length(lhs)
         push!(eqs, lhs[i] ~ rhs[i])
     end
-    
     solution = symbolic_solve(eqs, Symbolics.variables(:C, 1:c_idx))[1]
 
     if !(solution isa Dict)
         solution = Dict(variable(:C, 1) => solution)
     end
-    
-    return expand(substitute(result, solution)/v)
+    substitute.(result, Ref(solution))
+    return sum(substitute.(result, Ref(solution)) ./ leading_coeff)
 end
 
 # increasing from 0 to degree n
@@ -150,7 +148,10 @@ function factorize(expr, x)::Set{Factor}
     for root in keys(counts)
         if !isequal(abs(imag(root)), 0)
             fac_expr = expand((x - root)*(x - conj(root)))
-            @assert isequal(imag(fac_expr), 0) "Encountered issue with complex irrational roots"
+            if !isequal(imag(fac_expr), 0)
+                @warn "Encountered issue with complex irrational roots"
+                return nothing
+            end
             push!(facs, Factor(real(fac_expr), counts[root], x))
             continue
         end

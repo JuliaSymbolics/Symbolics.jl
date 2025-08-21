@@ -63,6 +63,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Function inverses test" begin include("inverse.jl") end
         @safetestset "Taylor Series Test" begin include("taylor.jl") end
         @safetestset "Discontinuity registration test" begin include("discontinuities.jl") end
+        @safetestset "Partial Fractions Test" begin include("partialfractions.jl") end
     end
 end
 
