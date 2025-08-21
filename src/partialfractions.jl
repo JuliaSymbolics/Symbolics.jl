@@ -19,7 +19,26 @@ end
 """
     partial_frac_decomposition(expr, x)
 
-Performs partial fraction decomposition for expressions with linear, reapeated, or irreducible quadratic factors in the denominator. Can't handle irrational roots or non-one leading coefficients
+Performs partial fraction decomposition for expressions with linear, repeated, or irreducible quadratic factors in the denominator. Can't currently handle irrational roots.
+
+When leading coefficient of the denominator is not 1, it will be factored out and then put back in at the end, often leading to non-integer coefficients in the result. Will return `nothing` if the expression is not a valid polynomial fraction, or if it has irrational roots.
+
+# Examples
+
+```jldoctest
+julia> @variables x
+1-element Vector{Num}:
+ x
+
+julia> partial_frac_decomposition((3x-1) / (x^2 + x - 6), x)
+(1//1) / (-2 + x) + (2//1) / (3 + x)
+
+julia> partial_frac_decomposition((4x^3 + 16x + 7)/(x^2 + 4)^2, x) # repeated irreducible quadratic factor
+(4x) / (4 + x^2) + 7 / ((4 + x^2)^2)
+
+julia> partial_frac_decomposition((4x^2 - 22x + 7)/((2x+3)*(x-2)^2), x) # non-one leading coefficient
+(-3//1) / ((-2 + x)^2) + (2//1) / ((3//2) + x)
+```
 
 !!! note that irreducible quadratic and repeated linear factors require the `Groebner` package to solve a system of equations
 """
