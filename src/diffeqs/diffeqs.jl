@@ -297,7 +297,7 @@ function const_coeff_solve(eq::LinearODE)
     for i in eachindex(solutions)[1:(end - 1)]
         j = i + 1
 
-        if imag(roots[i]) != 0 && roots[i] == conj(roots[j])
+        if !isequal(imag(roots[i]), 0) && isequal(roots[i], conj(roots[j]))
             solutions[i] = exp(real(roots[i] * eq.t)) * cos(imag(roots[i] * eq.t))
             solutions[j] = exp(real(roots[i] * eq.t)) * sin(imag(roots[i] * eq.t))
         end
@@ -339,7 +339,7 @@ end
 Returns a, r from q(t)=a*e^(rt) if it is of that form. If not, returns `nothing`
 """
 function get_rrf_coeff(q, t)
-    facs = _true_factors(q)
+    facs = factors(q)
 
     # handle complex r
     # very convoluted, could probably be improved (possibly by making heavier use of @rule)
@@ -463,7 +463,7 @@ function method_of_undetermined_coefficients(eq::LinearODE)
     end
 
     # polynomial
-    degree = Symbolics.degree(eq.q, eq.t) # just a starting point
+    degree = max(Symbolics.degree(eq.q, eq.t), Symbolics.degree.(eq.p, eq.t)...) # just a starting point
     a = Symbolics.variables(:𝒶, 1:degree+1)
     form = sum(a[n]*eq.t^(n-1) for n = 1:degree+1)
     eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
@@ -481,14 +481,16 @@ function method_of_undetermined_coefficients(eq::LinearODE)
     end
 
     # exponential
-    @variables 𝒶
     coeff = get_rrf_coeff(eq.q, eq.t)
     if coeff !== nothing
+        a_form = form # use form from polynomial case
+
         r = coeff[2]
-        form = 𝒶*exp(r*eq.t)
+        form = a_form*exp(r*eq.t)
         eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
-        coeff_solution = symbolic_solve(eq_subbed, 𝒶)
+        eq_subbed = simplify(expand((eq_subbed.lhs - eq_subbed.rhs) / exp(r*eq.t)))
+        coeff_solution = solve_interms_ofvar(eq_subbed, eq.t)
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
             return substitute(form, coeff_solution[1])
@@ -619,7 +621,7 @@ function linearize_bernoulli(expr, x, t, v)
         if Symbolics.hasderiv(Symbolics.value(term))
             facs = _true_factors(term)
             leading_coeff = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
-            if _get_der_order(term//leading_coeff, x, t) != 1
+            if !isequal(term//leading_coeff, Dt(x))
                 return nothing
             end
         elseif !isempty(Symbolics.get_variables(term, [x]))
@@ -662,22 +664,4 @@ function solve_bernoulli(expr, x, t)
     end
 
     return simplify(solution^(1//(1-n)))
-end
-
-"""
-Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n with initial condition x(0) = x0
-"""
-function solve_bernoulli(expr, x, t, x0)
-    @variables 𝓋
-    eq, n = linearize_bernoulli(expr, x, t, 𝓋)
-
-    v0 = x0^(1-n) # convert initial condition from x(0) to v(0)
-
-    ivp = IVP(eq, [v0])
-    solution = solve_IVP(ivp)
-    if solution === nothing
-        return nothing
-    end
-
-    return symbolic_solve(solution ~ x^(1-n), x)
 end
