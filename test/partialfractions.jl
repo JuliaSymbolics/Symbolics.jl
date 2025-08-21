@@ -10,7 +10,6 @@ import Symbolics: partial_frac_decomposition
 @test isequal(partial_frac_decomposition((9x^2 + 34x + 14) / ((x+2)*(x^2 - x - 12)), x), expand(3/(x+2) + 7/(x-4) - 1/(x+3)))
 
 # https://tutorial.math.lamar.edu/Problems/Alg/PartialFractions.aspx
-# can't handle leading coefficients being not 1 in denominator
 @test isequal(partial_frac_decomposition((17x-53)/(x^2 - 2x - 15), x), expand(4/(x-5) + 13/(x+3)))
 @test isequal(partial_frac_decomposition((34-12x)/(3x^2 - 10x - 8), x), (-3)/(2//3 + x) + -1/(-4 + x))
 @test isequal(partial_frac_decomposition((125 + 4x - 9x^2)/((x-1)*(x+3)*(x+4)), x), expand(6/(x-1) - 8/(x+3) - 7/(x+4)))
