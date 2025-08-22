@@ -8,7 +8,7 @@ else
     using ..SymPy
 end
 
-using Symbolics: value, symbolics_to_sympy, sympy_to_symbolics
+using Symbolics: value, symbolics_to_sympy, sympy_to_symbolics, Differential, Num
 using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Symbolic, Term
 using LinearAlgebra
 
@@ -16,12 +16,20 @@ function Symbolics.symbolics_to_sympy(expr)
     expr = value(expr)
     expr isa Symbolic || return expr
     if iscall(expr)
-        sop = symbolics_to_sympy(operation(expr))
-        sargs = map(symbolics_to_sympy, arguments(expr))
-        sop === (^) && length(sargs) == 2 && sargs[2] isa Number ? Base.literal_pow(^, sargs[1], Val(sargs[2])) : sop(sargs...)
+        op = operation(expr)
+        args = arguments(expr)
+
+        if op isa Differential
+            @assert length(args) == 1 "Differential operator must have exactly one argument."
+            return SymPy.sympy.Derivative(symbolics_to_sympy(args[1]), symbolics_to_sympy(op.x))
+        end
+
+        sop = symbolics_to_sympy(op)
+        sargs = map(symbolics_to_sympy, args)
+        return sop === (^) && length(sargs) == 2 ? sargs[1]^sargs[2] : sop(sargs...)
     else
         name = string(nameof(expr))
-        symtype(expr) <: FnType ? SymPy.SymFunction(name) : SymPy.Sym(name)
+        return symtype(expr) <: FnType ? SymPy.SymFunction(name) : SymPy.Sym(name)
     end
 end
 
@@ -36,7 +44,10 @@ function Symbolics.sympy_to_symbolics(sympy_expr, vars)
         dict[nameof(v)] = v
     end
 
-    Symbolics.parse_expr_to_symbolic(Meta.parse(string(sympy_expr)), dict)
+    # Convert Python/SymPy notation to Julia notation
+    expr_str = string(sympy_expr)
+    expr_str = replace(expr_str, "**" => "^")  # Convert exponentiation
+    Symbolics.parse_expr_to_symbolic(Meta.parse(expr_str), dict)
 end
 
 function Symbolics.sympy_linear_solve(A, b)
@@ -51,13 +62,16 @@ function Symbolics.sympy_linear_solve(A, b)
 end
 
 function Symbolics.sympy_algebraic_solve(expr, var)
-    expr_sympy = expr isa AbstractVector ? map(symbolics_to_sympy, expr) : symbolics_to_sympy(expr)
-    var_sympy = var isa AbstractVector ? map(symbolics_to_sympy, var) : symbolics_to_sympy(var)
-    sol_sympy = SymPy.solve(expr_sympy, var_sympy, dict=true)
+    expr_sympy = expr isa AbstractVector ? map(symbolics_to_sympy, expr) :
+                 symbolics_to_sympy(expr)
+    var_sympy = var isa AbstractVector ? map(symbolics_to_sympy, var) :
+                symbolics_to_sympy(var)
+    sol_sympy = SymPy.solve(expr_sympy, var_sympy, dict = true)
     vars = var isa AbstractVector ? var : [var]
     if expr isa AbstractVector
         varmap = Dict(string(nameof(v)) => v for v in vars)
-        return [Dict(varmap[string(k)] => sympy_to_symbolics(v, vars) for (k, v) in s) for s in sol_sympy]
+        return [Dict(varmap[string(k)] => sympy_to_symbolics(v, vars) for (k, v) in s)
+                for s in sol_sympy]
     else
         return [sympy_to_symbolics(s[var_sympy], vars) for s in sol_sympy]
     end
@@ -89,7 +103,19 @@ function Symbolics.sympy_ode_solve(expr, func, var)
     func_sympy = symbolics_to_sympy(func)
     var_sympy = symbolics_to_sympy(var)
     sol_sympy = SymPy.dsolve(expr_sympy, func_sympy)
-    sympy_to_symbolics(sol_sympy, [func, var])
+    sol_expr = sol_sympy.rhs
+    parsing_vars = Vector{SymbolicUtils.BasicSymbolic}()
+    vars_in_expr = Symbolics.get_variables(value(expr))
+    func_val = value(func)
+    for v in vars_in_expr
+        if !isequal(v, func_val)
+            push!(parsing_vars, v)
+        end
+    end
+    push!(parsing_vars, value(var))
+    push!(parsing_vars, operation(func_val))
+    unwrapped_vars = unique(parsing_vars)
+    sympy_to_symbolics(sol_expr, unwrapped_vars)
 end
 
 end

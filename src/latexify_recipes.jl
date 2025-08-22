@@ -101,6 +101,14 @@ end
     return unwrap(n)
 end
 
+@latexrecipe function f(n::CallWithMetadata)
+    env --> :equation
+    mult_symbol --> ""
+    index --> :subscript
+
+    return n.f
+end
+
 @latexrecipe function f(n::Symbolic)
     env --> :equation
     mult_symbol --> ""

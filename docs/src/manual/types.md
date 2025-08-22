@@ -42,3 +42,10 @@ typeof(Z)
 typeof(s)
 ```
 
+## Type Wrapper API
+
+```@docs
+Symbolics.wrap
+Symbolics.unwrap
+```
+

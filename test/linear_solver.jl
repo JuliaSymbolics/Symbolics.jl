@@ -7,34 +7,34 @@ D = Differential(t)
 
 # Test division by zero gives a NaN
 # https://github.com/JuliaSymbolics/Symbolics.jl/issues/1540
-@test Symbolics.solve_for((x~0), y) === NaN
+@test Symbolics.symbolic_linear_solve((x~0), y) === NaN
 
 expr = x * p + y * (1 - p) ~ 0
-sol = Symbolics.solve_for(expr, p)
+sol = Symbolics.symbolic_linear_solve(expr, p)
 @test sol isa Num
 @test isequal(sol, y/(y - x))
 a, b, islinear = Symbolics.linear_expansion(expr, p)
 @test eltype((a, b)) <: Num
 @test isequal((a, b, islinear), (-(x - y), -y, true))
-@test isequal(Symbolics.solve_for(x * p ~ 0, p), 0)
-@test_throws Any Symbolics.solve_for(1/x + p * p/x ~ 0, p)
-@test isequal(Symbolics.solve_for(x * y ~ p, x), p / y)
-@test isequal(Symbolics.solve_for(x * -y ~ p, y), -p / x)
-@test isequal(Symbolics.solve_for(x * y ~ p, p), x * y)
-@test isequal(Symbolics.solve_for(x^2 * y ~ p, y), p / x^2)
-@test isequal(Symbolics.solve_for(x^2 * y ~ p, p), x^2 * y)
-@test_throws Any Symbolics.solve_for(x^2 * y - sin(p) ~ p, p)
-@test Symbolics.solve_for(x^2 * y - sin(p) ~ p, p, check=false) === nothing
-@test_throws Any Symbolics.solve_for(t*D(x) ~ y, t)
-@test isequal(Symbolics.solve_for(t*D(x) ~ y, D(x)), y/t)
-@test isequal(Symbolics.solve_for([t*D(x) ~ y], [D(x)]), [y/t])
-@test isequal(Symbolics.solve_for(t*D(x) ~ y, y), t*D(x))
+@test isequal(Symbolics.symbolic_linear_solve(x * p ~ 0, p), 0)
+@test_throws Any Symbolics.symbolic_linear_solve(1/x + p * p/x ~ 0, p)
+@test isequal(Symbolics.symbolic_linear_solve(x * y ~ p, x), p / y)
+@test isequal(Symbolics.symbolic_linear_solve(x * -y ~ p, y), -p / x)
+@test isequal(Symbolics.symbolic_linear_solve(x * y ~ p, p), x * y)
+@test isequal(Symbolics.symbolic_linear_solve(x^2 * y ~ p, y), p / x^2)
+@test isequal(Symbolics.symbolic_linear_solve(x^2 * y ~ p, p), x^2 * y)
+@test_throws Any Symbolics.symbolic_linear_solve(x^2 * y - sin(p) ~ p, p)
+@test Symbolics.symbolic_linear_solve(x^2 * y - sin(p) ~ p, p, check=false) === nothing
+@test_throws Any Symbolics.symbolic_linear_solve(t*D(x) ~ y, t)
+@test isequal(Symbolics.symbolic_linear_solve(t*D(x) ~ y, D(x)), y/t)
+@test isequal(Symbolics.symbolic_linear_solve([t*D(x) ~ y], [D(x)]), [y/t])
+@test isequal(Symbolics.symbolic_linear_solve(t*D(x) ~ y, y), t*D(x))
 Dx = D(x)
 expr = Dx * x + Dx*t - 2//3*x + y*Dx
 a, b, islinear = Symbolics.linear_expansion(expr, x)
 @test iszero(expand(a * x + b - expr))
-@test isequal(Symbolics.solve_for(expr ~ Dx, Dx), (-2//3*x)/(1 - t - x - y))
-@test isequal(Symbolics.solve_for(expr ~ Dx, x), (t*Dx + y*Dx - Dx) / ((2//3) - Dx))
+@test isequal(Symbolics.symbolic_linear_solve(expr ~ Dx, Dx), (-2//3*x)/(1 - t - x - y))
+@test isequal(Symbolics.symbolic_linear_solve(expr ~ Dx, x), (t*Dx + y*Dx - Dx) / ((2//3) - Dx))
 
 exprs = [
  3//2*x + 2y + 10
@@ -52,11 +52,11 @@ eqs = [
         2//1 + y - z ~ 3//1*x
         2//1 + y - 2z ~ 3//1*z
       ]
-@test [2 1 -1; -3 1 -1; 0 1 -5] * Symbolics.solve_for(eqs, [x, y, z]) == [2; -2; -2]
-@test isequal(Symbolics.solve_for(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x), (1//7)*(y - 2//1*z))
-@test isequal(Symbolics.solve_for(x + y ~ 0, x), Symbolics.solve_for([x + y ~ 0], x))
-@test isequal(Symbolics.solve_for([x + y ~ 0], [x]), Symbolics.solve_for(x + y ~ 0, [x]))
-@test isequal(Symbolics.solve_for(2x/z + sin(z), x), sin(z) / (-2 / z))
+@test [2 1 -1; -3 1 -1; 0 1 -5] * Symbolics.symbolic_linear_solve(eqs, [x, y, z]) == [2; -2; -2]
+@test isequal(Symbolics.symbolic_linear_solve(2//1*x + y - 2//1*z ~ 9//1*x, 1//1*x), (1//7)*(y - 2//1*z))
+@test isequal(Symbolics.symbolic_linear_solve(x + y ~ 0, x), Symbolics.symbolic_linear_solve([x + y ~ 0], x))
+@test isequal(Symbolics.symbolic_linear_solve([x + y ~ 0], [x]), Symbolics.symbolic_linear_solve(x + y ~ 0, [x]))
+@test isequal(Symbolics.symbolic_linear_solve(2x/z + sin(z), x), sin(z) / (-2 / z))
 
 @variables t x
 D = Symbolics.Difference(t; dt=1)
@@ -89,4 +89,25 @@ a, b, islinear = Symbolics.linear_expansion(D(x) - x, x)
 
     @variables x y
     @test !Symbolics.linear_expansion(x + z([x, y]), y)[3]
+end
+
+@testset "linear_expansion of ifelse" begin
+    @variables p
+    a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p + 1, 3p + 2), p)
+    @test islin
+    @test isequal(a, ifelse(p < 1, 2, 3))
+    @test isequal(b, ifelse(p < 1, 1, 2))
+
+    a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p, 3p), p)
+    @test islin
+    @test isequal(a, ifelse(p < 1, 2, 3))
+    @test isequal(b, 0)
+
+    a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p, 2p + 1), p)
+    @test islin
+    @test isequal(a, 2)
+    @test isequal(b, ifelse(p < 1, 0, 1))
+
+    @test !Symbolics.linear_expansion(ifelse(p < 1, p^2, 2p), p)[3]
+    @test !Symbolics.linear_expansion(ifelse(p < 1, 2p, p^2), p)[3]
 end

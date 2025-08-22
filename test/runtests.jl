@@ -15,6 +15,12 @@ function activate_sympy_env()
     Pkg.instantiate()
 end
 
+function activate_sympy_pythoncall_env()
+    Pkg.activate("sympy_pythoncall")
+    Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+    Pkg.instantiate()
+end
+
 if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
 end
@@ -25,6 +31,7 @@ limit2(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 
 if GROUP == "All" || GROUP == "Core"
     @testset begin
+        @safetestset "Invalidations Test" begin include("invalidations.jl") end
         @safetestset "Struct Test" begin include("struct.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
@@ -64,6 +71,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Taylor Series Test" begin include("taylor.jl") end
         @safetestset "Discontinuity registration test" begin include("discontinuities.jl") end
         @safetestset "Partial Fractions Test" begin include("partialfractions.jl") end
+        @safetestset "ODE solver test" begin include("diffeqs.jl") end
     end
 end
 
@@ -73,6 +81,10 @@ end
 
 if GROUP == "All" || GROUP == "LuxExt"
     @safetestset "Lux extension Test" begin include("extensions/lux.jl") end
+end
+
+if GROUP == "All" || GROUP == "D3TreesExt"
+    @safetestset "D3Trees extension Test" begin include("extensions/d3trees.jl") end
 end
 
 if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
@@ -97,4 +109,9 @@ end
 if GROUP == "All" || GROUP == "SymPy"
     activate_sympy_env()
     @safetestset "SymPy Test" begin include("sympy.jl") end
+end
+
+if GROUP == "All" || GROUP == "SymPyPythonCall"
+    activate_sympy_pythoncall_env()
+    @safetestset "SymPyPythonCall Test" begin include("sympy_pythoncall.jl") end
 end

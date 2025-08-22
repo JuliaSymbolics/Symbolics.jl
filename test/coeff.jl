@@ -59,3 +59,7 @@ e = x*y^2 + 2x + y^3*x^3
 @test isequal(coeff(2*x*y + y, x*y), 2)
 @test isequal(coeff(2*x^2*y + y, x^2*y), 2)
 @test_throws AssertionError coeff(2*x*y + y, 2*x*y) # numerical factors not allowed in second argument of `coeff`
+@testset "Issue#1610 non-numeric coeff" begin
+    @variables x a b c d
+    @test isequal(coeff(c + (a + b*x)*d, x), b * d)
+end

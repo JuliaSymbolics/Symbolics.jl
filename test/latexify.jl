@@ -71,4 +71,7 @@ Dy = Differential(y)
 
 @test_reference "latexify_refs/indices5.txt" latexify(a'a)
 
+@variables f(..)
+@test_reference "latexify_refs/call_with_metadata.txt" latexify(f)
+
 @test !occursin("identity", latexify(Num(π))) # issue #1254
