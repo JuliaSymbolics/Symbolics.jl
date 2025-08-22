@@ -7,19 +7,19 @@ import Nemo, Groebner
 @syms f(t)::Real F(s)::Real
 
 # https://sites.math.washington.edu/~aloveles/Math307Fall2019/m307LaplacePractice.pdf
-@test isequal(laplace(exp(4t) + 5, f, t, s, F), 1/(s-4) + 5/s)
-@test isequal(laplace(cos(2t) + 7sin(2t), f, t, s, F), s/(s^2 + 4) + 14/(s^2 + 4))
-@test isequal(laplace(exp(-2t)*cos(3t) + 5exp(-2t)*sin(3t), f, t, s, F), (s+2)/((s+2)^2 + 9) + 15/((s+2)^2 + 9))
-@test isequal(laplace(10 + 5t + t^2 - 4t^3, f, t, s, F), expand(10/s + 5/s^2 + 2/s^3 - 24/s^4))
-@test isequal(laplace(exp(3t)*(t^2 + 4t + 2), f, t, s, F), 2/(s-3)^3 + 4/(s-3)^2 + 2/(s-3))
-@test isequal(laplace(6exp(5t)*cos(2t) - exp(7t), f, t, s, F), 6(s-5)/((s-5)^2 + 4) + expand(-1/(s-7)))
+@test isequal(laplace(exp(4t) + 5, f, t, F, s), 1/(s-4) + 5/s)
+@test isequal(laplace(cos(2t) + 7sin(2t), f, t, F, s), s/(s^2 + 4) + 14/(s^2 + 4))
+@test isequal(laplace(exp(-2t)*cos(3t) + 5exp(-2t)*sin(3t), f, t, F, s), (s+2)/((s+2)^2 + 9) + 15/((s+2)^2 + 9))
+@test isequal(laplace(10 + 5t + t^2 - 4t^3, f, t, F, s), expand(10/s + 5/s^2 + 2/s^3 - 24/s^4))
+@test isequal(laplace(exp(3t)*(t^2 + 4t + 2), f, t, F, s), 2/(s-3)^3 + 4/(s-3)^2 + 2/(s-3))
+@test isequal(laplace(6exp(5t)*cos(2t) - exp(7t), f, t, F, s), 6(s-5)/((s-5)^2 + 4) + expand(-1/(s-7)))
 
 # https://www.math.lsu.edu/~adkins/m2065/2065s08review2a.pdf
-@test isequal(inverse_laplace(7/(s+3)^3, F, t, s, f), (7//2)t^2 * exp(-3t))
-@test isequal(inverse_laplace((s-9)/(s^2 + 9), F, t, s, f), cos(3t) - 3sin(3t))
+@test isequal(inverse_laplace(7/(s+3)^3, F, s, f, t), (7//2)t^2 * exp(-3t))
+@test isequal(inverse_laplace((s-9)/(s^2 + 9), F, s, f, t), cos(3t) - 3sin(3t))
 # partial fraction decomposition
-@test isequal(inverse_laplace((s+2)/(s^2 - 3s - 4), F, t, s, f), (6//5)*exp(4t) - (1//5)*exp(-t))
-@test isequal(inverse_laplace(1/(s^2 - 10s + 9), F, t, s, f), (1//8)*exp(9t) - (1//8)*exp(t))
+@test isequal(inverse_laplace((s+2)/(s^2 - 3s - 4), F, s, f, t), (6//5)*exp(4t) - (1//5)*exp(-t))
+@test isequal(inverse_laplace(1/(s^2 - 10s + 9), F, s, f, t), (1//8)*exp(9t) - (1//8)*exp(t))
 
 Dt = Differential(t)
 @test isequal(laplace_solve_ode(Dt(f(t)) + 3f(t) ~ t^2*exp(-3t) + t*exp(-2t) + t, f, t, [1]), (1//3)*t^3*exp(-3t) + t*exp(-2t) + (1//3)*t + (19//9)*exp(-3t) - exp(-2t) - 1//9)

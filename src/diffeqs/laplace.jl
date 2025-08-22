@@ -1,6 +1,15 @@
 import DomainSets.ClosedInterval
 
-function laplace(expr, f, t, s, F)
+"""
+    laplace(expr, f, t, F, s)
+
+Performs the Laplace transform of `expr` with respect to the variable `t`, where `f(t)` is a function in `expr` being transformed, and `F(s)` is the Laplace transform of `f(t)`. Returns the transformed expression in terms of `s`.
+
+Note that `f(t)` and `F(s)` should be defined using `@syms`
+
+Currently relies mostly on linearity and a rules table. When the rules table does not apply, it falls back to the integral definition of the Laplace transform.
+"""
+function laplace(expr, f, t, F, s)
     expr = expand(expr)
     Dt = Differential(t)
     Ds = Differential(s)
@@ -38,7 +47,7 @@ function laplace(expr, f, t, s, F)
         @rule t*exp(~a * t) => 1 / (-~a + s)^(2)
         @rule t^~n * exp(t) => factorial(~n) / (s)^(~n + 1)
         @rule t*exp(t) => 1 / (s)^(2)
-        @rule exp(~c*t) * ~g => laplace(~g, f, t, s - ~c, F) # s-shift rule
+        @rule exp(~c*t) * ~g => laplace(~g, f, t, F, s - ~c) # s-shift rule
         @rule t*f(t) => -Ds(F(s)) # s-derivative rule
         @rule t^(~n)*f(t) => (-1)^(~n) * (Ds^~n)(F(s)) # s-derivative rule
         @rule f(~a + t) => exp(~a*s)*F(s) # t-shift rule
@@ -71,20 +80,29 @@ function laplace(expr, f, t, s, F)
         factors = _true_factors(wrap(term))
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
         if !isempty(constant)
-            result += laplace(term / constant[1], f, t, s, F) * constant[1]
+            result += laplace(term / constant[1], f, t, F, s) * constant[1]
         else 
-            result += laplace(term, f, t, s, F)
+            result += laplace(term, f, t, F, s)
         end
     end
 
     return result
 end
 
-function laplace(expr::Equation, f, t, s, F)
-    return laplace(expr.lhs, f, t, s, F) ~ laplace(expr.rhs, f, t, s, F)
+function laplace(expr::Equation, f, t, F, s)
+    return laplace(expr.lhs, f, t, F, s) ~ laplace(expr.rhs, f, t, F, s)
 end
 
-function inverse_laplace(expr, F, t, s, f)
+"""
+    inverse_laplace(expr, F, s, f, t)
+
+Performs the inverse Laplace transform of `expr` with respect to the variable `s`, where `F(s)` is the Laplace transform of `f(t)`. Returns the transformed expression in terms of `t`.
+
+Note that `f(t)` and `F(s)` should be defined using `@syms`.
+
+Will perform partial fraction decomposition and linearity before applying the inverse Laplace transform rules. When unable to find a result, returns `nothing`.
+"""
+function inverse_laplace(expr, F, s, f, t)
     if isequal(expr, 0)
         return 0
     end
@@ -92,7 +110,7 @@ function inverse_laplace(expr, F, t, s, f)
     # check for partial fractions
     partial_fractions = partial_frac_decomposition(expr, s)
     if partial_fractions !== nothing && !isequal(partial_fractions, expr)
-        return inverse_laplace(partial_fractions, F, t, s, f)
+        return inverse_laplace(partial_fractions, F, s, f, t)
     end
 
     inverse_transform_rules = Symbolics.Chain([
@@ -128,7 +146,7 @@ function inverse_laplace(expr, F, t, s, f)
     
     result = 0
     if length(_terms) == 1 && length(filter(x -> isempty(get_variables(x)), _true_factors(_terms[1]))) == 0
-        println("Inverse laplace failed: $expr")
+        @warn "Inverse laplace failed: $expr"
         return nothing # no result
     end
 
@@ -137,19 +155,24 @@ function inverse_laplace(expr, F, t, s, f)
         factors = _true_factors(term)
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
         if !isempty(constant)
-            result += inverse_laplace(term / constant[1], F, t, s, f) * constant[1]
+            result += inverse_laplace(term / constant[1], F, s, f, t) * constant[1]
         else
-            result += inverse_laplace(term, F, t, s, f)
+            result += inverse_laplace(term, F, s, f, t)
         end
     end
 
     return result
 end
 
-function inverse_laplace(expr::Equation, F, t, s, f)
-    return inverse_laplace(expr.lhs, F, t, s, f) ~ inverse_laplace(expr.rhs, F, t, s, f)
+function inverse_laplace(expr::Equation, F, s, f, t)
+    return inverse_laplace(expr.lhs, F, s, f, t) ~ inverse_laplace(expr.rhs, F, s, f, t)
 end
 
+"""
+    unwrap_der(expr, Dt)
+
+Helper function to unwrap derivatives of `f(t)` in `expr` with respect to the differential operator `Dt = Differential(t)`. Returns a tuple `(n, base_expr)`, where `n` is the order of the derivative and `base_expr` is the expression with the derivatives removed. If `expr` does not contain `f(t)` or its derivatives, returns `(0, expr)`.
+"""
 function unwrap_der(expr, Dt)
     reduce_rule = @rule Dt(~x) => ~x
 
@@ -161,21 +184,27 @@ function unwrap_der(expr, Dt)
     return order + 1, expr
 end
 
+"""
+    laplace_solve_ode(eq, f, t, f0)
+    
+Solves the ordinary differential equation `eq` for the function `f(t)` using the Laplace transform method.
+    
+`f0` is a vector of initial conditions evaluated at `t=0` (`[f(0), f'(0), f''(0), ...]`, must be same length as order of `eq`).
+"""
 function laplace_solve_ode(eq, f, t, f0)
-    @variables s
-    @syms F(s)
-    transformed_eq = laplace(eq, f, t, s, F)
-    transformed_eq = substitute(transformed_eq, Dict(F(s) => variable(:F), [variable(:f0, i-1) => f0[i] for i=1:length(f0)]...))
+    s = variable(:𝓈)
+    @syms 𝓕(s)
+    transformed_eq = laplace(eq, f, t, 𝓕, s)
+    transformed_eq = substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:f0, i-1) => f0[i] for i=1:length(f0)]...))
     transformed_eq = expand(transformed_eq.lhs - transformed_eq.rhs)
-    # transformed_soln = symbolic_solve(transformed_eq, variable(:F))
 
     F_terms = 0
     other_terms = []
     for term in terms(transformed_eq)
-        if isempty(get_variables(term, [variable(:F)]))
+        if isempty(get_variables(term, [variable(:𝓕)]))
             push!(other_terms, -1*term)
         else
-            F_terms += term/variable(:F) # assumes term is something times F
+            F_terms += term/variable(:𝓕) # assumes term is something times F
         end
     end
 
@@ -185,5 +214,5 @@ function laplace_solve_ode(eq, f, t, f0)
 
     transformed_soln = simplify(sum(other_terms ./ F_terms))
 
-    return expand(inverse_laplace(transformed_soln, F, t, s, f))
+    return expand(inverse_laplace(transformed_soln, 𝓕, s, f, t))
 end
