@@ -22,8 +22,54 @@ Symbolics.jl currently has the following options for solving integrals symbolica
 
 | Option    | Description | Pros | Cons |
 | -------- | ------- | ------- | ------- |
+| SymbolicIntegration.jl | Pure symbolic integration using the Risch algorithm | Returns exact symbolic results with rational coefficients, handles complex expressions | May not solve all integrals, focused on specific function classes |
 | SymbolicNumericIntegration.jl  | Uses numeric integrators with symbolic regression machine learning methods | Can solve some hard integrals very fast and easily | Can be unreliable in easy cases, will give floats (0.5) instead of rational values (1//2) |
 | SymPy's Integrate | Uses SymPy (through SymPy.jl) to integrate the expression | Reasonably robust and tested solution | Extremely slow |
+
+### SymbolicIntegration.jl
+
+SymbolicIntegration.jl provides pure symbolic integration using the Risch algorithm and other symbolic
+methods. Unlike numerical methods, it returns exact symbolic results with rational coefficients (e.g., `1//2`
+instead of `0.5`). The package implements a flexible framework for symbolic integration that uses Julia's
+multiple dispatch to select appropriate algorithms for different types of integrands.
+
+The main integration method is `RischMethod`, which implements the Risch algorithm for integrating:
+- Polynomial functions
+- Rational functions  
+- Exponential functions
+- Logarithmic functions
+- Trigonometric functions
+- Combinations of the above
+
+For using SymbolicIntegration.jl, see [the SymbolicIntegration.jl repository](https://github.com/JuliaSymbolics/SymbolicIntegration.jl) 
+for more details. Quick examples:
+
+```julia
+using Symbolics
+using SymbolicIntegration
+
+@variables x
+
+# Basic integrations
+integrate(x^2, x)           # Returns (1//3)*(x^3)
+integrate(1/x, x)           # Returns log(x)
+integrate(exp(x), x)        # Returns exp(x)
+integrate(1/(x^2 + 1), x)   # Returns atan(x)
+
+# Rational function with complex roots
+f = (x^3 + x^2 + x + 2)/(x^4 + 3*x^2 + 2)
+integrate(f, x)  # Returns (1//2)*log(2 + x^2) + atan(x)
+
+# Nested transcendental functions
+integrate(1/(x*log(x)), x)  # Returns log(log(x))
+
+# Explicit method selection
+integrate(sin(x)*cos(x), x, RischMethod())
+
+# Configurable method
+risch = RischMethod(use_algebraic_closure=true, catch_errors=false)
+integrate(exp(x)/(1 + exp(x)), x, risch)
+```
 
 ### SymbolicNumericIntegration.jl
 
