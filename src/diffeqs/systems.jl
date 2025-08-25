@@ -99,7 +99,7 @@ function symbolic_eigen(A::Matrix{<:Number})
     
     for value in values
         eqs = (value*I - A) * v# .~ zeros(size(A, 1)) # equations to give eigenvectors
-        eqs = substitute(eqs, Dict(v[1] => 1)) # set first element to 1 to constrain solution space
+        eqs = fast_substitute(eqs, Dict(v[1] => 1)) # set first element to 1 to constrain solution space
 
         sol = symbolic_solve(eqs[1:end-1], v[2:end]) # solve all but one equation (because of constraining solutions above)
 
