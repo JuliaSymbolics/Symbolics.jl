@@ -15,6 +15,22 @@ function _get_der_order(expr, x, t)
     return _get_der_order(substitute(expr, Dict(Differential(t)(x) => x)), x, t) + 1
 end
 
+"""
+    unwrap_der(expr, Dt)
+
+Helper function to unwrap derivatives of `f(t)` in `expr` with respect to the differential operator `Dt = Differential(t)`. Returns a tuple `(n, base_expr)`, where `n` is the order of the derivative and `base_expr` is the expression with the derivatives removed. If `expr` does not contain `f(t)` or its derivatives, returns `(0, expr)`.
+"""
+function unwrap_der(expr, Dt)
+    reduce_rule = @rule Dt(~x) => ~x
+
+    if reduce_rule(expr) === nothing
+        return 0, expr
+    end
+
+    order, expr = unwrap_der(reduce_rule(expr), Dt)
+    return order + 1, expr
+end
+
 # takes into account fractions
 function _true_factors(expr)
     facs = factors(expr)
