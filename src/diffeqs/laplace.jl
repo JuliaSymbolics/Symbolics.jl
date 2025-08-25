@@ -186,7 +186,7 @@ function laplace_solve_ode(eq, f, t, f0)
     s = variable(:𝓈)
     @syms 𝓕(s)
     transformed_eq = laplace(eq, f, t, 𝓕, s)
-    transformed_eq = substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:f0, i-1) => f0[i] for i=1:length(f0)]...))
+    transformed_eq = fast_substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:f0, i-1) => f0[i] for i=1:length(f0)]...))
     transformed_eq = expand(transformed_eq.lhs - transformed_eq.rhs)
 
     F_terms = 0

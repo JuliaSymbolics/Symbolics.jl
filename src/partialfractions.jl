@@ -90,7 +90,7 @@ function partial_frac_decomposition(expr, x)
             # cover up method
             other_facs = filter(f -> !isequal(f, fac), facs)
             
-            numerator = rationalize(unwrap(substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root)))) # plug in root to expression without its factor in denominator
+            numerator = rationalize(unwrap(fast_substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root)))) # plug in root to expression without its factor in denominator
             push!(result, numerator / fac.expr^fac.multiplicity)
 
             if fac.multiplicity > 1
@@ -114,7 +114,7 @@ function partial_frac_decomposition(expr, x)
         solution = Dict(variable(:𝒞, 1) => solution)
     end
     
-    return sum(substitute.(result, Ref(solution)) ./ leading_coeff) # substitute solutions back in and sum
+    return sum(fast_substitute.(result, Ref(solution)) ./ leading_coeff) # fast_substitute solutions back in and sum
 end
 
 # increasing from 0 to degree n. doesn't skip powers of x like polynomial_coeffs
