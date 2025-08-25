@@ -161,7 +161,7 @@ function factorize(expr, x)
         if !isequal(abs(imag(root)), 0)
             fac_expr = expand((x - root)*(x - conj(root)))
             if !isequal(imag(fac_expr), 0)
-                @warn "Encountered issue with complex irrational roots"
+                @warn "Encountered issue with complex irrational roots. Returning nothing."
                 return nothing
             end
             push!(facs, Factor(real(fac_expr), counts[root], x))
