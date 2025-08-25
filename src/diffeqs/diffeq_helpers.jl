@@ -12,13 +12,29 @@ function _get_der_order(expr, x, t)
         return maximum(_get_der_order.(factors(expr), Ref(x), Ref(t)))
     end
 
-    return _get_der_order(substitute(expr, Dict(Differential(t)(x) => x)), x, t) + 1
+    return _get_der_order(fast_substitute(expr, Dict(Differential(t)(x) => x)), x, t) + 1
+end
+
+"""
+    unwrap_der(expr, Dt)
+
+Helper function to unwrap derivatives of `f(t)` in `expr` with respect to the differential operator `Dt = Differential(t)`. Returns a tuple `(n, base_expr)`, where `n` is the order of the derivative and `base_expr` is the expression with the derivatives removed. If `expr` does not contain `f(t)` or its derivatives, returns `(0, expr)`.
+"""
+function unwrap_der(expr, Dt)
+    reduce_rule = @rule Dt(~x) => ~x
+
+    if reduce_rule(expr) === nothing
+        return 0, expr
+    end
+
+    order, expr = unwrap_der(reduce_rule(expr), Dt)
+    return order + 1, expr
 end
 
 # takes into account fractions
 function _true_factors(expr)
     facs = factors(expr)
-    true_facs::Vector{Number} = []
+    true_facs::Vector{Real} = []
     frac_rule = @rule (~x)/(~y) => [~x, 1/~y]
     for fac in facs
         frac = frac_rule(fac)
@@ -45,7 +61,7 @@ function reduce_order(eq, x, t, ys)
     
     # reduction of order
     y_sub = Dict([[(Dt^i)(x) => ys[i+1] for i=0:n-1]; (Dt^n)(x) => variable(:𝒴)])
-    eq = substitute(eq, y_sub)
+    eq = fast_substitute(eq, y_sub)
     
     # isolate (Dt^n)(x)
     f = symbolic_linear_solve(eq, variable(:𝒴), check=false)
@@ -60,7 +76,7 @@ function unreduce_order(expr, x, t, ys)
     Dt = Differential(t)
     rev_y_sub = Dict(ys[i] => (Dt^(i-1))(x) for i in eachindex(ys))
 
-    return substitute(expr, rev_y_sub)
+    return fast_substitute(expr, rev_y_sub)
 end
 
 function is_solution(solution, eq::Equation, x, t)
