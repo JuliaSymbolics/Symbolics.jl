@@ -372,8 +372,7 @@ end
         Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)]))
 end false
 
-for (ff, opts) in [sum => (identity, +, false),
-    prod => (identity, *, true),
+for (ff, opts) in [
     any => (identity, (|), false),
     all => (identity, (&), true)]
 
@@ -385,5 +384,17 @@ for (ff, opts) in [sum => (identity, +, false),
     @eval @wrapped function (::$(typeof(ff)))(f::Function, x::AbstractArray;
         dims=:, init=$init)
         mapreduce(f, $g, x, dims=dims, init=init)
+    end false
+end
+
+for (ff, opts) in [sum => (identity, +),
+    prod => (identity, *)]
+
+    f, g = opts
+    @eval @wrapped function (::$(typeof(ff)))(x::AbstractArray; kw...)
+        mapreduce($f, $g, x; kw...)
+    end false
+    @eval @wrapped function (::$(typeof(ff)))(f::Function, x::AbstractArray; kw...)
+        mapreduce(f, $g, x; kw...)
     end false
 end
