@@ -52,14 +52,21 @@ Currently relies mostly on linearity and a rules table. When the rules table doe
 """
 function laplace(expr, f, t, F, s)
     expr = expand(expr)
+
+    if isequal(expr, 0)
+        return 0
+    end
+
     Dt = Differential(t)
 
     transformed = transform_rules(f, t, F, s)(expr)
+
+    # Check if transformation was successful
     if !isequal(transformed, expr)
         return transformed
     end
 
-    # t-derivative rule
+    # t-derivative rule ((Dt^n)(f(t)) -> s^n*F(s) - s^(n-1)*f(0) - s^(n-2)*f'(0) - ... - f^(n-1)(0))
     n, expr = unwrap_der(expr, Dt)
     if n != 0 && isequal(expr, f(t))
         f0 = Symbolics.variables(:f0, 0:(n-1))
@@ -73,9 +80,13 @@ function laplace(expr, f, t, F, s)
 
     terms = Symbolics.terms(expr)
     result = 0
+
+    # unable to apply linearity, so return based on definition
     if length(terms) == 1 && length(filter(x->isempty(Symbolics.get_variables(x)), _true_factors(terms[1]))) == 0
         return Integral(t in ClosedInterval(0, Inf))(expr*exp(-s*t))
     end
+
+    # apply linearity by splitting into terms and factoring out constants
     for term in terms
         factors = _true_factors(wrap(term))
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
@@ -144,6 +155,8 @@ function inverse_laplace(expr, F, s, f, t)
     end
 
     transformed = inverse_transform_rules(F, s, f, t)(expr)
+
+    # Check if transformation was successful
     if !isequal(transformed, expr)
         return transformed
     end
@@ -156,7 +169,7 @@ function inverse_laplace(expr, F, s, f, t)
         return nothing # no result
     end
 
-    # apply linearity
+    # apply linearity by splitting into terms and factoring out constants
     for term in _terms
         factors = _true_factors(term)
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
@@ -184,10 +197,14 @@ Solves the ordinary differential equation `eq` for the function `f(t)` using the
 function laplace_solve_ode(eq, f, t, f0)
     s = variable(:𝓈)
     @syms 𝓕(s)
+
+    # transform equation
     transformed_eq = laplace(eq, f, t, 𝓕, s)
+    # substitute in initial conditions
     transformed_eq = fast_substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:f0, i-1) => f0[i] for i=1:length(f0)]...))
     transformed_eq = expand(transformed_eq.lhs - transformed_eq.rhs)
 
+    # solve for/isolate F(s)
     F_terms = 0
     other_terms = []
     for term in terms(transformed_eq)
@@ -202,7 +219,9 @@ function laplace_solve_ode(eq, f, t, f0)
         other_terms = 0
     end
 
+    # (a + b + ...)*F(s) = (c + d + ...)  ->  F(s) = (c + d + ...) / (a + b + ...)
     transformed_soln = simplify(sum(other_terms ./ F_terms))
 
+    # perform inverse laplace transform to get f(t)
     return expand(inverse_laplace(transformed_soln, 𝓕, s, f, t))
 end
