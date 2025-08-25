@@ -35,8 +35,8 @@ transform_rules(f, t, F, s) = Symbolics.Chain([
     @rule t^~n * exp(t) => factorial(~n) / (s)^(~n + 1)
     @rule t*exp(t) => 1 / (s)^(2)
     @rule exp(~c*t) * ~g => laplace(~g, f, t, F, s - ~c) # s-shift rule
-    @rule t*f(t) => -Ds(F(s)) # s-derivative rule
-    @rule t^(~n)*f(t) => (-1)^(~n) * (Ds^~n)(F(s)) # s-derivative rule
+    @rule t*f(t) => -Differential(s)(F(s)) # s-derivative rule
+    @rule t^(~n)*f(t) => (-1)^(~n) * (Differential(s)^~n)(F(s)) # s-derivative rule
     @rule f(~a + t) => exp(~a*s)*F(s) # t-shift rule
     @rule f(t) => F(s)
 ])
@@ -53,7 +53,6 @@ Currently relies mostly on linearity and a rules table. When the rules table doe
 function laplace(expr, f, t, F, s)
     expr = expand(expr)
     Dt = Differential(t)
-    Ds = Differential(s)
 
     transformed = transform_rules(f, t, F, s)(expr)
     if !isequal(transformed, expr)
