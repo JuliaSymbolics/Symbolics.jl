@@ -95,7 +95,7 @@ function laplace(expr::Equation, f, t, F, s)
 end
 
 # postprocess_root prevents automatic evaluation of sqrt to its floating point value
-function _sqrt(x)
+function processed_sqrt(x)
     return postprocess_root(term(sqrt, x))
 end
 
@@ -105,15 +105,15 @@ inverse_transform_rules(F, s, f, t) = Symbolics.Chain([
     @rule 1/(~a + s) => exp(-~a * t)
     @rule 1/s^(~n) => t^(~n-1) / factorial(~n-1)
     @rule 1/(2 * s^(3/2)) => sqrt(t)/term(term(sqrt, pi))
-    @rule 1/(~a + s^2) => sin(_sqrt(~a) * t)/_sqrt(~a)
-    @rule s/(~a + s^2) => cos(_sqrt(~a) * t)
-    @rule s / (~a + s^2)^2 => t*sin(_sqrt(~a) * t)/(2*_sqrt(~a))
-    @rule (-~a + s^2) / (~a + s^2)^2 => t*cos(_sqrt(~a) * t)
-    @rule 1 / (~a + s^2)^2 => (sin(_sqrt(~a)*t) - _sqrt(~a)*t*cos(_sqrt(~a)*t))/ (2*_sqrt(~a)^3)
-    @rule s^2 / (~a + s^2)^2 => (sin(_sqrt(~a)*t) + _sqrt(~a)*t*cos(_sqrt(~a)*t)) / (2*_sqrt(~a))
-    @rule s*(~a + s^2) / (~a + s^2)^2 => cos(_sqrt(~a)*t) - _sqrt(~a)*t*sin(_sqrt(~a)*t)
-    @rule s*(3*~a + s^2) / (~a + s^2)^2 => cos(_sqrt(~a)*t) + _sqrt(~a)*t*sin(_sqrt(~a)*t)
-    @rule (s*sin(~b) + ~a*cos(~b)) / (~a + s^2) => sin(~b + _sqrt(~a)*t)
+    @rule 1/(~a + s^2) => sin(processed_sqrt(~a) * t)/processed_sqrt(~a)
+    @rule s/(~a + s^2) => cos(processed_sqrt(~a) * t)
+    @rule s / (~a + s^2)^2 => t*sin(processed_sqrt(~a) * t)/(2*processed_sqrt(~a))
+    @rule (-~a + s^2) / (~a + s^2)^2 => t*cos(processed_sqrt(~a) * t)
+    @rule 1 / (~a + s^2)^2 => (sin(processed_sqrt(~a)*t) - processed_sqrt(~a)*t*cos(processed_sqrt(~a)*t))/ (2*processed_sqrt(~a)^3)
+    @rule s^2 / (~a + s^2)^2 => (sin(processed_sqrt(~a)*t) + processed_sqrt(~a)*t*cos(processed_sqrt(~a)*t)) / (2*processed_sqrt(~a))
+    @rule s*(~a + s^2) / (~a + s^2)^2 => cos(processed_sqrt(~a)*t) - processed_sqrt(~a)*t*sin(processed_sqrt(~a)*t)
+    @rule s*(3*~a + s^2) / (~a + s^2)^2 => cos(processed_sqrt(~a)*t) + processed_sqrt(~a)*t*sin(processed_sqrt(~a)*t)
+    @rule (s*sin(~b) + ~a*cos(~b)) / (~a + s^2) => sin(~b + processed_sqrt(~a)*t)
     @rule (s*cos(~b) - ~a*sin(~b)) / ((~a)^2 + s^2) => cos(~b + ~a*t)
     @rule 1/(s^2 - (~b)^2) => sinh(~b * t)/~b
     @rule s/(s^2 - (~b)^2) => cosh(~b * t)
@@ -173,22 +173,6 @@ end
 
 function inverse_laplace(expr::Equation, F, s, f, t)
     return inverse_laplace(expr.lhs, F, s, f, t) ~ inverse_laplace(expr.rhs, F, s, f, t)
-end
-
-"""
-    unwrap_der(expr, Dt)
-
-Helper function to unwrap derivatives of `f(t)` in `expr` with respect to the differential operator `Dt = Differential(t)`. Returns a tuple `(n, base_expr)`, where `n` is the order of the derivative and `base_expr` is the expression with the derivatives removed. If `expr` does not contain `f(t)` or its derivatives, returns `(0, expr)`.
-"""
-function unwrap_der(expr, Dt)
-    reduce_rule = @rule Dt(~x) => ~x
-
-    if reduce_rule(expr) === nothing
-        return 0, expr
-    end
-
-    order, expr = unwrap_der(reduce_rule(expr), Dt)
-    return order + 1, expr
 end
 
 """
