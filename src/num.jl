@@ -31,6 +31,18 @@ Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
 
+"""
+    ifelse(cond::Num, x, y)
+
+Symbolic conditional expression. Returns `x` if `cond` evaluates to true, and `y` if `cond` 
+evaluates to false. This allows encoding conditional logic in symbolic expressions.
+
+# Examples
+```julia
+@variables a b c
+ifelse(a > b, c, 0)  # Returns c if a > b, otherwise 0
+```
+"""
 Base.ifelse(x::Num, y, z) = Num(ifelse(value(x), value(y), value(z)))
 
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
