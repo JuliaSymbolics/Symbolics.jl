@@ -37,7 +37,7 @@ Symbolics.symbolic_solve_ode
 
 ### Continuous Dynamical Systems
 ```@docs
-Symbolics.solve_linear_system
+Symbolics.solve_linear_ode
 ```
 
 ### SymPy 
