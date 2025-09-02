@@ -35,6 +35,12 @@ Symbolics.LinearODE
 Symbolics.symbolic_solve_ode
 ```
 
+### Initial Value Problems
+
+```@docs
+Symbolics.solve_IVP
+```
+
 ### Continuous Dynamical Systems
 ```@docs
 Symbolics.solve_linear_ode
@@ -44,4 +50,8 @@ Symbolics.solve_linear_ode
 
 ```@docs
 Symbolics.sympy_ode_solve
+```
+
+```@docs
+Symbolics.sympy_pythoncall_ode_solve
 ```

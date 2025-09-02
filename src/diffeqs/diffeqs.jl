@@ -560,6 +560,35 @@ function solve_IVP(ivp::IVP)
 end
 
 """
+    solve_IVP(eq::LinearODE, initial_conditions::Vector{<:Number})
+
+Solve an initial value problem for a linear ODE with given initial conditions.
+
+# Arguments
+- `eq`: A `LinearODE` to solve
+- `initial_conditions`: Vector of initial conditions for x(0), x'(0), x''(0), etc.
+
+# Returns
+Symbolic solution satisfying the initial conditions
+
+# Examples
+```jldoctest
+julia> using Symbolics
+julia> @variables x, t
+2-element Vector{Num}:
+ x
+ t
+
+julia> eq = LinearODE(x, t, [-3, 2], 0)  # d²x/dt² + 2dx/dt - 3x = 0
+julia> solve_IVP(eq, [1, -1])  # x(0) = 1, x'(0) = -1
+(1//2)*exp(-3t) + (1//2)*exp(t)
+```
+"""
+function solve_IVP(eq::LinearODE, initial_conditions::Vector{<:Number})
+    return solve_IVP(IVP(eq, initial_conditions))
+end
+
+"""
 Solve Clairaut's equation of the form x = x'*t + f(x').
 
 Returns solution of the form x = C*t + f(C) where C is a constant.
