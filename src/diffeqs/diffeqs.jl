@@ -18,20 +18,20 @@ julia> @variables x, t
  x
  t
 
-julia> eq = LinearODE(x, t, [1, 2, 3], 3exp(4t))
+julia> eq = SymbolicLinearODE(x, t, [1, 2, 3], 3exp(4t))
 (Dt^3)x + (3)(Dt^2)x + (2)(Dt^1)x + (1)(Dt^0)x ~ 3exp(4t)
 ```
 """
-struct LinearODE
+struct SymbolicLinearODE
     x::Num
     t::Num
     p::AbstractArray
     q::Any
     C::Vector{Num}
 
-    LinearODE(x, t, p, q) = new(x, t, p, q, variables(:C, 1:length(p)))
+    SymbolicLinearODE(x, t, p, q) = new(x, t, p, q, variables(:C, 1:length(p)))
 
-    function LinearODE(expr, x, t)
+    function SymbolicLinearODE(expr, x, t)
         if expr isa Equation
             expr = expr.lhs - expr.rhs
         end
@@ -76,15 +76,15 @@ function is_linear_ode(expr, x, t)
     return islinear && all(isempty.(get_variables.(A, x)))
 end
 
-Dt(eq::LinearODE) = Differential(eq.t)
-order(eq::LinearODE) = length(eq.p)
+Dt(eq::SymbolicLinearODE) = Differential(eq.t)
+order(eq::SymbolicLinearODE) = length(eq.p)
 
-"""Generates symbolic expression to represent `LinearODE`"""
-function get_expression(eq::LinearODE)
+"""Generates symbolic expression to represent `SymbolicLinearODE`"""
+function get_expression(eq::SymbolicLinearODE)
     (Dt(eq)^order(eq))(eq.x) + sum([(eq.p[n]) * (Dt(eq)^(n - 1))(eq.x) for n in 1:length(eq.p)]) ~ eq.q
 end
 
-function Base.string(eq::LinearODE)
+function Base.string(eq::SymbolicLinearODE)
     "(D$(eq.t)^$(order(eq)))$(eq.x) + " *
     join(
         ["($(eq.p[length(eq.p)-n]))(D$(eq.t)^$(length(eq.p)-n-1))$(eq.x)"
@@ -92,25 +92,25 @@ function Base.string(eq::LinearODE)
         " + ") * " ~ $(eq.q)"
 end
 
-Base.print(io::IO, eq::LinearODE) = print(io, string(eq))
-Base.show(io::IO, eq::LinearODE) = print(io, eq)
-Base.isequal(eq1::LinearODE, eq2::LinearODE) =
+Base.print(io::IO, eq::SymbolicLinearODE) = print(io, string(eq))
+Base.show(io::IO, eq::SymbolicLinearODE) = print(io, eq)
+Base.isequal(eq1::SymbolicLinearODE, eq2::SymbolicLinearODE) =
     isequal(eq1.x, eq2.x) && isequal(eq1.t, eq2.t) &&
     isequal(eq1.p, eq2.p) && isequal(eq1.q, eq2.q)
 
 """Returns true if q(t) = 0 for linear ODE `eq`"""
-is_homogeneous(eq::LinearODE) = isempty(Symbolics.get_variables(eq.q))
+is_homogeneous(eq::SymbolicLinearODE) = isempty(Symbolics.get_variables(eq.q))
 """Returns true if all coefficient functions p(t) of `eq` are constant"""
-has_const_coeffs(eq::LinearODE) = all(isempty.(Symbolics.get_variables.(eq.p)))
+has_const_coeffs(eq::SymbolicLinearODE) = all(isempty.(Symbolics.get_variables.(eq.p)))
 """Returns homgeneous version of `eq` where q(t) = 0"""
-to_homogeneous(eq::LinearODE) = LinearODE(eq.x, eq.t, eq.p, 0)
+to_homogeneous(eq::SymbolicLinearODE) = SymbolicLinearODE(eq.x, eq.t, eq.p, 0)
 
 """
 Returns the characteristic polynomial p of `eq` (must have constant coefficients) in terms of variable `r`
 
 p(D) = Dⁿ + aₙ₋₁Dⁿ⁻¹ + ... + a₁D + a₀I
 """
-function characteristic_polynomial(eq::LinearODE, r)
+function characteristic_polynomial(eq::SymbolicLinearODE, r)
     poly = 0
     @assert has_const_coeffs(eq) "ODE must have constant coefficients to generate characteristic polynomial"
     p = [eq.p; 1] # add implied coefficient of 1 to highest order
@@ -122,11 +122,11 @@ function characteristic_polynomial(eq::LinearODE, r)
 end
 
 """
-    symbolic_solve_ode(eq::LinearODE)
+    symbolic_solve_ode(eq::SymbolicLinearODE)
 Symbolically solve a linear ordinary differential equation
 
 # Arguments
-- eq: a `LinearODE` to solve
+- eq: a `SymbolicLinearODE` to solve
 
 # Returns
 Symbolic solution to the ODE
@@ -149,22 +149,22 @@ julia> @variables x, t
  t
 
 # Integrating Factor (note that SymPy is required for integration)
-julia> symbolic_solve_ode(LinearODE(x, t, [5/t], 7t))
+julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [5/t], 7t))
 (C₁ + t^7) / (t^5)
 
 # Constant Coefficients and RRF (note that Nemo is required to find characteristic roots)
-julia> symbolic_solve_ode(LinearODE(x, t, [9, -6], 4exp(3t)))
+julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [9, -6], 4exp(3t)))
 C₁*exp(3t) + C₂*t*exp(3t) + (2//1)*(t^2)*exp(3t)
 
-julia> symbolic_solve_ode(LinearODE(x, t, [6, 5], 2exp(-t)*cos(t)))
+julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [6, 5], 2exp(-t)*cos(t)))
 C₁*exp(-2t) + C₂*exp(-3t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
 
 # Method of Undetermined Coefficients
-julia> symbolic_solve_ode(LinearODE(x, t, [-3, 2], 2t - 5))
+julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5))
 (11//9) - (2//3)*t + C₁*exp(t) + C₂*exp(-3t)
 ```
 """
-function symbolic_solve_ode(eq::LinearODE)
+function symbolic_solve_ode(eq::SymbolicLinearODE)
     homogeneous_solutions = find_homogeneous_solutions(eq)
     
     if is_homogeneous(eq) && homogeneous_solutions !== nothing
@@ -191,7 +191,7 @@ Symbolically solve an ODE
 - t: independent variable
 
 # Supported Methods
-- all methods of solving linear ODEs mentioned for `symbolic_solve_ode(eq::LinearODE)`
+- all methods of solving linear ODEs mentioned for `symbolic_solve_ode(eq::SymbolicLinearODE)`
 - Clairaut's equation
 - Bernoulli equations
 
@@ -208,7 +208,7 @@ julia> @variables x, t
 julia> Dt = Differential(t)
 Differential(t)
 
-# LinearODE (via constant coefficients and RRF)
+# SymbolicLinearODE (via constant coefficients and RRF)
 julia> symbolic_solve_ode(9t*x - 6*Dt(x) ~ 4exp(3t), x, t)
 C₁*exp(3t) + C₂*t*exp(3t) + (2//1)*(t^2)*exp(3t)
 
@@ -233,7 +233,7 @@ function symbolic_solve_ode(expr::Equation, x, t)
     end
 
     if is_linear_ode(expr, x, t)
-        eq = LinearODE(expr, x, t)
+        eq = SymbolicLinearODE(expr, x, t)
         return symbolic_solve_ode(eq)
     end
 end
@@ -243,7 +243,7 @@ Find homogeneous solutions of linear ODE `eq` with integration constants of `eq.
 
 Currently only works for constant coefficient ODEs
 """
-function find_homogeneous_solutions(eq::LinearODE)
+function find_homogeneous_solutions(eq::SymbolicLinearODE)
     if has_const_coeffs(eq)
         return const_coeff_solve(to_homogeneous(eq))
     end
@@ -254,11 +254,11 @@ Find a particular solution to linear ODE `eq`
 
 Currently works for any linear combination of exponentials, sin, cos, or an exponential times sin or cos (e.g. e^2t * cos(-t) + e^-3t + sin(5t))
 """
-function find_particular_solution(eq::LinearODE)
+function find_particular_solution(eq::SymbolicLinearODE)
     # if q has multiple terms, find a particular solution for each and sum together
     terms = Symbolics.terms(eq.q)
     if length(terms) != 1
-        solutions = find_particular_solution.(LinearODE.(Ref(eq.x), Ref(eq.t), Ref(eq.p), terms))
+        solutions = find_particular_solution.(SymbolicLinearODE.(Ref(eq.x), Ref(eq.t), Ref(eq.p), terms))
         if any(s -> s === nothing, solutions)
             return nothing
         end
@@ -287,7 +287,7 @@ Returns homogeneous solutions to linear ODE `eq` with constant coefficients
 
 xₕ(t) = C₁e^(r₁t) + C₂e^(r₂t) + ... + Cₙe^(rₙt)
 """
-function const_coeff_solve(eq::LinearODE)
+function const_coeff_solve(eq::SymbolicLinearODE)
     @variables 𝓇
     p = characteristic_polynomial(eq, 𝓇)
     roots = symbolic_solve(p, 𝓇, dropmultiplicity = false)
@@ -319,7 +319,7 @@ end
 """
 Solve almost any first order ODE using an integrating factor. Requires SymPy!
 """
-function integrating_factor_solve(eq::LinearODE)
+function integrating_factor_solve(eq::SymbolicLinearODE)
     p = eq.p[1] # only p
     v = 0 # integrating factor
     if isempty(Symbolics.get_variables(p))
@@ -381,7 +381,7 @@ end
 """
 For finding particular solution when q(t) = a*e^(rt)*cos(bt) (or sin(bt))
 """
-function exp_trig_particular_solution(eq::LinearODE)
+function exp_trig_particular_solution(eq::SymbolicLinearODE)
     facs = _true_factors(eq.q)
 
     a = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [eq.t])), facs))
@@ -432,7 +432,7 @@ Exponential Response Formula: x_p(t) = a*e^(rt)/p(r) where p(r) is characteristi
 
 Resonant Response Formula: If r is a characteristic root, multiply by t and take the derivative of p (possibly multiple times)
 """
-function resonant_response_formula(eq::LinearODE)
+function resonant_response_formula(eq::SymbolicLinearODE)
     @assert has_const_coeffs(eq)
 
     # get a and r from q = a*e^(rt)
@@ -455,7 +455,7 @@ function resonant_response_formula(eq::LinearODE)
                            (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)))))
 end
 
-function method_of_undetermined_coefficients(eq::LinearODE)
+function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
     # constant
     p = eq.p[1]
     if isempty(Symbolics.get_variables(p, eq.t)) && isempty(Symbolics.get_variables(eq.q, eq.t))
@@ -526,16 +526,16 @@ end
 Initial value problem (IVP) for a linear ODE
 """
 struct IVP
-    eq::LinearODE
+    eq::SymbolicLinearODE
     initial_conditions::Vector{Num} # values at t = 0 of nth derivative of x
 
-    function IVP(eq::LinearODE, initial_conditions::Vector{<:Number})
+    function IVP(eq::SymbolicLinearODE, initial_conditions::Vector{<:Number})
         @assert length(initial_conditions) == order(eq) "# of Initial conditions must match order of ODE"
         new(eq, initial_conditions)
     end
 end
 
-function solve_IVP(ivp::IVP)
+function solve_symbolic_IVP(ivp::IVP)
     general_solution = symbolic_solve_ode(ivp.eq)
     if general_solution === nothing
         return nothing
@@ -557,6 +557,35 @@ function solve_IVP(ivp::IVP)
     end
 
     return expand(simplify(substitute(general_solution, symbolic_solve(eqs, ivp.eq.C)[1])))
+end
+
+"""
+    solve_symbolic_IVP(eq::SymbolicLinearODE, initial_conditions::Vector{<:Number})
+
+Solve an initial value problem for a linear ODE with given initial conditions.
+
+# Arguments
+- `eq`: A `SymbolicLinearODE` to solve
+- `initial_conditions`: Vector of initial conditions for x(0), x'(0), x''(0), etc.
+
+# Returns
+Symbolic solution satisfying the initial conditions
+
+# Examples
+```jldoctest
+julia> using Symbolics
+julia> @variables x, t
+2-element Vector{Num}:
+ x
+ t
+
+julia> eq = SymbolicLinearODE(x, t, [-3, 2], 0)  # d²x/dt² + 2dx/dt - 3x = 0
+julia> solve_symbolic_IVP(eq, [1, -1])  # x(0) = 1, x'(0) = -1
+(1//2)*exp(-3t) + (1//2)*exp(t)
+```
+"""
+function solve_symbolic_IVP(eq::SymbolicLinearODE, initial_conditions::Vector{<:Number})
+    return solve_symbolic_IVP(IVP(eq, initial_conditions))
 end
 
 """
@@ -602,7 +631,7 @@ function solve_clairaut(expr, x, t)
 end
 
 """
-Linearize a Bernoulli equation of the form dx/dt + p(t)x = q(t)x^n into a `LinearODE` of the form dv/dt + (1-n)p(t)v = (1-n)q(t) where v = x^(1-n)
+Linearize a Bernoulli equation of the form dx/dt + p(t)x = q(t)x^n into a `SymbolicLinearODE` of the form dv/dt + (1-n)p(t)v = (1-n)q(t) where v = x^(1-n)
 """
 function linearize_bernoulli(expr, x, t, v)
     Dt = Differential(t)
@@ -643,7 +672,7 @@ function linearize_bernoulli(expr, x, t, v)
     p //= leading_coeff
     q //= leading_coeff
     
-    return LinearODE(v, t, [p*(1-n)], q*(1-n)), n
+    return SymbolicLinearODE(v, t, [p*(1-n)], q*(1-n)), n
 end
 
 """
