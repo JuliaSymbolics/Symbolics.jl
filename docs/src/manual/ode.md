@@ -35,13 +35,10 @@ Symbolics.SymbolicLinearODE
 Symbolics.symbolic_solve_ode
 ```
 
-### Initial Value Problems
-
 ```@docs
 Symbolics.solve_symbolic_IVP
 ```
 
-### Continuous Dynamical Systems
 ```@docs
 Symbolics.solve_linear_ode_system
 ```
