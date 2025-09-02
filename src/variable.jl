@@ -342,6 +342,60 @@ for f in [:iscall, :operation, :arguments]
     @eval SymbolicUtils.$f(x::CallWithMetadata) = $f(x.f)
 end
 
+"""
+    iscall(expr)
+
+Check if a symbolic expression `expr` represents a function call. Returns `true` if the 
+expression is a composite expression with an operation and arguments, `false` otherwise.
+
+This function is fundamental for traversing and analyzing symbolic expressions.
+
+# Examples
+```julia
+@variables x y
+expr = sin(x + y)
+iscall(expr)      # true - it's a function call to sin
+iscall(x)         # false - it's just a variable
+```
+"""
+SymbolicUtils.iscall
+
+"""
+    operation(expr)
+
+Extract the operation (function) from a symbolic function call expression.
+Only valid for expressions where `iscall(expr)` returns `true`.
+
+Returns the function/operator that is being applied in the expression.
+
+# Examples
+```julia
+@variables x y
+expr = sin(x + y)
+operation(expr)   # Returns the sin function
+operation(x + y)  # Returns the + operator
+```
+"""
+SymbolicUtils.operation
+
+"""
+    arguments(expr)
+
+Extract the arguments from a symbolic function call expression.
+Only valid for expressions where `iscall(expr)` returns `true`.
+
+Returns a tuple/vector containing the arguments passed to the operation.
+
+# Examples
+```julia
+@variables x y
+expr = sin(x + y)
+arguments(expr)   # Returns (x + y,)
+arguments(x + y)  # Returns (x, y)
+```
+"""
+SymbolicUtils.arguments
+
 SymbolicUtils.Code.toexpr(x::CallWithMetadata, st) = SymbolicUtils.Code.toexpr(x.f, st)
 
 CallWithMetadata(f) = CallWithMetadata(f, nothing)
