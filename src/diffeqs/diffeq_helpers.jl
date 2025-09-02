@@ -67,7 +67,7 @@ function is_solution(solution, eq::Equation, x, t)
     is_solution(solution, eq.lhs - eq.rhs, x, t)
 end
 
-function is_solution(solution, eq::LinearODE)
+function is_solution(solution, eq::SymbolicLinearODE)
     is_solution(solution, get_expression(eq), eq.x, eq.t)
 end
 

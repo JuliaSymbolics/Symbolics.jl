@@ -28,7 +28,7 @@ The analytical solution can be investigated symbolically using `observed(sys)`.
     This area is currently under heavy development. More solvers will be available in the near future.
 
 ```@docs
-Symbolics.LinearODE
+Symbolics.SymbolicLinearODE
 ```
 
 ```@docs
@@ -38,12 +38,12 @@ Symbolics.symbolic_solve_ode
 ### Initial Value Problems
 
 ```@docs
-Symbolics.solve_IVP
+Symbolics.solve_symbolic_IVP
 ```
 
 ### Continuous Dynamical Systems
 ```@docs
-Symbolics.solve_linear_ode
+Symbolics.solve_linear_ode_system
 ```
 
 ### SymPy 
