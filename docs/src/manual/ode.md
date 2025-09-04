@@ -28,16 +28,19 @@ The analytical solution can be investigated symbolically using `observed(sys)`.
     This area is currently under heavy development. More solvers will be available in the near future.
 
 ```@docs
-Symbolics.LinearODE
+Symbolics.SymbolicLinearODE
 ```
 
 ```@docs
 Symbolics.symbolic_solve_ode
 ```
 
-### Continuous Dynamical Systems
 ```@docs
-Symbolics.solve_linear_system
+Symbolics.solve_symbolic_IVP
+```
+
+```@docs
+Symbolics.solve_linear_ode_system
 ```
 
 ### Laplace Transform
@@ -54,4 +57,8 @@ Symbolics.laplace_solve_ode
 
 ```@docs
 Symbolics.sympy_ode_solve
+```
+
+```@docs
+Symbolics.sympy_pythoncall_ode_solve
 ```

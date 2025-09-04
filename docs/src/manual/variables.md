@@ -73,8 +73,9 @@ This will work for any floating-point input, as well as symbolic input.
 
 Control flow can be expressed in Symbolics.jl in the following way:
 
-- `ifelse(cond,x,y)`: this function allows to encode conditionals in
-  the symbolic branches.
+```@docs
+Base.ifelse(::Num, ::Any, ::Any)
+```
 
 ## Inspection Functions
 
