@@ -59,7 +59,7 @@ function is_linear_ode(expr, x, t)
     @assert n >= 1 "ODE must have at least one derivative"
     
     y_sub = Dict([[(Dt^i)(x) => ys[i+1] for i=0:n-1]; (Dt^n)(x) => variable(:𝒴)])
-    expr = substitute(expr, y_sub)
+    expr = fast_substitute(expr, y_sub)
 
     # isolate (Dt^n)(x)
     f = symbolic_linear_solve(expr, variable(:𝒴), check=false)
@@ -362,7 +362,7 @@ function get_rrf_coeff(q, t)
         return a, r_re + r_im * im
     end
 
-    a = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [t])), facs))
+    a = prod([1; filter(fac -> isempty(Symbolics.get_variables(fac, [t])), facs)])
 
     not_a = filter(fac -> !isempty(Symbolics.get_variables(fac, [t])), facs) # should just be e^(rt)
     if length(not_a) != 1
@@ -384,7 +384,7 @@ For finding particular solution when q(t) = a*e^(rt)*cos(bt) (or sin(bt))
 function exp_trig_particular_solution(eq::SymbolicLinearODE)
     facs = _true_factors(eq.q)
 
-    a = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [eq.t])), facs))
+    a = prod([1; filter(fac -> isempty(Symbolics.get_variables(fac, [eq.t])), facs)])
 
     not_a = filter(fac -> !isempty(Symbolics.get_variables(fac, [eq.t])), facs)
 
@@ -415,12 +415,12 @@ function exp_trig_particular_solution(eq::SymbolicLinearODE)
     @variables 𝓈
     p = characteristic_polynomial(eq, 𝓈)
     Ds = Differential(𝓈)
-    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)), 0)
+    while isequal(fast_substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)), 0)
         k += 1
     end
 
     rrf = expand(simplify(a * exp((r + b * im) * eq.t) * eq.t^k /
-                           (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
+                           (fast_substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
 
     return is_sin ? imag(rrf) : real(rrf)
 end
@@ -447,12 +447,12 @@ function resonant_response_formula(eq::SymbolicLinearODE)
     @variables 𝓈
     p = characteristic_polynomial(eq, 𝓈)
     Ds = Differential(𝓈)
-    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)), 0)
+    while isequal(fast_substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)), 0)
         k += 1
     end
 
     return expand(simplify(a * exp(r * eq.t) * eq.t^k /
-                           (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)))))
+                           (fast_substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)))))
 end
 
 function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
@@ -476,8 +476,8 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
         coeff_solution = nothing
     end
     
-    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution) && isequal(expand(substitute(eq_subbed, coeff_solution[1])), 0)
-        return substitute(form, coeff_solution[1])
+    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution) && isequal(expand(fast_substitute(eq_subbed, coeff_solution[1])), 0)
+        return fast_substitute(form, coeff_solution[1])
     end
 
     # exponential
@@ -487,13 +487,13 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
 
         r = coeff[2]
         form = a_form*exp(r*eq.t)
-        eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+        eq_subbed = fast_substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
         eq_subbed = simplify(expand((eq_subbed.lhs - eq_subbed.rhs) / exp(r*eq.t)))
         coeff_solution = solve_interms_ofvar(eq_subbed, eq.t)
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
-            return substitute(form, coeff_solution[1])
+            return fast_substitute(form, coeff_solution[1])
         end
     end
 
@@ -505,9 +505,9 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
     if parsed !== nothing
         ω = parsed[1]
         form = 𝒶*cos(ω*eq.t) + 𝒷*sin(ω*eq.t)
-        eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+        eq_subbed = fast_substitute(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
-        eq_subbed = expand(substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>𝒸𝓈, sin(ω*eq.t)=>𝓈𝓃)))
+        eq_subbed = expand(fast_substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>𝒸𝓈, sin(ω*eq.t)=>𝓈𝓃)))
         cos_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, 𝒸𝓈)), terms(eq_subbed)))/𝒸𝓈)
         sin_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, 𝓈𝓃)), terms(eq_subbed)))/𝓈𝓃)
         if !isempty(Symbolics.get_variables(cos_eq, [eq.t,𝓈𝓃,𝒸𝓈])) || !isempty(Symbolics.get_variables(sin_eq, [eq.t,𝓈𝓃,𝒸𝓈]))
@@ -517,7 +517,7 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
         end
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
-            return substitute(form, coeff_solution[1])
+            return fast_substitute(form, coeff_solution[1])
         end
     end
 end
@@ -556,7 +556,7 @@ function solve_symbolic_IVP(ivp::IVP)
         push!(eqs, eq)
     end
 
-    return expand(simplify(substitute(general_solution, symbolic_solve(eqs, ivp.eq.C)[1])))
+    return expand(simplify(fast_substitute(general_solution, symbolic_solve(eqs, ivp.eq.C)[1])))
 end
 
 """
@@ -622,7 +622,7 @@ function solve_clairaut(expr, x, t)
     end
 
     C = Symbolics.variable(:C, 1) # constant of integration
-    f = substitute(f, Dict(Dt(x) => C))
+    f = fast_substitute(f, Dict(Dt(x) => C))
     if !isempty(Symbolics.get_variables(f, [x]))
         return nothing
     end
@@ -649,7 +649,7 @@ function linearize_bernoulli(expr, x, t, v)
     for term in terms
         if Symbolics.hasderiv(Symbolics.value(term))
             facs = _true_factors(term)
-            leading_coeff = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
+            leading_coeff = prod([1; filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs)])
             if !isequal(term//leading_coeff, Dt(x))
                 return nothing
             end
@@ -661,10 +661,10 @@ function linearize_bernoulli(expr, x, t, v)
             end
 
             if isequal(x_fac[1], x)
-                p = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs))
+                p = prod([1; filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs)])
             else
                 n = degree(x_fac[1])
-                q = -prod(filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs))
+                q = -prod([1; filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs)])
             end
         end
     end
