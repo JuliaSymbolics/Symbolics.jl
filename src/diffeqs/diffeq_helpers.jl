@@ -15,38 +15,34 @@ function _get_der_order(expr, x, t)
     return _get_der_order(fast_substitute(expr, Dict(Differential(t)(x) => x)), x, t) + 1
 end
 
+function reduce_rule(expr, Dt)
+    iscall(expr) && isequal(operation(expr), Dt) ? wrap(arguments(expr)[1]) : nothing
+end
+
 """
     unwrap_der(expr, Dt)
 
 Helper function to unwrap derivatives of `f(t)` in `expr` with respect to the differential operator `Dt = Differential(t)`. Returns a tuple `(n, base_expr)`, where `n` is the order of the derivative and `base_expr` is the expression with the derivatives removed. If `expr` does not contain `f(t)` or its derivatives, returns `(0, expr)`.
 """
 function unwrap_der(expr, Dt)
-    reduce_rule = @rule Dt(~x) => ~x
 
-    if reduce_rule(expr) === nothing
+    if reduce_rule(unwrap(expr), Dt) === nothing
         return 0, expr
     end
 
-    order, expr = unwrap_der(reduce_rule(expr), Dt)
+    order, expr = unwrap_der(reduce_rule(unwrap(expr), Dt), Dt)
     return order + 1, expr
 end
 
 # takes into account fractions
 function _true_factors(expr)
-    facs = factors(expr)
-    true_facs::Vector{Real} = []
-    frac_rule = @rule (~x)/(~y) => [~x, 1/~y]
-    for fac in facs
-        frac = frac_rule(fac)
-        if frac !== nothing && !isequal(frac[1], 1)
-            append!(true_facs, _true_factors(frac[1]))
-            append!(true_facs, _true_factors(frac[2]))
-        else
-            push!(true_facs, fac)
-        end
-    end
+    expr = flatten_fractions(unwrap(expr)) # flatten nested fractions
 
-    return convert(Vector{Num}, true_facs)
+    numerator_factors = SymbolicUtils.numerators(unwrap(expr))
+    denominator_factors = SymbolicUtils.denominators(unwrap(expr))
+
+    facs = filter(fac -> !isequal(fac, 1), [numerator_factors; 1 ./ denominator_factors])
+    return isempty(facs) ? [1] : facs
 end
 
 """
@@ -98,15 +94,12 @@ function is_solution(solution, eq, x, t)
 end
 
 function _parse_trig(expr, t)
-    parse_sin = Symbolics.Chain([(@rule sin(t) => 1), (@rule sin(~x * t) => ~x)])
-    parse_cos = Symbolics.Chain([(@rule cos(t) => 1), (@rule cos(~x * t) => ~x)])
-
-    if !isequal(parse_sin(expr), expr)
-        return parse_sin(expr), true
+    if iscall(expr) && isequal(operation(expr), sin) && any(isequal.(t, factors(arguments(expr)[1])))
+        return arguments(expr)[1]/t, true
     end
 
-    if !isequal(parse_cos(expr), expr)
-        return parse_cos(expr), false
+    if iscall(expr) && isequal(operation(expr), cos) && any(isequal.(t, factors(arguments(expr)[1])))
+        return arguments(expr)[1]/t, false
     end
 
     return nothing

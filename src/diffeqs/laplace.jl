@@ -80,7 +80,7 @@ julia> laplace(log(t), f, t, F, s) # fallback to definition
 Integral(t, 0.0 .. Inf)(exp(-s*t)*log(t))
 ```
 """
-function laplace(expr, f, t, F, s)
+function laplace(expr, f, t, F, s; rules=nothing)
     expr = expand(expr)
 
     if isequal(expr, 0)
@@ -89,7 +89,11 @@ function laplace(expr, f, t, F, s)
 
     Dt = Differential(t)
 
-    transformed = transform_rules(f, t, F, s)(expr)
+    if rules === nothing
+        rules = transform_rules(f, t, F, s)
+    end
+
+    transformed = rules(expr)
 
     # Check if transformation was successful
     if !isequal(transformed, expr)
@@ -99,7 +103,7 @@ function laplace(expr, f, t, F, s)
     # t-derivative rule ((Dt^n)(f(t)) -> s^n*F(s) - s^(n-1)*f(0) - s^(n-2)*f'(0) - ... - f^(n-1)(0))
     n, expr = unwrap_der(expr, Dt)
     if n != 0 && isequal(expr, f(t))
-        f0 = Symbolics.variables(:f0, 0:(n-1))
+        f0 = Symbolics.variables(:𝒻0, 0:(n-1))
         transformed = s^n*F(s)
         for i = 1:n
             transformed -= s^(n-i)*f0[i]
@@ -121,9 +125,9 @@ function laplace(expr, f, t, F, s)
         factors = _true_factors(wrap(term))
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
         if !isempty(constant)
-            result += laplace(term / constant[1], f, t, F, s) * constant[1]
+            result += laplace(term / constant[1], f, t, F, s, rules=rules) * constant[1]
         else 
-            result += laplace(term, f, t, F, s)
+            result += laplace(term, f, t, F, s, rules=rules)
         end
     end
 
@@ -194,7 +198,7 @@ julia> inverse_laplace(1/s^4, F, s, f, t)
 (1//6)*(t^3)
 ```
 """
-function inverse_laplace(expr, F, s, f, t)
+function inverse_laplace(expr, F, s, f, t; rules=nothing)
     if isequal(expr, 0)
         return 0
     end
@@ -205,7 +209,11 @@ function inverse_laplace(expr, F, s, f, t)
         return inverse_laplace(partial_fractions, F, s, f, t)
     end
 
-    transformed = inverse_transform_rules(F, s, f, t)(expr)
+    if rules === nothing
+        rules = inverse_transform_rules(F, s, f, t)
+    end
+
+    transformed = rules(expr)
 
     # Check if transformation was successful
     if !isequal(transformed, expr)
@@ -225,9 +233,9 @@ function inverse_laplace(expr, F, s, f, t)
         factors = _true_factors(term)
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
         if !isempty(constant)
-            result += inverse_laplace(term / constant[1], F, s, f, t) * constant[1]
+            result += inverse_laplace(term / constant[1], F, s, f, t, rules=rules) * constant[1]
         else
-            result += inverse_laplace(term, F, s, f, t)
+            result += inverse_laplace(term, F, s, f, t, rules=rules)
         end
     end
 
@@ -270,7 +278,7 @@ function laplace_solve_ode(eq, f, t, f0)
     # transform equation
     transformed_eq = laplace(eq, f, t, 𝓕, s)
     # substitute in initial conditions
-    transformed_eq = fast_substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:f0, i-1) => f0[i] for i=1:length(f0)]...))
+    transformed_eq = fast_substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:𝒻0, i-1) => f0[i] for i=1:length(f0)]...))
     transformed_eq = expand(transformed_eq.lhs - transformed_eq.rhs)
 
     # solve for/isolate F(s)
