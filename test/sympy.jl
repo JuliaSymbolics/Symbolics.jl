@@ -13,14 +13,6 @@ end
 
 using Test
 
-# Load SymPy from the sympy test environment
-import Pkg
-let sympy_env = joinpath(@__DIR__, "sympy")
-    if isdir(sympy_env)
-        Pkg.activate(sympy_env)
-    end
-end
-
 using SymPy
 using Symbolics
 
