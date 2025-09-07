@@ -86,6 +86,67 @@ function get_variables!(vars, e::Equation, varlist=nothing)
   get_variables!(vars, e.rhs, varlist)
 end
 
+"""
+    get_differential_vars(e, varlist = nothing; sort::Bool = false)
+
+Return a vector of differential variables appearing in `e`, optionally restricting to variables in `varlist`.
+
+A differential variable is an expression where the operation is a `Differential`, such as `D(u)` where `D = Differential(x)`.
+
+Note that the returned differential variables are not wrapped in the `Num` type.
+
+# Examples
+```jldoctest
+julia> @variables t x u(x, t);
+
+julia> D = Differential(x); Dt = Differential(t);
+
+julia> expr = D(u) + Dt(u) + u + sin(D(u));
+
+julia> Symbolics.get_differential_vars(expr; sort = true)
+2-element Vector{SymbolicUtils.BasicSymbolic}:
+ Differential(x)(u(x, t))
+ Differential(t)(u(x, t))
+```
+"""
+function get_differential_vars(e::Num, varlist = nothing; sort::Bool = false)
+    get_differential_vars(unwrap(e), varlist; sort)
+end
+function get_differential_vars(e, varlist = nothing; sort::Bool = false)
+    vars = Vector{BasicSymbolic}()
+    get_differential_vars!(vars, e, varlist)
+    if sort
+        sort!(vars; by = string)
+    end
+    vars
+end
+
+get_differential_vars!(vars, e::Num, varlist=nothing) = get_differential_vars!(vars, value(e), varlist)
+get_differential_vars!(vars, e, varlist=nothing) = vars
+
+get_differential_vars!(vars, e::Number, varlist=nothing) = vars
+
+function get_differential_vars!(vars, e::Symbolic, varlist=nothing)
+    if is_derivative(e)
+        if isnothing(varlist) || any(isequal(e), varlist)
+            push!(vars, e)
+        end
+    end
+    
+    if iscall(e)
+        get_differential_vars!(vars, operation(e), varlist)
+        foreach(x -> get_differential_vars!(vars, x, varlist), arguments(e))
+    end
+    
+    unique!(vars)
+    return vars
+end
+
+function get_differential_vars!(vars, e::Equation, varlist=nothing)
+    get_differential_vars!(vars, e.lhs, varlist)
+    get_differential_vars!(vars, e.rhs, varlist)
+end
+
 # Sym / Term --> Symbol
 Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)

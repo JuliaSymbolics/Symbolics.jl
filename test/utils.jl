@@ -1,6 +1,6 @@
 using Symbolics
 import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap, 
-                  isblock, flatten_expr!, build_expr, get_variables, 
+                  isblock, flatten_expr!, build_expr, get_variables, get_differential_vars,
                   is_singleton, diff2term, tosymbol, lower_varname, 
                   makesubscripts, degree, coeff
 using SparseArrays
@@ -164,6 +164,84 @@ end
         xtt_true = diff2term(unwrap(D(D(x[1]))))
         @test isequal(xtt, xtt_true)
     end
+end
+
+@testset "get_differential_vars" begin
+    @variables t x u(x, t) v(t) w[1:2]
+    Dt = Differential(t)
+    Dx = Differential(x)
+
+    # Test with no differentials
+    expr1 = u + v + x
+    diff_vars1 = Symbolics.get_differential_vars(expr1)
+    @test length(diff_vars1) == 0
+
+    # Test with single differential
+    expr2 = Dt(u) + u
+    diff_vars2 = Symbolics.get_differential_vars(expr2)
+    @test length(diff_vars2) == 1
+    @test isequal(diff_vars2[1], Dt(u))
+
+    # Test with multiple differentials
+    expr3 = Dx(u) + Dt(u) + sin(Dt(v))
+    diff_vars3 = Symbolics.get_differential_vars(expr3)
+    @test length(diff_vars3) == 3
+    @test any(isequal(Symbolics.value(Dt(u))), diff_vars3)
+    @test any(isequal(Symbolics.value(Dx(u))), diff_vars3)
+    @test any(isequal(Symbolics.value(Dt(v))), diff_vars3)
+
+    # Test with nested differentials (finds both outer and inner)
+    expr4 = Dx(Dt(u)) + u
+    diff_vars4 = Symbolics.get_differential_vars(expr4)
+    @test length(diff_vars4) == 2
+    @test any(isequal(Symbolics.value(Dx(Dt(u)))), diff_vars4)
+    @test any(isequal(Symbolics.value(Dt(u))), diff_vars4)
+
+    # Test with duplicates (should be unique)
+    expr5 = Dt(u) + 2*Dt(u) + sin(Dt(u))
+    diff_vars5 = Symbolics.get_differential_vars(expr5)
+    @test length(diff_vars5) == 1
+    @test isequal(diff_vars5[1], Dt(u))
+
+    # Test sorting
+    expr6 = Dt(v) + Dx(u) + Dt(u)
+    diff_vars6_sorted = Symbolics.get_differential_vars(expr6; sort = true)
+    @test length(diff_vars6_sorted) == 3
+    # Should be sorted by string representation
+    strings = string.(diff_vars6_sorted)
+    @test issorted(strings)
+
+    # Test with varlist restriction  
+    target_vars = [Symbolics.value(Dt(u)), Symbolics.value(Dx(u))]
+    expr7 = Dt(u) + Dx(u) + Dt(v) + u
+    diff_vars7 = Symbolics.get_differential_vars(expr7, target_vars)
+    @test length(diff_vars7) == 2
+    @test any(isequal(Symbolics.value(Dt(u))), diff_vars7)
+    @test any(isequal(Symbolics.value(Dx(u))), diff_vars7)
+    @test !any(isequal(Symbolics.value(Dt(v))), diff_vars7)
+
+    # Test with Num wrapper
+    expr8 = Num(Dt(u)) + Num(u)
+    diff_vars8 = Symbolics.get_differential_vars(expr8)
+    @test length(diff_vars8) == 1
+    @test isequal(diff_vars8[1], Dt(u))
+
+    # Test with array elements
+    @variables z(t)[1:2]
+    Dz1 = Dt(z[1])
+    Dz2 = Dt(z[2])
+    expr9 = Dz1 + Dz2 + z[1]
+    diff_vars9 = Symbolics.get_differential_vars(expr9)
+    @test length(diff_vars9) == 2
+    @test any(isequal(Symbolics.value(Dz1)), diff_vars9)
+    @test any(isequal(Symbolics.value(Dz2)), diff_vars9)
+
+    # Test with equations
+    eq = Dt(u) ~ Dx(u) + u
+    diff_vars_eq = Symbolics.get_differential_vars(eq)
+    @test length(diff_vars_eq) == 2
+    @test any(isequal(Symbolics.value(Dt(u))), diff_vars_eq)
+    @test any(isequal(Symbolics.value(Dx(u))), diff_vars_eq)
 end
 
 @testset "`fast_substitute` inside array symbolics" begin
