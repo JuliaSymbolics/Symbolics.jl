@@ -45,7 +45,6 @@ D3Trees = "e3df1716-f71e-5df9-9e2d-98e193103c45"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
 Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
-Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
 PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
@@ -85,7 +84,6 @@ LogExpFunctions = "0.3"
 Lux = "1"
 MacroTools = "0.5"
 NaNMath = "1"
-Nemo = "0.46, 0.47, 0.48, 0.49"
 OffsetArrays = "1.15.0"
 PkgBenchmark = "0.2"
 PreallocationTools = "0.4"
@@ -130,4 +128,4 @@ SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "SymPyPythonCall", "Random", "LambertW", "Lux", "ComponentArrays", "Nemo", "DynamicQuantities", "D3Trees", "SnoopCompile"]
+test = ["Test", "SafeTestsets", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "SymPyPythonCall", "Random", "LambertW", "Lux", "ComponentArrays", "DynamicQuantities", "D3Trees", "SnoopCompile"]
