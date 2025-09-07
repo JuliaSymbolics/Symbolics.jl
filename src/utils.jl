@@ -138,7 +138,8 @@ function get_differential_vars!(vars, e::Symbolic, varlist=nothing)
         foreach(x -> get_differential_vars!(vars, x, varlist), arguments(e))
     end
     
-    return (vars isa AbstractVector) ? unique!(vars) : vars
+    unique!(vars)
+    return vars
 end
 
 function get_differential_vars!(vars, e::Equation, varlist=nothing)
