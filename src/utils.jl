@@ -110,7 +110,7 @@ julia> Symbolics.get_differential_vars(expr; sort = true)
 ```
 """
 function get_differential_vars(e::Num, varlist = nothing; sort::Bool = false)
-    get_differential_vars(value(e), varlist; sort)
+    get_differential_vars(unwrap(e), varlist; sort)
 end
 function get_differential_vars(e, varlist = nothing; sort::Bool = false)
     vars = Vector{BasicSymbolic}()
