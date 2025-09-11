@@ -102,3 +102,22 @@ derivative(::typeof(>), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 derivative(::typeof(>=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 derivative(::typeof(==), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 derivative(::typeof(!=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
+
+@register_symbolic SpecialFunctions.expinti(x::Real)
+derivative(::typeof(expinti), args::NTuple{1,Any}, ::Val{1}) = exp(args[1])/args[1]
+
+@register_symbolic SpecialFunctions.expint(nu, z)
+# https://en.wikipedia.org/wiki/Exponential_integral#Derivatives
+# expinti(0, z) = exp(-z)/z
+# derivative(expinti(nu, z), z) = -expinti(nu - 1, z)
+function derivative(::typeof(expint), args::NTuple{2,Any}, ::Val{2})
+    args[1]==1 && return -exp(-args[2])/args[2]
+    args[1]==0 && return (-exp(args[2])) / args[2] + exp(args[2]) / (args[2]^2)
+    return -SpecialFunctions.expint(args[1] - 1, args[2])
+end
+
+@register_symbolic SpecialFunctions.sinint(x)
+derivative(::typeof(sinint), args::NTuple{1,Any}, ::Val{1}) = sin(args[1])/args[1]
+
+@register_symbolic SpecialFunctions.cosint(x)
+derivative(::typeof(cosint), args::NTuple{1,Any}, ::Val{1}) = cos(args[1])/args[1]
