@@ -53,6 +53,7 @@ makedocs(
             "Algebra" => [
                 "manual/solver.md",
                 "manual/groebner.md",
+                "manual/constraint_satisfaction.md",
             ],
 
             "Calculus" => [
