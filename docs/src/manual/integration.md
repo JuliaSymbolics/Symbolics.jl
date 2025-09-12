@@ -20,26 +20,44 @@ Symbolics.Integral
 
 Symbolics.jl currently has the following options for solving integrals symbolically:
 
-| Option    | Description | Pros | Cons |
-| -------- | ------- | ------- | ------- |
-| SymbolicIntegration.jl | Pure symbolic integration using the Risch algorithm | Returns exact symbolic results with rational coefficients, handles complex expressions | May not solve all integrals, focused on specific function classes |
-| SymbolicNumericIntegration.jl  | Uses numeric integrators with symbolic regression machine learning methods | Can solve some hard integrals very fast and easily | Can be unreliable in easy cases, will give floats (0.5) instead of rational values (1//2) |
-| SymPy's Integrate | Uses SymPy (through SymPy.jl) to integrate the expression | Reasonably robust and tested solution | Extremely slow |
+| Package    | Method | Description | Pros | Cons |
+| ---------- | ------ | ----------- | ---- | ---- |
+| SymbolicIntegration.jl | Risch Algorithm | Implements theoretical Risch algorithm for elementary functions | Mathematically rigorous, returns exact symbolic results, handles rational functions and transcendental functions (exp, log, trig) | Still in early development, unstable, limited to specific function classes, no support for algebraic functions |
+| SymbolicIntegration.jl | Rule-Based Method | Applies over 3,400 integration rules systematically | Handles non-integer powers, supports multiple symbolic variables, more flexible than pure Risch | Rule-dependent success, no theoretical completeness guarantee, limited by predefined rule set |
+| SymbolicNumericIntegration.jl  | Symbolic-Numeric Hybrid | Uses numeric integrators with symbolic regression machine learning methods | Can solve some hard integrals very fast and easily, works differently from pure symbolic methods | Can be unreliable in easy cases, will give floats (0.5) instead of rational values (1//2), precision loss |
+| SymPy's Integrate | Hybrid Methods | Uses SymPy (through SymPy.jl) to integrate the expression | Reasonably robust and tested solution, mature implementation | Extremely slow, Python overhead |
 
 ### SymbolicIntegration.jl
 
-SymbolicIntegration.jl provides pure symbolic integration using the Risch algorithm and other symbolic
-methods. Unlike numerical methods, it returns exact symbolic results with rational coefficients (e.g., `1//2`
+SymbolicIntegration.jl provides pure symbolic integration using multiple algorithmic approaches.
+Unlike numerical methods, it returns exact symbolic results with rational coefficients (e.g., `1//2`
 instead of `0.5`). The package implements a flexible framework for symbolic integration that uses Julia's
 multiple dispatch to select appropriate algorithms for different types of integrands.
 
-The main integration method is `RischMethod`, which implements the Risch algorithm for integrating:
+The package offers two main integration methods:
+
+#### Risch Algorithm Method
+
+The `RischMethod` implements the theoretical Risch algorithm for integrating:
 - Polynomial functions
 - Rational functions  
 - Exponential functions
 - Logarithmic functions
 - Trigonometric functions
 - Combinations of the above
+
+This method is mathematically rigorous and provides guaranteed results when an elementary antiderivative exists.
+However, it is still under development and may not handle all cases robustly.
+
+#### Rule-Based Method
+
+The rule-based approach systematically applies over 3,400 integration rules to solve integrals:
+- Handles non-integer powers and algebraic functions
+- Supports more complex integrations than pure Risch
+- Can handle multiple symbolic variables
+- More flexible but depends on the predefined rule set
+
+The package automatically tries the Risch algorithm first, then falls back to rule-based methods if needed.
 
 For using SymbolicIntegration.jl, see [the SymbolicIntegration.jl repository](https://github.com/JuliaSymbolics/SymbolicIntegration.jl) 
 for more details. Quick examples:
@@ -50,25 +68,29 @@ using SymbolicIntegration
 
 @variables x
 
-# Basic integrations
+# Basic integrations (automatic method selection)
 integrate(x^2, x)           # Returns (1//3)*(x^3)
 integrate(1/x, x)           # Returns log(x)
 integrate(exp(x), x)        # Returns exp(x)
 integrate(1/(x^2 + 1), x)   # Returns atan(x)
 
-# Rational function with complex roots
+# Rational function with complex roots (typically uses Risch)
 f = (x^3 + x^2 + x + 2)/(x^4 + 3*x^2 + 2)
 integrate(f, x)  # Returns (1//2)*log(2 + x^2) + atan(x)
 
-# Nested transcendental functions
+# Nested transcendental functions (uses Risch)
 integrate(1/(x*log(x)), x)  # Returns log(log(x))
 
-# Explicit method selection
+# Explicit Risch method selection
 integrate(sin(x)*cos(x), x, RischMethod())
 
-# Configurable method
+# Configurable Risch method
 risch = RischMethod(use_algebraic_closure=true, catch_errors=false)
 integrate(exp(x)/(1 + exp(x)), x, risch)
+
+# Rule-based method for cases not handled by Risch
+integrate(x^(1/2), x)       # Uses rule-based method for non-integer powers
+integrate(sqrt(x + 1), x)   # Handles algebraic functions via rules
 ```
 
 ### SymbolicNumericIntegration.jl
