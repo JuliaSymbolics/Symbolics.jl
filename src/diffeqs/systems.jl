@@ -87,8 +87,8 @@ end
 Replacement for `LinearAlgebra.eigen` function that uses symbolic functions to avoid floating-point inaccuracies
 """
 function symbolic_eigen(A::Matrix{<:Number})
-    @variables λ # eigenvalue
-    v = variables(:v, 1:size(A, 1)) # vector of subscripted variables to represent eigenvector
+    λ = variable(:ℰ) # eigenvalue
+    v = variables(:𝓋, 1:size(A, 1)) # vector of subscripted variables to represent eigenvector
     
     # find eigenvalues first
     p = det(λ*I - A) ~ 0 # polynomial to solve
@@ -99,7 +99,7 @@ function symbolic_eigen(A::Matrix{<:Number})
     
     for value in values
         eqs = (value*I - A) * v# .~ zeros(size(A, 1)) # equations to give eigenvectors
-        eqs = substitute(eqs, Dict(v[1] => 1)) # set first element to 1 to constrain solution space
+        eqs = fast_substitute(eqs, Dict(v[1] => 1)) # set first element to 1 to constrain solution space
 
         sol = symbolic_solve(eqs[1:end-1], v[2:end]) # solve all but one equation (because of constraining solutions above)
 
