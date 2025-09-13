@@ -352,3 +352,24 @@ end
     f = build_function(x + D(x), [x, D(x)]; cse = true, expression = Val{false})
     @test f([1, 2]) == 3
 end
+
+@testset "`build_function` with `UpperTriangular`" begin
+    function f_test(J,u)
+        J[1,1] = u[1]
+        J[1,2] = u[2]
+        J[2,1] = -u[1]
+        J[2,2] = -u[2]
+        return nothing
+    end
+
+    @variables u[1:2]
+    J = fill!(Array{Num}(undef, 2, 2), 0)
+    f_test(J, u)
+    up_J = UpperTriangular(J - Diagonal(J))
+
+    out, fjac_upper_expr = build_function(up_J, u; skipzeros = true, expression = false)
+    Jtmp = UpperTriangular(zeros(2, 2))
+    utmp = rand(2)
+    @test_nowarn fjac_upper_expr(Jtmp, utmp)
+    @test Jtmp[3] == utmp[2]
+end

@@ -589,6 +589,12 @@ function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symboli
     return _recursive_unwrap(val)
 end
 
+for T in [LinearAlgebra.UpperTriangular, LinearAlgebra.LowerTriangular]
+    @eval function _recursive_unwrap(val::$T)
+        $T(_recursive_unwrap(collect(val)))
+    end
+end
+
 function _recursive_unwrap(val)
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
         if parent(val) !== val
