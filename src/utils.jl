@@ -639,4 +639,6 @@ function evaluate(ineq::Inequality, subs)
     end
 end 
 
-
+vartype_from_args(::BasicSymbolic{T}, args...) where {T} = T
+vartype_from_args(_, args...) = vartype_from_args(args...)
+vartype_from_args() = error("Cannot infer `vartype`.")

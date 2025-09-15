@@ -77,13 +77,6 @@ end
     return :($(recipe(z.re)) + $(recipe(z.im)) * $im)
 end
 
-@latexrecipe function f(n::ArrayOp)
-    env --> :equation
-    mult_symbol --> ""
-    index --> :subscript
-    return recipe(n.term)
-end
-
 @latexrecipe function f(n::Function)
     env --> :equation
     mult_symbol --> ""
@@ -142,8 +135,6 @@ Base.show(io::IO, ::MIME"text/latex", x::BasicSymbolic) = print(io, "\$\$ " * la
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
-
-_toexpr(O::ArrayOp; latexwrapper = default_latex_wrapper) = _toexpr(O.term; latexwrapper)
 
 # `_toexpr` is only used for latexify
 function _toexpr(O; latexwrapper = default_latex_wrapper)
