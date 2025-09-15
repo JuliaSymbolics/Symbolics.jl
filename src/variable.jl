@@ -192,6 +192,7 @@ end
 
 function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime)
     ndim = :($length(($(indices...),)))
+    shape = :($(SymbolicUtils.ShapeVecT)(($(indices...),)))
     if call_args_are_function(call_args)
         vname, fntype = function_name_and_type(lhs)
         # name was already unwrapped before calling this function and is of the form $x
@@ -208,7 +209,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
             end
         end
         argtypes = arg_types_from_call_args(call_args)
-        ex = :($Sym{$FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}}($_vname))
+        ex = :($Sym{$FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}}($_vname; shape = $shape))
     else
         vname = lhs
         if isruntime
@@ -218,7 +219,6 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
         end
         ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($_vname)(map($unwrap, ($(call_args...),))...))
     end
-    ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
 
     if val !== nothing
         ex = :($setdefaultval($ex, $val))
@@ -394,22 +394,20 @@ end
 function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
     # TODO: just use Sym here
     ndim = :($length(($(indices...),)))
+    shape = :($(SymbolicUtils.ShapeVecT)(($(indices...),)))
 
     need_scalarize = false
     expr = if call_args === nothing
-        ex = :($Sym{Array{$type, $ndim}}($var_name))
-        :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        ex = :($Sym{Array{$type, $ndim}}($var_name; shape = $shape))
     elseif call_args_are_function(call_args)
         need_scalarize = true
         var_name, fntype = function_name_and_type(var_name)
         argtypes = arg_types_from_call_args(call_args)
-        ex = :($Sym{Array{$FnType{$argtypes, $type, $(fntype...)}, $ndim}}($var_name))
-        :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        ex = :($Sym{Array{$FnType{$argtypes, $type, $(fntype...)}, $ndim}}($var_name; shape = $shape))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
-        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
+        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name; shape = $shape))
         :($map($CallWith(($(call_args...),)), $ex))
     end
 
@@ -806,16 +804,6 @@ function rename_metadata(from, to, name)
 end
 
 rename(x::Union{Num, Arr}, name) = wrap(rename(unwrap(x), name))
-function rename(x::ArrayOp, name)
-    t = x.term
-    args = arguments(t)
-    # Hack:
-    @assert operation(t) === (map) && args[1] isa CallWith
-    rn = rename(args[2], name)
-
-    xx = metadata(operation(t)(args[1], rn), metadata(x))
-    rename_getindex_source(rename_metadata(x, xx, name))
-end
 
 function rename(x::BasicSymbolic, name)
     if issym(x)
