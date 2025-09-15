@@ -116,28 +116,6 @@ function _filter_poly(expr, var)
     end
 
     args = copy(parent(arguments(expr)))
-    if expr isa ComplexTerm
-        subs1, subs2 = Dict(), Dict()
-        expr1, expr2 = 0, 0
-
-        if !isequal(expr.re, 0)
-            subs1, expr1 = _filter_poly(expr.re, var)
-        end
-        if !isequal(expr.im, 0)
-            subs2, expr2 = _filter_poly(expr.im, var)
-        end
-
-        subs = merge(subs1, subs2)
-        i_var = gensym()
-        i_var = (@variables $i_var)[1]
-
-        subs[i_var] = im
-        expr = unwrap(expr1 + i_var * expr2)
-
-        args = map(unwrap, arguments(expr))
-        oper = operation(expr)
-        return subs, term(oper, args...)
-    end
 
     subs = Dict{Any, Any}()
     for (i, arg) in enumerate(args)

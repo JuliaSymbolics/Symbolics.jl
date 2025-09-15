@@ -46,7 +46,7 @@ end
 
 (D::Differential)(x::Union{AbstractFloat, Integer}) = wrap(0)
 (D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
-(D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
+(D::Differential)(x::Complex{Num}) = Complex{Num}(wrap(D(unwrap(real(x)))), wrap(D(unwrap(imag(x)))))
 SymbolicUtils.promote_symtype(::Differential, T) = T
 SymbolicUtils.isbinop(f::Differential) = false
 
@@ -414,8 +414,9 @@ function expand_derivatives(n::Num, simplify=false; kwargs...)
     wrap(expand_derivatives(value(n), simplify; kwargs...))
 end
 function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
-    wrap(ComplexTerm{Real}(expand_derivatives(real(n), simplify; kwargs...),
-                           expand_derivatives(imag(n), simplify; kwargs...)))
+    re = expand_derivatives(real(n), simplify; kwargs...)
+    img = expand_derivatives(imag(n), simplify; kwargs...)
+    Complex{Num}(wrap(re), wrap(img))
 end
 expand_derivatives(x, simplify=false; kwargs...) = x
 
