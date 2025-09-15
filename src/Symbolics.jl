@@ -197,9 +197,6 @@ for T in [Num, Complex{Num}]
 
         Broadcast.broadcastable(x::$T) = x
     end
-    for S in [:(BasicSymbolic{<:FnType}), :CallWithMetadata]
-        @eval (f::$S)(x::$T, y...) = wrap(f(unwrap(x), unwrap.(y)...))
-    end
 end
 
 for sType in [Pair, Vector, Dict]
@@ -545,7 +542,7 @@ include("inverse.jl")
 export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
 include("discontinuities.jl")
 
-@public Arr, CallWithMetadata, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
+@public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, getparent, option_to_metadata_type, scalarize, shape
 @public unwrap, variable, wrap

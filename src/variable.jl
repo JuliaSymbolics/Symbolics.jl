@@ -68,11 +68,7 @@ function scalarize_getindex(x, parent=Ref{Any}(x))
     else
         xx = unwrap(scalarize(x))
         xx = metadata(xx, metadata(x))
-        if symtype(xx) <: FnType
-            setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent[])
-        else
-            setmetadata(xx, GetindexParent, parent[])
-        end
+        setmetadata(xx, GetindexParent, parent[])
     end
 end
 
@@ -212,7 +208,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
             end
         end
         argtypes = arg_types_from_call_args(call_args)
-        ex = :($CallWithMetadata($Sym{$FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}}($_vname)))
+        ex = :($Sym{$FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}}($_vname))
     else
         vname = lhs
         if isruntime
@@ -333,45 +329,6 @@ function setprops_expr(expr, props, macroname, varname)
     expr
 end
 
-struct CallWithMetadata{T,M} <: Symbolic{T}
-    f::Symbolic{T}
-    metadata::M
-end
-
-for f in [:iscall, :operation, :arguments]
-    @eval SymbolicUtils.$f(x::CallWithMetadata) = $f(x.f)
-end
-
-SymbolicUtils.Code.toexpr(x::CallWithMetadata, st) = SymbolicUtils.Code.toexpr(x.f, st)
-
-CallWithMetadata(f) = CallWithMetadata(f, nothing)
-
-SymbolicIndexingInterface.symbolic_type(::Type{<:CallWithMetadata}) = ScalarSymbolic()
-
-# HACK:
-# A `DestructuredArgs` with `create_bindings = false` doesn't create a `Let` block, and
-# instead adds the assignments to the rewrites dictionary. This is problematic, because
-# if the `DestructuredArgs` contains a `CallWithMetadata` the key in the `Dict` will be
-# a `CallWithMetadata` which won't match against the operation of the called symbolic.
-# This is the _only_ hook we have and relies on the `DestructuredArgs` being converted
-# into a list of `Assignment`s before being added to the `Dict` inside `toexpr(::Let, st)`.
-# The callable symbolic is unwrapped so it matches the operation of the called version.
-SymbolicUtils.Code.Assignment(f::CallWithMetadata, x) = SymbolicUtils.Code.Assignment(f.f, x)
-
-function Base.show(io::IO, c::CallWithMetadata)
-    show(io, c.f)
-    print(io, "⋆")
-end
-
-struct CallWithParent end
-
-function (f::CallWithMetadata)(args...)
-    setmetadata(metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f)), CallWithParent, f)
-end
-
-Base.isequal(a::CallWithMetadata, b::CallWithMetadata) = isequal(a.f,  b.f)
-Base.hash(x::CallWithMetadata, h::UInt) = hash(x.f, h)
-
 function arg_types_from_call_args(call_args)
     if length(call_args) == 1 && only(call_args) == :..
         return Tuple
@@ -411,7 +368,7 @@ function construct_var(macroname, var_name, type, call_args, val, prop)
         # (..)::ArgT is Vararg{ArgT}
         var_name, fntype = function_name_and_type(var_name)
         argtypes = arg_types_from_call_args(call_args)
-        :($CallWithMetadata($Sym{$FnType{$argtypes, $type, $(fntype...)}}($var_name)))
+        :($Sym{$FnType{$argtypes, $type, $(fntype...)}}($var_name))
     # This elseif handles the special case with e.g. variables on the form
     # @variables X(deps...) where deps is a vector (which length might be unknown).
     elseif (call_args isa Vector) && (length(call_args) == 1) && (call_args[1] isa Expr) &&
@@ -447,8 +404,7 @@ function _construct_array_vars(macroname, var_name, type, call_args, val, prop, 
         var_name, fntype = function_name_and_type(var_name)
         argtypes = arg_types_from_call_args(call_args)
         ex = :($Sym{Array{$FnType{$argtypes, $type, $(fntype...)}, $ndim}}($var_name))
-        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map($CallWithMetadata, $ex))
+        :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
     else
         # [(R -> R)(R) ....]
         need_scalarize = true
@@ -818,10 +774,7 @@ Also see `variables`.
 function variable(name, idx...; T=Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
     v = Sym{T}(name_ij)
-    if T <: FnType
-        v = CallWithMetadata(v)
-    end
-    Num(setmetadata(v, VariableSource, (:variables, name_ij)))
+    wrap(setmetadata(v, VariableSource, (:variables, name_ij)))
 end
 
 ##### Renaming #####
@@ -857,15 +810,11 @@ function rename(x::ArrayOp, name)
     t = x.term
     args = arguments(t)
     # Hack:
-    @assert operation(t) === (map) && (args[1] isa CallWith || args[1] == CallWithMetadata)
+    @assert operation(t) === (map) && args[1] isa CallWith
     rn = rename(args[2], name)
 
     xx = metadata(operation(t)(args[1], rn), metadata(x))
     rename_getindex_source(rename_metadata(x, xx, name))
-end
-
-function rename(x::CallWithMetadata, name)
-    rename_metadata(x, CallWithMetadata(rename(x.f, name), x.metadata), name)
 end
 
 function rename(x::BasicSymbolic, name)
@@ -875,7 +824,7 @@ function rename(x::BasicSymbolic, name)
         symtype(xx) <: AbstractArray ? rename_getindex_source(xx) : xx
     elseif iscall(x) && operation(x) === getindex
         rename(arguments(x)[1], name)[arguments(x)[2:end]...]
-    elseif iscall(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
+    elseif iscall(x) && symtype(operation(x)) <: FnType
         xx = @set x.f = rename(operation(x), name)
         @set! xx.hash = Ref{UInt}(0)
         return rename_metadata(x, xx, name)
