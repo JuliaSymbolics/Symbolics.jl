@@ -441,9 +441,7 @@ end
 const DP = DynamicPolynomials
 # extracting underlying polynomial and coefficient type from Polyforms
 underlyingpoly(x::Number) = x
-underlyingpoly(pf::PolyForm) = pf.p
 coefftype(x::Number) = typeof(x)
-coefftype(pf::PolyForm) = DP.coefficient_type(underlyingpoly(pf))
 
 #=
 Converts an array of symbolic polynomials
@@ -456,31 +454,28 @@ function symbol_to_poly(sympolys::AbstractArray)
     stdsympolys = map(unwrap, sympolys)
     sort!(stdsympolys, lt=(<ₑ))
 
-    pvar2sym = Bijections.Bijection{Any,Any}()
-    sym2term = Dict{BasicSymbolic,Any}()
-    polyforms = map(f -> PolyForm(f, pvar2sym, sym2term), stdsympolys)
+    symidx = findfirst(x -> x isa BasicSymbolic, stdsympolys)
+    varT = vartype(stdsympolys[symidx])
+
+    poly_to_bs = Bijections.Bijection{SymbolicUtils.PolyVarT, BasicSymbolic{varT}}()
+    bs_to_poly = Bijections.active_inv(poly_to_bs)
+    polyforms = Vector{SymbolicUtils.PolynomialT}(map(f -> SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, f), stdsympolys))
 
     # Discover common coefficient type
     commontype = mapreduce(coefftype, promote_type, polyforms, init=Int)
     @assert commontype <: Union{Integer,Rational} "Only integer and rational coefficients are supported as input."
 
-    # Convert all to DP.Polynomial, so that coefficients are of same type,
-    # and constants are treated as polynomials
-    # We also need this because Groebner does not support abstract types as input
-    polynoms = Vector{DP.Polynomial{DP.Commutative{DP.CreationOrder},DP.Graded{DP.LexOrder},commontype}}(undef, length(sympolys))
-    for (i, pf) in enumerate(polyforms)
-        polynoms[i] = underlyingpoly(pf)
-    end
+    polynoms = polyforms
 
-    polynoms, pvar2sym, sym2term
+    polynoms, poly_to_bs
 end
 
 #=
 Converts an array of AbstractPolynomialLike`s into an array of
 symbolic expressions mapping variables w.r.t pvar2sym
 =#
-function poly_to_symbol(polys, pvar2sym, sym2term, ::Type{T}) where {T}
-    map(f -> PolyForm{T}(f, pvar2sym, sym2term), polys)
+function poly_to_symbol(polys, poly_to_bs, ::Type{T}) where {T}
+    map(Base.Fix1(SymbolicUtils.from_poly, poly_to_bs), polys)
 end
 
 """

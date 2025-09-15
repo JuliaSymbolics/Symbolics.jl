@@ -281,7 +281,6 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
-    expression = expression isa PolyForm ? SymbolicUtils.toterm(expression) : expression
 
     # handle multiplicities (repeated roots), i.e. (x+1)^20
     if iscall(expression)
