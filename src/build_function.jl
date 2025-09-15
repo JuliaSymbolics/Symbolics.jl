@@ -619,7 +619,7 @@ function buildvarnumbercache(args...)
     return Dict(varnumsdict)
 end
 
-function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
+function numbered_expr(O::BasicSymbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)

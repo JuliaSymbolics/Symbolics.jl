@@ -26,7 +26,7 @@ import DomainSets: Domain, DomainSets
 using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
+import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
 FnType, @rule, Rewriters, substitute, symtype,
 promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
 
@@ -177,7 +177,7 @@ export limit
 
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
-(::Type{T})(x::SymbolicUtils.Symbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
+(::Type{T})(x::SymbolicUtils.BasicSymbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
 for T in [Num, Complex{Num}]
     @eval begin
         #(::Type{S})(x::$T) where {S<:Union{NumberTypes,AbstractArray}} = S(Symbolics.unwrap(x))::S
@@ -197,7 +197,7 @@ for T in [Num, Complex{Num}]
 
         Broadcast.broadcastable(x::$T) = x
     end
-    for S in [:(Symbolic{<:FnType}), :CallWithMetadata]
+    for S in [:(BasicSymbolic{<:FnType}), :CallWithMetadata]
         @eval (f::$S)(x::$T, y...) = wrap(f(unwrap(x), unwrap.(y)...))
     end
 end

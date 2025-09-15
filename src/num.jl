@@ -110,7 +110,7 @@ Base.nameof(n::Num) = nameof(value(n))
 Base.iszero(x::Num) = SymbolicUtils.fraction_iszero(unwrap(x))
 Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
 
-import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
+import SymbolicUtils: <ₑ, Term, operation, arguments
 
 function Base.show(io::IO, n::Num)
     show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
@@ -118,20 +118,7 @@ end
 
 Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
-Base.promote_rule(::Type{<:Symbolic{<:Number}}, ::Type{<:Num}) = Num
-function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
-    if f === :op
-        Base.depwarn(
-            "`x.op` is deprecated, use `operation(x)` instead", :getproperty)
-        operation(t)
-    elseif f === :args
-        Base.depwarn("`x.args` is deprecated, use `arguments(x)` instead",
-            :getproperty)
-        arguments(t)
-    else
-        getfield(t, f)
-    end
-end
+Base.promote_rule(::Type{<:BasicSymbolic}, ::Type{<:Num}) = Num
 <ₑ(s::Num, x) = value(s) <ₑ value(x)
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
@@ -179,12 +166,8 @@ end
 @num_method Base.isequal begin
     va = value(a)
     vb = value(b)
-    if va isa SymbolicUtils.BasicSymbolic{Real} && vb isa SymbolicUtils.BasicSymbolic{Real}
-        isequal(va, vb)::Bool
-    else
-        isequal(va, vb)::Bool
-    end
-end (AbstractFloat, Number, Symbolic)
+    isequal(va, vb)::Bool
+end (AbstractFloat, Number, BasicSymbolic)
 
 # Provide better error message for symbolic variables in ranges
 function Base.:(:)(a::Integer, b::Num)
@@ -251,26 +234,23 @@ Base.to_index(x::Num) = Base.to_index(value(x))
 
 Base.hash(x::Num, h::UInt) = hash(value(x), h)::UInt
 
-Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
-Base.convert(::Type{Num}, x::Number) = Num(x)
+function Base.convert(::Type{Num}, x::BasicSymbolic)
+    symtype(x) <: Real || error("`symtype` must be `<:Real`")
+    Num(x)
+end
+# TODO: `Const{T}` instead of `Const{SymReal}`
+Base.convert(::Type{Num}, x::Number) = Num(Const{SymReal}(x))
 Base.convert(::Type{Num}, x::Num) = x
 
 Base.convert(::Type{T}, x::AbstractArray{Num}) where {T <: Array{Num}} = T(map(Num, x))
-function Base.convert(::Type{Sym}, x::Num)
-    value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
-end
 
 function LinearAlgebra.lu(
         x::Union{Adjoint{<:RCNum}, Transpose{<:RCNum}, Array{<:RCNum}}; check = true, kw...)
     sym_lu(x; check = check)
 end
 
-_iszero(x::Number) = iszero(x)
-_isone(x::Number) = isone(x)
-_iszero(::Symbolic) = false
-_isone(::Symbolic) = false
-_iszero(x::Num) = _iszero(value(x))::Bool
-_isone(x::Num) = _isone(value(x))::Bool
+SymbolicUtils._iszero(x::Num) = SymbolicUtils._iszero(value(x))
+SymbolicUtils._isone(x::Num) = SymbolicUtils._isone(value(x))
 
 Code.cse(x::Num) = Code.cse(unwrap(x))
 
