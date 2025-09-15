@@ -542,7 +542,7 @@ const _fail = Dict()
 
 _getname(x, _) = nameof(x)
 _getname(x::Symbol, _) = x
-function _getname(x::Symbolic, val)
+function _getname(x::BasicSymbolic, val)
     issym(x) && return nameof(x)
     if iscall(x) && issym(operation(x))
         return nameof(operation(x))
@@ -562,7 +562,7 @@ getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
 SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Num}) = ScalarSymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Arr}) = ArraySymbolic()
-function SymbolicIndexingInterface.symbolic_type(::Type{T}) where {S <: AbstractArray, T <: Symbolic{S}}
+function SymbolicIndexingInterface.symbolic_type(::Type{T}) where {S <: AbstractArray, T <: BasicSymbolic{S}}
     ArraySymbolic()
 end
 # need this otherwise the `::Type{<:BasicSymbolic}` method in SymbolicUtils is
@@ -573,18 +573,7 @@ end
 
 SymbolicIndexingInterface.hasname(x::Union{Num,Arr,Complex{Num}}) = hasname(unwrap(x))
 
-function SymbolicIndexingInterface.hasname(x::Symbolic)
-    issym(x) || !iscall(x) || iscall(x) && (issym(operation(x)) || operation(x) == getindex && hasname(arguments(x)[1]))
-end
-
-# This is type piracy, but changing it breaks precompilation for MTK because it relies on this falling back to
-# `_getname` which calls `nameof` which returns the name of the system, when `x::AbstractSystem`.
-# FIXME: In a breaking release
-function SymbolicIndexingInterface.getname(x, val = _fail)
-    _getname(unwrap(x), val)
-end
-
-function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symbolic, Equation, Inequality}, d::Dict; kwargs...)
+function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, BasicSymbolic, Equation, Inequality}, d::Dict; kwargs...)
     val = fixpoint_sub(ex, d; kwargs...)
     return _recursive_unwrap(val)
 end
@@ -704,7 +693,7 @@ function fast_substitute(expr, subs; operator = Nothing)
     op = fast_substitute(operation(expr), subs; operator)
     args = SymbolicUtils.arguments(expr)
     if !(op isa operator)
-        canfold = Ref(!(op isa Symbolic))
+        canfold = Ref(!(op isa BasicSymbolic))
         args = let canfold = canfold
             map(args) do x
                 symbolic_type(x) == NotSymbolic() && !is_array_of_symbolics(x) && return x
@@ -735,7 +724,7 @@ function fast_substitute(expr, pair::Pair; operator = Nothing)
     op = fast_substitute(operation(expr), pair; operator)
     args = SymbolicUtils.arguments(expr)
     if !(op isa operator)
-        canfold = Ref(!(op isa Symbolic))
+        canfold = Ref(!(op isa BasicSymbolic))
         args = let canfold = canfold
             map(args) do x
                 symbolic_type(x) == NotSymbolic() && !is_array_of_symbolics(x) && return x
@@ -879,7 +868,7 @@ function rename(x::CallWithMetadata, name)
     rename_metadata(x, CallWithMetadata(rename(x.f, name), x.metadata), name)
 end
 
-function rename(x::Symbolic, name)
+function rename(x::BasicSymbolic, name)
     if issym(x)
         xx = @set! x.name = name
         xx = rename_metadata(x, xx, name)

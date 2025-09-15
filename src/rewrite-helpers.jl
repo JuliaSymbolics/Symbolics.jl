@@ -1,5 +1,5 @@
 """
-    replacenode(expr::Symbolic, rules...)
+    replacenode(expr::BasicSymbolic, rules...)
 
 Walk the expression and replacenode subexpressions according to `rules`. `rules`
 could be rules constructed with `@rule`, a function, or a pair where the
@@ -18,12 +18,12 @@ function replacenode(expr::Num, r::Pair, rules::Pair...; fixpoint = false)
 end
 # Fix ambiguity
 replacenode(expr::Num, rules...; fixpoint = false) = _replacenode(unwrap(expr), rules...; fixpoint)
-replacenode(expr::Symbolic, rules...; fixpoint = false) = _replacenode(unwrap(expr), rules...; fixpoint)
-replacenode(expr::Symbolic, r::Pair, rules::Pair...; fixpoint = false) = _replacenode(expr, r, rules...; fixpoint)
+replacenode(expr::BasicSymbolic, rules...; fixpoint = false) = _replacenode(unwrap(expr), rules...; fixpoint)
+replacenode(expr::BasicSymbolic, r::Pair, rules::Pair...; fixpoint = false) = _replacenode(expr, r, rules...; fixpoint)
 replacenode(expr::Number, rules...; fixpoint = false) = expr
 replacenode(expr::Number, r::Pair, rules::Pair...; fixpoint = false) = expr
 
-function _replacenode(expr::Symbolic, rules...; fixpoint = false)
+function _replacenode(expr::BasicSymbolic, rules...; fixpoint = false)
     rs = map(r -> r isa Pair ? (x -> isequal(x, unwrap(r[1])) ? unwrap(r[2]) : nothing) : r, rules)
     R = Prewalk(Chain(rs))
     if fixpoint
@@ -52,12 +52,12 @@ D = Differential(t)
 hasnode(Symbolics.is_derivative, X + D(X) + D(X^2)) # returns `true`.
 ```
 """
-function hasnode(r::Function, y::Union{Num, Symbolic})
+function hasnode(r::Function, y::Union{Num, BasicSymbolic})
     _hasnode(r, y)
 end
-hasnode(r::Num, y::Union{Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
-hasnode(r::Symbolic, y::Union{Num, Symbolic}) = occursin(unwrap(r), unwrap(y))
-hasnode(r::Union{Num, Symbolic, Function}, y::Number) = false
+hasnode(r::Num, y::Union{Num, BasicSymbolic}) = occursin(unwrap(r), unwrap(y))
+hasnode(r::BasicSymbolic, y::Union{Num, BasicSymbolic}) = occursin(unwrap(r), unwrap(y))
+hasnode(r::Union{Num, BasicSymbolic, Function}, y::Number) = false
 
 function _hasnode(r, y)
     y = unwrap(y)

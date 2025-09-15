@@ -3,8 +3,6 @@ using DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
-import SymbolicUtils: unsorted_arguments
-
 """
 $(TYPEDEF)
 
@@ -13,7 +11,7 @@ $(TYPEDFIELDS)
 """
 struct SemiMonomial
     "monomial"
-    p::Union{S, N} where {S <: Symbolic, N <: Real}
+    p::Union{BasicSymbolic, Real}
     "coefficient"
     coeff::Any
 end
@@ -35,7 +33,8 @@ function Base.:*(a::SemiMonomial, b::SemiMonomial)
     SemiMonomial(a.p * b.p, a.coeff * b.coeff)
 end
 Base.:*(m::SemiMonomial, n::Number) = SemiMonomial(m.p, m.coeff * n)
-function Base.:*(m::SemiMonomial, t::Symbolic)
+function Base.:*(m::SemiMonomial, t::BasicSymbolic)
+    isconst(t) && return m * unwrap_const(t)
     if iscall(t)
         op = operation(t)
         if op == (+)
@@ -72,7 +71,7 @@ function pdegrees(x)
         Dict(keys(dict) .=> degrees)
     elseif issym(x) || iscall(x)
         return Dict(x=>1)
-    elseif x isa Number
+    elseif unwrap_const(x) isa Number
         return Dict()
     else
         error("pdegrees for $x unknown")
@@ -80,7 +79,7 @@ function pdegrees(x)
 end
 
 pdegree(x::Number) = 0
-function pdegree(x::Symbolic)
+function pdegree(x::BasicSymbolic)
     degree_dict = pdegrees(x)
     if isempty(degree_dict)
         return 0
@@ -116,7 +115,7 @@ end
 
 # Return true if the degrees of `m` are all 0s and its coefficient is a `Real`.
 Base.:isreal(m::SemiMonomial) = m.p isa Number && isone(m.p) && unwrap(m.coeff) isa Real
-Base.:isreal(::Symbolic) = false
+Base.:isreal(::BasicSymbolic) = false
 
 # Transform `m` to a `Real`.
 # Assume `isreal(m) == true`, otherwise calling this function does not make sense.

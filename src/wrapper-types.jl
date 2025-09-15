@@ -112,30 +112,30 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         # for every argument find the types that
         # should be allowed as argument. These are:
         #
-        # (1) T    (2) wrapper_type(T)    (3) Symbolic{T}
+        # (1) T    (2) wrapper_type(T)    (3) BasicSymbolic
         #
         # However later while emitting methods we omit the one
         # method where all arguments are (1) since those are
         # expected to be defined outside Symbolics
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
-            Ts = has_symwrapper(T) ? (T, :(Symbolics.SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
-                                (T,:(Symbolics.SymbolicUtils.Symbolic{<:$T}))
+            Ts = has_symwrapper(T) ? (T, BasicSymbolic, wrapper_type(T)) :
+                                (T, BasicSymbolic)
             if T <: AbstractArray && wrap_arrays
                 eT = eltype(T)
                 if eT == Any
                     eT = Real
                 end
                 _arr_type_fn = if hasmethod(ndims, Tuple{Type{T}})
-                    (elT) -> :(AbstractArray{T, $(ndims(T))} where {T <: $elT})
+                    (elT) -> AbstractArray{T, ndims(T)} where {T <: elT}
                 else
-                    (elT) -> :(AbstractArray{T} where {T <: $elT})
+                    (elT) -> AbstractArray{T} where {T <: elT}
                 end
                 if has_symwrapper(eT)
-                    Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})), 
+                    Ts = (Ts..., _arr_type_fn(BasicSymbolic), 
                     _arr_type_fn(wrapper_type(eT)))
                 else
-                    Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})))
+                    Ts = (Ts..., _arr_type_fn(BasicSymbolic))
                 end
             end
             Ts
@@ -158,19 +158,31 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
             :($n::$T)
         end
 
-        fbody = :(if any($iswrapped, ($(names...),))
-                      $wrap($impl_name($self, $([:($unwrap($arg)) for arg in names]...)))
-                  else
-                      $impl_name($self, $(names...))
-                  end)
+        impl_args = map(enumerate(names)) do (i, name)
+            is_wrapper_type(Ts[i]) ? :($unwrap($name)) : name
+        end
+        implcall = :($impl_name($self, $(impl_args...)))
+        if any(is_wrapper_type, Ts)
+            implcall = :($wrap($implcall))
+        end
+
+        body = Expr(:block)
+        for (i, T) in enumerate(Ts)
+            if T === BasicSymbolic
+                push!(body.args, :(@assert $symtype($(names[i])) <: $(types[i][1])))
+            else T === AbstractArray{T} where {T <: BasicSymbolic}
+                push!(body.args, :(@assert $symtype($(names[i])[1]) <: $(types[i][1])))
+            end
+        end
+        push!(body.args, implcall)
 
         if isempty(kwargs)
             :(function $fname($(method_args...))
-                  $fbody
+                  $body
               end)
         else
             :(function $fname($(method_args...); $(kwargs...))
-                  $fbody
+                  $body
               end)
         end
     end

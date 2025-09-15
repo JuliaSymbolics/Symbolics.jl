@@ -7,7 +7,7 @@ function nterms(t)
 end
 
 # Soft pivoted
-# Note: we call this function with a matrix of Union{SymbolicUtils.Symbolic, Any}
+# Note: we call this function with a matrix of Union{SymbolicUtils.BasicSymbolic, Any}
 function sym_lu(A; check=true)
     SINGULAR = typemax(Int)
     m, n = size(A)
@@ -28,7 +28,7 @@ function sym_lu(A; check=true)
 
         p[k] = kp
 
-        if amin == SINGULAR && !(amin isa Symbolic) && (amin isa Number) && iszero(info)
+        if amin == SINGULAR && !(amin isa BasicSymbolic) && (amin isa Number) && iszero(info)
             info = k
         end
 
@@ -132,7 +132,7 @@ function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
     do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
 
-LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{Symbolic,RCNum}}, b::AbstractVector{<:Union{Symbolic,RCNum}}, x::AbstractVector{<:Union{Symbolic,RCNum}} = b) = symsub!(A, b, x)
+LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     LinearAlgebra.require_one_based_indexing(A, b, x)
     n = size(A, 2)
@@ -152,7 +152,7 @@ function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     x
 end
 
-LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{Symbolic,RCNum}}, b::AbstractVector{<:Union{Symbolic,RCNum}}, x::AbstractVector{<:Union{Symbolic,RCNum}} = b) = symsub!(A, b, x)
+LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = b)
     LinearAlgebra.require_one_based_indexing(A, b, x)
     n = size(A, 2)
@@ -220,7 +220,7 @@ end
 
 function LinearAlgebra.norm(x::AbstractArray{<:RCNum}, p::Real=2)
     p = value(p)
-    issym = p isa Symbolic
+    issym = p isa BasicSymbolic
     if !issym && p == 2
         sqrt(sum(x->abs2(x), x))
     elseif !issym && isone(p)
@@ -258,7 +258,7 @@ function linear_expansion(ts::AbstractArray, xs::AbstractArray)
     @label FINISH
     return A, bvec, islinear
 end
-# _linear_expansion always returns `Symbolic`
+# _linear_expansion always returns `BasicSymbolic`
 function _linear_expansion(t::Equation, x)
     a₂, b₂, islinear = linear_expansion(t.rhs, x)
     islinear || return (a₂, b₂, false)
@@ -272,7 +272,7 @@ is_expansion_leaf(t) = !iscall(t) || (operation(t) isa Operator)
 @noinline expansion_check(op) = op isa Operator && error("The operation is an Operator. This should never happen.")
 function _linear_expansion(t, x)
     t = value(t)
-    t isa Symbolic || return (0, t, true)
+    t isa BasicSymbolic || return (0, t, true)
     x = value(x)
     is_expansion_leaf(t) && return trivial_linear_expansion(t, x)
     isequal(t, x) && return (1, 0, true)

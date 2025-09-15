@@ -70,7 +70,7 @@ end
 
 get_variables!(vars, e::Number, varlist=nothing) = vars
 
-function get_variables!(vars, e::Symbolic, varlist=nothing)
+function get_variables!(vars, e::BasicSymbolic, varlist=nothing)
     if is_singleton(e)
         if isnothing(varlist) || any(isequal(e), varlist)
             push!(vars, e)
@@ -126,7 +126,7 @@ get_differential_vars!(vars, e, varlist=nothing) = vars
 
 get_differential_vars!(vars, e::Number, varlist=nothing) = vars
 
-function get_differential_vars!(vars, e::Symbolic, varlist=nothing)
+function get_differential_vars!(vars, e::BasicSymbolic, varlist=nothing)
     if is_derivative(e)
         if isnothing(varlist) || any(isequal(e), varlist)
             push!(vars, e)
@@ -148,11 +148,11 @@ function get_differential_vars!(vars, e::Equation, varlist=nothing)
 end
 
 # Sym / Term --> Symbol
-Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
+Base.Symbol(x::Union{Num,BasicSymbolic}) = tosymbol(x)
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x, x_metadata::Dict{Datatype, Any}) -> Symbolic
+    diff2term(x, x_metadata::Dict{Datatype, Any}) -> BasicSymbolic
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
@@ -215,7 +215,7 @@ end
 setname(v, name) = setmetadata(v, Symbolics.VariableSource, (:variables, name))
 
 """
-    tosymbol(x::Union{Num,Symbolic}; states=nothing, escape=true) -> Symbol
+    tosymbol(x::Union{Num,BasicSymbolic}; states=nothing, escape=true) -> Symbol
 
 Convert `x` to a symbol. `states` are the states of a system, and `escape`
 means if the target has escapes like `val"y(t)"`. If `escape` is false, then
@@ -265,7 +265,7 @@ function tosymbol(t; states=nothing, escape=true)
     end
 end
 
-function lower_varname(var::Symbolic, idv, order)
+function lower_varname(var::BasicSymbolic, idv, order)
     order == 0 && return var
     D = Differential(idv)
     for _ in 1:order
@@ -431,7 +431,7 @@ function coeff(p, sym=nothing)
         end
     else
         p isa Number && return sym === nothing ? p : 0
-        p isa Symbolic && return coeff(p, sym)
+        p isa BasicSymbolic && return coeff(p, sym)
         throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
     end
 end
@@ -516,7 +516,7 @@ julia> numerator(x/y)
 x
 ```
 """
-function Base.numerator(x::Union{Num, Symbolic})
+function Base.numerator(x::Union{Num, BasicSymbolic})
     x = unwrap(x)
     if iscall(x) && operation(x) == /
         x = arguments(x)[1] # get numerator
@@ -536,7 +536,7 @@ julia> denominator(x/y)
 y
 ```
 """
-function Base.denominator(x::Union{Num, Symbolic})
+function Base.denominator(x::Union{Num, BasicSymbolic})
     x = unwrap(x)
     if iscall(x) && operation(x) == /
         x = arguments(x)[2] # get denominator

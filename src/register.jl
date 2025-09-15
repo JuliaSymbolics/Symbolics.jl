@@ -1,5 +1,3 @@
-using SymbolicUtils: Symbolic
-
 """
     @register_symbolic(expr, define_promotion = true, Ts = [Real])
 
@@ -92,7 +90,7 @@ function is_symbolic_or_array_of_symbolic(arr::AbstractArray)
 end
 
 symbolic_eltype(x) = eltype(x)
-symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: SymbolicUtils.Symbolic{eT}} = eT
+symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(Const{T}(x)))
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
