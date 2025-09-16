@@ -201,7 +201,6 @@ end
 
 canonical_form(eq::Equation) = eq.lhs - eq.rhs ~ 0
 
-get_variables(eq::Equation) = unique(vcat(get_variables(eq.lhs), get_variables(eq.rhs)))
 
 struct ConstrainedEquation
   constraints
