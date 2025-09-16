@@ -27,8 +27,8 @@ using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
 import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
-FnType, @rule, Rewriters, substitute, symtype,
-promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+    FnType, @rule, Rewriters, substitute, symtype, shape,
+    promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl
 
 using SymbolicUtils.Code
 
@@ -53,6 +53,8 @@ import OffsetArrays
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 import SciMLPublic: @public
+
+using Moshi.Match: @match
 
 import Preferences: @load_preference
 
