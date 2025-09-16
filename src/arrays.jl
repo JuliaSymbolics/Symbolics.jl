@@ -59,9 +59,6 @@ Base.size(A::Arr) = size(unwrap(A))
 Base.axes(A::Arr) = axes(unwrap(A))
 Base.eachindex(A::Arr) = eachindex(unwrap(A))
 
-function get_variables!(vars, e::Arr, varlist=nothing)
-    foreach(x -> get_variables!(vars, x, varlist), collect(e))
-    vars
 end
 
 # cannot use `@wrapped` since it will define `\(::BasicSymbolic, ::BasicSymbolic)`

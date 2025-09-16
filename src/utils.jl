@@ -14,45 +14,6 @@ function flatten_expr!(x)
     xs
 end
 
-
-"""
-    get_variables(e, varlist = nothing; sort::Bool = false)
-
-Return a vector of variables appearing in `e`, optionally restricting to variables in `varlist`.
-
-Note that the returned variables are not wrapped in the `Num` type.
-
-# Examples
-```jldoctest
-julia> @variables t x y z(t);
-
-julia> Symbolics.get_variables(x + y + sin(z); sort = true)
-3-element Vector{SymbolicUtils.BasicSymbolic}:
- x
- y
- z(t)
-
-julia> Symbolics.get_variables(x - y; sort = true)
-2-element Vector{SymbolicUtils.BasicSymbolic}:
- x
- y
-```
-"""
-function get_variables(e::Num, varlist = nothing; sort::Bool = false)
-    get_variables(value(e), varlist; sort)
-end
-function get_variables(e, varlist = nothing; sort::Bool = false)
-    vars = Vector{BasicSymbolic}()
-    get_variables!(vars, e, varlist)
-    if sort
-        sort!(vars; by = SymbolicUtils.get_degrees)
-    end
-    vars
-end
-
-get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
-get_variables!(vars, e, varlist=nothing) = vars
-
 function is_singleton(e)
     if iscall(e)
         op = operation(e)
@@ -62,24 +23,6 @@ function is_singleton(e)
     else
         return issym(e)
     end
-end
-
-get_variables!(vars, e::Number, varlist=nothing) = vars
-
-function get_variables!(vars, e::BasicSymbolic, varlist=nothing)
-    if is_singleton(e)
-        if isnothing(varlist) || any(isequal(e), varlist)
-            push!(vars, e)
-        end
-    else
-        get_variables!(vars, operation(e), varlist)
-        foreach(x -> get_variables!(vars, x, varlist), arguments(e))
-    end
-    return (vars isa AbstractVector) ? unique!(vars) : vars
-end
-
-function get_variables!(vars, e::Equation, varlist=nothing)
-  get_variables!(vars, e.rhs, varlist)
 end
 
 """
