@@ -31,6 +31,10 @@ Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
 
+function SymbolicUtils.search_variables!(buffer, expr::Num; kw...)
+    SymbolicUtils.search_variables!(buffer, unwrap(expr); kw...)
+end
+
 """
     ifelse(cond::Num, x, y)
 

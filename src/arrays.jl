@@ -59,6 +59,8 @@ Base.size(A::Arr) = size(unwrap(A))
 Base.axes(A::Arr) = axes(unwrap(A))
 Base.eachindex(A::Arr) = eachindex(unwrap(A))
 
+function SymbolicUtils.search_variables!(buffer, expr::Arr; kw...)
+    SymbolicUtils.search_variables!(buffer, unwrap(expr); kw...)
 end
 
 # cannot use `@wrapped` since it will define `\(::BasicSymbolic, ::BasicSymbolic)`
