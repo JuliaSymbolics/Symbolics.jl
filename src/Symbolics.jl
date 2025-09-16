@@ -27,7 +27,7 @@ using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
 import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
-    FnType, @rule, Rewriters, substitute, symtype, shape,
+    FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
     promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl
 
 using SymbolicUtils.Code

@@ -4,7 +4,7 @@ end
 
 const RCNum = Union{Num, Complex{Num}}
 
-unwrap(x::Num) = x.val
+SymbolicUtils.unwrap(x::Num) = x.val
 
 """
     Num(val)
