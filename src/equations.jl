@@ -201,6 +201,10 @@ end
 
 canonical_form(eq::Equation) = eq.lhs - eq.rhs ~ 0
 
+function SymbolicUtils.search_variables!(buffer, eq::Equation; kw...)
+    SymbolicUtils.search_variables!(buffer, eq.lhs; kw...)
+    SymbolicUtils.search_variables!(buffer, eq.rhs; kw...)
+end
 
 struct ConstrainedEquation
   constraints
