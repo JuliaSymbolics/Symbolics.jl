@@ -532,7 +532,7 @@ Also see `variables`.
 """
 function variable(name, idx...; T=Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
-    v = Sym{T}(name_ij)
+    v = Sym{VartypeT}(name_ij; type = T)
     wrap(setmetadata(v, VariableSource, (:variables, name_ij)))
 end
 
