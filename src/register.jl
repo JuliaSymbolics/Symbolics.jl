@@ -21,34 +21,37 @@ overwriting.
 ```
 See `@register_array_symbolic` to register functions which return arrays.
 """
-macro register_symbolic(expr, define_promotion = true, Ts = :([]), wrap_arrays = true)
-    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, Ts)
+macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
     ret_type = isnothing(ret_type) ? Real : ret_type
-
+    N = length(args′)
+    symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
     fexpr = :(Symbolics.@wrapped function $f($(args′...))
-                  args = [$(argnames...),]
-                  unwrapped_args = map($nested_unwrap, args)
-                  res = if !any($is_symbolic_or_array_of_symbolic, unwrapped_args)
-                      $f(unwrapped_args...) # partial-eval if all args are unwrapped
-                  else
-                      $Term{$ret_type}($f, unwrapped_args)
-                  end
-                  if typeof.(args) == typeof.(unwrapped_args)
-                      return res
-                  else
-                      return $wrap(res)
-                  end
-              end $wrap_arrays)
+        args = ($(argnames...),)
+        if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
+            args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
+            $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type = $ret_type, shape = $(SymbolicUtils.ShapeVecT()))
+        else
+            $f($(argnames...))
+        end
+    end $wrap_arrays)
 
     if define_promotion
         fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
+        promote_expr = quote
+            function (::$(typeof(SymbolicUtils.promote_shape)))(::$ftype, args...)
+                @nospecialize args
+                $(SymbolicUtils.ShapeVecT)()
+            end
+        end
+        fexpr = :($fexpr; $promote_expr)
     end
     esc(fexpr)
 end
 
-function destructure_registration_expr(expr, Ts)
+function destructure_registration_expr(expr)
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
@@ -56,8 +59,6 @@ function destructure_registration_expr(expr, Ts)
         ret_type = nothing
     end
     @assert expr.head === :call
-    @assert Ts.head === :vect
-    Ts = Ts.args
 
     f = expr.args[1]
     args = expr.args[2:end]
