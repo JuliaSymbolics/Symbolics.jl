@@ -13,11 +13,7 @@ function flatten_expr!(x)
     end
     xs
 end
-function build_expr(head::Symbol, args)
-    ex = Expr(head)
-    append!(ex.args, args)
-    ex
-end
+
 
 """
     get_variables(e, varlist = nothing; sort::Bool = false)
