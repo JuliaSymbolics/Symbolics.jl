@@ -54,6 +54,21 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 
 import SciMLPublic: @public
 
+import Preferences: @load_preference
+
+const DEFAULT_VARTYPE_PREF = @load_preference("vartype", "SymReal")
+const VartypeT = @static if DEFAULT_VARTYPE_PREF == "SymReal"
+    SymReal
+elseif DEFAULT_VARTYPE_PREF == "SafeReal"
+    SafeReal
+elseif DEFAULT_VARTYPE_PREF == "TreeReal"
+    TreeReal
+else
+    error("""
+    Invalid vartype preference: $DEFAULT_VARTYPE_PREF. Must be one of "SymReal", \
+    "SafeReal" or "TreeReal".
+    """)
+end
 # re-export
 
 export simplify, substitute
