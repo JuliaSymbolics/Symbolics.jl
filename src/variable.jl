@@ -484,7 +484,13 @@ function getdefaultval(x, val=_fail)
     if val !== _fail
         return val
     else
-        error("$x has no default value")
+        @match x begin
+            BSImpl.Term(; f, args) && if f === getindex end => begin
+                idxs = Iterators.map(unwrap_const, Iterators.drop(args, 1))
+                return getdefaultval(args[1], val)[idxs...]
+            end
+            _ => error("$x has no default value")
+        end
     end
 end
 
