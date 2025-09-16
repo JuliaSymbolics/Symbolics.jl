@@ -272,30 +272,15 @@ end
 
 const _fail = Dict()
 
-_getname(x, _) = nameof(x)
-_getname(x::Symbol, _) = x
-function _getname(x::BasicSymbolic, val)
-    issym(x) && return nameof(x)
-    if iscall(x) && issym(operation(x))
-        return nameof(operation(x))
-    end
-    if !hasmetadata(x, Symbolics.GetindexParent) && iscall(x) && operation(x) == getindex
-        return _getname(arguments(x)[1], val)
-    end
-    ss = getsource(x, nothing)
-    if ss === nothing
-        ss = getsource(getparent(x), val)
-    end
-    ss === _fail && throw(ArgumentError("Variable $x doesn't have a source defined."))
-    ss[2]
-end
-
 getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
 SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Num}) = ScalarSymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Arr}) = ArraySymbolic()
 
 SymbolicIndexingInterface.hasname(x::Union{Num,Arr,Complex{Num}}) = hasname(unwrap(x))
+function SymbolicIndexingInterface.getname(x::Union{Num, Arr, Complex{Num}})
+    SymbolicIndexingInterface.getname(unwrap(x))
+end
 
 function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, BasicSymbolic, Equation, Inequality}, d::Dict; kwargs...)
     val = fixpoint_sub(ex, d; kwargs...)
