@@ -28,7 +28,21 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 """
 struct VariableSource <: AbstractVariableMetadata end
 
-setdefaultval(x, val) = setmetadata(x, VariableDefaultValue, val)
+function setdefaultval(x, val)
+    sh = shape(x)
+    if sh isa SymbolicUtils.Unknown
+        @assert sh.ndims == -1 || ndims(val) == sh.ndims """
+        Variable $x must have default of matching `ndims`. Got $val with `ndims` \
+        $(ndims(val)).
+        """
+    else
+        @assert isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
+        Variable $x must have default of matching size. Got $val with size \
+        $(size(val)).
+        """
+    end
+    setmetadata(x, VariableDefaultValue, val)
+end
 
 function map_subscripts(indices)
     str = string(indices)
