@@ -48,14 +48,14 @@ F = lu(X)
 R = simplify_fractions.(F.L * F.U - X[F.p, :])
 @test iszero(R)
 @test simplify_fractions.(F \ X) == I
-@test Symbolics._solve(X, X, true) == I
+@test Symbolics._solve(X, X, vars, true) == I
 inv(X)
 qr(X)
 
 X2 = [0 b c; 0 0 0; 0 h 0]
 @test_throws SingularException lu(X2)
 F2 = lu(X2, check=false)
-@test F2.info == 1
+@test F2.info == 2 # F2.info == rank(X2)
 
 # test operations with sparse arrays
 # note `isequal` instead of `==` because `==` would give another symbolic type

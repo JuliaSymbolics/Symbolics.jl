@@ -8,46 +8,218 @@ end
 
 # Soft pivoted
 # Note: we call this function with a matrix of Union{SymbolicUtils.Symbolic, Any}
-function sym_lu(A; check=true)
+function _sym_lu(A)
     SINGULAR = typemax(Int)
     m, n = size(A)
     F = map(x->x isa RCNum ? x : Num(x), A)
     minmn = min(m, n)
     p = Vector{LinearAlgebra.BlasInt}(undef, minmn)
-    info = 0
+    lead = 1
+    leads = zeros(Int, minmn)
+    rank = 0
     for k = 1:minmn
-        kp = k
+        kp = k # pivot index
+
+        # search for the expression different from zero with the least terms
         amin = SINGULAR
-        for i in k:m
-            absi = _iszero(F[i, k]) ? SINGULAR : nterms(F[i,k])
-            if absi < amin
-                kp = i
-                amin = absi
+        for j = lead:n
+            for i = k:m # search first by columns
+                absi = _iszero(F[i, j]) ? SINGULAR : nterms(F[i, j])
+                if absi < amin
+                    kp = i
+                    amin = absi
+                end
+            end
+            # break when pivot found
+            if amin != SINGULAR
+                lead = j
+                leads[k] = lead
+                break
             end
         end
 
         p[k] = kp
 
-        if amin == SINGULAR && !(amin isa Symbolic) && (amin isa Number) && iszero(info)
-            info = k
+        # break from function as the reduced echelon form has been
+        # reached, but fill `p`
+        if amin == SINGULAR && !(amin isa Symbolic) && (amin isa Number)
+            for i = k+1:minmn
+                p[i] = i
+            end
+            break
+        end
+        rank = k
+
+        # swap rows
+        if k != kp
+            for j = 1:n
+                F[k, j], F[kp, j] = F[kp, j], F[k, j]
+            end
         end
 
-        # swap
-        for j in 1:n
-            F[k, j], F[kp, j] = F[kp, j], F[k, j]
+        # set values for L matrix
+        c = F[k, lead]
+        for i = k+1:m
+            F[i, k] = F[i, lead] / c
+            if lead != k
+                F[i, lead] = zero(Num)
+            end
         end
 
-        for i in k+1:m
-            F[i, k] = F[i, k] / F[k, k]
-        end
-        for j = k+1:n
-            for i in k+1:m
+        # substract the row from every other, traverse first by colums
+        # we start from lead+1 to avoid chaing the leading value on the column
+        for j = lead+1:n
+            for i = k+1:m
+                # this line occupies most of the time, distributed in the
+                # following methods
+                #   - `*(::Num, ::Num)` dynamic dispatch
+                #   - `-(::Num, ::Num)` dynamic dispatch
                 F[i, j] = F[i, j] - F[i, k] * F[k, j]
             end
         end
+
+        # advance the lead by one
+        lead = lead + 1
     end
+    return F, p, filter!(!iszero, leads), rank
+end
+function sym_lu(A; check=true)
+    F, p, leads, rank = _sym_lu(A)
+    info = rank == minimum(size(A)) ? 0 : rank
     check && LinearAlgebra.checknonsingular(info)
     LU(F, p, convert(LinearAlgebra.BlasInt, info))
+end
+
+# soft pivoted reduced row echelon form for extended matrix
+function sym_rref(A, b)
+    SINGULAR = typemax(Int)
+    m, n = size(A)
+    F = map(x->x isa Num ? x : Num(x), A)
+    b = map(x->x isa Num ? x : Num(x), b)
+    minmn = min(m, n)
+    lead = 1
+    leads = zeros(Int, minmn)
+    rank = 0
+    for k = 1:m
+        kp = k # pivot index
+
+        # search for the expression different from zero with the least terms
+        amin = SINGULAR
+        for j = lead:n
+            for i = k:m # search first by columns
+                absi = _iszero(F[i, j]) ? SINGULAR : nterms(F[i, j])
+                if absi < amin
+                    kp = i
+                    amin = absi
+                end
+            end
+            # break when pivot found
+            if amin != SINGULAR
+                lead = j
+                leads[k] = lead
+                break
+            end
+        end
+
+        # normally, here we would save the permutation in an array
+        # but this is not needed as we have the extended matrix
+
+        # break from function as the reduced echelon form has been reached
+        if amin == SINGULAR && !(amin isa Symbolic) && (amin isa Number)
+            break
+        end
+        rank = k
+
+        # swap rows, only needed to swap lead:end
+        if k != kp
+            for j = lead:n
+                F[k, j], F[kp, j] = F[kp, j], F[k, j]
+            end
+        end
+
+        # normalize the current row
+        c = F[k, lead]
+        for j = lead:n
+            F[k, j] = F[k, j] / c
+        end
+        b[k] = b[k] / c
+
+        # substract the row form every other, traverse first by colums
+        for j = lead+1:n
+            for i = 1:m
+                if i != k
+                    # this line occupies most of the time, distributed in the
+                    # following methods
+                    #   - `*(::Num, ::Num)` dynamic dispatch
+                    #   - `-(::Num, ::Num)` dynamic dispatch
+                    F[i, j] = F[i, j] - F[i, lead] * F[k, j]
+                end
+            end
+        end
+        # substract the row in the extended part of the matrix
+        for i = 1:m
+            if i != k
+                b[i] = b[i] - F[i, lead] * b[k]
+            end
+        end
+        # zero the lead column
+        for i = 1:m
+            if i != k
+                F[i, lead] = zero(Num)
+            end
+        end
+
+        # advance the lead by one
+        lead = lead + 1
+    end
+    return F, b, filter!(!iszero, leads), rank
+end
+
+# convert an upper extended matrix to rref using leads
+# modifies `U` and `b`
+function _sym_urref!(U, b, leads)
+    m, n = size(U)
+    for k = 1:length(leads)
+        lead = leads[k]
+
+        c = U[k, lead]
+        for j = lead:n
+            U[k, j] = U[k, j] / c
+        end
+        b[k] = b[k] / c
+
+        for j = lead+1:n
+            for i = 1:k-1
+                # this line occupies most of the time, distributed in the
+                # following causes
+                #   - `*(::Num, ::Num)` dynamic dispatch
+                #   - `-(::Num, ::Num)` dynamic dispatch
+                U[i, j] = U[i, j] - U[k, j] * U[i, lead]
+            end
+        end
+        for i = 1:m
+            if i != k
+                b[i] = b[i] - b[k] * U[i, lead]
+            end
+        end
+        for i = 1:m
+            if i != k
+                U[i, lead] = zero(eltype(U))
+            end
+        end
+    end
+    U, b
+end
+
+function _factorize(A, b)
+    m, n = size(A)
+    if m <= n
+        F, p, leads, rank = _sym_lu(A)
+        return F, b, p, leads, rank
+    else
+        F, b, leads, rank = sym_rref(A, b)
+        return F, b, Int[], leads, rank
+    end
 end
 
 # Given a vector of equations and a
@@ -106,7 +278,7 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
     islinear || return nothing
     # a * x + b = 0
     if eq isa AbstractArray && var isa AbstractArray
-        x = _solve(a, -b, simplify)
+        x = _solve(a, -b, var, simplify)
     else
         if (a === wrap(0))
             x = NaN
@@ -125,10 +297,51 @@ symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = sym
 symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq, [var]; x...))
 
 
-function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
+const ℝ = (identity)((Symbolics.wrap)((SymbolicUtils.setmetadata)((SymbolicUtils.Sym){Real}(:ℝ), Symbolics.VariableSource, (:variables, :ℝ))))
+
+function _solve(A::AbstractMatrix, b::AbstractArray, vars, do_simplify)
     A = Num.(SymbolicUtils.quick_cancel.(A))
     b = Num.(SymbolicUtils.quick_cancel.(b))
-    sol = value.(sym_lu(A) \ b)
+    m, n = size(A)
+    minmn = min(m, n)
+    F, b, ipiv, leads, rank = _factorize(A, b)
+    if m == n && rank == minmn
+        info = 0
+        sol = value.(LU(F, ipiv, convert(LinearAlgebra.BlasInt, info)) \ b)
+    else
+        # check for consistency
+        for i ∈ rank+1:m
+            if !iszero(b[i])
+                throw(ArgumentError("Inconsistent linear system"))
+            end
+        end
+        _sol = Vector{Num}(undef, n)
+        if m <= n
+            # system is of the form Ax = (LU)x = L(Ux) = Lx' = b[p]
+            # with L being square `UnitLowerTriangular`
+
+            # first solve Lx' = b[p], -----------------------------------+
+            p = LinearAlgebra.ipiv2perm(ipiv, m)                       # |
+            L = UnitLowerTriangular(F[1:m, 1:m])                       # |
+            _x = symsub!(L, b[p])                                      # |
+                                                                       # |
+            # then solve Ux = x', first converting [U|x'] to rref, <-----+
+            U = triu!(F)                                               # |
+            F, b = _sym_urref!(U, _x, leads)                           # |
+        else                                                           # |
+        end                                                            # |
+        # and later filling the values for all the variables <-----------+
+        freeidx = setdiff(1:n, leads) # indices for free variables
+        for i in freeidx
+            _sol[i] = ℝ
+        end
+        F[CartesianIndex.(1:length(leads), leads)] .= 0
+        for (i, v) ∈ enumerate(leads)
+            _sol[v] = b[i] - view(F, i, :) ⋅ vars
+        end
+
+        sol = value.(_sol)
+    end
     do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
 
@@ -139,10 +352,10 @@ function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
     end
-    @inbounds for j in n:-1:1
+    @inbounds for j = n:-1:1
         _iszero(A.data[j,j]) && throw(SingularException(j))
         xj = x[j] = b[j] / A.data[j,j]
-        for i in j-1:-1:1
+        for i = j-1:-1:1
             sub = _isone(xj) ? A.data[i,j] : A.data[i,j] * xj
             if !_iszero(sub)
                 b[i] -= sub
@@ -159,9 +372,9 @@ function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = 
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
     end
-    @inbounds for j in 1:n
+    @inbounds for j = 1:n
         xj = x[j] = b[j]
-        for i in j+1:n
+        for i = j+1:n
             sub = _isone(xj) ? A.data[i,j] : A.data[i,j] * xj
             if !_iszero(sub)
                 b[i] -= sub
@@ -396,8 +609,8 @@ function _sparse(::Type{Tv}, ::Type{Ti}, M) where {Tv, Ti}
     rowval = Vector{Ti}(undef, nz)
     colptr[1] = 1
     cnt = 1
-    @inbounds for j in 1:size(M, 2)
-        for i in 1:size(M, 1)
+    @inbounds for j = 1:size(M, 2)
+        for i = 1:size(M, 1)
             v = M[i, j]
             if !_iszero(v)
                 rowval[cnt] = i
