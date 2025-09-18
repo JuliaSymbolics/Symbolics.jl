@@ -56,13 +56,6 @@ end
 Base.show(io::IO, ::MIME"text/plain", arr::Arr) = show(io, arr)
 
 ################# Base array functions
-geteltype(s::BasicSymbolic) = geteltype(symtype(s))
-geteltype(::Type{<:AbstractArray{T}}) where {T} = T
-geteltype(::Type{<:AbstractArray}) = Unknown()
-
-ndims(::Type{<:Arr{<:Any, N}}) where N = N
-
-Base.eltype(A::Arr) = geteltype(unwrap(A))
 Base.length(A::Arr) = length(unwrap(A))
 Base.size(A::Arr) = size(unwrap(A))
 Base.axes(A::Arr) = axes(unwrap(A))
