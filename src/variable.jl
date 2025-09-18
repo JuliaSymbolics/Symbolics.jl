@@ -95,30 +95,9 @@ function parse_vars(macroname, type, x, transform = identity)
             default = esc(default)
         end
         parse_result = SymbolicUtils.parse_variable(var_expr; default_type = type)
-
+        handle_nonconcrete_symtype!(parse_result)
         sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
-
-        # is a function call and the function doesn't have a type and all arguments
-        # are named
-        if parse_result_is_dependent_variable(parse_result)
-            args = parse_result[:args]
-            argnames = Any[get(arg, :name, nothing) for arg in args]
-            # if the last arg is a `Vararg`, splat it
-            if !isempty(args) && Meta.isexpr(args[end][:type], :curly) && args[end][:type].args[1] == :Vararg
-                argnames[end] = Expr(:..., argnames[end])
-            end
-            # Turn the result into something of the form `@variables x(..)`.
-            # This makes it so that the `FnType` is recognized as a dependent variable
-            # according to `SymbolicUtils.is_function_symtype`
-            parse_result[:args] = [SymbolicUtils.parse_variable(:(..); default_type = type)]
-            parse_result[:type].args[2] = Tuple
-            # Re-create the `Sym`
-            sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
-            # Call the `Sym` with the arguments to create a dependent variable.
-            map!(esc, argnames, argnames)
-            sym = Expr(:call, sym)
-            append!(sym.args, argnames)
-        end
+        sym = handle_maybe_dependent_variable!(parse_result, sym, type)
 
         if options === nothing && cursor < length(x) && isoption(x[cursor + 1])
             options = x[cursor + 1].args
@@ -139,6 +118,34 @@ function parse_vars(macroname, type, x, transform = identity)
     return ex
 end
 
+function handle_nonconcrete_symtype!(parse_result)
+    type = parse_result[:type]
+    if type == :Complex
+        parse_result[:type] = :(Complex{Real})
+    end
+    if Meta.isexpr(type, :curly)
+        if type.args[1] in (:Array, :Vector, :Matrix, Array, Vector, Matrix) && type.args[2] == :Complex
+            type.args[2] = :(Complex{Real})
+        end
+        if type.args[1] == :FnType || type.args[1] == SymbolicUtils.FnType
+            if Meta.isexpr(type.args[2], :curly) # Tuple{...}
+                for i in 2:length(type.args[2].args)
+                    if type.args[2].args[i] == :Complex
+                        type.args[2].args[i] = :(Complex{Real})
+                    end
+                end
+            end
+            if type.args[3] == :Complex
+                type.args[3] = :(Complex{Real})
+            end
+            for parse_arg in parse_result[:args]
+                handle_nonconcrete_symtype!(parse_arg)
+            end
+        end
+    end
+    return nothing
+end
+
 function parse_result_is_dependent_variable(parse_result)
     # This means it is a function call
     return haskey(parse_result, :args) &&
@@ -147,6 +154,31 @@ function parse_result_is_dependent_variable(parse_result)
     # This ensures all arguments have defined names
         all(n -> n !== nothing && n != :..,
             (get(arg, :name, nothing) for arg in parse_result[:args]))
+end
+
+function handle_maybe_dependent_variable!(parse_result, sym, type)
+    # is a function call and the function doesn't have a type and all arguments
+    # are named
+    parse_result_is_dependent_variable(parse_result) || return sym
+
+    args = parse_result[:args]
+    argnames = Any[get(arg, :name, nothing) for arg in args]
+    # if the last arg is a `Vararg`, splat it
+    if !isempty(args) && Meta.isexpr(args[end][:type], :curly) && args[end][:type].args[1] == :Vararg
+        argnames[end] = Expr(:..., argnames[end])
+    end
+    # Turn the result into something of the form `@variables x(..)`.
+    # This makes it so that the `FnType` is recognized as a dependent variable
+    # according to `SymbolicUtils.is_function_symtype`
+    parse_result[:args] = [SymbolicUtils.parse_variable(:(..); default_type = type)]
+    parse_result[:type].args[2] = Tuple
+    # Re-create the `Sym`
+    sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
+    # Call the `Sym` with the arguments to create a dependent variable.
+    map!(esc, argnames, argnames)
+    sym = Expr(:call, sym)
+    append!(sym.args, argnames)
+    return sym
 end
 
 function _add_metadata(parse_result, var::Expr, default, macroname::Symbol, metadata::Union{Nothing, Vector{Any}})
