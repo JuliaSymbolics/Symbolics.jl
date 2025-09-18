@@ -1,5 +1,17 @@
 @symbolic_wrap struct Num <: Real
-    val::Any
+    val::BasicSymbolic{VartypeT}
+
+    function Num(ex)
+        # need `<: Number` instead of `<: Real` to allow the primitive `@number_methods`
+        # methods below to infer. They could be made to infer `Union{Complex{Num}, Num}`
+        # by manually checking the `symtype` of the result and branching instead of using
+        # `wrap`. However, this causes issues with LinearAlgebra methods because it
+        # preallocates a buffer using the inferred result type, and then tries to
+        # e.g. set an integer into it, which fails because `convert(::Type{Union{..}}, ::T)`
+        # doesn't work.
+        @assert symtype(ex) <: Number
+        return new(Const{VartypeT}(ex))
+    end
 end
 
 const RCNum = Union{Num, Complex{Num}}
