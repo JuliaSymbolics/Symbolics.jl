@@ -26,9 +26,10 @@ import DomainSets: Domain, DomainSets
 using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-FnType, @rule, Rewriters, substitute, symtype,
-promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
+    FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
+    promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
+    Operator
 
 using SymbolicUtils.Code
 
@@ -54,6 +55,23 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 
 import SciMLPublic: @public
 
+using Moshi.Match: @match
+
+import Preferences: @load_preference
+
+const DEFAULT_VARTYPE_PREF = @load_preference("vartype", "SymReal")
+const VartypeT = @static if DEFAULT_VARTYPE_PREF == "SymReal"
+    SymReal
+elseif DEFAULT_VARTYPE_PREF == "SafeReal"
+    SafeReal
+elseif DEFAULT_VARTYPE_PREF == "TreeReal"
+    TreeReal
+else
+    error("""
+    Invalid vartype preference: $DEFAULT_VARTYPE_PREF. Must be one of "SymReal", \
+    "SafeReal" or "TreeReal".
+    """)
+end
 # re-export
 
 export simplify, substitute
@@ -177,7 +195,7 @@ export limit
 
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
-(::Type{T})(x::SymbolicUtils.Symbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
+(::Type{T})(x::SymbolicUtils.BasicSymbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
 for T in [Num, Complex{Num}]
     @eval begin
         #(::Type{S})(x::$T) where {S<:Union{NumberTypes,AbstractArray}} = S(Symbolics.unwrap(x))::S
@@ -196,9 +214,7 @@ for T in [Num, Complex{Num}]
         SymbolicUtils.hasmetadata(x::$T, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
 
         Broadcast.broadcastable(x::$T) = x
-    end
-    for S in [:(Symbolic{<:FnType}), :CallWithMetadata]
-        @eval (f::$S)(x::$T, y...) = wrap(f(unwrap(x), unwrap.(y)...))
+        SymbolicUtils.scalarize(x::$T) = scalarize(unwrap(x))
     end
 end
 
@@ -545,7 +561,7 @@ include("inverse.jl")
 export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
 include("discontinuities.jl")
 
-@public Arr, CallWithMetadata, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
+@public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, getparent, option_to_metadata_type, scalarize, shape
 @public unwrap, variable, wrap

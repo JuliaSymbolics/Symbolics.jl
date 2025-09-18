@@ -1,6 +1,3 @@
-abstract type Operator end
-propagate_shape(::Operator, x) = axes(x)
-
 """
 $(TYPEDEF)
 
@@ -37,18 +34,17 @@ struct Differential <: Operator
 end
 function (D::Differential)(x)
     x = unwrap(x)
-    if isarraysymbolic(x)
-        array_term(D, x)
-    else
-        term(D, x)
-    end
+    term(D, x)
 end
 
 (D::Differential)(x::Union{AbstractFloat, Integer}) = wrap(0)
 (D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
-(D::Differential)(x::Complex{Num}) = wrap(ComplexTerm{Real}(D(unwrap(real(x))), D(unwrap(imag(x)))))
-SymbolicUtils.promote_symtype(::Differential, T) = T
+(D::Differential)(x::Complex{Num}) = Complex{Num}(wrap(D(unwrap(real(x)))), wrap(D(unwrap(imag(x)))))
 SymbolicUtils.isbinop(f::Differential) = false
+
+function SymbolicUtils.operator_to_term(d::Differential, ex::BasicSymbolic{T}) where {T}
+    return diff2term(ex)
+end
 
 is_derivative(x) = iscall(x) ? operation(x) isa Differential : false
 
@@ -62,9 +58,6 @@ Base.nameof(D::Differential) = :Differential
 
 Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
 Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
-
-_isfalse(occ::Bool) = occ === false
-_isfalse(occ::Symbolic) = iscall(occ) && _isfalse(operation(occ))
 
 """
     $(TYPEDSIGNATURES)
@@ -237,7 +230,7 @@ passed differential and not any other Differentials it encounters.
 
 # Arguments
 - `D::Differential`: The differential to apply
-- `arg::Symbolic`: The symbolic expression to apply the differential on.
+- `arg::BasicSymbolic`: The symbolic expression to apply the differential on.
 - `simplify::Bool=false`: Whether to simplify the resulting expression using
     [`SymbolicUtils.simplify`](@ref).
 - `occurrences=nothing`: Information about the occurrences of the independent
@@ -349,7 +342,7 @@ function executediff(D, arg, simplify=false; throw_no_derivative=false)
 
         if _iszero(x)
             continue
-        elseif x isa Symbolic
+        elseif x isa BasicSymbolic
             push!(exprs, x)
         else
             c += x
@@ -376,7 +369,7 @@ This function recursively traverses a symbolic expression, applying the chain ru
 and other derivative rules to expand any derivatives it encounters.
 
 # Arguments
-- `O::Symbolic`: The symbolic expression to expand.
+- `O::BasicSymbolic`: The symbolic expression to expand.
 - `simplify::Bool=false`: Whether to simplify the resulting expression using
     [`SymbolicUtils.simplify`](@ref).
 
@@ -398,7 +391,7 @@ julia> dfx = expand_derivatives(Dx(f))
 (k*((2abs(x - y)) / y - 2z)*ifelse(signbit(x - y), -1, 1)) / y
 ```
 """
-function expand_derivatives(O::Symbolic, simplify=false; throw_no_derivative=false)
+function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivative=false)
     if iscall(O) && isa(operation(O), Differential)
         arg = only(arguments(O))
         arg = expand_derivatives(arg, false; throw_no_derivative)
@@ -417,8 +410,9 @@ function expand_derivatives(n::Num, simplify=false; kwargs...)
     wrap(expand_derivatives(value(n), simplify; kwargs...))
 end
 function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
-    wrap(ComplexTerm{Real}(expand_derivatives(real(n), simplify; kwargs...),
-                           expand_derivatives(imag(n), simplify; kwargs...)))
+    re = expand_derivatives(real(n), simplify; kwargs...)
+    img = expand_derivatives(imag(n), simplify; kwargs...)
+    Complex{Num}(wrap(re), wrap(img))
 end
 expand_derivatives(x, simplify=false; kwargs...) = x
 
@@ -461,7 +455,7 @@ sin(x)
 ```
 """
 derivative_idx(O::Any, ::Any) = 0
-function derivative_idx(O::Symbolic, idx)
+function derivative_idx(O::BasicSymbolic, idx)
     iscall(O) ? derivative(operation(O), (arguments(O)...,), Val(idx)) : 0
 end
 

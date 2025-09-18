@@ -13,49 +13,6 @@ function flatten_expr!(x)
     end
     xs
 end
-function build_expr(head::Symbol, args)
-    ex = Expr(head)
-    append!(ex.args, args)
-    ex
-end
-
-"""
-    get_variables(e, varlist = nothing; sort::Bool = false)
-
-Return a vector of variables appearing in `e`, optionally restricting to variables in `varlist`.
-
-Note that the returned variables are not wrapped in the `Num` type.
-
-# Examples
-```jldoctest
-julia> @variables t x y z(t);
-
-julia> Symbolics.get_variables(x + y + sin(z); sort = true)
-3-element Vector{SymbolicUtils.BasicSymbolic}:
- x
- y
- z(t)
-
-julia> Symbolics.get_variables(x - y; sort = true)
-2-element Vector{SymbolicUtils.BasicSymbolic}:
- x
- y
-```
-"""
-function get_variables(e::Num, varlist = nothing; sort::Bool = false)
-    get_variables(value(e), varlist; sort)
-end
-function get_variables(e, varlist = nothing; sort::Bool = false)
-    vars = Vector{BasicSymbolic}()
-    get_variables!(vars, e, varlist)
-    if sort
-        sort!(vars; by = SymbolicUtils.get_degrees)
-    end
-    vars
-end
-
-get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
-get_variables!(vars, e, varlist=nothing) = vars
 
 function is_singleton(e)
     if iscall(e)
@@ -66,24 +23,6 @@ function is_singleton(e)
     else
         return issym(e)
     end
-end
-
-get_variables!(vars, e::Number, varlist=nothing) = vars
-
-function get_variables!(vars, e::Symbolic, varlist=nothing)
-    if is_singleton(e)
-        if isnothing(varlist) || any(isequal(e), varlist)
-            push!(vars, e)
-        end
-    else
-        get_variables!(vars, operation(e), varlist)
-        foreach(x -> get_variables!(vars, x, varlist), arguments(e))
-    end
-    return (vars isa AbstractVector) ? unique!(vars) : vars
-end
-
-function get_variables!(vars, e::Equation, varlist=nothing)
-  get_variables!(vars, e.rhs, varlist)
 end
 
 """
@@ -126,7 +65,7 @@ get_differential_vars!(vars, e, varlist=nothing) = vars
 
 get_differential_vars!(vars, e::Number, varlist=nothing) = vars
 
-function get_differential_vars!(vars, e::Symbolic, varlist=nothing)
+function get_differential_vars!(vars, e::BasicSymbolic, varlist=nothing)
     if is_derivative(e)
         if isnothing(varlist) || any(isequal(e), varlist)
             push!(vars, e)
@@ -148,11 +87,11 @@ function get_differential_vars!(vars, e::Equation, varlist=nothing)
 end
 
 # Sym / Term --> Symbol
-Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
+Base.Symbol(x::Num) = Symbol(unwrap(x))
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x, x_metadata::Dict{Datatype, Any}) -> Symbolic
+    diff2term(x, x_metadata::Dict{Datatype, Any}) -> BasicSymbolic
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
@@ -192,7 +131,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
     d_separator = 'ˍ'
 
     if ds === nothing
-        return maketerm(typeof(O), TermInterface.head(O), map(diff2term, children(O)),
+        return maketerm(typeof(O), TermInterface.head(O), map(diff2term, arguments(O)),
                         O_metadata isa Nothing ?
             metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...))
     else
@@ -207,7 +146,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
             error("diff2term case not handled: $oldop")
         end
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return setname(maketerm(typeof(O), rename(oldop, newname), children(O), O_metadata isa Nothing ?
+        return setname(maketerm(typeof(O), rename(oldop, newname), arguments(O), O_metadata isa Nothing ?
             metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...)), newname)
     end
 end
@@ -215,7 +154,7 @@ end
 setname(v, name) = setmetadata(v, Symbolics.VariableSource, (:variables, name))
 
 """
-    tosymbol(x::Union{Num,Symbolic}; states=nothing, escape=true) -> Symbol
+    tosymbol(x::Union{Num,BasicSymbolic}; states=nothing, escape=true) -> Symbol
 
 Convert `x` to a symbol. `states` are the states of a system, and `escape`
 means if the target has escapes like `val"y(t)"`. If `escape` is false, then
@@ -265,28 +204,13 @@ function tosymbol(t; states=nothing, escape=true)
     end
 end
 
-function lower_varname(var::Symbolic, idv, order)
+function lower_varname(var::BasicSymbolic, idv, order)
     order == 0 && return var
     D = Differential(idv)
     for _ in 1:order
         var = D(var)
     end
     return diff2term(var)
-end
-
-### OOPS
-
-struct Unknown end
-
-macro oops(ex)
-    quote
-        tmp = $(esc(ex))
-        if tmp === Unknown()
-            return Unknown()
-        else
-            tmp
-        end
-    end
 end
 
 function makesubscripts(n)
@@ -301,7 +225,7 @@ end
 
 function var_from_nested_derivative(x,i=0)
     x = unwrap(x)
-    if issym(x) || x isa CallWithMetadata
+    if issym(x)
         (x, i)
     elseif iscall(x)
         operation(x) isa Differential ?
@@ -431,7 +355,7 @@ function coeff(p, sym=nothing)
         end
     else
         p isa Number && return sym === nothing ? p : 0
-        p isa Symbolic && return coeff(p, sym)
+        p isa BasicSymbolic && return coeff(p, sym)
         throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
     end
 end
@@ -441,9 +365,7 @@ end
 const DP = DynamicPolynomials
 # extracting underlying polynomial and coefficient type from Polyforms
 underlyingpoly(x::Number) = x
-underlyingpoly(pf::PolyForm) = pf.p
 coefftype(x::Number) = typeof(x)
-coefftype(pf::PolyForm) = DP.coefficient_type(underlyingpoly(pf))
 
 #=
 Converts an array of symbolic polynomials
@@ -456,31 +378,28 @@ function symbol_to_poly(sympolys::AbstractArray)
     stdsympolys = map(unwrap, sympolys)
     sort!(stdsympolys, lt=(<ₑ))
 
-    pvar2sym = Bijections.Bijection{Any,Any}()
-    sym2term = Dict{BasicSymbolic,Any}()
-    polyforms = map(f -> PolyForm(f, pvar2sym, sym2term), stdsympolys)
+    symidx = findfirst(x -> x isa BasicSymbolic, stdsympolys)
+    varT = vartype(stdsympolys[symidx])
+
+    poly_to_bs = Bijections.Bijection{SymbolicUtils.PolyVarT, BasicSymbolic{varT}}()
+    bs_to_poly = Bijections.active_inv(poly_to_bs)
+    polyforms = Vector{SymbolicUtils.PolynomialT}(map(f -> SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, f), stdsympolys))
 
     # Discover common coefficient type
     commontype = mapreduce(coefftype, promote_type, polyforms, init=Int)
     @assert commontype <: Union{Integer,Rational} "Only integer and rational coefficients are supported as input."
 
-    # Convert all to DP.Polynomial, so that coefficients are of same type,
-    # and constants are treated as polynomials
-    # We also need this because Groebner does not support abstract types as input
-    polynoms = Vector{DP.Polynomial{DP.Commutative{DP.CreationOrder},DP.Graded{DP.LexOrder},commontype}}(undef, length(sympolys))
-    for (i, pf) in enumerate(polyforms)
-        polynoms[i] = underlyingpoly(pf)
-    end
+    polynoms = polyforms
 
-    polynoms, pvar2sym, sym2term
+    polynoms, poly_to_bs
 end
 
 #=
 Converts an array of AbstractPolynomialLike`s into an array of
 symbolic expressions mapping variables w.r.t pvar2sym
 =#
-function poly_to_symbol(polys, pvar2sym, sym2term, ::Type{T}) where {T}
-    map(f -> PolyForm{T}(f, pvar2sym, sym2term), polys)
+function poly_to_symbol(polys, poly_to_bs, ::Type{T}) where {T}
+    map(Base.Fix1(SymbolicUtils.from_poly, poly_to_bs), polys)
 end
 
 """
@@ -516,7 +435,7 @@ julia> numerator(x/y)
 x
 ```
 """
-function Base.numerator(x::Union{Num, Symbolic})
+function Base.numerator(x::Union{Num, BasicSymbolic})
     x = unwrap(x)
     if iscall(x) && operation(x) == /
         x = arguments(x)[1] # get numerator
@@ -536,7 +455,7 @@ julia> denominator(x/y)
 y
 ```
 """
-function Base.denominator(x::Union{Num, Symbolic})
+function Base.denominator(x::Union{Num, BasicSymbolic})
     x = unwrap(x)
     if iscall(x) && operation(x) == /
         x = arguments(x)[2] # get denominator
@@ -639,4 +558,6 @@ function evaluate(ineq::Inequality, subs)
     end
 end 
 
-
+vartype_from_args(::BasicSymbolic{T}, args...) where {T} = T
+vartype_from_args(_, args...) = vartype_from_args(args...)
+vartype_from_args() = error("Cannot infer `vartype`.")

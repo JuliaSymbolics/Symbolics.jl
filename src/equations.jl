@@ -127,7 +127,7 @@ function Base.show(io::IO, eq::Equation)
     end
 end
 
-scalarize(eq::Equation) = scalarize(eq.lhs) .~ scalarize(eq.rhs)
+SymbolicUtils.scalarize(eq::Equation) = scalarize(eq.lhs) .~ scalarize(eq.rhs)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
 # ambiguity
 for T in [:Pair, :Any]
@@ -201,7 +201,10 @@ end
 
 canonical_form(eq::Equation) = eq.lhs - eq.rhs ~ 0
 
-get_variables(eq::Equation) = unique(vcat(get_variables(eq.lhs), get_variables(eq.rhs)))
+function SymbolicUtils.search_variables!(buffer, eq::Equation; kw...)
+    SymbolicUtils.search_variables!(buffer, eq.lhs; kw...)
+    SymbolicUtils.search_variables!(buffer, eq.rhs; kw...)
+end
 
 struct ConstrainedEquation
   constraints

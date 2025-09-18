@@ -77,13 +77,6 @@ end
     return :($(recipe(z.re)) + $(recipe(z.im)) * $im)
 end
 
-@latexrecipe function f(n::ArrayOp)
-    env --> :equation
-    mult_symbol --> ""
-    index --> :subscript
-    return recipe(n.term)
-end
-
 @latexrecipe function f(n::Function)
     env --> :equation
     mult_symbol --> ""
@@ -101,15 +94,7 @@ end
     return unwrap(n)
 end
 
-@latexrecipe function f(n::CallWithMetadata)
-    env --> :equation
-    mult_symbol --> ""
-    index --> :subscript
-
-    return n.f
-end
-
-@latexrecipe function f(n::Symbolic)
+@latexrecipe function f(n::BasicSymbolic)
     env --> :equation
     mult_symbol --> ""
     index --> :subscript
@@ -133,7 +118,7 @@ end
     env --> :equation
     index --> :subscript
 
-    if hide_lhs(eq.lhs) || !(eq.lhs isa Union{Number, AbstractArray, Symbolic})
+    if hide_lhs(eq.lhs) || !(eq.lhs isa Union{Number, AbstractArray, BasicSymbolic})
         return eq.rhs
     else
         return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
@@ -146,12 +131,10 @@ end
 end
 
 Base.show(io::IO, ::MIME"text/latex", x::RCNum) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::Symbolic) = print(io, "\$\$ " * latexify(x) * " \$\$")
+Base.show(io::IO, ::MIME"text/latex", x::BasicSymbolic) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
-
-_toexpr(O::ArrayOp; latexwrapper = default_latex_wrapper) = _toexpr(O.term; latexwrapper)
 
 # `_toexpr` is only used for latexify
 function _toexpr(O; latexwrapper = default_latex_wrapper)
