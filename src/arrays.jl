@@ -5,7 +5,16 @@ import Base: eltype, length, ndims, size, axes, eachindex
 ### Wrapper type for dispatch
 
 @symbolic_wrap struct Arr{T,N} <: AbstractArray{T, N}
-    value
+    value::BasicSymbolic{VartypeT}
+
+    function Arr{T, N}(ex) where {T, N}
+        if is_wrapper_type(T)
+            @assert symtype(ex) <: AbstractArray{<:wraps_type(T), N}
+        else
+            @assert symtype(ex) <: AbstractArray{T, N}
+        end
+        new{T, N}(Const{VartypeT}(ex))
+    end
 end
 
 Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
