@@ -1,6 +1,3 @@
-abstract type Operator end
-propagate_shape(::Operator, x) = axes(x)
-
 """
 $(TYPEDEF)
 
@@ -37,18 +34,17 @@ struct Differential <: Operator
 end
 function (D::Differential)(x)
     x = unwrap(x)
-    if isarraysymbolic(x)
-        array_term(D, x)
-    else
-        term(D, x)
-    end
+    term(D, x)
 end
 
 (D::Differential)(x::Union{AbstractFloat, Integer}) = wrap(0)
 (D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
 (D::Differential)(x::Complex{Num}) = Complex{Num}(wrap(D(unwrap(real(x)))), wrap(D(unwrap(imag(x)))))
-SymbolicUtils.promote_symtype(::Differential, T) = T
 SymbolicUtils.isbinop(f::Differential) = false
+
+function SymbolicUtils.operator_to_term(d::Differential, ex::BasicSymbolic{T}) where {T}
+    return diff2term(ex)
+end
 
 is_derivative(x) = iscall(x) ? operation(x) isa Differential : false
 
