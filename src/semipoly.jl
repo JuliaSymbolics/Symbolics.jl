@@ -3,253 +3,66 @@ using DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs
 
-"""
-$(TYPEDEF)
+const SemipolyDictT = Dict{BasicSymbolic{VartypeT}, BasicSymbolic{VartypeT}}
 
-# Attributes
-$(TYPEDFIELDS)
-"""
-struct SemiMonomial
-    "monomial"
-    p::Union{BasicSymbolic, Real}
-    "coefficient"
-    coeff::Any
-end
-
-Base.:+(a::SemiMonomial) = a
-function Base.:+(a::SemiMonomial, b::SemiMonomial)
-    Term(+, [a, b])
-end
-function Base.:+(m::SemiMonomial, t)
-    if iscall(t) && operation(t) == (+)
-        return Term(+, [arguments(t); m])
-    end
-    Term(+, [m, t])
-end
-Base.:+(t, m::SemiMonomial) = m + t
-
-Base.:*(m::SemiMonomial) = m
-function Base.:*(a::SemiMonomial, b::SemiMonomial)
-    SemiMonomial(a.p * b.p, a.coeff * b.coeff)
-end
-Base.:*(m::SemiMonomial, n::Number) = SemiMonomial(m.p, m.coeff * n)
-function Base.:*(m::SemiMonomial, t::BasicSymbolic)
-    isconst(t) && return m * unwrap_const(t)
-    if iscall(t)
-        op = operation(t)
-        if op == (+)
-            args = collect(all_terms(t))
-            return Term(+, (m,) .* args)
-        elseif op == (*)
-            return Term(*, [arguments(t); m])
+function canonicalize_poly(poly_to_bs, bs_to_poly, poly, degree, vars::AbstractSet)
+    subskeys = SymbolicUtils.PolyVarT[]
+    subsvals = SymbolicUtils.PolynomialT[]
+    for pvar in MP.variables(poly)
+        var = poly_to_bs[pvar]
+        if isdiv(var)
+            var = SymbolicUtils.flatten_fractions(var)
         end
-    end
-    Term(*, [t, m])
-end
-Base.:*(t, m::SemiMonomial) = m * t
-
-function Base.:/(a::SemiMonomial, b::SemiMonomial)
-    SemiMonomial(a.p / b.p, a.coeff / b.coeff)
-end
-
-function Base.:^(base::SemiMonomial, exp::Real)
-    SemiMonomial(base.p^exp, base.coeff^exp)
-end
-
-# return a dictionary of exponents with respect to variables
-function pdegrees(x)
-    if ismul(x)
-        return x.dict
-    elseif isdiv(x)
-        num_dict = pdegrees(x.num)
-        den_dict = pdegrees(x.den)
-        inv_den_dict = Dict(keys(den_dict) .=> map(-, values(den_dict)))
-        mergewith(+, num_dict, inv_den_dict)
-    elseif ispow(x)
-        dict = pdegrees(x.base)
-        degrees = map(degree -> degree * x.exp, values(dict))
-        Dict(keys(dict) .=> degrees)
-    elseif issym(x) || iscall(x)
-        return Dict(x=>1)
-    elseif unwrap_const(x) isa Number
-        return Dict()
-    else
-        error("pdegrees for $x unknown")
-    end
-end
-
-pdegree(x::Number) = 0
-function pdegree(x::BasicSymbolic)
-    degree_dict = pdegrees(x)
-    if isempty(degree_dict)
-        return 0
-    end
-    sum(values(degree_dict))
-end
-
-issemimonomial(x) = x isa SemiMonomial
-
-# Return true is `m` is a `SemiMonomial`, satisfies the definition of a monomial and
-# its degree is less than or equal to `degree_bound`.
-# If `m` is a constant about `vars`, return true if `consts = true` and return false if
-# `consts = false`.
-function isboundedmonomial(m, vars, degree_bound::Real; consts = true)::Bool
-    if !(m isa SemiMonomial)
-        return false
-    end
-    degree_dict = pdegrees(m.p)
-    if isempty(degree_dict)
-        return consts && !has_vars(m.coeff, vars)
-    end
-    degrees = values(degree_dict)
-    for degree in degrees
-        if !isinteger(degree) || degree < 0
-            return false
-        end
-    end
-    if sum(degrees) > degree_bound
-        return false
-    end
-    !has_vars(m.coeff, vars)
-end
-
-# Return true if the degrees of `m` are all 0s and its coefficient is a `Real`.
-Base.:isreal(m::SemiMonomial) = m.p isa Number && isone(m.p) && unwrap(m.coeff) isa Real
-Base.:isreal(::BasicSymbolic) = false
-
-# Transform `m` to a `Real`.
-# Assume `isreal(m) == true`, otherwise calling this function does not make sense.
-function Base.:real(m::SemiMonomial)::Real
-    if isinteger(m.coeff)
-        return Int(m.coeff)
-    end
-    return m.coeff
-end
-
-symtype(m::SemiMonomial) = symtype(m.p)
-
-issym(::SemiMonomial) = true
-
-Base.:nameof(m::SemiMonomial) = Symbol(:SemiMonomial, m.p, m.coeff)
-
-isop(x, op) = iscall(x) && operation(x) === op
-isop(op) = Base.Fix2(isop, op)
-
-simpleterm(T, f, args, m) = Term{SymbolicUtils._promote_symtype(f, args)}(f, args)
-
-function mark_and_exponentiate(expr, vars)
-    # Step 1
-    # Mark all the interesting variables -- substitute without recursing into nl forms
-    expr′ = mark_vars(expr, vars)
-
-    # Step 2
-    # Construct and propagate BoundedDegreeMonomial for ^ and * and /
-
-    # does not do fraction simplification
-    rules = [@rule (~a::issemimonomial)^(~b::isreal) => (~a)^real(~b)
-             @rule (~a::isop(+))^(~b::isreal) => expand(Pow((~a), real(~b)))
-             @rule *(~~xs::(xs -> all(issemimonomial, xs))) => *(~~xs...)
-             @rule *(~~xs::(xs -> any(isop(+), xs))) => expand(Term(*, ~~xs))
-             @rule (~a::isop(+)) / (~b::issemimonomial) => +(map(x->x/~b, arguments(~a))...)
-             @rule (~a::issemimonomial) / (~b::issemimonomial) => (~a) / (~b)]
-    expr′ = Postwalk(RestartedChain(rules), maketerm = simpleterm)(expr′)
-end
-
-function semipolyform_terms(expr, vars)
-    expr = mark_and_exponentiate(expr, vars)
-    if iscall(expr) && operation(expr) == (+)
-        args = collect(all_terms(expr))
-        return args
-    elseif isreal(expr) && iszero(real(expr)) # when `expr` is just a 0
-        return []
-    else
-        return [expr]
-    end
-end
-semipolyform_terms(vars) = Base.Fix2(semipolyform_terms, vars)
-
-"""
-$(TYPEDSIGNATURES)
-
-Return true if `expr` contains any variables in `vars`.
-"""
-function has_vars(expr, vars)::Bool
-    if symbolic_type(expr) == ArraySymbolic() && shape(expr) != Unknown()
-        for i in eachindex(expr)
-            expr[i] in vars && return true
-        end
-    end
-    if expr in vars
-        return true
-    elseif iscall(expr)
-        if operation(expr) === getindex && hasmetadata(arguments(expr)[1], VariableSource)
-            return false
-        end
-        for arg in arguments(expr)
-            if has_vars(arg, vars)
-                return true
+        @match var begin
+            BSImpl.Div(; num, den) => begin
+                den_has_vars = SymbolicUtils.query(in(vars), den)
+                # We only care about terms up to degree `degree`. So we only care about
+                # numerators with degree <= `2degree + 1`, since if the denominator is
+                # degree `degree` this entire variable goes in the residual anyway. The +1
+                # is in case `degree == 0`.
+                result, resid = semipolynomial_form(num, vars, 2degree + 1; consts = false)
+                newpoly = SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, resid / den)
+                if newpoly isa SymbolicUtils.PolyVarT
+                    newpoly = MP.polynomial(newpoly, SymbolicUtils.PolyCoeffT)
+                end
+                for (monomial, coeff) in result
+                    if den_has_vars
+                        monomial = monomial / den
+                        @match monomial begin
+                            BSImpl.Div(; num = n2, den = d2) => begin
+                                den_has_vars2 = isequal(den, d2) || SymbolicUtils.query(in(vars), den)
+                                if den_has_vars2
+                                    coeff *= monomial
+                                    monomial = 1
+                                end
+                            end
+                            _ => nothing
+                        end
+                    else
+                        coeff = coeff / den
+                    end
+                    mono = SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, monomial, false)
+                    coeff = if SymbolicUtils.isconst(coeff)
+                        unwrap_const(coeff)
+                    else
+                        SymbolicUtils.basicsymbolic_to_polyvar(bs_to_poly, coeff)
+                    end
+                    MA.operate!(+, newpoly, mono * coeff)
+                end
+                push!(subskeys, pvar)
+                push!(subsvals, newpoly)
             end
-        end
-    elseif expr isa Array
-        for el in expr
-            has_vars(el, vars) && return true
+            _ => nothing
         end
     end
-    return false
+    return MP.subs(poly, subskeys => subsvals)
 end
 
-function mark_vars(expr, vars)
-    if expr in vars
-        return SemiMonomial(expr, 1)
-    elseif !iscall(expr)
-        return SemiMonomial(1, expr)
+function _semipoly_query_recurse(ex::SymbolicT)
+    @match ex begin
+        BSImpl.Term(; f, args) && if f === getindex && hasmetadata(args[1], VariableSource) end => false
+        _ => true
     end
-    op = operation(expr)
-    if op === (^) || op == (/)
-        args = arguments(expr)
-        @assert length(args) == 2
-        return Term{symtype(expr)}(op, map(mark_vars(vars), args))
-    end
-    args = arguments(expr)
-    if op === (+) || op === (*)
-        return Term{symtype(expr)}(op, map(mark_vars(vars), args))
-    elseif length(args) == 1
-        if op == sqrt
-            return mark_vars(args[1]^(1//2), vars)
-        elseif linearity_1(op)
-            return Term{symtype(expr)}(op, mark_vars(args[1], vars))
-        end
-    end
-    return SemiMonomial(1, expr)
-end
-mark_vars(vars) = Base.Fix2(mark_vars, vars)
-
-function bifurcate_terms(terms, vars, degree::Real; consts = true)
-    # Step 4: Bifurcate polynomial and nonlinear parts:
-    monomial_indices = findall(t -> isboundedmonomial(t, vars, degree; consts = consts),
-                               terms)
-    monomials = @view terms[monomial_indices]
-    polys_dict = Dict()
-    sizehint!(polys_dict, length(monomials))
-    for m in monomials
-        if haskey(polys_dict, m.p)
-            polys_dict[m.p] += m.coeff
-        else
-            polys_dict[m.p] = m.coeff
-        end
-    end
-    if length(monomials) == length(terms)
-        return polys_dict, 0
-    end
-    deleteat!(terms, monomial_indices) # the remaining elements in terms are not monomials
-    nl = cautious_sum(terms)
-    return polys_dict, nl
-end
-
-function init_semipoly_vars(vars)
-    set = OrderedSet(unwrap.(vars))
-    @assert length(set) == length(vars) # vars passed to semi-polynomial form must be unique
-    set
 end
 
 """
@@ -268,12 +81,62 @@ a key `1` and the corresponding value will be the constant term. If `false`, the
 function semipolynomial_form(expr, vars, degree::Real; consts = true)
     if degree < 0
         @warn "Degree for semi-polynomial form should be ≥ 0"
-        return Dict(), expr
+        return SemipolyDictT(), expr
     end
-    vars = init_semipoly_vars(vars)
+    if any(iswrapped, vars)
+        vars = map(unwrap, vars)
+    end
+    if !(vars isa AbstractSet)
+        vars = Set(vars)
+    end
     expr = unwrap(expr)
-    terms = semipolyform_terms(expr, vars)
-    bifurcate_terms(terms, vars, degree; consts = consts)
+    expr = expand(expr, false)
+    poly_to_bs = Bijections.Bijection{SymbolicUtils.PolyVarT, BasicSymbolic{VartypeT}}()
+    bs_to_poly = Bijections.active_inv(poly_to_bs)
+    poly = SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, expr, false)
+    poly = canonicalize_poly(poly_to_bs, bs_to_poly, poly, degree, vars)
+    pvars = MP.variables(poly)
+    nonpoly_mask = falses(length(pvars))
+    in_vars_mask = falses(length(pvars))
+    for (i, pvar) in enumerate(pvars)
+        var = poly_to_bs[pvar]
+        in_vars_mask[i] = var in vars
+        in_vars_mask[i] && continue
+        nonpoly_mask[i] = SymbolicUtils.query(in(vars), var; recurse = _semipoly_query_recurse)
+    end
+    result = SemipolyDictT()
+    constant = SymbolicUtils.zeropoly()
+    residual = SymbolicUtils.zeropoly()
+    for t in MP.terms(poly)
+        is_monomial_in_vars = true
+        monomial_degree = 0
+        true_monomial = SymbolicUtils.MonomialT()
+        coeff_monomial = SymbolicUtils.MonomialT()
+        for (i, exp) in enumerate(MP.exponents(t))
+            iszero(exp) && continue
+            monomial_degree += in_vars_mask[i] * exp
+            MA.operate!(*, in_vars_mask[i] ? true_monomial : coeff_monomial, MP.variables(t)[i] ^ exp)
+            is_monomial_in_vars &= !nonpoly_mask[i]
+        end
+        if is_monomial_in_vars && monomial_degree <= degree
+            if monomial_degree == 0
+                MA.operate!(+, constant, t)
+            else
+                mono = SymbolicUtils.from_poly(poly_to_bs, true_monomial)
+                result[mono] = get(result, mono, 0) + MP.coefficient(t) * SymbolicUtils.from_poly(poly_to_bs, coeff_monomial)
+            end
+        else
+            MA.operate!(+, residual, t)
+        end
+    end
+
+    if consts && !iszero(constant)
+        result[Const{VartypeT}(1)] = SymbolicUtils.from_poly(poly_to_bs, constant)
+    else
+        MA.operate!(+, residual, constant)
+    end
+    residual = SymbolicUtils.from_poly(poly_to_bs, residual)
+    return result, residual
 end
 
 """
@@ -289,13 +152,21 @@ a key `1` and the corresponding value will be the constant term. If `false`, the
 function semipolynomial_form(exprs::AbstractArray, vars, degree::Real; consts = true)
     if degree < 0
         @warn "Degree for semi-polynomial form should be ≥ 0"
-        return fill(Dict(), length), exprs
+        return fill(SemipolyDictT(), size(exprs)), exprs
     end
-    vars = init_semipoly_vars(vars)
-    exprs = unwrap.(exprs)
-    matches = map(semipolyform_terms(vars), exprs)
-    tmp = map(match -> bifurcate_terms(match, vars, degree; consts = consts), matches)
-    map(first, tmp), map(last, tmp)
+    if any(iswrapped, vars)
+        vars = map(unwrap, vars)
+    end
+    if !(vars isa AbstractSet)
+        vars = Set(vars)
+    end
+    results = similar(exprs, SemipolyDictT)
+    residuals = similar(exprs, BasicSymbolic{VartypeT})
+
+    for (i, expr) in enumerate(exprs)
+        results[i], residuals[i] = semipolynomial_form(expr, vars, degree; consts)
+    end
+    return results, residuals
 end
 
 """
@@ -379,6 +250,7 @@ function semiquadratic_form(exprs, vars)
                 push!(I2, i)
                 if isop(k, ^)
                     b, e = arguments(k)
+                    e = unwrap_const(e)
                     @assert e == 2
                     q = idxmap[b]
                     j = div(q*(q+1), 2)
@@ -412,37 +284,37 @@ function semiquadratic_form(exprs, vars)
           wrap.(nls))
 end
 
-## Utilities
+isop(x, op) = iscall(x) && operation(x) === op
+isop(op) = Base.Fix2(isop, op)
 
-all_terms(x) = iscall(x) && operation(x) == (+) ? collect(Iterators.flatten(map(all_terms, arguments(x)))) : (x,)
-
-function unwrap_sp(m::SemiMonomial)
-    degree_dict = pdegrees(m.p)
-    # avoid making negative exponent in `Mul` dict
-    positive_dict = Dict()
-    negative_dict = Dict()
-    for (var, degree) in degree_dict
-        if isinteger(degree)
-            degree = Int(degree)
-        end
-        if degree > 0
-            positive_dict[var] = degree
-        else
-            negative_dict[var] = -degree
-        end
-    end
-    m.coeff * Mul(symtype(m.p), 1, positive_dict) / Mul(symtype(m.p), 1, negative_dict)
-end
-function unwrap_sp(x)
+function pdegrees(x)
     x = unwrap(x)
-    iscall(x) ? maketerm(typeof(x),
-                         TermInterface.head(x), map(unwrap_sp,
-                                                    TermInterface.children(x)), nothing) : x
+    if ismul(x)
+        return x.dict
+    elseif isdiv(x)
+        num_dict = pdegrees(x.num)
+        den_dict = pdegrees(x.den)
+        inv_den_dict = Dict(keys(den_dict) .=> map(-, values(den_dict)))
+        mergewith(+, num_dict, inv_den_dict)
+    elseif ispow(x)
+        base, exp = arguments(x)
+        dict = pdegrees(base)
+        degrees = map(degree -> degree * unwrap_const(exp), values(dict))
+        Dict(keys(dict) .=> degrees)
+    elseif issym(x) || iscall(x)
+        return Dict(x=>1)
+    elseif SymbolicUtils.isconst(x) || x isa Number
+        return Dict()
+    else
+        error("pdegrees for $x unknown")
+    end
 end
 
-function cautious_sum(nls)
-    if isempty(nls)
+pdegree(x::Number) = 0
+function pdegree(x)
+    degree_dict = pdegrees(x)
+    if isempty(degree_dict)
         return 0
     end
-    sum(unwrap_sp, nls)
+    sum(values(degree_dict))
 end
