@@ -127,7 +127,7 @@ function Base.show(io::IO, eq::Equation)
     end
 end
 
-scalarize(eq::Equation) = scalarize(eq.lhs) .~ scalarize(eq.rhs)
+SymbolicUtils.scalarize(eq::Equation) = scalarize(eq.lhs) .~ scalarize(eq.rhs)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
 # ambiguity
 for T in [:Pair, :Any]
