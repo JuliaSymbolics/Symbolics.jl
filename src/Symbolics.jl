@@ -214,6 +214,7 @@ for T in [Num, Complex{Num}]
         SymbolicUtils.hasmetadata(x::$T, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
 
         Broadcast.broadcastable(x::$T) = x
+        SymbolicUtils.scalarize(x::$T) = scalarize(unwrap(x))
     end
 end
 
