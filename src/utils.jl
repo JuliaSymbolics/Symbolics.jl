@@ -87,7 +87,7 @@ function get_differential_vars!(vars, e::Equation, varlist=nothing)
 end
 
 # Sym / Term --> Symbol
-Base.Symbol(x::Union{Num,BasicSymbolic}) = tosymbol(x)
+Base.Symbol(x::Num) = Symbol(unwrap(x))
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
