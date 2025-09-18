@@ -213,21 +213,6 @@ function lower_varname(var::BasicSymbolic, idv, order)
     return diff2term(var)
 end
 
-### OOPS
-
-struct Unknown end
-
-macro oops(ex)
-    quote
-        tmp = $(esc(ex))
-        if tmp === Unknown()
-            return Unknown()
-        else
-            tmp
-        end
-    end
-end
-
 function makesubscripts(n)
     set = 'i':'z'
     m = length(set)
