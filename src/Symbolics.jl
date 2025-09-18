@@ -115,6 +115,10 @@ export Inequality, ≲, ≳
 include("inequality.jl")
 
 import Bijections, DynamicPolynomials
+import DynamicPolynomials as DP
+import MultivariatePolynomials as MP
+import MutableArithmetics as MA
+
 export tosymbol, terms, factors
 include("utils.jl")
 
