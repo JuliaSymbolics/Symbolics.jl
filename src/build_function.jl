@@ -121,6 +121,9 @@ function _build_function(target::JuliaTarget, op, args...;
                          nanmath = true,
                          kwargs...)
     op = _recursive_unwrap(op)
+    if symtype(op) <: AbstractArray
+        return _build_function(target, wrap(op), args...; conv, expression, expression_module, checkbounds, states, linenumbers, cse, nanmath, kwargs...)
+    end
     states.rewrites[:nanmath] = nanmath
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
     fun = Func(dargs, [], op)
@@ -148,7 +151,7 @@ end
 
 SymbolicUtils.Code.get_rewrites(x::Arr) = SymbolicUtils.Code.get_rewrites(unwrap(x))
 
-function _build_function(target::JuliaTarget, op::Union{Arr, SymbolicUtils.BasicSymbolic{<:AbstractArray}}, args...;
+function _build_function(target::JuliaTarget, op::Arr, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
@@ -171,8 +174,12 @@ function _build_function(target::JuliaTarget, op::Union{Arr, SymbolicUtils.Basic
 
     outsym = DEFAULT_OUTSYM
     if iip_config[2]
+        if SymbolicUtils.isarrayop(op) && !haskey(states.rewrites, :arrayop_output)
+            states.rewrites[:arrayop_output] = outsym
+        end
         body = inplace_expr(op, outsym)
         iip_expr = wrap_code[2](Func(vcat(outsym, dargs), [], body))
+        delete!(states.rewrites, :arrayop_output)
     else
         iip_expr = get_unimplemented_expr([outsym; dargs])
     end
