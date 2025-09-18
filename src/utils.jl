@@ -131,7 +131,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
     d_separator = 'ˍ'
 
     if ds === nothing
-        return maketerm(typeof(O), TermInterface.head(O), map(diff2term, children(O)),
+        return maketerm(typeof(O), TermInterface.head(O), map(diff2term, arguments(O)),
                         O_metadata isa Nothing ?
             metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...))
     else
@@ -146,7 +146,7 @@ function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothi
             error("diff2term case not handled: $oldop")
         end
         newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return setname(maketerm(typeof(O), rename(oldop, newname), children(O), O_metadata isa Nothing ?
+        return setname(maketerm(typeof(O), rename(oldop, newname), arguments(O), O_metadata isa Nothing ?
             metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...)), newname)
     end
 end
