@@ -293,18 +293,18 @@ julia> Symbolics.degree(x^2)
 function degree(p, sym=nothing)
     p = value(p)
     sym = value(sym)
-    if p isa Number
+    if SymbolicUtils.isconst(p) || p isa Number
         return 0
     end
     if isequal(p, sym)
         return 1
     end
     if isterm(p)
-        if sym === nothing
-            return 1
-        elseif operation(p) === (^)
+        if operation(p) === (^)
             base, exp = arguments(p)
             return unwrap_const(exp) * degree(base, sym)
+        elseif sym === nothing
+            return 1
         else
             return Int(isequal(p, sym))
         end
