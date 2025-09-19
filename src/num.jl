@@ -130,7 +130,6 @@ end
 
 Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
 Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
-Base.promote_rule(::Type{<:BasicSymbolic}, ::Type{<:Num}) = Num
 <ₑ(s::Num, x) = value(s) <ₑ value(x)
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
