@@ -388,7 +388,6 @@ end
 ###
 
 # Pretty much just copy-pasted from stdlib
-SparseArrays.SparseMatrixCSC{Tv,Ti}(M::StridedMatrix) where {Tv<:RCNum,Ti} = _sparse(Tv,  Ti, M)
 function _sparse(::Type{Tv}, ::Type{Ti}, M) where {Tv, Ti}
     nz = count(!_iszero, M)
     colptr = zeros(Ti, size(M, 2) + 1)
