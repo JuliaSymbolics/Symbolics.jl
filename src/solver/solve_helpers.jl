@@ -33,10 +33,13 @@ function ssqrt(n)
         return sqrt(n)
     end
 
-    if n isa SymbolicUtils.BasicSymbolic{Real}
+    if symtype(n) === Real
         return term(ssqrt, n)
     end
 end
+
+SymbolicUtils.promote_symtype(::typeof(ssqrt), ::Type{T}) where {T} = T
+SymbolicUtils.promote_shape(::typeof(ssqrt), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
 
 derivative(::typeof(ssqrt), args...) = substitute(derivative(sqrt, args...), sqrt => ssqrt)
 
@@ -52,11 +55,13 @@ function scbrt(n)
         return (n)^(1 / 3)
     end
 
-    if n isa SymbolicUtils.BasicSymbolic{Real}
+    if symtype(n) === Real
         return term(scbrt, n)
     end
 end
 
+SymbolicUtils.promote_symtype(::typeof(scbrt), ::Type{T}) where {T} = T
+SymbolicUtils.promote_shape(::typeof(scbrt), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
 derivative(::typeof(scbrt), args...) = substitute(derivative(cbrt, args...), cbrt => scbrt)
 
 function slog(n)
