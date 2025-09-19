@@ -56,6 +56,7 @@ end
 Base.show(io::IO, ::MIME"text/plain", arr::Arr) = show(io, arr)
 
 ################# Base array functions
+Base.IndexStyle(::Type{<:Arr}) = Base.IndexStyle(BasicSymbolic{VartypeT})
 Base.length(A::Arr) = length(unwrap(A))
 Base.size(A::Arr) = size(unwrap(A))
 Base.axes(A::Arr) = axes(unwrap(A))
