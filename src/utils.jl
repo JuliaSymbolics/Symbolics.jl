@@ -26,6 +26,51 @@ function is_singleton(e)
 end
 
 """
+    get_variables(e, varlist = nothing)
+
+Return a vector of variables appearing in e, optionally restricting to variables in varlist.
+
+Note that the returned variables are not wrapped in the Num type.
+
+Examples
+≡≡≡≡≡≡≡≡
+
+```julia
+julia> @variables t x y z(t);
+
+julia> Symbolics.get_variables(x + y + sin(z))
+3-element Vector{SymbolicUtils.BasicSymbolic}:
+ x
+ y
+ z(t)
+
+julia> Symbolics.get_variables(x - y)
+2-element Vector{SymbolicUtils.BasicSymbolic}:
+ x
+ y
+```
+"""
+function get_variables(e; kw...)
+    return search_variables(e; kw...)
+end
+
+function get_variables!(buffer, e; kw...)
+    return search_variables!(buffer, e; kw...)
+end
+
+function _get_is_atomic(varlist)
+    let vars = Set(varlist)
+        function _is_atomic(ex)
+            SymbolicUtils.default_is_atomic(ex) && ex in vars
+        end
+    end
+end
+
+function get_variables(e, varlist; kw...)
+    search_variables(e; kw..., is_atomic = _get_is_atomic(varlist))
+end
+
+"""
     get_differential_vars(e, varlist = nothing; sort::Bool = false)
 
 Return a vector of differential variables appearing in `e`, optionally restricting to variables in `varlist`.
@@ -213,16 +258,6 @@ function lower_varname(var::BasicSymbolic, idv, order)
     return diff2term(var)
 end
 
-function makesubscripts(n)
-    set = 'i':'z'
-    m = length(set)
-    map(1:n) do i
-        repeats = ceil(Int, i / m)
-        c = set[(i-1) % m + 1]
-        Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
-    end
-end
-
 function var_from_nested_derivative(x,i=0)
     x = unwrap(x)
     if issym(x)
@@ -267,6 +302,9 @@ function degree(p, sym=nothing)
     if isterm(p)
         if sym === nothing
             return 1
+        elseif operation(p) === (^)
+            base, exp = arguments(p)
+            return unwrap_const(exp) * degree(base, sym)
         else
             return Int(isequal(p, sym))
         end
@@ -274,8 +312,6 @@ function degree(p, sym=nothing)
         return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
     elseif isadd(p)
         return maximum(degree(key, sym) for key in keys(p.dict))
-    elseif ispow(p)
-        return p.exp * degree(p.base, sym)
     elseif isdiv(p)
         return degree(p.num, sym) - degree(p.den, sym)
     elseif issym(p)
@@ -420,7 +456,7 @@ function symbolic_to_float end
 symbolic_to_float(x::Num) = symbolic_to_float(unwrap(x))
 symbolic_to_float(x::Number) = x
 function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
-    substitute(x,Dict())
+    unwrap_const(substitute(x,Dict()))
 end
 
 """
@@ -541,14 +577,14 @@ false
 function evaluate end
 
 function evaluate(eq::Equation, subs)
-    lhs = fast_substitute(eq.lhs, subs)
-    rhs = fast_substitute(eq.rhs, subs)
+    lhs = substitute(eq.lhs, subs)
+    rhs = substitute(eq.rhs, subs)
     return isequal(lhs, rhs)
 end
 
 function evaluate(ineq::Inequality, subs)
-    lhs = fast_substitute(ineq.lhs, subs)
-    rhs = fast_substitute(ineq.rhs, subs)
+    lhs = substitute(ineq.lhs, subs)
+    rhs = substitute(ineq.rhs, subs)
     if (ineq.relational_op == geq)
         return isless(rhs, lhs)
     elseif (ineq.relational_op == leq)
