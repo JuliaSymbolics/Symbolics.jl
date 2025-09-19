@@ -41,7 +41,7 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
     if define_promotion
         fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
         promote_expr = quote
-            function (::$(typeof(SymbolicUtils.promote_shape)))(::$ftype, args...)
+            function (::$(typeof(SymbolicUtils.promote_shape)))(::$ftype, args::$(SymbolicUtils.ShapeT)...)
                 @nospecialize args
                 $(SymbolicUtils.ShapeVecT)()
             end
