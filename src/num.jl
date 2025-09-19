@@ -29,7 +29,6 @@ const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value, args)...))
-value(x) = unwrap(x)
 
 SymbolicUtils.@number_methods(Num,
     Num(f(value(a))),
