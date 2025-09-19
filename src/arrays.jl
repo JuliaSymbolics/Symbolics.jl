@@ -71,6 +71,10 @@ end
 for (T1, T2) in [
     (Arr{<:Any, 2}, Arr{<:Any, 1}),
     (Arr{<:Any, 2}, Arr{<:Any, 2}),
+    (AbstractArray{<:Any, 2}, Arr{<:Any, 1}),
+    (AbstractArray{<:Any, 2}, Arr{<:Any, 2}),
+    (Arr{<:Any, 2}, AbstractArray{<:Any, 1}),
+    (Arr{<:Any, 2}, AbstractArray{<:Any, 2}),
     (Arr{<:Any, 2}, BasicSymbolic{SymReal}),
     (Arr{<:Any, 2}, BasicSymbolic{SafeReal}),
     (Arr{<:Any, 2}, BasicSymbolic{TreeReal}),
