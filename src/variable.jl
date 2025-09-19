@@ -348,6 +348,15 @@ function _recursive_unwrap(val::AbstractSparseArray)
     end
 end
 
+struct FPSubFilterer{O} end
+
+function (::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
+    SymbolicUtils.default_substitute_filter(ex) && @match ex begin
+        BSImpl.Term(; f) => !(f isa O)
+        _ => true
+    end
+end
+
 """
     fixpoint_sub(expr, dict; operator = Nothing, maxiters = 1000)
 
@@ -359,16 +368,14 @@ specified to prevent substitution of expressions inside operators of the given t
 `maxiters` keyword is used to limit the number of times the substitution can occur to avoid
 infinite loops in cases where the substitutions in `dict` are circular
 (e.g. `[x => y, y => x]`).
-
-See also: [`fast_substitute`](@ref).
 """
 function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000)
     dict = subrules_to_dict(dict)
-    y = fast_substitute(x, dict; operator)
+    y = substitute(x, dict; filterer=FPSubFilterer{operator}())
     iters = maxiters
     while !isequal(x, y) && iters > 0
         y = x
-        x = fast_substitute(y, dict; operator)
+        x = substitute(y, dict; filterer=FPSubFilterer{operator}())
         iters -= 1
     end
 
@@ -383,106 +390,6 @@ function fixpoint_sub(x::SparseMatrixCSC, dict; operator = Nothing, maxiters = 1
     V = fixpoint_sub(V, dict; operator, maxiters)
     m, n = size(x)
     return sparse(I, J, V, m, n)
-end
-
-const Eq = Union{Equation, Inequality}
-"""
-    fast_substitute(expr, dict; operator = Nothing)
-
-Given a symbolic expression, equation or inequality `expr` perform the substitutions in
-`dict`. This only performs the substitutions once. For example,
-`fast_substitute(x, Dict(x => y, y => 3))` will return `y`. The `operator` keyword can be
-specified to prevent substitution of expressions inside operators of the given type.
-
-See also: [`fixpoint_sub`](@ref).
-"""
-function fast_substitute(eq::Eq, subs; operator = Nothing)
-    if eq isa Inequality
-        Inequality(fast_substitute(eq.lhs, subs; operator),
-            fast_substitute(eq.rhs, subs; operator),
-            eq.relational_op)
-    else
-        Equation(fast_substitute(eq.lhs, subs; operator),
-            fast_substitute(eq.rhs, subs; operator))
-    end
-end
-function fast_substitute(eq::T, subs::Pair; operator = Nothing) where {T <: Eq}
-    T(fast_substitute(eq.lhs, subs; operator), fast_substitute(eq.rhs, subs; operator))
-end
-function fast_substitute(eqs::AbstractArray, subs; operator = Nothing)
-    fast_substitute.(eqs, (subs,); operator)
-end
-function fast_substitute(eqs::AbstractArray, subs::Pair; operator = Nothing)
-    fast_substitute.(eqs, (subs,); operator)
-end
-function fast_substitute(eqs::SparseMatrixCSC, subs; operator = Nothing)
-    I, J, V = findnz(eqs)
-    V = fast_substitute(V, subs; operator)
-    m, n = size(eqs)
-    return sparse(I, J, V, m, n)
-end
-for (exprType, subsType) in Iterators.product((Num, Symbolics.Arr), (Any, Pair))
-    @eval function fast_substitute(expr::$exprType, subs::$subsType; operator = Nothing)
-        fast_substitute(value(expr), subs; operator)
-    end
-end
-function fast_substitute(expr, subs; operator = Nothing)
-    if (_val = get(subs, expr, nothing)) !== nothing
-        return _val
-    end
-    iscall(expr) || return expr
-    op = fast_substitute(operation(expr), subs; operator)
-    args = SymbolicUtils.arguments(expr)
-    if !(op isa operator)
-        canfold = Ref(!(op isa BasicSymbolic))
-        args = let canfold = canfold
-            map(args) do x
-                symbolic_type(x) == NotSymbolic() && !is_array_of_symbolics(x) && return x
-                x′ = fast_substitute(x, subs; operator)
-                canfold[] = canfold[] && (symbolic_type(x′) == NotSymbolic() && !is_array_of_symbolics(x′))
-                x′
-            end
-        end
-        if op === getindex && symbolic_type(args[1]) == NotSymbolic()
-            canfold[] = true
-        end
-        canfold[] && return op(args...)
-    end
-    maketerm(typeof(expr),
-        op,
-        args,
-        metadata(expr))
-end
-function fast_substitute(expr, pair::Pair; operator = Nothing)
-    a, b = pair
-    isequal(expr, a) && return b
-    if a isa AbstractArray
-        for (ai, bi) in zip(a, b)
-            expr = fast_substitute(expr, ai => bi; operator)
-        end
-    end
-    iscall(expr) || return expr
-    op = fast_substitute(operation(expr), pair; operator)
-    args = SymbolicUtils.arguments(expr)
-    if !(op isa operator)
-        canfold = Ref(!(op isa BasicSymbolic))
-        args = let canfold = canfold
-            map(args) do x
-                symbolic_type(x) == NotSymbolic() && !is_array_of_symbolics(x) && return x
-                x′ = fast_substitute(x, pair; operator)
-                canfold[] = canfold[] && (symbolic_type(x′) == NotSymbolic() && !is_array_of_symbolics(x′))
-                x′
-            end
-        end
-        if op === getindex && symbolic_type(args[1]) == NotSymbolic()
-            canfold[] = true
-        end
-        canfold[] && return op(args...)
-    end
-    maketerm(typeof(expr),
-        op,
-        args,
-        metadata(expr))
 end
 
 function is_array_of_symbolics(x)
