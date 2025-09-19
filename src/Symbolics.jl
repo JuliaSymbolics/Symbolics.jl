@@ -146,10 +146,6 @@ export SymbolicsSparsityDetector
 
 include("adtypes.jl")
 
-export Difference, DiscreteUpdate
-
-include("difference.jl")
-
 export infimum, supremum
 include("domains.jl")
 
