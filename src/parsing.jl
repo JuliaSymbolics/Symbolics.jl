@@ -118,7 +118,7 @@ function parse_expr_to_symbolic(ex::Expr, mod::Union{Module,AbstractDict})
         else
             # Treat as symbolic function or term
             x = parse_expr_to_symbolic(op, mod)
-            return Term{Real}(x, parsed_args)
+            return Term{VartypeT}(x, parsed_args; type = Real)
         end
     elseif ex.head == :ref
         arr = parse_expr_to_symbolic(ex.args[1], mod)
