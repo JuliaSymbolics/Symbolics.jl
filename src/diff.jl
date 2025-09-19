@@ -184,8 +184,6 @@ function _recursive_hasoperator(op, O)
     else
         if isadd(O) || ismul(O)
             any(_recursive_hasoperator(op), keys(O.dict))
-        elseif ispow(O)
-            _recursive_hasoperator(op)(O.base) || _recursive_hasoperator(op)(O.exp)
         elseif isdiv(O)
             _recursive_hasoperator(op)(O.num) || _recursive_hasoperator(op)(O.den)
         else
