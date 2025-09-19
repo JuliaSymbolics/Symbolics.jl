@@ -423,9 +423,6 @@ function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
 end
 expand_derivatives(x, simplify=false; kwargs...) = x
 
-_iszero(x) = false
-_isone(x) = false
-
 # Don't specialize on the function here
 """
 $(SIGNATURES)
