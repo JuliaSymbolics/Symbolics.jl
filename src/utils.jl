@@ -14,6 +14,13 @@ function flatten_expr!(x)
     xs
 end
 
+"""
+    $(TYPEDSIGNATURES)
+
+Equivalent to `unwrap_const ∘ unwrap`.
+"""
+value(x) = unwrap_const(unwrap(x))
+
 function is_singleton(e)
     if iscall(e)
         op = operation(e)
