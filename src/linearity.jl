@@ -64,6 +64,22 @@ end
 
 # to make Mul and Add work
 Base.:*(::Number, comb::TermCombination) = comb
+function Base.:*(x::BasicSymbolic{VartypeT}, comb::TermCombination)
+    @assert SymbolicUtils.isconst(x)
+    unwrap_const(x) * comb
+end
+function Base.:*(comb::TermCombination, x::BasicSymbolic{VartypeT})
+    @assert SymbolicUtils.isconst(x)
+    comb * unwrap_const(x)
+end
+function Base.:+(x::BasicSymbolic{VartypeT}, comb::TermCombination)
+    @assert SymbolicUtils.isconst(x)
+    unwrap_const(x) + comb
+end
+function Base.:+(comb::TermCombination, x::BasicSymbolic{VartypeT})
+    @assert SymbolicUtils.isconst(x)
+    comb + unwrap_const(x)
+end
 function Base.:^(comb::TermCombination, ::Number)
     isone(comb) && return comb
     iszero(comb) && return _scalar
