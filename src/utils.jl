@@ -352,7 +352,7 @@ function coeff(p, sym=nothing)
     # if `sym` is a product, iteratively compute the coefficient w.r.t. each term in `sym`
     if iscall(value(sym)) && operation(value(sym)) === (*)
         for t in arguments(value(sym))
-            @assert !(t isa Number) "`coeff(p, sym)` does not allow `sym` containing numerical factors"
+            @assert !(t isa Number || SymbolicUtils.isconst(t)) "`coeff(p, sym)` does not allow `sym` containing numerical factors"
             p = coeff(p, t)
         end
         return p
@@ -360,13 +360,11 @@ function coeff(p, sym=nothing)
             
     p, sym = value(p), value(sym)
 
-    if isequal(sym, 1)
+    if _isone(sym)
         sym = nothing
     end
 
-    if issym(p) || isterm(p)
-        sym === nothing ? 0 : Int(isequal(p, sym))
-    elseif ispow(p)
+    if issym(p) || SymbolicUtils.isconst(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif isadd(p)
         if sym===nothing
