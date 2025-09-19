@@ -815,48 +815,48 @@ end
 
 hessian(O, vars::Arr; kwargs...) = hessian(O, collect(vars); kwargs...) 
 
-isidx(x) = x isa TermCombination
+isidx(x) = unwrap_const(x) isa TermCombination
 
-basic_mkterm(t, g, args, m) = metadata(Term{Any}(g, args), m)
+basic_mkterm(t, g, args, m) = metadata(Term{VartypeT}(g, args; type = Any), m)
 
 const _scalar = one(TermCombination)
 
-const linearity_rules = [
-      @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
-      @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
+const linearity_rules = (
+      (@rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)),
+      (@rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)),
 
-      @rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar
-      @rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)
-      @rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)
+      (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
+      (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)),
+      (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)),
 
-      @rule ~x::issym => 0
+      (@rule ~x::issym => 0),
 
       # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
       # where condition `cond` is considered constant in differentiation
-      @rule ifelse(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)
+      (@rule ifelse(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)),
 
       # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
       # Functions with 1 and 2 arguments are already handled above
-      @rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2
-]
-const linearity_rules_affine = [
-      @rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)
-      @rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)
+      (@rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2),
+)
+const linearity_rules_affine = (
+      (@rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)),
+      (@rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)),
 
-      @rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar
-      @rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)
-      @rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)
+      (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
+      (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)),
+      (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)),
 
-      @rule ~x::issym => 0
+      (@rule ~x::issym => 0),
       # if the condition is dependent on the variable, do not consider this as affine
-      @rule ifelse(~cond::isidx, ~x, ~y) => (~cond)^2
+      (@rule ifelse(~cond::isidx, ~x, ~y) => (~cond)^2),
       # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
       # where condition `cond` is considered constant in differentiation
-      @rule ifelse(~cond::(!isidx), ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)
+      (@rule ifelse(~cond::(!isidx), ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)),
       # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
       # Functions with 1 and 2 arguments are already handled above
-      @rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2
-]
+      (@rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2),
+)
 const linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 const affine_linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules_affine); maketerm=basic_mkterm))
 
@@ -890,7 +890,7 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
     u = map(value, vars)
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
     f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
-    lp = linearity_propagator(f)
+    lp = unwrap_const(linearity_propagator(f))
     S = _sparse(lp, length(u))
     S = full ? S : tril(S)
 end
