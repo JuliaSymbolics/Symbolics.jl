@@ -1,11 +1,8 @@
 @register_symbolic Base.binomial(n::Number, k::Integer)::Integer false
 SymbolicUtils.promote_symtype(::typeof(binomial), ::Type{T}, ::Type{S}) where {T <: Number, S <: Integer} = T
 
-@register_symbolic Base.sign(x) false
-SymbolicUtils.promote_symtype(::typeof(sign), ::Type{T}) where {T <: Number} = T
 derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
 
-@register_symbolic Base.signbit(x)::Bool
 derivative(::typeof(signbit), args::NTuple{1,Any}, ::Val{1}) = 0
 derivative(::typeof(abs), args::NTuple{1,Any}, ::Val{1}) = ifelse(signbit(args[1]),-one(args[1]),one(args[1]))
 
@@ -26,10 +23,6 @@ function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{2})
     ifelse(x > y, zero(y), one(y))
 end
 
-@register_symbolic Base.ceil(x)
-@register_symbolic Base.floor(x)
-@register_symbolic Base.factorial(x::Integer)::Integer
-
 function derivative(::Union{typeof(ceil),typeof(floor),typeof(factorial)}, args::NTuple{1,Any}, ::Val{1})
     zero(args[1])
 end
@@ -37,7 +30,14 @@ end
 @register_symbolic Base.rand(x)
 @register_symbolic Base.randn(x)
 
-@register_symbolic Base.clamp(x, y, z)
+for (T1, T2, T3) in Iterators.product(Iterators.repeated((Num, BasicSymbolic{VartypeT}, Number), 3)...)
+    if T1 != Num && T2 != Num && T3 != Num
+        continue
+    end
+    @eval function Base.clamp(a::$T1, b::$T2, c::$T3)
+        wrap(clamp(unwrap(a), unwrap(b), unwrap(c)))
+    end
+end
 
 function derivative(::typeof(Base.clamp), args::NTuple{3, Any}, ::Val{1})
     x, l, h = args
