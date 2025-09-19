@@ -29,7 +29,7 @@ import TermInterface: maketerm, iscall, operation, arguments, metadata
 import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
     FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
     promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
-    Operator
+    Operator, _iszero, _isone, search_variables, search_variables!
 
 using SymbolicUtils.Code
 
