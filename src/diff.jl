@@ -218,6 +218,13 @@ function Base.showerror(io::IO, err::DerivativeNotDefinedError)
     show(io, MIME"text/plain"(), err_str)
 end
 
+function symdiff_substitute_filter(ex::BasicSymbolic{T}) where {T}
+    SymbolicUtils.default_substitute_filter(ex) || @match ex begin
+        BSImpl.Term(; f) && if f isa Differential end => true
+        _ => false
+    end
+end
+
 """
     executediff(D, arg, simplify=false; occurrences=nothing)
 
@@ -294,12 +301,12 @@ function executediff(D, arg, simplify=false; throw_no_derivative=false)
             c = 0
             inner_function = arguments(arg)[1]
             if iscall(a) || isequal(a, D.x)
-                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => a))
+                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => a); filterer = symdiff_substitute_filter)
                 t2 = executediff(D, a, simplify; throw_no_derivative)
                 c -= t1*t2
             end
             if iscall(b) || isequal(b, D.x)
-                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => b))
+                t1 = SymbolicUtils.substitute(inner_function, Dict(op.domain.variables => b); filterer = symdiff_substitute_filter)
                 t2 = executediff(D, b, simplify; throw_no_derivative)
                 c += t1*t2
             end
