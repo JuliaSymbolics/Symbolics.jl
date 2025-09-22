@@ -410,24 +410,6 @@ function is_array_of_symbolics(x)
         any(y -> symbolic_type(y) != NotSymbolic() || is_array_of_symbolics(y), x)
 end
 
-"""
-    $(TYPEDSIGNATURES)
-
-Return the array variable that was indexed to obtain symbolic variable `x`.
-"""
-function getparent(x, val=_fail)
-    maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
-    if maybe_parent !== nothing
-        return maybe_parent
-    else
-        if iscall(x) && operation(x) === getindex
-            return arguments(x)[1]
-        end
-    end
-    val === _fail && throw(ArgumentError("Cannot find the parent of $x."))
-    return val
-end
-
 function getdefaultval(x, val=_fail)
     x = unwrap(x)
     val = getmetadata(x, VariableDefaultValue, val)

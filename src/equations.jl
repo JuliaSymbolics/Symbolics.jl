@@ -109,11 +109,6 @@ function SymbolicUtils.search_variables!(buffer, eq::Equation; kw...)
     SymbolicUtils.search_variables!(buffer, eq.rhs; kw...)
 end
 
-struct ConstrainedEquation
-  constraints
-  eq
-end
-
 function expand_derivatives(eq::Equation, simplify=false)
     return Equation(expand_derivatives(eq.lhs, simplify), expand_derivatives(eq.rhs, simplify))
 end

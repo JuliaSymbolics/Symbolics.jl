@@ -50,23 +50,6 @@ function sym_lu(A; check=true)
     LU(F, p, convert(LinearAlgebra.BlasInt, info))
 end
 
-# Given a vector of equations and a
-# list of independent variables,
-# return the coefficient matrix `A` and a
-# vector of constants (possibly symbolic) `b` such that
-# A \ b will solve the equations for the vars
-function A_b(eqs::AbstractArray, vars::AbstractArray, check)
-    exprs = rhss(eqs) .- lhss(eqs)
-    if check
-        for ex in exprs
-            @assert isaffine(ex, vars)
-        end
-    end
-    A = jacobian(exprs, vars)
-    b = A * vars - exprs
-    A, b
-end
-
 function solve_for(eq::Any, var::Any; simplify=false, check=true)
     Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for)
     return symbolic_linear_solve(eq, var; simplify=simplify, check=check)
