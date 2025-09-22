@@ -55,38 +55,41 @@ end
 #################### POLYADIC ################
 
 function *(x::Arr, args...)
-    return *(unwrap(x), args...)
+    return wrap(*(unwrap(x), args...))
 end
 
 function *(a::SymbolicUtils.PolyadicNumericOpFirstArgT, b::Arr, bs...)
-    return *(a, unwrap(b), bs...)
+    return wrap(*(a, unwrap(b), bs...))
 end
 function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, bs...) where {T}
-    return *(a, unwrap(b), bs...)
+    return wrap(*(a, unwrap(b), bs...))
 end
 function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs...) where {T}
-    return *(a, unwrap(b), unwrap(c), bs...)
+    return wrap(*(a, unwrap(b), unwrap(c), bs...))
 end
 function *(a::Number, b::Arr, bs...)
-    return *(a, unwrap(b), bs...)
+    return wrap(*(unwrap(a), unwrap(b), bs...))
 end
 function *(x1::Arr, x2::BasicSymbolic{VartypeT}, args...)
-    return *(unwrap(x1), x2, args...)
+    return wrap(*(unwrap(x1), x2, args...))
 end
 function *(x1::Arr, x2::Arr, args...)
-    return *(unwrap(x1), unwrap(x2), args...)
+    return wrap(*(unwrap(x1), unwrap(x2), args...))
 end
 function *(x1::Arr, x2::AbstractMatrix, args...)
-    return *(unwrap(x1), x2, args...)
+    return wrap(*(unwrap(x1), x2, args...))
 end
 function *(x1::Arr, x2::AbstractVector, args...)
-    return *(unwrap(x1), x2, args...)
+    return wrap(*(unwrap(x1), x2, args...))
+end
+function *(x1::AbstractMatrix, x2::Arr, args...)
+    return wrap(*(x1, unwrap(x2), args...))
 end
 function *(x1::Arr, x2::Arr, x3::Arr, args...)
-    return *(unwrap(x1), unwrap(x2), unwrap(x3), args...)
+    return wrap(*(unwrap(x1), unwrap(x2), unwrap(x3), args...))
 end
 function *(x1::Arr, x2::Arr, x3::Arr, x4::Arr, args...)
-    return *(unwrap(x1), unwrap(x2), unwrap(x3), unwrap(x4), args...)
+    return wrap(*(unwrap(x1), unwrap(x2), unwrap(x3), unwrap(x4), args...))
 end
 
 function +(x::Arr, args...)
