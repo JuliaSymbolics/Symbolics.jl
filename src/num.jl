@@ -133,7 +133,10 @@ Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
 
-Num(q::AbstractIrrational) = Num(Term(identity, [q]))
+function Num(q::AbstractIrrational)
+    args = SymbolicUtils.ArgsT{VartypeT}((q,))
+    Num(Term{VartypeT}(identity, args; type = Real, shape = SymbolicUtils.ShapeVecT()))
+end
 
 for T in (Integer, Rational)
     @eval Base.:(^)(n::Num, i::$T) = Num(value(n)^i)
