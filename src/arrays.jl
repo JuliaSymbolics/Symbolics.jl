@@ -121,7 +121,7 @@ end
 
 function inplace_expr(x, out_array, intermediates = nothing)
     x = unwrap(x)
-    if SymbolicUtils.isarrayop(x)
+    if SymbolicUtils.isarrayop(x) && x.term === nothing
         return x
     elseif symtype(x) <: Number
         return term(broadcast_assign!, out_array, x)
