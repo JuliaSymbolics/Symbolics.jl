@@ -64,7 +64,7 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
     snakecase --> true
     safescripts --> true
 
-    return recipe(n)
+    return recipe(value(n))
 end
 
 @latexrecipe function f(z::Complex{Num})
@@ -72,9 +72,9 @@ end
     mult_symbol --> ""
     index --> :subscript
 
-    iszero(z.im) && return :($(recipe(z.re)))
-    iszero(z.re) && return :($(recipe(z.im)) * $im)
-    return :($(recipe(z.re)) + $(recipe(z.im)) * $im)
+    iszero(z.im) && return :($(recipe(value(z.re))))
+    iszero(z.re) && return :($(recipe(value(z.im))) * $im)
+    return :($(recipe(value(z.re))) + $(recipe(value(z.im))) * $im)
 end
 
 @latexrecipe function f(n::Function)
@@ -91,7 +91,7 @@ end
     mult_symbol --> ""
     index --> :subscript
 
-    return unwrap(n)
+    return value(n)
 end
 
 @latexrecipe function f(n::BasicSymbolic)
@@ -119,7 +119,7 @@ end
     index --> :subscript
 
     if hide_lhs(eq.lhs) || !(eq.lhs isa Union{Number, AbstractArray, BasicSymbolic})
-        return eq.rhs
+        return value(eq.rhs)
     else
         return Expr(:(=), Num(eq.lhs), Num(eq.rhs))
     end
@@ -138,6 +138,8 @@ Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:RCNum}) = print(io, "\$
 
 # `_toexpr` is only used for latexify
 function _toexpr(O; latexwrapper = default_latex_wrapper)
+    O = unwrap(O)
+    SymbolicUtils.isconst(O) && return value(O)
     if ismul(O)
         m = O
         numer = Any[]
@@ -150,9 +152,8 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
                 push!(numer, _toexpr(term))
                 continue
             end
-
-            base = term.base
-            pow  = term.exp
+            base, pow = arguments(term)
+            pow = value(pow)
             isneg = (pow isa Number && pow < 0) || (iscall(pow) && operation(pow) === (-) && length(arguments(pow)) == 1)
             if !isneg
                 if _isone(pow)
