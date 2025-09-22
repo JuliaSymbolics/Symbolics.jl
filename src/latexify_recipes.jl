@@ -125,11 +125,6 @@ end
     end
 end
 
-@latexrecipe function f(c::Connection)
-    index --> :subscript
-    return Expr(:call, :connect, map(nameof, c.systems)...)
-end
-
 Base.show(io::IO, ::MIME"text/latex", x::RCNum) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::BasicSymbolic) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
