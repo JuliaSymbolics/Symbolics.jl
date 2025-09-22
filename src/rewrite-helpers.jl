@@ -55,8 +55,8 @@ hasnode(Symbolics.is_derivative, X + D(X) + D(X^2)) # returns `true`.
 function hasnode(r::Function, y::Union{Num, BasicSymbolic})
     _hasnode(r, y)
 end
-hasnode(r::Num, y::Union{Num, BasicSymbolic}) = occursin(unwrap(r), unwrap(y))
-hasnode(r::BasicSymbolic, y::Union{Num, BasicSymbolic}) = occursin(unwrap(r), unwrap(y))
+hasnode(r::Num, y::Union{Num, BasicSymbolic}) = SymbolicUtils.query(isequal(unwrap(r)), unwrap(y))
+hasnode(r::BasicSymbolic, y::Union{Num, BasicSymbolic}) = SymbolicUtils.query(isequal(unwrap(r)), unwrap(y))
 hasnode(r::Union{Num, BasicSymbolic, Function}, y::Number) = false
 
 function _hasnode(r, y)

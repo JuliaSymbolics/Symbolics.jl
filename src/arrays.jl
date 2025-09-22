@@ -148,7 +148,8 @@ function inplace_builtin(term, outsym)
 end
 
 hasnode(r::Function, y::Arr) = _hasnode(r, y)
-hasnode(r::Union{Num, BasicSymbolic, Arr}, y::Arr) = occursin(unwrap(r), unwrap(y))
+hasnode(r::Union{Num, Arr}, y::Arr) = SymbolicUtils.query(isequal(unwrap(r)), unwrap(y))
+hasnode(r::Arr, y::BasicSymbolic) = SymbolicUtils.query(isequal(unwrap(r)), unwrap(y))
 
 #=
 """
