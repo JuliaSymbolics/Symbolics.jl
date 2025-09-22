@@ -1,5 +1,11 @@
-@register_symbolic Base.binomial(n::Number, k::Integer)::Integer false
-SymbolicUtils.promote_symtype(::typeof(binomial), ::Type{T}, ::Type{S}) where {T <: Number, S <: Integer} = T
+for (T1, T2) in Iterators.product(Iterators.repeated([Number, BasicSymbolic{VartypeT}, Num], 2)...)
+    if T1 != Num && T2 != Num
+        continue
+    end
+    @eval function Base.binomial(a::$T1, b::$T2)
+        binomial(unwrap(a), unwrap(b))
+    end
+end
 
 derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
 
