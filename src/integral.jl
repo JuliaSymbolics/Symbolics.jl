@@ -31,7 +31,7 @@ function (I::Integral)(x::Union{Rational, AbstractIrrational, AbstractFloat, Int
     wrap((b - a)*x)
 end
 (I::Integral)(x::Complex) = Complex{Num}(wrap(I(unwrap(real(x)))), wrap(I(unwrap(imag(x)))))
-(I::Integral)(x) = Term{SymbolicUtils.symtype(x)}(I, [x])
+(I::Integral)(x) = Term{VartypeT}(I, [x]; type = SymbolicUtils.symtype(x), shape = SymbolicUtils.shape(x))
 (I::Integral)(x::Num) = Num(I(Symbolics.value(x)))
 SymbolicUtils.promote_symtype(::Integral, x) = x
 
