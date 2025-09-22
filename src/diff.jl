@@ -1012,7 +1012,3 @@ function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::Abst
     end
     exprs
 end
-
-function SymbolicUtils.substitute(op::Differential, dict; kwargs...)
-    @set! op.x = substitute(op.x, dict; kwargs...)
-end
