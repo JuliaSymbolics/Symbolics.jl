@@ -76,6 +76,12 @@ end
 function *(x1::Arr, x2::Arr, args...)
     return *(unwrap(x1), unwrap(x2), args...)
 end
+function *(x1::Arr, x2::AbstractMatrix, args...)
+    return *(unwrap(x1), x2, args...)
+end
+function *(x1::Arr, x2::AbstractVector, args...)
+    return *(unwrap(x1), x2, args...)
+end
 function *(x1::Arr, x2::Arr, x3::Arr, args...)
     return *(unwrap(x1), unwrap(x2), unwrap(x3), args...)
 end
@@ -86,7 +92,9 @@ end
 function +(x::Arr, args...)
     return +(unwrap(x), args...)
 end
-
+function +(x::Arr, y::AbstractArray, args...)
+    return +(unwrap(x), y, args...)
+end
 function +(x1::Arr, x2::Arr, args...)
     return +(unwrap(x1), unwrap(x2), args...)
 end
