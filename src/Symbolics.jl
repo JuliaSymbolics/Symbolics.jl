@@ -108,7 +108,7 @@ sqrt(2)
 """
 substitute
 
-export Equation, ConstrainedEquation
+export Equation
 include("equations.jl")
 
 export Inequality, ≲, ≳
