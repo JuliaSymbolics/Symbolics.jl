@@ -344,7 +344,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
 
     if iip
-        out = Sym{Any}(DEFAULT_OUTSYM)
+        out = Sym{VartypeT}(DEFAULT_OUTSYM; type = Any, shape = SymbolicUtils.Unknown(-1))
         iip_expr = Func(vcat(out, dargs), [], postprocess_fbody(set_array(parallel,
                                     dargs,
                                     out,
@@ -613,6 +613,7 @@ function numbered_expr(O::BasicSymbolic,varnumbercache,args...;varordering = arg
                        states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
+    O isa BasicSymbolic || return O
     if (issym(O) || issym(operation(O))) || (iscall(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
         if !isnothing(j)
