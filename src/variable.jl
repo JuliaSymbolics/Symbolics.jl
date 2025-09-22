@@ -104,6 +104,7 @@ function parse_vars(macroname, type, x, transform = identity)
             cursor += 1
         end
         sym = _add_metadata(parse_result, sym, default, macroname, options)
+        sym = handle_maybe_callandwrap!(parse_result, sym)
         sym = Expr(:call, wrap, sym)
 
         if parse_result[:isruntime]
@@ -174,10 +175,20 @@ function handle_maybe_dependent_variable!(parse_result, sym, type)
     parse_result[:type].args[2] = Tuple
     # Re-create the `Sym`
     sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
+    # Change the type
+    parse_result[:type] = parse_result[:type].args[3]
     # Call the `Sym` with the arguments to create a dependent variable.
     map!(esc, argnames, argnames)
     sym = Expr(:call, sym)
     append!(sym.args, argnames)
+    return sym
+end
+
+function handle_maybe_callandwrap!(parse_result, sym)
+    type = parse_result[:type]
+    if Meta.isexpr(type, :curly) && (type.args[1] == :FnType || type.args[1] === SymbolicUtils.FnType)
+        sym = Expr(:call, CallAndWrap, sym)
+    end
     return sym
 end
 
