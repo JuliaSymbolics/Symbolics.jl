@@ -170,7 +170,6 @@ import Libdl
 include("build_function.jl")
 export build_function
 
-import Distributions
 include("extra_functions.jl")
 
 using Latexify

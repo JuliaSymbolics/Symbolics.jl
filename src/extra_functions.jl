@@ -47,21 +47,28 @@ function derivative(::typeof(Base.clamp), args::NTuple{3, Any}, ::Val{1})
     ifelse(x<l, z, ifelse(x>h, z, o))
 end
 
-@register_symbolic Distributions.pdf(dist,x)
-@register_symbolic Distributions.logpdf(dist,x)
-@register_symbolic Distributions.cdf(dist,x)
-@register_symbolic Distributions.logcdf(dist,x)
-@register_symbolic Distributions.quantile(dist,x)
-
-@register_symbolic Distributions.Uniform(mu,sigma) false
-@register_symbolic Distributions.Normal(mu,sigma) false
-
-@register_symbolic ∈(x::Real, y::AbstractArray)::Bool
-@register_symbolic ∪(x, y)
-@register_symbolic ∩(x, y)
-@register_symbolic ∨(x, y)
-@register_symbolic ∧(x, y)
-@register_symbolic ⊆(x, y)
+for T1 in [Real, Num, BasicSymbolic{VartypeT}], T2 in [AbstractArray, Arr, BasicSymbolic{VartypeT}]
+    if T1 != Num && T2 != Arr
+        continue
+    end
+    @eval function Base.in(x::$T1, y::$T2)
+        return in(unwrap(x), unwrap(y))
+    end
+end
+for (T1, T2) in Iterators.product(Iterators.repeated([AbstractArray, Arr, BasicSymbolic{VartypeT}], 2)...)
+    if T1 != Arr && T2 != Arr
+        continue
+    end
+    @eval function Base.union(a::$T1, b::$T2)
+        union(unwrap(a), unwrap(b))
+    end
+    @eval function Base.intersect(a::$T1, b::$T2)
+        intersect(unwrap(a), unwrap(b))
+    end
+    @eval function Base.issubset(a::$T1, b::$T2)
+        issubset(unwrap(a), unwrap(b))
+    end
+end
 
 LinearAlgebra.norm(x::Num, p::Real) = abs(x)
 
@@ -72,11 +79,4 @@ derivative(::typeof(>=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 derivative(::typeof(==), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 derivative(::typeof(!=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 
-@register_symbolic SpecialFunctions.expinti(x::Real)
 derivative(::typeof(expinti), args::NTuple{1,Any}, ::Val{1}) = exp(args[1])/args[1]
-
-@register_symbolic SpecialFunctions.expint(nu, z)
-
-@register_symbolic SpecialFunctions.sinint(x)
-
-@register_symbolic SpecialFunctions.cosint(x)
