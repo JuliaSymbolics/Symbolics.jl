@@ -524,3 +524,51 @@ function rename(x::BasicSymbolic{T}, newname::Symbol) where {T}
         _ => error("Cannot rename $x.")
     end
 end
+
+#### Callable ###
+
+struct CallAndWrap{T}
+    f::BasicSymbolic{VartypeT}
+end
+
+rettype_from_fntype(::Type{T}) where {A, R, T <: SymbolicUtils.FnType{A, R}} = R
+
+function CallAndWrap(f::BasicSymbolic{VartypeT})
+    @assert symtype(f) <: SymbolicUtils.FnType
+    R = rettype_from_fntype(symtype(f))
+    if hasmethod(wrapper_type, Tuple{Type{R}})
+        CallAndWrap{wrapper_type(R)}(f)
+    else
+        f
+    end
+end
+
+function (caw::CallAndWrap{T})(args...) where {T}
+    T(caw.f(args...))
+end
+
+SymbolicIndexingInterface.symbolic_type(::Type{<:CallAndWrap}) = ScalarSymbolic()
+
+Base.isequal(a::CallAndWrap, b::CallAndWrap) = isequal(a.f,  b.f)
+Base.isequal(a::BasicSymbolic{VartypeT}, b::CallAndWrap) = isequal(a,  b.f)
+Base.isequal(a::CallAndWrap, b::BasicSymbolic{VartypeT}) = isequal(a.f,  b)
+Base.hash(x::CallAndWrap, h::UInt) = hash(x.f, h)
+
+function Base.show(io::IO, caw::CallAndWrap)
+    show(io, caw.f)
+    print(io, "⋆")
+end
+
+has_symwrapper(::Type{T}) where {A, R, T <: SymbolicUtils.FnType{A, R}} = has_symwrapper(R)
+wrapper_type(::Type{T}) where {A, R, T <: SymbolicUtils.FnType{A, R}} = CallAndWrap{wrapper_type(R)}
+is_wrapper_type(::Type{T}) where {T <: CallAndWrap} = true
+wraps_type(::Type{T}) where {W, T <: CallAndWrap{W}} = FnType{A, R} where {A, R <: wraps_type(W)}
+iswrapped(::CallAndWrap) = true
+SymbolicUtils.unwrap(x::CallAndWrap) = x.f
+SymbolicUtils.symtype(x::CallAndWrap) = symtype(x.f)
+SymbolicIndexingInterface.getname(x::CallAndWrap) = getname(x.f)
+SymbolicIndexingInterface.hasname(x::CallAndWrap) = hasname(x.f)
+Symbolics.rename(x::CallAndWrap, name) = CallAndWrap(rename(x.f, name))
+SymbolicUtils.getmetadata(x::CallAndWrap, args...) = SymbolicUtils.getmetadata(x.f, args...)
+SymbolicUtils.setmetadata(x::CallAndWrap, args...) = SymbolicUtils.setmetadata(x.f, args...)
+SymbolicUtils.hasmetadata(x::CallAndWrap, args...) = SymbolicUtils.hasmetadata(x.f, args...)
