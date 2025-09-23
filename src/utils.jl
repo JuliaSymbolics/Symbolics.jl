@@ -407,6 +407,28 @@ const DP = DynamicPolynomials
 # extracting underlying polynomial and coefficient type from Polyforms
 underlyingpoly(x::Number) = x
 coefftype(x::Number) = typeof(x)
+coefftype(x::DP.Polynomial) = eltype(MP.coefficients(x))
+
+as_concrete_polynomial(x::Number) = x
+function as_concrete_polynomial(x::DP.Polynomial)
+    coeffs = MP.coefficients(x)
+    isconcretetype(eltype(coeffs)) && return x
+    isempty(coeffs) && return poly_to_coefftype(Int, x)
+    T = typeof(coeffs[1])
+    for coeff in coeffs
+        T = promote_type(T, typeof(coeff))
+    end
+    poly_to_coefftype(T, x)
+end
+
+function as_concrete_polynomial(x::SymbolicUtils.PolyVarT)
+    mv = DP.MonomialVector{SymbolicUtils.PolyVarOrder, SymbolicUtils.MonomialOrder}([x], [Int[1]])
+    return DP.Polynomial(Int[1], mv)
+end
+
+function poly_to_coefftype(::Type{T}, x::DP.Polynomial) where {T}
+    DP.Polynomial(Vector{T}(MP.coefficients(x)), MP.monomials(x))
+end
 
 #=
 Converts an array of symbolic polynomials
@@ -424,13 +446,12 @@ function symbol_to_poly(sympolys::AbstractArray)
 
     poly_to_bs = Bijections.Bijection{SymbolicUtils.PolyVarT, BasicSymbolic{varT}}()
     bs_to_poly = Bijections.active_inv(poly_to_bs)
-    polyforms = Vector{SymbolicUtils.PolynomialT}(map(f -> SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, f), stdsympolys))
-
+    polyforms = map(f -> as_concrete_polynomial(SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, f)), stdsympolys)
     # Discover common coefficient type
     commontype = mapreduce(coefftype, promote_type, polyforms, init=Int)
     @assert commontype <: Union{Integer,Rational} "Only integer and rational coefficients are supported as input."
 
-    polynoms = polyforms
+    polynoms = map(Base.Fix1(poly_to_coefftype, commontype), polyforms)
 
     polynoms, poly_to_bs
 end
@@ -439,7 +460,7 @@ end
 Converts an array of AbstractPolynomialLike`s into an array of
 symbolic expressions mapping variables w.r.t pvar2sym
 =#
-function poly_to_symbol(polys, poly_to_bs, ::Type{T}) where {T}
+function poly_to_symbol(polys, poly_to_bs)
     map(Base.Fix1(SymbolicUtils.from_poly, poly_to_bs), polys)
 end
 

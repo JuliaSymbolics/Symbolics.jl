@@ -43,7 +43,7 @@ function turn_to_poly(expr, var)
     expr = unwrap(expr)
     !iscall(expr) && return (expr, Dict())
 
-    args = copy(parent(arguments(expr)))
+    args = copy(parent(sorted_arguments(expr)))
 
     sub = 0
     broken = Ref(false)
@@ -107,8 +107,8 @@ julia> trav_pow(unwrap(x^2), x, Ref(false), 3^x)
 """
 function trav_pow(arg, var, broken, sub)
     args_arg = arguments(arg)
-    base = args_arg[1]
-    power = args_arg[2]
+    base = value(args_arg[1])
+    power = value(args_arg[2])
 
     # case 1: log(x)^2 .... 9^x = 3^2^x = 3^2x = (3^x)^2
     !isequal(add_sub(sub, base, var, broken), false) && power isa Integer && return arg, base
@@ -125,7 +125,7 @@ function trav_pow(arg, var, broken, sub)
             broken[] = true
             return arg, false
         end
-        new_b = term(^, new_b, p)
+        new_b = ^(new_b, p)
         return new_b, sub
     end
 
@@ -359,7 +359,7 @@ function attract_and_solve_sqrtpoly(lhs, var)
 
     for root in roots
         if isapprox(
-            substitute(lhs, Dict(var => eval(Symbolics.toexpr(root)))), 0, atol = 1e-4)
+            value(substitute(lhs, Dict(var => eval(Symbolics.toexpr(root))))), 0, atol = 1e-4)
             push!(answers, root)
         end
     end

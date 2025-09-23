@@ -21,7 +21,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             else
                 a, b, islin = linear_expansion(lhs - new_var, var)
                 if islin
-                    lhs_roots = [-b // a]
+                    lhs_roots = [-b / a]
                 else
                     lhs_roots = [RootsOf(lhs - new_var, var)]
                     if warns
@@ -32,7 +32,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
 
             for i in eachindex(lhs_roots)
                 for j in eachindex(rhs)
-                    if iscall(lhs_roots[i]) && operation(lhs_roots[i]) == RootsOf
+                    if iscall(lhs_roots[i]) && operation(lhs_roots[i]) === RootsOf
                         _args = copy(parent(arguments(lhs_roots[i])))
                         _args[1] = substitute(_args[1], Dict(new_var => rhs[j]), fold = false)
                         T = typeof(lhs_roots[i])
@@ -53,7 +53,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             return nothing, conditions
         end
 
-        old_lhs = deepcopy(lhs)
+        old_lhs = lhs
 
         oper = operation(lhs)
         args = arguments(lhs)
@@ -86,32 +86,33 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                 lhs = unwrap(numerator(lhs))
             else
                 # 2 / x = y
-                rhs = map(sol -> term(/, numerator(lhs), sol), rhs)
+                rhs = map(sol -> /(numerator(lhs), sol), rhs)
                 lhs = unwrap(denominator(lhs))
             end
 
         elseif oper === (^)
             var_in_base = any(isequal(x, var) for x in get_variables(args[1]))
             var_in_pow = n_occurrences(args[2], var) != 0
-            if var_in_base && !var_in_pow && args[2] isa Integer
+            a2 = unwrap_const(args[2])
+            if var_in_base && !var_in_pow && a2 isa Integer
                 lhs = args[1]
-                power = args[2]
+                power = a2
                 new_roots = []
 
                 if complex_roots
                     for i in eachindex(rhs)
-                        for k in 0:(args[2] - 1)
-                            r = term(^, rhs[i], (1 // power))
-                            c = term(*, 2 * (k), pi) * im / power
+                        for k in 0:(a2 - 1)
+                            r = ^(rhs[i], (1 // power))
+                            c = *(2 * (k), pi) * im / power
                             root = r * Base.MathConstants.e^c
                             push!(new_roots, root)
                         end
                     end
                 else
                     for i in eachindex(rhs)
-                        push!(new_roots, term(^, rhs[i], (1 // power)))
+                        push!(new_roots, ^(rhs[i], (1 // power)))
                         if iseven(power)
-                            push!(new_roots, term(-, new_roots[end]))
+                            push!(new_roots, -new_roots[end])
                         end
                     end
                 end
@@ -120,10 +121,10 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
             elseif var_in_base && !var_in_pow
                 lhs = args[1]
                 s, power = filter_stuff(args[2])
-                rhs = map(sol -> term(^, sol, 1 // power), rhs)
+                rhs = map(sol ->^(sol, 1 / power), rhs)
             else
                 lhs = args[2]
-                rhs = map(sol -> term(/, term(slog, sol), term(slog, args[1])), rhs)
+                rhs = map(sol -> /(slog(sol), slog(args[1])), rhs)
             end
         elseif has_left_inverse(oper)
             lhs = args[1]
@@ -135,12 +136,12 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                 new_var = (@variables $new_var)[1]
                 period = fundamental_period(oper)
                 rhs = map(
-                    sol -> term(invop, sol) +
-                           term(*, period, new_var),
+                    sol -> invop(sol) +
+                           *(period, new_var),
                     rhs)
                 @info string(new_var) * " ϵ" * " Ζ"
             else
-                rhs = map(sol -> term(invop, sol), rhs)
+                rhs = map(sol -> invop(sol), rhs)
             end
         end
 
@@ -305,7 +306,7 @@ function ia_solve(lhs, var; warns = true, complex_roots = true, periodic_roots =
         domain_error = false
         for j in eachindex(conditions)
             condition, t = conditions[j]
-            cond_val = substitute(condition, Dict(var=>eval(toexpr(sols[i])))) 
+            cond_val = unwrap_const(substitute(condition, Dict(var=>eval(toexpr(sols[i])))))
             cond_val isa Complex && continue
             domain_error |= !t(cond_val, 0)
         end
