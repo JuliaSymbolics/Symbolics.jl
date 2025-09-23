@@ -146,7 +146,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
     expr_univar = false
     x_univar = false
 
-    if (T == Num || T == SymbolicUtils.BasicSymbolic{Real})
+    if (T === Num || T === BasicSymbolic{VartypeT} && symtype(x) <: Real)
         x_univar = true
         check_x(x)
     else
@@ -154,7 +154,6 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             check_x(var)
         end
     end
-
     if !(expr isa Vector)
         expr_univar = true
         expr = expr isa Equation ? expr.lhs - expr.rhs : expr
@@ -241,9 +240,13 @@ function symbolic_solve(expr; x...)
         sub_vars = reduce(vcat, subs isa Dict ? collect(keys(subs)) : collect.(keys.(subs)))
     end
 
-    vars_list = get_variables.(filtered)
-    filt_vars = unique(isa(vars_list, AbstractArray) && all(isa.(vars_list, AbstractArray)) ? reduce(vcat, vars_list) : vars_list)
-
+    vars_list = Set{BasicSymbolic{VartypeT}}()
+    for ex in wrap(filtered)
+        SymbolicUtils.search_variables!(vars_list, ex)
+    end
+    # vars_list = get_variables.(filtered)
+    # filt_vars = unique(isa(vars_list, AbstractArray) && all(isa.(vars_list, AbstractArray)) ? reduce(vcat, vars_list) : vars_list)
+    filt_vars = collect(vars_list)
     vars = isempty(sub_vars) ? filt_vars : setdiff(filt_vars, sub_vars)
     vars = wrap.(vars)
     @assert all(v isa Num for v in vars) "All variables should be Nums or BasicSymbolics"
@@ -287,9 +290,9 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
         expr = unwrap(simplify((copy(wrap(expression)))))
         args = arguments(expr)
         operation = SymbolicUtils.operation(expr)
-        if isequal(operation, ^) && args[2] isa Int64
+        if isequal(operation, ^) && SymbolicUtils.isconst(args[2]) && (a2 = unwrap_const(args[2]); a2 isa Int64)
             expression = wrap(args[1])
-            mult_n = args[2]
+            mult_n = a2
         end
     end
 

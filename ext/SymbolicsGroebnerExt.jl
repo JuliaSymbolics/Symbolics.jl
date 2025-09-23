@@ -5,19 +5,20 @@ const Nemo = Groebner.Nemo
 using Symbolics
 using Symbolics: Num, symtype, BasicSymbolic
 import Symbolics.PrecompileTools
+import Symbolics.Bijections
+import Symbolics: SymbolicUtils
+import Symbolics: DP, MP
 
 function Symbolics.groebner_basis(polynomials::Vector{Num}; ordering=InputOrdering(), kwargs...)
-    polynoms, pvar2sym, sym2term = Symbolics.symbol_to_poly(polynomials)
-    sym2term_for_groebner = Dict{Any,Any}(v1 => k for (k, (v1, v2)) in sym2term)
-    all_sym_vars = Groebner.ordering_variables(ordering)
-    missed = setdiff(all_sym_vars, Set(collect(keys(sym2term_for_groebner))))
-    for var in missed
-        sym2term_for_groebner[var] = var
-    end
-    ordering = Groebner.ordering_transform(ordering, sym2term_for_groebner )
-    basis = Groebner.groebner(polynoms; ordering=ordering, kwargs...)
-    PolyType = symtype(first(polynomials))
-    Symbolics.poly_to_symbol(basis, pvar2sym, sym2term, PolyType)
+    polynoms, poly_to_bs = Symbolics.symbol_to_poly(polynomials)
+    basis = groebner_basis_poly(polynoms, poly_to_bs; ordering, kwargs...)
+    Symbolics.poly_to_symbol(basis, poly_to_bs)
+end
+
+function groebner_basis_poly(polynoms::Vector{<:DP.Polynomial}, poly_to_bs::Bijections.Bijection; ordering=InputOrdering(), kwargs...)
+    bs_to_poly = Bijections.active_inv(poly_to_bs)
+    ordering = Groebner.ordering_transform(ordering, bs_to_poly)
+    return Groebner.groebner(polynoms; ordering=ordering, kwargs...)
 end
 
 """
@@ -66,7 +67,13 @@ function nemo_crude_evaluate(poly::Nemo.MPolyRingElem, varmap)
 end
 
 function nemo_crude_evaluate(poly::Nemo.FracElem, varmap)
-    nemo_crude_evaluate(numerator(poly), varmap) // nemo_crude_evaluate(denominator(poly), varmap)
+    num = nemo_crude_evaluate(numerator(poly), varmap)
+    den = nemo_crude_evaluate(denominator(poly), varmap)
+    if num isa Num || den isa Num
+        num / den
+    else
+        num // den
+    end
 end
 
 function nemo_crude_evaluate(poly::Nemo.ZZRingElem, varmap)
@@ -86,10 +93,10 @@ function gen_separating_var(vars)
 end
 
 # Given a GB in k[params][vars] produces a GB in k(params)[vars]
-function demote(gb, vars::Vector{Num}, params::Vector{Num})
-    isequal(gb, [1]) && return gb 
-
-    gb = Symbolics.wrap.(SymbolicUtils.toterm.(gb))
+function demote(gb, gb_as_poly, bs_to_poly, vars::Vector{Num}, params::Vector{Num})
+    length(gb) == 1 && SymbolicUtils._isone(gb[1]) && return gb
+    isequal(gb, [1]) && return gb
+    # gb = Symbolics.wrap.(SymbolicUtils.toterm.(gb))
     Symbolics.check_polynomial.(gb)
 
     all_vars = [vars..., params...]
@@ -97,16 +104,16 @@ function demote(gb, vars::Vector{Num}, params::Vector{Num})
 
     sym_to_nemo = Dict(all_vars .=> nemo_all_vars)
     nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
-    nemo_gb = Symbolics.substitute(gb, sym_to_nemo)
-    nemo_gb = Symbolics.substitute(nemo_gb, sym_to_nemo)
+    pvar_to_nemo = [bs_to_poly[v] for v in all_vars] => nemo_all_vars
+    nemo_gb = [poly(pvar_to_nemo) for poly in gb_as_poly]
 
-    nemo_vars = filter(v -> string(v) in string.(vars), nemo_all_vars)
-    nemo_params = filter(v -> string(v) in string.(params), nemo_all_vars)
+    nemo_vars = view(nemo_all_vars, 1:length(vars))
+    nemo_params = view(nemo_all_vars, length(vars)+1:length(all_vars))
 
     ring_flat = parent(nemo_vars[1])
     ring_param, params_demoted = Nemo.polynomial_ring(Nemo.base_ring(ring_flat), map(string, nemo_params))
     ring_demoted, vars_demoted = Nemo.polynomial_ring(Nemo.fraction_field(ring_param), map(string, nemo_vars), internal_ordering=:lex)
-    varmap = Dict((nemo_vars .=> vars_demoted)..., (nemo_params .=> params_demoted)...)
+    varmap = Dict(vcat(nemo_vars .=> vars_demoted, nemo_params .=> params_demoted))
     gb_demoted = map(f -> ring_demoted(nemo_crude_evaluate(f, varmap)), nemo_gb)
     result = empty(gb_demoted)
     while true
@@ -124,7 +131,7 @@ function demote(gb, vars::Vector{Num}, params::Vector{Num})
     end
     @assert all(f -> isone(Nemo.leading_coefficient(f)), result)
 
-    sym_to_nemo = Dict(sym => nem for sym in all_vars for nem in [vars_demoted..., params_demoted...] if isequal(string(sym),string(nem)))
+    sym_to_nemo = Dict(all_vars .=> [vars_demoted; params_demoted])
     nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
 
     final_result = Num[]
@@ -150,8 +157,7 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
     # AAECC 9, 433–461 (1999). https://doi.org/10.1007/s002000050114
     
     rng = Groebner.Random.Xoshiro(42)
-
-    all_indeterminates = reduce(union, map(Symbolics.get_variables, eqs))
+    all_indeterminates = collect(reduce(union!, map(Symbolics.get_variables, eqs)))
     params = map(Symbolics.Num ∘ Symbolics.wrap, setdiff(all_indeterminates, vars))
 
     # Use a new variable to separate the input polynomials (Reference above)
@@ -179,10 +185,12 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
 
         push!(new_eqs, separating_form)
 
-        new_eqs = Symbolics.groebner_basis(new_eqs, ordering=Lex(vcat(vars, params)))
+        polynoms, poly_to_bs = Symbolics.symbol_to_poly(new_eqs)
+        basis = groebner_basis_poly(polynoms, poly_to_bs; ordering = Lex(vcat(vars, params)))
+        new_eqs = Symbolics.poly_to_symbol(basis, poly_to_bs)
 
         # handle "unsolvable" case
-        if isequal(1, new_eqs[1])
+        if SymbolicUtils._iszero(new_eqs[1])
             return []
         end
 
@@ -190,12 +198,11 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
             all_present = Symbolics.get_variables(new_eqs[i])
             if length(intersect(all_present, vars)) < 1
                 deleteat!(new_eqs, i)
+                deleteat!(basis, i)
             end
         end
-
-        new_eqs = demote(new_eqs, vars, params)
+        new_eqs = demote(new_eqs, basis, Bijections.active_inv(poly_to_bs), vars, params)
         new_eqs = map(Symbolics.unwrap, new_eqs)
-
         # condition for positive dimensionality, i.e. infinite solutions
         if length(new_eqs) < length(vars)
             warns && @warn("Infinite number of solutions")
@@ -209,13 +216,15 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
         # xn - fn(T, params) = 0
         generating = !(length(new_eqs) == length(vars))
         if length(new_eqs) == length(vars)
-            generating |= !(isequal(setdiff(Symbolics.get_variables(new_eqs[1]), params), [new_var]))
+            vars_in_1 = Symbolics.get_variables(new_eqs[1])
+            setdiff!(vars_in_1, params)
+            generating |= !(length(vars_in_1) == 1 && isequal(first(vars_in_1), new_var))
             for i in eachindex(new_eqs)[2:end]
                 present_vars = setdiff(Symbolics.get_variables(new_eqs[i]), new_var)
                 present_vars = setdiff(present_vars, params)
                 isempty(present_vars) && (generating = false; break;)
-                var_i = present_vars[1]
-                condition1 = isequal(present_vars, [var_i])
+                var_i = first(present_vars)
+                condition1 = length(present_vars) == 1
                 condition2 = Symbolics.degree(new_eqs[i], var_i) == 1
                 generating |= !(condition1 && condition2)
             end
@@ -234,7 +243,9 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
 
     # first, solve the first minimal polynomial
     @assert length(new_eqs) == length(vars)
-    @assert isequal(setdiff(Symbolics.get_variables(new_eqs[1]), params), [new_var])
+    vars_in_1 = Symbolics.get_variables(new_eqs[1])
+    setdiff!(vars_in_1, params)
+    @assert length(vars_in_1) == 1 && isequal(first(vars_in_1), new_var)
     minpoly_sols = Symbolics.symbolic_solve(Symbolics.wrap(new_eqs[1]), new_var, dropmultiplicity=dropmultiplicity)
     solutions = [Dict{Num, Any}(new_var => sol) for sol in minpoly_sols]
 
@@ -243,10 +254,10 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
     # second, iterate over eqs and sub each found solution
     # then add the roots of the remaining unknown variables 
     for (i, eq) in enumerate(new_eqs)
-        present_vars = setdiff(Symbolics.get_variables(eq), params)
-        present_vars = setdiff(present_vars, new_var)
+        present_vars = setdiff!(Symbolics.get_variables(eq), params)
+        present_vars = setdiff!(present_vars, new_var)
         @assert length(present_vars) == 1
-        var_tosolve = present_vars[1]
+        var_tosolve = first(present_vars)
         @assert Symbolics.degree(eq, var_tosolve) == 1
         @assert !isempty(solutions)
         for roots in solutions
@@ -270,7 +281,7 @@ end
 function transendence_basis(sys, vars)
     J = Symbolics.jacobian(sys, vars)
     x0 = Dict(v => rand(-10:10) for v in vars)
-    J_x0 = substitute(J, x0)
+    J_x0 = map(Symbolics.value, substitute(J, x0))
     rk, rref = Nemo.rref(Nemo.matrix(Nemo.QQ, J_x0))
     pivots = Int[]
     for i in 1:length(sys)
@@ -287,7 +298,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     isempty(tr_basis) && return nothing
     vars_gen = setdiff(vars, tr_basis)
     sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
-
+    sol === nothing && return nothing
     for roots in sol
         for x in tr_basis
             roots[x] = x
