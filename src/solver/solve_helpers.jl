@@ -79,6 +79,9 @@ function slog(n)
     return term(slog, n)
 end
 
+SymbolicUtils.promote_symtype(::typeof(slog), ::Type{T}) where {T} = T
+SymbolicUtils.promote_shape(::typeof(slog), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
+
 derivative(::typeof(slog), args...) = substitute(derivative(log, args...), log => slog)
 
 const RootsOf = (SymbolicUtils.@syms roots_of(poly,var))[1]
@@ -90,9 +93,9 @@ Base.show(io::IO, r::typeof(slog)) = print(io, "slog")
 function check_expr_validity(expr)
     type_expr = typeof(expr)
     valid_type = false
-
-    if type_expr <: Number || type_expr == Num || type_expr == SymbolicUtils.BasicSymbolic{Real} ||
-       type_expr == Complex{Num} || type_expr == SymbolicUtils.BasicSymbolic{Complex{Real}}
+    st = symtype(expr)
+    if type_expr <: Number || type_expr == Num || st <: Real ||
+       type_expr == Complex{Num} || st <: Complex{Real}
         valid_type = true
     end
     iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
@@ -108,13 +111,13 @@ end
 
 function check_poly_inunivar(poly, var)
     subs, filtered = filter_poly(poly, var)
-    coeffs, constant = polynomial_coeffs(filtered, [var])
-    return isequal(constant, 0)
+    coeffs, constant = polynomial_coeffs(filtered, var isa Array ? var : [var])
+    return SymbolicUtils._iszero(constant)
 end
 
 # converts everything to BIG
 function bigify(n)
-    n = unwrap(n)
+    n = value(n)
     if n isa Float64 || n isa Irrational
         return n
     end
@@ -123,7 +126,7 @@ function bigify(n)
         !iscall(n) && return n
         args = copy(parent(arguments(n)))
         for i in eachindex(args)
-            args[i] = bigify(args[i])
+            args[i] = Const{VartypeT}(bigify(args[i]))
         end
         n = maketerm(typeof(n), operation(n), args, metadata(n))
         return n
@@ -149,7 +152,7 @@ function bigify(n)
 end
 
 function comp_rational(x, y)
-    x, y = wrap(bigify(x)), wrap(bigify(y))
+    x, y = bigify(unwrap(x)), bigify(unwrap(y))
     if !(unwrap(x) isa AbstractFloat || x isa Complex) &&
        !(unwrap(y) isa AbstractFloat || y isa Complex)
         r = x // y
