@@ -245,7 +245,7 @@ end
 
 Base.to_index(x::Num) = Base.to_index(value(x))
 
-Base.hash(x::Num, h::UInt) = hash(value(x), h)::UInt
+Base.hash(x::Num, h::UInt) = hash(unwrap(x), h)::UInt
 
 function Base.convert(::Type{Num}, x::BasicSymbolic)
     symtype(x) <: Real || error("`symtype` must be `<:Real`")
