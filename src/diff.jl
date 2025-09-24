@@ -42,6 +42,10 @@ end
 (D::Differential)(x::Complex{Num}) = Complex{Num}(wrap(D(unwrap(real(x)))), wrap(D(unwrap(imag(x)))))
 SymbolicUtils.isbinop(f::Differential) = false
 
+function (s::SymbolicUtils.Substituter)(x::Differential)
+    Differential(s(x.x))
+end
+
 function SymbolicUtils.operator_to_term(d::Differential, ex::BasicSymbolic{T}) where {T}
     return diff2term(ex)
 end
