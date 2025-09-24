@@ -19,8 +19,24 @@ end
 function Base.getindex(x::Arr, idx...)
     wrap(unwrap(x)[idx...])
 end
-function Base.getindex(x::Arr, idx::BasicSymbolic...)
-    wrap(unwrap(x)[idx...])
+const SymIdxT = Union{Num, BasicSymbolic{VartypeT}}
+function Base.getindex(x::Arr, idx::SymIdxT, idxs...)
+    wrap(unwrap(x)[idx, idxs...])
+end
+function Base.getindex(x::Arr, i1, idx::SymIdxT, idxs...)
+    wrap(unwrap(x)[i1, idx, idxs...])
+end
+function Base.getindex(x::Arr, i1::SymIdxT, idx::SymIdxT, idxs...)
+    wrap(unwrap(x)[i1, idx, idxs...])
+end
+function Base.getindex(x::Arr, i1, i2, idx::SymIdxT, idxs...)
+    wrap(unwrap(x)[i1, i2, idx, idxs...])
+end
+function Base.getindex(x::Arr, i1, i2::SymIdxT, idx::SymIdxT, idxs...)
+    wrap(unwrap(x)[i1, i2, idx, idxs...])
+end
+function Base.getindex(x::Arr, i1::SymIdxT, i2::SymIdxT, idx::SymIdxT, idxs...)
+    wrap(unwrap(x)[i1, i2, idx, idxs...])
 end
 
 import Base: +, -, *
