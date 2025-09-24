@@ -362,9 +362,9 @@ end
 struct FPSubFilterer{O} end
 
 function (::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
-    SymbolicUtils.default_substitute_filter(ex) && @match ex begin
-        BSImpl.Term(; f) => !(f isa O)
-        _ => true
+    @match ex begin
+        BSImpl.Term(; f) && if f isa Operator end => !(f isa O)
+        _ => SymbolicUtils.default_substitute_filter(ex)
     end
 end
 
