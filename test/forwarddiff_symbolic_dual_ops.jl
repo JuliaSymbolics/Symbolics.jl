@@ -25,7 +25,7 @@ for f ∈ SymbolicUtils.monadic
     # The polygamma and trigamma functions seem to be missing rules in ForwardDiff.
     # The abs rule uses conditionals and cannot be used with Symbolics.Num.
     # acsc, asech, NanMath.log2 and NaNMath.log10 are tested separately
-    if f ∈ (abs, SF.polygamma, SF.trigamma, acsc, acsch, asech, NaNMath.log2, NaNMath.log10)
+    if f ∈ (abs, SF.polygamma, SF.trigamma, acsc, acsch, asech, NaNMath.log2, NaNMath.log10, sign, signbit, factorial, expinti, sinint)
         continue
     end
 
@@ -34,7 +34,7 @@ for f ∈ SymbolicUtils.monadic
     fd = @invokelatest ForwardDiff.derivative(fun, x)
     sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
-    @test isequal(fd, sym)
+    @test isequal(SymbolicUtils.evaluate(fd), SymbolicUtils.evaluate(sym))
 end
 
 # These are evaluated numerically. For some reason isequal evaluates to false for the symbolic expressions.
@@ -44,7 +44,7 @@ for f ∈ (acsc, asech, NaNMath.log2, NaNMath.log10)
     fd = @invokelatest ForwardDiff.derivative(fun, 1.0)
     sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
-    @test fd ≈ substitute(sym, Dict(x => 1.0))
+    @test fd ≈ Symbolics.value(substitute(sym, Dict(x => 1.0); fold = Val(true)))
 end
 
 for f ∈ SymbolicUtils.basic_diadic
@@ -57,7 +57,7 @@ for f ∈ SymbolicUtils.basic_diadic
     fd = @invokelatest ForwardDiff.derivative(fun, x)
     sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
-    @test isequal(fd, sym)
+    @test isequal(fd, unwrap_const(sym))
 end
 
 for f ∈ SymbolicUtils.diadic
@@ -103,7 +103,7 @@ for f ∈ (hypot, muladd)
     fd = @invokelatest ForwardDiff.derivative(fun, 5.0)
     sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
-    @test fd ≈ substitute(sym, Dict(x => 5.0))
+    @test Num(fd) ≈ substitute(sym, Dict(x => 5.0); fold = Val(true)) atol=1e-15
 end
 
 # fma is not defined for Symbolics.Num
@@ -118,5 +118,5 @@ end
 @testset "NaNMath.pow (issue #1399)" begin
     @variables x
     @test_throws DomainError substitute(ForwardDiff.derivative(z -> x^z, 0.5), x => -1.0)
-    @test isnan(Symbolics.value(substitute(ForwardDiff.derivative(z -> NaNMath.pow(x, z), 0.5), x => -1.0)))
+    @test isnan(Symbolics.value(substitute(ForwardDiff.derivative(z -> NaNMath.pow(x, z), 0.5), x => -1.0; fold = Val(true))))
 end

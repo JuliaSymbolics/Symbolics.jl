@@ -1,18 +1,14 @@
 :(function (ˍ₋out, x)
-      for var"%jj′" = (zip)(Base.OneTo(4), (Symbolics.reset_to_one)(Base.OneTo(4)))
-          begin
-              j = var"%jj′"[1]
-              j′ = var"%jj′"[2]
-              for var"%ii′" = (zip)(Base.OneTo(4), (Symbolics.reset_to_one)(Base.OneTo(4)))
-                  begin
-                      i = var"%ii′"[1]
-                      i′ = var"%ii′"[2]
+      begin
+          _out = ˍ₋out
+          var"%_out" = for _2 = 1:1:4
+                  for _1 = 1:1:4
                       begin
-                          ˍ₋out[(CartesianIndex)(i′, j′)] = (+)((getindex)(ˍ₋out, i′, j′), (getindex)(x, j, i))
+                          _out[(CartesianIndex)(_1, _2)] = (+)((getindex)(_out, _1, _2), (getindex)(x, _2, _1))
                           nothing
                       end
                   end
               end
-          end
+          _out
       end
   end)

@@ -1,4 +1,5 @@
 using Symbolics
+using Test
 
 # https://github.com/JuliaSymbolics/Symbolics.jl/issues/1206
 # test there is no extra white spaces on the left of e or f when displaying an array
