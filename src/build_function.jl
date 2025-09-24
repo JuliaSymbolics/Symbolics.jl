@@ -174,12 +174,8 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
 
     outsym = DEFAULT_OUTSYM
     if iip_config[2]
-        if SymbolicUtils.isarrayop(op) && !haskey(states.rewrites, :arrayop_output)
-            states.rewrites[:arrayop_output] = outsym
-        end
         body = inplace_expr(op, outsym)
         iip_expr = wrap_code[2](Func(vcat(outsym, dargs), [], body))
-        delete!(states.rewrites, :arrayop_output)
     else
         iip_expr = get_unimplemented_expr([outsym; dargs])
     end
@@ -188,8 +184,10 @@ function _build_function(target::JuliaTarget, op::Arr, args...;
         oop_expr = Code.cse(oop_expr)
         iip_expr = Code.cse(iip_expr)
     end
-
     oop_expr = conv(oop_expr, states)
+    if SymbolicUtils.isarrayop(op) && !haskey(states.rewrites, :arrayop_output)
+        states.rewrites[:arrayop_output] = outsym
+    end
     iip_expr = conv(iip_expr, states)
 
     if !checkbounds
