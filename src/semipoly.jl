@@ -76,11 +76,13 @@ function semipolynomial_form(expr, vars, degree::Real; consts = true)
         @warn "Degree for semi-polynomial form should be ≥ 0"
         return SemipolyDictT(), expr
     end
-    if any(iswrapped, vars)
-        vars = map(unwrap, vars)
-    end
-    if !(vars isa AbstractSet)
-        vars = Set(vars)
+    vars = Set([unwrap(x) for x in vars])
+    for v in vars
+        v isa BasicSymbolic{VartypeT} || continue
+        @match v begin
+            BSImpl.Term(; f, args) && if f === getindex end => push!(vars, args[1])
+            _ => nothing 
+        end
     end
     expr = unwrap(expr)
     expr = expand(expr, false)
