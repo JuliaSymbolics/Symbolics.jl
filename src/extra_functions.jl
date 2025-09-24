@@ -1,4 +1,4 @@
-for (T1, T2) in Iterators.product(Iterators.repeated([Number, BasicSymbolic{VartypeT}, Num], 2)...)
+for (T1, T2) in Iterators.product([Number, BasicSymbolic{VartypeT}, Num], [Integer, BasicSymbolic{VartypeT}, Num])
     if T1 != Num && T2 != Num
         continue
     end
