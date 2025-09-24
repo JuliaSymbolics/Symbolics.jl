@@ -186,7 +186,6 @@ include("parsing.jl")
 export parse_expr_to_symbolic
 
 include("error_hints.jl")
-include("struct.jl")
 
 include("limits.jl")
 export limit
