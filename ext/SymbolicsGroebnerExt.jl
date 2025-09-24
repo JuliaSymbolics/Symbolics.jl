@@ -42,8 +42,8 @@ julia> @variables x y;
 julia> is_groebner_basis([x^2 - y^2, x*y^2 + x, y^3 + y])
 ```
 """
-function Symbolics.is_groebner_basis(polynomials::Vector{<:Union{Num, BasicSymbolic{<:Number}}}; kwargs...)
-    polynoms, _, _ = Symbolics.symbol_to_poly(polynomials)
+function Symbolics.is_groebner_basis(polynomials::Vector{<:Union{Num, BasicSymbolic}}; kwargs...)
+    polynoms, _ = Symbolics.symbol_to_poly(polynomials)
     Groebner.isgroebner(polynoms; kwargs...)
 end
 
