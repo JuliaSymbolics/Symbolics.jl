@@ -1,25 +1,29 @@
 using Symbolics
+using Symbolics: unwrap
+using SymbolicUtils: Const
 using Test
 
 using Random
 
 @variables x y z
 
+const CONST_1 = Const{SymReal}(1)
+
 @testset "simple expressions" begin
     d, r = semipolynomial_form(x, [x], 1)
-    @test d == Dict(x => 1)
-    @test r == 0
+    @test isequal(d, Dict(x => CONST_1))
+    @test unwrap_const(r) == 0
 
     d, r = semipolynomial_form(x + sin(x) + 1 + y, [x], 1)
-    @test isequal(d, Dict(1 => 1 + y, x => 1))
+    @test isequal(d, Dict(CONST_1 => 1 + y, x => CONST_1))
     @test isequal(r, sin(x))
 
     d, r = semipolynomial_form(x^2 + 1 + y, [x], 1)
-    @test isequal(d, Dict(1 => 1 + y))
+    @test isequal(d, Dict(CONST_1 => 1 + y))
     @test isequal(r, x^2)
 
     d, r = semipolynomial_form((x + 2)^12, [x], 1)
-    @test isequal(d, Dict(1 => 1 << 12, x => (1 << 11) * 12))
+    @test isequal(d, Dict(CONST_1 => Const{SymReal}(1 << 12), x => Const{SymReal}((1 << 11) * 12)))
 end
 
 @testset "maintain SymbolicUtils.Symbolic subtype" begin
@@ -48,7 +52,7 @@ end
     @test SymbolicUtils.isdiv(nl)
     dict, nl = semipolynomial_form(div_expr, [x], Inf)
     @test isequal(dict, Dict(x => 1 / y))
-    @test iszero(nl)
+    @test iszero(unwrap_const(nl))
     dict, nl = semipolynomial_form(div_expr, [y], Inf)
     @test isempty(dict)
     @test isequal(nl, div_expr)
@@ -81,68 +85,68 @@ end
     expr = y_1 * (x + y) # (x + y)*(y^-1)
 
     d, r = semipolynomial_form(expr, [x, y], Inf)
-    @test isequal(d, Dict(1 => 1))
+    @test isequal(d, Dict(CONST_1 => CONST_1))
     @test isequal(r, x / y)
 
     d, r = semipolynomial_form(expr, [x, y], 0)
-    @test isequal(d, Dict(1 => 1))
+    @test isequal(d, Dict(CONST_1 => CONST_1))
     @test isequal(r, x / y)
 
     d, r = semipolynomial_form(expr, [x, y], 0.3)
-    @test isequal(d, Dict(1 => 1))
+    @test isequal(d, Dict(CONST_1 => CONST_1))
     @test isequal(r, x / y)
 
     d, r = semipolynomial_form(expr, [x, y], 1 // 2)
-    @test isequal(d, Dict(1 => 1))
+    @test isequal(d, Dict(CONST_1 => CONST_1))
     @test isequal(r, x / y)
 
     d, r = semipolynomial_form(expr, [x], 1)
-    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => CONST_1, x => 1 / y)) || isequal(d, Dict(CONST_1 => CONST_1, x => y_1))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [x], 1 // 1)
-    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => CONST_1, x => 1 / y)) || isequal(d, Dict(CONST_1 => CONST_1, x => y_1))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [x], Int32(1))
-    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => CONST_1, x => 1 / y)) || isequal(d, Dict(CONST_1 => CONST_1, x => y_1))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [x], 1.0)
-    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => CONST_1, x => 1 / y)) || isequal(d, Dict(CONST_1 => CONST_1, x => y_1))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [x], Float32(1.0))
-    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => CONST_1, x => 1 / y)) || isequal(d, Dict(CONST_1 => CONST_1, x => y_1))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [x], 1.5)
-    @test isequal(d, Dict(1 => 1, x => 1 / y)) || isequal(d, Dict(1 => 1, x => y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => CONST_1, x => 1 / y)) || isequal(d, Dict(CONST_1 => CONST_1, x => y_1))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [x], 0.9)
-    @test isequal(d, Dict(1 => 1))
+    @test isequal(d, Dict(CONST_1 => CONST_1))
     @test isequal(r, x / y) || isequal(r, x * y_1)
 
     d, r = semipolynomial_form(expr, [x], 99 // 100)
-    @test isequal(d, Dict(1 => 1))
+    @test isequal(d, Dict(CONST_1 => CONST_1))
     @test isequal(r, x / y) || isequal(r, x * y_1)
 
     d, r = semipolynomial_form(expr, [], 0.9)
-    @test isequal(d, Dict(1 => 1 + x / y)) || isequal(d, Dict(1 => 1 + x * y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => expr))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [], 0)
-    @test isequal(d, Dict(1 => 1 + x / y)) || isequal(d, Dict(1 => 1 + x * y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => expr))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [], 0.0)
-    @test isequal(d, Dict(1 => 1 + x / y)) || isequal(d, Dict(1 => 1 + x * y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => expr))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [], 0 // 1)
-    @test isequal(d, Dict(1 => 1 + x / y)) || isequal(d, Dict(1 => 1 + x * y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => expr))
+    @test iszero(unwrap_const(r))
 end
 
 # 682
@@ -159,59 +163,59 @@ end
     @test isequal(r, y_1 * x^4 + y^3) || isequal(r, x^4 / y + y^3)
 
     d, r = semipolynomial_form(expr, [x, y], 3)
-    @test isequal(d, Dict(y^3 => 1))
+    @test isequal(d, Dict(y^3 => CONST_1))
     @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
 
     d, r = semipolynomial_form(expr, [x, y], 4)
-    @test isequal(d, Dict(y^3 => 1))
+    @test isequal(d, Dict(y^3 => CONST_1))
     @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
 
     d, r = semipolynomial_form(expr, [x], 2)
-    @test isequal(d, Dict(1 => y^3))
+    @test isequal(d, Dict(CONST_1 => y^3))
     @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
 
     d, r = semipolynomial_form(expr, [x], 3)
-    @test isequal(d, Dict(1 => y^3))
+    @test isequal(d, Dict(CONST_1 => y^3))
     @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
 
     d, r = semipolynomial_form(expr, [x], 4)
-    @test isequal(d, Dict(1 => y^3, x^4 => y_1))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => y^3, x^4 => y_1))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [y], 2)
     @test isempty(d)
     @test isequal(r, y_1 * x^4 + y^3) || isequal(r, x^4 / y + y^3)
 
     d, r = semipolynomial_form(expr, [y], 3)
-    @test isequal(d, Dict(y^3 => 1))
+    @test isequal(d, Dict(y^3 => CONST_1))
     @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
 
     d, r = semipolynomial_form(expr, [y], 4)
-    @test isequal(d, Dict(y^3 => 1))
+    @test isequal(d, Dict(y^3 => CONST_1))
     @test isequal(r, y_1 * x^4) || isequal(r, x^4 / y)
 
     d, r = semipolynomial_form(expr, [], 0)
-    @test isequal(d, Dict(1 => y_1 * x^4 + y^3)) || isequal(d, Dict(1 => x^4 / y + y^3))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => expr))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [], 2)
-    @test isequal(d, Dict(1 => y_1 * x^4 + y^3)) || isequal(d, Dict(1 => x^4 / y + y^3))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => expr))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [], 3)
-    @test isequal(d, Dict(1 => y_1 * x^4 + y^3)) || isequal(d, Dict(1 => x^4 / y + y^3))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => expr))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [], 4)
-    @test isequal(d, Dict(1 => y_1 * x^4 + y^3)) || isequal(d, Dict(1 => x^4 / y + y^3))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => expr))
+    @test iszero(unwrap_const(r))
 end
 
 @testset "nested ^ exponentiation" begin
     expr = ((x + 1)^4 + x)^3
     d, r = semipolynomial_form(expr, [x], 2)
 
-    @test isequal(d, Dict(1 => 1, x => 15, x^2 => 93))
+    @test isequal(d, Dict(CONST_1 => CONST_1, x => Const{SymReal}(15), x^2 => Const{SymReal}(93)))
     @test isequal(r, 317x^3 + 681x^4 + 1014x^5 + 1095x^6 + 876x^7 + 519x^8 + 223x^9
                      + 66x^10 + 12x^11 + x^12)
 end
@@ -220,20 +224,20 @@ end
     expr = y^(1//1)
 
     d, r = semipolynomial_form(expr, [x], 0)
-    @test isequal(d, Dict(1 => y))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => y))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [x], 1)
-    @test isequal(d, Dict(1 => y))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => y))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [y], 0)
     @test isempty(d)
     @test isequal(r, y)
 
     d, r = semipolynomial_form(expr, [y], 1)
-    @test isequal(d, Dict(y => 1))
-    @test iszero(r)
+    @test isequal(d, Dict(y => CONST_1))
+    @test iszero(unwrap_const(r))
 
     expr = (x^(4//3) + y^(5//2))^3
 
@@ -254,60 +258,60 @@ end
     @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
 
     d, r = semipolynomial_form(expr, [x, y], 4)
-    @test isequal(d, Dict(x^4 => 1))
+    @test isequal(d, Dict(x^4 => CONST_1))
     @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
 
     d, r = semipolynomial_form(expr, [x, y], 5)
-    @test isequal(d, Dict(x^4 => 1))
+    @test isequal(d, Dict(x^4 => CONST_1))
     @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
 
     d, r = semipolynomial_form(expr, [x, y], 6)
-    @test isequal(d, Dict(x^4 => 1))
+    @test isequal(d, Dict(x^4 =>CONST_1))
     @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
 
     d, r = semipolynomial_form(expr, [y], 3)
-    @test isequal(d, Dict(1 => x^4))
+    @test isequal(d, Dict(CONST_1 => x^4))
     @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
 
     d, r = semipolynomial_form(expr, [y], 4)
-    @test isequal(d, Dict(1 => x^4))
+    @test isequal(d, Dict(CONST_1 => x^4))
     @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2))
 
     d, r = semipolynomial_form(expr, [y], 5)
-    @test isequal(d, Dict(1 => x^4, y^5 => 3x^(4//3)))
+    @test isequal(d, Dict(CONST_1 => x^4, y^5 => 3x^(4//3)))
     @test isequal(r, 3x^(8//3) * y^(5//2) + y^(15//2))
 
     d, r = semipolynomial_form(expr, [y], 6)
-    @test isequal(d, Dict(1 => x^4, y^5 => 3x^(4//3)))
+    @test isequal(d, Dict(CONST_1 => x^4, y^5 => 3x^(4//3)))
     @test isequal(r, 3x^(8//3) * y^(5//2) + y^(15//2))
 
     d, r = semipolynomial_form(expr, [x], 3)
-    @test isequal(d, Dict(1 => y^(15//2)))
+    @test isequal(d, Dict(CONST_1 => y^(15//2)))
     @test isequal(r, x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
 
     d, r = semipolynomial_form(expr, [x], 4)
-    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
+    @test isequal(d, Dict(CONST_1 => y^(15//2), x^4 => CONST_1))
     @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
 
     d, r = semipolynomial_form(expr, [x], 5)
-    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
+    @test isequal(d, Dict(CONST_1 => y^(15//2), x^4 => CONST_1))
     @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
 
     d, r = semipolynomial_form(expr, [x], 6)
-    @test isequal(d, Dict(1 => y^(15//2), x^4 => 1))
+    @test isequal(d, Dict(CONST_1 => y^(15//2), x^4 => CONST_1))
     @test isequal(r, 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5)
 
     d, r = semipolynomial_form(expr, [], 0)
-    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [], 1)
-    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(expr, [], 2)
-    @test isequal(d, Dict(1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => x^4 + 3x^(8//3) * y^(5//2) + 3x^(4//3) * y^5 + y^(15//2)))
+    @test iszero(unwrap_const(r))
 
     expr = (x + y)^(1//2)
 
@@ -324,21 +328,21 @@ end
     @test isequal(r, x + 2x^0.5 * y + y^2)
 
     d, r = semipolynomial_form(expr, [x, y], 1)
-    @test isequal(d, Dict(x => 1))
+    @test isequal(d, Dict(x => CONST_1))
     @test isequal(r, 2x^0.5 * y + y^2)
 
     d, r = semipolynomial_form(expr, [x, y], 2)
-    @test isequal(d, Dict(x => 1, y^2 => 1))
+    @test isequal(d, Dict(x => CONST_1, y^2 => CONST_1))
     @test isequal(r, 2x^0.5 * y)
 
     d, r = semipolynomial_form(expr, [x, y], 3)
-    @test isequal(d, Dict(x => 1, y^2 => 1))
+    @test isequal(d, Dict(x => CONST_1, y^2 => CONST_1))
     @test isequal(r, 2x^0.5 * y)
 
     # 680
     expr = (x^(1//2) + y^0.5)^2
     d, r = semipolynomial_form(expr, [x, y], 4)
-    @test isequal(d, Dict(x => 1, y => 1))
+    @test isequal(d, Dict(x => CONST_1, y => CONST_1))
     @test isequal(r, 2x^(1//2) * y^(1//2))
 
     expr = (3x^4 + y)^0.5
@@ -357,7 +361,7 @@ end
     expr = (x^2 - 1) / (x - 1)
     d, r = semipolynomial_form(expr, [x, y], Inf)
     @test isempty(d)
-    @test isequal(r, expr)
+    @test isequal(SymbolicUtils.simplify_fractions(r), SymbolicUtils.simplify_fractions(expr))
 end
 
 @testset "semilinear" begin
@@ -368,30 +372,30 @@ end
              y / z + 5z,
              x * y + y * z / x]
     A , c = semilinear_form(exprs, [x, y, z])
-    @test A[1, 1] == 3
-    @test A[1, 2] == 0
-    @test A[1, 3] == 0
-    @test A[2, 1] == 0
-    @test A[2, 2] == 0
-    @test A[2, 3] == 5
-    @test A[3, 1] == 0
-    @test A[3, 2] == 0
-    @test A[3, 3] == 0
+    @test unwrap_const(unwrap(A[1, 1])) == 3
+    @test unwrap_const(unwrap(A[1, 2])) == 0
+    @test unwrap_const(unwrap(A[1, 3])) == 0
+    @test unwrap_const(unwrap(A[2, 1])) == 0
+    @test unwrap_const(unwrap(A[2, 2])) == 0
+    @test unwrap_const(unwrap(A[2, 3])) == 5
+    @test unwrap_const(unwrap(A[3, 1])) == 0
+    @test unwrap_const(unwrap(A[3, 2])) == 0
+    @test unwrap_const(unwrap(A[3, 3])) == 0
     @test isequal(c, [tan(z), y / z, x * y + y * z / x])
 end
 
 @testset "expr = 0" begin
     d, r = semipolynomial_form(0, [], Inf)
     @test isempty(d)
-    @test iszero(r)
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(0//1, [], Inf)
     @test isempty(d)
-    @test iszero(r)
+    @test iszero(unwrap_const(r))
 
     d, r = semipolynomial_form(0.0, [], Inf)
     @test isempty(d)
-    @test iszero(r)
+    @test iszero(unwrap_const(r))
 end
 
 @testset "sqrt" begin
@@ -399,40 +403,40 @@ end
 
     d, r = semipolynomial_form(expr, [x], Inf)
     @test isempty(d)
-    @test isequal(r, x^(1//2))
+    @test isequal(r, sqrt(x))
 
     expr = sqrt(x)^2
 
     d, r = semipolynomial_form(expr, [x], Inf)
-    @test isequal(d, Dict(x => 1))
-    @test iszero(r)
+    @test isequal(d, Dict(x => CONST_1))
+    @test iszero(unwrap_const(r))
 
     expr = (sqrt(x) + sqrt(y))^2
 
     d, r = semipolynomial_form(expr, [x, y], Inf)
-    @test isequal(d, Dict(x => 1, y => 1))
-    @test isequal(r, 2x^(1//2) * y^(1//2))
+    @test isequal(d, Dict(x => CONST_1, y => CONST_1))
+    @test isequal(r, 2sqrt(x) * sqrt(y))
 
     d, r = semipolynomial_form(expr, [x], Inf)
-    @test isequal(d, Dict(x => 1, 1 => y))
-    @test isequal(r, 2x^(1//2) * y^(1//2))
+    @test isequal(d, Dict(x => CONST_1, CONST_1 => y))
+    @test isequal(r, 2sqrt(x) * sqrt(y))
 
     d, r = semipolynomial_form(expr, [], Inf)
-    @test isequal(d, Dict(1 => x + y + 2x^(1//2) * y^(1//2)))
-    @test iszero(r)
+    @test isequal(d, Dict(CONST_1 => x + y + 2sqrt(x) * sqrt(y)))
+    @test iszero(unwrap_const(r))
 end
 
-@syms a b c
+@variables a::Real b::Real c::Real
 
 const components = [2, a, b, c, x, y, z, (1+x), (1+y)^2, z*y, z*x]
 
-function verify(t::Symbolics.BasicSymbolic{Number}, d, wrt, nl)
+function verify(t::Symbolics.BasicSymbolic, d, wrt, nl)
     verify(Num(t), d, wrt, nl)
 end
 
 function verify(t, d, wrt, nl)
     try
-        iszero(t - (isempty(d) ? nl : sum(k*v for (k, v) in d) + nl))
+        isequal(unwrap_const(expand(unwrap(t - (isempty(d) ? nl : sum(k*v for (k, v) in d) + nl)))), 0)
     catch err
         println("""Error verifying semi-pf result for $t
                  wrt = $wrt
@@ -463,17 +467,33 @@ function trial()
         for deg=Any[1,2,3,4,Inf]
             if deg == 1
                 A, c = semilinear_form([t], wrt)
-                res = iszero(A*wrt + c - [t])
+                res = isequal(unwrap_const(expand(unwrap.(A*wrt + c - [t])[1])), 0)
                 if !res
                     println("Semi-linear form is wrong: [$t]  w.r.t   $wrt ")
-                    @show A c
+                    println("A = ")
+                    display(A)
+                    println()
+                    println("c =")
+                    display(c)
+                    println()
                 end
             elseif deg == 2
                 A,B,v2, c = semiquadratic_form([t], wrt)
-                res = iszero(A * wrt + B * v2 + c - [t])
+                res = isequal(unwrap_const(expand(unwrap.(A * wrt + B * v2 + c - [t])[1])), 0)
                 if !res
                     println("Semi-quadratic form is wrong: $t  w.r.t   $wrt")
-                    @show A B v2 c
+                    println("A = ")
+                    display(A)
+                    println()
+                    println("B = ")
+                    display(B)
+                    println()
+                    println("v2 = ")
+                    display(v2)
+                    println()
+                    println("c = ")
+                    display(c)
+                    println()
                 end
             else
                 if isfinite(deg)
@@ -519,15 +539,15 @@ end
     @variables t x(t)[1:3]
     expr = x[2] * 4 + 2x[1] + 2x[3] * x[1] + foo(x)
     mapping, resid = semipolynomial_form(expr, collect(x), 2)
-    @test mapping[x[2]] == 4
-    @test mapping[x[1]] == 2
-    @test mapping[x[3] * x[1]] == 2
+    @test unwrap_const(mapping[x[2]]) == 4
+    @test unwrap_const(mapping[x[1]]) == 2
+    @test unwrap_const(mapping[x[3] * x[1]]) == 2
     @test isequal(resid, foo(x))
 
     expr = x[2] * 4 + 2x[1] + 2x[3] * x[1] + foo([x[1]])
     mapping, resid = semipolynomial_form(expr, collect(x), 2)
-    @test mapping[x[2]] == 4
-    @test mapping[x[1]] == 2
-    @test mapping[x[3] * x[1]] == 2
+    @test unwrap_const(mapping[x[2]]) == 4
+    @test unwrap_const(mapping[x[1]]) == 2
+    @test unwrap_const(mapping[x[3] * x[1]]) == 2
     @test isequal(resid, foo([x[1]]))
 end
