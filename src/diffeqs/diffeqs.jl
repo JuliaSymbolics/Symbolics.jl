@@ -59,7 +59,7 @@ function is_linear_ode(expr, x, t)
     @assert n >= 1 "ODE must have at least one derivative"
     
     y_sub = Dict([[(Dt^i)(x) => ys[i+1] for i=0:n-1]; (Dt^n)(x) => variable(:𝒴)])
-    expr = substitute(expr, y_sub)
+    expr = substitute_in_deriv(expr, y_sub)
 
     # isolate (Dt^n)(x)
     f = symbolic_linear_solve(expr, variable(:𝒴), check=false)
@@ -291,7 +291,7 @@ function const_coeff_solve(eq::SymbolicLinearODE)
     @variables 𝓇
     p = characteristic_polynomial(eq, 𝓇)
     roots = symbolic_solve(p, 𝓇, dropmultiplicity = false)
-
+    roots = map(value, roots)
     # Handle complex + repeated roots
     solutions = exp.(roots * eq.t)
     for i in eachindex(solutions)[1:(end - 1)]
@@ -327,7 +327,7 @@ function integrating_factor_solve(eq::SymbolicLinearODE)
     else
         v = exp(sympy_integrate(p, eq.t))
     end
-    solution = (1 / v) * ((isequal(eq.q, 0) ? 0 : sympy_integrate(eq.q * v, eq.t)) + eq.C[1])
+    solution = (1 / v) * ((SymbolicUtils._iszero(eq.q) ? 0 : sympy_integrate(eq.q * v, eq.t)) + eq.C[1])
 
     if !isempty(Symbolics.get_variables(solution, variable(:Integral)))
         return nothing
@@ -415,12 +415,12 @@ function exp_trig_particular_solution(eq::SymbolicLinearODE)
     @variables 𝓈
     p = characteristic_polynomial(eq, 𝓈)
     Ds = Differential(𝓈)
-    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)), 0)
+    while SymbolicUtils._iszero(substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))
         k += 1
     end
 
     rrf = expand(simplify(a * exp((r + b * im) * eq.t) * eq.t^k /
-                           (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
+                           (substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
 
     return is_sin ? imag(rrf) : real(rrf)
 end
@@ -447,12 +447,12 @@ function resonant_response_formula(eq::SymbolicLinearODE)
     @variables 𝓈
     p = characteristic_polynomial(eq, 𝓈)
     Ds = Differential(𝓈)
-    while isequal(substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)), 0)
+    while SymbolicUtils._iszero(substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)))
         k += 1
     end
 
     return expand(simplify(a * exp(r * eq.t) * eq.t^k /
-                           (substitute(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)))))
+                           (substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r)))))
 end
 
 function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
@@ -466,7 +466,7 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
     degree = max(Symbolics.degree(eq.q, eq.t), Symbolics.degree.(eq.p, eq.t)...) # just a starting point
     a = Symbolics.variables(:𝒶, 1:degree+1)
     form = sum(a[n]*eq.t^(n-1) for n = 1:degree+1)
-    eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+    eq_subbed = substitute_in_deriv(get_expression(eq), Dict(eq.x => form))
     eq_subbed = eq_subbed.lhs - eq_subbed.rhs
     eq_subbed = expand_derivatives(eq_subbed)
     
@@ -476,8 +476,8 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
         coeff_solution = nothing
     end
     
-    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution) && isequal(expand(substitute(eq_subbed, coeff_solution[1])), 0)
-        return substitute(form, coeff_solution[1])
+    if degree > 0 && coeff_solution !== nothing && !isempty(coeff_solution) && SymbolicUtils._iszero(expand(substitute_in_deriv(eq_subbed, coeff_solution[1])))
+        return substitute_in_deriv(form, coeff_solution[1])
     end
 
     # exponential
@@ -487,13 +487,13 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
 
         r = coeff[2]
         form = a_form*exp(r*eq.t)
-        eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+        eq_subbed = substitute_in_deriv(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
         eq_subbed = simplify(expand((eq_subbed.lhs - eq_subbed.rhs) / exp(r*eq.t)))
         coeff_solution = solve_interms_ofvar(eq_subbed, eq.t)
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
-            return substitute(form, coeff_solution[1])
+            return substitute_in_deriv(form, coeff_solution[1])
         end
     end
 
@@ -505,9 +505,9 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
     if parsed !== nothing
         ω = parsed[1]
         form = 𝒶*cos(ω*eq.t) + 𝒷*sin(ω*eq.t)
-        eq_subbed = substitute(get_expression(eq), Dict(eq.x => form))
+        eq_subbed = substitute_in_deriv(get_expression(eq), Dict(eq.x => form))
         eq_subbed = expand_derivatives(eq_subbed)
-        eq_subbed = expand(substitute(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>𝒸𝓈, sin(ω*eq.t)=>𝓈𝓃)))
+        eq_subbed = expand(substitute_in_deriv(eq_subbed.lhs - eq_subbed.rhs, Dict(cos(ω*eq.t)=>𝒸𝓈, sin(ω*eq.t)=>𝓈𝓃)))
         cos_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, 𝒸𝓈)), terms(eq_subbed)))/𝒸𝓈)
         sin_eq = simplify(sum(filter(term -> !isempty(Symbolics.get_variables(term, 𝓈𝓃)), terms(eq_subbed)))/𝓈𝓃)
         if !isempty(Symbolics.get_variables(cos_eq, [eq.t,𝓈𝓃,𝒸𝓈])) || !isempty(Symbolics.get_variables(sin_eq, [eq.t,𝓈𝓃,𝒸𝓈]))
@@ -517,7 +517,7 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
         end
         
         if coeff_solution !== nothing && !isempty(coeff_solution)
-            return substitute(form, coeff_solution[1])
+            return substitute_in_deriv(form, coeff_solution[1])
         end
     end
 end
@@ -545,18 +545,18 @@ function solve_symbolic_IVP(ivp::IVP)
     for i in eachindex(ivp.initial_conditions)
         eq::Num = expand_derivatives((Dt(ivp.eq)^(i-1))(general_solution)) - ivp.initial_conditions[i]
 
-        eq = substitute(eq, Dict(ivp.eq.t => 0), fold=false)
+        eq = substitute_in_deriv(eq, Dict(ivp.eq.t => 0), fold=false)
         
         # make sure exp, sin, and cos don't evaluate to floats
-        exp0 = substitute(exp(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
-        sin0 = substitute(sin(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
-        cos0 = substitute(cos(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
+        exp0 = substitute_in_deriv(exp(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
+        sin0 = substitute_in_deriv(sin(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
+        cos0 = substitute_in_deriv(cos(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
 
-        eq = expand(simplify(substitute(eq, Dict(exp0 => 1, sin0 => 0, cos0 => 1), fold=false)))
+        eq = expand(simplify(substitute_in_deriv(eq, Dict(exp0 => 1, sin0 => 0, cos0 => 1), fold=false)))
         push!(eqs, eq)
     end
 
-    return expand(simplify(substitute(general_solution, symbolic_solve(eqs, ivp.eq.C)[1])))
+    return expand(simplify(substitute_in_deriv(general_solution, symbolic_solve(eqs, ivp.eq.C)[1])))
 end
 
 """
@@ -622,7 +622,7 @@ function solve_clairaut(expr, x, t)
     end
 
     C = Symbolics.variable(:C, 1) # constant of integration
-    f = substitute(f, Dict(Dt(x) => C))
+    f = substitute_in_deriv(f, Dict(Dt(x) => C))
     if !isempty(Symbolics.get_variables(f, [x]))
         return nothing
     end
@@ -650,7 +650,7 @@ function linearize_bernoulli(expr, x, t, v)
         if Symbolics.hasderiv(Symbolics.value(term))
             facs = _true_factors(term)
             leading_coeff = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
-            if !isequal(term//leading_coeff, Dt(x))
+            if !isequal(term/leading_coeff, Dt(x))
                 return nothing
             end
         elseif !isempty(Symbolics.get_variables(term, [x]))
@@ -670,7 +670,11 @@ function linearize_bernoulli(expr, x, t, v)
     end
     
     p //= leading_coeff
-    q //= leading_coeff
+    if q isa Union{Num, BasicSymbolic{VartypeT}}
+        q /= leading_coeff
+    else
+        q //= leading_coeff
+    end
     
     return SymbolicLinearODE(v, t, [p*(1-n)], q*(1-n)), n
 end
