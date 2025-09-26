@@ -39,7 +39,6 @@ import SymbolicUtils.Code: toexpr
 
 import ArrayInterface
 using RuntimeGeneratedFunctions
-using SciMLBase
 import MacroTools
 
 using SymbolicIndexingInterface
