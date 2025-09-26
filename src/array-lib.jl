@@ -2,19 +2,6 @@ import Base: getindex
 inner_unwrap(x) = x isa AbstractArray ? unwrap.(x) : x
 
 ##### getindex #####
-struct GetindexPosthookCtx end
-
-@wrapped function getindex_posthook(f, x::AbstractArray)
-    if hasmetadata(x, GetindexPosthookCtx)
-        g = getmetadata(x, GetindexPosthookCtx)
-        setmetadata(x,
-            GetindexPosthookCtx,
-            (res, args...) -> f(g(res, args...), args...))
-    else
-        setmetadata(x, GetindexPosthookCtx, f)
-    end
-end
-
 # Wrapped array should wrap the elements too
 function Base.getindex(x::Arr, idx...)
     wrap(unwrap(x)[idx...])
