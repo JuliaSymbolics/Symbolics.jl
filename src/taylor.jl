@@ -87,7 +87,15 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
     n! = factorial(n)
     c = (D^n)(f) # TODO: optimize the implementation for multiple n with a loop that avoids re-differentiating the same expressions
     c = expand_derivatives(c)
-    c = substitute(c, x => 0; kwargs...) / n!
+    c = value(substitute(c, x => 0; kwargs...))
+    if !(c isa BasicSymbolic{VartypeT}) && isinteger(c)
+        c = Integer(c)
+        c //= n!
+    elseif c isa Rational
+        c //= n!
+    else
+        c /= n!
+    end
     if rationalize && unwrap(c) isa Number
         # TODO: make rational coefficients "organically" and not using rationalize (see https://github.com/JuliaSymbolics/Symbolics.jl/issues/1299)
         c = unwrap(c)
