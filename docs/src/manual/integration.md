@@ -4,9 +4,6 @@ Symbolics.jl provides a the `Integral` operator for defining integrals. These ca
 various functionalities in order to represent integro-differential equations and as a representation
 for symbolic solving of integrals.
 
-!!! note
-    This area is currently under heavy development. More solvers will be available in the near future.
-
 ## Defining Symbolic Integrals
 
 Note that integration domains are defined using 
