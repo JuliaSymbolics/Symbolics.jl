@@ -83,15 +83,19 @@ import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
 
 include("num.jl")
+function (s::SymbolicUtils.Substituter)(x::Num)
+    Num(s(unwrap(x)))
+end
+
 
 include("rewrite-helpers.jl")
 include("complex.jl")
 
 """
-    substitute(expr, s; fold=true)
+    substitute(expr, s; fold=Val(true))
 
 Performs the substitution on `expr` according to rule(s) `s`.
-If `fold=false`, expressions which can be evaluated won't be evaluated.
+If `fold=Val(false)`, expressions which can be evaluated won't be evaluated.
 # Examples
 ```jldoctest
 julia> @variables t x y z(t)
@@ -104,7 +108,7 @@ julia> ex = x + y + sin(z)
 (x + y) + sin(z(t))
 julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
 (z(t) + y) + (z(t) ^ 2)
-julia> substitute(sqrt(2x), Dict([x => 1]); fold=false)
+julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(false))
 sqrt(2)
 ```
 """
@@ -202,9 +206,6 @@ for T in [Num, Complex{Num}]
         SymbolicUtils.simplify(n::$T; kw...) = wrap(SymbolicUtils.simplify(unwrap(n); kw...))
         SymbolicUtils.simplify_fractions(n::$T; kw...) = wrap(SymbolicUtils.simplify_fractions(unwrap(n); kw...))
         SymbolicUtils.expand(n::$T) = wrap(SymbolicUtils.expand(unwrap(n)))
-        substitute(expr::$T, s::Pair; kw...) = wrap(substituter(s)(unwrap(expr); kw...)) # backward compat
-        substitute(expr::$T, s::Vector; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
-        substitute(expr::$T, s::Dict; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
 
         SymbolicUtils.Code.toexpr(x::$T) = SymbolicUtils.Code.toexpr(unwrap(x))
 
@@ -215,10 +216,6 @@ for T in [Num, Complex{Num}]
         Broadcast.broadcastable(x::$T) = x
         SymbolicUtils.scalarize(x::$T) = scalarize(unwrap(x))
     end
-end
-
-for sType in [Pair, Vector, Dict]
-    @eval substitute(expr::Arr, s::$sType; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
 end
 
 # Symbolic solver

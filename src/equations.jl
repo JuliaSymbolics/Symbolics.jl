@@ -32,20 +32,9 @@ end
 
 SymbolicUtils.scalarize(eq::Equation, args...) = scalarize(eq.lhs, args...) .~ scalarize(eq.rhs, args...)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
-# ambiguity
-for T in [:Pair, :Any]
-    @eval function SymbolicUtils.substitute(x::Equation, rules::$T; kw...)
-        sub = substituter(rules)
-        sub(x.lhs; kw...) ~ sub(x.rhs; kw...)
-    end
-
-    @eval function SymbolicUtils.substitute(eqs::Array{Equation}, rules::$T; kw...)
-        sub = substituter(rules)
-        sub.(lhss(eqs); kw...) .~ sub.(rhss(eqs); kw...)
-    end
+function (s::SymbolicUtils.Substituter)(eq::Equation)
+    s(eq.lhs) ~ s(eq.rhs)
 end
-
-SymbolicUtils.substitute(nums::Array{Num}, rules; kw...) = substituter(rules).(nums; kw...)
 
 lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)

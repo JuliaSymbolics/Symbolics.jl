@@ -34,14 +34,14 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                 for j in eachindex(rhs)
                     if iscall(lhs_roots[i]) && operation(lhs_roots[i]) === RootsOf
                         _args = copy(parent(arguments(lhs_roots[i])))
-                        _args[1] = substitute(_args[1], Dict(new_var => rhs[j]), fold = false)
+                        _args[1] = substitute(_args[1], Dict(new_var => rhs[j]), fold = Val(false))
                         T = typeof(lhs_roots[i])
                         _op = operation(lhs_roots[i])
                         _meta = metadata(lhs_roots[i])
                         lhs_roots[i] = maketerm(T, _op, _args, _meta)
                         push!(roots, lhs_roots[i])
                     else
-                        push!(roots, substitute(lhs_roots[i], Dict(new_var=>rhs[j]), fold=false))
+                        push!(roots, substitute(lhs_roots[i], Dict(new_var=>rhs[j]), fold=Val(false)))
                     end
                 end
             end

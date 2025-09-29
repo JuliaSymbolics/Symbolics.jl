@@ -31,6 +31,10 @@ end
 SymbolicUtils.unwrap(x::Arr) = x.value
 SymbolicUtils.symtype(x::Arr) = symtype(unwrap(x))
 
+function (s::SymbolicUtils.Substituter)(x::Arr)
+    Arr(s(unwrap(x)))
+end
+
 maybewrap(T) = has_symwrapper(T) ? wrapper_type(T) : T
 # These methods allow @wrapped methods to be more specific and not overwrite
 # each other when defined both for matrix and vector

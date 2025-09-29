@@ -157,21 +157,6 @@ function Base.show(io::IO, z::Complex{<:Num})
     print(io, ")*im")
 end
 
-# TODO: move this to SymbolicUtils
-substitute(expr, s::Pair; kw...) = substituter([s[1] => s[2]])(expr; kw...)
-substitute(expr, s::Vector; kw...) = substituter(s)(expr; kw...)
-
-function subrules_to_dict(pairs)
-    if pairs isa Pair
-        pairs = (pairs,)
-    end
-    return Dict(k => value(v) for (k, v) in pairs)
-end
-function substituter(pairs)
-    dict = subrules_to_dict(pairs)
-    (expr; kw...) -> SymbolicUtils.substitute(value(expr), dict; kw...)
-end
-
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
 Base.nameof(n::Num) = nameof(value(n))
 
