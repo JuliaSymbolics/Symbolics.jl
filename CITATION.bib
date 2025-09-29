@@ -1,5 +1,19 @@
 ## Citation
 
+Hash Consing Optimization: SymbolicUtils.jl now uses hash consing to eliminate duplicate 
+symbolic expressions in memory and enable faster equality comparisons. This optimization 
+significantly improves performance for complex symbolic computations by reducing memory 
+overhead and computation time. Available in SymbolicUtils.jl starting from v3.28.0.
+@misc{zhu2025efficientsymboliccomputationhash,
+    title={Efficient Symbolic Computation via Hash Consing}, 
+    author={Bowen Zhu and Aayush Sabharwal and Songchen Tan and Yingbo Ma and Alan Edelman and Christopher Rackauckas},
+    year={2025},
+    eprint={2509.20534},
+    archivePrefix={arXiv},
+    primaryClass={cs.PL},
+    url={https://arxiv.org/abs/2509.20534}, 
+}
+
 If you use Symbolics.jl, please [cite this paper](https://arxiv.org/abs/2105.03949)
 
 @article{10.1145/3511528.3511535,
