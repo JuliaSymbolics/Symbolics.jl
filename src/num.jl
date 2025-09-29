@@ -34,8 +34,8 @@ Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value, args)...))
 
 SymbolicUtils.@number_methods(Num,
-    Num(f(value(a))),
-    Num(f(value(a), value(b))),
+    Num(f(unwrap(a))),
+    Num(f(unwrap(a), unwrap(b))),
     [conj, real, transpose])
 Base.conj(x::Num) = x
 Base.transpose(x::Num) = x
