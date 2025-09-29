@@ -1,7 +1,7 @@
 @symbolic_wrap struct Num <: Real
     val::BasicSymbolic{VartypeT}
 
-    function Num(ex)
+    function Num(ex::BasicSymbolic{VartypeT})
         # need `<: Number` instead of `<: Real` to allow the primitive `@number_methods`
         # methods below to infer. They could be made to infer `Union{Complex{Num}, Num}`
         # by manually checking the `symtype` of the result and branching instead of using
@@ -12,7 +12,7 @@
         @assert symtype(ex) <: Number
         return new(Const{VartypeT}(ex))
     end
-    function Num(ex::Complex)
+    function Num(ex::Number)
         return new(Const{VartypeT}(unwrap(ex)))
     end
 end
@@ -32,11 +32,39 @@ const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value, args)...))
+# Fixes an inference issue with https://github.com/JuliaApproximation/DomainSets.jl/blob/b68ee034ebcd2e3fc10dd334792cee17a8d5c633/src/domains/point.jl#L13
+# causing `Num(::Any)` to infer as `::Any`
+Num(x::DomainSets.Point{<:Number}) = Num(x.x)::Num
 
 SymbolicUtils.@number_methods(Num,
     Num(f(unwrap(a))),
     Num(f(unwrap(a), unwrap(b))),
-    [conj, real, transpose])
+    [conj, real, transpose, *, ^, //])
+
+function Base.:*(x1::Num, xs...)
+    Num(*(unwrap(x1), xs...))
+end
+
+function Base.:*(x1::Num, x2::Num, xs...)
+    Num(*(unwrap(x1), unwrap(x2), xs...))
+end
+
+function Base.:*(x1::Number, x2::Num, xs...)
+    Num(*(unwrap(x1), unwrap(x2), xs...))
+end
+
+function Base.:^(x1::Num, x2::Num)
+    Num(^(unwrap(x1), unwrap(x2)))
+end
+
+function Base.:^(x1::Union{Number, AbstractArray{<:Number}}, x2::Num)
+    Num(^(unwrap(x1), unwrap(x2)))
+end
+
+function Base.:^(x1::Num, x2::Union{Number, AbstractArray{<:Number}, BasicSymbolic{VartypeT}})
+    Num(^(unwrap(x1), unwrap(x2)))
+end
+
 Base.conj(x::Num) = x
 Base.transpose(x::Num) = x
 
@@ -169,8 +197,8 @@ function Base.show(io::IO, n::Num)
     show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
 end
 
-Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
-Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
+Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: Number} = Num
+Base.promote_rule(::Type{BigFloat}, ::Type{Num}) = Num
 <ₑ(s::Num, x) = value(s) <ₑ value(x)
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
@@ -289,23 +317,15 @@ Base.to_index(x::Num) = Base.to_index(value(x))
 
 Base.hash(x::Num, h::UInt) = hash(unwrap(x), h)::UInt
 
-function Base.convert(::Type{Num}, x::BasicSymbolic)
+function Base.convert(::Type{Num}, x::BasicSymbolic{VartypeT})
     symtype(x) <: Real || error("`symtype` must be `<:Real`")
     Num(x)
 end
-# TODO: `Const{T}` instead of `Const{SymReal}`
-Base.convert(::Type{Num}, x::Number) = Num(Const{SymReal}(x))
-Base.convert(::Type{Num}, x::Num) = x
-
-Base.convert(::Type{T}, x::AbstractArray{Num}) where {T <: Array{Num}} = T(map(Num, x))
 
 function LinearAlgebra.lu(
         x::Union{Adjoint{<:RCNum}, Transpose{<:RCNum}, Array{<:RCNum}}; check = true, kw...)
     sym_lu(x; check = check)
 end
-
-SymbolicUtils._iszero(x::Num) = SymbolicUtils._iszero(value(x))
-SymbolicUtils._isone(x::Num) = SymbolicUtils._isone(value(x))
 
 Code.cse(x::Num) = Code.cse(unwrap(x))
 

@@ -33,11 +33,7 @@ import Base: +, -, *
 # On wrapper:
 struct SymWrapBroadcast <: Broadcast.BroadcastStyle end
 
-Broadcast.broadcastable(s::Arr) = s
-
 Broadcast.BroadcastStyle(::Type{<:Arr}) = SymWrapBroadcast()
-
-Broadcast.result_style(::SymWrapBroadcast) = SymWrapBroadcast()
 
 Broadcast.BroadcastStyle(::SymWrapBroadcast,
     ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
