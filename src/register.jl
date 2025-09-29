@@ -39,7 +39,8 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
     end $wrap_arrays)
 
     if define_promotion
-        fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
+        type_args = [:($name::$Type) for name in argnames]
+        fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, $(type_args...)) = $ret_type)
         promote_expr = quote
             function (::$(typeof(SymbolicUtils.promote_shape)))(::$ftype, args::$(SymbolicUtils.ShapeT)...)
                 @nospecialize args
@@ -155,8 +156,9 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         end
 
         shape_args = [:($name::$(SymbolicUtils.ShapeT)) for name in argnames]
+        type_args = [:($name::$Type) for name in argnames]
         promote_expr = quote
-            function (::$typeof($promote_symtype))($fn_arg, $(argnames...))
+            function (::$typeof($promote_symtype))($fn_arg, $(type_args...))
                 f = $fn_arg_name
                 container_type = $container_type
                 nd = $(get(defs, :ndims, -1))
