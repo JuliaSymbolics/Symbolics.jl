@@ -21,7 +21,9 @@ using Reexport
 
 using Setfield
 
-import DomainSets: Domain, DomainSets
+@recompile_invalidations begin
+    import DomainSets: Domain, DomainSets
+end
 
 using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
@@ -80,7 +82,9 @@ export Num
 import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
 
-include("num.jl")
+@recompile_invalidations begin
+    include("num.jl")
+end
 function (s::SymbolicUtils.Substituter)(x::Num)
     Num(s(unwrap(x)))
 end
@@ -559,5 +563,66 @@ include("discontinuities.jl")
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, getparent, option_to_metadata_type, scalarize, shape
 @public unwrap, variable, wrap
+
+@setup_workload begin
+    fold1 = Val{false}()
+    @compile_workload begin
+        @syms x y f(t) q[1:5]
+        SymbolicUtils.Sym{SymReal}(:a; type = Real, shape = SymbolicUtils.ShapeVecT())
+        x + y
+        x * y
+        x / y
+        x ^ y
+        x ^ 5
+        6 ^ x
+        x - y
+        -y
+        2y
+        SymbolicUtils.symtype(y)
+        f(x)
+        (5x / 5)
+        expand((x + y) ^ 2)
+        simplify(x ^ (1//2) + (sin(x) ^ 2 + cos(x) ^ 2) + 2(x + y) - x - y)
+        ex = x + 2y + sin(x)
+        rules1 = Dict(x => y)
+        rules2 = Dict(x => 1)
+        # Running `fold = Val(true)` invalidates the precompiled statements
+        # for `fold = Val(false)` and itself doesn't precompile anyway.
+        # substitute(ex, rules1)
+        substitute(ex, rules1; fold = fold1)
+        substitute(ex, rules2; fold = fold1)
+        @variables x y f(::Real) q[1:5]
+        x + y
+        x * y
+        x / y
+        x ^ y
+        x ^ 5
+        # 6 ^ x
+        x - y
+        -y
+        2y
+        symtype(y)
+        f(x)
+        (5x / 5)
+        # expand((x + y) ^ 2)
+        # simplify(x ^ (1//2) + (sin(x) ^ 2 + cos(x) ^ 2) + 2(x + y) - x - y)
+        ex = x + 2y + sin(x)
+        rules1 = Dict(x => y)
+        # rules2 = Dict(x => 1)
+        # Running `fold = Val(true)` invalidates the precompiled statements
+        # for `fold = Val(false)` and itself doesn't precompile anyway.
+        # substitute(ex, rules1)
+        substitute(ex, rules1; fold = fold1)
+        # substitute(ex, rules2; fold = fold1)
+        # substitute(ex, rules2)
+        # substitute(ex, rules1; fold = fold2)
+        # substitute(ex, rules2; fold = fold2)
+        q[1]
+        q'q
+        
+    end
+end
+
+precompile(Tuple{typeof(Base.:(^)), SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymbolicUtils.SymReal}, Int64})
 
 end # module

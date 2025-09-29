@@ -20,10 +20,12 @@ I = Integral(x in ClosedInterval(a, b))
 @test isequal(I(2), 2*(b -a))
 ```
 """
-struct Integral{T <: Symbolics.VarDomainPairing} <: Function
+struct Integral{T <: Symbolics.VarDomainPairing}
     domain::T
     Integral(domain) = new{typeof(domain)}(domain)
 end
+
+Base.nameof(::Integral) = :Integral
 
 function (I::Integral)(x::Union{Rational, AbstractIrrational, AbstractFloat, Integer})
     domain = I.domain.domain
