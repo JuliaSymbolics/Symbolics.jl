@@ -85,12 +85,14 @@ function _parse_trig(expr, t)
     parse_sin = Symbolics.Chain([(@rule sin(t) => 1), (@rule sin(~x * t) => ~x)])
     parse_cos = Symbolics.Chain([(@rule cos(t) => 1), (@rule cos(~x * t) => ~x)])
 
+    # `unwrap_const` is required here because `Num` can wrap `Complex`, which leads
+    # to incorrect arithmetic at call sites of this functions.
     if !isequal(parse_sin(expr), expr)
-        return parse_sin(expr), true
+        return unwrap_const(parse_sin(expr)), true
     end
 
     if !isequal(parse_cos(expr), expr)
-        return parse_cos(expr), false
+        return unwrap_const(parse_cos(expr)), false
     end
 
     return nothing
