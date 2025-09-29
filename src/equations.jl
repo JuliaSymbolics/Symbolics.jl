@@ -12,14 +12,14 @@ $(FIELDS)
 """
 struct Equation
     """The expression on the left-hand side of the equation."""
-    lhs
+    lhs::BasicSymbolic{VartypeT}
     """The expression on the right-hand side of the equation."""
-    rhs
+    rhs::BasicSymbolic{VartypeT}
     function Equation(lhs, rhs)
-        new(value(lhs), value(rhs))
+        new(unwrap(lhs), unwrap(rhs))
     end
 end
-Base.:(==)(a::Equation, b::Equation) = all(isequal.((a.lhs, a.rhs), (b.lhs, b.rhs)))
+Base.:(==)(a::Equation, b::Equation) = isequal(a.lhs, b.lhs) && isequal(a.rhs, b.rhs)
 Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 
 function Base.show(io::IO, eq::Equation)
@@ -30,7 +30,7 @@ function Base.show(io::IO, eq::Equation)
     end
 end
 
-SymbolicUtils.scalarize(eq::Equation) = scalarize(eq.lhs) .~ scalarize(eq.rhs)
+SymbolicUtils.scalarize(eq::Equation, args...) = scalarize(eq.lhs, args...) .~ scalarize(eq.rhs, args...)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
 # ambiguity
 for T in [:Pair, :Any]

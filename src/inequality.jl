@@ -8,17 +8,17 @@ $(FIELDS)
 """
 struct Inequality
     """The expression on the left-hand side of the inequality."""
-    lhs
+    lhs::BasicSymbolic{VartypeT}
     """The expression on the right-hand side of the inequality."""
-    rhs
+    rhs::BasicSymbolic{VartypeT}
     """The relational operator of the inequality."""
     relational_op
     function Inequality(lhs, rhs, relational_op)
-        new(Symbolics.value(lhs), Symbolics.value(rhs), relational_op)
+        new(unwrap(lhs), unwrap(rhs), relational_op)
     end
 end
 
-Base.:(==)(a::Inequality, b::Inequality) = all([isequal(a.lhs, b.lhs), isequal(a.rhs, b.rhs), isequal(a.relational_op, b.relational_op)])
+Base.:(==)(a::Inequality, b::Inequality) = isequal(a.lhs, b.lhs) && isequal(a.rhs, b.rhs) && isequal(a.relational_op, b.relational_op)::Bool
 Base.hash(a::Inequality, salt::UInt) = hash(a.lhs, hash(a.rhs, hash(a.relational_op, salt)))
 
 @enum RelationalOperator leq geq # strict less than or strict greater than are not supported by any solver
