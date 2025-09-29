@@ -44,6 +44,11 @@ Base.eps(::Type{Num}) = Num(0)
 Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
+function Base.isapprox(a::Num, b::Num; kw...)
+    err = value(a - b)
+    err isa BasicSymbolic{VartypeT} && return false
+    isapprox(err, 0.0; kw...)
+end
 
 function SymbolicUtils.search_variables!(buffer, expr::Num; kw...)
     SymbolicUtils.search_variables!(buffer, unwrap(expr); kw...)
