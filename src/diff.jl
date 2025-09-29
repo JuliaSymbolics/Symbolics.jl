@@ -979,8 +979,8 @@ basic_mkterm(t, g, args, m) = metadata(Term{VartypeT}(g, args; type = Any), m)
 const _scalar = one(TermCombination)
 
 const linearity_rules = (
-      (@rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)),
-      (@rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)),
+      (@rule +(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
+      (@rule *(~~xs) => reduce(*, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
 
       (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
       (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)),
@@ -994,25 +994,25 @@ const linearity_rules = (
 
       # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
       # Functions with 1 and 2 arguments are already handled above
-      (@rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2),
+      (@rule (~f)(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)); init=_scalar)^2),
 )
 const linearity_rules_affine = (
-      (@rule +(~~xs) => reduce(+, filter(isidx, ~~xs), init=_scalar)),
-      (@rule *(~~xs) => reduce(*, filter(isidx, ~~xs), init=_scalar)),
+      (@rule +(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
+      (@rule *(~~xs) => reduce(*, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
 
       (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
-      (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)),
-      (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)),
+      (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? unwrap_const(~x) : unwrap_const(~x) * unwrap_const(~x)),
+      (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? unwrap_const(~x) : _scalar, isidx(~y) ? unwrap_const(~y) : _scalar)),
 
       (@rule ~x::issym => 0),
       # if the condition is dependent on the variable, do not consider this as affine
       (@rule ifelse(~cond::isidx, ~x, ~y) => (~cond)^2),
       # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
       # where condition `cond` is considered constant in differentiation
-      (@rule ifelse(~cond::(!isidx), ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)),
+      (@rule ifelse(~cond::(!isidx), ~x, ~y) => (isidx(~x) ? unwrap_const(~x) : _scalar) + (isidx(~y) ? unwrap_const(~y) : _scalar)),
       # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
       # Functions with 1 and 2 arguments are already handled above
-      (@rule (~f)(~~xs) => reduce(+, filter(isidx, ~~xs); init=_scalar)^2),
+      (@rule (~f)(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)); init=_scalar)^2),
 )
 const linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 const affine_linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules_affine); maketerm=basic_mkterm))
