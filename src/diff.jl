@@ -52,7 +52,7 @@ end
 
 is_derivative(x) = iscall(x) ? operation(x) isa Differential : false
 
-Base.:*(D1, D2::Differential) = D1 ∘ D2
+Base.:*(D1::ComposedFunction, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
 Base.:*(D1::Differential, D2::Differential) = D1 ∘ D2
 Base.:^(D::Differential, n::Integer) = iszero(n) ? identity : _repeat_apply(D, n)
