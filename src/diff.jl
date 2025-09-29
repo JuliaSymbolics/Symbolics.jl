@@ -739,7 +739,7 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function gradient(O, vars::AbstractVector; simplify=false, kwargs...)
-    Num[Num(expand_derivatives(Differential(v)(value(O)),simplify; kwargs...)) for v in vars]
+    Num[Num(expand_derivatives(Differential(vars[vi])(value(O)),simplify; kwargs...)) for vi in eachindex(vars)]
 end
 
 """
