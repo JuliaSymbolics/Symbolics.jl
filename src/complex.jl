@@ -40,3 +40,7 @@ function Base.show(io::IO, a::Complex{Num})
 
     show(io, real(a) + IM * imag(a))
 end
+
+function (s::SymbolicUtils.Substituter)(x::Complex{Num})
+    Complex{Num}(s(real(x)), s(imag(x)))
+end

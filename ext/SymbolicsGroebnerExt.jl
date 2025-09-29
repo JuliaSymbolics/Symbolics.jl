@@ -158,7 +158,7 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
     
     rng = Groebner.Random.Xoshiro(42)
     all_indeterminates = collect(reduce(union!, map(Symbolics.get_variables, eqs)))
-    params = map(Symbolics.Num ∘ Symbolics.wrap, setdiff(all_indeterminates, vars))
+    params = map(Symbolics.Num, setdiff(all_indeterminates, vars))
 
     # Use a new variable to separate the input polynomials (Reference above)
     new_var = gen_separating_var(vars)
@@ -261,8 +261,8 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
         @assert Symbolics.degree(eq, var_tosolve) == 1
         @assert !isempty(solutions)
         for roots in solutions
-            subbded_eq = Symbolics.substitute(eq, Dict([new_var => roots[new_var]]); fold=false)
-            subbded_eq = Symbolics.substitute(subbded_eq, Dict([var_tosolve => 0]); fold=false)
+            subbded_eq = Symbolics.substitute(eq, Dict([new_var => roots[new_var]]); fold=Val(false))
+            subbded_eq = Symbolics.substitute(subbded_eq, Dict([var_tosolve => 0]); fold=Val(false))
             new_var_sols = [-subbded_eq]
             @assert length(new_var_sols) == 1
             root = new_var_sols[1]
