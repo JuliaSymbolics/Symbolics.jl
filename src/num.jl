@@ -12,6 +12,9 @@
         @assert symtype(ex) <: Number
         return new(Const{VartypeT}(ex))
     end
+    function Num(ex::Complex)
+        return new(Const{VartypeT}(unwrap(ex)))
+    end
 end
 
 const RCNum = Union{Num, Complex{Num}}
@@ -63,17 +66,66 @@ Base.ifelse(x::Num, y, z) = Num(ifelse(value(x), value(y), value(z)))
 Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
 for C in [Complex, Complex{Bool}]
     @eval begin
-        Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
-        Base.:*(z::$C, x::Num) = Complex(real(z) * x, imag(z) * x)
-        Base.:/(x::Num, z::$C) =
-            let (a, b) = reim(z), den = a^2 + b^2
-                Complex(x * a / den, -x * b / den)
-            end
-        Base.:/(z::$C, x::Num) = Complex(real(z) / x, imag(z) / x)
-        Base.:+(x::Num, z::$C) = Complex(x + real(z), imag(z))
-        Base.:+(z::$C, x::Num) = Complex(real(z) + x, imag(z))
-        Base.:-(x::Num, z::$C) = Complex(x - real(z), -imag(z))
-        Base.:-(z::$C, x::Num) = Complex(real(z) - x, imag(z))
+        function Base.:*(x::Num, z::$C)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz = real(z)
+            iz = imag(z)
+            Complex(Num(rx * rz - ix * iz), Num(rx * iz + ix * rz))
+        end
+        function Base.:*(z::$C, x::Num)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz = real(z)
+            iz = imag(z)
+            Complex(Num(rx * rz - ix * iz), Num(rx * iz + ix * rz))
+        end
+        function Base.:/(x::Num, z::$C)
+            x = unwrap(x)
+            rz, iz = reim(z)
+            den = rz^2 + iz^2
+            rx = real(x)
+            ix = imag(x)
+            return Complex(Num((rx * rz + ix * iz) / den), Num((ix * rz - rx * iz) / den))
+        end
+        function Base.:/(z::$C, x::Num)
+            x = unwrap(x)
+            rz, iz = reim(z)
+            rx = real(x)
+            ix = imag(x)
+            den = rx^2 + ix^2
+            return Complex(Num((rx * rz + ix * iz) / den), Num((rx * iz - ix * rz) / den))
+        end
+        function Base.:+(x::Num, z::$C)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz, iz = reim(z)
+            return Complex(Num(rx + rz), Num(ix + iz))
+        end
+        function Base.:+(z::$C, x::Num)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz, iz = reim(z)
+            return Complex(Num(rx + rz), Num(ix + iz))
+        end
+        function Base.:-(x::Num, z::$C)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz, iz = reim(z)
+            return Complex(Num(rx - rz), Num(ix - iz))
+        end
+        function Base.:-(z::$C, x::Num)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz, iz = reim(z)
+            return Complex(Num(rz - rx), Num(iz - ix))
+        end
     end
 end
 
