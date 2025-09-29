@@ -381,7 +381,6 @@ infinite loops in cases where the substitutions in `dict` are circular
 (e.g. `[x => y, y => x]`).
 """
 function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000)
-    dict = subrules_to_dict(dict)
     y = substitute(x, dict; filterer=FPSubFilterer{operator}())
     iters = maxiters
     while !isequal(x, y) && iters > 0

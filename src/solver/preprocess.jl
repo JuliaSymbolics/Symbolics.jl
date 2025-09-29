@@ -45,7 +45,7 @@ function clean_f(filtered_expr, var, subs)
     if oper === (/)
         if !all(isequal(var, x) for x in get_variables(denominator(unwrapped_f)))
             filtered_expr = numerator(unwrapped_f)
-            push!(assumptions, substitute(denominator(unwrapped_f), subs, fold=false))
+            push!(assumptions, substitute(denominator(unwrapped_f), subs, fold=Val(false)))
         end
     end
     return filtered_expr, assumptions

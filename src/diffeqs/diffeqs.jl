@@ -545,14 +545,14 @@ function solve_symbolic_IVP(ivp::IVP)
     for i in eachindex(ivp.initial_conditions)
         eq::Num = expand_derivatives((Dt(ivp.eq)^(i-1))(general_solution)) - ivp.initial_conditions[i]
 
-        eq = substitute_in_deriv(eq, Dict(ivp.eq.t => 0), fold=false)
+        eq = substitute_in_deriv(eq, Dict(ivp.eq.t => 0), fold=Val(false))
         
         # make sure exp, sin, and cos don't evaluate to floats
-        exp0 = substitute_in_deriv(exp(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
-        sin0 = substitute_in_deriv(sin(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
-        cos0 = substitute_in_deriv(cos(ivp.eq.t), Dict(ivp.eq.t => 0), fold=false)
+        exp0 = substitute_in_deriv(exp(ivp.eq.t), Dict(ivp.eq.t => 0), fold=Val(false))
+        sin0 = substitute_in_deriv(sin(ivp.eq.t), Dict(ivp.eq.t => 0), fold=Val(false))
+        cos0 = substitute_in_deriv(cos(ivp.eq.t), Dict(ivp.eq.t => 0), fold=Val(false))
 
-        eq = expand(simplify(substitute_in_deriv(eq, Dict(exp0 => 1, sin0 => 0, cos0 => 1), fold=false)))
+        eq = expand(simplify(substitute_in_deriv(eq, Dict(exp0 => 1, sin0 => 0, cos0 => 1), fold=Val(false))))
         push!(eqs, eq)
     end
 
