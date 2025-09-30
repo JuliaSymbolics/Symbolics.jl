@@ -39,30 +39,40 @@ Num(x::DomainSets.Point{<:Number}) = Num(x.x)::Num
 SymbolicUtils.@number_methods(Num,
     Num(f(unwrap(a))),
     Num(f(unwrap(a), unwrap(b))),
-    [conj, real, transpose, *, ^, //])
+    [conj, real, transpose, +, -, *, ^, //, /, \])
 
-function Base.:*(x1::Num, xs...)
+Base.:+(x::Num) = x
+function Base.:+(x1::Num, xs::Real...)
+    Num(+(unwrap(x1), xs...))
+end
+function Base.:*(x1::Num, xs::Real...)
     Num(*(unwrap(x1), xs...))
 end
 
-function Base.:*(x1::Num, x2::Num, xs...)
-    Num(*(unwrap(x1), unwrap(x2), xs...))
+Base.:-(x::Num) = Num(-(unwrap(x)))
+for f in [-, ^, /, \]
+    for (T1, T2) in Iterators.product([Num, Real], [Num, Real])
+        T1 === Num || T2 === Num || continue
+        @eval function (::$(typeof(f)))(x1::$T1, x2::$T2)
+            Num($f(unwrap(x1), unwrap(x2)))
+        end
+    end
+end
+for (T1, T2) in Iterators.product([Num, Integer], [Num, Integer])
+    T1 === Num || T2 === Num || continue
+    @eval function Base.://(x1::$T1, x2::$T2)
+        Num(//(unwrap(x1), unwrap(x2)))
+    end
 end
 
-function Base.:*(x1::Number, x2::Num, xs...)
-    Num(*(unwrap(x1), unwrap(x2), xs...))
-end
+for f in [/, \, ^]
+    @eval function (::$(typeof(f)))(x1::AbstractArray{<:Real}, x2::Num)
+        $f(x1, unwrap(x2))
+    end
 
-function Base.:^(x1::Num, x2::Num)
-    Num(^(unwrap(x1), unwrap(x2)))
-end
-
-function Base.:^(x1::Union{Number, AbstractArray{<:Number}}, x2::Num)
-    Num(^(unwrap(x1), unwrap(x2)))
-end
-
-function Base.:^(x1::Num, x2::Union{Number, AbstractArray{<:Number}, BasicSymbolic{VartypeT}})
-    Num(^(unwrap(x1), unwrap(x2)))
+    @eval function (::$(typeof(f)))(x1::Num, x2::AbstractArray{<:Real})
+        $f(unwrap(x1), x2)
+    end
 end
 
 Base.conj(x::Num) = x
@@ -96,7 +106,9 @@ ifelse(a > b, c, 0)  # Returns c if a > b, otherwise 0
 """
 Base.ifelse(x::Num, y, z) = Num(ifelse(value(x), value(y), value(z)))
 
-Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
+Base.promote_rule(::Type{Bool}, ::Type{Num}) = Num
+Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: AbstractIrrational} = Num
+Base.promote_rule(::Type{Complex{Num}}, ::Type{Num}) = Complex{Num}
 for C in [Complex, Complex{Bool}]
     @eval begin
         function Base.:*(x::Num, z::$C)
