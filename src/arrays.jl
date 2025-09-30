@@ -4,18 +4,27 @@ import Base: eltype, length, ndims, size, axes, eachindex
 
 ### Wrapper type for dispatch
 
-@symbolic_wrap struct Arr{T,N} <: AbstractArray{T, N}
+struct Arr{T,N} <: AbstractArray{T, N}
     value::BasicSymbolic{VartypeT}
 
     function Arr{T, N}(ex) where {T, N}
         if is_wrapper_type(T)
             @assert symtype(ex) <: AbstractArray{<:wraps_type(T), N}
         else
+            @assert !(T <: BasicSymbolic)
             @assert symtype(ex) <: AbstractArray{T, N}
         end
         new{T, N}(Const{VartypeT}(ex))
     end
 end
+
+has_symwrapper(::Type{T}) where {T <: AbstractArray} = true
+has_symwrapper(::Type{T}) where {S <: BasicSymbolic, T <: AbstractArray{S}} = false
+wrapper_type(::Type{T}) where {S, N, T <: AbstractArray{S, N}} = Arr{maybewrap(S), N}
+wrapper_type(::Type{T}) where {T <: AbstractArray} = Arr
+is_wrapper_type(::Type{T}) where {T <: Arr} = true # used in `@register`
+wraps_type(::Type{T}) where {S, N, T <: Arr{S, N}} = Array{is_wrapper_type(S) ? wraps_type(S) : S, N}
+iswrapped(::Arr) = true
 
 Base.hash(x::Arr, u::UInt) = hash(unwrap(x), u)
 Base.isequal(a::Arr, b::Arr) = isequal(unwrap(a), unwrap(b))
@@ -38,11 +47,10 @@ end
 maybewrap(T) = has_symwrapper(T) ? wrapper_type(T) : T
 # These methods allow @wrapped methods to be more specific and not overwrite
 # each other when defined both for matrix and vector
-wrapper_type(::Type{<:AbstractMatrix}) = Arr{<:Any, 2}
-wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{maybewrap(T), 2}
+# wrapper_type(::Type{<:AbstractMatrix{T}}) where {T} = Arr{maybewrap(T), 2}
 
-wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
-wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
+# wrapper_type(::Type{<:AbstractVector}) = Arr{<:Any, 1}
+# wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
 
 function Base.show(io::IO, arr::Arr)
     x = unwrap(arr)
@@ -94,10 +102,10 @@ for (T1, T2) in [
     end
 end
 
-Base.inv(A::Arr{<:Any, 2}) = wrap(inv(unwrap(A)))
-LinearAlgebra.det(A::Arr{<:Any, 2}) = wrap(det(unwrap(A)))
-LinearAlgebra.adjoint(A::Arr{<:Any, 2}) = wrap(adjoint(unwrap(A)))
-LinearAlgebra.adjoint(A::Arr{<:Any, 1}) = wrap(adjoint(unwrap(A)))
+Base.inv(A::Arr{T, 2}) where {T} = Arr{T, 2}(inv(unwrap(A)))
+LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
+LinearAlgebra.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
+LinearAlgebra.adjoint(A::Arr{T, 1}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
 
 SymbolicUtils.scalarize(x::Arr) = SymbolicUtils.scalarize(unwrap(x))
 
