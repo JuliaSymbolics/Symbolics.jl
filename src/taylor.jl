@@ -87,7 +87,7 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
     n! = factorial(n)
     c = (D^n)(f) # TODO: optimize the implementation for multiple n with a loop that avoids re-differentiating the same expressions
     c = expand_derivatives(c)
-    c = value(substitute(c, x => 0; kwargs...))
+    c = value(substitute(c, x => 0; fold = Val(true), kwargs...))
     if !(c isa BasicSymbolic{VartypeT}) && isinteger(c)
         c = Integer(c)
         c //= n!
