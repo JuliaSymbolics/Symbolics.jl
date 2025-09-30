@@ -73,6 +73,7 @@ else
 end
 const COMMON_ONE = SymbolicUtils.one_of_vartype(VartypeT)
 const COMMON_ZERO = SymbolicUtils.zero_of_vartype(VartypeT)
+const SymbolicT = BasicSymbolic{VartypeT}
 
 # re-export
 
