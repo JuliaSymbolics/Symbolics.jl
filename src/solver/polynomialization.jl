@@ -359,7 +359,7 @@ function attract_and_solve_sqrtpoly(lhs, var)
 
     for root in roots
         if isapprox(
-            value(substitute(lhs, Dict(var => eval(Symbolics.toexpr(root))))), 0, atol = 1e-4)
+            value(substitute(lhs, Dict(var => eval(Symbolics.toexpr(root))); fold = Val(true))), 0, atol = 1e-4)
             push!(answers, root)
         end
     end

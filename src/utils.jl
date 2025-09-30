@@ -482,7 +482,7 @@ function symbolic_to_float end
 symbolic_to_float(x::Num) = symbolic_to_float(unwrap(x))
 symbolic_to_float(x::Number) = x
 function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
-    unwrap_const(substitute(x,Dict()))
+    unwrap_const(SymbolicUtils.evaluate(x))
 end
 
 """

@@ -306,7 +306,7 @@ function ia_solve(lhs, var; warns = true, complex_roots = true, periodic_roots =
         domain_error = false
         for j in eachindex(conditions)
             condition, t = conditions[j]
-            cond_val = unwrap_const(substitute(condition, Dict(var=>eval(toexpr(sols[i])))))
+            cond_val = unwrap_const(substitute(condition, Dict(var=>eval(toexpr(sols[i]))); fold = Val(true)))
             cond_val isa Complex && continue
             domain_error |= !t(cond_val, 0)
         end

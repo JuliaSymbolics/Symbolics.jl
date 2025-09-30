@@ -326,7 +326,7 @@ function SymbolicIndexingInterface.getname(x::Union{Num, Arr, Complex{Num}})
 end
 
 function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, BasicSymbolic, Equation, Inequality}, d::Dict; kwargs...)
-    val = fixpoint_sub(ex, d; kwargs...)
+    val = fixpoint_sub(ex, d; fold = Val(true), kwargs...)
     return _recursive_unwrap(val)
 end
 
@@ -380,12 +380,12 @@ specified to prevent substitution of expressions inside operators of the given t
 infinite loops in cases where the substitutions in `dict` are circular
 (e.g. `[x => y, y => x]`).
 """
-function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000)
-    y = substitute(x, dict; filterer=FPSubFilterer{operator}())
+function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000, kw...)
+    y = substitute(x, dict; filterer=FPSubFilterer{operator}(), kw...)
     iters = maxiters
     while !isequal(x, y) && iters > 0
         y = x
-        x = substitute(y, dict; filterer=FPSubFilterer{operator}())
+        x = substitute(y, dict; filterer=FPSubFilterer{operator}(), kw...)
         iters -= 1
     end
 
@@ -395,9 +395,9 @@ function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000)
 
     return x
 end
-function fixpoint_sub(x::SparseMatrixCSC, dict; operator = Nothing, maxiters = 1000)
+function fixpoint_sub(x::SparseMatrixCSC, dict; operator = Nothing, maxiters = 1000, kw...)
     I, J, V = findnz(x)
-    V = fixpoint_sub(V, dict; operator, maxiters)
+    V = fixpoint_sub(V, dict; operator, maxiters, kw...)
     m, n = size(x)
     return sparse(I, J, V, m, n)
 end
