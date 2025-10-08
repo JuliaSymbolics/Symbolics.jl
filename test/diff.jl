@@ -1,6 +1,8 @@
 using Symbolics
+using SymbolicUtils
 using Test
-using Symbolics: value
+using LinearAlgebra, SparseArrays
+using Symbolics: value, unwrap
 
 # Derivatives
 @variables t σ ρ β
@@ -12,9 +14,9 @@ Dx = Differential(x)
 
 @test Symbol(D(D(uu))) === Symbol("uuˍtt(t)")
 @test Symbol(D(uuˍt)) === Symbol(D(D(uu)))
-@test Symbol(D(v[2])) === Symbol("getindex(vˍt(t), 2)")
+@test Symbol(D(v[2])) === Symbol("(vˍt(t))[2]")
 
-test_equal(a, b) = @test isequal(simplify(a), simplify(b))
+test_equal(a, b) = @test isequal(unwrap_const(simplify(unwrap(a))), unwrap_const(simplify(unwrap(b))))
 
 @testset "ZeroOperator handling" begin
     @test_throws ErrorException Differential(0.1)(x)
@@ -24,8 +26,8 @@ end
 
 #@test @macroexpand(@derivatives D'~t D2''~t) == @macroexpand(@derivatives (D'~t), (D2''~t))
 
-@test isequal(expand_derivatives(D(t)), 1)
-@test isequal(expand_derivatives(D(D(t))), 0)
+@test isequal(unwrap_const(expand_derivatives(D(t))), 1)
+@test isequal(unwrap_const(expand_derivatives(D(D(t)))), 0)
 
 dsin = D(sin(t))
 @test isequal(expand_derivatives(dsin), cos(t))
@@ -33,12 +35,12 @@ dsin = D(sin(t))
 dcsch = D(csch(t))
 @test isequal(expand_derivatives(dcsch), simplify(-coth(t) * csch(t)))
 
-@test isequal(expand_derivatives(D(-7)), 0)
+@test isequal(unwrap_const(unwrap(expand_derivatives(D(-7)))), 0)
 @test isequal(expand_derivatives(D(sin(2t))), simplify(cos(2t) * 2))
 @test isequal(expand_derivatives(D2(sin(t))), simplify(-sin(t)))
 @test isequal(expand_derivatives(D2(sin(2t))), simplify(-sin(2t) * 4))
-@test isequal(expand_derivatives(D2(t)), 0)
-@test isequal(expand_derivatives(D2(5)), 0)
+@test isequal(unwrap_const(unwrap(expand_derivatives(D2(t)))), 0)
+@test isequal(unwrap_const(unwrap(expand_derivatives(D2(5)))), 0)
 
 # Chain rule
 dsinsin = D(sin(sin(t)))
@@ -65,23 +67,23 @@ test_equal(jac[3,3], -1β)
 
 # issue #545
 z = t + t^2
-#test_equal(expand_derivatives(D(z)), 1 + t * 2)
+test_equal(expand_derivatives(D(z)), 1 + t * 2)
 
 z = t-2t
-#test_equal(expand_derivatives(D(z)), -1)
+test_equal(expand_derivatives(D(z)), -1)
 
 # Variable dependence checking in differentiation
 @variables a(t) b(a)
 @test !isequal(D(b), 0)
-@test isequal(expand_derivatives(D(t)), 1)
-@test isequal(expand_derivatives(Dx(x)), 1)
+test_equal(expand_derivatives(D(t)), 1)
+test_equal(expand_derivatives(Dx(x)), 1)
 
 @variables x(t) y(t) z(t)
 
 @test isequal(expand_derivatives(D(x * y)), simplify(y*D(x) + x*D(y)))
 @test isequal(expand_derivatives(D(x * y)), simplify(D(x)*y + x*D(y)))
 
-@test isequal(expand_derivatives(D(2t)), 2)
+test_equal(expand_derivatives(D(2t)), 2)
 @test isequal(expand_derivatives(D(2x)), 2D(x))
 @test isequal(expand_derivatives(D(x^2)), simplify(2 * x * D(x)))
 
@@ -92,7 +94,7 @@ z = t-2t
 @test iszero(expand_derivatives(D(42)))
 @test all(iszero, Symbolics.gradient(42, [t, x, y, z]))
 @test all(iszero, Symbolics.hessian(42, [t, x, y, z]))
-@test isequal(Symbolics.jacobian([t, x, 42], [t, x]),
+foreach(test_equal, Symbolics.jacobian([t, x, 42], [t, x]),
               Num[1  0
                   Differential(t)(x)           1
                   0  0])
@@ -112,7 +114,6 @@ t1 = Symbolics.gradient(tmp, [x1, x2])
 D = Differential(k)
 @test Symbolics.tosymbol(value(D(x))) === Symbol("xˍk(t)")
 
-using Symbolics
 @variables t x(t)
 ∂ₜ = Differential(t)
 ∂ₓ = Differential(x)
@@ -133,10 +134,7 @@ dxyu = Dx(Dy(u(x,y)))
 dxxu = Dx(Dx(u(x,y)))
 @test isequal(expand_derivatives(dxxu), dxxu)
 
-using Symbolics, LinearAlgebra, SparseArrays
-using Test
-
-canonequal(a, b) = isequal(simplify(a), simplify(b))
+canonequal(a, b) = isequal(simplify(unwrap_const(unwrap(a))), simplify(unwrap_const(unwrap(b))))
 
 # Calculus
 @variables t σ ρ β
@@ -202,8 +200,8 @@ end
 input=rand(3)
 output=rand(8)
 
-findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
-findnz(Symbolics.jacobian_sparsity(f1!, output, input,1,2,c=3))[[1,2]] == findnz(reference_jac)[[1,2]]
+@test findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
+@test findnz(Symbolics.jacobian_sparsity(f1!, output, input,1,2,c=3))[[1,2]] == findnz(reference_jac)[[1,2]]
 
 input = rand(2,2)
 function f2!(res,u,a,b,c)
@@ -211,7 +209,7 @@ function f2!(res,u,a,b,c)
     res.=[a*x^2, y^3, b*x^4, sin(y), c*x+y, x+z^2, a*z+x, x+y^2+sin(z)]
 end
 
-findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
+@test findnz(Symbolics.jacobian_sparsity(f!, output, input))[[1,2]] == findnz(reference_jac)[[1,2]]
 
 # Check for failures due to du[4] undefined
 function f_undef(du,u)
@@ -226,9 +224,7 @@ udef_ref = sparse([1 0 0 0
                     0 1 0 0
                     0 0 1 1
                     0 0 0 0])
-findnz(sparsity_pattern)[[1,2]] == findnz(udef_ref)[[1,2]]
-
-using Symbolics
+@test findnz(sparsity_pattern)[[1,2]] == findnz(udef_ref)[[1,2]]
 
 rosenbrock(X) = sum(1:length(X)-1) do i
     100 * (X[i+1] - X[i]^2)^2 + (1 - X[i])^2
@@ -261,7 +257,7 @@ expression2 = substitute(expression, Dict(collect(Differential(t).(x) .=> ẋ)))
 
 @test isequal(
     Symbolics.derivative(ifelse(signbit(b), b^2, sqrt(b)), b),
-    ifelse(signbit(b), 2b,(SymbolicUtils.unstable_pow(2Symbolics.unwrap(sqrt(b)), -1)))
+    ifelse(signbit(b), 2b,(^(2Symbolics.unwrap(sqrt(b)), -1)))
 )
 
 # Chain rule
@@ -291,12 +287,11 @@ sub_eqs = substitute(eqs, Dict([D(x)=>D(x), x=>1]))
 @test sub_eqs == [D(x) ~ 1, D(y) ~ 1 + y]
 
 @variables x y
-@test substitute([x + y; x - y], Dict(x=>1, y=>2)) == [3, -1]
+@test unwrap_const.(unwrap.(substitute([x + y; x - y], Dict(x=>1, y=>2)))) == [3, -1]
 
 
 # 530#discussion_r825125589
 let
-    using Symbolics
     @variables u[1:2] y[1:1] t
     u = collect(u)
     y = collect(y)
@@ -311,9 +306,9 @@ let
     @variables t a(t)
     vars = collect(@variables(x(t)[1:1])[1])
     ps = collect(@variables(ps[1:1])[1])
-    @test Symbolics.derivative(ps[1], vars[1]) == 0
-    @test Symbolics.derivative(ps[1], a) == 0
-    @test Symbolics.derivative(x[1], a) == 0
+    @test unwrap_const(unwrap(Symbolics.derivative(ps[1], vars[1]))) == 0
+    @test unwrap_const(unwrap(Symbolics.derivative(ps[1], a))) == 0
+    @test unwrap_const(unwrap(Symbolics.derivative(x[1], a))) == 0
 end
 
 # 580
@@ -332,10 +327,10 @@ end
 @variables t t2 x(t)
 D = Differential(t)
 ex = D(x)
-ex2 = substitute(ex, [t=>t2])
+ex2 = substitute(ex, [t=>t2]; filterer = Returns(true))
 @test isequal(operation(Symbolics.unwrap(ex2)).x, t2)
-ex3 = substitute(D(x) * 2 + x / t, [t=>t2])
-xt2 = substitute(x, [t => t2])
+ex3 = substitute(D(x) * 2 + x / t, [t=>t2]; filterer = Returns(true))
+xt2 = substitute(x, [t => t2]; filterer = Returns(true))
 @test isequal(ex3, xt2 / t2 + 2Differential(t2)(xt2))
 
 # 581
@@ -348,9 +343,8 @@ end
 #908
 #
 let
-    using Symbolics
     @variables t
-    @test isequal(expand_derivatives(Differential(t)(im*t)), im)
+    @test isequal(unwrap_const(unwrap(expand_derivatives(Differential(t)(im*t)))), im)
     @test isequal(expand_derivatives(Differential(t)(t^2 + im*t)), 2t + im)
 end
 
@@ -434,13 +428,13 @@ end
 
 # Derivative of a `BasicSymbolic` (#1085)
 let
-    x = Symbolics.Sym{Int}(:x)
+    x = Symbolics.Sym{SymReal}(:x; type = Int)
     @testset for f in [sqrt, sin, acos, exp]
         @test isequal(
             Symbolics.derivative(f, x),
             Symbolics.derivative(
                 f,
-                Symbolics.BasicSymbolic(x)
+                x
             )
         )
     end
@@ -519,16 +513,16 @@ let
     @variables p[1:1] x[1:1]
     p = collect(p)
     x = collect(x)
-    @test collect(Symbolics.sparsehessian(p[1] * x[1], x)) == [0;;]
+    test_equal.(collect(Symbolics.sparsehessian(p[1] * x[1], x)), [0;;])
     @test isequal(collect(Symbolics.sparsehessian(p[1] * x[1]^2, x)), [2p[1];;])
 
     # second example
     @variables a[1:2]
     a = collect(a)
     ex = (a[1]+a[2])^2
-    @test Symbolics.hessian(ex, [a[1]]) == [2;;]
-    @test collect(Symbolics.sparsehessian(ex, [a[1]])) == [2;;]
-    @test collect(Symbolics.sparsehessian(ex, a)) == fill(2, 2, 2)
+    test_equal.(Symbolics.hessian(ex, [a[1]]), [2;;])
+    test_equal.(collect(Symbolics.sparsehessian(ex, [a[1]])), [2;;])
+    test_equal.(collect(Symbolics.sparsehessian(ex, a)), fill(2, 2, 2))
 end
 
 # issue #847
@@ -631,7 +625,7 @@ end
 
     f = - 1.5log(5 + p[3]) - 1.5log(7 + p[1]) - 1.5log(8 - p[2]) - 1.5log(9 - p[4]) + 0.08p[4]*p[9] -1.5log(5 + p[3]) - 1.5log(7 + p[1]) - 1.5log(8 - p[2]) - 1.5log(9 - p[4]) + 0.08p[4]*p[9]
 
-    @test iszero(Symbolics.unwrap.(Symbolics.gradient(f, vp) .- Symbolics.gradient(f, p)))
-    @test iszero(Symbolics.unwrap.(Symbolics.hessian(f, vp) .- Symbolics.hessian(f, p)))
-    @test iszero(Symbolics.unwrap.(Symbolics.jacobian([f], vp) .- Symbolics.jacobian([f], p)))
+    test_equal.(Symbolics.unwrap.(Symbolics.gradient(f, vp) .- Symbolics.gradient(f, p)), 0)
+    test_equal.(Symbolics.unwrap.(Symbolics.hessian(f, vp) .- Symbolics.hessian(f, p)), 0)
+    test_equal.(Symbolics.unwrap.(Symbolics.jacobian([f], vp) .- Symbolics.jacobian([f], p)), 0)
 end

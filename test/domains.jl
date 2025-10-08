@@ -31,7 +31,5 @@ var_domain_pair = t ∈ (0,1)
 @test var_domain_pair.domain isa Interval
 
 # Other types
-t = Symbolics.Num(:t)
-@assert (t ∈ domain) isa VarDomainPairing
 t = Symbolics.variable(:t)
 @assert (t ∈ domain) isa VarDomainPairing

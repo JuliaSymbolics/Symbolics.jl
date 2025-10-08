@@ -93,10 +93,9 @@ function symbolic_eigen(A::Matrix{<:Number})
     # find eigenvalues first
     p = det(λ*I - A) ~ 0 # polynomial to solve
     values = symbolic_solve(p, λ) # solve polynomial
-    
+    values = map(unwrap_const, values)
     # then, find eigenvectors
     S::Matrix{Number} = Matrix(I, size(A, 1), 0) # matrix storing vertical eigenvectors
-    
     for value in values
         eqs = (value*I - A) * v# .~ zeros(size(A, 1)) # equations to give eigenvectors
         eqs = substitute(eqs, Dict(v[1] => 1)) # set first element to 1 to constrain solution space
@@ -107,6 +106,7 @@ function symbolic_eigen(A::Matrix{<:Number})
         if sol[1] isa Dict
             sol = [sol[1][var] for var in v[2:end]]
         end
+        sol = map(unwrap_const, sol)
         vec::Vector{Number} = prepend!(sol, [1]) # add back the 1 (representing v_1) from substitution
         S = [S vec] # add vec to matrix
     end

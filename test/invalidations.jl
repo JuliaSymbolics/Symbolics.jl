@@ -1,5 +1,5 @@
 using SnoopCompile: @snoop_invalidations
-using Symbolics
+using Symbolics, Test
 
 struct FakeType end
 

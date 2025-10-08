@@ -30,7 +30,8 @@ end
 function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     !iscall(x) && return x
 
-    x = Symbolics.term(operation(x), map(_postprocess_root, arguments(x))...)
+    x = maketerm(BasicSymbolic{VartypeT}, operation(x), map(_postprocess_root, arguments(x)), nothing)
+    iscall(x) || return x
     oper = operation(x)
 
     # sqrt(0), cbrt(0) => 0
@@ -46,22 +47,22 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     args = arguments(x)
 
     # (X)^0 => 1
-    if oper === (^) && isequal(args[2], 0) && !isequal(args[1], 0)
+    if oper === (^) && SymbolicUtils._iszero(args[2]) && !SymbolicUtils._iszero(args[1])
         return 1
     end
 
     # (X)^1 => X
-    if oper === (^) && isequal(args[2], 1)
+    if oper === (^) && SymbolicUtils._isone(args[2])
         return args[1]
     end
 
     # (0)^X => 0
-    if oper === (^) && isequal(args[1], 0) && !isequal(args[2], 0)
+    if oper === (^) && SymbolicUtils._iszero(args[1]) && !SymbolicUtils._iszero(args[2])
         return 0
     end
 
     # y / 0 => Inf
-    if oper === (/) && !isequal(numerator(x), 0) && isequal(denominator(x), 0)
+    if oper === (/) && !SymbolicUtils._iszero(numerator(x)) && SymbolicUtils._iszero(denominator(x))
         return Inf
     end
 
@@ -76,14 +77,18 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
             end
             square, squarefree
         end
-        arg = arguments(x)[1]
+        arg = value(arguments(x)[1])
         if arg isa Integer
             square, squarefree = squarefree_decomp(arg)
             if arg < 0
                 square = im * square
             end
             if !isone(square)
-                return square * Symbolics.term(Symbolics.operation(x), squarefree)
+                if isone(squarefree)
+                    return square
+                else
+                    return square * Symbolics.term(Symbolics.operation(x), squarefree; type = symtype(x), shape = shape(x))
+                end
             end
         elseif arg isa Rational
             n, d = numerator(arg), denominator(arg)
@@ -95,7 +100,11 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
             nd_square = n_square // d_square
             nd_squarefree = n_squarefree // d_squarefree
             if !isone(nd_square)
-                return nd_square * Symbolics.term(Symbolics.operation(x), nd_squarefree)
+                if isone(nd_squarefree)
+                    return nd_square
+                else
+                    return nd_square * Symbolics.term(Symbolics.operation(x), nd_squarefree; type = symtype(x), shape = shape(x))
+                end
             end
         end
     end
@@ -103,6 +112,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     # (sqrt(N))^M => N^div(M, 2)*sqrt(N)^(mod(M, 2))
     if oper === (^)
         arg1, arg2 = arguments(x)
+        arg2 = unwrap_const(arg2)
         if iscall(arg1) && (operation(arg1) === sqrt || operation(arg1) === ssqrt)
             if arg2 isa Integer
                 isequal(arg2, 2) && return arguments(arg1)[1]
@@ -121,10 +131,10 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     if oper === (+)
         args = arguments(x)
         for arg in args
-            if isequal(arg, 0)
+            if SymbolicUtils.isconst(arg) && isequal(value(arg), 0)
                 after_removing = setdiff(args, arg)
                 isone(length(after_removing)) && return after_removing[1]
-                return Symbolics.term(+, after_removing)
+                return Symbolics.term(+, after_removing; type = symtype(x), shape = shape(x))
             end
         end
     end
@@ -133,10 +143,13 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
 end
 
 function postprocess_root(x)
-    math_consts = (Base.MathConstants.pi, Base.MathConstants.e)
+    math_consts = Set(Any[Base.MathConstants.pi, Base.MathConstants.e])
     while true
-        old_x = deepcopy(x)
-        contains_math_const = any([Symbolics.n_occurrences(x, c) > 0 for c in math_consts])
+        old_x = x
+        x isa Union{Num, BasicSymbolic{VartypeT}} || return x
+        x = unwrap(x)
+        contains_math_const = SymbolicUtils.query(in(math_consts) ∘ value, x)
+        # contains_math_const = any([Symbolics.n_occurrences(x, c) > 0 for c in math_consts])
         if contains_math_const
             x = _postprocess_root(x)
         else
@@ -184,7 +197,7 @@ function convert_consts(x)
     inv_opers = [asin, acos, atan]
 
     if any(isequal(oper, o) for o in inv_opers) && isempty(Symbolics.get_variables(x))
-        val = Symbolics.symbolic_to_float(x)
+        val = value(Symbolics.symbolic_to_float(x))
         for (exact, evald) in inv_pairs
             if isapprox(evald, val)
                 return exact

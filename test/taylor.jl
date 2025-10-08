@@ -1,4 +1,7 @@
 using Symbolics, Test
+import SymbolicUtils: evaluate
+
+evalsol(x) = Symbolics.value(evaluate(x))
 
 # test all variations of series() input
 ns = 0:3
@@ -20,36 +23,36 @@ Y, = @variables y[ns]
 
 # https://en.wikipedia.org/wiki/Taylor_series#List_of_Maclaurin_series_of_some_common_functions
 @variables x
-@test taylor(exp(x), x, 0:9) - sum(x^n//factorial(n) for n in 0:9) == 0
-@test taylor(log(1-x), x, 0:9) - sum(-x^n/n for n in 1:9) == 0
-@test taylor(log(1+x), x, 0:9) - sum((-1)^(n+1)*x^n/n for n in 1:9) == 0
+@test evalsol(expand(taylor(exp(x), x, 0:9) - sum(x^n/factorial(n) for n in 0:9))) == 0
+@test evalsol(expand(taylor(log(1-x), x, 0:9) - sum(-x^n/n for n in 1:9))) == 0
+@test evalsol(expand(taylor(log(1+x), x, 0:9) - sum((-1)^(n+1)*x^n/n for n in 1:9))) == 0
 
-@test taylor(1/(1-x), x, 0:9) - sum(x^n for n in 0:9) == 0
-@test taylor(1/(1-x)^2, x, 0:8) - sum(n * x^(n-1) for n in 1:9) == 0
-@test taylor(1/(1-x)^3, x, 0:7) - sum((n-1)*n*x^(n-2)/2 for n in 2:9) == 0
+@test evalsol(expand(taylor(1/(1-x), x, 0:9) - sum(x^n for n in 0:9))) == 0
+@test evalsol(expand(taylor(1/(1-x)^2, x, 0:8) - sum(n * x^(n-1) for n in 1:9))) == 0
+@test evalsol(expand(taylor(1/(1-x)^3, x, 0:7) - sum((n-1)*n*x^(n-2)/2 for n in 2:9))) == 0
 for α in (-1//2, 0, 1//2, 1, 2, 3)
-    @test taylor((1+x)^α, x, 0:7) - sum(binomial(α, n)*x^n for n in 0:7) == 0
+    @test evalsol(expand(taylor((1+x)^α, x, 0:7) - sum(binomial(α, n)*x^n for n in 0:7))) == 0
 end
 
-@test taylor(sin(x), x, 0:7) - sum((-1)^n/factorial(2*n+1) * x^(2*n+1) for n in 0:3) == 0
-@test taylor(cos(x), x, 0:7) - sum((-1)^n/factorial(2*n) * x^(2*n) for n in 0:3) == 0
-@test taylor(tan(x), x, 0:7) - taylor(taylor(sin(x), x, 0:7) / taylor(cos(x), x, 0:7), x, 0:7) == 0
-@test taylor(asin(x), x, 0:7) - sum(factorial(2*n)/(4^n*factorial(n)^2*(2*n+1)) * x^(2*n+1) for n in 0:3) == 0
-@test taylor(acos(x), x, 0:7) - (π/2 - taylor(asin(x), x, 0:7)) == 0 # TODO: make π/2 a proper fraction (like Num(π)/2)
-@test taylor(atan(x), x, 0:7) - taylor(asin(x/√(1+x^2)), x, 0:7) == 0
+@test evalsol(expand(taylor(sin(x), x, 0:7) - sum((-1)^n/factorial(2*n+1) * x^(2*n+1) for n in 0:3))) == 0
+@test evalsol(expand(taylor(cos(x), x, 0:7) - sum((-1)^n/factorial(2*n) * x^(2*n) for n in 0:3))) == 0
+@test evalsol(expand(taylor(tan(x), x, 0:7) - taylor(taylor(sin(x), x, 0:7) / taylor(cos(x), x, 0:7), x, 0:7))) == 0
+@test evalsol(expand(taylor(asin(x), x, 0:7) - sum(factorial(2*n)/(4^n*factorial(n)^2*(2*n+1)) * x^(2*n+1) for n in 0:3))) == 0
+@test evalsol(expand(taylor(acos(x), x, 0:7) - (π/2 - taylor(asin(x), x, 0:7)))) == 0 # TODO: make π/2 a proper fraction (like Num(π)/2)
+@test evalsol(expand(taylor(atan(x), x, 0:7) - taylor(asin(x/√(1+x^2)), x, 0:7))) == 0
 
-@test taylor(sinh(x), x, 0:7) - sum(1/factorial(2*n+1) * x^(2*n+1) for n in 0:3) == 0
-@test taylor(cosh(x), x, 0:7) - sum(1/factorial(2*n) * x^(2*n) for n in 0:3) == 0
-@test taylor(tanh(x), x, 0:7) - (x - x^3/3 + 2/15*x^5 - 17/315*x^7) == 0
+@test evalsol(expand(taylor(sinh(x), x, 0:7) - sum(1/factorial(2*n+1) * x^(2*n+1) for n in 0:3))) == 0
+@test evalsol(expand(taylor(cosh(x), x, 0:7) - sum(1/factorial(2*n) * x^(2*n) for n in 0:3))) == 0
+@test evalsol(expand(taylor(tanh(x), x, 0:7) - (x - x^3/3 + 2/15*x^5 - 17/315*x^7))) == 0
 
 # around x ≠ 0
-@test substitute(taylor(√(x), x, 1, 0:6), x => x + 1) - taylor(√(1+x), x, 0:6) == 0
+@test evalsol(substitute(taylor(√(x), x, 1, 0:6), x => x + 1) - taylor(√(1+x), x, 0:6)) == 0
 
 # equations
 eq = sin(2*x) ~ 2*sin(x)*cos(x)
 eq = taylor(eq, x, 0:7)
 eqs = taylor_coeff(eq, x) # should automatically expand to 7th order
-@test length(eqs) == 7+1 && all(isequal(eq.lhs, eq.rhs) for eq in eqs)
+@test length(eqs) == 7+1 && all(isequal(evaluate(eq.lhs), evaluate(eq.rhs)) for eq in eqs)
 
 # expand quintic equation around x=1
 @variables ϵ
@@ -62,11 +65,11 @@ eqs = substitute(eqs, Dict(sol))
 @test all(isequal(eq.lhs, eq.rhs) for eq in eqs)
 
 # system of equations
-@test taylor(exp(im*x) ~ 0, x, 0:5) == taylor([cos(x) ~ 0, sin(x) ~ 0], x, 0:5)
+@test evaluate(taylor(exp(im*x) ~ 0, x, 0:5)) == evaluate(taylor([cos(x) ~ 0, sin(x) ~ 0], x, 0:5))
 
 # don't evaluate numerical expressions
 eq = y ~ 2*Num(π)*x
-eq = taylor(eq, x, 0, 1; rationalize=false, fold=false)
+eq = taylor(eq, x, 0, 1; rationalize=false, fold=Val(false))
 @test contains(string(eq), "π") # should not turn 2*π into 6.28...
 
 # integral with symbolic limits

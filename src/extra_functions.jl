@@ -1,42 +1,14 @@
-@register_symbolic Base.binomial(n, k)::Int true
-function _binomial(nothing, n, k)
-    begin
-        args = [n, k]
-        unwrapped_args = map(Symbolics.unwrap, args)
-        res = if !(any((x->begin
-                                SymbolicUtils.issym(x) || SymbolicUtils.iscall(x)
-                            end), unwrapped_args))
-                Base.binomial(unwrapped_args...)
-            else
-                SymbolicUtils.Term{Int}(Base.binomial, unwrapped_args)
-            end
-        if typeof.(args) == typeof.(unwrapped_args)
-            return res
-        else
-            return Symbolics.wrap(res)
-        end
+for (T1, T2) in Iterators.product([Number, BasicSymbolic{VartypeT}, Num], [Integer, BasicSymbolic{VartypeT}, Num])
+    if T1 != Num && T2 != Num
+        continue
+    end
+    @eval function Base.binomial(a::$T1, b::$T2)
+        binomial(unwrap(a), unwrap(b))
     end
 end
 
-for (T1, T2) in ((Symbolics.SymbolicUtils.Symbolic{<:Real}, Int64),
-                 (Num, Int64),
-                 (Real, Symbolics.SymbolicUtils.Symbolic{<:Int64}),
-                 (Symbolics.SymbolicUtils.Symbolic{<:Real}, Symbolics.SymbolicUtils.Symbolic{<:Int64}),
-                 (Num, Symbolics.SymbolicUtils.Symbolic{<:Int64}))
-
-    @eval function Base.binomial(n::$T1, k::$T2)
-        if any(Symbolics.iswrapped, (n, k))
-            Symbolics.wrap(_binomial(nothing, Symbolics.unwrap(n), Symbolics.unwrap(k)))
-        else
-            _binomial(nothing, n, k)
-        end
-    end
-end
-
-@register_symbolic Base.sign(x)::Int
 derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
 
-@register_symbolic Base.signbit(x)::Bool
 derivative(::typeof(signbit), args::NTuple{1,Any}, ::Val{1}) = 0
 derivative(::typeof(abs), args::NTuple{1,Any}, ::Val{1}) = ifelse(signbit(args[1]),-one(args[1]),one(args[1]))
 
@@ -57,10 +29,6 @@ function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{2})
     ifelse(x > y, zero(y), one(y))
 end
 
-@register_symbolic Base.ceil(x)
-@register_symbolic Base.floor(x)
-@register_symbolic Base.factorial(x)
-
 function derivative(::Union{typeof(ceil),typeof(floor),typeof(factorial)}, args::NTuple{1,Any}, ::Val{1})
     zero(args[1])
 end
@@ -68,7 +36,14 @@ end
 @register_symbolic Base.rand(x)
 @register_symbolic Base.randn(x)
 
-@register_symbolic Base.clamp(x, y, z)
+for (T1, T2, T3) in Iterators.product(Iterators.repeated((Num, BasicSymbolic{VartypeT}, Number), 3)...)
+    if T1 != Num && T2 != Num && T3 != Num
+        continue
+    end
+    @eval function Base.clamp(a::$T1, b::$T2, c::$T3)
+        wrap(clamp(unwrap(a), unwrap(b), unwrap(c)))
+    end
+end
 
 function derivative(::typeof(Base.clamp), args::NTuple{3, Any}, ::Val{1})
     x, l, h = args
@@ -78,21 +53,28 @@ function derivative(::typeof(Base.clamp), args::NTuple{3, Any}, ::Val{1})
     ifelse(x<l, z, ifelse(x>h, z, o))
 end
 
-@register_symbolic Distributions.pdf(dist,x)
-@register_symbolic Distributions.logpdf(dist,x)
-@register_symbolic Distributions.cdf(dist,x)
-@register_symbolic Distributions.logcdf(dist,x)
-@register_symbolic Distributions.quantile(dist,x)
-
-@register_symbolic Distributions.Uniform(mu,sigma) false
-@register_symbolic Distributions.Normal(mu,sigma) false
-
-@register_symbolic ∈(x::Real, y::AbstractArray)::Bool
-@register_symbolic ∪(x, y)
-@register_symbolic ∩(x, y)
-@register_symbolic ∨(x, y)
-@register_symbolic ∧(x, y)
-@register_symbolic ⊆(x, y)
+for T1 in [Real, Num, BasicSymbolic{VartypeT}], T2 in [AbstractArray, Arr, BasicSymbolic{VartypeT}]
+    if T1 != Num && T2 != Arr
+        continue
+    end
+    @eval function Base.in(x::$T1, y::$T2)
+        return in(unwrap(x), unwrap(y))
+    end
+end
+for (T1, T2) in Iterators.product(Iterators.repeated([AbstractArray, Arr, BasicSymbolic{VartypeT}], 2)...)
+    if T1 != Arr && T2 != Arr
+        continue
+    end
+    @eval function Base.union(a::$T1, b::$T2)
+        union(unwrap(a), unwrap(b))
+    end
+    @eval function Base.intersect(a::$T1, b::$T2)
+        intersect(unwrap(a), unwrap(b))
+    end
+    @eval function Base.issubset(a::$T1, b::$T2)
+        issubset(unwrap(a), unwrap(b))
+    end
+end
 
 LinearAlgebra.norm(x::Num, p::Real) = abs(x)
 
@@ -103,11 +85,4 @@ derivative(::typeof(>=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 derivative(::typeof(==), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 derivative(::typeof(!=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
 
-@register_symbolic SpecialFunctions.expinti(x::Real)
 derivative(::typeof(expinti), args::NTuple{1,Any}, ::Val{1}) = exp(args[1])/args[1]
-
-@register_symbolic SpecialFunctions.expint(nu, z)
-
-@register_symbolic SpecialFunctions.sinint(x)
-
-@register_symbolic SpecialFunctions.cosint(x)
