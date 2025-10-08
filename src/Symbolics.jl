@@ -9,7 +9,6 @@ import PrecompileTools: @recompile_invalidations
 
 @recompile_invalidations begin
     import CommonWorldInvalidations
-end
 
 using DocStringExtensions, Markdown
 
@@ -21,9 +20,7 @@ using Reexport
 
 using Setfield
 
-@recompile_invalidations begin
     import DomainSets: Domain, DomainSets
-end
 
 using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
@@ -49,7 +46,7 @@ import SymbolicLimits
 
 using ADTypes: ADTypes
 
-@reexport using SymbolicUtils
+using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 import SciMLPublic: @public
@@ -57,7 +54,9 @@ import SciMLPublic: @public
 using Moshi.Match: @match
 
 import Preferences: @load_preference
+end
 
+@reexport using SymbolicUtils
 const DEFAULT_VARTYPE_PREF = @load_preference("vartype", "SymReal")
 const VartypeT = @static if DEFAULT_VARTYPE_PREF == "SymReal"
     SymReal
@@ -74,6 +73,9 @@ end
 const COMMON_ONE = SymbolicUtils.one_of_vartype(VartypeT)
 const COMMON_ZERO = SymbolicUtils.zero_of_vartype(VartypeT)
 const SymbolicT = BasicSymbolic{VartypeT}
+const SArgsT = SymbolicUtils.ArgsT{VartypeT}
+const SSym = SymbolicUtils.Sym{VartypeT}
+const STerm = SymbolicUtils.Term{VartypeT}
 
 # re-export
 
@@ -128,11 +130,11 @@ import DynamicPolynomials as DP
 import MultivariatePolynomials as MP
 import MutableArithmetics as MA
 
-export tosymbol, terms, factors
-include("utils.jl")
-
 using ConstructionBase
 include("arrays.jl")
+
+export tosymbol, terms, factors
+include("utils.jl")
 
 export @register_symbolic, @register_array_symbolic
 include("register.jl")
@@ -562,7 +564,7 @@ include("discontinuities.jl")
 
 @public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
-@public get_variables, get_variables!, get_differential_vars, getparent, option_to_metadata_type, scalarize, shape
+@public get_variables, get_variables!, get_differential_vars, option_to_metadata_type, scalarize, shape
 @public unwrap, variable, wrap
 
 @setup_workload begin
@@ -579,6 +581,16 @@ include("discontinuities.jl")
         x - y
         -y
         2y
+        z = 2
+        dict = SymbolicUtils.ACDict{VartypeT}()
+        dict[x] = 1
+        dict[y] = 1
+        type::typeof(DataType) = rand() < 0.5 ? Real : Float64
+        nt = (; type, shape, unsafe = true)
+        Base.pairs(nt)
+        BSImpl.AddMul{VartypeT}(1, dict, SymbolicUtils.AddMulVariant.MUL; type, shape = SymbolicUtils.ShapeVecT(), unsafe = true)
+        *(y, z)
+        *(z, y)
         SymbolicUtils.symtype(y)
         f(x)
         (5x / 5)
@@ -587,11 +599,17 @@ include("discontinuities.jl")
         ex = x + 2y + sin(x)
         rules1 = Dict(x => y)
         rules2 = Dict(x => 1)
+        Dx = Differential(x)
+        Differential(y)(ex)
+        uex = unwrap(ex)
+        executediff(Dx, uex)
         # Running `fold = Val(true)` invalidates the precompiled statements
         # for `fold = Val(false)` and itself doesn't precompile anyway.
         # substitute(ex, rules1)
         substitute(ex, rules1; fold = fold1)
         substitute(ex, rules2; fold = fold1)
+        @variables foo
+        f(foo)
         @variables x y f(::Real) q[1:5]
         x + y
         x * y
@@ -603,8 +621,16 @@ include("discontinuities.jl")
         -y
         2y
         symtype(y)
+        z = 2
+        *(y, z)
+        *(z, y)
         f(x)
         (5x / 5)
+        [x, y]
+        [x, f, f]
+        promote_type(Int, Num)
+        promote_type(Real, Num)
+        promote_type(Float64, Num)
         # expand((x + y) ^ 2)
         # simplify(x ^ (1//2) + (sin(x) ^ 2 + cos(x) ^ 2) + 2(x + y) - x - y)
         ex = x + 2y + sin(x)
@@ -614,6 +640,7 @@ include("discontinuities.jl")
         # for `fold = Val(false)` and itself doesn't precompile anyway.
         # substitute(ex, rules1)
         substitute(ex, rules1; fold = fold1)
+        linear_expansion(ex, y)
         # substitute(ex, rules2; fold = fold1)
         # substitute(ex, rules2)
         # substitute(ex, rules1; fold = fold2)
