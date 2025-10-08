@@ -143,11 +143,10 @@ Base.Symbol(x::Num) = Symbol(unwrap(x))
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x, x_metadata::Dict{Datatype, Any}) -> BasicSymbolic
+    diff2term(x) -> BasicSymbolic
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
-Any upstream metadata can be passed via `x_metadata`
 
 ```jldoctest
 julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
@@ -159,48 +158,42 @@ julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
 (zˍt(t))[1]
 ```
 """
-function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothing)
-    iscall(O) || return O
-
+function diff2term(O::SymbolicT)
+    opchain = Differential[]
     inner = O
-    op = identity
-    while is_derivative(inner)
-        op = op ∘ operation(inner)
-        inner = arguments(inner)[1]
-    end
-    if iscall(inner) && operation(inner) == getindex
-        return diff2term(op(arguments(inner)[1]), O_metadata)[arguments(inner)[2:end]...]
-    end
-    if is_derivative(O)
-        ds = ""
-        while is_derivative(O)
-            ds = string(operation(O).x) * ds
-            O = arguments(O)[1]
+    while true
+        @match inner begin
+            BSImpl.Term(; f, args) && if f isa Differential end => begin
+                push!(opchain, f)
+                inner = args[1]
+            end
+            _ => break
         end
-    else
-        ds = nothing
     end
-    d_separator = 'ˍ'
+    isempty(opchain) && return O
+    return rename(inner, diff2term_name(inner, opchain))
+end
+diff2term(O::Num) = Num(diff2term(unwrap(O)))
+diff2term(O::Arr{T, N}) where {T, N} = Arr{T, N}(diff2term(unwrap(O)))
 
-    if ds === nothing
-        return maketerm(typeof(O), TermInterface.head(O), map(diff2term, arguments(O)),
-                        O_metadata isa Nothing ?
-            metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...))
-    else
-        oldop = operation(O)
-        opname = if issym(oldop)
-            string(nameof(oldop))
-        elseif iscall(oldop) && operation(oldop) === getindex
-            string(nameof(arguments(oldop)[1]))
-        elseif oldop isa Function
-            return nothing
-        else
-            error("diff2term case not handled: $oldop")
-        end
-        newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return setname(maketerm(typeof(O), rename(oldop, newname), arguments(O), O_metadata isa Nothing ?
-            metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...)), newname)
+const DIFF2TERM_SEPARATOR = 'ˍ'
+
+function diff2term_name(x::SymbolicT, oplist::Vector)
+    isempty(oplist) && return getname(x)
+    io = IOBuffer()
+    write(io, getname(x))
+    seekstart(io)
+    has_sep = false
+    for c in readeach(io, Char)
+        has_sep = c == DIFF2TERM_SEPARATOR
+        has_sep && break
     end
+    seekend(io)
+    has_sep || write(io, DIFF2TERM_SEPARATOR)
+    for op in oplist
+        write(io, getname(op.x))
+    end
+    return Symbol(take!(io))
 end
 
 setname(v, name) = setmetadata(v, Symbolics.VariableSource, (:variables, name))
