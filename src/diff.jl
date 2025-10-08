@@ -614,9 +614,15 @@ julia> Symbolics.derivative_idx(myop, 2)  # wrt. y^2
 sin(x)
 ```
 """
-derivative_idx(O::Any, ::Any) = 0
+derivative_idx(O::Any, ::Any) = COMMON_ZERO
 function derivative_idx(O::BasicSymbolic, idx)
-    iscall(O) ? derivative(operation(O), (arguments(O)...,), Val(idx)) : 0
+    iscall(O) || return COMMON_ZERO
+    res = derivative(operation(O), (arguments(O)...,), Val(idx))
+    if res isa NoDeriv
+        return res
+    else
+        return Const{VartypeT}(res)
+    end
 end
 
 # Indicate that no derivative is defined.
