@@ -50,7 +50,13 @@ function SymbolicUtils.operator_to_term(d::Differential, ex::BasicSymbolic{Varty
     return diff2term(ex)
 end
 
-is_derivative(x) = iscall(x) ? operation(x) isa Differential : false
+function is_derivative(x::SymbolicT)
+    @match x begin
+        BSImpl.Term(; f) && if f isa Differential end => true
+        _ => false
+    end
+end
+is_derivative(_) = false
 
 Base.:*(D1::ComposedFunction, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
