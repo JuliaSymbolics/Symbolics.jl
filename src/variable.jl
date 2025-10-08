@@ -105,7 +105,7 @@ function parse_vars(macroname, type, x, transform = identity)
         end
         sym = _add_metadata(parse_result, sym, default, macroname, options)
         sym = handle_maybe_callandwrap!(parse_result, sym)
-        sym = Expr(:call, wrap, sym)
+        sym = Expr(:call, transform, Expr(:call, wrap, sym))
 
         if parse_result[:isruntime]
             varname = Symbol(parse_result[:name])
