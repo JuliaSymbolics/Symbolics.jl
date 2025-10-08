@@ -91,17 +91,17 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
     if eq isa AbstractArray && var isa AbstractArray
         x = _solve(a, -b, simplify)
     else
-        if (a === wrap(0))
-            x = NaN
+        if (a === COMMON_ZERO) || _iszero(a)
+            x = SymbolicUtils.Const{VartypeT}(NaN)
         else
             x = a \ -b
         end
     end
     simplify || return x
     if x isa AbstractArray
-        SymbolicUtils.simplify.(simplify_fractions.(x))
+        return SymbolicUtils.simplify.(simplify_fractions.(x))
     else
-        SymbolicUtils.simplify(simplify_fractions(x))
+        return SymbolicUtils.simplify(simplify_fractions(x))
     end
 end
 symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq], var; x...)
@@ -220,9 +220,13 @@ end
 
 When `islinear`, return `a` and `b` such that `a * x + b == t`.
 """
-function linear_expansion(t, x)
-    a, b, islinear = _linear_expansion(t, x)
-    x isa Num ? (wrap(a), wrap(b), islinear) : (a, b, islinear)
+function linear_expansion(t, x::Num)
+    a, b, islin = linear_expansion(t, unwrap(x))
+    Num(a), Num(b), islin
+end
+
+@inline function linear_expansion(t, x::SymbolicT)
+    return _linear_expansion(unwrap(t), x)
 end
 function linear_expansion(ts::AbstractArray, xs::AbstractArray)
     A = Matrix{Num}(undef, length(ts), length(xs))
@@ -231,7 +235,7 @@ function linear_expansion(ts::AbstractArray, xs::AbstractArray)
     for (i, t) in enumerate(ts)
         b = t isa Equation ? t.rhs - t.lhs : t
         for (j, x) in enumerate(xs)
-            a, b, islinear = _linear_expansion(b, x)
+            a, b, islinear = _linear_expansion(unwrap(b), unwrap(x))
             islinear &= islinear
             islinear || @goto FINISH
             A[i, j] = a
@@ -242,128 +246,145 @@ function linear_expansion(ts::AbstractArray, xs::AbstractArray)
     return A, bvec, islinear
 end
 # _linear_expansion always returns `BasicSymbolic`
-function _linear_expansion(t::Equation, x)
-    a₂, b₂, islinear = linear_expansion(t.rhs, x)
-    islinear || return (a₂, b₂, false)
-    a₁, b₁, islinear = linear_expansion(t.lhs, x)
+function _linear_expansion(t::Equation, x::SymbolicT)
+    a₂, b₂, islinear = linear_expansion(t.rhs, unwrap(x))
+    islinear || return (COMMON_ZERO, COMMON_ZERO, false)
+    a₁, b₁, islinear = linear_expansion(t.lhs, unwrap(x))
     # t.rhs - t.lhs = 0
     return (a₂ - a₁, b₂ - b₁, islinear)
 end
-trivial_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
+@inline trivial_linear_expansion(t, x) = isequal(t, x) ? (COMMON_ONE, COMMON_ZERO, true) : (COMMON_ZERO, t, true)
 
 is_expansion_leaf(t) = !iscall(t) || (operation(t) isa Operator)
-@noinline expansion_check(op) = op isa Operator && error("The operation is an Operator. This should never happen.")
-function _linear_expansion(t, x)
-    t = value(t)
-    t isa BasicSymbolic || return (0, t, true)
-    x = value(x)
-    is_expansion_leaf(t) && return trivial_linear_expansion(t, x)
-    isequal(t, x) && return (1, 0, true)
+@noinline throw_bad_expansion() = error("The operation is an Operator. This should never happen.")
 
-    op, args = operation(t), arguments(t)
-    expansion_check(op)
+struct LinearExpansionPredicate
+    x::SymbolicT
+    arr::Union{SymbolicT, Nothing}
+end
 
-    if iscall(x) && operation(x) == getindex
-        arrx, idxsx... = arguments(x)
-    else
-        arrx = nothing
-        idxsx = nothing
-    end
-
-    if op === (+)
-        a₁ = b₁ = 0
-        islinear = true
-        # (a₁ x + b₁) + (a₂ x + b₂) = (a₁ + a₂) x + (b₁ + b₂)
-        for (i, arg) in enumerate(args)
-            a₂, b₂, islinear = linear_expansion(arg, x)
-            islinear || return (a₁, b₁, false)
-            a₁ += a₂
-            b₁ += b₂
+function LinearExpansionPredicate(ex::SymbolicT)
+    @match ex begin
+        BSImpl.Term(; f, args) && if f === getindex end => begin
+            LinearExpansionPredicate(ex, args[1])
         end
-        return (a₁, b₁, true)
-    elseif op === (-)
-        @assert length(args) == 1
-        a, b, islinear = linear_expansion(args[1], x)
-        return (-a, -b, islinear)
-    elseif op === (*)
-        # (a₁ x + b₁) (a₂ x + b₂) = a₁ a₂ x² + (a₁ b₂ + a₂ b₁) x + b₁ b₂
-        a₁ = 0
-        b₁ = 1
-        islinear = true
-        for (i, arg) in enumerate(args)
-            a₂, b₂, islinear = linear_expansion(arg, x)
-            (islinear && _iszero(a₁ * a₂)) || return (a₁, b₁, false)
-            a₁ = a₁ * b₂ + a₂ * b₁
-            b₁ *= b₂
-        end
-        return (a₁, b₁, true)
-    elseif op === (^)
-        # (a₁ x + b₁)^(a₂ x + b₂) is linear => a₂ = 0 && (b₂ == 1 || a₁ == 0)
-        a₂, b₂, islinear = linear_expansion(args[2], x)
-        (islinear && _iszero(a₂)) || return (0, 0, false)
-        a₁, b₁, islinear = linear_expansion(args[1], x)
-        _isone(b₂) && return (a₁, b₁, islinear)
-        (islinear && _iszero(a₁)) || return (0, 0, false)
-        return (0, b₁^b₂, islinear)
-    elseif op === (/)
-        # (a₁ x + b₁)/(a₂ x + b₂) is linear => a₂ = 0
-        a₂, b₂, islinear = linear_expansion(denominator(t), x)
-        (islinear && _iszero(a₂)) || return (0, 0, false)
-        a₁, b₁, islinear = linear_expansion(numerator(t), x)
-        # (a₁ x + b₁)/b₂
-        return islinear ? (a₁ / b₂, b₁ / b₂, islinear) : (0, 0, false)
-    elseif op === getindex
-        arrt, idxst... = arguments(t)
-        isequal(arrt, arrx) && return (0, t, true)
-        shape(arrt) isa SymbolicUtils.Unknown && return (0, t, true)
-
-        indexed_t = scalarize(t)
-        # when indexing a registered function/callable symbolic
-        # scalarizing and indexing leads to the same symbolic variable
-        # which causes a StackOverflowError without this
-        isequal(t, indexed_t) && return (0, t, true)
-        return linear_expansion(Symbolics.scalarize(arrt)[idxst...], x)
-    elseif op === ifelse
-        cond, iftrue, iffalse = arguments(t)
-        truea, trueb, istruelinear = linear_expansion(iftrue, x)
-        istruelinear || return (0, t, false)
-        falsea, falseb, isfalselinear = linear_expansion(iffalse, x)
-        isfalselinear || return (0, t, false)
-        a = isequal(truea, falsea) ? truea : ifelse(cond, truea, falsea)
-        b = isequal(trueb, falseb) ? trueb : ifelse(cond, trueb, falseb)
-        return (a, b, true)
-    else
-        for (i, arg) in enumerate(args)
-            isequal(arg, arrx) && return (0, 0, false)
-            if symbolic_type(arg) == NotSymbolic()
-                arg isa AbstractArray || continue
-                _occursin_array(x, arrx, arg) && return (0, 0, false)
-                continue
-            end
-            a, b, islinear = linear_expansion(arg, x)
-            (_iszero(a) && islinear) || return (0, 0, false)
-        end
-        return (0, t, true)
+        _ => LinearExpansionPredicate(ex, nothing)
     end
 end
 
-"""
-    _occursin_array(sym, arrsym, arr)
+function (ledp::LinearExpansionPredicate)(ex::SymbolicT)
+    isequal(ex, ledp.x) || ledp.arr !== nothing && isequal(ex, ledp.arr)
+end
 
-Check if `sym` (or, if `sym` is an element of an array symbolic, the array symbolic
-`arrsym`) occursin in the non-symbolic array `arr`.
-"""
-function _occursin_array(sym, arrsym, arr)
-    for el in arr
-        if symbolic_type(el) == NotSymbolic()
-            return el isa AbstractArray && _occursin_array(sym, arrsym, el)
-        else
-            if sym !== nothing && occursin(sym, el) || arrsym !== nothing && occursin(arrsym, el)
-                return true
+_linear_expansion(t, x::SymbolicT, _...) = (COMMON_ZERO, Const{VartypeT}(t), true)
+function _linear_expansion(t::SymbolicT, x::SymbolicT, pred = LinearExpansionPredicate(x))::Tuple{SymbolicT, SymbolicT, Bool}
+    is_expansion_leaf(t) && return trivial_linear_expansion(t, x)
+    isequal(t, x) && return (COMMON_ONE, COMMON_ZERO, true)
+    SymbolicUtils.query(pred, t) || return (COMMON_ZERO, t, true)
+
+    @match t begin
+        BSImpl.Term(; f) && if f isa Operator end => throw_bad_expansion()
+        BSImpl.AddMul(; coeff, dict, variant, type, shape) => begin
+            cf = Const{VartypeT}(coeff)
+            if variant === SymbolicUtils.AddMulVariant.ADD
+                a_buffer = SArgsT()
+                b_buffer = SArgsT()
+                for (k, v) in dict
+                    a, b, islin = _linear_expansion(k, x, pred)
+                    islin || return (COMMON_ZERO, COMMON_ZERO, false)
+                    push!(a_buffer, a * v)
+                    push!(b_buffer, b * v)
+                end
+                if !_iszero(coeff)
+                    push!(b_buffer, cf)
+                end
+                a = SymbolicUtils.add_worker(VartypeT, a_buffer)
+                b = SymbolicUtils.add_worker(VartypeT, b_buffer)
+                return a, b, true
+            else
+                a = COMMON_ZERO
+                b = COMMON_ZERO
+                k = COMMON_ZERO
+                for (_k, _v) in dict
+                    _a, _b, islin = _linear_expansion(_k, x, pred)
+                    islin || return (COMMON_ZERO, COMMON_ZERO, false)
+                    _a_zero = _iszero(_a)
+                    _a_zero && continue
+                    a === COMMON_ZERO || return (COMMON_ZERO, COMMON_ZERO, false)
+                    _isone(_v) || return (COMMON_ZERO, COMMON_ZERO, false)
+                    a = _a
+                    b = _b
+                    k = _k
+                end
+
+                if a === COMMON_ZERO
+                    return (COMMON_ZERO, t, true)
+                end
+                newdict = copy(dict)
+                delete!(newdict, k)
+                tmp = Symbolics.Mul{VartypeT}(coeff, newdict; type, shape, unsafe=true)
+                return (a * tmp, b * tmp, true)
             end
         end
+        BSImpl.Term(; f, args) => begin
+            if f === (-)
+                @assert length(args) == 1
+                a, b, islin = _linear_expansion(args[1], x, pred)
+                islin || return (COMMON_ZERO, COMMON_ZERO, false)
+                return -a, -b, islin
+            elseif f === (^)
+                # If we are here, then both the base and exponent are non-trivial yet the
+                # expression contains `x`. Thus `t` cannot be linear in `x`
+                return (COMMON_ZERO, COMMON_ZERO, false)
+            elseif f === getindex
+                # This is a `getindex` expression that somehow contains `x`. It is not
+                # identical to `x`, otherwise we would have exited earlier.
+                #
+                # Case 1: `x` is an indexed array and `t` is another element of the same
+                # array
+                arrt = args[1]
+                @match x begin
+                    BSImpl.Term(; f = fx, args = argsx) && if f === getindex end => begin
+                        isequal(arrt, argsx[1]) && return (COMMON_ZERO, t, true)
+                    end
+                    _ => nothing
+                end
+
+                indexed_t = scalarize(t)
+                # when indexing a registered function/callable symbolic
+                # scalarizing and indexing leads to the same symbolic variable
+                # which causes a StackOverflowError without this
+                isequal(t, indexed_t) && return (COMMON_ZERO, t, true)
+                return _linear_expansion(indexed_t, x, pred)
+            elseif f === ifelse
+                cond, iftrue, iffalse = args
+                truea, trueb, istruelinear = _linear_expansion(iftrue, x, pred)
+                istruelinear || return (COMMON_ZERO, t, false)
+                falsea, falseb, isfalselinear = _linear_expansion(iffalse, x, pred)
+                isfalselinear || return (COMMON_ZERO, t, false)
+                a = isequal(truea, falsea) ? truea : ifelse(cond, truea, falsea)
+                b = isequal(trueb, falseb) ? trueb : ifelse(cond, trueb, falseb)
+                return (a, b, true)
+            else
+                for (i, arg) in enumerate(args)
+                    pred(arg) && return (COMMON_ZERO, COMMON_ZERO, false)
+                    a, b, islinear = _linear_expansion(arg, x, pred)
+                    (_iszero(a) && islinear) || return (COMMON_ZERO, COMMON_ZERO, false)
+                end
+                return (COMMON_ZERO, t, true)
+            end
+        end
+        BSImpl.Div(; num, den, type, shape) => begin
+            if SymbolicUtils.query(LinearExpansionPredicate(x), den)
+                return (COMMON_ZERO, COMMON_ZERO, false)
+            end
+            a, b, islin = _linear_expansion(num, x)
+            islin || return (COMMON_ZERO, COMMON_ZERO, false)
+            a = SymbolicUtils.Div{VartypeT}(a, den, false; type, shape)
+            b = SymbolicUtils.Div{VartypeT}(b, den, false; type, shape)
+            return a, b, true
+        end
     end
-    return false
 end
 
 ###
