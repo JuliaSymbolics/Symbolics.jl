@@ -160,35 +160,37 @@ Returns true if the expression or equation `O` contains [`Differential`](@ref) t
 hasderiv(O) = recursive_hasoperator(Differential, O)
 
 
-_recursive_hasoperator(op, eq::Equation) = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
-_recursive_hasoperator(op) = Base.Fix1(recursive_hasoperator, op) # curry version
+_recursive_hasoperator(::Type{op}, eq::Equation) where {op} = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
+_recursive_hasoperator(::Type{op}) where {op} = Base.Fix1(recursive_hasoperator, op) # curry version
 _recursive_hasoperator(::Type{T}, ::T) where T = true
 
 
 """
     recursive_hasoperator(op, O)
 
-An internal function that contains the logic for [`hasderiv`](@ref) and [`hasdiff`](@ref).
+An internal function that contains the logic for [`hasderiv`](@ref).
 Return true if `O` contains a term with `Operator` `op`.
 """
 SymbolicUtils.@cache function recursive_hasoperator(op::Any, O::Any)::Bool
     _recursive_hasoperator(op, O)
 end
 
-function _recursive_hasoperator(op, O)
-    iscall(O) || return false
-    if operation(O) isa op
-        return true
-    else
-        if isadd(O) || ismul(O)
-            any(_recursive_hasoperator(op), keys(O.dict))
-        elseif isdiv(O)
-            _recursive_hasoperator(op)(O.num) || _recursive_hasoperator(op)(O.den)
-        else
-            any(_recursive_hasoperator(op), arguments(O))
+function _recursive_hasoperator(::Type{op}, O::SymbolicT) where {op}
+    @match O begin
+        BSImpl.Const(;) => false
+        BSImpl.Sym(;) => false
+        BSImpl.Term(; f, args) => f isa op || any(_recursive_hasoperator(op), args)
+        BSImpl.AddMul(; dict) => any(_recursive_hasoperator(op), keys(dict))
+        BSImpl.Div(; num, den) => recursive_hasoperator(op, num) || recursive_hasoperator(op, den)
+        BSImpl.ArrayOp(; expr, term) => begin
+            if term isa SymbolicT
+                recursive_hasoperator(op, term) && return true
+            end
+            recursive_hasoperator(op, expr)
         end
     end
 end
+_recursive_hasoperator(::Type{op}, O) where {op} = false
 
 struct DerivativeNotDefinedError <: Exception
     expr
