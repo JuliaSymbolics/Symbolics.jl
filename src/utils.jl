@@ -382,7 +382,7 @@ function coeff(p, sym=nothing)
         end
     elseif isdiv(p)
         numerator, denominator = arguments(p)
-        if !occursin(sym, denominator)
+        if !SymbolicUtils.query(isequal(sym), denominator)
             coeff(numerator, sym) / denominator
         else
             throw(DomainError(p, "coeff on fractions is not yet implemented."))
