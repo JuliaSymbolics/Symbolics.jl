@@ -264,67 +264,6 @@ end
     isequal(va, vb)::Bool
 end (AbstractFloat, Number, BasicSymbolic)
 
-# Provide better error message for symbolic variables in ranges
-function Base.:(:)(a::Integer, b::Num)
-    error("""
-Array bounds must be concrete (non-symbolic) values.
-
-You attempted to create a range like $a:$b where '$b' is a symbolic variable.
-
-This error commonly occurs when trying to create array variables with symbolic dimensions:
-
-@variables n
-@variables X[1:n]  # Error: n is symbolic
-
-To fix this:
-1. Use concrete numbers for array bounds: @variables X[1:10]
-2. If you need variable-sized arrays, consider creating individual variables 
-   or use symbolic indexing at runtime rather than at declaration time
-
-For more information about array variables, see the Symbolics.jl documentation.
-""")
-end
-
-function Base.:(:)(a::Num, b::Integer)
-    error("""
-Array bounds must be concrete (non-symbolic) values.
-
-You attempted to create a range like $a:$b where '$a' is a symbolic variable.
-
-This error commonly occurs when trying to create array variables with symbolic dimensions:
-
-@variables n
-@variables X[n:10]  # Error: n is symbolic
-
-To fix this:
-1. Use concrete numbers for array bounds: @variables X[1:10]
-2. If you need variable-sized arrays, consider creating individual variables 
-   or use symbolic indexing at runtime rather than at declaration time
-
-For more information about array variables, see the Symbolics.jl documentation.
-""")
-end
-
-function Base.:(:)(a::Num, b::Num)
-    error("""
-Array bounds must be concrete (non-symbolic) values.
-
-You attempted to create a range like $a:$b where both '$a' and '$b' are symbolic variables.
-
-This error commonly occurs when trying to create array variables with symbolic dimensions:
-
-@variables n m
-@variables X[n:m]  # Error: both n and m are symbolic
-
-To fix this:
-1. Use concrete numbers for array bounds: @variables X[1:10]
-2. If you need variable-sized arrays, consider creating individual variables 
-   or use symbolic indexing at runtime rather than at declaration time
-
-For more information about array variables, see the Symbolics.jl documentation.
-""")
-end
-
 Base.to_index(x::Num) = Base.to_index(value(x))
 
 Base.hash(x::Num, h::UInt) = hash(unwrap(x), h)::UInt
