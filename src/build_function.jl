@@ -106,7 +106,7 @@ SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator, args...) = false
 # don't CSE inside `getindex` of things created via `@variables`
 # EXCEPT called variables
 function SymbolicUtils.Code.cse_inside_expr(sym, ::typeof(getindex), x::BasicSymbolic, idxs...)
-    return !hasmetadata(sym, VariableSource) || SymbolicUtils.is_called_function_symbolic(x)
+    return !hasmetadata(x, VariableSource) || SymbolicUtils.is_called_function_symbolic(x)
 end
 
 function _build_function(target::JuliaTarget, op, args...;
