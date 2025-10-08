@@ -605,13 +605,25 @@ function evaluate(ineq::Inequality, subs)
     lhs = substitute(ineq.lhs, subs)
     rhs = substitute(ineq.rhs, subs)
     if (ineq.relational_op == geq)
-        return isless(rhs, lhs)
+        return if SymbolicUtils.isconst(rhs) && SymbolicUtils.isconst(lhs)
+            isless(unwrap_const(rhs), unwrap_const(lhs))::Bool
+        else
+            isless(rhs, lhs)
+        end
     elseif (ineq.relational_op == leq)
-        return isless(lhs, rhs)
+        return if SymbolicUtils.isconst(lhs) && SymbolicUtils.isconst(rhs)
+            isless(unwrap_const(lhs), unwrap_const(rhs))::Bool
+        else
+            isless(lhs, rhs)
+        end
     else
         throw(ArgumentError("Inequality $ineq not supported"))
     end
-end 
+end
+
+function evaluate(x, subs)
+    unwrap_const(substitute(x, subs; fold = Val(true)))
+end
 
 vartype_from_args(::BasicSymbolic{T}, args...) where {T} = T
 vartype_from_args(_, args...) = vartype_from_args(args...)
