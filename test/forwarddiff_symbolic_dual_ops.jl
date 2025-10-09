@@ -15,8 +15,8 @@ SF = SymbolicUtils.SpecialFunctions
 for f ∈ SymbolicUtils.basic_monadic
     fun = eval(:(ξ ->($f)(ξ)))
 
-    fd = ForwardDiff.derivative(fun, x)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
+    fd = @invokelatest ForwardDiff.derivative(fun, x)
+    sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
     @test isequal(fd, sym)
 end
@@ -31,8 +31,8 @@ for f ∈ SymbolicUtils.monadic
 
     fun = eval(:(ξ ->($f)(ξ)))
 
-    fd = ForwardDiff.derivative(fun, x)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
+    fd = @invokelatest ForwardDiff.derivative(fun, x)
+    sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
     @test isequal(fd, sym)
 end
@@ -41,8 +41,8 @@ end
 for f ∈ (acsc, asech, NaNMath.log2, NaNMath.log10)
     fun = eval(:(ξ ->($f)(ξ)))
 
-    fd = ForwardDiff.derivative(fun, 1.0)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
+    fd = @invokelatest ForwardDiff.derivative(fun, 1.0)
+    sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
     @test fd ≈ substitute(sym, Dict(x => 1.0))
 end
@@ -54,8 +54,8 @@ for f ∈ SymbolicUtils.basic_diadic
 
     fun = eval(:(ξ ->($f)(ξ, 2.0)))
 
-    fd = ForwardDiff.derivative(fun, x)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
+    fd = @invokelatest ForwardDiff.derivative(fun, x)
+    sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
     @test isequal(fd, sym)
 end
@@ -67,8 +67,8 @@ for f ∈ SymbolicUtils.diadic
 
     fun = eval(:(ξ ->($f)(ξ, 2.0)))
 
-    fd = ForwardDiff.derivative(fun, x)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
+    fd = @invokelatest ForwardDiff.derivative(fun, x)
+    sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
     @test isequal(fd, sym)
 end
@@ -76,8 +76,8 @@ end
 for f ∈ (NaNMath.atanh,)
     fun = eval(:(ξ ->($f)(ξ)))
 
-    fd = ForwardDiff.derivative(fun, x)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
+    fd = @invokelatest ForwardDiff.derivative(fun, x)
+    sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
     @test isequal(fd, sym)
 end
@@ -85,8 +85,8 @@ end
 for f ∈ (besselj, bessely, besseli, besselk)
     fun = eval(:(ξ ->($f)(ξ, 2)))
 
-    fd = ForwardDiff.derivative(fun, x)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
+    fd = @invokelatest ForwardDiff.derivative(fun, x)
+    sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
     @test isequal(fd, sym)
 end
@@ -100,8 +100,8 @@ end
 for f ∈ (hypot, muladd)
     fun = eval(:(ξ ->($f)(ξ, 2.0, 3.0)))
 
-    fd = ForwardDiff.derivative(fun, 5.0)
-    sym = Symbolics.Differential(x)(fun(x)) |> expand_derivatives
+    fd = @invokelatest ForwardDiff.derivative(fun, 5.0)
+    sym = Symbolics.Differential(x)(@invokelatest fun(x)) |> expand_derivatives
 
     @test fd ≈ substitute(sym, Dict(x => 5.0))
 end
