@@ -4,9 +4,11 @@ using Symbolics: value
 using SymbolicUtils.Code: DestructuredArgs, Func, NameState, Let, cse
 @variables a b c1 c2 c3 d e g
 oop, iip = Symbolics.build_function([sqrt(a), sin(b)], [a, b], nanmath = true)
-@test all(isnan, eval(oop)([-1, Inf]))
+oop = eval(oop)
+@test all(isnan, @invokelatest oop([-1, Inf]))
 out = [0, 0.0]
-eval(iip)(out, [-1, Inf])
+iip = eval(iip)
+@invokelatest iip(out, [-1, Inf])
 @test all(isnan, out)
 
 # Multiple argument matrix
@@ -37,10 +39,18 @@ h_par_rgf = Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], p
 h_ip! = eval(h_str[2])
 h_ip_skip! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true, fillzeros=false)[2])
 h_ip_skip_par! = eval(Symbolics.build_function(h, [a], [b], [c1, c2, c3], [d], [e], [g], skipzeros=true, parallel=Symbolics.MultithreadedForm(), fillzeros=false)[2])
-h3_oop = eval(h_str_3[1])
-h3_ip = eval(h_str_3[2])
-h4_oop = eval(h_str_4[1])
-h4_ip = eval(h_str_4[2])
+h3_oop = let f = eval(h_str_3[1])
+    (args...) -> @invokelatest f(args...)
+end
+h3_ip = let f = eval(h_str_3[2])
+    (args...) -> @invokelatest f(args...)
+end
+h4_oop = let f = eval(h_str_4[1])
+    (args...) -> @invokelatest f(args...)
+end
+h4_ip = let f = eval(h_str_4[2])
+    (args...) -> @invokelatest f(args...)
+end
 inputs = ([1], [2], [3, 4, 5], [6], [7], [8])
 
 @test h_oop(inputs...) == h_julia(inputs...)
@@ -80,10 +90,18 @@ end
 
 h_str_skip = Symbolics.build_function(h_skip, [a], [b], [c1, c2, c3], [], [], [g], checkbounds=true)
 h_str_skip_cse = Symbolics.build_function(h_skip, [a], [b], [c1, c2, c3], [], [], [g], checkbounds=true, cse=true)
-h_oop_skip = eval(h_str_skip[1])
-h_ip!_skip = eval(h_str_skip[2])
-h_oop_skip_cse = eval(h_str_skip_cse[1])
-h_ip!_skip_cse = eval(h_str_skip_cse[2])
+h_oop_skip = let f = eval(h_str_skip[1])
+    (args...) -> @invokelatest f(args...)
+end
+h_ip!_skip = let f = eval(h_str_skip[2])
+    (args...) -> @invokelatest f(args...)
+end
+h_oop_skip_cse = let f = eval(h_str_skip_cse[1])
+    (args...) -> @invokelatest f(args...)
+end
+h_ip!_skip_cse = let f = eval(h_str_skip_cse[2])
+    (args...) -> @invokelatest f(args...)
+end
 inputs_skip = ([1], [2], [3, 4, 5], [], [], [8])
 
 @test h_oop_skip(inputs_skip...) == h_julia_skip(inputs_skip...) == h_oop_skip_cse(inputs_skip...)
@@ -110,24 +128,36 @@ h_str_scalar2 = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], 
 h_str_scalar_cse = Symbolics.build_function(h_scalar, [a], [b], [c1, c2, c3], [d], [e], [g], cse=true)
 @test h_str_scalar == h_str_scalar2
 
-h_oop_scalar = eval(h_str_scalar)
-h_oop_scalar_cse = eval(h_str_scalar_cse)
+h_oop_scalar = let f = eval(h_str_scalar)
+    (args...) -> f(args...)
+end
+h_oop_scalar_cse = let f = eval(h_str_scalar_cse)
+    (args...) -> f(args...)
+end
 @test h_oop_scalar(inputs...) == h_julia_scalar(inputs...) == h_oop_scalar_cse(inputs...)
 
 @variables z[1:100]
 @variables t x(t) y(t) k
-f = eval(build_function((x+y)/k, [x,y,k]))
+f = let _f = eval(build_function((x+y)/k, [x,y,k]))
+    (args...) -> @invokelatest _f(args...)
+end
 @test f([1,1,2]) == 1
 
-f = eval(build_function([(x+y)/k], [x,y,k])[1])
+f = let _f = eval(build_function([(x+y)/k], [x,y,k])[1])
+    (args...) -> @invokelatest _f(args...)
+end
 @test f([1,1,2]) == [1]
 
-f = eval(build_function([(x+y)/k], [x,y,k])[2])
+f = let _f = eval(build_function([(x+y)/k], [x,y,k])[2])
+    (args...) -> @invokelatest _f(args...)
+end
 z = [0.0]
 f(z, [1,1,2])
 @test z == [1]
 
-f = eval(build_function(sparse([1],[1], [(x+y)/k], 10,10), [x,y,k])[1])
+f = let _f = eval(build_function(sparse([1],[1], [(x+y)/k], 10,10), [x,y,k])[1])
+    (args...) -> @invokelatest _f(args...)
+end
 
 @test size(f([1.,1.,2])) == (10,10)
 @test f([1.,1.,2])[1,1] == 1.0
@@ -186,7 +216,8 @@ expr = toexpr(Func([value(D(x))], [], value(D(x))))
 
 a = rand(4)
 @variables x[1:4]
-@test eval(build_function(sin.(cos.(x)), cos.(x))[1])(a) == sin.(a)
+f = eval(build_function(sin.(cos.(x)), cos.(x))[1])
+@test @invokelatest(f(a)) == sin.(a)
 
 # more skipzeros
 @variables x,y
@@ -222,10 +253,10 @@ let # issue#136
     f_cse = build_function(A,[x,y],parallel=Symbolics.MultithreadedForm(),cse=true)[2]
     g_cse = eval(f_cse)
 
-    g(C, [1,2])
+    @invokelatest g(C, [1,2])
     @test contains(repr(f), "schedule")
     @test isequal(C, B)
-    g_cse(C_2, [1,2])
+    @invokelatest g_cse(C_2, [1,2])
     @test isequal(C_2, B)
 end
 
@@ -248,7 +279,7 @@ let #issue#587
 
     f_expr = build_function(sj, z)
     myf = eval(first(f_expr))
-    J = myf(rand(N))
+    J = @invokelatest myf(rand(N))
 
     @test typeof(J) <: SparseMatrixCSC
     @test nnz(J) == nnz(sj)
@@ -273,7 +304,7 @@ let #658
     using Symbolics
     @variables a, X1[1:3], X2[1:3]
     k = eval(build_function(a * X1 + X2, X1, X2, a)[1])
-    @test k(ones(3), ones(3), 1.5) == [2.5, 2.5, 2.5]
+    @test @invokelatest(k(ones(3), ones(3), 1.5)) == [2.5, 2.5, 2.5]
 end
 
 @testset "ArrayOp codegen" begin

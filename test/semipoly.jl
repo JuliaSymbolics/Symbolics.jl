@@ -530,4 +530,10 @@ end
     @test mapping[x[1]] == 2
     @test mapping[x[3] * x[1]] == 2
     @test isequal(resid, foo([x[1]]))
+
+    @variables x[1:4]
+    expr = x[3] * x[4]
+    mapping, resid = semipolynomial_form(expr, [x[3]], 2)
+    @test isequal(mapping[x[3]], x[4])
+    @test isequal(resid, 0)
 end
