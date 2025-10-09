@@ -183,6 +183,9 @@ function has_vars(expr, vars)::Bool
     if expr in vars
         return true
     elseif iscall(expr)
+        if operation(expr) === getindex && hasmetadata(arguments(expr)[1], VariableSource)
+            return false
+        end
         for arg in arguments(expr)
             if has_vars(arg, vars)
                 return true
