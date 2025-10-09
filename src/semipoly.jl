@@ -58,6 +58,13 @@ function canonicalize_poly(poly_to_bs, bs_to_poly, poly, degree, vars::AbstractS
     return MP.subs(poly, subskeys => subsvals)
 end
 
+function _semipoly_query_recurse(ex::SymbolicT)
+    @match ex begin
+        BSImpl.Term(; f, args) && if f === getindex && hasmetadata(args[1], VariableSource) end => false
+        _ => true
+    end
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -97,7 +104,7 @@ function semipolynomial_form(expr, vars, degree::Real; consts = true)
         var = poly_to_bs[pvar]
         in_vars_mask[i] = var in vars
         in_vars_mask[i] && continue
-        nonpoly_mask[i] = SymbolicUtils.query(in(vars), var)
+        nonpoly_mask[i] = SymbolicUtils.query(in(vars), var; recurse = _semipoly_query_recurse)
     end
     result = SemipolyDictT()
     constant = SymbolicUtils.zeropoly()
