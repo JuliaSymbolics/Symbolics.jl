@@ -457,6 +457,15 @@ end
 function nzmap(f, x::AbstractSparseArray)
     Setfield.@set x.nzval = nzmap(f, x.nzval)
 end
+
+function nzmap(f, x::UpperTriangular)
+    UpperTriangular(nzmap(f, parent(x)))
+end
+
+function nzmap(f, x::LowerTriangular)
+    UpperTriangular(nzmap(f, parent(x)))
+end
+
 nzmap(f, x) = map(f, x)
 
 _issparse(x::AbstractArray) = issparse(x)
@@ -478,6 +487,13 @@ function _make_sparse_array(arr, similarto)
         newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))})
         return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), false)
     end
+end
+
+function _make_array(rhs::UpperTriangular, similarto)
+    return term(UpperTriangular, _make_array(parent(rhs), similarto))
+end
+function _make_array(rhs::LowerTriangular, similarto)
+    return term(LowerTriangular, _make_array(parent(rhs), similarto))
 end
 
 function _make_array(rhss::AbstractArray, similarto)
