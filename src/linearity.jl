@@ -63,7 +63,6 @@ end
 =#
 
 # to make Mul and Add work
-Base.:*(::Number, comb::TermCombination) = comb
 function Base.:^(comb::TermCombination, ::Number)
     isone(comb) && return comb
     iszero(comb) && return _scalar
