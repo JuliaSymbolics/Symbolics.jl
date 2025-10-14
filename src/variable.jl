@@ -29,6 +29,7 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 struct VariableSource <: AbstractVariableMetadata end
 
 function setdefaultval(x, val)
+    val === nothing && return x
     sh = shape(x)
     if sh isa SymbolicUtils.Unknown
         @assert sh.ndims == -1 || ndims(val) == sh.ndims """
