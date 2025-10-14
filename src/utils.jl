@@ -33,9 +33,10 @@ function is_singleton(e)
 end
 
 """
-    get_variables(e, varlist = nothing)
+    get_variables(e, varlist = nothing; kw...)
 
 Return a vector of variables appearing in e, optionally restricting to variables in varlist.
+Takes the same keyword arguments as `SymbolicUtils.search_variables`.
 
 Note that the returned variables are not wrapped in the Num type.
 
@@ -65,16 +66,20 @@ function get_variables!(buffer, e; kw...)
     return search_variables!(buffer, e; kw...)
 end
 
-function _get_is_atomic(varlist)
-    let vars = Set(varlist)
+function _get_is_atomic(varlist, prev_atomic)
+    let vars = Set(varlist), prev_atomic = prev_atomic
         function _is_atomic(ex)
-            SymbolicUtils.default_is_atomic(ex) && ex in vars
+            prev_atomic(ex) && ex in vars
         end
     end
 end
 
-function get_variables(e, varlist; kw...)
-    search_variables(e; kw..., is_atomic = _get_is_atomic(varlist))
+function get_variables(e, varlist; is_atomic = SymbolicUtils.default_is_atomic, kw...)
+    search_variables(e; kw..., is_atomic = _get_is_atomic(varlist, is_atomic))
+end
+
+function get_variables!(buffer, e, varlist; is_atomic = SymbolicUtils.default_is_atomic, kw...)
+    search_variables!(buffer, e; kw..., is_atomic = _get_is_atomic(varlist, is_atomic))
 end
 
 """
