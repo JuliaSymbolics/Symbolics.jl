@@ -122,7 +122,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          kwargs...)
     op = _recursive_unwrap(op)
     if symtype(op) <: AbstractArray
-        return _build_function(target, wrap(op), args...; conv, expression, expression_module, checkbounds, states, linenumbers, cse, nanmath, kwargs...)
+        return _build_function(target, wrap(op), args...; conv, expression, expression_module, checkbounds, states, linenumbers, cse, nanmath, wrap_code, kwargs...)
     end
     states.rewrites[:nanmath] = nanmath
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
