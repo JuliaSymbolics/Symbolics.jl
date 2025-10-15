@@ -12,7 +12,13 @@ function wrapper_fn_from_idxs(x::Arr{T, N}, idxs...) where {T, N}
     return nd == 0 ? is_wrapper_type(T) ? T : identity : Arr{T, nd}
 end
 # Wrapped array should wrap the elements too
-Base.getindex(x::Arr{T, N}, idx::CartesianIndex{N}) where {T, N} = T(unwrap(x)[idx])
+function Base.getindex(x::Arr{T, N}, idx::CartesianIndex{N}) where {T, N}
+    if is_wrapper_type(T)
+        T(unwrap(x)[idx])
+    else
+        unwrap(x)[idx]
+    end
+end
 function Base.getindex(x::Arr, idx...)
     wrapper_fn_from_idxs(x, idx...)(unwrap(x)[idx...])
 end
