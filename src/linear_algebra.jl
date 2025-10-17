@@ -201,20 +201,6 @@ function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
     end
 end
 
-function LinearAlgebra.norm(x::AbstractArray{<:RCNum}, p::Real=2)
-    p = value(p)
-    issym = p isa BasicSymbolic
-    if !issym && p == 2
-        sqrt(sum(x->abs2(x), x))
-    elseif !issym && isone(p)
-        sum(abs, x)
-    elseif !issym && isinf(p)
-        mapreduce(abs, max, x)
-    else
-        sum(x->abs(x)^p, x)^inv(p)
-    end
-end
-
 """
     (a, b, islinear) = linear_expansion(t, x)
 
@@ -383,6 +369,16 @@ function _linear_expansion(t::SymbolicT, x::SymbolicT, pred = LinearExpansionPre
             a = SymbolicUtils.Div{VartypeT}(a, den, false; type, shape)
             b = SymbolicUtils.Div{VartypeT}(b, den, false; type, shape)
             return a, b, true
+        end
+        BSImpl.ArrayOp(; output_idx) => begin
+            if isempty(output_idx)
+                # is scalar
+                scal = SymbolicUtils.scalarize(t, Val{true}())::SymbolicT
+                return _linear_expansion(scal, x)
+            else
+                # TODO: call `_linear_expansion(t.expr, x)` and parse the result
+                return COMMON_ZERO, COMMON_ZERO, false
+            end
         end
     end
 end
