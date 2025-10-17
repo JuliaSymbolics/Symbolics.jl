@@ -59,11 +59,11 @@ julia> Symbolics.get_variables(x - y)
 ```
 """
 function get_variables(e; kw...)
-    return search_variables(e; kw...)
+    return search_variables(unwrap(e); kw...)
 end
 
 function get_variables!(buffer, e; kw...)
-    return search_variables!(buffer, e; kw...)
+    return search_variables!(buffer, unwrap(e); kw...)
 end
 
 function _get_is_atomic(varlist, prev_atomic)
@@ -75,11 +75,11 @@ function _get_is_atomic(varlist, prev_atomic)
 end
 
 function get_variables(e, varlist; is_atomic = SymbolicUtils.default_is_atomic, kw...)
-    search_variables(e; kw..., is_atomic = _get_is_atomic(varlist, is_atomic))
+    search_variables(unwrap(e); kw..., is_atomic = _get_is_atomic(varlist, is_atomic))
 end
 
 function get_variables!(buffer, e, varlist; is_atomic = SymbolicUtils.default_is_atomic, kw...)
-    search_variables!(buffer, e; kw..., is_atomic = _get_is_atomic(varlist, is_atomic))
+    search_variables!(buffer, unwrap(e); kw..., is_atomic = _get_is_atomic(varlist, is_atomic))
 end
 
 """
