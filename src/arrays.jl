@@ -109,6 +109,27 @@ Base.inv(A::Arr{T, 2}) where {T} = Arr{T, 2}(inv(unwrap(A)))
 LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
 LinearAlgebra.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
 LinearAlgebra.adjoint(A::Arr{T, 1}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
+function LinearAlgebra.norm(A::Arr{T}) where {T}
+    if is_wrapper_type(T)
+        T(norm(unwrap(A)))
+    else
+        norm(unwrap(A))
+    end
+end
+function LinearAlgebra.norm(A::Arr{T}, p::Num) where {T}
+    if is_wrapper_type(T)
+        T(norm(unwrap(A), unwrap(p)))
+    else
+        norm(unwrap(A), unwrap(p))
+    end
+end
+function LinearAlgebra.norm(A::Arr{T}, p::Real) where {T}
+    if is_wrapper_type(T)
+        T(norm(unwrap(A), unwrap(p)))
+    else
+        norm(unwrap(A), unwrap(p))
+    end
+end
 
 SymbolicUtils.scalarize(x::Arr) = SymbolicUtils.scalarize(unwrap(x))
 
