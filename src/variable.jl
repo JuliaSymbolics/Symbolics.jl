@@ -37,7 +37,7 @@ function setdefaultval(x, val)
         $(ndims(val)).
         """
     else
-        @assert isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
+        @assert val === missing || isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
         Variable $x must have default of matching size. Got $val with size \
         $(size(val)).
         """
@@ -418,8 +418,12 @@ function getdefaultval(x, val=_fail)
     else
         @match x begin
             BSImpl.Term(; f, args) && if f === getindex end => begin
+                parentval = getdefaultval(args[1], val)
+                if parentval === missing
+                    return missing
+                end
                 idxs = Iterators.map(unwrap_const, Iterators.drop(args, 1))
-                return getdefaultval(args[1], val)[idxs...]
+                return parentval[idxs...]
             end
             _ => error("$x has no default value")
         end
