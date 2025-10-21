@@ -410,6 +410,18 @@ function is_array_of_symbolics(x)
         any(y -> symbolic_type(y) != NotSymbolic() || is_array_of_symbolics(y), x)
 end
 
+function getmetadata_maybe_indexed(x::SymbolicT, key::DataType, default)
+    hasmetadata(x, key) && return getmetadata(x, key, default)
+    @match x begin
+        BSImpl.Term(; f, args) && if f === getindex end => begin
+            hasmetadata(args[1], key) || return default
+            idxs = unwrap_const.(@view args[2:end])
+            return getmetadata(args[1], key)[idxs...]
+        end
+        _ => return default
+    end
+end
+
 function getdefaultval(x, val=_fail)
     x = unwrap(x)
     val = getmetadata(x, VariableDefaultValue, val)
