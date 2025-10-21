@@ -26,6 +26,7 @@ end
 @register_array_symbolic LuxCore.stateless_apply(
     model::LuxCore.AbstractLuxLayer, x::AbstractArray, ps::Union{NamedTuple, <:AbstractVector}) begin
     size = LuxCore.outputsize(model, Symbolics.wrap(x), default_rng())
+    ndims = ndims(x)
     eltype = Real
 end
 
