@@ -328,34 +328,34 @@ end
 
 function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, BasicSymbolic, Equation, Inequality}, d::Dict; kwargs...)
     val = fixpoint_sub(ex, d; fold = Val(true), kwargs...)
-    return _recursive_unwrap(val)
+    return _recursive_unwrap(val; eval = Val(true))
 end
 
 for T in [LinearAlgebra.UpperTriangular, LinearAlgebra.LowerTriangular]
-    @eval function _recursive_unwrap(val::$T)
-        $T(_recursive_unwrap(collect(val)))
+    @eval function _recursive_unwrap(val::$T; eval::Val{_eval} = Val(false)) where {_eval}
+        $T(_recursive_unwrap(collect(val); eval = Val{_eval}()))
     end
 end
 
-function _recursive_unwrap(val)
+function _recursive_unwrap(val; eval::Val{_eval} = Val(false)) where {_eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
         if parent(val) !== val
-            return Setfield.@set val.parent = _recursive_unwrap(parent(val))
+            return Setfield.@set val.parent = _recursive_unwrap(parent(val); eval = Val{_eval}())
         end
-        return _recursive_unwrap.(val)
+        return _recursive_unwrap.(val; eval = Val{_eval}())
     else
-        return unwrap(val)
+        return _eval ? value(val) : unwrap(val)
     end
 end
 
-function _recursive_unwrap(val::AbstractSparseArray)
+function _recursive_unwrap(val::AbstractSparseArray; eval::Val{_eval} = Val(false)) where {_eval}
     if val isa AbstractSparseVector
         (Is, Vs) = findnz(val)
-        Vs = _recursive_unwrap.(Vs)
+        Vs = _recursive_unwrap.(Vs; eval = Val{_eval}())
         return SparseVector(length(val), Is, Vs)
     else
         (Is, Js, Vs) = findnz(val)
-        Vs = _recursive_unwrap.(Vs)
+        Vs = _recursive_unwrap.(Vs; eval = Val{_eval}())
         return sparse(Is, Js, Vs, size(val)...) 
     end
 end
