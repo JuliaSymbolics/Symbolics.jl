@@ -29,24 +29,39 @@ julia> D3 = Differential(x)^3 # 3rd order differential operator
 struct Differential <: Operator
     """The variable or expression to differentiate with respect to."""
     x::BasicSymbolic{VartypeT}
-    Differential(x) = new(value(x))
-    Differential(x::Union{AbstractFloat, Integer}) = error("D(::Number) is not a valid derivative. Derivatives must be taken w.r.t. symbolic variables.")
+    """The derivative order. Can be rational for fractional derivatives."""
+    order::Union{Int, Rational{Int}}
+    function Differential(x::BasicSymbolic{VartypeT}, order = 1)
+        @assert order > 0 "Derivative order must be positive"
+        @match x begin
+            BSImpl.Const(;) => throw(ArgumentError("Cannot take derivative with respect to constant."))
+            _ => new(x, order)
+        end
+    end
+    Differential(x::Union{Num, Arr}, order = 1) = Differential(unwrap(x), order)
+    Differential(::CallAndWrap, order = 1) = throw(ArgumentError("Cannot take derivative with respect to a symbolic function."))
+    Differential(::Union{AbstractFloat, Integer}) = error("D(::Number) is not a valid derivative. Derivatives must be taken w.r.t. symbolic variables.")
 end
 function (D::Differential)(x::BasicSymbolic{VartypeT})
-    x = unwrap(x)
-    BSImpl.Term{VartypeT}(D, SymbolicUtils.ArgsT{VartypeT}((x,)); type = symtype(x), shape = shape(x))
+    @match x begin
+        BSImpl.Term(; f, args) && if f isa Differential && isequal(f.x, D.x) end => begin
+            return Differential(D.x, D.order + f.order)(args[1])
+        end
+        _ => return BSImpl.Term{VartypeT}(D, SArgsT((x,)); type = symtype(x), shape = shape(x))
+    end
 end
 
-(D::Differential)(x::Union{AbstractFloat, Integer}) = wrap(COMMON_ZERO)
-(D::Differential)(x::Union{Num, Arr}) = wrap(D(unwrap(x)))
-(D::Differential)(x::Complex{Num}) = Complex{Num}(wrap(D(unwrap(real(x)))), wrap(D(unwrap(imag(x)))))
+(D::Differential)(::Union{AbstractFloat, Integer}) = Num(COMMON_ZERO)
+(D::Differential)(x::Num) = Num(D(unwrap(x)))
+(D::Differential)(x::Arr{T, N}) where {T, N} = Arr{T, N}(D(unwrap(x)))
+(D::Differential)(x::Complex{Num}) = Complex{Num}(Num(D(unwrap(real(x)))), Num(D(unwrap(imag(x)))))
 SymbolicUtils.isbinop(f::Differential) = false
 
 function (s::SymbolicUtils.Substituter)(x::Differential)
-    Differential(s(x.x))
+    Differential(s(x.x), x.order)
 end
 
-function SymbolicUtils.operator_to_term(d::Differential, ex::BasicSymbolic{VartypeT})
+function SymbolicUtils.operator_to_term(::Differential, ex::BasicSymbolic{VartypeT})
     return diff2term(ex)
 end
 
@@ -61,13 +76,16 @@ is_derivative(_) = false
 Base.:*(D1::ComposedFunction, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
 Base.:*(D1::Differential, D2::Differential) = D1 ∘ D2
-Base.:^(D::Differential, n::Integer) = iszero(n) ? identity : _repeat_apply(D, n)
+function Base.:^(D::Differential, n::Integer)
+    iszero(n) && return identity
+    return Differential(D.x, D.order * n)
+end
 
-Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ")")
+Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ", ", D.order, ")")
 Base.nameof(D::Differential) = :Differential
 
-Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x)
-Base.hash(D::Differential, u::UInt) = hash(D.x, xor(u, 0xdddddddddddddddd))
+Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x) && isequal(D1.order, D2.order)
+Base.hash(D::Differential, u::UInt) = hash(D.order, hash(D.x, xor(u, 0xdddddddddddddddd)))
 
 """
     $(TYPEDSIGNATURES)
