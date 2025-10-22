@@ -169,6 +169,7 @@ function diff2term(O::SymbolicT)
     while true
         @match inner begin
             BSImpl.Term(; f, args) && if f isa Differential end => begin
+                isinteger(f.order) || throw(ArgumentError("`diff2term` only supports integer order derivatives."))
                 push!(opchain, f)
                 inner = args[1]
             end
@@ -196,7 +197,10 @@ function diff2term_name(x::SymbolicT, oplist::Vector)
     seekend(io)
     has_sep || write(io, DIFF2TERM_SEPARATOR)
     for op in oplist
-        write(io, getname(op.x))
+        iv = getname(op.x)
+        for _ in 1:floor(Int, op.order)
+            write(io, iv)
+        end
     end
     return Symbol(take!(io))
 end

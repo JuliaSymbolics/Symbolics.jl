@@ -213,10 +213,15 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
         num = args[1]
         den = op.x
         deg = 1
-        while num isa Term && num.f isa Differential
-            deg += 1
-            den *= num.f.x
-            num = first(arguments(num))
+        while true
+            @match num begin
+                BSImpl.Term(; f, args) && if f isa Differential end => begin
+                    deg += f.order
+                    den *= f.x ^ f.order
+                    num = args[1]
+                end
+                _ => break
+            end
         end
         return :(_derivative($(_toexpr(num)), $den, $deg))
     elseif op isa Integral
