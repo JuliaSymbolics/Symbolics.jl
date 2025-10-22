@@ -286,6 +286,14 @@ passed differential and not any other Differentials it encounters.
     derivative is encountered.
 """
 function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=false, throw_no_derivative=false)
+    isinteger(D.order) || throw(ArgumentError("`executediff` requires integer derivative order."))
+    order = floor(Int, D.order)
+    if order > 1
+        for _ in 1:order
+            arg = executediff(Differential(D.x), arg; simplify, throw_no_derivative)
+        end
+        return arg
+    end
     isequal(arg, D.x) && return COMMON_ONE
     occursin_info(D.x, arg) || return COMMON_ZERO
 
@@ -302,11 +310,26 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 inner_args = arguments(arg)
                 return chain_diff(D, arg, inner_args; simplify, throw_no_derivative)
             elseif f === getindex
-                # The symbolic being indexed has to be a tree, because if it weren't then
-                # either it is equal to `D.x` and we already returned 1, or it isn't and
-                # `occursin_info` fails and we returned 0.
+                arr = arguments(arg)[1]
                 inner_args = arguments(arguments(arg)[1])
-                return chain_diff(D, arg, inner_args; simplify, throw_no_derivative)
+                idx = SymbolicUtils.StableIndex(@views arguments(arg)[2:end])
+                summed_args = SymbolicUtils.ArgsT{VartypeT}()
+                sizehint!(summed_args, length(inner_args))
+                # We know `D.x` is in `arg`, so the derivative is not identically zero.
+                # `arg` cannot be `D.x` since, that would have also early exited. 
+                for (i, a) in enumerate(inner_args)
+                    der = derivative_idx(arr, i)
+                    if isequal(a, D.x)
+                        der isa NoDeriv && return D(arg)
+                        push!(summed_args, der[idx])
+                        continue
+                    elseif der isa NoDeriv
+                        push!(summed_args, Differential(a)(arg) * executediff(D, a))
+                    else
+                        push!(summed_args, der[idx] * executediff(D, a))
+                    end
+                end
+                return SymbolicUtils.add_worker(VartypeT, summed_args)
             elseif f === ifelse
                 inner_args = arguments(arg)
                 dtrue = executediff(D, inner_args[2]; throw_no_derivative)
@@ -359,10 +382,6 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     if t isa NoDeriv
                         throw_no_derivative && throw(DerivativeNotDefinedError(arg, i))
                         t = D(arg)
-                    elseif t isa SymbolicT
-                        t = Const{VartypeT}(t)
-                    else
-                        error()
                     end
                     if !_isone(t2)
                         t = t * t2
@@ -419,126 +438,6 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
             return BSImpl.ArrayOp{VartypeT}(output_idx, expr, reduce, term, ranges; type = symtype(arg), shape = shape(arg))
         end
     end
-    if !iscall(arg)
-        return D(arg) # Cannot expand
-    elseif (op = operation(arg); issym(op))
-        inner_args = arguments(arg)
-        if any(isequal(D.x), inner_args)
-            return D(arg) # base case if any argument is directly equal to the i.v.
-        else
-            return sum(inner_args, init=0) do a
-                return executediff(Differential(a), arg; throw_no_derivative) *
-                executediff(D, a; throw_no_derivative)
-            end
-        end
-    elseif op === getindex
-        arr = arguments(arg)[1]
-        inner_args = arguments(arguments(arg)[1])
-        idxs = @views arguments(arg)[2:end]
-        c = 0
-        # We know `D.x` is in `arg`, so the derivative is not identically zero.
-        # `arg` cannot be `D.x` since, that would have also early exited. 
-        for (i, a) in enumerate(inner_args)
-            der = derivative_idx(arr, i)
-            if isequal(a, D.x)
-                der isa NoDeriv && return D(arg)
-                c += der[idxs...]
-                continue
-            elseif der isa NoDeriv
-                c += Differential(a)(arg) * executediff(D, a)
-            else
-                c += der[idxs...] * executediff(D, a)
-            end
-        end
-        return c
-    elseif op === ifelse
-        args = arguments(arg)
-        O = op(args[1],
-            executediff(D, args[2], simplify; throw_no_derivative),
-            executediff(D, args[3], simplify; throw_no_derivative))
-        return O
-    elseif isa(op, Differential)
-        if isequal(op.x, D.x)
-            return D(arg)
-        else
-            inner = executediff(D, arguments(arg)[1], false; throw_no_derivative)
-            # if the inner expression is not expandable either, return
-            if iscall(inner) && operation(inner) isa Differential
-                return D(arg)
-            else
-                # otherwise give the nested Differential another try
-                return executediff(op, inner, simplify; throw_no_derivative)
-            end
-        end
-    elseif isa(op, Integral)
-        if isa(op.domain.domain, AbstractInterval)
-            domain = op.domain.domain
-            a, b = value.(DomainSets.endpoints(domain))
-            c = 0
-            inner_function = arguments(arg)[1]
-            if iscall(a) || isequal(a, D.x)
-                t1 = substitute_in_deriv(inner_function, Dict(op.domain.variables => a))
-                t2 = executediff(D, a, simplify; throw_no_derivative)
-                c -= t1*t2
-            end
-            if iscall(b) || isequal(b, D.x)
-                t1 = substitute_in_deriv(inner_function, Dict(op.domain.variables => b))
-                t2 = executediff(D, b, simplify; throw_no_derivative)
-                c += t1*t2
-            end
-            inner = executediff(D, inner_function; throw_no_derivative)
-            c += op(inner)
-            return value(c)
-        end
-    end
-
-    inner_args = arguments(arg)
-    l = length(inner_args)
-    exprs = []
-    c = 0
-
-    for i in 1:l
-        t2 = executediff(D, inner_args[i],false; throw_no_derivative)
-
-        x = if _iszero(t2)
-            t2
-        elseif _isone(t2)
-            d = derivative_idx(arg, i)
-            if d isa NoDeriv
-                throw_no_derivative && throw(DerivativeNotDefinedError(arg, i))
-                D(arg)
-            else
-                d
-            end
-        else
-            t1 = derivative_idx(arg, i)
-            t1 = if t1 isa NoDeriv
-                throw_no_derivative && throw(DerivativeNotDefinedError(arg, i))
-                D(arg)
-            else
-                t1
-            end
-            t1 * t2
-        end
-
-        if _iszero(x)
-            continue
-        elseif x isa BasicSymbolic
-            push!(exprs, x)
-        else
-            c += x
-        end
-    end
-
-    if isempty(exprs)
-        return c
-    elseif length(exprs) == 1
-        term = (simplify ? SymbolicUtils.simplify(exprs[1]) : exprs[1])
-        return _iszero(c) ? term : c + term
-    else
-        x = +((!_iszero(c) ? vcat(c, exprs) : exprs)...)
-        return simplify ? SymbolicUtils.simplify(x) : x
-    end
 end
 
 """
@@ -573,27 +472,32 @@ julia> dfx = expand_derivatives(Dx(f))
 ```
 """
 function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivative=false)
-    if iscall(O) && isa(operation(O), Differential)
-        arg = only(arguments(O))
-        arg = expand_derivatives(arg, false; throw_no_derivative)
-        return executediff(operation(O), arg; simplify, throw_no_derivative)
-    elseif iscall(O) && isa(operation(O), Integral)
-        return operation(O)(expand_derivatives(arguments(O)[1]; throw_no_derivative))
-    elseif !hasderiv(O)
-        return O
-    else
-        args = map(a->expand_derivatives(a, false; throw_no_derivative), arguments(O))
-        O1 = operation(O)(args...)
-        return simplify ? SymbolicUtils.simplify(O1) : O1
+    @match O begin
+        BSImpl.Term(; f, args) && if f isa Differential end => begin
+            arg = expand_derivatives(args[1], false; throw_no_derivative)
+            return executediff(f, arg; simplify, throw_no_derivative)
+        end
+        BSImpl.Term(; f, args) && if f isa Integral end => begin
+            return f(expand_derivatives(args[1]; throw_no_derivative))
+        end
+        if !hasderiv(O) end => return O
+        _ => begin
+            newargs = SArgsT()
+            for arg in arguments(O)
+                push!(newargs, expand_derivatives(arg, false; throw_no_derivative))
+            end
+            O1 = maketerm(SymbolicT, operation(O), newargs, nothing; type = symtype(O))
+            return simplify ? SymbolicUtils.simplify(O1) : O1
+        end
     end
 end
 function expand_derivatives(n::Num, simplify=false; kwargs...)
-    wrap(expand_derivatives(value(n), simplify; kwargs...))
+    Num(expand_derivatives(value(n), simplify; kwargs...))
 end
 function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
     re = expand_derivatives(real(n), simplify; kwargs...)
     img = expand_derivatives(imag(n), simplify; kwargs...)
-    Complex{Num}(wrap(re), wrap(img))
+    Complex{Num}(Num(re), Num(img))
 end
 expand_derivatives(x, simplify=false; kwargs...) = x
 
@@ -703,7 +607,7 @@ function _differential_macro(x)
         rhs = di.args[3]
         order, lhs = count_order(lhs)
         push!(lhss, lhs)
-        expr = :($lhs = $_repeat_apply(Differential($value($rhs)), $order))
+        expr = :($lhs = Differential($rhs, $order))
         push!(ex.args,  expr)
     end
     push!(ex.args, Expr(:tuple, lhss...))
@@ -752,9 +656,9 @@ All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function derivative(O, var; simplify=false, kwargs...)
     if O isa AbstractArray
-        Num[Num(expand_derivatives(Differential(var)(value(o)), simplify; kwargs...)) for o in O]
+        Num[Num(expand_derivatives(Differential(var)(unwrap(o)), simplify; kwargs...)) for o in O]
     else
-        Num(expand_derivatives(Differential(var)(value(O)), simplify; kwargs...))
+        Num(expand_derivatives(Differential(var)(unwrap(O)), simplify; kwargs...))
     end
 end
 
@@ -771,7 +675,7 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function gradient(O, vars::AbstractVector; simplify=false, kwargs...)
-    Num[Num(expand_derivatives(Differential(vars[vi])(value(O)),simplify; kwargs...)) for vi in eachindex(vars)]
+    Num[Num(expand_derivatives(Differential(vars[vi])(unwrap(O)),simplify; kwargs...)) for vi in eachindex(vars)]
 end
 
 """
@@ -792,7 +696,7 @@ function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false, sca
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
-    Num[Num(expand_derivatives(Differential(value(v))(value(O)),simplify; kwargs...)) for O in ops, v in vars]
+    Num[Num(expand_derivatives(Differential(unwrap(v))(unwrap(O)),simplify; kwargs...)) for O in ops, v in vars]
 end
 
 function jacobian(ops, vars; simplify=false, kwargs...)

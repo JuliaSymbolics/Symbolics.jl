@@ -1,19 +1,24 @@
 # recursively find highest derivative order in `expr`
-function _get_der_order(expr, x, t)
+function _get_der_order(expr::SymbolicT, x, t)
     if !hasderiv(unwrap(expr))
         return 0
     end
-
-    if length(terms(expr)) > 1
-        return maximum(_get_der_order.(terms(expr), Ref(x), Ref(t)))
+    @match expr begin
+        BSImpl.Term(; f, args) && if f isa Differential && isequal(f.x, t) && isequal(args[1], x) end => begin
+            return f.order
+        end
+        _ => begin
+            best = 0
+            args = arguments(expr)
+            for arg in args
+                _order = _get_der_order(arg, x, t)
+                best = max(best, _order)
+            end
+            return best
+        end
     end
-
-    if length(factors(expr)) > 1
-        return maximum(_get_der_order.(factors(expr), Ref(x), Ref(t)))
-    end
-
-    return _get_der_order(substitute_in_deriv(expr, Dict(Differential(t)(x) => x)), x, t) + 1
 end
+_get_der_order(eq::Equation, x, t) = max(_get_der_order(eq.lhs, x, t), _get_der_order(eq.rhs, x, t))
 
 # takes into account fractions
 function _true_factors(expr)

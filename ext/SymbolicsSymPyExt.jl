@@ -21,7 +21,14 @@ function Symbolics.symbolics_to_sympy(expr)
 
         if op isa Differential
             @assert length(args) == 1 "Differential operator must have exactly one argument."
-            return SymPy.sympy.Derivative(symbolics_to_sympy(args[1]), symbolics_to_sympy(op.x))
+            @assert isinteger(op.order) "Only integer derivative order is supported"
+            order = floor(Int, op.order) - 1
+            wrt_sympy = symbolics_to_sympy(op.x)
+            val = SymPy.sympy.Derivative(symbolics_to_sympy(args[1]), wrt_sympy)
+            for _ in 1:order
+                val = SymPy.sympy.Derivative(val, wrt_sympy)
+            end
+            return val
         end
 
         sop = symbolics_to_sympy(op)
