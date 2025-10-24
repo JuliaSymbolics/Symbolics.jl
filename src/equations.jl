@@ -23,6 +23,7 @@ Base.:(==)(a::Equation, b::Equation) = isequal(a.lhs, b.lhs) && isequal(a.rhs, b
 Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 
 function Base.show(io::IO, eq::Equation)
+    warn_load_latexify()
     if hide_lhs(eq.lhs)
         show(io, eq.rhs)
     else

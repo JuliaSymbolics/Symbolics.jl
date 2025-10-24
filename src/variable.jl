@@ -564,6 +564,7 @@ Base.isequal(a::CallAndWrap, b::BasicSymbolic{VartypeT}) = isequal(a.f,  b)
 Base.hash(x::CallAndWrap, h::UInt) = hash(x.f, h)
 
 function Base.show(io::IO, caw::CallAndWrap)
+    warn_load_latexify()
     show(io, caw.f)
     print(io, "⋆")
 end

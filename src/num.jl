@@ -189,6 +189,7 @@ Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
 Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
 function Base.show(io::IO, z::Complex{<:Num})
+    warn_load_latexify()
     r, i = reim(z)
     compact = get(io, :compact, false)
     show(io, r)
@@ -206,6 +207,7 @@ Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
 import SymbolicUtils: <ₑ, Term, operation, arguments
 
 function Base.show(io::IO, n::Num)
+    warn_load_latexify()
     show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
 end
 

@@ -81,7 +81,10 @@ function Base.:^(D::Differential, n::Integer)
     return Differential(D.x, D.order * n)
 end
 
-Base.show(io::IO, D::Differential) = print(io, "Differential(", D.x, ", ", D.order, ")")
+function Base.show(io::IO, D::Differential)
+    warn_load_latexify()
+    print(io, "Differential(", D.x, ", ", D.order, ")")
+end
 Base.nameof(D::Differential) = :Differential
 
 Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x) && isequal(D1.order, D2.order)
