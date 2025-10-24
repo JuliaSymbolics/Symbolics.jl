@@ -7,6 +7,9 @@ using Symbolics: VartypeT
 
 using DomainSets: Interval
 
+const LatexifyExt = Base.get_extension(Symbolics, :SymbolicsLatexifyExt)
+const _toexpr = LatexifyExt._toexpr
+
 @variables x y z u(x) dx h[1:10,1:10] hh(x,y)[1:10,1:10] gg(x,y)[1:10,1:10] [latexwrapper = string]
 @variables AA(x) [latexwrapper = string] X₁(x) [latexwrapper = string]
 @variables a[1:10]
@@ -14,8 +17,8 @@ Dx = Differential(x)
 Dy = Differential(y)
 
 # issue 260
-@test Symbolics._toexpr(3*x/y) == :((3x) / y)
-@test Symbolics._toexpr(3*x^y) == :(3x^y)
+@test _toexpr(3*x/y) == :((3x) / y)
+@test _toexpr(3*x^y) == :(3x^y)
 
 @test_reference "latexify_refs/inverse.txt" latexify(x^-1)
 
