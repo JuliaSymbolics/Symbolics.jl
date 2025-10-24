@@ -102,10 +102,11 @@ end
 const DEFAULT_OUTSYM = Symbol("ˍ₋out")
 
 # don't CSE inside operators
-SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator, args...) = false
+SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator) = false
 # don't CSE inside `getindex` of things created via `@variables`
 # EXCEPT called variables
-function SymbolicUtils.Code.cse_inside_expr(sym, ::typeof(getindex), x::BasicSymbolic, idxs...)
+function SymbolicUtils.Code.cse_inside_expr(sym, ::typeof(getindex))
+    x = arguments(sym)[1]
     return !hasmetadata(x, VariableSource) || SymbolicUtils.is_called_function_symbolic(x)
 end
 
