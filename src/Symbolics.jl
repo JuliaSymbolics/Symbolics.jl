@@ -81,6 +81,9 @@ const STerm = SymbolicUtils.Term{VartypeT}
 
 export simplify, substitute
 
+warn_load_latexify() = warn_load_latexify(nothing)
+warn_load_latexify(_) = nothing
+
 export Num
 import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")

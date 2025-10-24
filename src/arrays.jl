@@ -56,6 +56,7 @@ maybewrap(T) = has_symwrapper(T) ? wrapper_type(T) : T
 # wrapper_type(::Type{<:AbstractVector{T}}) where {T} = Arr{maybewrap(T), 1}
 
 function Base.show(io::IO, arr::Arr)
+    warn_load_latexify()
     x = unwrap(arr)
     iscall(x) && print(io, "(")
     print(io, unwrap(arr))

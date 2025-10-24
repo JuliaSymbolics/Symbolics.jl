@@ -32,6 +32,7 @@ function SymbolicUtils.scalarize(ineq::Inequality)
 end
 
 function Base.show(io::IO, ineq::Inequality)
+    warn_load_latexify()
     print(io, ineq.lhs, ineq.relational_op == leq ? " ≲ " : " ≳ ", ineq.rhs)
 end
 
