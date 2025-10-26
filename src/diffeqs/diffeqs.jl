@@ -198,7 +198,7 @@ Symbolically solve an ODE
 # Examples
 
 ```jldoctest
-julia> using Symbolics; import Nemo
+julia> using Symbolics; import Nemo, SymPy
 
 julia> @variables x, t
 2-element Vector{Num}:
