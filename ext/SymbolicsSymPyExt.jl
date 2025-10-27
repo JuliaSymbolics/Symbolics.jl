@@ -9,12 +9,12 @@ else
 end
 
 using Symbolics: value, symbolics_to_sympy, sympy_to_symbolics, Differential, Num
-using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Symbolic, Term
+using SymbolicUtils: iscall, operation, arguments, symtype, FnType, SymbolicT, Term
 using LinearAlgebra
 
 function Symbolics.symbolics_to_sympy(expr)
     expr = value(expr)
-    expr isa Symbolic || return expr
+    expr isa SymbolicT || return expr
     if iscall(expr)
         op = operation(expr)
         args = arguments(expr)

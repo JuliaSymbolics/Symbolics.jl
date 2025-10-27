@@ -9,13 +9,13 @@ else
 end
 
 using Symbolics: value, Differential, Num
-using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Symbolic, Term
+using SymbolicUtils: iscall, operation, arguments, symtype, FnType, SymbolicT, Term
 using LinearAlgebra
 
 # Use the high-level SymPyPythonCall API for conversion
 function Symbolics.symbolics_to_sympy_pythoncall(expr)
     expr = value(expr)
-    expr isa Symbolic || return expr
+    expr isa SymbolicT || return expr
     if iscall(expr)
         op = operation(expr)
         args = arguments(expr)
