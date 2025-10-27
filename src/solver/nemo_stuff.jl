@@ -5,11 +5,11 @@ function check_polynomial(poly; strict=true)
     vars = get_variables(poly)
     distr, rem = polynomial_coeffs(poly, vars)
     if strict
-        @assert isequal(rem, 0) "Not a polynomial"
-        @assert all(c -> c isa Integer || c isa Rational, collect(values(distr))) "Coefficients must be integer or rational"
+        @assert SymbolicUtils._iszero(rem) "Not a polynomial"
+        @assert all(c -> unwrap_const(c) isa Union{Integer, Rational}, collect(values(distr))) "Coefficients must be integer or rational"
         return true
     else
-        return isequal(rem, 0)
+        return SymbolicUtils._iszero(rem)
     end
 end
 

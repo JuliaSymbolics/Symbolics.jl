@@ -20,18 +20,20 @@ I = Integral(x in ClosedInterval(a, b))
 @test isequal(I(2), 2*(b -a))
 ```
 """
-struct Integral{T <: Symbolics.VarDomainPairing} <: Function
+struct Integral{T <: Symbolics.VarDomainPairing}
     domain::T
     Integral(domain) = new{typeof(domain)}(domain)
 end
+
+Base.nameof(::Integral) = :Integral
 
 function (I::Integral)(x::Union{Rational, AbstractIrrational, AbstractFloat, Integer})
     domain = I.domain.domain
     a, b = value.(DomainSets.endpoints(domain))
     wrap((b - a)*x)
 end
-(I::Integral)(x::Complex) = wrap(ComplexTerm{Real}(I(unwrap(real(x))), I(unwrap(imag(x)))))
-(I::Integral)(x) = Term{SymbolicUtils.symtype(x)}(I, [x])
+(I::Integral)(x::Complex) = Complex{Num}(wrap(I(unwrap(real(x)))), wrap(I(unwrap(imag(x)))))
+(I::Integral)(x) = Term{VartypeT}(I, [x]; type = SymbolicUtils.symtype(x), shape = SymbolicUtils.shape(x))
 (I::Integral)(x::Num) = Num(I(Symbolics.value(x)))
 SymbolicUtils.promote_symtype(::Integral, x) = x
 

@@ -1,5 +1,5 @@
 using Symbolics, Test
-using SymbolicUtils: metadata
+using SymbolicUtils: metadata, unwrap_const
 using Symbolics: unwrap
 using SymbolicIndexingInterface: getname, hasname
 
@@ -8,7 +8,7 @@ using SymbolicIndexingInterface: getname, hasname
 @testset "types" begin
     @test a isa Num
     @test b isa Num
-    @test eltype(Z) <: Complex{Real}
+    @test eltype(Z) <: Complex{Num}
 
     for x in [z, Z[1], z+a, z*a, z^2, z/z] # z/z is sus
         @test x isa Complex{Num}
@@ -20,8 +20,8 @@ using SymbolicIndexingInterface: getname, hasname
     # issue #314
     bi = a+a*im
     bs = substitute(bi, (Dict(a=>1.0))) # returns 1.0 + im
-    typeof(bs) # Complex{Num}
-    bv = Symbolics.value.(bs)
+    @test bs isa Complex{Num}
+    bv = unwrap_const(Symbolics.value(bs))
     @test typeof(bv) == ComplexF64
 end
 

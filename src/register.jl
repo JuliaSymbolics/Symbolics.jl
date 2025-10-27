@@ -1,5 +1,3 @@
-using SymbolicUtils: Symbolic
-
 """
     @register_symbolic(expr, define_promotion = true, Ts = [Real])
 
@@ -23,34 +21,38 @@ overwriting.
 ```
 See `@register_array_symbolic` to register functions which return arrays.
 """
-macro register_symbolic(expr, define_promotion = true, Ts = :([]), wrap_arrays = true)
-    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, Ts)
+macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
     ret_type = isnothing(ret_type) ? Real : ret_type
-
+    N = length(args′)
+    symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
     fexpr = :(Symbolics.@wrapped function $f($(args′...))
-                  args = [$(argnames...),]
-                  unwrapped_args = map($nested_unwrap, args)
-                  res = if !any($is_symbolic_or_array_of_symbolic, unwrapped_args)
-                      $f(unwrapped_args...) # partial-eval if all args are unwrapped
-                  else
-                      $Term{$ret_type}($f, unwrapped_args)
-                  end
-                  if typeof.(args) == typeof.(unwrapped_args)
-                      return res
-                  else
-                      return $wrap(res)
-                  end
-              end $wrap_arrays)
+        args = ($(argnames...),)
+        if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
+            args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
+            $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type = $ret_type, shape = $(SymbolicUtils.ShapeVecT()))
+        else
+            $f($(argnames...))
+        end
+    end $wrap_arrays)
 
     if define_promotion
-        fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
+        type_args = [:($name::$Type) for name in argnames]
+        fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, $(type_args...)) = $ret_type)
+        promote_expr = quote
+            function (::$(typeof(SymbolicUtils.promote_shape)))(::$ftype, args::$(SymbolicUtils.ShapeT)...)
+                @nospecialize args
+                $(SymbolicUtils.ShapeVecT)()
+            end
+        end
+        fexpr = :($fexpr; $promote_expr)
     end
     esc(fexpr)
 end
 
-function destructure_registration_expr(expr, Ts)
+function destructure_registration_expr(expr)
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
@@ -58,8 +60,6 @@ function destructure_registration_expr(expr, Ts)
         ret_type = nothing
     end
     @assert expr.head === :call
-    @assert Ts.head === :vect
-    Ts = Ts.args
 
     f = expr.args[1]
     args = expr.args[2:end]
@@ -92,7 +92,7 @@ function is_symbolic_or_array_of_symbolic(arr::AbstractArray)
 end
 
 symbolic_eltype(x) = eltype(x)
-symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: SymbolicUtils.Symbolic{eT}} = eT
+symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(Const{T}(x)))
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
@@ -103,33 +103,46 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         ex.args[1] => ex.args[2]
     end |> Dict
 
+    shape_expr = if haskey(defs, :size)
+        quote
+            sz = $(defs[:size])
+            nd = length(sz)
+            sh = $(SymbolicUtils.ShapeVecT)(map(Base.UnitRange{Int} ∘ Base.OneTo, sz))
+        end
+    else
+        quote
+            nd = $(get(defs, :ndims, -1))
+            sh = $(SymbolicUtils.Unknown)(sh)
+        end
+    end
+    eltype_expr = get(defs, :eltype, Any)
+    container_type = get(defs, :container_type, Array)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
+    N = length(args′)
+    symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
+    assigns = macroexpand(@__MODULE__, :(Base.Cartesian.@nexprs $N i -> ($argnames[i] = args[i])))
     fexpr = quote
         @wrapped function $f($(args′...))
-            args = [$(argnames...),]
-            unwrapped_args = map($nested_unwrap, args)
-            eltype = $symbolic_eltype
-            res = if !any($is_symbolic_or_array_of_symbolic, unwrapped_args)
-                $f(unwrapped_args...) # partial-eval if all args are unwrapped
-            elseif $ret_type == nothing || ($ret_type <: AbstractArray)
-                $array_term($(Expr(:parameters, [Expr(:kw, k, v) for (k, v) in defs]...)), $f, unwrapped_args...)
+            args = ($(argnames...),)
+            if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
+                args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
+                $assigns
+                $shape_expr
+                eltype = $eltype ∘ $symtype
+                type = if nd == -1
+                    $container_type{$eltype_expr}
+                else
+                    $container_type{$eltype_expr, nd}
+                end
+                $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type, shape = sh)
             else
-                $Term{$ret_type}($f, unwrapped_args)
-            end
-
-            if typeof.(args) == typeof.(unwrapped_args)
-                return res
-            else
-                return $wrap(res)
+                $f($(argnames...))
             end
         end $wrap_arrays
     end |> esc
 
     if define_promotion
-        container_type = get(defs, :container_type, :($propagate_atype(f, $(argnames...))))
-        etype = get(defs, :eltype, :($propagate_eltype(f, $(argnames...))))
-        ndim = get(defs, :ndims, nothing)
         is_callable_struct = f isa Expr && f.head == :(::)
         fn_arg = if is_callable_struct
             f
@@ -141,18 +154,26 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         else
             :f
         end
+
+        shape_args = [:($name::$(SymbolicUtils.ShapeT)) for name in argnames]
+        type_args = [:($name::$Type) for name in argnames]
         promote_expr = quote
-            function (::$typeof($promote_symtype))($fn_arg, $(argnames...))
+            function (::$typeof($promote_symtype))($fn_arg, $(type_args...))
                 f = $fn_arg_name
                 container_type = $container_type
-                etype = $etype
-                $(
-                    if ndim === nothing
-                        :(return container_type{etype})
-                    else
-                        :(ndim = $ndim; return container_type{etype, ndim})
-                    end
-                )
+                nd = $(get(defs, :ndims, -1))
+                etype = $eltype_expr
+                if nd == -1
+                    return container_type{etype}
+                else
+                    return container_type{etype, nd}
+                end
+            end
+            function (::$(typeof(SymbolicUtils.promote_shape)))($fn_arg, $(shape_args...))
+                @nospecialize $(argnames...)
+                size = identity
+                $shape_expr
+                return sh
             end
         end |> esc
         fexpr = :($fexpr; $promote_expr)
@@ -194,6 +215,6 @@ overloads for one function, all the rest of the registers must set
 overwriting.
 """
 macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
-    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, :([]))
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
     register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays)
 end

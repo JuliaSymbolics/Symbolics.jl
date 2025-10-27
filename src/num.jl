@@ -1,10 +1,25 @@
 @symbolic_wrap struct Num <: Real
-    val::Any
+    val::BasicSymbolic{VartypeT}
+
+    function Num(ex::BasicSymbolic{VartypeT})
+        # need `<: Number` instead of `<: Real` to allow the primitive `@number_methods`
+        # methods below to infer. They could be made to infer `Union{Complex{Num}, Num}`
+        # by manually checking the `symtype` of the result and branching instead of using
+        # `wrap`. However, this causes issues with LinearAlgebra methods because it
+        # preallocates a buffer using the inferred result type, and then tries to
+        # e.g. set an integer into it, which fails because `convert(::Type{Union{..}}, ::T)`
+        # doesn't work.
+        @assert symtype(ex) <: Number
+        return new(Const{VartypeT}(ex))
+    end
+    function Num(ex::Number)
+        return new(Const{VartypeT}(unwrap(ex)))
+    end
 end
 
 const RCNum = Union{Num, Complex{Num}}
 
-unwrap(x::Num) = x.val
+SymbolicUtils.unwrap(x::Num) = x.val
 
 """
     Num(val)
@@ -17,12 +32,49 @@ const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
 (n::Num)(args...) = Num(value(n)(map(value, args)...))
-value(x) = unwrap(x)
+# Fixes an inference issue with https://github.com/JuliaApproximation/DomainSets.jl/blob/b68ee034ebcd2e3fc10dd334792cee17a8d5c633/src/domains/point.jl#L13
+# causing `Num(::Any)` to infer as `::Any`
+Num(x::DomainSets.Point{<:Number}) = Num(x.x)::Num
 
 SymbolicUtils.@number_methods(Num,
-    Num(f(value(a))),
-    Num(f(value(a), value(b))),
-    [conj, real, transpose])
+    Num(f(unwrap(a))),
+    Num(f(unwrap(a), unwrap(b))),
+    [conj, real, transpose, +, -, *, ^, //, /, \])
+
+Base.:+(x::Num) = x
+function Base.:+(x1::Num, xs::Real...)
+    Num(+(unwrap(x1), xs...))
+end
+function Base.:*(x1::Num, xs::Real...)
+    Num(*(unwrap(x1), xs...))
+end
+
+Base.:-(x::Num) = Num(-(unwrap(x)))
+for f in [-, ^, /, \]
+    for (T1, T2) in Iterators.product([Num, Real], [Num, Real])
+        T1 === Num || T2 === Num || continue
+        @eval function (::$(typeof(f)))(x1::$T1, x2::$T2)
+            Num($f(unwrap(x1), unwrap(x2)))
+        end
+    end
+end
+for (T1, T2) in Iterators.product([Num, Integer], [Num, Integer])
+    T1 === Num || T2 === Num || continue
+    @eval function Base.://(x1::$T1, x2::$T2)
+        Num(//(unwrap(x1), unwrap(x2)))
+    end
+end
+
+for f in [/, \, ^]
+    @eval function (::$(typeof(f)))(x1::AbstractArray{<:Real}, x2::Num)
+        $f(x1, unwrap(x2))
+    end
+
+    @eval function (::$(typeof(f)))(x1::Num, x2::AbstractArray{<:Real})
+        $f(unwrap(x1), x2)
+    end
+end
+
 Base.conj(x::Num) = x
 Base.transpose(x::Num) = x
 
@@ -30,6 +82,15 @@ Base.eps(::Type{Num}) = Num(0)
 Base.typemin(::Type{Num}) = Num(-Inf)
 Base.typemax(::Type{Num}) = Num(Inf)
 Base.float(x::Num) = x
+function Base.isapprox(a::Num, b::Num; kw...)
+    err = value(a - b)
+    err isa BasicSymbolic{VartypeT} && return false
+    isapprox(err, 0.0; kw...)
+end
+
+function SymbolicUtils.search_variables!(buffer, expr::Num; kw...)
+    SymbolicUtils.search_variables!(buffer, unwrap(expr); kw...)
+end
 
 """
     ifelse(cond::Num, x, y)
@@ -45,20 +106,71 @@ ifelse(a > b, c, 0)  # Returns c if a > b, otherwise 0
 """
 Base.ifelse(x::Num, y, z) = Num(ifelse(value(x), value(y), value(z)))
 
-Base.promote_rule(::Type{Bool}, ::Type{<:Num}) = Num
+Base.promote_rule(::Type{Bool}, ::Type{Num}) = Num
+Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: AbstractIrrational} = Num
+Base.promote_rule(::Type{Complex{Num}}, ::Type{Num}) = Complex{Num}
 for C in [Complex, Complex{Bool}]
     @eval begin
-        Base.:*(x::Num, z::$C) = Complex(x * real(z), x * imag(z))
-        Base.:*(z::$C, x::Num) = Complex(real(z) * x, imag(z) * x)
-        Base.:/(x::Num, z::$C) =
-            let (a, b) = reim(z), den = a^2 + b^2
-                Complex(x * a / den, -x * b / den)
-            end
-        Base.:/(z::$C, x::Num) = Complex(real(z) / x, imag(z) / x)
-        Base.:+(x::Num, z::$C) = Complex(x + real(z), imag(z))
-        Base.:+(z::$C, x::Num) = Complex(real(z) + x, imag(z))
-        Base.:-(x::Num, z::$C) = Complex(x - real(z), -imag(z))
-        Base.:-(z::$C, x::Num) = Complex(real(z) - x, imag(z))
+        function Base.:*(x::Num, z::$C)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz = real(z)
+            iz = imag(z)
+            Complex(Num(rx * rz - ix * iz), Num(rx * iz + ix * rz))
+        end
+        function Base.:*(z::$C, x::Num)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz = real(z)
+            iz = imag(z)
+            Complex(Num(rx * rz - ix * iz), Num(rx * iz + ix * rz))
+        end
+        function Base.:/(x::Num, z::$C)
+            x = unwrap(x)
+            rz, iz = reim(z)
+            den = rz^2 + iz^2
+            rx = real(x)
+            ix = imag(x)
+            return Complex(Num((rx * rz + ix * iz) / den), Num((ix * rz - rx * iz) / den))
+        end
+        function Base.:/(z::$C, x::Num)
+            x = unwrap(x)
+            rz, iz = reim(z)
+            rx = real(x)
+            ix = imag(x)
+            den = rx^2 + ix^2
+            return Complex(Num((rx * rz + ix * iz) / den), Num((rx * iz - ix * rz) / den))
+        end
+        function Base.:+(x::Num, z::$C)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz, iz = reim(z)
+            return Complex(Num(rx + rz), Num(ix + iz))
+        end
+        function Base.:+(z::$C, x::Num)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz, iz = reim(z)
+            return Complex(Num(rx + rz), Num(ix + iz))
+        end
+        function Base.:-(x::Num, z::$C)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz, iz = reim(z)
+            return Complex(Num(rx - rz), Num(ix - iz))
+        end
+        function Base.:-(z::$C, x::Num)
+            x = unwrap(x)
+            rx = real(x)
+            ix = imag(x)
+            rz, iz = reim(z)
+            return Complex(Num(rz - rx), Num(iz - ix))
+        end
     end
 end
 
@@ -77,6 +189,7 @@ Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
 Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
 function Base.show(io::IO, z::Complex{<:Num})
+    warn_load_latexify()
     r, i = reim(z)
     compact = get(io, :compact, false)
     show(io, r)
@@ -85,58 +198,29 @@ function Base.show(io::IO, z::Complex{<:Num})
     print(io, ")*im")
 end
 
-# TODO: move this to SymbolicUtils
-substitute(expr, s::Pair; kw...) = substituter([s[1] => s[2]])(expr; kw...)
-substitute(expr, s::Vector; kw...) = substituter(s)(expr; kw...)
-
-function _unwrap_callwithmeta(x)
-    x = value(x)
-    return x isa CallWithMetadata ? x.f : x
-end
-function subrules_to_dict(pairs)
-    if pairs isa Pair
-        pairs = (pairs,)
-    end
-    return Dict(_unwrap_callwithmeta(k) => value(v) for (k, v) in pairs)
-end
-function substituter(pairs)
-    dict = subrules_to_dict(pairs)
-    (expr; kw...) -> SymbolicUtils.substitute(value(expr), dict; kw...)
-end
-
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
 Base.nameof(n::Num) = nameof(value(n))
 
 Base.iszero(x::Num) = SymbolicUtils.fraction_iszero(unwrap(x))
 Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
 
-import SymbolicUtils: <ₑ, Symbolic, Term, operation, arguments
+import SymbolicUtils: <ₑ, Term, operation, arguments
 
 function Base.show(io::IO, n::Num)
+    warn_load_latexify()
     show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
 end
 
-Base.promote_rule(::Type{<:Number}, ::Type{<:Num}) = Num
-Base.promote_rule(::Type{BigFloat}, ::Type{<:Num}) = Num
-Base.promote_rule(::Type{<:Symbolic{<:Number}}, ::Type{<:Num}) = Num
-function Base.getproperty(t::Union{Add, Mul, Pow, Term}, f::Symbol)
-    if f === :op
-        Base.depwarn(
-            "`x.op` is deprecated, use `operation(x)` instead", :getproperty)
-        operation(t)
-    elseif f === :args
-        Base.depwarn("`x.args` is deprecated, use `arguments(x)` instead",
-            :getproperty)
-        arguments(t)
-    else
-        getfield(t, f)
-    end
-end
+Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: Number} = Num
+Base.promote_rule(::Type{BigFloat}, ::Type{Num}) = Num
 <ₑ(s::Num, x) = value(s) <ₑ value(x)
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
 
-Num(q::AbstractIrrational) = Num(Term(identity, [q]))
+function Num(q::AbstractIrrational)
+    args = SymbolicUtils.ArgsT{VartypeT}((q,))
+    Num(Term{VartypeT}(identity, args; type = Real, shape = SymbolicUtils.ShapeVecT()))
+end
 
 for T in (Integer, Rational)
     @eval Base.:(^)(n::Num, i::$T) = Num(value(n)^i)
@@ -179,98 +263,22 @@ end
 @num_method Base.isequal begin
     va = value(a)
     vb = value(b)
-    if va isa SymbolicUtils.BasicSymbolic{Real} && vb isa SymbolicUtils.BasicSymbolic{Real}
-        isequal(va, vb)::Bool
-    else
-        isequal(va, vb)::Bool
-    end
-end (AbstractFloat, Number, Symbolic)
-
-# Provide better error message for symbolic variables in ranges
-function Base.:(:)(a::Integer, b::Num)
-    error("""
-Array bounds must be concrete (non-symbolic) values.
-
-You attempted to create a range like $a:$b where '$b' is a symbolic variable.
-
-This error commonly occurs when trying to create array variables with symbolic dimensions:
-
-@variables n
-@variables X[1:n]  # Error: n is symbolic
-
-To fix this:
-1. Use concrete numbers for array bounds: @variables X[1:10]
-2. If you need variable-sized arrays, consider creating individual variables 
-   or use symbolic indexing at runtime rather than at declaration time
-
-For more information about array variables, see the Symbolics.jl documentation.
-""")
-end
-
-function Base.:(:)(a::Num, b::Integer)
-    error("""
-Array bounds must be concrete (non-symbolic) values.
-
-You attempted to create a range like $a:$b where '$a' is a symbolic variable.
-
-This error commonly occurs when trying to create array variables with symbolic dimensions:
-
-@variables n
-@variables X[n:10]  # Error: n is symbolic
-
-To fix this:
-1. Use concrete numbers for array bounds: @variables X[1:10]
-2. If you need variable-sized arrays, consider creating individual variables 
-   or use symbolic indexing at runtime rather than at declaration time
-
-For more information about array variables, see the Symbolics.jl documentation.
-""")
-end
-
-function Base.:(:)(a::Num, b::Num)
-    error("""
-Array bounds must be concrete (non-symbolic) values.
-
-You attempted to create a range like $a:$b where both '$a' and '$b' are symbolic variables.
-
-This error commonly occurs when trying to create array variables with symbolic dimensions:
-
-@variables n m
-@variables X[n:m]  # Error: both n and m are symbolic
-
-To fix this:
-1. Use concrete numbers for array bounds: @variables X[1:10]
-2. If you need variable-sized arrays, consider creating individual variables 
-   or use symbolic indexing at runtime rather than at declaration time
-
-For more information about array variables, see the Symbolics.jl documentation.
-""")
-end
+    isequal(va, vb)::Bool
+end (AbstractFloat, Number, BasicSymbolic)
 
 Base.to_index(x::Num) = Base.to_index(value(x))
 
-Base.hash(x::Num, h::UInt) = hash(value(x), h)::UInt
+Base.hash(x::Num, h::UInt) = hash(unwrap(x), h)::UInt
 
-Base.convert(::Type{Num}, x::Symbolic{<:Number}) = Num(x)
-Base.convert(::Type{Num}, x::Number) = Num(x)
-Base.convert(::Type{Num}, x::Num) = x
-
-Base.convert(::Type{T}, x::AbstractArray{Num}) where {T <: Array{Num}} = T(map(Num, x))
-function Base.convert(::Type{Sym}, x::Num)
-    value(x) isa Sym ? value(x) : error("cannot convert $x to Sym")
+function Base.convert(::Type{Num}, x::BasicSymbolic{VartypeT})
+    symtype(x) <: Real || error("`symtype` must be `<:Real`")
+    Num(x)
 end
 
 function LinearAlgebra.lu(
         x::Union{Adjoint{<:RCNum}, Transpose{<:RCNum}, Array{<:RCNum}}; check = true, kw...)
     sym_lu(x; check = check)
 end
-
-_iszero(x::Number) = iszero(x)
-_isone(x::Number) = isone(x)
-_iszero(::Symbolic) = false
-_isone(::Symbolic) = false
-_iszero(x::Num) = _iszero(value(x))::Bool
-_isone(x::Num) = _isone(value(x))::Bool
 
 Code.cse(x::Num) = Code.cse(unwrap(x))
 

@@ -12,7 +12,7 @@ my_f(x, y) = x^3 + 2y
 # Check `replacenode` function.
 let
     # Simple replacements.
-    @test isequal(replacenode(X + X + X, X =>1), 3)
+    @test isequal(unwrap_const(replacenode(X + X + X, X =>1)), 3)
     @test isequal(replacenode(X + X + X, Y => 1), 3X)
     res = replacenode(X + X + my_f(X, Z), X => Y)
     @test isequal(res, Y^3 + 2Y + 2Z)
@@ -26,8 +26,8 @@ let
     @test isequal(replacenode(X + sin(Y + a) + a, rep_func), X + sin(Y + a) + a)
 
     # On non-symbolic inputs.
-    @test isequal(replacenode(1, X =>2.0), 1)
-    @test isequal(replacenode(1, rep_func), 1)
+    @test isequal(unwrap_const(replacenode(1, X =>2.0)), 1)
+    @test isequal(unwrap_const(replacenode(1, rep_func)), 1)
 end
 
 # Test `hasnode` function.
@@ -127,7 +127,7 @@ let
     @test isequal(filterchildren(is_derivative, ex1), [])
     @test isequal(filterchildren(is_derivative, ex2), [])
     @test isequal(filterchildren(is_derivative, ex3), [])
-    @test isequal(filterchildren(is_derivative, ex4), [D(Y), D(my_f(1,Z))])
+    @test issetequal(filterchildren(is_derivative, ex4), [D(Y), D(my_f(1,Z))])
 end
 
 # https://github.com/JuliaSymbolics/Symbolics.jl/issues/1175

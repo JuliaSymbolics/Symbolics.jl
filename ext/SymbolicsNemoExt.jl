@@ -1,6 +1,7 @@
 module SymbolicsNemoExt
 using Nemo
 import Symbolics.PrecompileTools
+import Symbolics.Bijections
 
 if isdefined(Base, :get_extension)
     using Symbolics
@@ -39,17 +40,19 @@ end
 function Symbolics.factor_use_nemo(poly::Num)
     Symbolics.check_polynomial(poly)
     Symbolics.degree(poly) == 0 && return poly, Num[]
-    vars = Symbolics.get_variables(poly)
+    mp_polys, poly_to_bs = Symbolics.symbol_to_poly([poly])
+    mp_poly = only(mp_polys)
+    vars = collect(Symbolics.get_variables(poly))
+    bs_to_poly = Bijections.active_inv(poly_to_bs)
+    poly_vars = map(Base.Fix1(getindex, bs_to_poly), vars)
     nemo_ring, nemo_vars = Nemo.polynomial_ring(Nemo.QQ, map(string, vars))
-    sym_to_nemo = Dict(vars .=> nemo_vars)
-    nemo_to_sym = Dict(v => k for (k, v) in sym_to_nemo)
-    nemo_poly = Symbolics.substitute(poly, sym_to_nemo)
+    nemo_poly = mp_poly(poly_vars => nemo_vars)
     nemo_fac = Nemo.factor(nemo_poly)
     nemo_unit = Nemo.unit(nemo_fac)
     nemo_factors = collect(keys(nemo_fac.fac)) 
     sym_unit = Rational(Nemo.coeff(nemo_unit, 1))
+    nemo_to_sym = Dict(nemo_vars .=> vars)
     sym_factors = map(f -> Symbolics.wrap(nemo_crude_evaluate(f, nemo_to_sym)), nemo_factors)
-
     for (i, fac) in enumerate(sym_factors)
         sym_factors[i] = fac^(collect(values(nemo_fac.fac))[i])
     end
@@ -58,19 +61,19 @@ function Symbolics.factor_use_nemo(poly::Num)
 end
 
 # Helps with precompilation time
-PrecompileTools.@setup_workload begin
-    @variables a b c x y z
-    expr_with_params = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
-    equation1 = a*log(x)^b + c ~ 0
-    equation_polynomial = 9^x + 3^x + 2
-    exp_eq = 5*2^(x+1) + 7^(x+3)
-    PrecompileTools.@compile_workload begin
-        symbolic_solve(equation1, x)
-        symbolic_solve(equation_polynomial, x)
-        symbolic_solve(exp_eq)
-        symbolic_solve(expr_with_params, x, dropmultiplicity=false)
-        symbolic_solve(x^10 - a^10, x, dropmultiplicity=false)
-    end
-end
+# PrecompileTools.@setup_workload begin
+#     @variables a b c x y z
+#     expr_with_params = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
+#     equation1 = a*log(x)^b + c ~ 0
+#     equation_polynomial = 9^x + 3^x + 2
+#     exp_eq = 5*2^(x+1) + 7^(x+3)
+#     PrecompileTools.@compile_workload begin
+#         symbolic_solve(equation1, x)
+#         symbolic_solve(equation_polynomial, x)
+#         symbolic_solve(exp_eq)
+#         symbolic_solve(expr_with_params, x, dropmultiplicity=false)
+#         symbolic_solve(x^10 - a^10, x, dropmultiplicity=false)
+#     end
+# end
 
 end # module

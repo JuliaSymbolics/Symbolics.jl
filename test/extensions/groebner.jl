@@ -11,8 +11,8 @@ syms = [
     [x, sin((44 // 31)y) * z]
 ]
 for sym in syms
-    polynoms, pvar2sym, sym2term = Symbolics.symbol_to_poly(sym)
-    sym2 = Symbolics.poly_to_symbol(polynoms, pvar2sym, sym2term, Real)
+    polynoms, poly_to_bs = Symbolics.symbol_to_poly(sym)
+    sym2 = Symbolics.poly_to_symbol(polynoms, poly_to_bs)
     @test isequal(expand.(sym2), expand.(sym))
 end
 

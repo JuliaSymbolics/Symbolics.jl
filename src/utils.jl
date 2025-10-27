@@ -13,49 +13,13 @@ function flatten_expr!(x)
     end
     xs
 end
-function build_expr(head::Symbol, args)
-    ex = Expr(head)
-    append!(ex.args, args)
-    ex
-end
 
 """
-    get_variables(e, varlist = nothing; sort::Bool = false)
+    $(TYPEDSIGNATURES)
 
-Return a vector of variables appearing in `e`, optionally restricting to variables in `varlist`.
-
-Note that the returned variables are not wrapped in the `Num` type.
-
-# Examples
-```jldoctest
-julia> @variables t x y z(t);
-
-julia> Symbolics.get_variables(x + y + sin(z); sort = true)
-3-element Vector{SymbolicUtils.BasicSymbolic}:
- x
- y
- z(t)
-
-julia> Symbolics.get_variables(x - y; sort = true)
-2-element Vector{SymbolicUtils.BasicSymbolic}:
- x
- y
-```
+Equivalent to `unwrap_const ∘ unwrap`.
 """
-function get_variables(e::Num, varlist = nothing; sort::Bool = false)
-    get_variables(value(e), varlist; sort)
-end
-function get_variables(e, varlist = nothing; sort::Bool = false)
-    vars = Vector{BasicSymbolic}()
-    get_variables!(vars, e, varlist)
-    if sort
-        sort!(vars; by = SymbolicUtils.get_degrees)
-    end
-    vars
-end
-
-get_variables!(vars, e::Num, varlist=nothing) = get_variables!(vars, value(e), varlist)
-get_variables!(vars, e, varlist=nothing) = vars
+value(x) = unwrap_const(unwrap(x))
 
 function is_singleton(e)
     if iscall(e)
@@ -68,22 +32,54 @@ function is_singleton(e)
     end
 end
 
-get_variables!(vars, e::Number, varlist=nothing) = vars
+"""
+    get_variables(e, varlist = nothing; kw...)
 
-function get_variables!(vars, e::Symbolic, varlist=nothing)
-    if is_singleton(e)
-        if isnothing(varlist) || any(isequal(e), varlist)
-            push!(vars, e)
-        end
-    else
-        get_variables!(vars, operation(e), varlist)
-        foreach(x -> get_variables!(vars, x, varlist), arguments(e))
-    end
-    return (vars isa AbstractVector) ? unique!(vars) : vars
+Return a vector of variables appearing in e, optionally restricting to variables in varlist.
+Takes the same keyword arguments as `SymbolicUtils.search_variables`.
+
+Note that the returned variables are not wrapped in the Num type.
+
+Examples
+≡≡≡≡≡≡≡≡
+
+```julia
+julia> @variables t x y z(t);
+
+julia> Symbolics.get_variables(x + y + sin(z))
+3-element Vector{SymbolicUtils.BasicSymbolic}:
+ x
+ y
+ z(t)
+
+julia> Symbolics.get_variables(x - y)
+2-element Vector{SymbolicUtils.BasicSymbolic}:
+ x
+ y
+```
+"""
+function get_variables(e; kw...)
+    return search_variables(unwrap(e); kw...)
 end
 
-function get_variables!(vars, e::Equation, varlist=nothing)
-  get_variables!(vars, e.rhs, varlist)
+function get_variables!(buffer, e; kw...)
+    return search_variables!(buffer, unwrap(e); kw...)
+end
+
+function _get_is_atomic(varlist, prev_atomic)
+    let vars = Set(varlist), prev_atomic = prev_atomic
+        function _is_atomic(ex)
+            prev_atomic(ex) && ex in vars
+        end
+    end
+end
+
+function get_variables(e, varlist; is_atomic = SymbolicUtils.default_is_atomic, kw...)
+    search_variables(unwrap(e); kw..., is_atomic = _get_is_atomic(varlist, is_atomic))
+end
+
+function get_variables!(buffer, e, varlist; is_atomic = SymbolicUtils.default_is_atomic, kw...)
+    search_variables!(buffer, unwrap(e); kw..., is_atomic = _get_is_atomic(varlist, is_atomic))
 end
 
 """
@@ -126,7 +122,7 @@ get_differential_vars!(vars, e, varlist=nothing) = vars
 
 get_differential_vars!(vars, e::Number, varlist=nothing) = vars
 
-function get_differential_vars!(vars, e::Symbolic, varlist=nothing)
+function get_differential_vars!(vars, e::BasicSymbolic, varlist=nothing)
     if is_derivative(e)
         if isnothing(varlist) || any(isequal(e), varlist)
             push!(vars, e)
@@ -148,15 +144,14 @@ function get_differential_vars!(vars, e::Equation, varlist=nothing)
 end
 
 # Sym / Term --> Symbol
-Base.Symbol(x::Union{Num,Symbolic}) = tosymbol(x)
+Base.Symbol(x::Num) = Symbol(unwrap(x))
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x, x_metadata::Dict{Datatype, Any}) -> Symbolic
+    diff2term(x) -> BasicSymbolic
 
 Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
-Any upstream metadata can be passed via `x_metadata`
 
 ```jldoctest
 julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
@@ -168,54 +163,52 @@ julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
 (zˍt(t))[1]
 ```
 """
-function diff2term(O, O_metadata::Union{Dict, Nothing, Base.ImmutableDict}=nothing)
-    iscall(O) || return O
-
+function diff2term(O::SymbolicT)
+    opchain = Differential[]
     inner = O
-    op = identity
-    while is_derivative(inner)
-        op = op ∘ operation(inner)
-        inner = arguments(inner)[1]
-    end
-    if iscall(inner) && operation(inner) == getindex
-        return diff2term(op(arguments(inner)[1]), O_metadata)[arguments(inner)[2:end]...]
-    end
-    if is_derivative(O)
-        ds = ""
-        while is_derivative(O)
-            ds = string(operation(O).x) * ds
-            O = arguments(O)[1]
+    while true
+        @match inner begin
+            BSImpl.Term(; f, args) && if f isa Differential end => begin
+                isinteger(f.order) || throw(ArgumentError("`diff2term` only supports integer order derivatives."))
+                push!(opchain, f)
+                inner = args[1]
+            end
+            _ => break
         end
-    else
-        ds = nothing
     end
-    d_separator = 'ˍ'
+    isempty(opchain) && return O
+    return rename(inner, diff2term_name(inner, opchain))
+end
+diff2term(O::Num) = Num(diff2term(unwrap(O)))
+diff2term(O::Arr{T, N}) where {T, N} = Arr{T, N}(diff2term(unwrap(O)))
 
-    if ds === nothing
-        return maketerm(typeof(O), TermInterface.head(O), map(diff2term, children(O)),
-                        O_metadata isa Nothing ?
-            metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...))
-    else
-        oldop = operation(O)
-        opname = if issym(oldop)
-            string(nameof(oldop))
-        elseif iscall(oldop) && operation(oldop) === getindex
-            string(nameof(arguments(oldop)[1]))
-        elseif oldop isa Function
-            return nothing
-        else
-            error("diff2term case not handled: $oldop")
-        end
-        newname = occursin(d_separator, opname) ? Symbol(opname, ds) : Symbol(opname, d_separator, ds)
-        return setname(maketerm(typeof(O), rename(oldop, newname), children(O), O_metadata isa Nothing ?
-            metadata(O) : Base.ImmutableDict(metadata(O)..., O_metadata...)), newname)
+const DIFF2TERM_SEPARATOR = 'ˍ'
+
+function diff2term_name(x::SymbolicT, oplist::Vector)
+    isempty(oplist) && return getname(x)
+    io = IOBuffer()
+    write(io, getname(x))
+    seekstart(io)
+    has_sep = false
+    for c in readeach(io, Char)
+        has_sep = c == DIFF2TERM_SEPARATOR
+        has_sep && break
     end
+    seekend(io)
+    has_sep || write(io, DIFF2TERM_SEPARATOR)
+    for op in oplist
+        iv = getname(op.x)
+        for _ in 1:floor(Int, op.order)
+            write(io, iv)
+        end
+    end
+    return Symbol(take!(io))
 end
 
 setname(v, name) = setmetadata(v, Symbolics.VariableSource, (:variables, name))
 
 """
-    tosymbol(x::Union{Num,Symbolic}; states=nothing, escape=true) -> Symbol
+    tosymbol(x::Union{Num,BasicSymbolic}; states=nothing, escape=true) -> Symbol
 
 Convert `x` to a symbol. `states` are the states of a system, and `escape`
 means if the target has escapes like `val"y(t)"`. If `escape` is false, then
@@ -265,7 +258,7 @@ function tosymbol(t; states=nothing, escape=true)
     end
 end
 
-function lower_varname(var::Symbolic, idv, order)
+function lower_varname(var::BasicSymbolic, idv, order)
     order == 0 && return var
     D = Differential(idv)
     for _ in 1:order
@@ -274,34 +267,9 @@ function lower_varname(var::Symbolic, idv, order)
     return diff2term(var)
 end
 
-### OOPS
-
-struct Unknown end
-
-macro oops(ex)
-    quote
-        tmp = $(esc(ex))
-        if tmp === Unknown()
-            return Unknown()
-        else
-            tmp
-        end
-    end
-end
-
-function makesubscripts(n)
-    set = 'i':'z'
-    m = length(set)
-    map(1:n) do i
-        repeats = ceil(Int, i / m)
-        c = set[(i-1) % m + 1]
-        Sym{Int}(Symbol(join([c for _ in 1:repeats], "")))
-    end
-end
-
 function var_from_nested_derivative(x,i=0)
     x = unwrap(x)
-    if issym(x) || x isa CallWithMetadata
+    if issym(x)
         (x, i)
     elseif iscall(x)
         operation(x) isa Differential ?
@@ -334,14 +302,17 @@ julia> Symbolics.degree(x^2)
 function degree(p, sym=nothing)
     p = value(p)
     sym = value(sym)
-    if p isa Number
+    if SymbolicUtils.isconst(p) || p isa Number
         return 0
     end
     if isequal(p, sym)
         return 1
     end
     if isterm(p)
-        if sym === nothing
+        if operation(p) === (^)
+            base, exp = arguments(p)
+            return unwrap_const(exp) * degree(base, sym)
+        elseif sym === nothing
             return 1
         else
             return Int(isequal(p, sym))
@@ -350,8 +321,6 @@ function degree(p, sym=nothing)
         return sum(degree(k^v, sym) for (k, v) in zip(keys(p.dict), values(p.dict)))
     elseif isadd(p)
         return maximum(degree(key, sym) for key in keys(p.dict))
-    elseif ispow(p)
-        return p.exp * degree(p.base, sym)
     elseif isdiv(p)
         return degree(p.num, sym) - degree(p.den, sym)
     elseif issym(p)
@@ -392,7 +361,7 @@ function coeff(p, sym=nothing)
     # if `sym` is a product, iteratively compute the coefficient w.r.t. each term in `sym`
     if iscall(value(sym)) && operation(value(sym)) === (*)
         for t in arguments(value(sym))
-            @assert !(t isa Number) "`coeff(p, sym)` does not allow `sym` containing numerical factors"
+            @assert !(t isa Number || SymbolicUtils.isconst(t)) "`coeff(p, sym)` does not allow `sym` containing numerical factors"
             p = coeff(p, t)
         end
         return p
@@ -400,13 +369,11 @@ function coeff(p, sym=nothing)
             
     p, sym = value(p), value(sym)
 
-    if isequal(sym, 1)
+    if _isone(sym)
         sym = nothing
     end
 
-    if issym(p) || isterm(p)
-        sym === nothing ? 0 : Int(isequal(p, sym))
-    elseif ispow(p)
+    if issym(p) || SymbolicUtils.isconst(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif isadd(p)
         if sym===nothing
@@ -424,14 +391,14 @@ function coeff(p, sym=nothing)
         end
     elseif isdiv(p)
         numerator, denominator = arguments(p)
-        if !occursin(sym, denominator)
+        if !SymbolicUtils.query(isequal(sym), denominator)
             coeff(numerator, sym) / denominator
         else
             throw(DomainError(p, "coeff on fractions is not yet implemented."))
         end
     else
         p isa Number && return sym === nothing ? p : 0
-        p isa Symbolic && return coeff(p, sym)
+        p isa BasicSymbolic && return coeff(p, sym)
         throw(DomainError(p, "Datatype $(typeof(p)) not accepted."))
     end
 end
@@ -441,9 +408,29 @@ end
 const DP = DynamicPolynomials
 # extracting underlying polynomial and coefficient type from Polyforms
 underlyingpoly(x::Number) = x
-underlyingpoly(pf::PolyForm) = pf.p
 coefftype(x::Number) = typeof(x)
-coefftype(pf::PolyForm) = DP.coefficient_type(underlyingpoly(pf))
+coefftype(x::DP.Polynomial) = eltype(MP.coefficients(x))
+
+as_concrete_polynomial(x::Number) = x
+function as_concrete_polynomial(x::DP.Polynomial)
+    coeffs = MP.coefficients(x)
+    isconcretetype(eltype(coeffs)) && return x
+    isempty(coeffs) && return poly_to_coefftype(Int, x)
+    T = typeof(coeffs[1])
+    for coeff in coeffs
+        T = promote_type(T, typeof(coeff))
+    end
+    poly_to_coefftype(T, x)
+end
+
+function as_concrete_polynomial(x::SymbolicUtils.PolyVarT)
+    mv = DP.MonomialVector{SymbolicUtils.PolyVarOrder, SymbolicUtils.MonomialOrder}([x], [Int[1]])
+    return DP.Polynomial(Int[1], mv)
+end
+
+function poly_to_coefftype(::Type{T}, x::DP.Polynomial) where {T}
+    DP.Polynomial(Vector{T}(MP.coefficients(x)), MP.monomials(x))
+end
 
 #=
 Converts an array of symbolic polynomials
@@ -456,31 +443,27 @@ function symbol_to_poly(sympolys::AbstractArray)
     stdsympolys = map(unwrap, sympolys)
     sort!(stdsympolys, lt=(<ₑ))
 
-    pvar2sym = Bijections.Bijection{Any,Any}()
-    sym2term = Dict{BasicSymbolic,Any}()
-    polyforms = map(f -> PolyForm(f, pvar2sym, sym2term), stdsympolys)
+    symidx = findfirst(x -> x isa BasicSymbolic, stdsympolys)
+    varT = vartype(stdsympolys[symidx])
 
+    poly_to_bs = Bijections.Bijection{SymbolicUtils.PolyVarT, BasicSymbolic{varT}}()
+    bs_to_poly = Bijections.active_inv(poly_to_bs)
+    polyforms = map(f -> as_concrete_polynomial(SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, f)), stdsympolys)
     # Discover common coefficient type
     commontype = mapreduce(coefftype, promote_type, polyforms, init=Int)
     @assert commontype <: Union{Integer,Rational} "Only integer and rational coefficients are supported as input."
 
-    # Convert all to DP.Polynomial, so that coefficients are of same type,
-    # and constants are treated as polynomials
-    # We also need this because Groebner does not support abstract types as input
-    polynoms = Vector{DP.Polynomial{DP.Commutative{DP.CreationOrder},DP.Graded{DP.LexOrder},commontype}}(undef, length(sympolys))
-    for (i, pf) in enumerate(polyforms)
-        polynoms[i] = underlyingpoly(pf)
-    end
+    polynoms = map(Base.Fix1(poly_to_coefftype, commontype), polyforms)
 
-    polynoms, pvar2sym, sym2term
+    polynoms, poly_to_bs
 end
 
 #=
 Converts an array of AbstractPolynomialLike`s into an array of
 symbolic expressions mapping variables w.r.t pvar2sym
 =#
-function poly_to_symbol(polys, pvar2sym, sym2term, ::Type{T}) where {T}
-    map(f -> PolyForm{T}(f, pvar2sym, sym2term), polys)
+function poly_to_symbol(polys, poly_to_bs)
+    map(Base.Fix1(SymbolicUtils.from_poly, poly_to_bs), polys)
 end
 
 """
@@ -501,7 +484,7 @@ function symbolic_to_float end
 symbolic_to_float(x::Num) = symbolic_to_float(unwrap(x))
 symbolic_to_float(x::Number) = x
 function symbolic_to_float(x::SymbolicUtils.BasicSymbolic)
-    substitute(x,Dict())
+    unwrap_const(SymbolicUtils.evaluate(x))
 end
 
 """
@@ -516,7 +499,7 @@ julia> numerator(x/y)
 x
 ```
 """
-function Base.numerator(x::Union{Num, Symbolic})
+function Base.numerator(x::Union{Num, BasicSymbolic})
     x = unwrap(x)
     if iscall(x) && operation(x) == /
         x = arguments(x)[1] # get numerator
@@ -536,7 +519,7 @@ julia> denominator(x/y)
 y
 ```
 """
-function Base.denominator(x::Union{Num, Symbolic})
+function Base.denominator(x::Union{Num, BasicSymbolic})
     x = unwrap(x)
     if iscall(x) && operation(x) == /
         x = arguments(x)[2] # get denominator
@@ -622,21 +605,35 @@ false
 function evaluate end
 
 function evaluate(eq::Equation, subs)
-    lhs = fast_substitute(eq.lhs, subs)
-    rhs = fast_substitute(eq.rhs, subs)
+    lhs = substitute(eq.lhs, subs)
+    rhs = substitute(eq.rhs, subs)
     return isequal(lhs, rhs)
 end
 
 function evaluate(ineq::Inequality, subs)
-    lhs = fast_substitute(ineq.lhs, subs)
-    rhs = fast_substitute(ineq.rhs, subs)
+    lhs = substitute(ineq.lhs, subs)
+    rhs = substitute(ineq.rhs, subs)
     if (ineq.relational_op == geq)
-        return isless(rhs, lhs)
+        return if SymbolicUtils.isconst(rhs) && SymbolicUtils.isconst(lhs)
+            isless(unwrap_const(rhs), unwrap_const(lhs))::Bool
+        else
+            isless(rhs, lhs)
+        end
     elseif (ineq.relational_op == leq)
-        return isless(lhs, rhs)
+        return if SymbolicUtils.isconst(lhs) && SymbolicUtils.isconst(rhs)
+            isless(unwrap_const(lhs), unwrap_const(rhs))::Bool
+        else
+            isless(lhs, rhs)
+        end
     else
         throw(ArgumentError("Inequality $ineq not supported"))
     end
-end 
+end
 
+function evaluate(x, subs)
+    unwrap_const(substitute(x, subs; fold = Val(true)))
+end
 
+vartype_from_args(::BasicSymbolic{T}, args...) where {T} = T
+vartype_from_args(_, args...) = vartype_from_args(args...)
+vartype_from_args() = error("Cannot infer `vartype`.")
