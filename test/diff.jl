@@ -635,3 +635,34 @@ end
     @test iszero(Symbolics.unwrap.(Symbolics.hessian(f, vp) .- Symbolics.hessian(f, p)))
     @test iszero(Symbolics.unwrap.(Symbolics.jacobian([f], vp) .- Symbolics.jacobian([f], p)))
 end
+
+@testset "Derivatives of indexed array expressions" begin
+    @register_array_symbolic foobar(x, y) begin
+        size = (2,)
+        eltype = Real
+        ndims = 1
+    end
+    @register_array_symbolic dfoobar1(x, y) begin
+        size = (2,)
+        eltype = Real
+        ndims = 1
+    end
+    @register_array_symbolic dfoobar2(x, y) begin
+        size = (2,)
+        eltype = Real
+        ndims = 1
+    end
+    Symbolics.derivative(::typeof(foobar), args::NTuple{2, Any}, ::Val{1}) = dfoobar1(args...)
+    Symbolics.derivative(::typeof(foobar), args::NTuple{2, Any}, ::Val{2}) = dfoobar2(args...)
+    
+    @variables x y
+    ex = foobar(x + 2y, y)
+    @test ex isa Symbolics.Arr
+    @test size(ex) == (2,)
+
+    der = Symbolics.derivative(ex[1], x)
+    @test isequal(der, dfoobar1(x + 2y, y)[1])
+    
+    der = Symbolics.derivative(ex[1], y)
+    @test isequal(der, dfoobar1(x + 2y, y)[1] * 2 + dfoobar2(x + 2y, y)[1])
+end

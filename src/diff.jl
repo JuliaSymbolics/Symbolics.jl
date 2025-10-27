@@ -263,16 +263,25 @@ function executediff(D, arg, simplify=false; throw_no_derivative=false)
             end
         end
     elseif op === getindex
+        arr = arguments(arg)[1]
         inner_args = arguments(arguments(arg)[1])
+        idxs = @views arguments(arg)[2:end]
         c = 0
-        for a in inner_args
+        # We know `D.x` is in `arg`, so the derivative is not identically zero.
+        # `arg` cannot be `D.x` since, that would have also early exited. 
+        for (i, a) in enumerate(inner_args)
+            der = derivative_idx(arr, i)
             if isequal(a, D.x)
-                return D(arg)
+                der isa NoDeriv && return D(arg)
+                c += der[idxs...]
+                continue
+            elseif der isa NoDeriv
+                c += Differential(a)(arg) * executediff(D, a)
             else
-                c += Differential(a)(arg) * D(a)
+                c += der[idxs...] * executediff(D, a)
             end
         end
-        return expand_derivatives(c)
+        return c
     elseif op === ifelse
         args = arguments(arg)
         O = op(args[1],
