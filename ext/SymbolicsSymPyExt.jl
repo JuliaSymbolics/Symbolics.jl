@@ -8,13 +8,14 @@ else
     using ..SymPy
 end
 
-using Symbolics: value, symbolics_to_sympy, sympy_to_symbolics, Differential, Num
-using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Symbolic, Term
+using Symbolics: value, symbolics_to_sympy, sympy_to_symbolics, Differential, Num, SymbolicT
+import SymbolicUtils
+using SymbolicUtils: iscall, operation, arguments, symtype, FnType, Term, unwrap_const
 using LinearAlgebra
 
 function Symbolics.symbolics_to_sympy(expr)
     expr = value(expr)
-    expr isa Symbolic || return expr
+    expr isa SymbolicT || return expr
     if iscall(expr)
         op = operation(expr)
         args = arguments(expr)
@@ -34,8 +35,10 @@ function Symbolics.symbolics_to_sympy(expr)
         sop = symbolics_to_sympy(op)
         sargs = map(symbolics_to_sympy, args)
         return sop === (^) && length(sargs) == 2 ? sargs[1]^sargs[2] : sop(sargs...)
+    elseif SymbolicUtils.isconst(expr)
+        return unwrap_const(expr)
     else
-        name = string(nameof(expr))
+        name = string(Symbol(expr))
         return symtype(expr) <: FnType ? SymPy.SymFunction(name) : SymPy.Sym(name)
     end
 end
@@ -48,7 +51,7 @@ function Symbolics.sympy_to_symbolics(sympy_expr, vars)
     end
     dict = Dict{Symbol, Any}()
     for v in vars
-        dict[nameof(v)] = v
+        dict[Symbol(v)] = v
     end
 
     # Convert Python/SymPy notation to Julia notation
@@ -76,7 +79,7 @@ function Symbolics.sympy_algebraic_solve(expr, var)
     sol_sympy = SymPy.solve(expr_sympy, var_sympy, dict = true)
     vars = var isa AbstractVector ? var : [var]
     if expr isa AbstractVector
-        varmap = Dict(string(nameof(v)) => v for v in vars)
+        varmap = Dict(string(Symbol(v)) => v for v in vars)
         return [Dict(varmap[string(k)] => sympy_to_symbolics(v, vars) for (k, v) in s)
                 for s in sol_sympy]
     else
