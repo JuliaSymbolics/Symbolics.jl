@@ -320,6 +320,8 @@ getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Num}) = ScalarSymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr{T, N}}) where {T, N} = ArraySymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr{T}}) where {T} = ArraySymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr}) = ArraySymbolic()
 
 SymbolicIndexingInterface.hasname(x::Union{Num,Arr,Complex{Num}}) = hasname(unwrap(x))
 function SymbolicIndexingInterface.getname(x::Union{Num, Arr, Complex{Num}})
@@ -557,6 +559,7 @@ function (caw::CallAndWrap{T})(args...) where {T}
 end
 
 SymbolicIndexingInterface.symbolic_type(::Type{CallAndWrap{T}}) where {T} = ScalarSymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{CallAndWrap}) = ScalarSymbolic()
 
 Base.isequal(a::CallAndWrap, b::CallAndWrap) = isequal(a.f,  b.f)
 Base.isequal(a::BasicSymbolic{VartypeT}, b::CallAndWrap) = isequal(a,  b.f)
