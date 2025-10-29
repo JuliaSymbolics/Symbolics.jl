@@ -227,7 +227,7 @@ function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val,
     if val !== nothing
         ex = :($setdefaultval($ex, $val))
     end
-    ex = setprops_expr(ex, prop, macroname, Meta.quot(vname))
+    ex = setprops_expr(ex, prop, macroname, _vname)
     #ex = :($scalarize_getindex($ex))
 
     ex = :($wrap($ex))

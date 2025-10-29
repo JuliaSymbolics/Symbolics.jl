@@ -435,3 +435,10 @@ end
     @test isequal(f, ff)
     @test hash(f) == hash(ff)
 end
+
+# https://github.com/SciML/ModelingToolkitNeuralNets.jl/issues/58
+@testset "`getname` on symbolic functions returning arrays with interpolated names" begin
+    name1 = :f1
+    vs = @variables $name1(..)[1:3]
+    @test getname(vs[1]) == name1
+end
