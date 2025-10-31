@@ -23,8 +23,10 @@ overwriting.
 ```
 See `@register_array_symbolic` to register functions which return arrays.
 """
-macro register_symbolic(expr, define_promotion = true, Ts = :([]), wrap_arrays = true)
+macro register_symbolic(expr, define_promotion = true, Ts = :([]), wrap_arrays = true, args_list = [])
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, Ts)
+
+    args_list = parse_args_list(args_list)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
     ret_type = isnothing(ret_type) ? Real : ret_type
@@ -42,7 +44,7 @@ macro register_symbolic(expr, define_promotion = true, Ts = :([]), wrap_arrays =
                   else
                       return $wrap(res)
                   end
-              end $wrap_arrays)
+              end $wrap_arrays $args_list)
 
     if define_promotion
         fexpr = :($fexpr; (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type)
@@ -96,7 +98,7 @@ symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: SymbolicUtils.Symbolic
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
-function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true)
+function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, args_list = [])
     def_assignments = MacroTools.rmlines(partial_defs).args
     defs = map(def_assignments) do ex
         @assert ex.head == :(=)
@@ -123,7 +125,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             else
                 return $wrap(res)
             end
-        end $wrap_arrays
+        end $wrap_arrays $args_list
     end |> esc
 
     if define_promotion
@@ -161,6 +163,23 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     return fexpr
 end
 
+function parse_args_list(args_list)
+    if isa(args_list, Expr) && args_list.head == :vect
+        args_list = args_list.args
+
+        # for each element of args_list, convert exp to a tuple
+        args_list = map(args_list) do exp
+            if exp isa Expr && exp.head == :tuple
+                exp.args
+            else
+                (exp,)
+            end
+        end
+    end
+    
+    return args_list
+end
+
 """
     @register_array_symbolic(expr, define_promotion = true)
 
@@ -193,7 +212,10 @@ overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
 overwriting.
 """
-macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
+macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true, args_list = [])
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr, :([]))
-    register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays)
+
+    args_list = parse_args_list(args_list)
+
+    register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays, args_list)
 end
