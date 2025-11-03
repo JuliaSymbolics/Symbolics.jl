@@ -442,6 +442,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
     end
 end
+executediff(D::Differential, arg::Num; kw...) = executediff(D, unwrap(arg); kw...)
+executediff(D::Differential, arg::Number; kw...) = COMMON_ZERO
 
 """
 $(SIGNATURES)
@@ -694,18 +696,39 @@ an array of variable expressions.
 
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
-function jacobian(ops::AbstractVector, vars::AbstractVector; simplify=false, scalarize=true, kwargs...)
-    if scalarize
+function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
+                  simplify=false, scalarize::Union{Val{true}, Val{false}}=Val(true), kwargs...)
+    if scalarize isa Val{true}
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
-    Num[Num(expand_derivatives(Differential(unwrap(v))(unwrap(O)),simplify; kwargs...)) for O in ops, v in vars]
+    result = fill(COMMON_ZERO, length(ops), length(vars))
+    for i in eachindex(ops), j in eachindex(vars)
+        result[i, j] = executediff(Differential(vars[j]), ops[i]; simplify, kwargs...)
+    end
+    return result
 end
 
 function jacobian(ops, vars; simplify=false, kwargs...)
     ops = vec(scalarize(ops))
-    vars = vec(scalarize(vars)) # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
-    jacobian(ops, vars; simplify=simplify, scalarize=false, kwargs...)
+    if ops isa Vector{Num}
+        ops = unwrap.(ops)::Vector{SymbolicT}
+    elseif ops isa Vector{SymbolicT}
+    else
+        ops = ops::Vector{eltype(ops)}
+    end
+    # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
+    vars = vec(scalarize(vars))
+    if vars isa Vector{Num}
+        vars = unwrap.(vars)::Vector{SymbolicT}
+    elseif vars isa Vector{SymbolicT}
+    else
+        error("This should not happen!")
+    end
+    _res = jacobian(ops, vars; simplify=simplify, scalarize=Val(false), kwargs...)
+    res = similar(_res, Num)
+    map!(Num, res, _res)
+    return res
 end
 
 function faster_maybe_scalarize!(arg::Vector)
