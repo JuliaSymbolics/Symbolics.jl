@@ -1,17 +1,18 @@
-function nterms(t)
+function nterms(t::SymbolicT)
     if iscall(t)
-        return reduce(+, map(nterms, arguments(t)), init=0)
+        return sum(nterms, arguments(t))
     else
         return 1
     end
 end
+nterms(t::Num) = nterms(unwrap(t))
 
 # Soft pivoted
-# Note: we call this function with a matrix of Union{SymbolicUtils.BasicSymbolic, Any}
-function sym_lu(A; check=true)
+function sym_lu(A::AbstractMatrix{Num}; check=true)
     SINGULAR = typemax(Int)
     m, n = size(A)
-    F = map(x->x isa RCNum ? x : Num(x), A)
+    F = Matrix{Num}(undef, size(A)...)
+    copyto!(F, A)
     minmn = min(m, n)
     p = Vector{LinearAlgebra.BlasInt}(undef, minmn)
     info = 0
@@ -28,7 +29,7 @@ function sym_lu(A; check=true)
 
         p[k] = kp
 
-        if amin == SINGULAR && !(amin isa BasicSymbolic) && (amin isa Number) && iszero(info)
+        if amin == SINGULAR && iszero(info)
             info = k
         end
 
@@ -88,30 +89,44 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
     check && @assert islinear
     islinear || return nothing
     # a * x + b = 0
-    if eq isa AbstractArray && var isa AbstractArray
-        x = _solve(a, -b, simplify)
-    else
-        if (a === COMMON_ZERO) || _iszero(a)
-            x = SymbolicUtils.Const{VartypeT}(NaN)
-        else
-            x = a \ -b
-        end
-    end
+    x = __solve(a, b, simplify)
     simplify || return x
-    if x isa AbstractArray
-        return SymbolicUtils.simplify.(simplify_fractions.(x))
-    else
-        return SymbolicUtils.simplify(simplify_fractions(x))
+    if x isa SymbolicT
+        return SymbolicUtils.simplify(x)
     end
+    map!(SymbolicUtils.simplify, x, x)
+    return x
 end
+
+function __solve(a::AbstractArray{SymbolicT}, b::AbstractArray{SymbolicT}, simplify::Bool)
+    @inbounds for i in eachindex(b)
+        b[i] = -b[i]
+    end
+    return _solve(a, b, simplify)
+end
+function __solve(a::SymbolicT, b::SymbolicT, simplify::Bool)
+    if (a === COMMON_ZERO) || _iszero(a)
+        return SymbolicUtils.Const{VartypeT}(NaN)
+    end
+    return a \ -b
+end
+__solve(a::Num, b::Num, simplify::Bool) = Num(__solve(unwrap(a), unwrap(b), simplify))
+
 symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq], var; x...)
 symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq, [var]; x...))
 
 
-function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
-    A = Num.(SymbolicUtils.quick_cancel.(A))
-    b = Num.(SymbolicUtils.quick_cancel.(b))
-    sol = value.(sym_lu(A) \ b)
+function _solve(A::AbstractMatrix{SymbolicT}, b, do_simplify)
+    _solve(Num.(A), b, do_simplify)
+end
+function _solve(A::AbstractMatrix{Num}, b::Union{AbstractArray{Num}, AbstractArray{SymbolicT}}, do_simplify)
+    for i in eachindex(A)
+        A[i] = SymbolicUtils.quick_cancel(A[i])
+    end
+    for i in eachindex(b)
+        b[i] = SymbolicUtils.quick_cancel(b[i])
+    end
+    sol = sym_lu(A) \ b
     do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
 
@@ -214,22 +229,31 @@ end
 @inline function linear_expansion(t, x::SymbolicT)
     return _linear_expansion(unwrap(t), x)
 end
-function linear_expansion(ts::AbstractArray, xs::AbstractArray)
-    A = Matrix{Num}(undef, length(ts), length(xs))
-    bvec = Vector{Num}(undef, length(ts))
-    islinear = true
+
+function linear_expansion(ts::AbstractArray{T}, xs::AbstractArray{S}) where {T <: Union{Num, SymbolicT, Equation}, S <: Union{SymbolicT, Num}}
+    ts = vec(ts)
+    xs = vec(xs)
+    A = Matrix{SymbolicT}(undef, length(ts), length(xs))
+    bvec = Vector{SymbolicT}(undef, length(ts))
     for (i, t) in enumerate(ts)
-        b = t isa Equation ? t.rhs - t.lhs : t
+        if T === Equation
+            resid = t.rhs - t.lhs
+        elseif T === Num
+            resid = unwrap(t)
+        else
+            resid = t
+        end
         for (j, x) in enumerate(xs)
-            a, b, islinear = _linear_expansion(unwrap(b), unwrap(x))
-            islinear &= islinear
-            islinear || @goto FINISH
+            if S === Num
+                x = unwrap(x)
+            end
+            a, resid, islin = _linear_expansion(resid, x)
+            islin || return A, bvec, false
             A[i, j] = a
         end
-        bvec[i] = b
+        bvec[i] = resid
     end
-    @label FINISH
-    return A, bvec, islinear
+    return A, bvec, true
 end
 # _linear_expansion always returns `BasicSymbolic`
 function _linear_expansion(t::Equation, x::SymbolicT)
