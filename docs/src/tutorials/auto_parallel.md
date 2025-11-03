@@ -84,7 +84,7 @@ Now let's set up the parabolic PDE to be solved by DifferentialEquations.jl.
 We will set up the vanilla version and the sparse multithreaded
 version:
 
-```@example auto_parallel
+```julia
 using OrdinaryDiffEq
 u0 = zeros(N, N, 3)
 MyA = zeros(N, N);
@@ -99,7 +99,7 @@ fastprob = ODEProblem(ODEFunction((du, u, p, t) -> fastf(du, u),
 
 Let's see the timing difference:
 
-```@example auto_parallel
+```julia
 using BenchmarkTools
 #@btime solve(prob, TRBDF2()); # 33.073 s (895404 allocations: 23.87 GiB)
 #warning the following solve takes a long time to compile, but afterwards is very fast.
