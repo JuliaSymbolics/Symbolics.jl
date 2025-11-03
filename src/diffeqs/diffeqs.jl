@@ -459,7 +459,7 @@ function method_of_undetermined_coefficients(eq::SymbolicLinearODE)
     # constant
     p = eq.p[1]
     if isempty(Symbolics.get_variables(p, eq.t)) && isempty(Symbolics.get_variables(eq.q, eq.t))
-        return eq.q // p
+        return eq.q / p
     end
 
     # polynomial
@@ -669,11 +669,11 @@ function linearize_bernoulli(expr, x, t, v)
         end
     end
     
-    p //= leading_coeff
+    p /= leading_coeff
     if q isa Union{Num, BasicSymbolic{VartypeT}}
         q /= leading_coeff
     else
-        q //= leading_coeff
+        q /= leading_coeff
     end
     
     return SymbolicLinearODE(v, t, [p*(1-n)], q*(1-n)), n
