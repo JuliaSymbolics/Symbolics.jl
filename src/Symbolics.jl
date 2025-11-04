@@ -28,7 +28,7 @@ import TermInterface: maketerm, iscall, operation, arguments, metadata
 import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
     FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
     promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
-    Operator, _iszero, _isone, search_variables, search_variables!
+    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT
 
 using SymbolicUtils.Code
 
@@ -74,6 +74,7 @@ const COMMON_ONE = SymbolicUtils.one_of_vartype(VartypeT)
 const COMMON_ZERO = SymbolicUtils.zero_of_vartype(VartypeT)
 const SymbolicT = BasicSymbolic{VartypeT}
 const SArgsT = SymbolicUtils.ArgsT{VartypeT}
+const SConst = SymbolicUtils.BSImpl.Const{VartypeT}
 const SSym = SymbolicUtils.Sym{VartypeT}
 const STerm = SymbolicUtils.Term{VartypeT}
 
@@ -152,8 +153,8 @@ include("linearity.jl")
 using DiffRules, SpecialFunctions, NaNMath
 
 
-export Differential, expand_derivatives, is_derivative
-
+export Differential, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
+include("register_derivatives.jl")
 include("diff.jl")
 
 export SymbolicsSparsityDetector
