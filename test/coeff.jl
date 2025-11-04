@@ -16,7 +16,7 @@ import Symbolics: coeff
 @test isequal(coeff(a*x^sqrt(2), x^sqrt(2)), a)
 
 @test isequal(coeff(a + x, x), 1)
-@test isequal(coeff(2(a + x), x), 2)
+@test isequal(unwrap_const(coeff(2(a + x), x)), 2)
 
 e = 4 + x + 3x^2 + 2x^4 + a*x^2 + b
 @test isequal(coeff(e), 4)
@@ -51,13 +51,13 @@ e = x*y^2 + 2x + y^3*x^3
 @test isequal(coeff(e, x^0), 0)
 @test isequal(coeff(a*x + 3, x^0), 3)
 
-@test isequal(coeff(x / 5, x), 1//5)
+@test isequal(unwrap_const(coeff(x / 5, x)), 1//5)
 @test isequal(coeff(x / y, x), 1/y)
 @test isequal(coeff(x * 5y / (1 + y + z) , x), 5y / (1 + y + z))
 
 # issue #1041 - coefficient of cross term in multivariate polynomial
-@test isequal(coeff(2*x*y + y, x*y), 2)
-@test isequal(coeff(2*x^2*y + y, x^2*y), 2)
+@test isequal(unwrap_const(coeff(2*x*y + y, x*y)), 2)
+@test isequal(unwrap_const(coeff(2*x^2*y + y, x^2*y)), 2)
 @test_throws AssertionError coeff(2*x*y + y, 2*x*y) # numerical factors not allowed in second argument of `coeff`
 @testset "Issue#1610 non-numeric coeff" begin
     @variables x a b c d

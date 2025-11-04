@@ -86,7 +86,6 @@ end
 # Scalar output
 
 unwrap_nometa(x) = unwrap(x)
-unwrap_nometa(x::CallWithMetadata) = unwrap(x.f)
 function destructure_arg(arg::Union{AbstractArray, Tuple,NamedTuple}, inbounds, name)
     if !(arg isa Arr)
         DestructuredArgs(map(unwrap_nometa, arg), name, inbounds=inbounds, create_bindings=false)
@@ -103,11 +102,12 @@ end
 const DEFAULT_OUTSYM = Symbol("ˍ₋out")
 
 # don't CSE inside operators
-SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator, args...) = false
+SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator) = false
 # don't CSE inside `getindex` of things created via `@variables`
 # EXCEPT called variables
-function SymbolicUtils.Code.cse_inside_expr(sym, ::typeof(getindex), x::BasicSymbolic, idxs...)
-    return !hasmetadata(sym, VariableSource) || hasmetadata(sym, CallWithParent)
+function SymbolicUtils.Code.cse_inside_expr(sym, ::typeof(getindex))
+    x = arguments(sym)[1]
+    return !hasmetadata(x, VariableSource) || SymbolicUtils.is_called_function_symbolic(x)
 end
 
 function _build_function(target::JuliaTarget, op, args...;
@@ -122,6 +122,12 @@ function _build_function(target::JuliaTarget, op, args...;
                          nanmath = true,
                          kwargs...)
     op = _recursive_unwrap(op)
+    if symtype(op) <: AbstractArray
+        if wrap_code === nothing
+            wrap_code = (identity, identity)
+        end
+        return _build_function(target, wrap(op), args...; conv, expression, expression_module, checkbounds, states, linenumbers, cse, nanmath, wrap_code, kwargs...)
+    end
     states.rewrites[:nanmath] = nanmath
     dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
     fun = Func(dargs, [], op)
@@ -149,7 +155,7 @@ end
 
 SymbolicUtils.Code.get_rewrites(x::Arr) = SymbolicUtils.Code.get_rewrites(unwrap(x))
 
-function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUtils.BasicSymbolic{<:AbstractArray}}, args...;
+function _build_function(target::JuliaTarget, op::Arr, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
@@ -182,8 +188,10 @@ function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp, SymbolicUt
         oop_expr = Code.cse(oop_expr)
         iip_expr = Code.cse(iip_expr)
     end
-
     oop_expr = conv(oop_expr, states)
+    if SymbolicUtils.isarrayop(op) && !haskey(states.rewrites, :arrayop_output)
+        states.rewrites[:arrayop_output] = outsym
+    end
     iip_expr = conv(iip_expr, states)
 
     if !checkbounds
@@ -338,7 +346,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
 
     if iip
-        out = Sym{Any}(DEFAULT_OUTSYM)
+        out = Sym{VartypeT}(DEFAULT_OUTSYM; type = Any, shape = SymbolicUtils.Unknown(-1))
         iip_expr = Func(vcat(out, dargs), [], postprocess_fbody(set_array(parallel,
                                     dargs,
                                     out,
@@ -619,10 +627,11 @@ function buildvarnumbercache(args...)
     return Dict(varnumsdict)
 end
 
-function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
+function numbered_expr(O::BasicSymbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
+    O isa BasicSymbolic || return O
     if (issym(O) || issym(operation(O))) || (iscall(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
         if !isnothing(j)

@@ -17,8 +17,9 @@ function set_where(subt, supert)
     Expr(:where, supert, Ts...)
 end
 
-function SymbolicIndexingInterface.getname(x::Expr)
-    @assert x.head == :curly
+function _get_type_name(x::Union{Symbol, Expr})
+    x isa Symbol && return x
+    @assert Meta.isexpr(x, :curly)
     return x.args[1]
 end
 
@@ -26,7 +27,7 @@ macro symbolic_wrap(expr)
     @assert expr isa Expr && expr.head == :struct
     @assert expr.args[2].head == :(<:)
     sig = expr.args[2]
-    T = getname(sig.args[1])
+    T = _get_type_name(sig.args[1])
     supertype = set_where(sig.args[1], sig.args[2])
 
     quote
@@ -41,12 +42,6 @@ macro symbolic_wrap(expr)
 end
 
 iswrapped(x) = false
-"""
-    $(TYPEDSIGNATURES)
-
-Return the symbolic or non-symbolic value wrapped by a type such as `Num`.
-"""
-unwrap(x) = x
 
 """
     $(TYPEDSIGNATURES)
@@ -112,30 +107,30 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         # for every argument find the types that
         # should be allowed as argument. These are:
         #
-        # (1) T    (2) wrapper_type(T)    (3) Symbolic{T}
+        # (1) T    (2) wrapper_type(T)    (3) BasicSymbolic
         #
         # However later while emitting methods we omit the one
         # method where all arguments are (1) since those are
         # expected to be defined outside Symbolics
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
-            Ts = has_symwrapper(T) ? (T, :(Symbolics.SymbolicUtils.Symbolic{<:$T}), wrapper_type(T)) :
-                                (T,:(Symbolics.SymbolicUtils.Symbolic{<:$T}))
+            Ts = has_symwrapper(T) ? (T, BasicSymbolic{VartypeT}, wrapper_type(T)) :
+                                (T, BasicSymbolic{VartypeT})
             if T <: AbstractArray && wrap_arrays
                 eT = eltype(T)
                 if eT == Any
                     eT = Real
                 end
                 _arr_type_fn = if hasmethod(ndims, Tuple{Type{T}})
-                    (elT) -> :(AbstractArray{T, $(ndims(T))} where {T <: $elT})
+                    (elT) -> AbstractArray{S, ndims(T)} where {S <: elT}
                 else
-                    (elT) -> :(AbstractArray{T} where {T <: $elT})
+                    (elT) -> AbstractArray{S} where {S <: elT}
                 end
                 if has_symwrapper(eT)
-                    Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})), 
+                    Ts = (Ts..., AbstractArray{BasicSymbolic{VartypeT}}, 
                     _arr_type_fn(wrapper_type(eT)))
                 else
-                    Ts = (Ts..., _arr_type_fn(:(Symbolics.SymbolicUtils.Symbolic{<:$eT})))
+                    Ts = (Ts..., AbstractArray{BasicSymbolic{VartypeT}})
                 end
             end
             Ts
@@ -158,19 +153,40 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
             :($n::$T)
         end
 
-        fbody = :(if any($iswrapped, ($(names...),))
-                      $wrap($impl_name($self, $([:($unwrap($arg)) for arg in names]...)))
-                  else
-                      $impl_name($self, $(names...))
-                  end)
+        any_wrapper = false
+        impl_args = map(enumerate(names)) do (i, name)
+            if is_wrapper_type(Ts[i])
+                any_wrapper = true
+                :($unwrap($name))
+            elseif Ts[i] <: AbstractArray && is_wrapper_type(Ts[i].var.ub)
+                any_wrapper = true
+                :($_recursive_unwrap($name))
+            else
+                name
+            end
+        end
+        implcall = :($impl_name($self, $(impl_args...)))
+        if any_wrapper
+            implcall = :($wrap($implcall))
+        end
+
+        body = Expr(:block)
+        for (i, T) in enumerate(Ts)
+            if T === BasicSymbolic{VartypeT}
+                push!(body.args, :(@assert $symtype($(names[i])) <: $(types[i][1])))
+            elseif T === AbstractArray{BasicSymbolic{VartypeT}} && eltype(types[i][1]) !== Any
+                push!(body.args, :(@assert $symtype($(names[i])[1]) <: $(eltype(types[i][1]))))
+            end
+        end
+        push!(body.args, implcall)
 
         if isempty(kwargs)
             :(function $fname($(method_args...))
-                  $fbody
+                  $body
               end)
         else
             :(function $fname($(method_args...); $(kwargs...))
-                  $fbody
+                  $body
               end)
         end
     end

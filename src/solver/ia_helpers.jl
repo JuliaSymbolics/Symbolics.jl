@@ -40,7 +40,7 @@ function n_func_occ(expr, var)
             n_occurrences(arg, var) == 0 && continue
 
             # x
-            if !iscall(arg) && isequal(var, get_variables(arg)[1]) && !outside
+            if !iscall(arg) && isequal(var, first(get_variables(arg))) && !outside
                 n += 1
                 outside = true
                 continue
@@ -57,7 +57,7 @@ function n_func_occ(expr, var)
             case_1_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0 &&
                          n_occurrences(args_arg[1], var) != 0 &&
                          check_poly_inunivar(args_arg[1], var) &&
-                         n_occurrences(arg, var) != 0 && !(args_arg[2] isa Number)
+                         n_occurrences(arg, var) != 0 && !(value(args_arg[2]) isa Number)
             case_2_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) != 0 &&
                          n_occurrences(args_arg[1], var) == 0
             case_3_pow = oper_arg === (^) && n_occurrences(args_arg[2], var) == 0 &&
@@ -83,6 +83,16 @@ function n_func_occ(expr, var)
 
                 # n(2 / x) = 1; n(x/x^2) = 2?
             elseif oper_arg === (/)
+                num, den = args_arg
+                if SymbolicUtils.isconst(den)
+                    if is_var_outside(num)
+                        n += 1
+                        outside = true
+                    elseif !check_poly_inunivar(num, var)
+                        n += n_func_occ(num, var)
+                    end
+                    continue
+                end
                 n += n_func_occ(numerator(arg), var)
                 n += n_func_occ(denominator(arg), var)
 

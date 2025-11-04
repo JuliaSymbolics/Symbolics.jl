@@ -9,7 +9,6 @@ import PrecompileTools: @recompile_invalidations
 
 @recompile_invalidations begin
     import CommonWorldInvalidations
-end
 
 using DocStringExtensions, Markdown
 
@@ -21,14 +20,15 @@ using Reexport
 
 using Setfield
 
-import DomainSets: Domain, DomainSets
+    import DomainSets: Domain, DomainSets
 
 using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-FnType, @rule, Rewriters, substitute, symtype,
-promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
+    FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
+    promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
+    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT
 
 using SymbolicUtils.Code
 
@@ -38,7 +38,6 @@ import SymbolicUtils.Code: toexpr
 
 import ArrayInterface
 using RuntimeGeneratedFunctions
-using SciMLBase
 import MacroTools
 
 using SymbolicIndexingInterface
@@ -47,31 +46,65 @@ import SymbolicLimits
 
 using ADTypes: ADTypes
 
-import OffsetArrays
-
-@reexport using SymbolicUtils
+using SymbolicUtils
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 import SciMLPublic: @public
+
+using Moshi.Match: @match
+
+import Preferences: @load_preference
+end
+
+@reexport using SymbolicUtils
+const DEFAULT_VARTYPE_PREF = @load_preference("vartype", "SymReal")
+const VartypeT = @static if DEFAULT_VARTYPE_PREF == "SymReal"
+    SymReal
+elseif DEFAULT_VARTYPE_PREF == "SafeReal"
+    SafeReal
+elseif DEFAULT_VARTYPE_PREF == "TreeReal"
+    TreeReal
+else
+    error("""
+    Invalid vartype preference: $DEFAULT_VARTYPE_PREF. Must be one of "SymReal", \
+    "SafeReal" or "TreeReal".
+    """)
+end
+const COMMON_ONE = SymbolicUtils.one_of_vartype(VartypeT)
+const COMMON_ZERO = SymbolicUtils.zero_of_vartype(VartypeT)
+const SymbolicT = BasicSymbolic{VartypeT}
+const SArgsT = SymbolicUtils.ArgsT{VartypeT}
+const SConst = SymbolicUtils.BSImpl.Const{VartypeT}
+const SSym = SymbolicUtils.Sym{VartypeT}
+const STerm = SymbolicUtils.Term{VartypeT}
 
 # re-export
 
 export simplify, substitute
 
+warn_load_latexify() = warn_load_latexify(nothing)
+warn_load_latexify(_) = nothing
+
 export Num
 import MacroTools: splitdef, combinedef, postwalk, striplines
 include("wrapper-types.jl")
 
-include("num.jl")
+@recompile_invalidations begin
+    include("num.jl")
+end
+function (s::SymbolicUtils.Substituter)(x::Num)
+    Num(s(unwrap(x)))
+end
+
 
 include("rewrite-helpers.jl")
 include("complex.jl")
 
 """
-    substitute(expr, s; fold=true)
+    substitute(expr, s; fold=Val(true))
 
 Performs the substitution on `expr` according to rule(s) `s`.
-If `fold=false`, expressions which can be evaluated won't be evaluated.
+If `fold=Val(false)`, expressions which can be evaluated won't be evaluated.
 # Examples
 ```jldoctest
 julia> @variables t x y z(t)
@@ -84,24 +117,28 @@ julia> ex = x + y + sin(z)
 (x + y) + sin(z(t))
 julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
 (z(t) + y) + (z(t) ^ 2)
-julia> substitute(sqrt(2x), Dict([x => 1]); fold=false)
+julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(false))
 sqrt(2)
 ```
 """
 substitute
 
-export Equation, ConstrainedEquation
+export Equation
 include("equations.jl")
 
 export Inequality, ≲, ≳
 include("inequality.jl")
 
 import Bijections, DynamicPolynomials
-export tosymbol, terms, factors
-include("utils.jl")
+import DynamicPolynomials as DP
+import MultivariatePolynomials as MP
+import MutableArithmetics as MA
 
 using ConstructionBase
 include("arrays.jl")
+
+export tosymbol, terms, factors
+include("utils.jl")
 
 export @register_symbolic, @register_array_symbolic
 include("register.jl")
@@ -116,17 +153,13 @@ include("linearity.jl")
 using DiffRules, SpecialFunctions, NaNMath
 
 
-export Differential, expand_derivatives, is_derivative
-
+export Differential, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
+include("register_derivatives.jl")
 include("diff.jl")
 
 export SymbolicsSparsityDetector
 
 include("adtypes.jl")
-
-export Difference, DiscreteUpdate
-
-include("difference.jl")
 
 export infimum, supremum
 include("domains.jl")
@@ -152,12 +185,7 @@ import Libdl
 include("build_function.jl")
 export build_function
 
-import Distributions
 include("extra_functions.jl")
-
-using Latexify
-using LaTeXStrings
-include("latexify_recipes.jl")
 
 using RecipesBase
 include("plot_recipes.jl")
@@ -169,15 +197,13 @@ include("parsing.jl")
 export parse_expr_to_symbolic
 
 include("error_hints.jl")
-include("struct.jl")
-include("operators.jl")
 
 include("limits.jl")
 export limit
 
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
-(::Type{T})(x::SymbolicUtils.Symbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
+(::Type{T})(x::SymbolicUtils.BasicSymbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
 for T in [Num, Complex{Num}]
     @eval begin
         #(::Type{S})(x::$T) where {S<:Union{NumberTypes,AbstractArray}} = S(Symbolics.unwrap(x))::S
@@ -185,9 +211,6 @@ for T in [Num, Complex{Num}]
         SymbolicUtils.simplify(n::$T; kw...) = wrap(SymbolicUtils.simplify(unwrap(n); kw...))
         SymbolicUtils.simplify_fractions(n::$T; kw...) = wrap(SymbolicUtils.simplify_fractions(unwrap(n); kw...))
         SymbolicUtils.expand(n::$T) = wrap(SymbolicUtils.expand(unwrap(n)))
-        substitute(expr::$T, s::Pair; kw...) = wrap(substituter(s)(unwrap(expr); kw...)) # backward compat
-        substitute(expr::$T, s::Vector; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
-        substitute(expr::$T, s::Dict; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
 
         SymbolicUtils.Code.toexpr(x::$T) = SymbolicUtils.Code.toexpr(unwrap(x))
 
@@ -196,14 +219,8 @@ for T in [Num, Complex{Num}]
         SymbolicUtils.hasmetadata(x::$T, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
 
         Broadcast.broadcastable(x::$T) = x
+        SymbolicUtils.scalarize(x::$T) = scalarize(unwrap(x))
     end
-    for S in [:(Symbolic{<:FnType}), :CallWithMetadata]
-        @eval (f::$S)(x::$T, y...) = wrap(f(unwrap(x), unwrap.(y)...))
-    end
-end
-
-for sType in [Pair, Vector, Dict]
-    @eval substitute(expr::Arr, s::$sType; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
 end
 
 # Symbolic solver
@@ -545,9 +562,95 @@ include("inverse.jl")
 export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
 include("discontinuities.jl")
 
-@public Arr, CallWithMetadata, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
+@public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
-@public get_variables, get_variables!, get_differential_vars, getparent, option_to_metadata_type, scalarize, shape
+@public get_variables, get_variables!, get_differential_vars, option_to_metadata_type, scalarize, shape
 @public unwrap, variable, wrap
+
+@setup_workload begin
+    fold1 = Val{false}()
+    @compile_workload begin
+        @syms x y f(t) q[1:5]
+        SymbolicUtils.Sym{SymReal}(:a; type = Real, shape = SymbolicUtils.ShapeVecT())
+        x + y
+        x * y
+        x / y
+        x ^ y
+        x ^ 5
+        6 ^ x
+        x - y
+        -y
+        2y
+        z = 2
+        dict = SymbolicUtils.ACDict{VartypeT}()
+        dict[x] = 1
+        dict[y] = 1
+        type::typeof(DataType) = rand() < 0.5 ? Real : Float64
+        nt = (; type, shape, unsafe = true)
+        Base.pairs(nt)
+        BSImpl.AddMul{VartypeT}(1, dict, SymbolicUtils.AddMulVariant.MUL; type, shape = SymbolicUtils.ShapeVecT(), unsafe = true)
+        *(y, z)
+        *(z, y)
+        SymbolicUtils.symtype(y)
+        f(x)
+        (5x / 5)
+        expand((x + y) ^ 2)
+        simplify(x ^ (1//2) + (sin(x) ^ 2 + cos(x) ^ 2) + 2(x + y) - x - y)
+        ex = x + 2y + sin(x)
+        rules1 = Dict(x => y)
+        rules2 = Dict(x => 1)
+        Dx = Differential(x)
+        Differential(y)(ex)
+        uex = unwrap(ex)
+        executediff(Dx, uex)
+        # Running `fold = Val(true)` invalidates the precompiled statements
+        # for `fold = Val(false)` and itself doesn't precompile anyway.
+        # substitute(ex, rules1)
+        substitute(ex, rules1; fold = fold1)
+        substitute(ex, rules2; fold = fold1)
+        @variables foo
+        f(foo)
+        @variables x y f(::Real) q[1:5]
+        x + y
+        x * y
+        x / y
+        x ^ y
+        x ^ 5
+        # 6 ^ x
+        x - y
+        -y
+        2y
+        symtype(y)
+        z = 2
+        *(y, z)
+        *(z, y)
+        f(x)
+        (5x / 5)
+        [x, y]
+        [x, f, f]
+        promote_type(Int, Num)
+        promote_type(Real, Num)
+        promote_type(Float64, Num)
+        # expand((x + y) ^ 2)
+        # simplify(x ^ (1//2) + (sin(x) ^ 2 + cos(x) ^ 2) + 2(x + y) - x - y)
+        ex = x + 2y + sin(x)
+        rules1 = Dict(x => y)
+        # rules2 = Dict(x => 1)
+        # Running `fold = Val(true)` invalidates the precompiled statements
+        # for `fold = Val(false)` and itself doesn't precompile anyway.
+        # substitute(ex, rules1)
+        substitute(ex, rules1; fold = fold1)
+        linear_expansion(ex, y)
+        # substitute(ex, rules2; fold = fold1)
+        # substitute(ex, rules2)
+        # substitute(ex, rules1; fold = fold2)
+        # substitute(ex, rules2; fold = fold2)
+        q[1]
+        q'q
+        
+    end
+end
+
+precompile(Tuple{typeof(Base.:(^)), SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymbolicUtils.SymReal}, Int64})
 
 end # module

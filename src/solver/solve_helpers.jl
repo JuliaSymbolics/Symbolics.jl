@@ -33,12 +33,17 @@ function ssqrt(n)
         return sqrt(n)
     end
 
-    if n isa SymbolicUtils.BasicSymbolic{Real}
+    if symtype(n) === Real
         return term(ssqrt, n)
     end
 end
 
-derivative(::typeof(ssqrt), args...) = substitute(derivative(sqrt, args...), sqrt => ssqrt)
+SymbolicUtils.promote_symtype(::typeof(ssqrt), ::Type{T}) where {T} = T
+SymbolicUtils.promote_shape(::typeof(ssqrt), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
+
+@register_derivative ssqrt(x) I begin
+    substitute(@derivative_rule(sqrt(x), I), sqrt => ssqrt)
+end
 
 function scbrt(n)
     n = unwrap(n)
@@ -52,12 +57,16 @@ function scbrt(n)
         return (n)^(1 / 3)
     end
 
-    if n isa SymbolicUtils.BasicSymbolic{Real}
+    if symtype(n) === Real
         return term(scbrt, n)
     end
 end
 
-derivative(::typeof(scbrt), args...) = substitute(derivative(cbrt, args...), cbrt => scbrt)
+SymbolicUtils.promote_symtype(::typeof(scbrt), ::Type{T}) where {T} = T
+SymbolicUtils.promote_shape(::typeof(scbrt), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
+@register_derivative scbrt(x) I begin
+    substitute(@derivative_rule(cbrt(x), I), cbrt => scbrt)
+end
 
 function slog(n)
     n = unwrap(n)
@@ -74,7 +83,12 @@ function slog(n)
     return term(slog, n)
 end
 
-derivative(::typeof(slog), args...) = substitute(derivative(log, args...), log => slog)
+SymbolicUtils.promote_symtype(::typeof(slog), ::Type{T}) where {T} = T
+SymbolicUtils.promote_shape(::typeof(slog), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
+
+@register_derivative slog(x) I begin
+    substitute(@derivative_rule(log(x), I), log => slog)
+end
 
 const RootsOf = (SymbolicUtils.@syms roots_of(poly,var))[1]
 
@@ -85,9 +99,9 @@ Base.show(io::IO, r::typeof(slog)) = print(io, "slog")
 function check_expr_validity(expr)
     type_expr = typeof(expr)
     valid_type = false
-
-    if type_expr <: Number || type_expr == Num || type_expr == SymbolicUtils.BasicSymbolic{Real} ||
-       type_expr == Complex{Num} || type_expr == ComplexTerm{Real} || type_expr == SymbolicUtils.BasicSymbolic{Complex{Real}}
+    st = symtype(expr)
+    if type_expr <: Number || type_expr == Num || st <: Real ||
+       type_expr == Complex{Num} || st <: Complex{Real}
         valid_type = true
     end
     iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
@@ -103,14 +117,14 @@ end
 
 function check_poly_inunivar(poly, var)
     subs, filtered = filter_poly(poly, var)
-    coeffs, constant = polynomial_coeffs(filtered, [var])
-    return isequal(constant, 0)
+    coeffs, constant = polynomial_coeffs(filtered, var isa Array ? var : [var])
+    return SymbolicUtils._iszero(constant)
 end
 
 # converts everything to BIG
 function bigify(n)
-    n = unwrap(n)
-    if n isa ComplexTerm || n isa Float64 || n isa Irrational
+    n = value(n)
+    if n isa Float64 || n isa Irrational
         return n
     end
 
@@ -118,7 +132,7 @@ function bigify(n)
         !iscall(n) && return n
         args = copy(parent(arguments(n)))
         for i in eachindex(args)
-            args[i] = bigify(args[i])
+            args[i] = Const{VartypeT}(bigify(args[i]))
         end
         n = maketerm(typeof(n), operation(n), args, metadata(n))
         return n
@@ -144,7 +158,7 @@ function bigify(n)
 end
 
 function comp_rational(x, y)
-    x, y = wrap(bigify(x)), wrap(bigify(y))
+    x, y = bigify(unwrap(x)), bigify(unwrap(y))
     if !(unwrap(x) isa AbstractFloat || x isa Complex) &&
        !(unwrap(y) isa AbstractFloat || y isa Complex)
         r = x // y

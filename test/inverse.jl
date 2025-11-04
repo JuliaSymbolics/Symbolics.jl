@@ -1,4 +1,5 @@
 using Symbolics
+using Test
 
 @test inverse(sin) == left_inverse(sin) == right_inverse(sin) == asin
 @test inverse(asin) == left_inverse(asin) == right_inverse(asin) == sin

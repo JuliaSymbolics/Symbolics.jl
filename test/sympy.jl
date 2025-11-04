@@ -93,7 +93,7 @@ C = Symbolics.variables(:C, 1:5)
 @test_broken isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [-2t], 1)), Symbolics.sympy_simplify(exp(t^2)*sqrt(Symbolics.variable(:pi))*erf(t)/2 + C[1]*exp(t^2)))
 
 ## Bernoulli equations
-@test isequal(symbolic_solve_ode(Dt(x) + (4//t)*x ~ t^3 * x^2, x, t), 1/(C[1]t^4 - t^4 * log(t)))
+@test isequal(symbolic_solve_ode(Dt(x) + (4/t)*x ~ t^3 * x^2, x, t), 1/(C[1]t^4 - t^4 * log(t)))
 @test isnothing(symbolic_solve_ode(Dt(x) + sqrt(t)*x ~ sin(4t)*x^3, x, t))
 
 # Test issue #1605: Power with symbolic exponent

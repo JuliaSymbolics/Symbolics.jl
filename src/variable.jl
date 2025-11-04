@@ -28,66 +28,28 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 """
 struct VariableSource <: AbstractVariableMetadata end
 
-function recurse_and_apply(f, x)
-    if symtype(x) <: AbstractArray
-        getindex_posthook(x) do r,x,i...
-            recurse_and_apply(f, r)
-        end
+function setdefaultval(x, val)
+    val === nothing && return x
+    sh = shape(x)
+    if sh isa SymbolicUtils.Unknown
+        @assert sh.ndims == -1 || ndims(val) == sh.ndims """
+        Variable $x must have default of matching `ndims`. Got $val with `ndims` \
+        $(ndims(val)).
+        """
     else
-        f(x)
+        @assert val === missing || isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
+        Variable $x must have default of matching size. Got $val with size \
+        $(size(val)).
+        """
     end
+    setmetadata(x, VariableDefaultValue, val)
 end
-
-function set_scalar_metadata(x, V, val)
-    val = unwrap(val)
-    if val isa AbstractArray
-        val = unwrap.(val)
-    end
-    if symtype(x) <: AbstractArray
-        x = if val isa AbstractArray
-            getindex_posthook(x) do r,x,i...
-                set_scalar_metadata(r, V, val[i...])
-            end
-        else
-            getindex_posthook(x) do r,x,i...
-                set_scalar_metadata(r, V, val)
-            end
-        end
-    end
-    setmetadata(x, V, val)
-end
-setdefaultval(x, val) = set_scalar_metadata(x, VariableDefaultValue, val)
-
-struct GetindexParent end
-
-function scalarize_getindex(x, parent=Ref{Any}(x))
-    if symtype(x) <: AbstractArray
-        parent[] = getindex_posthook(x) do r,x,i...
-            scalarize_getindex(r, parent)
-        end
-    else
-        xx = unwrap(scalarize(x))
-        xx = metadata(xx, metadata(x))
-        if symtype(xx) <: FnType
-            setmetadata(CallWithMetadata(xx, metadata(xx)), GetindexParent, parent[])
-        else
-            setmetadata(xx, GetindexParent, parent[])
-        end
-    end
-end
-
 
 function map_subscripts(indices)
     str = string(indices)
     join(IndexMap[c] for c in str)
 end
 
-
-function unwrap_runtime_var(v)
-    isruntime = Meta.isexpr(v, :$) && length(v.args) == 1
-    isruntime && (v = v.args[1])
-    return isruntime, v
-end
 
 # Build variables more easily
 """
@@ -101,11 +63,9 @@ macro. `transform` is an optional function that takes constructed variables and 
 custom postprocessing to them, returning the created variables. This function returns the
 `Expr` for constructing the parsed variables.
 """
-parse_vars(macroname, type, x, transform=identity) = _parse_vars(macroname, type, x, transform=identity)
-
-function _parse_vars(macroname, type, x, transform=identity)
+function parse_vars(macroname, type, x, transform = identity)
     ex = Expr(:block)
-    var_names = Symbol[]
+    var_names = Expr(:vect)
     # if parsing things in the form of
     # begin
     #     x
@@ -118,167 +78,141 @@ function _parse_vars(macroname, type, x, transform=identity)
     isoption(ex) = Meta.isexpr(ex, [:vect, :vcat, :hcat])
     while cursor < length(x)
         cursor += 1
-        v = x[cursor]
+        var_expr = x[cursor]
 
-        # We need lookahead to the next `v` to parse
-        # `@variables x [connect=Flow,unit=u]`
-        nv = cursor < length(x) ? x[cursor+1] : nothing
-        val = unit = connect = options = nothing
-
-        # x = 1, [connect = flow; unit = u"m^3/s"]
-        if Meta.isexpr(v, :(=))
-            v, val = v.args
+        default = nothing
+        options = nothing
+        if Meta.isexpr(var_expr, :(=))
+            var_expr, default = var_expr.args
             # defaults with metadata for function variables
-            if Meta.isexpr(val, :block)
-                Base.remove_linenums!(val)
-                val = only(val.args)
+            if Meta.isexpr(default, :block)
+                Base.remove_linenums!(default)
+                default = only(default.args)
             end
-            if Meta.isexpr(val, :tuple) && length(val.args) == 2 && isoption(val.args[2])
-                options = val.args[2].args
-                val = val.args[1]
+            if Meta.isexpr(default, :tuple) && length(default.args) == 2 && isoption(default.args[2])
+                options = default.args[2].args
+                default = default.args[1]
             end
+            default = esc(default)
         end
+        parse_result = SymbolicUtils.parse_variable(var_expr; default_type = type)
+        handle_nonconcrete_symtype!(parse_result)
+        sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
+        sym = handle_maybe_dependent_variable!(parse_result, sym, type)
 
-        type′ = type
-
-        if Meta.isexpr(v, :(::))
-            v, type′ = v.args
-            type′ = type′ === :Complex ? Complex{type} : type′
-        end
-
-
-        # x [connect = flow; unit = u"m^3/s"]
-        if isoption(nv)
-            options = nv.args
+        if options === nothing && cursor < length(x) && isoption(x[cursor + 1])
+            options = x[cursor + 1].args
             cursor += 1
         end
+        sym = _add_metadata(parse_result, sym, default, macroname, options)
+        sym = handle_maybe_callandwrap!(parse_result, sym)
+        sym = Expr(:call, transform, Expr(:call, wrap, sym))
 
-        isruntime, v = unwrap_runtime_var(v)
-        iscall = Meta.isexpr(v, :call)
-        isarray = Meta.isexpr(v, :ref)
-        if iscall && Meta.isexpr(v.args[1], :ref) && !call_args_are_function(map(last∘unwrap_runtime_var, @view v.args[2:end]))
-            @warn("The variable syntax $v is deprecated. Use $(Expr(:ref, Expr(:call, v.args[1].args[1], v.args[2]), v.args[1].args[2:end]...)) instead.
-                  The former creates an array of functions, while the latter creates an array valued function.
-                  The deprecated syntax will cause an error in the next major release of Symbolics.
-                  This change will facilitate better implementation of various features of Symbolics.")
-        end
-        issym  = v isa Symbol
-        @assert iscall || isarray || issym "@$macroname expects a tuple of expressions or an expression of a tuple (`@$macroname x y z(t) v[1:3] w[1:2,1:4]` or `@$macroname x y z(t) v[1:3] w[1:2,1:4] k=1.0`)"
-
-        if isarray && Meta.isexpr(v.args[1], :call)
-            # This is the new syntax
-            isruntime, fname = unwrap_runtime_var(v.args[1].args[1])
-            call_args = map(last∘unwrap_runtime_var, @view v.args[1].args[2:end])
-            size = v.args[2:end]
-            var_name, expr = construct_dep_array_vars(macroname, fname, type′, call_args, size, val, options, transform, isruntime)
-        elseif iscall
-            isruntime, fname = unwrap_runtime_var(v.args[1])
-            call_args = map(last∘unwrap_runtime_var, @view v.args[2:end])
-            var_name, expr = construct_vars(macroname, fname, type′, call_args, val, options, transform, isruntime)
-        elseif isarray
-            var_name, expr = construct_vars(macroname, v, type′, nothing, val, options, transform, isruntime)
+        if parse_result[:isruntime]
+            varname = Symbol(parse_result[:name])
         else
-            var_name, expr = construct_vars(macroname, v, type′, nothing, val, options, transform, isruntime)
+            varname = esc(parse_result[:name])
         end
-
-        push!(var_names, var_name)
-        push!(ex.args, expr)
+        push!(var_names.args, varname)
+        push!(ex.args, Expr(:(=), varname, sym))
     end
-    rhs = build_expr(:vect, var_names)
-    push!(ex.args, rhs)
+    push!(ex.args, var_names)
     return ex
 end
 
-call_args_are_function(_) = false
-function call_args_are_function(call_args::AbstractArray)
-    !isempty(call_args) && (call_args[end] == :(..) || all(Base.Fix2(Meta.isexpr, :(::)), call_args))
-end
-
-function construct_dep_array_vars(macroname, lhs, type, call_args, indices, val, prop, transform, isruntime)
-    ndim = :($length(($(indices...),)))
-    if call_args_are_function(call_args)
-        vname, fntype = function_name_and_type(lhs)
-        # name was already unwrapped before calling this function and is of the form $x
-        if isruntime
-            _vname = vname
-        else
-            # either no ::fnType or $x::fnType
-            vname, fntype = function_name_and_type(lhs)
-            isruntime, vname = unwrap_runtime_var(vname)
-            if isruntime
-                _vname = vname
-            else
-                _vname = Meta.quot(vname)
+function handle_nonconcrete_symtype!(parse_result)
+    type = parse_result[:type]
+    if type == :Complex
+        parse_result[:type] = :(Complex{Real})
+    end
+    if Meta.isexpr(type, :curly)
+        if type.args[1] in (:Array, :Vector, :Matrix, Array, Vector, Matrix) && type.args[2] == :Complex
+            type.args[2] = :(Complex{Real})
+        end
+        if type.args[1] == :FnType || type.args[1] == SymbolicUtils.FnType
+            if Meta.isexpr(type.args[2], :curly) # Tuple{...}
+                for i in 2:length(type.args[2].args)
+                    if type.args[2].args[i] == :Complex
+                        type.args[2].args[i] = :(Complex{Real})
+                    end
+                end
+            end
+            if type.args[3] == :Complex
+                type.args[3] = :(Complex{Real})
+            end
+            for parse_arg in parse_result[:args]
+                handle_nonconcrete_symtype!(parse_arg)
             end
         end
-        argtypes = arg_types_from_call_args(call_args)
-        ex = :($CallWithMetadata($Sym{$FnType{$argtypes, Array{$type, $ndim}, $(fntype...)}}($_vname)))
-    else
-        vname = lhs
-        if isruntime
-            _vname = vname
-        else
-            _vname = Meta.quot(vname)
-        end
-        ex = :($Sym{$FnType{Tuple, Array{$type, $ndim}}}($_vname)(map($unwrap, ($(call_args...),))...))
     end
-    ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-
-    if val !== nothing
-        ex = :($setdefaultval($ex, $val))
-    end
-    ex = setprops_expr(ex, prop, macroname, _vname)
-    #ex = :($scalarize_getindex($ex))
-
-    ex = :($wrap($ex))
-
-    ex = :($transform($ex))
-    if isruntime
-        vname = gensym(Symbol(vname))
-    end
-    vname, :($vname = $ex)
+    return nothing
 end
 
-function construct_vars(macroname, v, type, call_args, val, prop, transform, isruntime)
-    issym  = v isa Symbol
-    isarray = !isruntime && Meta.isexpr(v, :ref)
-    if isarray
-        # this can't be an array of functions, since that was handled by `construct_dep_array_vars`
-        var_name = v.args[1]
-        if Meta.isexpr(var_name, :(::))
-            var_name, type′ = var_name.args
-            type = type′ === :Complex ? Complex{type} : type′
-        end
-        isruntime, var_name = unwrap_runtime_var(var_name)
-        indices = v.args[2:end]
-        expr = _construct_array_vars(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop, indices...)
-    elseif call_args_are_function(call_args)
-        var_name, fntype = function_name_and_type(v)
-        # name was already unwrapped before calling this function and is of the form $x
-        if isruntime
-            vname = var_name
-        else
-            # either no ::fnType or $x::fnType
-            var_name, fntype = function_name_and_type(v)
-            isruntime, var_name = unwrap_runtime_var(var_name)
-            if isruntime
-                vname = var_name
-            else
-                vname = Meta.quot(var_name)
-            end
-        end
-        expr = construct_var(macroname, fntype == () ? vname : Expr(:(::), vname, fntype[1]), type, call_args, val, prop)
-    else
-        var_name = v
-        if Meta.isexpr(v, :(::))
-            var_name, type′ = v.args
-            type = type′ === :Complex ? Complex{type} : type′
-        end
-        expr = construct_var(macroname, isruntime ? var_name : Meta.quot(var_name), type, call_args, val, prop)
+function parse_result_is_dependent_variable(parse_result)
+    # This means it is a function call
+    return haskey(parse_result, :args) &&
+    # This checks `fnT` in `FnType{argsT, retT, fnT}`
+        parse_result[:type].args[4] === Nothing &&
+    # This ensures all arguments have defined names
+        all(n -> n !== nothing && n != :..,
+            (get(arg, :name, nothing) for arg in parse_result[:args]))
+end
+
+function handle_maybe_dependent_variable!(parse_result, sym, type)
+    # is a function call and the function doesn't have a type and all arguments
+    # are named
+    parse_result_is_dependent_variable(parse_result) || return sym
+
+    args = parse_result[:args]
+    argnames = Any[get(arg, :name, nothing) for arg in args]
+    # if the last arg is a `Vararg`, splat it
+    if !isempty(args) && Meta.isexpr(args[end][:type], :curly) && args[end][:type].args[1] == :Vararg
+        argnames[end] = Expr(:..., argnames[end])
     end
-    lhs = isruntime ? gensym(Symbol(var_name)) : var_name
-    rhs = :($transform($expr))
-    lhs, :($lhs = $rhs)
+    # Turn the result into something of the form `@variables x(..)`.
+    # This makes it so that the `FnType` is recognized as a dependent variable
+    # according to `SymbolicUtils.is_function_symtype`
+    parse_result[:args] = [SymbolicUtils.parse_variable(:(..); default_type = type)]
+    parse_result[:type].args[2] = Tuple
+    # Re-create the `Sym`
+    sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
+    # Change the type
+    parse_result[:type] = parse_result[:type].args[3]
+    # Call the `Sym` with the arguments to create a dependent variable.
+    map!(esc, argnames, argnames)
+    sym = Expr(:call, sym)
+    append!(sym.args, argnames)
+    return sym
+end
+
+function handle_maybe_callandwrap!(parse_result, sym)
+    type = parse_result[:type]
+    if Meta.isexpr(type, :curly) && (type.args[1] == :FnType || type.args[1] === SymbolicUtils.FnType)
+        sym = Expr(:call, CallAndWrap, sym)
+    end
+    return sym
+end
+
+function _add_metadata(parse_result, var::Expr, default, macroname::Symbol, metadata::Union{Nothing, Vector{Any}})
+    @nospecialize var default metadata
+    if default !== nothing
+        var = Expr(:call, setdefaultval, var, default)
+    end
+    varname = parse_result[:name]
+    if parse_result[:isruntime]
+        varname = esc(varname)
+    else
+        varname = Meta.quot(varname)
+    end
+    var = Expr(:call, setmetadata, var, VariableSource, Expr(:tuple, Meta.quot(macroname), varname))
+    metadata === nothing && return var
+    for ex in metadata
+        Meta.isexpr(ex, :(=)) || error("Metadata must of the form of `key = value`")
+        key, value = ex.args
+        key_type = option_to_metadata_type(Val{key}())::DataType
+        var = Expr(:call, setmetadata, var, key_type, esc(value))
+    end
+    return var
 end
 
 """
@@ -312,164 +246,6 @@ option_to_metadata_type(::Val{:_____!_internal_2}) = error("Invalid option")
 option_to_metadata_type(::Val{:_____!_internal_3}) = error("Invalid option")
 option_to_metadata_type(::Val{:_____!_internal_4}) = error("Invalid option")
 option_to_metadata_type(::Val{:_____!_internal_5}) = error("Invalid option")
-
-function setprops_expr(expr, props, macroname, varname)
-    expr = :($setmetadata($expr, $VariableSource, ($(Meta.quot(macroname)), $varname,)))
-    isnothing(props) && return expr
-    for opt in props
-        if !Meta.isexpr(opt, :(=))
-            throw(Base.Meta.ParseError(
-                "Variable properties must be in " *
-                "the form of `a = b`. Got $opt."))
-        end
-
-        lhs, rhs = opt.args
-
-        @assert lhs isa Symbol "the lhs of an option must be a symbol"
-        expr = :($set_scalar_metadata($expr,
-                              $(option_to_metadata_type(Val{lhs}())),
-                       $rhs))
-    end
-    expr
-end
-
-struct CallWithMetadata{T,M} <: Symbolic{T}
-    f::Symbolic{T}
-    metadata::M
-end
-
-for f in [:iscall, :operation, :arguments]
-    @eval SymbolicUtils.$f(x::CallWithMetadata) = $f(x.f)
-end
-
-SymbolicUtils.Code.toexpr(x::CallWithMetadata, st) = SymbolicUtils.Code.toexpr(x.f, st)
-
-CallWithMetadata(f) = CallWithMetadata(f, nothing)
-
-SymbolicIndexingInterface.symbolic_type(::Type{<:CallWithMetadata}) = ScalarSymbolic()
-
-# HACK:
-# A `DestructuredArgs` with `create_bindings = false` doesn't create a `Let` block, and
-# instead adds the assignments to the rewrites dictionary. This is problematic, because
-# if the `DestructuredArgs` contains a `CallWithMetadata` the key in the `Dict` will be
-# a `CallWithMetadata` which won't match against the operation of the called symbolic.
-# This is the _only_ hook we have and relies on the `DestructuredArgs` being converted
-# into a list of `Assignment`s before being added to the `Dict` inside `toexpr(::Let, st)`.
-# The callable symbolic is unwrapped so it matches the operation of the called version.
-SymbolicUtils.Code.Assignment(f::CallWithMetadata, x) = SymbolicUtils.Code.Assignment(f.f, x)
-
-function Base.show(io::IO, c::CallWithMetadata)
-    show(io, c.f)
-    print(io, "⋆")
-end
-
-struct CallWithParent end
-
-function (f::CallWithMetadata)(args...)
-    setmetadata(metadata(unwrap(f.f(map(unwrap, args)...)), metadata(f)), CallWithParent, f)
-end
-
-Base.isequal(a::CallWithMetadata, b::CallWithMetadata) = isequal(a.f,  b.f)
-Base.hash(x::CallWithMetadata, h::UInt) = hash(x.f, h)
-
-function arg_types_from_call_args(call_args)
-    if length(call_args) == 1 && only(call_args) == :..
-        return Tuple
-    end
-    Ts = map(call_args) do arg
-        if arg == :..
-            Vararg
-        elseif arg isa Expr && arg.head == :(::)
-            if length(arg.args) == 1
-                arg.args[1]
-            elseif arg.args[1] == :..
-                :(Vararg{$(arg.args[2])})
-            else
-                arg.args[2]
-            end
-        else
-            error("Invalid call argument $arg")
-        end
-    end
-    return :(Tuple{$(Ts...)})
-end
-
-function function_name_and_type(var_name)
-    if var_name isa Expr && Meta.isexpr(var_name, :(::), 2)
-        var_name.args[1], (var_name.args[2],)
-    else
-        var_name, ()
-    end
-end
-
-function construct_var(macroname, var_name, type, call_args, val, prop)
-    expr = if call_args === nothing
-        :($Sym{$type}($var_name))
-    elseif call_args_are_function(call_args)
-        # function syntax is (x::TFunc)(.. or ::TArg1, ::TArg2)::TRet
-        # .. is Vararg
-        # (..)::ArgT is Vararg{ArgT}
-        var_name, fntype = function_name_and_type(var_name)
-        argtypes = arg_types_from_call_args(call_args)
-        :($CallWithMetadata($Sym{$FnType{$argtypes, $type, $(fntype...)}}($var_name)))
-    # This elseif handles the special case with e.g. variables on the form
-    # @variables X(deps...) where deps is a vector (which length might be unknown).
-    elseif (call_args isa Vector) && (length(call_args) == 1) && (call_args[1] isa Expr) &&
-            call_args[1].head == :(...) && (length(call_args[1].args) == 1)
-        :($Sym{$FnType{NTuple{$length($(call_args[1].args[1])), Any}, $type}}($var_name)($value.($(call_args[1].args[1]))...))
-    else
-        :($Sym{$FnType{NTuple{$(length(call_args)), Any}, $type}}($var_name)($(map(x->:($value($x)), call_args)...)))
-    end
-
-    if val !== nothing
-        expr = :($setdefaultval($expr, $val))
-    end
-
-    :($wrap($(setprops_expr(expr, prop, macroname, var_name))))
-end
-
-struct CallWith
-    args
-end
-
-(c::CallWith)(f) = unwrap(f(c.args...))
-
-function _construct_array_vars(macroname, var_name, type, call_args, val, prop, indices...)
-    # TODO: just use Sym here
-    ndim = :($length(($(indices...),)))
-
-    need_scalarize = false
-    expr = if call_args === nothing
-        ex = :($Sym{Array{$type, $ndim}}($var_name))
-        :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-    elseif call_args_are_function(call_args)
-        need_scalarize = true
-        var_name, fntype = function_name_and_type(var_name)
-        argtypes = arg_types_from_call_args(call_args)
-        ex = :($Sym{Array{$FnType{$argtypes, $type, $(fntype...)}, $ndim}}($var_name))
-        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map($CallWithMetadata, $ex))
-    else
-        # [(R -> R)(R) ....]
-        need_scalarize = true
-        ex = :($Sym{Array{$FnType{Tuple, $type}, $ndim}}($var_name))
-        ex = :($setmetadata($ex, $ArrayShapeCtx, ($(indices...),)))
-        :($map($CallWith(($(call_args...),)), $ex))
-    end
-
-    if val !== nothing
-        expr = :($setdefaultval($expr, $val))
-    end
-    expr = setprops_expr(expr, prop, macroname, var_name)
-    if need_scalarize
-        expr = :($scalarize_getindex($expr))
-    end
-
-    expr = :($wrap($expr))
-
-    return expr
-end
-
 
 """
 
@@ -535,86 +311,63 @@ julia> (t, a, b, c)
 ```
 """
 macro variables(xs...)
-    esc(_parse_vars(:variables, Real, xs))
+    parse_vars(:variables, Real, xs)
 end
 
 const _fail = Dict()
 
-_getname(x, _) = nameof(x)
-_getname(x::Symbol, _) = x
-function _getname(x::Symbolic, val)
-    issym(x) && return nameof(x)
-    if iscall(x) && issym(operation(x))
-        return nameof(operation(x))
-    end
-    if !hasmetadata(x, Symbolics.GetindexParent) && iscall(x) && operation(x) == getindex
-        return _getname(arguments(x)[1], val)
-    end
-    ss = getsource(x, nothing)
-    if ss === nothing
-        ss = getsource(getparent(x), val)
-    end
-    ss === _fail && throw(ArgumentError("Variable $x doesn't have a source defined."))
-    ss[2]
-end
-
 getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
-SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Num}) = ScalarSymbolic()
-SymbolicIndexingInterface.symbolic_type(::Type{<:Symbolics.Arr}) = ArraySymbolic()
-function SymbolicIndexingInterface.symbolic_type(::Type{T}) where {S <: AbstractArray, T <: Symbolic{S}}
-    ArraySymbolic()
-end
-# need this otherwise the `::Type{<:BasicSymbolic}` method in SymbolicUtils is
-# more specific
-function SymbolicIndexingInterface.symbolic_type(::Type{T}) where {S <: AbstractArray, T <: BasicSymbolic{S}}
-    ArraySymbolic()
-end
+SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Num}) = ScalarSymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr{T, N}}) where {T, N} = ArraySymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr{T}}) where {T} = ArraySymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr}) = ArraySymbolic()
 
 SymbolicIndexingInterface.hasname(x::Union{Num,Arr,Complex{Num}}) = hasname(unwrap(x))
-
-function SymbolicIndexingInterface.hasname(x::Symbolic)
-    issym(x) || !iscall(x) || iscall(x) && (issym(operation(x)) || operation(x) == getindex && hasname(arguments(x)[1]))
+function SymbolicIndexingInterface.getname(x::Union{Num, Arr, Complex{Num}})
+    SymbolicIndexingInterface.getname(unwrap(x))
 end
 
-# This is type piracy, but changing it breaks precompilation for MTK because it relies on this falling back to
-# `_getname` which calls `nameof` which returns the name of the system, when `x::AbstractSystem`.
-# FIXME: In a breaking release
-function SymbolicIndexingInterface.getname(x, val = _fail)
-    _getname(unwrap(x), val)
-end
-
-function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, Symbolic, Equation, Inequality}, d::Dict; kwargs...)
-    val = fixpoint_sub(ex, d; kwargs...)
-    return _recursive_unwrap(val)
+function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, BasicSymbolic, Equation, Inequality}, d::Dict; kwargs...)
+    val = fixpoint_sub(ex, d; fold = Val(true), kwargs...)
+    return _recursive_unwrap(val; eval = Val(true))
 end
 
 for T in [LinearAlgebra.UpperTriangular, LinearAlgebra.LowerTriangular]
-    @eval function _recursive_unwrap(val::$T)
-        $T(_recursive_unwrap(collect(val)))
+    @eval function _recursive_unwrap(val::$T; eval::Val{_eval} = Val(false)) where {_eval}
+        $T(_recursive_unwrap(collect(val); eval = Val{_eval}()))
     end
 end
 
-function _recursive_unwrap(val)
+function _recursive_unwrap(val; eval::Val{_eval} = Val(false)) where {_eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
         if parent(val) !== val
-            return Setfield.@set val.parent = _recursive_unwrap(parent(val))
+            return Setfield.@set val.parent = _recursive_unwrap(parent(val); eval = Val{_eval}())
         end
-        return _recursive_unwrap.(val)
+        return _recursive_unwrap.(val; eval = Val{_eval}())
     else
-        return unwrap(val)
+        return _eval ? value(val) : unwrap(val)
     end
 end
 
-function _recursive_unwrap(val::AbstractSparseArray)
+function _recursive_unwrap(val::AbstractSparseArray; eval::Val{_eval} = Val(false)) where {_eval}
     if val isa AbstractSparseVector
         (Is, Vs) = findnz(val)
-        Vs = _recursive_unwrap.(Vs)
+        Vs = _recursive_unwrap.(Vs; eval = Val{_eval}())
         return SparseVector(length(val), Is, Vs)
     else
         (Is, Js, Vs) = findnz(val)
-        Vs = _recursive_unwrap.(Vs)
+        Vs = _recursive_unwrap.(Vs; eval = Val{_eval}())
         return sparse(Is, Js, Vs, size(val)...) 
+    end
+end
+
+struct FPSubFilterer{O} end
+
+function (::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
+    @match ex begin
+        BSImpl.Term(; f) && if f isa Operator end => !(f isa O)
+        _ => SymbolicUtils.default_substitute_filter(ex)
     end
 end
 
@@ -629,16 +382,13 @@ specified to prevent substitution of expressions inside operators of the given t
 `maxiters` keyword is used to limit the number of times the substitution can occur to avoid
 infinite loops in cases where the substitutions in `dict` are circular
 (e.g. `[x => y, y => x]`).
-
-See also: [`fast_substitute`](@ref).
 """
-function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000)
-    dict = subrules_to_dict(dict)
-    y = fast_substitute(x, dict; operator)
+function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000, kw...)
+    y = substitute(x, dict; filterer=FPSubFilterer{operator}(), kw...)
     iters = maxiters
     while !isequal(x, y) && iters > 0
         y = x
-        x = fast_substitute(y, dict; operator)
+        x = substitute(y, dict; filterer=FPSubFilterer{operator}(), kw...)
         iters -= 1
     end
 
@@ -648,111 +398,11 @@ function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000)
 
     return x
 end
-function fixpoint_sub(x::SparseMatrixCSC, dict; operator = Nothing, maxiters = 1000)
+function fixpoint_sub(x::SparseMatrixCSC, dict; operator = Nothing, maxiters = 1000, kw...)
     I, J, V = findnz(x)
-    V = fixpoint_sub(V, dict; operator, maxiters)
+    V = fixpoint_sub(V, dict; operator, maxiters, kw...)
     m, n = size(x)
     return sparse(I, J, V, m, n)
-end
-
-const Eq = Union{Equation, Inequality}
-"""
-    fast_substitute(expr, dict; operator = Nothing)
-
-Given a symbolic expression, equation or inequality `expr` perform the substitutions in
-`dict`. This only performs the substitutions once. For example,
-`fast_substitute(x, Dict(x => y, y => 3))` will return `y`. The `operator` keyword can be
-specified to prevent substitution of expressions inside operators of the given type.
-
-See also: [`fixpoint_sub`](@ref).
-"""
-function fast_substitute(eq::Eq, subs; operator = Nothing)
-    if eq isa Inequality
-        Inequality(fast_substitute(eq.lhs, subs; operator),
-            fast_substitute(eq.rhs, subs; operator),
-            eq.relational_op)
-    else
-        Equation(fast_substitute(eq.lhs, subs; operator),
-            fast_substitute(eq.rhs, subs; operator))
-    end
-end
-function fast_substitute(eq::T, subs::Pair; operator = Nothing) where {T <: Eq}
-    T(fast_substitute(eq.lhs, subs; operator), fast_substitute(eq.rhs, subs; operator))
-end
-function fast_substitute(eqs::AbstractArray, subs; operator = Nothing)
-    fast_substitute.(eqs, (subs,); operator)
-end
-function fast_substitute(eqs::AbstractArray, subs::Pair; operator = Nothing)
-    fast_substitute.(eqs, (subs,); operator)
-end
-function fast_substitute(eqs::SparseMatrixCSC, subs; operator = Nothing)
-    I, J, V = findnz(eqs)
-    V = fast_substitute(V, subs; operator)
-    m, n = size(eqs)
-    return sparse(I, J, V, m, n)
-end
-for (exprType, subsType) in Iterators.product((Num, Symbolics.Arr), (Any, Pair))
-    @eval function fast_substitute(expr::$exprType, subs::$subsType; operator = Nothing)
-        fast_substitute(value(expr), subs; operator)
-    end
-end
-function fast_substitute(expr, subs; operator = Nothing)
-    if (_val = get(subs, expr, nothing)) !== nothing
-        return _val
-    end
-    iscall(expr) || return expr
-    op = fast_substitute(operation(expr), subs; operator)
-    args = SymbolicUtils.arguments(expr)
-    if !(op isa operator)
-        canfold = Ref(!(op isa Symbolic))
-        args = let canfold = canfold
-            map(args) do x
-                symbolic_type(x) == NotSymbolic() && !is_array_of_symbolics(x) && return x
-                x′ = fast_substitute(x, subs; operator)
-                canfold[] = canfold[] && (symbolic_type(x′) == NotSymbolic() && !is_array_of_symbolics(x′))
-                x′
-            end
-        end
-        if op === getindex && symbolic_type(args[1]) == NotSymbolic()
-            canfold[] = true
-        end
-        canfold[] && return op(args...)
-    end
-    maketerm(typeof(expr),
-        op,
-        args,
-        metadata(expr))
-end
-function fast_substitute(expr, pair::Pair; operator = Nothing)
-    a, b = pair
-    isequal(expr, a) && return b
-    if a isa AbstractArray
-        for (ai, bi) in zip(a, b)
-            expr = fast_substitute(expr, ai => bi; operator)
-        end
-    end
-    iscall(expr) || return expr
-    op = fast_substitute(operation(expr), pair; operator)
-    args = SymbolicUtils.arguments(expr)
-    if !(op isa operator)
-        canfold = Ref(!(op isa Symbolic))
-        args = let canfold = canfold
-            map(args) do x
-                symbolic_type(x) == NotSymbolic() && !is_array_of_symbolics(x) && return x
-                x′ = fast_substitute(x, pair; operator)
-                canfold[] = canfold[] && (symbolic_type(x′) == NotSymbolic() && !is_array_of_symbolics(x′))
-                x′
-            end
-        end
-        if op === getindex && symbolic_type(args[1]) == NotSymbolic()
-            canfold[] = true
-        end
-        canfold[] && return op(args...)
-    end
-    maketerm(typeof(expr),
-        op,
-        args,
-        metadata(expr))
 end
 
 function is_array_of_symbolics(x)
@@ -762,22 +412,16 @@ function is_array_of_symbolics(x)
         any(y -> symbolic_type(y) != NotSymbolic() || is_array_of_symbolics(y), x)
 end
 
-"""
-    $(TYPEDSIGNATURES)
-
-Return the array variable that was indexed to obtain symbolic variable `x`.
-"""
-function getparent(x, val=_fail)
-    maybe_parent = getmetadata(x, Symbolics.GetindexParent, nothing)
-    if maybe_parent !== nothing
-        return maybe_parent
-    else
-        if iscall(x) && operation(x) === getindex
-            return arguments(x)[1]
+function getmetadata_maybe_indexed(x::SymbolicT, key::DataType, default)
+    hasmetadata(x, key) && return getmetadata(x, key, default)
+    @match x begin
+        BSImpl.Term(; f, args) && if f === getindex end => begin
+            hasmetadata(args[1], key) || return default
+            idxs = unwrap_const.(@view args[2:end])
+            return getmetadata(args[1], key)[idxs...]
         end
+        _ => return default
     end
-    val === _fail && throw(ArgumentError("Cannot find the parent of $x."))
-    return val
 end
 
 function getdefaultval(x, val=_fail)
@@ -786,7 +430,17 @@ function getdefaultval(x, val=_fail)
     if val !== _fail
         return val
     else
-        error("$x has no default value")
+        @match x begin
+            BSImpl.Term(; f, args) && if f === getindex end => begin
+                parentval = getdefaultval(args[1], val)
+                if parentval === missing
+                    return missing
+                end
+                idxs = Iterators.map(unwrap_const, Iterators.drop(args, 1))
+                return parentval[idxs...]
+            end
+            _ => error("$x has no default value")
+        end
     end
 end
 
@@ -828,11 +482,8 @@ Also see `variables`.
 """
 function variable(name, idx...; T=Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
-    v = Sym{T}(name_ij)
-    if T <: FnType
-        v = CallWithMetadata(v)
-    end
-    Num(setmetadata(v, VariableSource, (:variables, name_ij)))
+    v = Sym{VartypeT}(name_ij; type = T)
+    wrap(setmetadata(v, VariableSource, (:variables, name_ij)))
 end
 
 ##### Renaming #####
@@ -845,69 +496,92 @@ end
 # x_t
 # sys.x
 
-function rename_getindex_source(x, parent=x)
-    getindex_posthook(x) do r,x,i...
-        hasmetadata(r, GetindexParent) ? setmetadata(r, GetindexParent, parent) : r
+function renamed_metadata(metadata::Union{Nothing, SymbolicUtils.MetadataT}, name::Symbol)
+    @nospecialize metadata
+    if metadata === nothing
+        return metadata
+    elseif metadata isa Base.ImmutableDict{DataType, Any}
+        newmeta = Base.ImmutableDict{DataType, Any}()
+        for (k, v) in metadata
+            if k === VariableSource
+                v = v::NTuple{2, Symbol}
+                v = (v[1], name)
+            end
+            newmeta = Base.ImmutableDict(newmeta, k, v)
+        end
+        return newmeta
     end
-end
-
-function rename_metadata(from, to, name)
-    if hasmetadata(from, VariableSource)
-        s = getmetadata(from, VariableSource)
-        to = setmetadata(to, VariableSource, (s[1], name))
-    end
-    if hasmetadata(from, GetindexParent)
-        s = getmetadata(from, GetindexParent)
-        to = setmetadata(to, GetindexParent, rename(s, name))
-    end
-    return to
+    error()
 end
 
 rename(x::Union{Num, Arr}, name) = wrap(rename(unwrap(x), name))
-function rename(x::ArrayOp, name)
-    t = x.term
-    args = arguments(t)
-    # Hack:
-    @assert operation(t) === (map) && (args[1] isa CallWith || args[1] == CallWithMetadata)
-    rn = rename(args[2], name)
 
-    xx = metadata(operation(t)(args[1], rn), metadata(x))
-    rename_getindex_source(rename_metadata(x, xx, name))
-end
-
-function rename(x::CallWithMetadata, name)
-    rename_metadata(x, CallWithMetadata(rename(x.f, name), x.metadata), name)
-end
-
-function rename(x::Symbolic, name)
-    if issym(x)
-        xx = @set! x.name = name
-        xx = rename_metadata(x, xx, name)
-        symtype(xx) <: AbstractArray ? rename_getindex_source(xx) : xx
-    elseif iscall(x) && operation(x) === getindex
-        rename(arguments(x)[1], name)[arguments(x)[2:end]...]
-    elseif iscall(x) && symtype(operation(x)) <: FnType || operation(x) isa CallWithMetadata
-        xx = @set x.f = rename(operation(x), name)
-        @set! xx.hash = Ref{UInt}(0)
-        return rename_metadata(x, xx, name)
-    else
-        error("can't rename $x to $name")
+function rename(x::BasicSymbolic{T}, newname::Symbol) where {T}
+    @match x begin
+        BSImpl.Sym(; name, type, shape, metadata) => begin
+            metadata = renamed_metadata(metadata, newname)
+            return BSImpl.Sym{T}(newname; type, shape, metadata)
+        end
+        BSImpl.Term(; f, args, type, shape, metadata) && if f === getindex end => begin
+            newargs = copy(parent(args))
+            newargs[1] = rename(newargs[1], newname)
+            return BSImpl.Term{T}(f, newargs; type, shape, metadata)
+        end
+        BSImpl.Term(; f, args, type, shape, metadata) && if f isa BasicSymbolic{T} end => begin
+            f = rename(f, newname)
+            metadata = renamed_metadata(metadata, newname)
+            return BSImpl.Term{T}(f, args; type, shape, metadata)
+        end
+        _ => error("Cannot rename $x.")
     end
 end
 
-# Deprecation below
+#### Callable ###
 
-struct Variable{T} end
-
-function (::Type{Variable{T}})(s, i...) where {T}
-    Base.depwarn("Variable{T}(name, idx...) is deprecated, use variable(name, idx...; T=T)", :Variable)
-    variable(s, i...; T=T)
+struct CallAndWrap{T}
+    f::BasicSymbolic{VartypeT}
 end
 
-(::Type{Variable})(s, i...) = Variable{Real}(s, i...)
+rettype_from_fntype(::Type{T}) where {A, R, T <: SymbolicUtils.FnType{A, R}} = R
 
-function (::Type{Sym{T}})(s, x, i...) where {T}
-    Base.depwarn("Sym{T}(name, x, idx...) is deprecated, use variable(name, x, idx...; T=T)", :Variable)
-    variable(s, x, i...; T=T)
+function CallAndWrap(f::BasicSymbolic{VartypeT})
+    @assert symtype(f) <: SymbolicUtils.FnType
+    R = rettype_from_fntype(symtype(f))
+    if hasmethod(wrapper_type, Tuple{Type{R}})
+        CallAndWrap{wrapper_type(R)}(f)
+    else
+        f
+    end
 end
-(::Type{Sym})(s, x, i...) = Sym{Real}(s, x, i...)
+
+function (caw::CallAndWrap{T})(args...) where {T}
+    T(caw.f(args...))
+end
+
+SymbolicIndexingInterface.symbolic_type(::Type{CallAndWrap{T}}) where {T} = ScalarSymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{CallAndWrap}) = ScalarSymbolic()
+
+Base.isequal(a::CallAndWrap, b::CallAndWrap) = isequal(a.f,  b.f)
+Base.isequal(a::BasicSymbolic{VartypeT}, b::CallAndWrap) = isequal(a,  b.f)
+Base.isequal(a::CallAndWrap, b::BasicSymbolic{VartypeT}) = isequal(a.f,  b)
+Base.hash(x::CallAndWrap, h::UInt) = hash(x.f, h)
+
+function Base.show(io::IO, caw::CallAndWrap)
+    warn_load_latexify()
+    show(io, caw.f)
+    print(io, "⋆")
+end
+
+has_symwrapper(::Type{T}) where {A, R, T <: SymbolicUtils.FnType{A, R}} = has_symwrapper(R)
+wrapper_type(::Type{T}) where {A, R, T <: SymbolicUtils.FnType{A, R}} = CallAndWrap{wrapper_type(R)}
+is_wrapper_type(::Type{T}) where {T <: CallAndWrap} = true
+wraps_type(::Type{T}) where {W, T <: CallAndWrap{W}} = FnType{A, R} where {A, R <: wraps_type(W)}
+iswrapped(::CallAndWrap) = true
+SymbolicUtils.unwrap(x::CallAndWrap) = x.f
+SymbolicUtils.symtype(x::CallAndWrap) = symtype(x.f)
+SymbolicIndexingInterface.getname(x::CallAndWrap) = getname(x.f)
+SymbolicIndexingInterface.hasname(x::CallAndWrap) = hasname(x.f)
+Symbolics.rename(x::CallAndWrap, name) = CallAndWrap(rename(x.f, name))
+SymbolicUtils.getmetadata(x::CallAndWrap, args...) = SymbolicUtils.getmetadata(x.f, args...)
+SymbolicUtils.setmetadata(x::CallAndWrap, args...) = SymbolicUtils.setmetadata(x.f, args...)
+SymbolicUtils.hasmetadata(x::CallAndWrap, args...) = SymbolicUtils.hasmetadata(x.f, args...)

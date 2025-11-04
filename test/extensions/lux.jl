@@ -22,31 +22,31 @@ using ComponentArrays
     @test out isa Symbolics.Arr
     @test length(out) == 6
     # test that we  can recover the same value as when using concrete numbers
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x),); fold = Val(true)))
     @test out_sub == out_ref
 
     out = LuxCore.stateless_apply(model, sym_x, sym_ps)
     @test out isa Symbolics.Arr
     @test length(out) == 6
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ps => ps),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ps => ps),); fold = Val(true)))
     @test out_sub == out_ref
 
     out = LuxCore.stateless_apply(model, sym_x, ca)
     @test out isa Symbolics.Arr
     @test length(out) == 6
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x,),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x,),); fold = Val(true)))
     @test out_sub == out_ref
 
     out = LuxCore.stateless_apply(model, sym_x, sym_ca)
     @test out isa Symbolics.Arr
     @test length(out) == 6
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ca => ca),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ca => ca),); fold = Val(true)))
     @test out_sub == out_ref
 
     out = LuxCore.stateless_apply(sym_model, sym_x, sym_ca)
     @test out isa Symbolics.Arr
     @test length(out) == 6
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_model => model, sym_x => x, sym_ca => ca),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_model => model, sym_x => x, sym_ca => ca),); fold = Val(true)))
     @test out_sub == out_ref
 end
 
@@ -71,30 +71,30 @@ end
     @test out isa Symbolics.Arr
     @test length(out) == 3
     # test that we  can recover the same value as when using concrete numbers
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x),); fold = Val(true)))
     @test out_sub == out_ref
 
     out = LuxCore.stateless_apply(model, sym_x, sym_ps)
     @test out isa Symbolics.Arr
     @test length(out) == 3
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ps => ps),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ps => ps),); fold = Val(true)))
     @test out_sub == out_ref
 
     out = LuxCore.stateless_apply(model, sym_x, ca)
     @test out isa Symbolics.Arr
     @test length(out) == 3
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x,),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x,),); fold = Val(true)))
     @test out_sub == out_ref
 
     out = LuxCore.stateless_apply(model, sym_x, sym_ca)
     @test out isa Symbolics.Arr
     @test length(out) == 3
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ca => ca),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_x => x, sym_ca => ca),); fold = Val(true)))
     @test out_sub == out_ref
 
     out = LuxCore.stateless_apply(sym_model, sym_x, sym_ca)
     @test out isa Symbolics.Arr
     @test length(out) == 3
-    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_model => model, sym_x => x, sym_ca => ca),)))
+    out_sub = Symbolics.value.(Symbolics.substitute.(Symbolics.scalarize(out), (Dict(sym_model => model, sym_x => x, sym_ca => ca),); fold = Val(true)))
     @test out_sub == out_ref
 end

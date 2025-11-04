@@ -2,20 +2,20 @@ import DomainSets: Domain, Interval, AbstractInterval
 import Symbolics: value, Sym, Term, Num
 
 struct VarDomainPairing
-  variables
+  variables::BasicSymbolic{VartypeT}
   domain::Domain
 end
 
-const DomainedVar = Union{Symbolic{<:Number}, Num}
+const DomainedVar = Union{BasicSymbolic, Num}
 
-Base.:∈(variable::DomainedVar,domain::Domain) = VarDomainPairing(value(variable),domain)
-Base.:∈(variable::DomainedVar,domain::Interval) = VarDomainPairing(value(variable),domain)
+Base.:∈(variable::DomainedVar,domain::Domain) = VarDomainPairing(unwrap(variable),domain)
+Base.:∈(variable::DomainedVar,domain::Interval) = VarDomainPairing(unwrap(variable),domain)
 
 # Construct Interval domain from a Tuple
 Base.:∈(variable::DomainedVar,domain::NTuple{2,Real}) = VarDomainPairing(variable,Interval(domain...))
 
 # Multiple variables
-Base.:∈(variables::NTuple{N,DomainedVar},domain::Domain) where N = VarDomainPairing(value.(variables),domain)
+Base.:∈(variables::NTuple{N,DomainedVar},domain::Domain) where N = VarDomainPairing(unwrap.(variables),domain)
 
 function infimum(d::AbstractInterval{<:Num})
     leftendpoint(d)

@@ -45,7 +45,7 @@ function clean_f(filtered_expr, var, subs)
     if oper === (/)
         if !all(isequal(var, x) for x in get_variables(denominator(unwrapped_f)))
             filtered_expr = numerator(unwrapped_f)
-            push!(assumptions, substitute(denominator(unwrapped_f), subs, fold=false))
+            push!(assumptions, substitute(denominator(unwrapped_f), subs, fold=Val(false)))
         end
     end
     return filtered_expr, assumptions
@@ -70,6 +70,7 @@ julia> filter_stuff(123)
 ```
 """
 function filter_stuff(expr)
+    expr = value(expr)
     if expr isa Integer
         return Dict(), expr
     elseif expr isa Rational || expr isa AbstractFloat || expr isa Complex
@@ -109,22 +110,23 @@ julia> RootFinding._filter_poly(x*sqrt(2), x)
 function _filter_poly(expr, var)
     expr = unwrap(expr)
     vars = get_variables(expr)
-    if !isequal(vars, []) && isequal(vars[1], expr)
+    if !isempty(vars) && isequal(first(vars), expr)
         return (Dict{Any, Any}(), expr)
-    elseif isequal(vars, [])
+    elseif isempty(vars)
         return filter_stuff(expr)
     end
 
     args = copy(parent(arguments(expr)))
-    if expr isa ComplexTerm
+    if symtype(expr) <: Complex
         subs1, subs2 = Dict(), Dict()
         expr1, expr2 = 0, 0
-
-        if !isequal(expr.re, 0)
-            subs1, expr1 = _filter_poly(expr.re, var)
+        rr = real(expr)
+        ii = imag(expr)
+        if !isequal(rr, 0)
+            subs1, expr1 = _filter_poly(rr, var)
         end
-        if !isequal(expr.im, 0)
-            subs2, expr2 = _filter_poly(expr.im, var)
+        if !isequal(ii, 0)
+            subs2, expr2 = _filter_poly(ii, var)
         end
 
         subs = merge(subs1, subs2)
@@ -138,27 +140,26 @@ function _filter_poly(expr, var)
         oper = operation(expr)
         return subs, term(oper, args...)
     end
-
     subs = Dict{Any, Any}()
     for (i, arg) in enumerate(args)
         # handle constants
-        arg = unwrap(arg)
+        arg = value(arg)
         vars = get_variables(arg)
-        if isequal(vars, [])
+        if isempty(vars)
             if arg isa Integer
-                args[i] = bigify(args[i])
+                args[i] = Const{VartypeT}(bigify(args[i]))
                 continue
             elseif arg isa Rational || arg isa AbstractFloat || arg isa Complex
-                args[i] = comp_rational(arg, 1)
+                args[i] = Const{VartypeT}(comp_rational(arg, 1))
                 continue
             end
-            args[i] = sub(subs, args[i])
+            args[i] = Const{VartypeT}(sub(subs, args[i]))
             continue
         end
 
         # handle "x" as an argument
         if length(vars) == 1
-            if isequal(arg, var) || isequal(vars[1], arg)
+            if isequal(arg, var) || isequal(first(vars), arg)
                 continue
             end
         end
@@ -170,8 +171,10 @@ function _filter_poly(expr, var)
                 continue
             end
             # filter(args[1]), filter[args[2]] and then merge
-            subs1, monomial[1] = _filter_poly(monomial[1], var)
-            subs2, monomial[2] = _filter_poly(monomial[2], var)
+            subs1, __monomial_1 = _filter_poly(monomial[1], var)
+            subs2, __monomial_2 = _filter_poly(monomial[2], var)
+            monomial[1] = Const{VartypeT}(__monomial_1)
+            monomial[2] = Const{VartypeT}(__monomial_2)
 
             merge!(subs, merge(subs1, subs2))
             args[i] = maketerm(typeof(arg), oper, monomial, metadata(arg))
@@ -182,7 +185,7 @@ function _filter_poly(expr, var)
             subs_of_monom = Dict{Any, Any}()
             for (j, x) in enumerate(monomial)
                 vars = get_variables(x)
-                if (!isempty(vars) && isequal(vars[1], x))
+                if (!isempty(vars) && isequal(first(vars), x))
                     continue
                 elseif x isa Integer
                     monomial[j] = bigify(monomial[j])
@@ -192,7 +195,8 @@ function _filter_poly(expr, var)
                     continue
                 end
                 # filter each arg and then merge
-                new_subs, monomial[j] = _filter_poly(monomial[j], var)
+                new_subs, __monomial_j = _filter_poly(monomial[j], var)
+                monomial[j] = Const{VartypeT}(__monomial_j)
                 merge!(subs_of_monom, new_subs)
             end
             merge!(subs, subs_of_monom)
@@ -245,10 +249,10 @@ function filter_poly(og_expr, var; assumptions=false)
     vars = get_variables(expr)
 
     # handle edge cases
-    if !isequal(vars, []) && isequal(vars[1], expr)
+    if !isempty(vars) && isequal(first(vars), expr)
         assumptions && return Dict{Any, Any}(), expr, []
         return (Dict{Any, Any}(), expr)
-    elseif isequal(vars, [])
+    elseif isempty(vars)
         assumptions && return filter_stuff(expr), []
         return filter_stuff(expr)
     end
@@ -259,7 +263,7 @@ function filter_poly(og_expr, var; assumptions=false)
     # reassemble expr to avoid variables remembering original values issue and clean
     args = arguments(expr)
     oper = operation(expr)
-    new_expr, assum_array = clean_f(term(oper, args...), var, subs)
+    new_expr, assum_array = clean_f(term(oper, args...; type = symtype(expr), shape = shape(expr)), var, subs)
 
     assumptions && return subs, new_expr, assum_array
     return subs, new_expr
@@ -301,7 +305,7 @@ function sdegree(coeffs, var)
     degree = 0
     vars = collect(keys(coeffs))
     for n in vars
-        isequal(n, 1) && continue
+        SymbolicUtils._isone(n) && continue
         isequal(n, var) && degree > 1 && continue
 
         if isequal(n, var) && degree < 1
@@ -310,9 +314,7 @@ function sdegree(coeffs, var)
         end
 
         args = arguments(n)
-        if args[2] > degree
-            degree = args[2]
-        end
+        degree = max(unwrap_const(args[2]), degree)
     end
     return degree
 end

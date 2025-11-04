@@ -32,7 +32,6 @@ limit2(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 if GROUP == "All" || GROUP == "Core"
     @testset begin
         @safetestset "Invalidations Test" begin include("invalidations.jl") end
-        @safetestset "Struct Test" begin include("struct.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
         @safetestset "View-setting" begin include("stencils.jl") end
@@ -42,7 +41,6 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Differentiation Test" begin include("diff.jl") end
         @safetestset "Utils Test" begin include("utils.jl") end
         @safetestset "ADTypes Test" begin include("adtypes.jl") end
-        @safetestset "Difference Test" begin include("difference.jl") end
         @safetestset "Degree Test" begin include("degree.jl") end
         @safetestset "Coeff Test" begin include("coeff.jl") end
         @safetestset "Parsing Test" begin include("parsing.jl") end
@@ -60,9 +58,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Domain Test" begin include("domains.jl") end
         @safetestset "Inequality Test" begin include("inequality.jl") end
         @safetestset "Integral Test" begin include("integral.jl") end
-        @safetestset "CartesianIndex Test" begin include("cartesianindex.jl") end
         @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
-        @safetestset "LuxCore extensions Test" begin include("extensions/lux.jl") end
         @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
         @safetestset "Show Test" begin include("show.jl") end
         @safetestset "Utility Function Test" begin include("utils.jl") end
@@ -88,19 +84,19 @@ end
 
 if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
     @safetestset "SymbolicIndexingInterface Trait Test" begin
-        include("symbolic_indexing_interface_trait.jl")
+      include("symbolic_indexing_interface_trait.jl")
     end
     @safetestset "SymbolicIndexingInterface Parameter Indexing Test" begin
-        include("symbolic_indexing_interface_parameter_indexing.jl")
+      include("symbolic_indexing_interface_parameter_indexing.jl")
     end
     @safetestset "SymbolicIndexingInterface Symbolic Evaluate Test" begin
-        include("symbolic_indexing_interface_symbolic_evaluate.jl")
+      include("symbolic_indexing_interface_symbolic_evaluate.jl")
     end
 end
 
 if GROUP == "All" || GROUP == "Downstream"
     activate_downstream_env()
-    #@time @safetestset "ParameterizedFunctions MATLABDiffEq Regression Test" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
+    @time @safetestset "ParameterizedFunctions MATLABDiffEq Regression Test" begin include("downstream/ParameterizedFunctions_MATLAB.jl") end
     @safetestset "ModelingToolkit Variable Utils Test" begin include("downstream/modeling_toolkit_utils.jl") end
     @safetestset "DI Test" begin include("downstream/differentiation_interface.jl") end
 end

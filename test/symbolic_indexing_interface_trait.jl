@@ -2,10 +2,9 @@ using Symbolics
 using SymbolicUtils
 using SymbolicIndexingInterface
 
-@test all(symbolic_type.([SymbolicUtils.BasicSymbolic, Symbolics.Num, Symbolics.CallWithMetadata]) .==
+@test all(symbolic_type.([SymbolicUtils.BasicSymbolic, Symbolics.Num, Symbolics.CallAndWrap]) .==
           (ScalarSymbolic(),))
-@test all(symbolic_type.([Symbolics.ArrayOp, Symbolics.Arr]) .==
-          (ArraySymbolic(),))
+@test symbolic_type(Symbolics.Arr) == ArraySymbolic()
 @variables x
 @test symbolic_type(x) == ScalarSymbolic()
 @variables y[1:3]
@@ -20,9 +19,9 @@ using SymbolicIndexingInterface
 subs = Dict(x => 0.1, y => 2z)
 subs2 = merge(subs, Dict(z => 2x+3))
 
-@test symbolic_evaluate(x, subs) == 0.1
+@test Symbolics.value(symbolic_evaluate(x, subs)) == 0.1
 @test isequal(symbolic_evaluate(y, subs), 2z)
-@test symbolic_evaluate(y, subs2) == 6.4
+@test Symbolics.value(symbolic_evaluate(y, subs2)) == 6.4
 
 @testset "`hasname` for `getindex`ed trees" begin
     @variables x[1:2] y[1:2]

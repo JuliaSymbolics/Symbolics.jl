@@ -209,7 +209,7 @@ using SymbolicUtils.Code: Func, toexpr
 D = Differential(t)
 expr = toexpr(Func([value(D(x))], [], value(D(x))))
 @test expr.args[2].args[end] == expr.args[1].args[1] # check function body and function arg
-@test expr.args[2].args[end] == :(var"Differential(t)(x(t))")
+@test expr.args[2].args[end] == :(var"Differential(t, 1)(x(t))")
 
 ## Oop Arr case:
 #
@@ -242,7 +242,7 @@ let # issue#136
 
     val = Dict(x=>1, y=>2)
     B = map(A) do e
-        Num(substitute(e, val))
+        Num(substitute(e, val))::Num
     end
 
     C = copy(B) - 100*I
@@ -269,8 +269,8 @@ let #issue#587
     _Q = Array(sprand(N, N, 0.1))
 
     F(z) = [
-            _S * z
-            _Q * z.^2
+            collect(_S * z)
+            collect(_Q * z.^2)
            ]
 
     Symbolics.@variables z[1:N]
