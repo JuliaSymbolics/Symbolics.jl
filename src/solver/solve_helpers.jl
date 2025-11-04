@@ -41,7 +41,9 @@ end
 SymbolicUtils.promote_symtype(::typeof(ssqrt), ::Type{T}) where {T} = T
 SymbolicUtils.promote_shape(::typeof(ssqrt), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
 
-derivative(::typeof(ssqrt), args...) = substitute(derivative(sqrt, args...), sqrt => ssqrt)
+@register_derivative ssqrt(x) I begin
+    substitute(@derivative_rule(sqrt(x), I), sqrt => ssqrt)
+end
 
 function scbrt(n)
     n = unwrap(n)
@@ -62,7 +64,9 @@ end
 
 SymbolicUtils.promote_symtype(::typeof(scbrt), ::Type{T}) where {T} = T
 SymbolicUtils.promote_shape(::typeof(scbrt), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
-derivative(::typeof(scbrt), args...) = substitute(derivative(cbrt, args...), cbrt => scbrt)
+@register_derivative scbrt(x) I begin
+    substitute(@derivative_rule(cbrt(x), I), cbrt => scbrt)
+end
 
 function slog(n)
     n = unwrap(n)
@@ -82,7 +86,9 @@ end
 SymbolicUtils.promote_symtype(::typeof(slog), ::Type{T}) where {T} = T
 SymbolicUtils.promote_shape(::typeof(slog), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
 
-derivative(::typeof(slog), args...) = substitute(derivative(log, args...), log => slog)
+@register_derivative slog(x) I begin
+    substitute(@derivative_rule(log(x), I), log => slog)
+end
 
 const RootsOf = (SymbolicUtils.@syms roots_of(poly,var))[1]
 

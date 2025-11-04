@@ -123,6 +123,9 @@ macro register_derivative(f::Expr, I::Union{Symbol, Int}, body)
     return esc(Expr(:function, derhead, Expr(:block, unpack, body)))
 end
 
+# Fallback
+@register_derivative (f::Any)(args...) I nothing
+
 # Pre-defined derivatives
 import DiffRules
 for (modu, fun, arity) ∈ DiffRules.diffrules(; filter_modules=(:Base, :SpecialFunctions, :NaNMath))
@@ -136,7 +139,7 @@ for (modu, fun, arity) ∈ DiffRules.diffrules(; filter_modules=(:Base, :Special
         end
 
         # Using the macro here doesn't work somehow.
-        @eval function derivative_rule(::typeof($modu.$fun), ::Val{$arity}, args::SymbolicUtils.ArgsT{VartypeT}, ::Val{$i})
+        @eval function derivative_rule(::typeof($modu.$fun), ::Val{$arity}, args::ROArgsT{VartypeT}, ::Val{$i})
             $SConst($expr)
         end
     end
@@ -285,7 +288,7 @@ sin(x)
 ```
 """
 @inline derivative_idx(::Any, ::Any) = COMMON_ZERO
-function derivative_idx(O::VartypeT, idx::Int)
+function derivative_idx(O::SymbolicT, idx::Int)
     iscall(O) || return COMMON_ZERO
     f = operation(O)
     args = arguments(O)

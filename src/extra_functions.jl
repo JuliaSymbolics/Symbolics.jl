@@ -7,31 +7,16 @@ for (T1, T2) in Iterators.product([Number, BasicSymbolic{VartypeT}, Num], [Integ
     end
 end
 
-derivative(::typeof(sign), args::NTuple{1,Any}, ::Val{1}) = 0
-
-derivative(::typeof(signbit), args::NTuple{1,Any}, ::Val{1}) = 0
-derivative(::typeof(abs), args::NTuple{1,Any}, ::Val{1}) = ifelse(signbit(args[1]),-one(args[1]),one(args[1]))
-
-function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{1})
-    x, y = args
-    ifelse(x < y, one(x), zero(x))
-end
-function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{2})
-    x, y = args
-    ifelse(x < y, zero(y), one(y))
-end
-function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{1})
-    x, y = args
-    ifelse(x > y, one(x), zero(x))
-end
-function derivative(::typeof(max), args::NTuple{2,Any}, ::Val{2})
-    x, y = args
-    ifelse(x > y, zero(y), one(y))
-end
-
-function derivative(::Union{typeof(ceil),typeof(floor),typeof(factorial)}, args::NTuple{1,Any}, ::Val{1})
-    zero(args[1])
-end
+@register_derivative sign(x) 1 COMMON_ZERO
+@register_derivative signbit(x) 1 COMMON_ZERO
+@register_derivative abs(x) 1 ifelse(signbit(x),-one(x),one(x))
+@register_derivative min(x, y) 1 ifelse(x < y, one(x), zero(x))
+@register_derivative min(x, y) 2 ifelse(x < y, zero(y), one(y))
+@register_derivative max(x, y) 1 ifelse(x > y, one(x), zero(x))
+@register_derivative max(x, y) 2 ifelse(x > y, zero(y), one(y))
+@register_derivative ceil(x) 1 COMMON_ZERO
+@register_derivative floor(x) 1 COMMON_ZERO
+@register_derivative factorial(x) 1 COMMON_ZERO
 
 @register_symbolic Base.rand(x)
 @register_symbolic Base.randn(x)
@@ -45,13 +30,7 @@ for (T1, T2, T3) in Iterators.product(Iterators.repeated((Num, BasicSymbolic{Var
     end
 end
 
-function derivative(::typeof(Base.clamp), args::NTuple{3, Any}, ::Val{1})
-    x, l, h = args
-    T = promote_type(symtype(x), symtype(l), symtype(h))
-    z = zero(T)
-    o = one(T)
-    ifelse(x<l, z, ifelse(x>h, z, o))
-end
+@register_derivative clamp(x, l, h) 1 ifelse(x < l, COMMON_ZERO, ifelse(x > h, COMMON_ZERO, COMMON_ONE))
 
 for T1 in [Real, Num, BasicSymbolic{VartypeT}], T2 in [AbstractArray, Arr, BasicSymbolic{VartypeT}]
     if T1 != Num && T2 != Arr
@@ -78,11 +57,10 @@ end
 
 LinearAlgebra.norm(x::Num, p::Real) = abs(x)
 
-derivative(::typeof(<), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
-derivative(::typeof(<=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
-derivative(::typeof(>), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
-derivative(::typeof(>=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
-derivative(::typeof(==), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
-derivative(::typeof(!=), ::NTuple{2, Any}, ::Val{i}) where {i} = 0
-
-derivative(::typeof(expinti), args::NTuple{1,Any}, ::Val{1}) = exp(args[1])/args[1]
+@register_derivative <(x, y) I COMMON_ZERO
+@register_derivative <=(x, y) I COMMON_ZERO
+@register_derivative >(x, y) I COMMON_ZERO
+@register_derivative >=(x, y) I COMMON_ZERO
+@register_derivative ==(x, y) I COMMON_ZERO
+@register_derivative !=(x, y) I COMMON_ZERO
+@register_derivative expinti(x) 1 exp(x) / x

@@ -630,25 +630,25 @@ end
     test_equal.(Symbolics.unwrap.(Symbolics.jacobian([f], vp) .- Symbolics.jacobian([f], p)), 0)
 end
 
+@register_array_symbolic foobar(x, y) begin
+    size = (2,)
+    eltype = Real
+    ndims = 1
+end
+@register_array_symbolic dfoobar1(x, y) begin
+    size = (2,)
+    eltype = Real
+    ndims = 1
+end
+@register_array_symbolic dfoobar2(x, y) begin
+    size = (2,)
+    eltype = Real
+    ndims = 1
+end
+@register_derivative foobar(x, y) 1 dfoobar1(x, y)
+@register_derivative foobar(x, y) 2 dfoobar2(x, y)
+
 @testset "Derivatives of indexed array expressions" begin
-    @register_array_symbolic foobar(x, y) begin
-        size = (2,)
-        eltype = Real
-        ndims = 1
-    end
-    @register_array_symbolic dfoobar1(x, y) begin
-        size = (2,)
-        eltype = Real
-        ndims = 1
-    end
-    @register_array_symbolic dfoobar2(x, y) begin
-        size = (2,)
-        eltype = Real
-        ndims = 1
-    end
-    Symbolics.derivative(::typeof(foobar), args::NTuple{2, Any}, ::Val{1}) = dfoobar1(args...)
-    Symbolics.derivative(::typeof(foobar), args::NTuple{2, Any}, ::Val{2}) = dfoobar2(args...)
-    
     @variables x y
     ex = foobar(x + 2y, y)
     @test ex isa Symbolics.Arr

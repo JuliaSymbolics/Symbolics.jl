@@ -225,15 +225,15 @@ function Base.showerror(io::IO, err::DerivativeNotDefinedError)
     # and code fences
     err_str = Markdown.parse("""
         Derivative of `$(err.expr)` with respect to its $(err.i)-th argument is not defined.
-        Define a derivative by adding a method to `Symbolics.derivative`:
+        Define a derivative by using `@register_derivative`:
 
         ```julia
-        function Symbolics.derivative(::typeof($op), args::NTuple{$nargs, Any}, ::Val{$(err.i)})
+        @register_derivative $op(args...) $(err.i) begin
             # ...
         end
         ```
 
-        Refer to the documentation for `Symbolics.derivative` and the
+        Refer to the documentation for `@register_derivative` and the
         "[Adding Analytical Derivatives](@ref)" section of the docs for further information.
         """)
     show(io, MIME"text/plain"(), err_str)
@@ -321,12 +321,12 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 # We know `D.x` is in `arg`, so the derivative is not identically zero.
                 # `arg` cannot be `D.x` since, that would have also early exited. 
                 for (i, a) in enumerate(inner_args)
-                    der = derivative_idx(arr, i)
+                    der = derivative_idx(arr, i)::Union{Nothing, SymbolicT}
                     if isequal(a, D.x)
-                        der isa NoDeriv && return D(arg)
+                        der === nothing && return D(arg)
                         push!(summed_args, der[idx])
                         continue
-                    elseif der isa NoDeriv
+                    elseif der === nothing
                         push!(summed_args, Differential(a)(arg) * executediff(D, a))
                     else
                         push!(summed_args, der[idx] * executediff(D, a))
@@ -381,8 +381,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 for (i, iarg) in enumerate(inner_args)
                     t2 = executediff(D, iarg; simplify, throw_no_derivative)::SymbolicT
                     _iszero(t2) && continue
-                    t = derivative_idx(arg, i)::Union{NoDeriv, SymbolicT}
-                    if t isa NoDeriv
+                    t = derivative_idx(arg, i)::Union{Nothing, SymbolicT}
+                    if t === nothing
                         throw_no_derivative && throw(DerivativeNotDefinedError(arg, i))
                         t = D(arg)
                     end
@@ -506,89 +506,6 @@ function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
 end
 expand_derivatives(x, simplify=false; kwargs...) = x
 
-# Don't specialize on the function here
-"""
-$(SIGNATURES)
-
-Calculate the derivative of the op `O` with respect to its argument with index
-`idx`.
-
-# Examples
-
-```jldoctest label1
-julia> using Symbolics
-
-julia> @variables x y;
-
-julia> Symbolics.derivative_idx(Symbolics.value(sin(x)), 1)
-cos(x)
-```
-
-Note that the function does not recurse into the operation's arguments, i.e., the
-chain rule is not applied:
-
-```jldoctest label1
-julia> myop = Symbolics.value(sin(x) * y^2)
-sin(x)*(y^2)
-
-julia> typeof(Symbolics.operation(myop))  # Op is multiplication function
-typeof(*)
-
-julia> Symbolics.derivative_idx(myop, 1)  # wrt. sin(x)
-y^2
-
-julia> Symbolics.derivative_idx(myop, 2)  # wrt. y^2
-sin(x)
-```
-"""
-derivative_idx(O::Any, ::Any) = COMMON_ZERO
-function derivative_idx(O::BasicSymbolic, idx)
-    iscall(O) || return COMMON_ZERO
-    res = derivative(operation(O), (arguments(O)...,), Val(idx))
-    if res isa NoDeriv
-        return res
-    else
-        return Const{VartypeT}(res)
-    end
-end
-
-# Indicate that no derivative is defined.
-struct NoDeriv
-end
-
-"""
-    Symbolics.derivative(::typeof(f), args::NTuple{N, Any}, ::Val{i})
-
-Return the derivative of `f(args...)` with respect to `args[i]`. `N` should be the number
-of arguments that `f` takes and `i` is the argument with respect to which the derivative
-is taken. The result can be a numeric value (if the derivative is constant) or a symbolic
-expression. This function is useful for defining derivatives of custom functions registered
-via `@register_symbolic`, to be used when calling `expand_derivatives`.
-"""
-derivative(f, args, v) = NoDeriv()
-
-# Pre-defined derivatives
-import DiffRules
-for (modu, fun, arity) ∈ DiffRules.diffrules(; filter_modules=(:Base, :SpecialFunctions, :NaNMath))
-    fun in [:*, :+, :abs, :mod, :rem, :max, :min] && continue # special
-    for i ∈ 1:arity
-
-        expr = if arity == 1
-            DiffRules.diffrule(modu, fun, :(args[1]))
-        else
-            DiffRules.diffrule(modu, fun, ntuple(k->:(args[$k]), arity)...)[i]
-        end
-        @eval derivative(::typeof($modu.$fun), args::NTuple{$arity,Any}, ::Val{$i}) = $expr
-    end
-end
-
-derivative(::typeof(+), args::NTuple{N,Any}, ::Val) where {N} = 1
-derivative(::typeof(*), args::NTuple{N,Any}, ::Val{i}) where {N,i} = *(deleteat!(collect(args), i)...)
-derivative(::typeof(one), args::Tuple{<:Any}, ::Val) = 0
-
-derivative(f::Function, x::Union{Num, <:BasicSymbolic}) = derivative(f(x), x)
-derivative(::Function, x::Any) = TypeError(:derivative, "2nd argument", Union{Num, <:BasicSymbolic}, x) |> throw
-
 function count_order(x)
     @assert !(x isa Symbol) "The variable $x must have an order of differentiation that is greater or equal to 1!"
     n = 1
@@ -666,6 +583,8 @@ function derivative(O, var; simplify=false, kwargs...)
         Num(expand_derivatives(Differential(var)(unwrap(O)), simplify; kwargs...))
     end
 end
+derivative(f::Function, var::Union{SymbolicT, Num}) = derivative(f(var), var)
+derivative(::Function, x::Any) = throw(TypeError(:derivative, "2nd argument", Union{Num, SymbolicT}, x))
 
 """
 $(SIGNATURES)
