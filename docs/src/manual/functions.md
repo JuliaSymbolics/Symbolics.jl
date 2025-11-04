@@ -95,19 +95,18 @@ also supplied.
 
 ### Defining Derivatives of Registered Functions
 
-In order for symbolic differentiation to work, an overload of `Symbolics.derivative` is
-required. The syntax is `derivative(typeof(f), args::NTuple{i,Any}, ::Val{j})` where
-`i` is the number of arguments to the function and `j` is which argument is being
-differentiated. So for example:
+In order for symbolic differentiation to work, defining [`@register_derivative`](@ref) for
+registered functions is required. For example,
 
 ```julia
-function derivative(::typeof(min), args::NTuple{2,Any}, ::Val{1})
-    x, y = args
-    ifelse(x < y, one(x), zero(x))
-end
+@register_derivative min(x, y) 1 ifelse(x < y, 1, 0)
 ```
 
-is the partial derivative of the Julia `min(x,y)` function with respect to `x`.
+is the partial derivative of the Julia `min(x,y)` function with respect to `x`. Refer to
+the documentation of [`@register_derivative`](@ref) for an in-depth explanation of the macro
+syntax.
+
+Querying the rules defined using this method requires the use of [`@derivative_rule`](@ref).
 
 !!! note
     Downstream symbolic derivative functionality only work if every partial derivative that
@@ -147,6 +146,8 @@ Note that at this time array derivatives cannot be defined.
 ```@docs
 @register_symbolic
 @register_array_symbolic
+@register_derivative
+@derivative_rule
 ```
 
 ## Direct Registration API (Advanced, Experimental)
@@ -181,11 +182,12 @@ Additionally a symbolic name is required:
 Base.nameof(interp::AbstractInterpolation) = :Interpolation
 ```
 
-The derivative is defined similarly to the macro case:
+With Symbolics.jl v7 we don't expose a direct API for defining derivatives. It
+requires using the macro.
 
 ```julia
-function Symbolics.derivative(interp::AbstractInterpolation, args::NTuple{1, Any}, ::Val{1})
-    Symbolics.unwrap(derivative(interp, Symbolics.wrap(args[1])))
+@register_derivative (interp::AbstractInterpolation)(x) 1 begin
+    # ...
 end
 ```
 
