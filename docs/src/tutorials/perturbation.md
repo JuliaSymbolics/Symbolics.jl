@@ -26,7 +26,7 @@ function solve_newton(eq, x, x₀; abstol=1e-8, maxiters=50)
     xₙ = x₀ # numerical value of the initial guess
     for i = 1:maxiters
         # calculate new guess by numerically evaluating symbolic expression at previous guess
-        xₙ₊₁ = substitute(x - f / f′, x => xₙ)
+        xₙ₊₁ = Symbolics.value(substitute(x - f / f′, x => xₙ; fold = Val(true)))
         if abs(xₙ₊₁ - xₙ) < abstol
             return xₙ₊₁ # converged
         else
