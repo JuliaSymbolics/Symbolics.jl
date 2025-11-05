@@ -45,10 +45,8 @@ Dy = Differential(y)
 @test_reference "latexify_refs/stable_mul_ordering1.txt" latexify(x * y)
 @test_reference "latexify_refs/stable_mul_ordering2.txt" latexify(y * x)
 
-@test_throws TypeError latexify(x ~ y + z)
-# @test_reference "latexify_refs/equation1.txt" latexify(x ~ y + z)
-@test_throws TypeError latexify(x ~ Dx(y + z))
-# @test_reference "latexify_refs/equation2.txt" latexify(x ~ Dx(y + z))
+@test_reference "latexify_refs/equation1.txt" latexify(x ~ y + z)
+@test_reference "latexify_refs/equation2.txt" latexify(x ~ Dx(y + z))
 @test_reference "latexify_refs/equation5.txt" latexify(AA^2 + AA + 1 + X₁)
 
 @test_reference "latexify_refs/equation_vec1.txt" latexify([
