@@ -140,7 +140,7 @@ end
     if hide_lhs(value(eq.lhs)) || !(value(eq.lhs) isa Union{Number, AbstractArray, BasicSymbolic})
         return value(eq.rhs)
     else
-        return Expr(:(=), wrap(value(eq.lhs)), wrap(value(eq.rhs)))
+        return Expr(:(=), recipe(eq.lhs), recipe(eq.rhs))
     end
 end
 
