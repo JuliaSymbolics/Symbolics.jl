@@ -82,8 +82,19 @@ const STerm = SymbolicUtils.Term{VartypeT}
 
 export simplify, substitute
 
-warn_load_latexify() = warn_load_latexify(nothing)
-warn_load_latexify(_) = nothing
+import AbstractPlutoDingetjes: is_inside_pluto
+const WARNED_LATEXIFY = Ref(false)
+function warn_load_latexify()
+    is_inside_pluto() || return
+    WARNED_LATEXIFY[] && return
+    @warn """
+    Attempting to print a symbolic expression in a Pluto notebook. Please run \
+    `import Latexify` to enable pretty-printing of symbolic expressions. This \
+    warning will only display once.
+    """
+    WARNED_LATEXIFY[] = true
+    return nothing
+end
 
 export Num
 import MacroTools: splitdef, combinedef, postwalk, striplines
