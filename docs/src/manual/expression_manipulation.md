@@ -45,6 +45,6 @@ Symbolics.evaluate
 Symbolics.symbolic_to_float
 Symbolics.terms(x)
 Symbolics.factors(x)
-numerator(x::Union{Num, Symbolics.Symbolic})
-denominator(x::Union{Num, Symbolics.Symbolic})
+numerator(x::Union{Num, SymbolicUtils.BasicSymbolic})
+denominator(x::Union{Num, SymbolicUtils.BasicSymbolic})
 ```

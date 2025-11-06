@@ -213,6 +213,6 @@ Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
 
 ```@docs
 Symbolics.Arr
-Symbolics.scalarize
-Symbolics.shape
+SymbolicUtils.scalarize
+SymbolicUtils.shape
 ```
