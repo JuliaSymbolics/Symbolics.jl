@@ -256,6 +256,24 @@ function substitute_in_deriv(ex, rules; kw...)
     substitute(ex, rules; kw..., filterer = symdiff_substitute_filter)
 end
 
+function deriv_and_depvar_substitute_filter(ex::SymbolicT)
+    SymbolicUtils.default_substitute_filter(ex) || @match ex begin
+        BSImpl.Term(; f) && if f isa Differential end => true
+        BSImpl.Term(; f) && if f isa SymbolicT end => true
+        _ => false
+    end
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Identical to `substitute` except it also substitutes inside `Differential` operator
+applications and dependent variables.
+"""
+function substitute_in_deriv_and_depvar(ex, rules; kw...)
+    substitute(ex, rules; kw..., filterer = deriv_and_depvar_substitute_filter)
+end
+
 function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::SymbolicUtils.ROArgsT{VartypeT}; kw...)
     any(isequal(D.x), inner_args) && return D(arg)
 
@@ -358,12 +376,12 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
                 inner_function = arguments(arg)[1]
                 if iscall(a) || isequal(a, D.x)
-                    t1 = substitute_in_deriv(inner_function, Dict(domainvars => a))
+                    t1 = substitute_in_deriv_and_depvar(inner_function, Dict(domainvars => a))
                     t2 = executediff(D, a; simplify, throw_no_derivative)
                     push!(summed_args, -t1*t2)
                 end
                 if iscall(b) || isequal(b, D.x)
-                    t1 = substitute_in_deriv(inner_function, Dict(domainvars => b))
+                    t1 = substitute_in_deriv_and_depvar(inner_function, Dict(domainvars => b))
                     t2 = executediff(D, b; simplify, throw_no_derivative)
                     push!(summed_args, t1*t2)
                 end
