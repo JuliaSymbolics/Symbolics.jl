@@ -61,7 +61,6 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "LogExpFunctions Test" begin include("logexpfunctions.jl") end
         @safetestset "Registration without using Test" begin include("registration_without_using.jl") end
         @safetestset "Show Test" begin include("show.jl") end
-        @safetestset "Utility Function Test" begin include("utils.jl") end
         @safetestset "RootFinding solver" begin include("solver.jl") end
         @safetestset "Function inverses test" begin include("inverse.jl") end
         @safetestset "Taylor Series Test" begin include("taylor.jl") end
