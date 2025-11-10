@@ -62,7 +62,7 @@ end
 end
 
 @testset "Issue#1342 substitute working on called symbolics" begin
-    @variables p(..) x y
+    @variables p(::Real) x y
     arg = unwrap(substitute(p(x), [p => identity]))
     @test iscall(arg) && operation(arg) == identity && isequal(only(arguments(arg)), x)
     @test unwrap_const(unwrap(substitute(p(x), [p => sqrt, x => 4.0]; fold = Val(true)))) ≈ 2.0
