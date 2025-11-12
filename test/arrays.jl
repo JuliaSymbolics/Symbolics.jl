@@ -445,3 +445,8 @@ end
     @test isequal(SymbolicUtils.sorted_arguments(sym), [unwrap(x), unwrap(y)])
     @test operation(sym) === +
 end
+
+@testset "matmul ambiguity" begin
+    @variables x[1:3] y
+    @test_nowarn x * y
+end
