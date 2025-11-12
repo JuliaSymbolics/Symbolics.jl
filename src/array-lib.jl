@@ -74,7 +74,9 @@ const PolyadicT = Union{AbstractArray{<:Number}, Number}
 function *(x::Arr, args::PolyadicT...)
     return *(unwrap(x), args...)
 end
-
+function *(x::Arr, y::Number, args::PolyadicT...)
+    return *(unwrap(x), unwrap(y), args...)
+end
 function *(a::PolyadicT, b::Arr, bs::PolyadicT...)
     return *(a, unwrap(b), bs...)
 end
