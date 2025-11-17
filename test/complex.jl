@@ -1,5 +1,5 @@
 using Symbolics, Test
-using SymbolicUtils: metadata
+using SymbolicUtils: metadata, symbolic_type, ScalarSymbolic, symtype, iscall, operation, arguments
 using Symbolics: unwrap
 using SymbolicIndexingInterface: getname, hasname
 
@@ -49,4 +49,38 @@ end
     @test getname(z) == :z
     @test !hasname(2x)
     @test !hasname(x + y)
+end
+
+@testset "symbolic_type" begin
+    # Test that ComplexTerm has correct symbolic_type classification
+    # Regression test for bug where ComplexTerm returned NotSymbolic()
+    # causing namespace issues in ModelingToolkit
+
+    @variables x y p
+
+    # Create a ComplexTerm
+    complex_expr = p * x * (1 + im * y)
+    ct = unwrap(complex_expr)
+
+    # Verify it's a ComplexTerm
+    @test ct isa Symbolics.ComplexTerm
+
+    # Test symbolic_type returns ScalarSymbolic, not NotSymbolic
+    @test symbolic_type(ct) == ScalarSymbolic()
+
+    # Verify symtype is still correct
+    @test Symbolics.symtype(ct) == Complex{Real}
+
+    # Test that ComplexTerm is recognized as symbolic (needed for proper traversal)
+    @test iscall(ct)
+    @test operation(ct) == Complex{Real}
+    @test length(arguments(ct)) == 2
+
+    # Test with array parts (ComplexTerm can have array .re and .im)
+    @variables x_arr[1:3] y_arr[1:3]
+    ct_with_arrays = Symbolics.ComplexTerm{Real}(x_arr, y_arr)
+
+    # ComplexTerm itself is still scalar even with array parts
+    @test symbolic_type(ct_with_arrays) == ScalarSymbolic()
+    @test Symbolics.symtype(ct_with_arrays) == Complex{Real}
 end
