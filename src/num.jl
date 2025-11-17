@@ -65,7 +65,7 @@ for (T1, T2) in Iterators.product([Num, Integer], [Num, Integer])
     end
 end
 
-for f in [/, \, ^]
+for f in [\, ^]
     @eval function (::$(typeof(f)))(x1::AbstractArray{<:Real}, x2::Num)
         $f(x1, unwrap(x2))
     end
@@ -73,6 +73,14 @@ for f in [/, \, ^]
     @eval function (::$(typeof(f)))(x1::Num, x2::AbstractArray{<:Real})
         $f(unwrap(x1), x2)
     end
+end
+
+function Base.:(/)(x1::AbstractArray{<:Real}, x2::Num)
+    /(unwrap(x1), unwrap(x2))
+end
+
+function Base.:(/)(x1::Num, x2::AbstractVector{<:Real})
+    /(unwrap(x1), unwrap(x2))
 end
 
 Base.conj(x::Num) = x

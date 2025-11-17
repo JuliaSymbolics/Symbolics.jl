@@ -11,6 +11,7 @@ function wrapper_fn_from_idxs(x::Arr{T, N}, idxs...) where {T, N}
     nd = _indexed_ndims(idxs...)
     return nd == 0 ? is_wrapper_type(T) ? T : identity : Arr{T, nd}
 end
+wrapper_fn_from_idxs(x::Arr{T, N}, idx::SymbolicUtils.StableIndex{Int}) where {T, N} = T
 # Wrapped array should wrap the elements too
 function Base.getindex(x::Arr{T, N}, idx::CartesianIndex{N}) where {T, N}
     if is_wrapper_type(T)
@@ -80,10 +81,10 @@ end
 function *(a::PolyadicT, b::Arr, bs::PolyadicT...)
     return *(a, unwrap(b), bs...)
 end
-function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, bs::PolyadicT...) where {T}
+function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, bs::PolyadicT...) where {T <: Number}
     return *(a, unwrap(b), bs...)
 end
-function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs::PolyadicT...) where {T}
+function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs::PolyadicT...) where {T <: Number}
     return *(a, unwrap(b), unwrap(c), bs...)
 end
 function *(a::Number, b::Arr, bs::PolyadicT...)
@@ -120,6 +121,20 @@ end
 function +(x1::Arr, x2::Arr, args::AbstractArray...)
     return +(unwrap(x1), unwrap(x2), args...)
 end
+
+for T1 in [Arr, AbstractArray], T2 in [Arr, AbstractArray]
+    T1 == T2 == AbstractArray && continue
+    @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Num(unwrap(x1) \ unwrap(x2))
+    @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
+    @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 1}) = Arr{Num, 1}(unwrap(x1) \ unwrap(x2))
+    @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
+
+    @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
+    @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
+    @eval Base.:(/)(x1::$T1{Num, 2}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
+end
+
+Base.:(/)(x1::Num, x2::Arr{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
 
 #################### MAP-REDUCE ################
 
