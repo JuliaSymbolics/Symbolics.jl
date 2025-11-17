@@ -3,7 +3,8 @@ using SymbolicUtils, Test
 using Symbolics: symtype, shape, wrap, unwrap, Arr, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
 using Base: Slice
 using SymbolicUtils: Sym, term, operation, search_variables
-import LinearAlgebra: dot, Adjoint
+import SymbolicUtils.Code: toexpr
+import LinearAlgebra: dot, Adjoint, cross, diagm
 import ..limit2
 
 struct TestMetaT end
@@ -446,7 +447,78 @@ end
     @test operation(sym) === +
 end
 
-@testset "matmul ambiguity" begin
-    @variables x[1:3] y
-    @test_nowarn x * y
+@testset "Basic functions test" begin
+    @variables a b c
+    @variables x[1:3] y[1:3, 1:3]
+    arrays = [
+        x,
+        y,
+        unwrap(x),
+        unwrap(y),
+        collect(y),
+        [a, b, c],
+        diagm([a, b, c]) * x,
+        diagm([a, b, c]) * [a, b, c],
+        y * [a, b, c],
+        diagm([a, b, c]) * y,
+    ]
+
+    xval = rand(3)
+    yval = rand(3, 3)
+    setup(ex) = quote
+        let a = 1.0, b = 2.3, c = 4.5, x = $xval, y = $yval
+            $(ex)
+        end
+    end
+
+    @testset "$arr1 AND $arr2" for arr1 in arrays, arr2 in arrays
+        val1 = eval(setup(toexpr(arr1)))
+        val2 = eval(setup(toexpr(arr2)))
+        if ndims(arr1) == ndims(arr2) == 1 && length(arr1) == length(arr2) == 3
+            t1 = setup(toexpr(cross(arr1, arr2)))
+            @test eval(t1) ≈ cross(val1, val2)
+        end
+        if size(arr1) == size(arr2)
+            t1 = setup(toexpr(dot(arr1, arr2)))
+            @test eval(t1) ≈ dot(val1, val2)
+
+            t1 = setup(toexpr(arr1 .* arr2))
+            @test eval(t1) ≈ val1 .* val2
+
+            t1 = setup(toexpr(arr1 + arr2))
+            @test eval(t1) ≈ val1 + val2
+        end
+        t1 = try
+            setup(toexpr(arr1'arr2))
+        catch
+            nothing
+        end
+        if t1 !== nothing
+            @test eval(t1) ≈ val1'val2
+        end
+
+        truth = try
+            val1 / val2
+        catch
+            nothing
+        end
+        if truth !== nothing
+            t1 = setup(toexpr(arr1 / arr2))
+            @test eval(t1) ≈ truth
+        end
+
+        truth = try
+            val1 \ val2
+        catch
+            nothing
+        end
+        t1 = try
+            setup(toexpr(arr1 \ arr2))
+        catch
+            nothing
+        end
+        if truth !== nothing && t1 !== nothing
+            @test eval(t1) ≈ truth
+        end
+    end
 end
