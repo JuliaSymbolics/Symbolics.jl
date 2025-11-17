@@ -11,6 +11,7 @@ function wrapper_fn_from_idxs(x::Arr{T, N}, idxs...) where {T, N}
     nd = _indexed_ndims(idxs...)
     return nd == 0 ? is_wrapper_type(T) ? T : identity : Arr{T, nd}
 end
+wrapper_fn_from_idxs(x::Arr{T, N}, idx::SymbolicUtils.StableIndex{Int}) where {T, N} = T
 # Wrapped array should wrap the elements too
 function Base.getindex(x::Arr{T, N}, idx::CartesianIndex{N}) where {T, N}
     if is_wrapper_type(T)
