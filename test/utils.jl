@@ -297,3 +297,9 @@ end
     @test Symbolics.evaluate(ltr, Dict(x => 1, y => 2))
     @test !Symbolics.evaluate(ltr, Dict(x => 2, y => 1))
 end
+
+@testset "Issue #1683: Scalarization of `Num` retains type" begin
+    @variables x
+    x2 = Symbolics.scalarize(x)
+    @test x2 isa Num
+end

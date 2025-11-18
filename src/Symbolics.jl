@@ -219,18 +219,18 @@ for T in [Num, Complex{Num}]
     @eval begin
         #(::Type{S})(x::$T) where {S<:Union{NumberTypes,AbstractArray}} = S(Symbolics.unwrap(x))::S
 
-        SymbolicUtils.simplify(n::$T; kw...) = wrap(SymbolicUtils.simplify(unwrap(n); kw...))
-        SymbolicUtils.simplify_fractions(n::$T; kw...) = wrap(SymbolicUtils.simplify_fractions(unwrap(n); kw...))
-        SymbolicUtils.expand(n::$T) = wrap(SymbolicUtils.expand(unwrap(n)))
+        SymbolicUtils.simplify(n::$T; kw...) = $T(SymbolicUtils.simplify(unwrap(n); kw...))
+        SymbolicUtils.simplify_fractions(n::$T; kw...) = $T(SymbolicUtils.simplify_fractions(unwrap(n); kw...))
+        SymbolicUtils.expand(n::$T) = $T(SymbolicUtils.expand(unwrap(n)))
 
         SymbolicUtils.Code.toexpr(x::$T) = SymbolicUtils.Code.toexpr(unwrap(x))
 
-        SymbolicUtils.setmetadata(x::$T, t, v) = wrap(SymbolicUtils.setmetadata(unwrap(x), t, v))
+        SymbolicUtils.setmetadata(x::$T, t, v) = $T(SymbolicUtils.setmetadata(unwrap(x), t, v))
         SymbolicUtils.getmetadata(x::$T, t) = SymbolicUtils.getmetadata(unwrap(x), t)
         SymbolicUtils.hasmetadata(x::$T, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
 
         Broadcast.broadcastable(x::$T) = x
-        SymbolicUtils.scalarize(x::$T) = scalarize(unwrap(x))
+        SymbolicUtils.scalarize(x::$T) = $T(scalarize(unwrap(x)))
     end
 end
 
