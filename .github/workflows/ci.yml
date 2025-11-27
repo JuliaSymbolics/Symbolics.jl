@@ -3,6 +3,7 @@ on:
   pull_request:
     branches:
       - master
+      - backport-v6
     paths-ignore:
       - 'docs/**'
   push:
