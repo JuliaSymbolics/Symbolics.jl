@@ -362,12 +362,18 @@ function _recursive_unwrap(val::AbstractSparseArray; eval::Val{_eval} = Val(fals
     end
 end
 
-struct FPSubFilterer{O} end
+struct FPSubFilterer{O, F}
+    fallback_filterer::F
+end
 
-function (::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
+function FPSubFilterer{O}(; fallback_filterer = SymbolicUtils.default_substitute_filter) where {O}
+    FPSubFilterer{O, typeof(fallback_filterer)}(fallback_filterer)
+end
+
+function (filt::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
     @match ex begin
         BSImpl.Term(; f) && if f isa Operator end => !(f isa O)
-        _ => SymbolicUtils.default_substitute_filter(ex)
+        _ => filt.fallback_filterer(ex)
     end
 end
 
@@ -383,12 +389,14 @@ specified to prevent substitution of expressions inside operators of the given t
 infinite loops in cases where the substitutions in `dict` are circular
 (e.g. `[x => y, y => x]`).
 """
-function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000, kw...)
-    y = substitute(x, dict; filterer=FPSubFilterer{operator}(), kw...)
+function fixpoint_sub(x, dict; operator::Type{_OP} = Nothing, maxiters = 1000, filterer = SymbolicUtils.default_substitute_filter, fold::Val{FOLD} = Val{false}()) where {_OP, FOLD}
+    filterer = FPSubFilterer{_OP}(; fallback_filterer = filterer)
+    substituter = SymbolicUtils.Substituter{FOLD}(dict, filterer)
+    y = substituter(x)
     iters = maxiters
     while !isequal(x, y) && iters > 0
         y = x
-        x = substitute(y, dict; filterer=FPSubFilterer{operator}(), kw...)
+        x = substituter(x)
         iters -= 1
     end
 
@@ -398,9 +406,9 @@ function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000, kw...)
 
     return x
 end
-function fixpoint_sub(x::SparseMatrixCSC, dict; operator = Nothing, maxiters = 1000, kw...)
+function fixpoint_sub(x::SparseMatrixCSC, dict; kw...)
     I, J, V = findnz(x)
-    V = fixpoint_sub(V, dict; operator, maxiters, kw...)
+    V = fixpoint_sub(V, dict; kw...)
     m, n = size(x)
     return sparse(I, J, V, m, n)
 end

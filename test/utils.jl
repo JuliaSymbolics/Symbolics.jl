@@ -3,6 +3,7 @@ import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap,
                   isblock, flatten_expr!, get_variables, get_differential_vars,
                   is_singleton, diff2term, tosymbol, lower_varname, 
                   degree, coeff
+import SymbolicUtils
 using SymbolicUtils: symtype
 using SparseArrays
 using Test
@@ -302,4 +303,14 @@ end
     @variables x
     x2 = Symbolics.scalarize(x)
     @test x2 isa Num
+end
+
+@testset "`fixpoint_sub` accepts `substitute` kwargs" begin
+    @variables x
+    ex = unwrap(sin(x))
+    @test iscall(Symbolics.fixpoint_sub(ex, Dict([x => 1.0])))
+    @test SymbolicUtils.isconst(Symbolics.fixpoint_sub(ex, Dict([x => 1.0]); fold = Val(true)))
+
+    filterer = Base.Fix2(!==, sin) ∘ operation
+    @test isequal(ex, Symbolics.fixpoint_sub(ex, Dict([x => 1.0]); filterer))
 end
