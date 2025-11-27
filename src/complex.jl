@@ -18,6 +18,9 @@ function wrapper_type(::Type{Complex{T}}) where T
 end
 
 symtype(a::ComplexTerm{T}) where T = Complex{T}
+
+SymbolicUtils.symbolic_type(::ComplexTerm) = SymbolicUtils.ScalarSymbolic()
+
 iscall(a::ComplexTerm) = true
 operation(a::ComplexTerm{T}) where T = Complex{T}
 arguments(a::ComplexTerm) = [a.re, a.im]
