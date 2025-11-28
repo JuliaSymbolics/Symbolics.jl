@@ -565,6 +565,8 @@ function __init__()
                 "but a symbolic expression appeared instead of a Bool. For help regarding control flow with symbolic variables, see https://docs.sciml.ai/ModelingToolkit/dev/basics/FAQ/#How-do-I-handle-if-statements-in-my-symbolic-forms?")
         end
     end
+    SymbolicUtils.hashcons(RootsOf, true)
+    SymbolicUtils.hashcons(IM, true)
 end
 
 export inverse, left_inverse, right_inverse, @register_inverse, has_inverse, has_left_inverse, has_right_inverse
@@ -572,11 +574,6 @@ include("inverse.jl")
 
 export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
 include("discontinuities.jl")
-
-function __init__()
-    SymbolicUtils.hashcons(RootsOf, true)
-    SymbolicUtils.hashcons(IM, true)
-end
 
 @public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
