@@ -573,6 +573,11 @@ include("inverse.jl")
 export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity
 include("discontinuities.jl")
 
+function __init__()
+    SymbolicUtils.hashcons(RootsOf, true)
+    SymbolicUtils.hashcons(IM, true)
+end
+
 @public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, option_to_metadata_type, scalarize, shape
