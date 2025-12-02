@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-authors = ["Shashi Gowda <gowda@mit.edu>"]
 version = "7.1.1"
+authors = ["Shashi Gowda <gowda@mit.edu>"]
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -94,7 +94,7 @@ Moshi = "0.3.7"
 MultivariatePolynomials = "0.5.12"
 MutableArithmetics = "1.6.5"
 NaNMath = "1"
-Nemo = "0.46, 0.47, 0.48, 0.49, 0.52"
+Nemo = "0.46, 0.47, 0.48, 0.49, 0.52, 0.53"
 PkgBenchmark = "0.2"
 PreallocationTools = "0.4"
 PrecompileTools = "1"
