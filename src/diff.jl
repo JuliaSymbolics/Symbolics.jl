@@ -660,7 +660,7 @@ function jacobian(ops, vars; simplify=false, kwargs...)
         vars = unwrap.(vars)::Vector{SymbolicT}
     elseif vars isa Vector{SymbolicT}
     else
-        error("This should not happen!")
+        error("This should not happen! `vars` must be convertible to Vector{SymbolicT}. \nReceived vars = $vars")
     end
     _res = jacobian(ops, vars; simplify=simplify, scalarize=Val(false), kwargs...)
     res = similar(_res, Num)
