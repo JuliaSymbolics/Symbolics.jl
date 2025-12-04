@@ -15,7 +15,7 @@ and easily understandable to all Julia programmers.
 SymbolicUtils.substitute
 SymbolicUtils.simplify
 ```
-Documentation for `rewriter` can be found [here](https://symbolicutils.juliasymbolics.org/rewrite/), using the `@rule` macro or the `@acrule` macro from SymbolicUtils.jl.
+Documentation for `rewriter` can be found [here](https://docs.sciml.ai/SymbolicUtils/stable/manual/rewrite/#Rule-based-rewriting), using the `@rule` macro or the `@acrule` macro from SymbolicUtils.jl.
 
 ## Functionality Provided by SymPy.jl Integration
 
