@@ -114,8 +114,11 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         # expected to be defined outside Symbolics
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
-            Ts = has_symwrapper(T) ? (T, BasicSymbolic{VartypeT}, wrapper_type(T)) :
-                                (T, BasicSymbolic{VartypeT})
+            if has_symwrapper(T)
+                Ts = (T, SymbolicT, wrapper_type(T))
+            else
+                Ts = (T, SymbolicT)
+            end
             if T <: AbstractArray && wrap_arrays
                 eT = eltype(T)
                 if eT == Any
@@ -127,10 +130,9 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
                     (elT) -> AbstractArray{S} where {S <: elT}
                 end
                 if has_symwrapper(eT)
-                    Ts = (Ts..., AbstractArray{BasicSymbolic{VartypeT}}, 
-                    _arr_type_fn(wrapper_type(eT)))
+                    Ts = (Ts..., _arr_type_fn(SymbolicT), _arr_type_fn(wrapper_type(eT)))
                 else
-                    Ts = (Ts..., AbstractArray{BasicSymbolic{VartypeT}})
+                    Ts = (Ts..., _arr_type_fn(SymbolicT))
                 end
             end
             Ts
@@ -189,7 +191,7 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         for (i, T) in enumerate(Ts)
             if T === BasicSymbolic{VartypeT}
                 push!(body.args, :(@assert $symtype($(names[i])) <: $(types[i][1])))
-            elseif T === AbstractArray{BasicSymbolic{VartypeT}} && eltype(types[i][1]) !== Any
+            elseif T <: (AbstractArray{S} where {S <: SymbolicT}) && eltype(types[i][1]) !== Any
                 push!(body.args, :(@assert $symtype($(names[i])[1]) <: $(eltype(types[i][1]))))
             end
         end
