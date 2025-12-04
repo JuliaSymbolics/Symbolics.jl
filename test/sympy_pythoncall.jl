@@ -18,7 +18,7 @@ sol = sympy_pythoncall_algebraic_solve(eq, x)
 # Test 3: Integration
 expr = x^2
 result = sympy_pythoncall_integrate(expr, x)
-@test Symbolics.simplify(result - x^3/3) == 0
+@test isequal(Symbolics.simplify(result), x^3/3)
 
 # Test 4: Simplification
 expr = x^2 + 2x^2
