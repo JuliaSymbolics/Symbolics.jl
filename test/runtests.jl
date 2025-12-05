@@ -34,6 +34,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Invalidations Test" begin include("invalidations.jl") end
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
+        @safetestset "SymStruct" begin include("symstruct.jl") end
         @safetestset "View-setting" begin include("stencils.jl") end
         @safetestset "Complex" begin include("complex.jl") end
         @safetestset "Semi-polynomial" begin include("semipoly.jl") end
