@@ -69,7 +69,7 @@ recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
 
 @latexrecipe function f(n::Num)
     env --> :equation
-    mult_symbol --> ""
+    mult_symbol --> "~"
     fmt --> FancyNumberFormatter(5)
     index --> :subscript
     snakecase --> true
@@ -80,7 +80,7 @@ end
 
 @latexrecipe function f(z::Complex{Num})
     env --> :equation
-    mult_symbol --> ""
+    mult_symbol --> "~"
     index --> :subscript
 
     iszero(z.im) && return :($(recipe(value(z.re))))
@@ -90,7 +90,7 @@ end
 
 @latexrecipe function f(n::Function)
     env --> :equation
-    mult_symbol --> ""
+    mult_symbol --> "~"
     index --> :subscript
 
     return nameof(n)
@@ -99,7 +99,7 @@ end
 
 @latexrecipe function f(n::Symbolics.Arr)
     env --> :equation
-    mult_symbol --> ""
+    mult_symbol --> "~"
     index --> :subscript
 
     return value(n)
@@ -107,7 +107,7 @@ end
 
 @latexrecipe function f(n::Symbolics.CallAndWrap)
     env --> :equation
-    mult_symbol --> ""
+    mult_symbol --> "~"
     index --> :subscript
 
     return n.f
@@ -115,7 +115,7 @@ end
 
 @latexrecipe function f(n::SymbolicUtils.BasicSymbolic)
     env --> :equation
-    mult_symbol --> ""
+    mult_symbol --> "~"
     index --> :subscript
 
     return recipe(n)
