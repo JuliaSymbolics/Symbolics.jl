@@ -378,19 +378,26 @@ function (filt::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
 end
 
 """
-    fixpoint_sub(expr, dict; operator = Nothing, maxiters = 1000)
+    fixpoint_sub(expr, dict, ::Type{OP} = Nothing; maxiters = 1000)
 
 Given a symbolic expression, equation or inequality `expr` perform the substitutions in
 `dict` recursively until the expression does not change. Substitutions that depend on one
 another will thus be recursively expanded. For example,
-`fixpoint_sub(x, Dict(x => y, y => 3))` will return `3`. The `operator` keyword can be
-specified to prevent substitution of expressions inside operators of the given type. The
+`fixpoint_sub(x, Dict(x => y, y => 3))` will return `3`. The `OP` argument can be
+specified to prevent substitution of expressions inside `Operator`s of the given type. The
 `maxiters` keyword is used to limit the number of times the substitution can occur to avoid
 infinite loops in cases where the substitutions in `dict` are circular
 (e.g. `[x => y, y => x]`).
 """
-function fixpoint_sub(x, dict; operator::Type{_OP} = Nothing, maxiters = 1000, filterer = SymbolicUtils.default_substitute_filter, fold::Val{FOLD} = Val{false}()) where {_OP, FOLD}
-    filterer = FPSubFilterer{_OP}(; fallback_filterer = filterer)
+function fixpoint_sub(x, dict, ::Type{OP} = Nothing; maxiters = 1000, filterer = SymbolicUtils.default_substitute_filter, fold::Val{FOLD} = Val{false}(), kw...) where {OP, FOLD}
+    if get(kw, :operator, nothing) !== nothing
+        Base.depwarn("""
+        The `operator` keyword to `fixpoint_sub` is deprecated. Please pass it as the \
+        third positional argument instead.
+        """, :fixpoint_sub_op_kwarg)
+        return fixpoint_sub(x, dict, kw[:operator]; maxiters, filterer, fold)
+    end
+    filterer = FPSubFilterer{OP}(; fallback_filterer = filterer)
     substituter = SymbolicUtils.Substituter{FOLD}(dict, filterer)
     y = substituter(x)
     iters = maxiters
@@ -406,9 +413,9 @@ function fixpoint_sub(x, dict; operator::Type{_OP} = Nothing, maxiters = 1000, f
 
     return x
 end
-function fixpoint_sub(x::SparseMatrixCSC, dict; kw...)
+function fixpoint_sub(x::SparseMatrixCSC, dict, ::Type{OP} = Nothing; kw...) where {OP}
     I, J, V = findnz(x)
-    V = fixpoint_sub(V, dict; kw...)
+    V = fixpoint_sub(V, dict, OP; kw...)
     m, n = size(x)
     return sparse(I, J, V, m, n)
 end
