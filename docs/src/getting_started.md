@@ -385,8 +385,8 @@ _S = sprand(N, N, 0.1)
 _Q = sprand(N, N, 0.1)
 
 F(z) = [ # some complicated sparse amenable function
-    _S * z
-    _Q * z.^2
+    collect(_S * z)
+    collect(_Q * z.^2)
 ]
 
 Symbolics.@variables z[1:N]
