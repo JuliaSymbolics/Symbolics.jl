@@ -140,29 +140,3 @@ Base.:(/)(x1::Num, x2::Arr{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
 
 SymbolicUtils.@map_methods Arr unwrap wrap
 SymbolicUtils.@mapreduce_methods Arr unwrap wrap
-
-#################### REGISTRATION ################
-
-@register_array_symbolic LinearAlgebra.triu(x::AbstractArray) begin
-    size = size(x)
-    eltype = eltype(x)
-end
-
-@register_array_symbolic LinearAlgebra.tril(x::AbstractArray) begin
-    size = size(x)
-    eltype = eltype(x)
-end
-
-@register_array_symbolic LinearAlgebra.normalize(x::AbstractArray) begin
-    size = size(x)
-    eltype = eltype(x)
-end
-
-@register_array_symbolic LinearAlgebra.mul!(x::AbstractArray, y::AbstractArray, z::AbstractArray, α, β) begin
-    size = size(x)
-    eltype = eltype(x)
-end
-@register_array_symbolic Base.copy(x::AbstractArray) begin
-    size = size(x)
-    eltype = eltype(x)
-end
