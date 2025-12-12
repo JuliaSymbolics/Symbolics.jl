@@ -72,7 +72,7 @@ function solve_cascade(eqs, xs, x₀, ϵ)
     sol = Dict(xs[begin] => x₀) # store solutions in a map
 
     # verify that x₀ is a solution of the first equation
-    eq0 = substitute(eqs[1], sol)
+    eq0 = substitute(eqs[1], sol; fold = Val(true))
     isequal(eq0.lhs, eq0.rhs) || error("$sol does not solve $(eqs[1])")
 
     # solve remaining equations sequentially
@@ -94,7 +94,7 @@ x_pert = substitute(x_taylor, x_coeffs_sol)
 The $n$-th order solution of our original quintic equation is the sum up to the $ϵ^n$-th order term, evaluated at $ϵ=1$:
 ```@example perturb
 for n in 0:7
-    x_pert_sol = substitute(taylor(x_pert, ϵ, 0:n), ϵ => 1)
+    x_pert_sol = substitute(taylor(x_pert, ϵ, 0:n), ϵ => big(1))
     println("$n-th order solution: x = $x_pert_sol = $(x_pert_sol * 1.0)")
 end
 ```
