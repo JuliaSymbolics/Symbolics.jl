@@ -132,7 +132,9 @@ function LinearAlgebra.norm(A::Arr{T}, p::Real) where {T}
     end
 end
 
-SymbolicUtils.scalarize(x::Arr) = SymbolicUtils.scalarize(unwrap(x))
+function SymbolicUtils.scalarize(x::Arr, ::Val{toplevel}) where {toplevel}
+    SymbolicUtils.scalarize(unwrap(x), Val{toplevel}())
+end
 
 Base.isempty(x::Arr) = isempty(unwrap(x))
 Base.collect(x::Arr) = wrap.(collect(unwrap(x)))
