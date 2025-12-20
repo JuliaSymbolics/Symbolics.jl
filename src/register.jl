@@ -22,9 +22,20 @@ overwriting.
 See `@register_array_symbolic` to register functions which return arrays.
 """
 macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
-    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
+    f, ftype, argnames, Ts, is_typed, ret_type = destructure_registration_expr(expr)
 
-    args′ = map((a, T) -> :($a::$T), argnames, Ts)
+    # For typed scalar arguments, wrap in ExactType{T} to prevent symbolic dispatch.
+    # For untyped arguments (defaulting to Real), use Real directly.
+    # For array types, don't use ExactType since arrays can contain symbolic elements.
+    # This prevents exponential growth in method count - see issue #1724
+    args′ = map(argnames, Ts, is_typed) do a, T, typed
+        Teval = Base.eval(__module__, T)
+        if typed && !(Teval <: AbstractArray)
+            :($a::$ExactType{$T})
+        else
+            :($a::$T)
+        end
+    end
     ret_type = isnothing(ret_type) ? Real : ret_type
     N = length(args′)
     symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
@@ -64,9 +75,12 @@ function destructure_registration_expr(expr)
     f = expr.args[1]
     args = expr.args[2:end]
 
-    # Default arg types to Real
+    # Default arg types to Real for untyped arguments
     Ts = map(a -> a isa Symbol ? Real : (@assert(a.head == :(::)); a.args[2]), args)
     argnames = map(a -> a isa Symbol ? a : a.args[1], args)
+    # Track which arguments were explicitly typed (not defaulting to Real)
+    # These should NOT get symbolic dispatch methods - see issue #1724
+    is_typed = map(a -> !(a isa Symbol), args)
 
     ftype = if f isa Expr && f.head == :(::)
         if length(f.args) == 1
@@ -77,7 +91,7 @@ function destructure_registration_expr(expr)
     else
         :($typeof($f))
     end
-    f, ftype, argnames, Ts, ret_type
+    f, ftype, argnames, Ts, is_typed, ret_type
 end
 
 nested_unwrap(x) = unwrap(x)
@@ -96,7 +110,7 @@ symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(C
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
-function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true)
+function register_array_symbolic(f, ftype, argnames, Ts, is_typed, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true)
     def_assignments = MacroTools.rmlines(partial_defs).args
     defs = map(def_assignments) do ex
         @assert ex.head == :(=)
@@ -118,7 +132,18 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     eltype_expr = get(defs, :eltype, Any)
     container_type = get(defs, :container_type, Array)
 
-    args′ = map((a, T) -> :($a::$T), argnames, Ts)
+    # For typed scalar arguments, wrap in ExactType{T} to prevent symbolic dispatch.
+    # For untyped arguments (defaulting to Real), use Real directly.
+    # For array types, don't use ExactType since arrays can contain symbolic elements.
+    # This prevents exponential growth in method count - see issue #1724
+    args′ = map(argnames, Ts, is_typed) do a, T, typed
+        Teval = Base.eval(@__MODULE__, T)
+        if typed && !(Teval <: AbstractArray)
+            :($a::$ExactType{$T})
+        else
+            :($a::$T)
+        end
+    end
     N = length(args′)
     symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
     assigns = macroexpand(@__MODULE__, :(Base.Cartesian.@nexprs $N i -> ($argnames[i] = args[i])))
@@ -215,6 +240,6 @@ overloads for one function, all the rest of the registers must set
 overwriting.
 """
 macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
-    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
-    register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays)
+    f, ftype, argnames, Ts, is_typed, ret_type = destructure_registration_expr(expr)
+    register_array_symbolic(f, ftype, argnames, Ts, is_typed, ret_type, block, define_promotion, wrap_arrays)
 end

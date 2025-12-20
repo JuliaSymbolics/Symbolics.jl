@@ -66,6 +66,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Taylor Series Test" begin include("taylor.jl") end
         @safetestset "Discontinuity registration test" begin include("discontinuities.jl") end
         @safetestset "ODE solver test" begin include("diffeqs.jl") end
+        @safetestset "Method count test" begin include("register_method_count.jl") end
     end
 end
 

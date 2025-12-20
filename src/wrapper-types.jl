@@ -1,5 +1,15 @@
 export @symbolic_wrap, @wrapped
 
+"""
+    ExactType{T}
+
+A marker type used internally by @register_symbolic to indicate that an argument
+should accept only the specified type T, without generating symbolic dispatch methods.
+This is used for explicitly typed arguments to prevent exponential growth in method
+count. See https://github.com/JuliaSymbolics/Symbolics.jl/issues/1724
+"""
+struct ExactType{T} end
+
 # Turn A{X} <: B{Int, X} into
 #
 # B{Int, X} where X
@@ -112,24 +122,46 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         # However later while emitting methods we omit the one
         # method where all arguments are (1) since those are
         # expected to be defined outside Symbolics
+        #
+        # Special case: ExactType{T} is a marker indicating that only T should be
+        # accepted (no symbolic dispatch). This is used by @register_symbolic for
+        # explicitly typed arguments. See https://github.com/JuliaSymbolics/Symbolics.jl/issues/1724
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
-            Ts = has_symwrapper(T) ? (T, BasicSymbolic{VartypeT}, wrapper_type(T)) :
-                                (T, BasicSymbolic{VartypeT})
-            if T <: AbstractArray && wrap_arrays
-                eT = eltype(T)
-                if eT == Any
-                    eT = Real
+            # Check for ExactType marker from @register_symbolic
+            if T isa Type && T <: ExactType
+                Ts = (T.parameters[1],)
+            elseif has_symwrapper(T)
+                Ts = (T, BasicSymbolic{VartypeT}, wrapper_type(T))
+                if T <: AbstractArray && wrap_arrays
+                    eT = eltype(T)
+                    if eT == Any
+                        eT = Real
+                    end
+                    _arr_type_fn = if hasmethod(ndims, Tuple{Type{T}})
+                        (elT) -> AbstractArray{S, ndims(T)} where {S <: elT}
+                    else
+                        (elT) -> AbstractArray{S} where {S <: elT}
+                    end
+                    if has_symwrapper(eT)
+                        Ts = (Ts..., AbstractArray{BasicSymbolic{VartypeT}}, 
+                        _arr_type_fn(wrapper_type(eT)))
+                    else
+                        Ts = (Ts..., AbstractArray{BasicSymbolic{VartypeT}})
+                    end
                 end
-                _arr_type_fn = if hasmethod(ndims, Tuple{Type{T}})
-                    (elT) -> AbstractArray{S, ndims(T)} where {S <: elT}
-                else
-                    (elT) -> AbstractArray{S} where {S <: elT}
-                end
-                if has_symwrapper(eT)
-                    Ts = (Ts..., AbstractArray{BasicSymbolic{VartypeT}}, 
-                    _arr_type_fn(wrapper_type(eT)))
-                else
+            else
+                Ts = (T, BasicSymbolic{VartypeT})
+                if T <: AbstractArray && wrap_arrays
+                    eT = eltype(T)
+                    if eT == Any
+                        eT = Real
+                    end
+                    _arr_type_fn = if hasmethod(ndims, Tuple{Type{T}})
+                        (elT) -> AbstractArray{S, ndims(T)} where {S <: elT}
+                    else
+                        (elT) -> AbstractArray{S} where {S <: elT}
+                    end
                     Ts = (Ts..., AbstractArray{BasicSymbolic{VartypeT}})
                 end
             end
