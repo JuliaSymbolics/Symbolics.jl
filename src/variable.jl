@@ -62,8 +62,23 @@ is the default type of created variables. `x` is the tuple of expressions passed
 macro. `transform` is an optional function that takes constructed variables and performs
 custom postprocessing to them, returning the created variables. This function returns the
 `Expr` for constructing the parsed variables.
+
+See also: [`_parse_vars`](@ref).
 """
 function parse_vars(macroname, type, x, transform = identity)
+    esc(_parse_vars(macroname, type, x, transform))
+end
+
+"""
+    $TYPEDSIGNATURES
+
+The worker function for [`parse_vars`](@ref). This returns the expanded code, exactly as it
+should be run. In other words, this does not require sanitization and the result should be
+passed through `esc` before returning from the macro. `parse_vars` does this automatically.
+This function also guarantees that the last expression in the returned `Expr(:block)` is an
+`Expr(:vect)` of the identifiers for the created variables.
+"""
+function _parse_vars(macroname, type, x, transform = identity)
     ex = Expr(:block)
     var_names = Expr(:vect)
     # if parsing things in the form of
@@ -93,11 +108,10 @@ function parse_vars(macroname, type, x, transform = identity)
                 options = default.args[2].args
                 default = default.args[1]
             end
-            default = esc(default)
         end
         parse_result = SymbolicUtils.parse_variable(var_expr; default_type = type)
         handle_nonconcrete_symtype!(parse_result)
-        sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
+        sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT; do_esc = false)
         sym = handle_maybe_dependent_variable!(parse_result, sym, type)
 
         if options === nothing && cursor < length(x) && isoption(x[cursor + 1])
@@ -109,9 +123,9 @@ function parse_vars(macroname, type, x, transform = identity)
         sym = Expr(:call, transform, Expr(:call, wrap, sym))
 
         if parse_result[:isruntime]
-            varname = Symbol(parse_result[:name])
+            varname = gensym(Symbol(parse_result[:name]))
         else
-            varname = esc(parse_result[:name])
+            varname = parse_result[:name]
         end
         push!(var_names.args, varname)
         push!(ex.args, Expr(:(=), varname, sym))
@@ -175,11 +189,9 @@ function handle_maybe_dependent_variable!(parse_result, sym, type)
     parse_result[:args] = [SymbolicUtils.parse_variable(:(..); default_type = type)]
     parse_result[:type].args[2] = Tuple
     # Re-create the `Sym`
-    sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
+    sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT; do_esc = false)
     # Change the type
     parse_result[:type] = parse_result[:type].args[3]
-    # Call the `Sym` with the arguments to create a dependent variable.
-    map!(esc, argnames, argnames)
     sym = Expr(:call, sym)
     append!(sym.args, argnames)
     return sym
@@ -199,9 +211,7 @@ function _add_metadata(parse_result, var::Expr, default, macroname::Symbol, meta
         var = Expr(:call, setdefaultval, var, default)
     end
     varname = parse_result[:name]
-    if parse_result[:isruntime]
-        varname = esc(varname)
-    else
+    if !parse_result[:isruntime]
         varname = Meta.quot(varname)
     end
     var = Expr(:call, setmetadata, var, VariableSource, Expr(:tuple, Meta.quot(macroname), varname))
@@ -210,7 +220,7 @@ function _add_metadata(parse_result, var::Expr, default, macroname::Symbol, meta
         Meta.isexpr(ex, :(=)) || error("Metadata must of the form of `key = value`")
         key, value = ex.args
         key_type = option_to_metadata_type(Val{key}())::DataType
-        var = Expr(:call, setmetadata, var, key_type, esc(value))
+        var = Expr(:call, setmetadata, var, key_type, value)
     end
     return var
 end
