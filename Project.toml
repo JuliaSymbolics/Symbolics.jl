@@ -1,7 +1,7 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-authors = ["Shashi Gowda <gowda@mit.edu>"]
 version = "7.2.0"
+authors = ["Shashi Gowda <gowda@mit.edu>"]
 
 [deps]
 ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
@@ -114,7 +114,7 @@ SymPy = "2.2"
 SymPyPythonCall = "0.5"
 SymbolicIndexingInterface = "0.3.14"
 SymbolicLimits = "0.2.2"
-SymbolicUtils = "4.9"
+SymbolicUtils = "4.10"
 TermInterface = "2"
 julia = "1.10"
 
