@@ -522,3 +522,10 @@ end
         end
     end
 end
+
+@testset "Scalarization of `Arr` retains type" begin
+    @variables x[1:2, 1:2]
+    scal = Symbolics.scalarize(x)
+    @test scal isa Matrix{Num}
+    @test isequal(scal, Num[x[1, 1] x[1, 2]; x[2, 1] x[2, 2]])
+end

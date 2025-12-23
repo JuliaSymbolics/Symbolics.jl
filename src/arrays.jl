@@ -132,8 +132,12 @@ function LinearAlgebra.norm(A::Arr{T}, p::Real) where {T}
     end
 end
 
-function SymbolicUtils.scalarize(x::Arr, ::Val{toplevel}) where {toplevel}
-    SymbolicUtils.scalarize(unwrap(x), Val{toplevel}())
+function SymbolicUtils.scalarize(x::Arr{T, N}, ::Val{toplevel}) where {toplevel, T, N}
+    scal = SymbolicUtils.scalarize(unwrap(x), Val{toplevel}())::(AbstractArray{_T, N} where {_T})
+    if is_wrapper_type(T)
+        scal = map(T, scal)
+    end
+    return scal
 end
 
 Base.isempty(x::Arr) = isempty(unwrap(x))
