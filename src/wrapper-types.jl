@@ -147,6 +147,21 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
     impl = :(function $impl_name($self, $(names...))
         $body
     end)
+
+    function is_wrapped_array_eltype(T)
+        T <: AbstractArray || return false
+        if T isa UnionAll
+            _inner = T.body
+            while _inner isa UnionAll
+                _inner = _inner.body
+            end
+            return _inner.parameters[1] == T.var && is_wrapper_type(T.var.ub)::Bool ||
+                is_wrapper_type(eltype(T))::Bool
+        elseif T isa DataType
+            return is_wrapper_type(eltype(T))::Bool
+        end
+        error("Unreachable")
+    end
     # TODO: maybe don't drop first lol
     methods = map(Iterators.drop(Iterators.product(types...), 1)) do Ts
         method_args = map(names, Ts) do n, T
@@ -158,7 +173,7 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
             if is_wrapper_type(Ts[i])
                 any_wrapper = true
                 :($unwrap($name))
-            elseif Ts[i] <: AbstractArray && is_wrapper_type(Ts[i].var.ub)
+            elseif Ts[i] <: AbstractArray && is_wrapped_array_eltype(Ts[i])
                 any_wrapper = true
                 :($_recursive_unwrap($name))
             else

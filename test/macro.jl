@@ -438,3 +438,9 @@ end
     vs = @variables $name1(..)[1:3]
     @test getname(vs[1]) == name1
 end
+
+@testset "`@register_symbolic` edge cases" begin
+    @register_symbolic foo1(x::AbstractArray)
+    @register_symbolic foo1(x::AbstractArray{Int})
+    @register_symbolic foo1(x::AbstractVector{Int})
+end

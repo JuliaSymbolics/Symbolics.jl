@@ -157,3 +157,5 @@ end
     size = size(x)
     eltype = eltype(x)
 end
+
+@register_symbolic LinearAlgebra.tr(x::AbstractMatrix)
