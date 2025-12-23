@@ -182,18 +182,18 @@ show(A)</code></pre><pre class="documenter-example-output"><code class="nohighli
               begin
                   begin
                       begin
-                          var&quot;##out#288&quot; = ˍ₋out.nzval
+                          var&quot;##out#291&quot; = ˍ₋out.nzval
                           begin
                               (Symbolics.var&quot;#noop#recursive_split##4&quot;())(map(fetch, (begin
                                               let
-                                                  task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#288&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x41d7040f, 0x25a479a7, 0xa5f72b22, 0x06365387, 0xc6d32e9a), Nothing}(nothing), (var&quot;##out#288&quot;, ˍ₋arg1)))
+                                                  task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#291&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xb59bfceb, 0x26dab019, 0xdb24e713, 0x5316a393, 0x908b80cb), Nothing}(nothing), (var&quot;##out#291&quot;, ˍ₋arg1)))
                                                   task.sticky = false
                                                   Base.schedule(task)
                                                   task
                                               end
                                           end, begin
                                               let
-                                                  task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#288&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xdeb5ea75, 0xe27283e5, 0x195258f3, 0xf4fcc2e7, 0xaa34ad3b), Nothing}(nothing), (var&quot;##out#288&quot;, ˍ₋arg1)))
+                                                  task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#291&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xd79b4724, 0xab792333, 0x555b90e2, 0x68eff797, 0x04345bc7), Nothing}(nothing), (var&quot;##out#291&quot;, ˍ₋arg1)))
                                                   task.sticky = false
                                                   Base.schedule(task)
                                                   task
@@ -225,9 +225,9 @@ rows, cols, _ = findnz(sj)
 out = sparse(rows, cols, zeros(length(cols)), size(sj)...) # pre-allocate, and correct structure
 myf = eval(last(f_expr))
 myf(out, rand(N)) # note that out matches the sparsity structure of sj
-out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 19 stored entries:
-⎡⠀⠐⠠⡢⠀⎤
-⎢⢈⡈⡈⠀⡀⎥
-⎢⠀⠠⠀⠄⠀⎥
-⎢⠁⠀⠈⠀⠀⎥
-⎣⠐⠀⠠⠠⠀⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Tuesday 23 December 2025 05:29">Tuesday 23 December 2025</span>. Using Julia version 1.12.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 17 stored entries:
+⎡⠀⠀⠄⠀⠀⎤
+⎢⡊⡀⠀⠀⠄⎥
+⎢⠀⠀⠰⡂⠀⎥
+⎢⠂⠀⠈⠁⠀⎥
+⎣⠌⠁⠀⠂⠀⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Tuesday 23 December 2025 05:47">Tuesday 23 December 2025</span>. Using Julia version 1.12.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
