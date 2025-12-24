@@ -183,3 +183,7 @@ function combine_terms_2(linearity, term1, term2)
     end
     term
 end
+
+function combine_terms_ifelse_affine(cond, iftrue, iffalse)
+    return cond * cond + iftrue + iffalse
+end
