@@ -905,10 +905,10 @@ const linearity_rules_affine = (
 
       (@rule ~x::issym => 0),
       # if the condition is dependent on the variable, do not consider this as affine
-      (@rule ifelse(~cond::isidx, ~x, ~y) => (~cond)^2),
-      # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
-      # where condition `cond` is considered constant in differentiation
-      (@rule ifelse(~cond::(!isidx), ~x, ~y) => (isidx(~x) ? unwrap_const(~x) : _scalar) + (isidx(~y) ? unwrap_const(~y) : _scalar)),
+      (@rule ifelse(~cond, ~x, ~y) => combine_terms_ifelse_affine(
+            isidx(~cond) ? unwrap_const(~cond)::TermCombination : _scalar,
+            isidx(~x) ? unwrap_const(~x)::TermCombination : _scalar,
+            isidx(~y) ? unwrap_const(~y)::TermCombination : _scalar)),
       # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
       # Functions with 1 and 2 arguments are already handled above
       (@rule (~f)(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)); init=_scalar)^2),
