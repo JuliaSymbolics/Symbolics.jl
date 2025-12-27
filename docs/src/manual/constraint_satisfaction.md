@@ -16,56 +16,76 @@ The goal is to find an assignment of values to variables that satisfies all cons
 
 In symbolic computation, constraint satisfaction extends beyond simple numerical domains to handle symbolic expressions, boolean formulas, and mathematical relationships.
 
-## SymbolicSAT.jl
+## SymbolicSMT.jl
 
-SymbolicSAT.jl extends SymbolicUtils expression simplification with theorem proving capabilities through the Z3 Theorem Prover. It allows adding boolean constraints to the symbolic simplification process.
+SymbolicSMT.jl extends SymbolicUtils expression simplification with theorem proving capabilities through the Z3 Theorem Prover. It allows adding boolean constraints to the symbolic simplification process.
 
 ### Key Features
 
 - **Z3 Integration**: Uses the powerful Z3 SMT (Satisfiability Modulo Theories) solver
 - **Symbolic Constraints**: Work with symbolic mathematical expressions as constraints
-- **Expression Simplification**: Simplify expressions under given constraints
+- **Satisfiability Checking**: Determine if expressions can be satisfied under constraints
+- **Provability Checking**: Prove or disprove statements under constraints
 - **Boolean Logic**: Handle complex boolean formulas and logical relationships
 
 ### Basic Usage
 
-```julia
-using SymbolicUtils, SymbolicSAT
+```@example constraint_sat
+using Symbolics, SymbolicSMT
 
-@syms a::Real b::Real
+@variables x::Real y::Real
 
 # Define constraints
-constraints = Constraints([a^2 + b^2 < 4])
+constraints = Constraints([x > 0, y > 0])
 
-# Simplify expressions under constraints
-result = simplify((a < 2) & (b < 2), constraints)
-# Returns true, since if a^2 + b^2 < 4, then both a < 2 and b < 2
+# Check if an expression is satisfiable under constraints
+issatisfiable(x + y > 1, constraints)
+```
+
+```@example constraint_sat
+# Check if an expression is provable (always true) under constraints
+isprovable(x >= 0, constraints)
+```
+
+```@example constraint_sat
+# Check if x can be negative (it cannot, given x > 0)
+issatisfiable(x < 0, constraints)
 ```
 
 ### Example Applications
 
-#### Geometric Constraints
+#### Bound Checking
 
-```julia
-@syms x::Real y::Real r::Real
+```@example constraint_sat
+@variables a::Integer b::Integer
 
-# Circle constraint: points within radius r
-circle_constraint = Constraints([x^2 + y^2 <= r^2])
+# Define bounds
+bounds = Constraints([a >= 0, a <= 10, b >= 0, b <= 10])
 
-# Check if a point is in the upper half of the circle
-upper_half = simplify(y >= 0, circle_constraint)
+# Can the sum exceed 15?
+issatisfiable(a + b > 15, bounds)
 ```
 
-#### Mathematical Relations
+```@example constraint_sat
+# Is the sum always at most 20?
+isprovable(a + b <= 20, bounds)
+```
 
-```julia
-@syms x::Real y::Real
+#### Quadratic Constraints
 
-# Linear constraint
-linear_constraint = Constraints([2*x + 3*y == 10])
+```@example constraint_sat
+@variables p::Integer q::Integer
 
-# Simplify expressions knowing this relationship
-result = simplify(x > 0, Constraints([2*x + 3*y == 10, y > 0]))
+# Circle-like constraint
+circle = Constraints([p^2 + q^2 < 25])
+
+# Can p be 3?
+issatisfiable(p == 3, circle)
+```
+
+```@example constraint_sat
+# Can p be 5? (No, because 5^2 = 25 is not < 25)
+issatisfiable(p == 5, circle)
 ```
 
 ## SAT Solving in Julia
@@ -79,7 +99,7 @@ Boolean Satisfiability Testing (SAT) is the problem of determining whether there
 SAT solvers have wide applications in:
 
 - **Software Verification**: Model checking, program analysis
-- **Hardware Verification**: Circuit verification and testing  
+- **Hardware Verification**: Circuit verification and testing
 - **Planning and Scheduling**: Resource allocation, job scheduling
 - **Artificial Intelligence**: Automated reasoning, knowledge representation
 - **Cryptography**: Cryptanalysis and security analysis
@@ -91,26 +111,25 @@ SAT solvers have wide applications in:
 In symbolic computation, SAT solvers enable:
 
 1. **Constraint Solving**: Finding symbolic solutions to constraint systems
-2. **Theorem Proving**: Automatically proving or disproving mathematical statements  
+2. **Theorem Proving**: Automatically proving or disproving mathematical statements
 3. **Expression Simplification**: Simplifying expressions under logical constraints
 4. **Satisfiability Checking**: Determining if constraint systems have solutions
 
-### Example: Logic Puzzles
+### Boolean Constraints
 
-```julia
-# Example: Solving a simple logic puzzle
-# If A implies B, and B implies C, and A is true, then C must be true
+```@example constraint_sat
+@variables flag1::Bool flag2::Bool
 
-@syms A::Bool B::Bool C::Bool
+# Boolean constraints
+bool_constraints = Constraints([flag1, flag2])
 
-constraints = Constraints([
-    A ⟹ B,  # A implies B
-    B ⟹ C,  # B implies C
-    A       # A is true
-])
+# Both flags are true, so their AND is satisfiable
+issatisfiable(flag1 & flag2, bool_constraints)
+```
 
-# This should simplify to true
-result = simplify(C, constraints)
+```@example constraint_sat
+# Can flag1 be false? No, it's constrained to be true
+issatisfiable(!flag1, bool_constraints)
 ```
 
 ## SMT Solvers
@@ -125,7 +144,7 @@ Satisfiability Modulo Theories (SMT) solvers extend SAT solvers to handle richer
 
 ### Z3 Theorem Prover
 
-Z3 is Microsoft Research's high-performance SMT solver that SymbolicSAT.jl uses:
+Z3 is Microsoft Research's high-performance SMT solver that SymbolicSMT.jl uses:
 
 - **Multiple Theories**: Supports arithmetic, bit-vectors, arrays, and more
 - **Decision Procedures**: Efficient algorithms for theory-specific reasoning
@@ -134,38 +153,62 @@ Z3 is Microsoft Research's high-performance SMT solver that SymbolicSAT.jl uses:
 
 ## Advanced Constraint Satisfaction
 
-### Optimization with Constraints
+### Multi-Variable Arithmetic
 
-Beyond satisfiability, constraint satisfaction can be extended to optimization:
+SymbolicSMT.jl supports multi-variable arithmetic expressions:
 
-```julia
-# Find values that minimize an objective function subject to constraints
-@syms x::Real y::Real
+```@example constraint_sat
+@variables m::Integer n::Integer
 
-constraints = Constraints([
-    x + y >= 1,
-    2*x - y <= 3,
-    x >= 0,
-    y >= 0
-])
+# Multi-variable constraints
+multi_constraints = Constraints([m >= 1, n >= 1])
 
-# Minimize x + 2*y subject to constraints
-# (This would require additional optimization tools)
+# Check multi-variable expressions - can sum be <= 0?
+issatisfiable(m + n <= 0, multi_constraints)  # false - m + n >= 2 when m,n >= 1
 ```
 
-### Multi-Objective Constraints
+```@example constraint_sat
+# Is sum always >= 2?
+isprovable(m + n >= 2, multi_constraints)  # true - always satisfied when m,n >= 1
+```
 
-Handle multiple competing objectives:
+### Power Operators
 
-```julia
-@syms price::Real quality::Real durability::Real
+```@example constraint_sat
+@variables t::Integer
 
-# Product design constraints
-constraints = Constraints([
-    price + quality + durability <= 100,  # Resource constraint
-    quality >= 0.7 * durability,          # Quality-durability relation
-    price >= 10                           # Minimum price
-])
+power_constraints = Constraints([t >= 0, t <= 3])
+
+# Can t^2 be at most 9?
+issatisfiable(t^2 <= 9, power_constraints)
+```
+
+```@example constraint_sat
+# Is t^2 always <= 9 when t is in [0,3]?
+isprovable(t^2 <= 9, power_constraints)
+```
+
+### Expression Resolution
+
+The `resolve` function attempts to determine if an expression is provably true or false:
+
+```@example constraint_sat
+@variables v::Integer
+
+resolve_constraints = Constraints([v > 5])
+
+# v > 0 is provably true when v > 5
+resolve(v > 0, resolve_constraints)
+```
+
+```@example constraint_sat
+# v < 0 is provably false when v > 5
+resolve(v < 0, resolve_constraints)
+```
+
+```@example constraint_sat
+# v > 10 cannot be determined - returns the expression
+resolve(v > 10, resolve_constraints)
 ```
 
 ## Integration with Symbolic Computation
@@ -179,10 +222,8 @@ Constraint satisfaction integrates naturally with other symbolic computation fea
 
 ## Further Reading
 
-- [SymbolicSAT.jl Repository](https://github.com/JuliaSymbolics/SymbolicSAT.jl)
+- [SymbolicSMT.jl Repository](https://github.com/JuliaSymbolics/SymbolicSMT.jl)
 - [Z3 Theorem Prover](https://github.com/Z3Prover/z3)
 - [Satisfiability.jl](https://github.com/dpsanders/SatisfiabilityInterface.jl) - Alternative SAT interface for Julia
 - [SMT-LIB Standard](http://smtlib.cs.uiowa.edu/) - Standard format for SMT solvers
 
-!!! warning "Experimental Status"
-    SymbolicSAT.jl is experimental software. Use it primarily for research and exploration. Always validate results through multiple approaches when possible.
