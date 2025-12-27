@@ -32,56 +32,39 @@ In symbolic computation, constraint satisfaction extends beyond simple numerical
 ```julia
 using Symbolics, SymbolicSMT
 
-@variables a::Real b::Real
+@variables x::Integer
 
-# Define constraints
-constraints = Constraints([a^2 + b^2 < 4])
+# Define constraints on a single variable
+constraints = Constraints([x > 5])
 
 # Resolve expressions under constraints
-result = resolve((a < 2) & (b < 2), constraints)
-# Returns true, since if a^2 + b^2 < 4, then both a < 2 and b < 2
+resolve(x > 0, constraints)   # true (provably true since x > 5 implies x > 0)
+resolve(x < 0, constraints)   # false (provably false)
+resolve(x > 10, constraints)  # x > 10 (cannot determine, returns original expression)
 
 # Check if an expression is satisfiable under constraints
-issatisfiable(a > 1, constraints)  # true - there exist valid a, b values where a > 1
+issatisfiable(x > 100, constraints)  # true - x could be 101
 
 # Check if an expression is provably always true under constraints
-isprovable(a < 2, constraints)  # true - always satisfied under the constraints
+isprovable(x > 0, constraints)  # true - always satisfied when x > 5
 ```
 
 ### Example Applications
 
-#### Geometric Constraints
+#### Single Variable Constraints
 
 ```julia
 using Symbolics, SymbolicSMT
 
-@variables x::Real y::Real
+@variables n::Integer
 
-# Circle constraint: points within radius 2
-circle_constraint = Constraints([x^2 + y^2 <= 4])
+# Define bounds on a variable
+constraints = Constraints([n >= 0, n <= 100])
 
-# Check if x can be greater than 2 inside the circle
-issatisfiable(x > 2, circle_constraint)  # false - not possible
-
-# Check if y is always bounded
-isprovable(y <= 2, circle_constraint)  # true
-```
-
-#### Mathematical Relations
-
-```julia
-using Symbolics, SymbolicSMT
-
-@variables x::Real y::Real
-
-# Linear constraints
-constraints = Constraints([2*x + 3*y == 10, x >= 0, y >= 0])
-
-# Check if x must be positive
-isprovable(x >= 0, constraints)  # true (given as constraint)
-
-# Check if x can be greater than 5
-issatisfiable(x > 5, constraints)  # false - 2*5 + 3*y = 10 requires y < 0
+# Check properties
+isprovable(n >= 0, constraints)   # true (given as constraint)
+issatisfiable(n > 50, constraints)  # true
+issatisfiable(n > 200, constraints) # false (violates n <= 100)
 ```
 
 ## SAT Solving in Julia
@@ -155,49 +138,53 @@ Z3 is Microsoft Research's high-performance SMT solver that SymbolicSMT.jl uses:
 
 ## Advanced Constraint Satisfaction
 
-### Optimization with Constraints
+### Boolean Constraint Systems
 
-Beyond satisfiability, constraint satisfaction can be extended to optimization:
-
-```julia
-using Symbolics, SymbolicSMT
-
-# Find values that minimize an objective function subject to constraints
-@variables x::Real y::Real
-
-constraints = Constraints([
-    x + y >= 1,
-    2*x - y <= 3,
-    x >= 0,
-    y >= 0
-])
-
-# Check feasibility of the constraint system
-issatisfiable(x >= 0, constraints)  # true - the system is feasible
-
-# Minimize x + 2*y subject to constraints
-# (This would require additional optimization tools)
-```
-
-### Multi-Objective Constraints
-
-Handle multiple competing objectives:
+SymbolicSMT.jl excels at boolean constraint systems with multiple variables:
 
 ```julia
 using Symbolics, SymbolicSMT
 
-@variables price::Real quality::Real durability::Real
+@variables P::Bool Q::Bool R::Bool S::Bool
 
-# Product design constraints
+# Define implication helper
+⟹(p, q) = (!p) | q
+
+# Model a complex logical system
 constraints = Constraints([
-    price + quality + durability <= 100,  # Resource constraint
-    quality >= 0.7 * durability,          # Quality-durability relation
-    price >= 10                           # Minimum price
+    P ⟹ Q,      # P implies Q
+    Q ⟹ R,      # Q implies R
+    R ⟹ S,      # R implies S
+    P           # P is true
 ])
 
-# Check if quality can exceed 50
-issatisfiable(quality > 50, constraints)  # true or false depending on the system
+# Prove properties about the system
+isprovable(S, constraints)      # true - S must be true
+isprovable(Q & R, constraints)  # true - both Q and R must be true
+issatisfiable(!Q, constraints)  # false - Q cannot be false
 ```
+
+### Combining Boolean and Integer Constraints
+
+```julia
+using Symbolics, SymbolicSMT
+
+@variables flag::Bool count::Integer
+
+# Mixed constraints
+constraints = Constraints([flag, count > 0])
+
+# Check properties
+isprovable(flag, constraints)      # true
+isprovable(count > 0, constraints) # true
+issatisfiable(count > 100, constraints) # true - count could be 101
+```
+
+!!! note "Current Limitations"
+    SymbolicSMT.jl currently has limited support for multi-variable arithmetic expressions
+    (e.g., `x + y > 0`). For best results, use boolean logic and single-variable
+    arithmetic constraints. See the [SymbolicSMT.jl repository](https://github.com/JuliaSymbolics/SymbolicSMT.jl)
+    for the latest updates on supported features.
 
 ## Integration with Symbolic Computation
 
