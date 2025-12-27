@@ -210,6 +210,3 @@ Constraint satisfaction integrates naturally with other symbolic computation fea
 - [Satisfiability.jl](https://github.com/dpsanders/SatisfiabilityInterface.jl) - Alternative SAT interface for Julia
 - [SMT-LIB Standard](http://smtlib.cs.uiowa.edu/) - Standard format for SMT solvers
 
-!!! note "Version Requirements"
-    SymbolicSMT.jl v1.2+ requires Symbolics.jl v7+ and SymbolicUtils.jl v4+.
-    Multi-variable arithmetic and power operators are fully supported in this version.
