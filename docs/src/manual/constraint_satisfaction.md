@@ -24,48 +24,68 @@ SymbolicSMT.jl extends SymbolicUtils expression simplification with theorem prov
 
 - **Z3 Integration**: Uses the powerful Z3 SMT (Satisfiability Modulo Theories) solver
 - **Symbolic Constraints**: Work with symbolic mathematical expressions as constraints
-- **Expression Simplification**: Simplify expressions under given constraints
+- **Satisfiability Checking**: Determine if expressions can be satisfied under constraints
+- **Provability Checking**: Prove or disprove statements under constraints
 - **Boolean Logic**: Handle complex boolean formulas and logical relationships
 
 ### Basic Usage
 
-```julia
-using SymbolicUtils, SymbolicSMT
+```@example constraint_sat
+using Symbolics, SymbolicSMT
 
-@syms a::Real b::Real
+@variables x::Real y::Real
 
 # Define constraints
-constraints = Constraints([a^2 + b^2 < 4])
+constraints = Constraints([x > 0, y > 0])
 
-# Simplify expressions under constraints
-result = simplify((a < 2) & (b < 2), constraints)
-# Returns true, since if a^2 + b^2 < 4, then both a < 2 and b < 2
+# Check if an expression is satisfiable under constraints
+issatisfiable(x + y > 1, constraints)
+```
+
+```@example constraint_sat
+# Check if an expression is provable (always true) under constraints
+isprovable(x >= 0, constraints)
+```
+
+```@example constraint_sat
+# Check if x can be negative (it cannot, given x > 0)
+issatisfiable(x < 0, constraints)
 ```
 
 ### Example Applications
 
-#### Geometric Constraints
+#### Bound Checking
 
-```julia
-@syms x::Real y::Real r::Real
+```@example constraint_sat
+@variables a::Integer b::Integer
 
-# Circle constraint: points within radius r
-circle_constraint = Constraints([x^2 + y^2 <= r^2])
+# Define bounds
+bounds = Constraints([a >= 0, a <= 10, b >= 0, b <= 10])
 
-# Check if a point is in the upper half of the circle
-upper_half = simplify(y >= 0, circle_constraint)
+# Can the sum exceed 15?
+issatisfiable(a + b > 15, bounds)
 ```
 
-#### Mathematical Relations
+```@example constraint_sat
+# Is the sum always at most 20?
+isprovable(a + b <= 20, bounds)
+```
 
-```julia
-@syms x::Real y::Real
+#### Quadratic Constraints
 
-# Linear constraint
-linear_constraint = Constraints([2*x + 3*y == 10])
+```@example constraint_sat
+@variables p::Integer q::Integer
 
-# Simplify expressions knowing this relationship
-result = simplify(x > 0, Constraints([2*x + 3*y == 10, y > 0]))
+# Circle-like constraint
+circle = Constraints([p^2 + q^2 < 25])
+
+# Can p be 3?
+issatisfiable(p == 3, circle)
+```
+
+```@example constraint_sat
+# Can p be 5? (No, because 5^2 = 25 is not < 25)
+issatisfiable(p == 5, circle)
 ```
 
 ## SAT Solving in Julia
@@ -79,7 +99,7 @@ Boolean Satisfiability Testing (SAT) is the problem of determining whether there
 SAT solvers have wide applications in:
 
 - **Software Verification**: Model checking, program analysis
-- **Hardware Verification**: Circuit verification and testing  
+- **Hardware Verification**: Circuit verification and testing
 - **Planning and Scheduling**: Resource allocation, job scheduling
 - **Artificial Intelligence**: Automated reasoning, knowledge representation
 - **Cryptography**: Cryptanalysis and security analysis
@@ -91,26 +111,25 @@ SAT solvers have wide applications in:
 In symbolic computation, SAT solvers enable:
 
 1. **Constraint Solving**: Finding symbolic solutions to constraint systems
-2. **Theorem Proving**: Automatically proving or disproving mathematical statements  
+2. **Theorem Proving**: Automatically proving or disproving mathematical statements
 3. **Expression Simplification**: Simplifying expressions under logical constraints
 4. **Satisfiability Checking**: Determining if constraint systems have solutions
 
-### Example: Logic Puzzles
+### Boolean Constraints
 
-```julia
-# Example: Solving a simple logic puzzle
-# If A implies B, and B implies C, and A is true, then C must be true
+```@example constraint_sat
+@variables flag1::Bool flag2::Bool
 
-@syms A::Bool B::Bool C::Bool
+# Boolean constraints
+bool_constraints = Constraints([flag1, flag2])
 
-constraints = Constraints([
-    A ⟹ B,  # A implies B
-    B ⟹ C,  # B implies C
-    A       # A is true
-])
+# Both flags are true, so their AND is satisfiable
+issatisfiable(flag1 & flag2, bool_constraints)
+```
 
-# This should simplify to true
-result = simplify(C, constraints)
+```@example constraint_sat
+# Can flag1 be false? No, it's constrained to be true
+issatisfiable(!flag1, bool_constraints)
 ```
 
 ## SMT Solvers
@@ -134,65 +153,63 @@ Z3 is Microsoft Research's high-performance SMT solver that SymbolicSMT.jl uses:
 
 ## Advanced Constraint Satisfaction
 
-### Optimization with Constraints
-
-Beyond satisfiability, constraint satisfaction can be extended to optimization:
-
-```julia
-# Find values that minimize an objective function subject to constraints
-@syms x::Real y::Real
-
-constraints = Constraints([
-    x + y >= 1,
-    2*x - y <= 3,
-    x >= 0,
-    y >= 0
-])
-
-# Minimize x + 2*y subject to constraints
-# (This would require additional optimization tools)
-```
-
-### Multi-Objective Constraints
-
-Handle multiple competing objectives:
-
-```julia
-@syms price::Real quality::Real durability::Real
-
-# Product design constraints
-constraints = Constraints([
-    price + quality + durability <= 100,  # Resource constraint
-    quality >= 0.7 * durability,          # Quality-durability relation
-    price >= 10                           # Minimum price
-])
-```
-
 ### Multi-Variable Arithmetic
 
 SymbolicSMT.jl supports multi-variable arithmetic expressions:
 
 ```@example constraint_sat
-@variables x::Integer y::Integer
+@variables m::Integer n::Integer
 
 # Multi-variable constraints
-constraints6 = Constraints([x >= 1, y >= 1])
+multi_constraints = Constraints([m >= 1, n >= 1])
 
-# Check multi-variable expressions
-issatisfiable(x + y <= 0, constraints6)  # false - x + y >= 2 when x,y >= 1
+# Check multi-variable expressions - can sum be <= 0?
+issatisfiable(m + n <= 0, multi_constraints)  # false - m + n >= 2 when m,n >= 1
 ```
 
 ```@example constraint_sat
-isprovable(x + y >= 2, constraints6)  # true - always satisfied when x,y >= 1
+# Is sum always >= 2?
+isprovable(m + n >= 2, multi_constraints)  # true - always satisfied when m,n >= 1
+```
+
+### Power Operators
+
+```@example constraint_sat
+@variables t::Integer
+
+power_constraints = Constraints([t >= 0, t <= 3])
+
+# Can t^2 be at most 9?
+issatisfiable(t^2 <= 9, power_constraints)
 ```
 
 ```@example constraint_sat
-# Quadratic constraints with multiple variables
-@variables a::Integer b::Integer
-constraints7 = Constraints([a^2 + b^2 < 4])
-issatisfiable(a == 1, constraints7)  # true - (1,0) satisfies a^2 + b^2 < 4
+# Is t^2 always <= 9 when t is in [0,3]?
+isprovable(t^2 <= 9, power_constraints)
 ```
 
+### Expression Resolution
+
+The `resolve` function attempts to determine if an expression is provably true or false:
+
+```@example constraint_sat
+@variables v::Integer
+
+resolve_constraints = Constraints([v > 5])
+
+# v > 0 is provably true when v > 5
+resolve(v > 0, resolve_constraints)
+```
+
+```@example constraint_sat
+# v < 0 is provably false when v > 5
+resolve(v < 0, resolve_constraints)
+```
+
+```@example constraint_sat
+# v > 10 cannot be determined - returns the expression
+resolve(v > 10, resolve_constraints)
+```
 
 ## Integration with Symbolic Computation
 
