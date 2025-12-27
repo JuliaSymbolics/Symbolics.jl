@@ -29,7 +29,7 @@ In symbolic computation, constraint satisfaction extends beyond simple numerical
 
 ### Basic Usage
 
-```julia
+```@example constraint_sat
 using Symbolics, SymbolicSMT
 
 @variables x::Integer
@@ -39,12 +39,22 @@ constraints = Constraints([x > 5])
 
 # Resolve expressions under constraints
 resolve(x > 0, constraints)   # true (provably true since x > 5 implies x > 0)
-resolve(x < 0, constraints)   # false (provably false)
-resolve(x > 10, constraints)  # x > 10 (cannot determine, returns original expression)
+```
 
+```@example constraint_sat
+resolve(x < 0, constraints)   # false (provably false)
+```
+
+```@example constraint_sat
+resolve(x > 10, constraints)  # x > 10 (cannot determine, returns original expression)
+```
+
+```@example constraint_sat
 # Check if an expression is satisfiable under constraints
 issatisfiable(x > 100, constraints)  # true - x could be 101
+```
 
+```@example constraint_sat
 # Check if an expression is provably always true under constraints
 isprovable(x > 0, constraints)  # true - always satisfied when x > 5
 ```
@@ -53,18 +63,22 @@ isprovable(x > 0, constraints)  # true - always satisfied when x > 5
 
 #### Single Variable Constraints
 
-```julia
-using Symbolics, SymbolicSMT
-
+```@example constraint_sat
 @variables n::Integer
 
 # Define bounds on a variable
-constraints = Constraints([n >= 0, n <= 100])
+constraints2 = Constraints([n >= 0, n <= 100])
 
 # Check properties
-isprovable(n >= 0, constraints)   # true (given as constraint)
-issatisfiable(n > 50, constraints)  # true
-issatisfiable(n > 200, constraints) # false (violates n <= 100)
+isprovable(n >= 0, constraints2)   # true (given as constraint)
+```
+
+```@example constraint_sat
+issatisfiable(n > 50, constraints2)  # true
+```
+
+```@example constraint_sat
+issatisfiable(n > 200, constraints2) # false (violates n <= 100)
 ```
 
 ## SAT Solving in Julia
@@ -78,7 +92,7 @@ Boolean Satisfiability Testing (SAT) is the problem of determining whether there
 SAT solvers have wide applications in:
 
 - **Software Verification**: Model checking, program analysis
-- **Hardware Verification**: Circuit verification and testing  
+- **Hardware Verification**: Circuit verification and testing
 - **Planning and Scheduling**: Resource allocation, job scheduling
 - **Artificial Intelligence**: Automated reasoning, knowledge representation
 - **Cryptography**: Cryptanalysis and security analysis
@@ -90,15 +104,13 @@ SAT solvers have wide applications in:
 In symbolic computation, SAT solvers enable:
 
 1. **Constraint Solving**: Finding symbolic solutions to constraint systems
-2. **Theorem Proving**: Automatically proving or disproving mathematical statements  
+2. **Theorem Proving**: Automatically proving or disproving mathematical statements
 3. **Expression Simplification**: Simplifying expressions under logical constraints
 4. **Satisfiability Checking**: Determining if constraint systems have solutions
 
 ### Example: Logic Puzzles
 
-```julia
-using Symbolics, SymbolicSMT
-
+```@example constraint_sat
 # Example: Solving a simple logic puzzle
 # If A implies B, and B implies C, and A is true, then C must be true
 
@@ -107,14 +119,14 @@ using Symbolics, SymbolicSMT
 # Define implication: A ⟹ B is equivalent to (!A) | B
 ⟹(p, q) = (!p) | q
 
-constraints = Constraints([
+constraints3 = Constraints([
     A ⟹ B,  # A implies B
     B ⟹ C,  # B implies C
     A       # A is true
 ])
 
 # Check if C is provably true under these constraints
-isprovable(C, constraints)  # true
+isprovable(C, constraints3)  # true
 ```
 
 ## SMT Solvers
@@ -142,16 +154,11 @@ Z3 is Microsoft Research's high-performance SMT solver that SymbolicSMT.jl uses:
 
 SymbolicSMT.jl excels at boolean constraint systems with multiple variables:
 
-```julia
-using Symbolics, SymbolicSMT
-
+```@example constraint_sat
 @variables P::Bool Q::Bool R::Bool S::Bool
 
-# Define implication helper
-⟹(p, q) = (!p) | q
-
 # Model a complex logical system
-constraints = Constraints([
+constraints4 = Constraints([
     P ⟹ Q,      # P implies Q
     Q ⟹ R,      # Q implies R
     R ⟹ S,      # R implies S
@@ -159,25 +166,35 @@ constraints = Constraints([
 ])
 
 # Prove properties about the system
-isprovable(S, constraints)      # true - S must be true
-isprovable(Q & R, constraints)  # true - both Q and R must be true
-issatisfiable(!Q, constraints)  # false - Q cannot be false
+isprovable(S, constraints4)      # true - S must be true
+```
+
+```@example constraint_sat
+isprovable(Q & R, constraints4)  # true - both Q and R must be true
+```
+
+```@example constraint_sat
+issatisfiable(!Q, constraints4)  # false - Q cannot be false
 ```
 
 ### Combining Boolean and Integer Constraints
 
-```julia
-using Symbolics, SymbolicSMT
-
+```@example constraint_sat
 @variables flag::Bool count::Integer
 
 # Mixed constraints
-constraints = Constraints([flag, count > 0])
+constraints5 = Constraints([flag, count > 0])
 
 # Check properties
-isprovable(flag, constraints)      # true
-isprovable(count > 0, constraints) # true
-issatisfiable(count > 100, constraints) # true - count could be 101
+isprovable(flag, constraints5)      # true
+```
+
+```@example constraint_sat
+isprovable(count > 0, constraints5) # true
+```
+
+```@example constraint_sat
+issatisfiable(count > 100, constraints5) # true - count could be 101
 ```
 
 !!! note "Current Limitations"
