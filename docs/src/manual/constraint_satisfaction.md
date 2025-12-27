@@ -168,6 +168,32 @@ constraints = Constraints([
 ])
 ```
 
+### Multi-Variable Arithmetic
+
+SymbolicSMT.jl supports multi-variable arithmetic expressions:
+
+```@example constraint_sat
+@variables x::Integer y::Integer
+
+# Multi-variable constraints
+constraints6 = Constraints([x >= 1, y >= 1])
+
+# Check multi-variable expressions
+issatisfiable(x + y <= 0, constraints6)  # false - x + y >= 2 when x,y >= 1
+```
+
+```@example constraint_sat
+isprovable(x + y >= 2, constraints6)  # true - always satisfied when x,y >= 1
+```
+
+```@example constraint_sat
+# Quadratic constraints with multiple variables
+@variables a::Integer b::Integer
+constraints7 = Constraints([a^2 + b^2 < 4])
+issatisfiable(a == 1, constraints7)  # true - (1,0) satisfies a^2 + b^2 < 4
+```
+
+
 ## Integration with Symbolic Computation
 
 Constraint satisfaction integrates naturally with other symbolic computation features:
@@ -184,5 +210,6 @@ Constraint satisfaction integrates naturally with other symbolic computation fea
 - [Satisfiability.jl](https://github.com/dpsanders/SatisfiabilityInterface.jl) - Alternative SAT interface for Julia
 - [SMT-LIB Standard](http://smtlib.cs.uiowa.edu/) - Standard format for SMT solvers
 
-!!! warning "Experimental Status"
-    SymbolicSAT.jl is experimental software. Use it primarily for research and exploration. Always validate results through multiple approaches when possible.
+!!! note "Version Requirements"
+    SymbolicSMT.jl v1.2+ requires Symbolics.jl v7+ and SymbolicUtils.jl v4+.
+    Multi-variable arithmetic and power operators are fully supported in this version.
