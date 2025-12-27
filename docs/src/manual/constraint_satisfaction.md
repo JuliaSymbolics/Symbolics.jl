@@ -16,9 +16,9 @@ The goal is to find an assignment of values to variables that satisfies all cons
 
 In symbolic computation, constraint satisfaction extends beyond simple numerical domains to handle symbolic expressions, boolean formulas, and mathematical relationships.
 
-## SymbolicSAT.jl
+## SymbolicSMT.jl
 
-SymbolicSAT.jl extends SymbolicUtils expression simplification with theorem proving capabilities through the Z3 Theorem Prover. It allows adding boolean constraints to the symbolic simplification process.
+SymbolicSMT.jl extends SymbolicUtils expression simplification with theorem proving capabilities through the Z3 Theorem Prover. It allows adding boolean constraints to the symbolic simplification process.
 
 ### Key Features
 
@@ -30,7 +30,7 @@ SymbolicSAT.jl extends SymbolicUtils expression simplification with theorem prov
 ### Basic Usage
 
 ```julia
-using SymbolicUtils, SymbolicSAT
+using SymbolicUtils, SymbolicSMT
 
 @syms a::Real b::Real
 
@@ -125,7 +125,7 @@ Satisfiability Modulo Theories (SMT) solvers extend SAT solvers to handle richer
 
 ### Z3 Theorem Prover
 
-Z3 is Microsoft Research's high-performance SMT solver that SymbolicSAT.jl uses:
+Z3 is Microsoft Research's high-performance SMT solver that SymbolicSMT.jl uses:
 
 - **Multiple Theories**: Supports arithmetic, bit-vectors, arrays, and more
 - **Decision Procedures**: Efficient algorithms for theory-specific reasoning
@@ -205,7 +205,7 @@ Constraint satisfaction integrates naturally with other symbolic computation fea
 
 ## Further Reading
 
-- [SymbolicSAT.jl Repository](https://github.com/JuliaSymbolics/SymbolicSAT.jl)
+- [SymbolicSMT.jl Repository](https://github.com/JuliaSymbolics/SymbolicSMT.jl)
 - [Z3 Theorem Prover](https://github.com/Z3Prover/z3)
 - [Satisfiability.jl](https://github.com/dpsanders/SatisfiabilityInterface.jl) - Alternative SAT interface for Julia
 - [SMT-LIB Standard](http://smtlib.cs.uiowa.edu/) - Standard format for SMT solvers
