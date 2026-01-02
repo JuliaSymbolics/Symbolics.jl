@@ -194,6 +194,31 @@ function Base.:/(x::Complex{Num}, y::Complex{Num})
     Complex((a*c + b*d)/den, (b*c - a*d)/den)
 end
 Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
+
+"""
+    ^(z::Complex{Num}, p::Real)
+
+Compute complex symbolic power using polar form:
+z^p = |z|^p * exp(i*p*arg(z))
+
+This is necessary because Base's complex power implementation uses
+boolean conditionals that fail with symbolic values.
+"""
+function Base.:^(z::Complex{Num}, p::Real)
+    a, b = reim(z)
+    # r = |z| = sqrt(a² + b²)
+    r = sqrt(a^2 + b^2)
+    # θ = arg(z) = atan(b, a)
+    θ = atan(b, a)
+    # z^p = r^p * (cos(pθ) + i*sin(pθ))
+    r_pow = r^p
+    θ_pow = p * θ
+    return Complex(r_pow * cos(θ_pow), r_pow * sin(θ_pow))
+end
+
+# Also add Rational power for completeness
+Base.:^(z::Complex{Num}, p::Rational) = z^float(p)
+
 Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
 function Base.show(io::IO, z::Complex{<:Num})

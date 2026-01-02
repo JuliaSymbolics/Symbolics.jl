@@ -50,3 +50,39 @@ end
     @test !hasname(2x)
     @test !hasname(x + y)
 end
+
+@testset "Complex{Num} power" begin
+    @variables x y
+    
+    # Basic power operations
+    w = Complex(x, y)
+    @test w^2 isa Complex{Num}  # Integer power (already works)
+    
+    # Non-integer powers should not error (this was the bug)
+    result = w^(1/3)
+    @test result isa Complex{Num}
+    
+    # Rational power
+    result_rat = w^(1//3)
+    @test result_rat isa Complex{Num}
+    
+    # Numerical verification using build_function
+    r = real(w^(1/3))
+    i = imag(w^(1/3))
+    r_fn = Symbolics.build_function(r, [x, y]; expression=Val{false})
+    i_fn = Symbolics.build_function(i, [x, y]; expression=Val{false})
+    
+    # cbrt(8 + 0im) = 2 + 0im
+    @test r_fn([8.0, 0.0]) ≈ 2.0
+    @test i_fn([8.0, 0.0]) ≈ 0.0 atol=1e-10
+    
+    # cbrt(8im) = sqrt(3) + 1im (principal root)
+    @test r_fn([0.0, 8.0]) ≈ sqrt(3) atol=1e-10
+    @test i_fn([0.0, 8.0]) ≈ 1.0 atol=1e-10
+    
+    # Test Complex{concrete Real}^Num works (the secondary fix)
+    # Result is Complex{Num} since the base is complex
+    @variables p
+    c = (1.0 + 2.0im)^p
+    @test c isa Complex{Num}
+end
