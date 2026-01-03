@@ -1,7 +1,7 @@
 # Complex{T}^Num where T is a concrete Real type (not Num)
 # This creates a symbolic power term for cases like (1+2im)^x
 Base.:^(a::Complex{T}, b::Num) where {T<:Union{AbstractFloat,Integer,Rational,AbstractIrrational}} = 
-    Symbolics.wrap(SymbolicUtils.term(^, a, Symbolics.unwrap(b)))
+    Complex{Num}(SymbolicUtils.term(^, a, Symbolics.unwrap(b)))
 """
     symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
 

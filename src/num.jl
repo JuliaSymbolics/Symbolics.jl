@@ -216,8 +216,17 @@ function Base.:^(z::Complex{Num}, p::Real)
     return Complex(r_pow * cos(θ_pow), r_pow * sin(θ_pow))
 end
 
-# Also add Rational power for completeness
-Base.:^(z::Complex{Num}, p::Rational) = z^float(p)
+# Resolve ambiguity with Base.^(::Complex{T}, ::Rational) where T<:Real
+# This method is needed because both ^(::Complex{Num}, ::Real) and 
+# Base.^(::Complex{T}, ::Rational) where T<:Real match Complex{Num}^Rational
+function Base.:^(z::Complex{Num}, p::Rational)
+    a, b = reim(z)
+    r = sqrt(a^2 + b^2)
+    θ = atan(b, a)
+    r_pow = r^p
+    θ_pow = p * θ
+    return Complex(r_pow * cos(θ_pow), r_pow * sin(θ_pow))
+end
 
 Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
