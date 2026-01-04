@@ -85,6 +85,7 @@ end
     @variables p
     c = (1.0 + 2.0im)^p
     @test c isa Complex{Num}
+    @test SymbolicUtils.shape(Symbolics.unwrap(c)) == UnitRange{Int}[]
     @test SymbolicUtils.shape(Symbolics.unwrap(real(c))) == UnitRange{Int}[]
     @test SymbolicUtils.shape(Symbolics.unwrap(imag(c))) == UnitRange{Int}[]
 end
