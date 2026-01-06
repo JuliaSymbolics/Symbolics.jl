@@ -375,6 +375,23 @@ function _linear_expansion(t::SymbolicT, x::SymbolicT, pred = LinearExpansionPre
                 a = isequal(truea, falsea) ? truea : ifelse(cond, truea, falsea)
                 b = isequal(trueb, falseb) ? trueb : ifelse(cond, trueb, falseb)
                 return (a, b, true)
+            elseif f === LinearAlgebra.dot
+                a, b = args
+                sh = SymbolicUtils.shape(a)
+                if !SymbolicUtils.is_array_shape(sh)
+                    return _linear_expansion(a * b, x, pred)
+                end
+                if sh isa SymbolicUtils.Unknown
+                    return (COMMON_ZERO, t, false)
+                end
+                sh = sh::SymbolicUtils.ShapeVecT
+                add_buffer = SymbolicUtils.ArgsT{VartypeT}()
+                sizehint!(add_buffer, length(a))
+                for i in SymbolicUtils.stable_eachindex(a)
+                    push!(add_buffer, LinearAlgebra.dot(a[i], b[i]))
+                end
+                res = SymbolicUtils.add_worker(VartypeT, add_buffer)
+                return _linear_expansion(res, x, pred)
             else
                 for (i, arg) in enumerate(args)
                     pred(arg) && return (COMMON_ZERO, COMMON_ZERO, false)
