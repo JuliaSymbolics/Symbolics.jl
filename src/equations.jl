@@ -24,8 +24,8 @@ Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 
 function Base.show(io::IO, eq::Equation)
     warn_load_latexify()
-    if hide_lhs(eq.lhs)
-        show(io, eq.rhs)
+    if hide_lhs(unwrap_const(eq.lhs))::Bool
+        show(io, unwrap_const(eq.rhs))
     else
         print(io, eq.lhs, " ~ ", eq.rhs)
     end
