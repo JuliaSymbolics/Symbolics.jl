@@ -105,3 +105,26 @@ end
     @test !Symbolics.linear_expansion(ifelse(p < 1, p^2, 2p), p)[3]
     @test !Symbolics.linear_expansion(ifelse(p < 1, 2p, p^2), p)[3]
 end
+
+@testset "`linear_expansion` of `LinearAlgebra.dot`" begin
+    @variables a b c d
+    arr1 = Symbolics.SConst([a, b])
+    arr2 = Symbolics.SConst([c, d])
+    ex = dot(Symbolics.SConst([arr1, arr2]), [[1, 2], [3, 4]])
+    @test isequal(
+        Symbolics.scalarize(Symbolics.linear_expansion(ex, a)), 
+        (Symbolics.SConst(1), 2b + dot(arr2, [3, 4]), true)
+    )
+    @test isequal(
+        Symbolics.scalarize(Symbolics.linear_expansion(ex, b)), 
+        (Symbolics.SConst(2), a + dot(arr2, [3, 4]), true)
+    )
+    @test isequal(
+        Symbolics.scalarize(Symbolics.linear_expansion(ex, c)), 
+        (Symbolics.SConst(3), 4d + dot(arr1, [1, 2]), true)
+    )
+    @test isequal(
+        Symbolics.scalarize(Symbolics.linear_expansion(ex, d)),
+        (Symbolics.SConst(4), 3c + dot(arr1, [1, 2]), true)
+    )
+end
