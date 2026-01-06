@@ -332,7 +332,7 @@ function _linear_expansion(t::SymbolicT, x::SymbolicT, pred = LinearExpansionPre
                 end
                 newdict = copy(dict)
                 delete!(newdict, k)
-                tmp = Symbolics.Mul{VartypeT}(coeff, newdict; type, shape, unsafe=true)
+                tmp = Symbolics.Mul{VartypeT}(coeff, newdict; type, shape)
                 return (a * tmp, b * tmp, true)
             end
         end
