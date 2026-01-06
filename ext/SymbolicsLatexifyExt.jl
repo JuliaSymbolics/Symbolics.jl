@@ -229,20 +229,22 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
     end
 
     if op isa Differential
+      #  DERIVATIVES LOGIC
         num = args[1]
-        den = op.x
-        deg = 1
-        while true
-            @match num begin
-                BSImpl.Term(; f, args) && if f isa Differential end => begin
-                    deg += f.order
-                    den *= f.x ^ f.order
-                    num = args[1]
-                end
-                _ => break
-            end
+        diff_var = op.x 
+        
+        deg = hasproperty(op, :order) ? op.order : 1
+        
+        while iscall(num) && operation(num) isa Differential && isequal(operation(num).x, diff_var)
+            inner_op = operation(num)
+            inner_deg = hasproperty(inner_op, :order) ? inner_op.order : 1
+            deg += inner_deg
+            num = arguments(num)[1]
         end
-        return :(_derivative($(_toexpr(num)), $den, $deg))
+
+        den = deg > 1 ? (diff_var^deg) : diff_var
+        return :(_derivative($(_toexpr(num)), $den, $deg))   
+
     elseif op isa Integral
         lower = op.domain.domain.left
         upper = op.domain.domain.right
@@ -297,17 +299,20 @@ function getindex_to_symbol(t)
 end
 
 function diffdenom(e)
+    e = unwrap(e)
     if SymbolicUtils.issym(e)
         LaTeXString("\\mathrm{d}$e")
     elseif SymbolicUtils.ispow(e)
-        LaTeXString("\\mathrm{d}$(e.base)$(isone(e.exp) ? "" : "^{$(e.exp)}")")
-    elseif SymbolicUtils.ismul(e)
-        LaTeXString(prod(
-                "\\mathrm{d}$(k)$(isone(v) ? "" : "^{$v}")"
-                for (k, v) in e.dict
-               ))
+        # FIX: Use arguments() to get base and exponent
+        base, expo = arguments(e)
+        # FIX: Use isequal() to avoid symbolic boolean errors
+        suffix = isequal(expo, 1) ? "" : "^{$(expo)}"
+        LaTeXString("\\mathrm{d}$(base)$(suffix)")
+   elseif SymbolicUtils.ismul(e)
+        # FIX: Recurse on arguments for product terms
+        LaTeXString(prod(diffdenom(arg).s for arg in arguments(e)))
     else
-        e
+        LaTeXString("\\mathrm{d}$e")
     end
 end
 
