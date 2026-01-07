@@ -237,8 +237,7 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
         
         while iscall(num) && operation(num) isa Differential && isequal(operation(num).x, diff_var)
             inner_op = operation(num)
-            inner_deg = hasproperty(inner_op, :order) ? inner_op.order : 1
-            deg += inner_deg
+            deg += inner_op.order
             num = arguments(num)[1]
         end
 
@@ -303,13 +302,10 @@ function diffdenom(e)
     if SymbolicUtils.issym(e)
         LaTeXString("\\mathrm{d}$e")
     elseif SymbolicUtils.ispow(e)
-        # FIX: Use arguments() to get base and exponent
         base, expo = arguments(e)
-        # FIX: Use isequal() to avoid symbolic boolean errors
-        suffix = isequal(expo, 1) ? "" : "^{$(expo)}"
+        suffix = SymbolicUtils._isone(expo) ? "" : "^{$(expo)}"
         LaTeXString("\\mathrm{d}$(base)$(suffix)")
    elseif SymbolicUtils.ismul(e)
-        # FIX: Recurse on arguments for product terms
         LaTeXString(prod(diffdenom(arg).s for arg in arguments(e)))
     else
         LaTeXString("\\mathrm{d}$e")
