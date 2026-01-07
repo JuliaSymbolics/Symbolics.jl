@@ -233,7 +233,7 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
         num = args[1]
         diff_var = op.x 
         
-        deg = hasproperty(op, :order) ? op.order : 1
+        deg = op.order
         
         while iscall(num) && operation(num) isa Differential && isequal(operation(num).x, diff_var)
             inner_op = operation(num)
