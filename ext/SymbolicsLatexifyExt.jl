@@ -229,20 +229,21 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
     end
 
     if op isa Differential
+      #  DERIVATIVES LOGIC
         num = args[1]
-        den = op.x
-        deg = 1
-        while true
-            @match num begin
-                BSImpl.Term(; f, args) && if f isa Differential end => begin
-                    deg += f.order
-                    den *= f.x ^ f.order
-                    num = args[1]
-                end
-                _ => break
-            end
+        diff_var = op.x 
+        
+        deg = op.order
+        
+        while iscall(num) && operation(num) isa Differential && isequal(operation(num).x, diff_var)
+            inner_op = operation(num)
+            deg += inner_op.order
+            num = arguments(num)[1]
         end
-        return :(_derivative($(_toexpr(num)), $den, $deg))
+
+        den = deg > 1 ? (diff_var^deg) : diff_var
+        return :(_derivative($(_toexpr(num)), $den, $deg))   
+
     elseif op isa Integral
         lower = op.domain.domain.left
         upper = op.domain.domain.right
@@ -297,17 +298,17 @@ function getindex_to_symbol(t)
 end
 
 function diffdenom(e)
+    e = unwrap(e)
     if SymbolicUtils.issym(e)
         LaTeXString("\\mathrm{d}$e")
     elseif SymbolicUtils.ispow(e)
-        LaTeXString("\\mathrm{d}$(e.base)$(isone(e.exp) ? "" : "^{$(e.exp)}")")
-    elseif SymbolicUtils.ismul(e)
-        LaTeXString(prod(
-                "\\mathrm{d}$(k)$(isone(v) ? "" : "^{$v}")"
-                for (k, v) in e.dict
-               ))
+        base, expo = arguments(e)
+        suffix = SymbolicUtils._isone(expo) ? "" : "^{$(expo)}"
+        LaTeXString("\\mathrm{d}$(base)$(suffix)")
+   elseif SymbolicUtils.ismul(e)
+        LaTeXString(prod(diffdenom(arg).s for arg in arguments(e)))
     else
-        e
+        LaTeXString("\\mathrm{d}$e")
     end
 end
 
