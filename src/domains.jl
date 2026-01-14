@@ -6,7 +6,7 @@ struct VarDomainPairing
   domain::Domain
 end
 
-const DomainedVar = Union{BasicSymbolic, Num}
+const DomainedVar = Union{SymbolicT, Num}
 
 Base.:∈(variable::DomainedVar,domain::Domain) = VarDomainPairing(unwrap(variable),domain)
 Base.:∈(variable::DomainedVar,domain::Interval) = VarDomainPairing(unwrap(variable),domain)
