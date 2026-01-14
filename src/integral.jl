@@ -20,22 +20,48 @@ I = Integral(x in ClosedInterval(a, b))
 @test isequal(I(2), 2*(b -a))
 ```
 """
-struct Integral{T <: Symbolics.VarDomainPairing}
-    domain::T
-    Integral(domain) = new{typeof(domain)}(domain)
+struct Integral
+    domain::VarDomainPairing
 end
 
 Base.nameof(::Integral) = :Integral
 
+const AnyInterval{T} = DomainSets.Interval{A, B, T} where {A, B}
+
 function (I::Integral)(x::Union{Rational, AbstractIrrational, AbstractFloat, Integer})
     domain = I.domain.domain
-    a, b = value.(DomainSets.endpoints(domain))
-    wrap((b - a)*x)
+    # Despite this not being a concrete type, `endpoints` only needs to access fields
+    # of `Interval` so this ends up being type-stable. There doesn't seem to be a way
+    # to test this and ensure it remains type-stable.
+    if domain isa AnyInterval{Num}
+        a, b = unwrap.(DomainSets.endpoints(domain))
+        return Num((b - a) * x)
+    elseif domain isa AnyInterval{SymbolicT}
+        a, b = DomainSets.endpoints(domain)
+        return Num((b - a) * x)
+    elseif domain isa AnyInterval{Int}
+        a, b = DomainSets.endpoints(domain)
+        return Num((b - a) * x)
+    elseif domain isa AnyInterval{Float64}
+        a, b = DomainSets.endpoints(domain)
+        return Num((b - a) * x)
+    else
+        # ::NTuple{2, Any} avoids `indexed_iterate` dynamic dispatching
+        a, b = DomainSets.endpoints(domain)::NTuple{2, Any}
+        # SConst avoids `*` dynamic dispatching
+        return Num(SConst(b - a) * x)
+    end
 end
-(I::Integral)(x::Complex) = Complex{Num}(wrap(I(unwrap(real(x)))), wrap(I(unwrap(imag(x)))))
-(I::Integral)(x) = Term{VartypeT}(I, [x]; type = SymbolicUtils.symtype(x), shape = SymbolicUtils.shape(x))
-(I::Integral)(x::Num) = Num(I(Symbolics.value(x)))
-SymbolicUtils.promote_symtype(::Integral, x) = x
+(I::Integral)(x::Complex) = Complex{Num}(Num(I(unwrap(real(x)))), Num(I(unwrap(imag(x)))))
+function (I::Integral)(x)
+    return Term{VartypeT}(
+        I, SArgsT((x,));
+        type = SymbolicUtils.symtype(x), shape = SymbolicUtils.shape(x)
+    )
+end
+(I::Integral)(x::Num) = Num(I(unwrap(x)))
+SymbolicUtils.promote_symtype(::Integral, T::SymbolicUtils.TypeT) = T
+SymbolicUtils.promote_shape(::Integral, @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
 
 function Base.show(io::IO, I::Integral)
     print(io, "Integral(", I.domain.variables, ", ", I.domain.domain, ")")
