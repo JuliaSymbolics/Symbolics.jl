@@ -1248,9 +1248,9 @@ version = "0.3.46"
 
 [[deps.SymbolicLimits]]
 deps = ["SymbolicUtils", "TermInterface"]
-git-tree-sha1 = "49201c2793ce02f141c6f8b5194ce34e8012cd68"
+git-tree-sha1 = "5085671d2cba1eb02136a3d6661c583e801984c1"
 uuid = "19f23fe9-fdab-4a78-91af-e7b7767979c3"
-version = "0.2.4"
+version = "1.1.0"
 
 [[deps.SymbolicSMT]]
 deps = ["SymbolicUtils", "Symbolics", "Z3"]
