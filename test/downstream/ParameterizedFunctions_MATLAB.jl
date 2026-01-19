@@ -1,15 +1,16 @@
 using ModelingToolkit, ParameterizedFunctions
 
 ### Capture MATLABDiffEq.jl type issues
-@parameters t a b c d
+@independent_variables t
+@parameters a b c d
 @variables x(t) y(t)
 D = Differential(t)
 eqs = [D(x) ~ a*x - b*x*y
        D(y) ~ -c*y + d*x*y]
-sys = ODESystem(eqs)
+@named sys = System(eqs, t)
 equations(sys)
-matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),states(sys),
-                                        parameters(sys),independent_variable(sys),
+matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
+                                        parameters(sys),ModelingToolkit.get_iv(sys),
                                         target = ModelingToolkit.MATLABTarget())
 @test matstr == "diffeqf = @(t,internal_var___u) [
   internal_var___p(1) * internal_var___u(1) + -1 * internal_var___p(2) * internal_var___u(1) * internal_var___u(2);
@@ -28,8 +29,8 @@ prob = ODEProblem(f,u0,tspan,p)
 
 sys = modelingtoolkitize(prob)
 [eq.rhs for eq ∈ equations(sys)]
-matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),states(sys),
-                                        parameters(sys),independent_variable(sys),
+matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
+                                        parameters(sys),ModelingToolkit.get_iv(sys),
                                         target = ModelingToolkit.MATLABTarget())
 @test matstr == "diffeqf = @(t,internal_var___u) [
   internal_var___p(1) * internal_var___u(1) - internal_var___p(2) * internal_var___u(1) * internal_var___u(2);
