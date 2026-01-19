@@ -1,5 +1,5 @@
 using Base.Threads
-using SymbolicUtils.Code: LazyState
+using SymbolicUtils.Code: LazyState, apply_optimization_rules
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
@@ -319,7 +319,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        states = LazyState(),
                        iip_config = (true, true),
                        nanmath = true,
-                       parallel=nothing, cse = false, kwargs...)
+                       parallel=nothing, cse = false,
+                       optimize = nothing,
+                       kwargs...)
     if rhss isa SubArray
         rhss = copy(rhss)
     end
@@ -364,6 +366,10 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     if cse
         oop_expr = Code.cse(oop_expr)
         iip_expr = Code.cse(iip_expr)
+    end
+
+    if !isnothing(optimize) 
+        iip_expr = apply_optimization_rules(iip_expr, states, optimize)
     end
 
     oop_expr = conv(oop_expr, states)
