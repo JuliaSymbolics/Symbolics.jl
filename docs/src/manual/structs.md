@@ -64,7 +64,7 @@ end
 
 The `shape` option allows specifying the shape of array fields. Here, we're saying that the shape
 of field `:x` is `(1:N,)` (i.e. it is a 1-indexed vector of length `N`). The expression can use
-type information of the registered struct type. The specific details of all options are documeneted
+type information of the registered struct type. The specific details of all options are documented
 in the [`@symstruct`](@ref) macro. With the above declaration, we can now have safe symbolic `PointN`.
 
 ```@repl symstruct

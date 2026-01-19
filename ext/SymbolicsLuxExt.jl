@@ -16,7 +16,7 @@ using SymbolicUtils: symtype, unwrap
 end
 
 # SymbolicUtils@4 requires implementing `promote_symtype(::typeof(f), sh1::Shapet, sh2::ShapeT, ...)`
-# for `subtitute` and other functions to work correctly. Effectively, it requires being
+# for `substitute` and other functions to work correctly. Effectively, it requires being
 # able to compute the shape of the output from the function and shapes of the inputs. With
 # `LuxCore.stateless_apply`, this becomes difficult since it requires using `LuxCore.outputsize`,
 # which needs the model as input. The code below takes a similar approach to the
