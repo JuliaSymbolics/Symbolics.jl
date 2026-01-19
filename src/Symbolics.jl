@@ -581,7 +581,7 @@ include("symstruct.jl")
 @public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, option_to_metadata_type, scalarize, shape
-@public unwrap, variable, wrap
+@public unwrap, variable, wrap, linear_expansion, LinearExpander
 
 @setup_workload begin
     fold1 = Val{false}()
