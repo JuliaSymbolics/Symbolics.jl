@@ -262,6 +262,7 @@ end
 is_expansion_leaf(t) = !iscall(t) || (operation(t) isa Operator)
 @noinline throw_bad_expansion() = error("The operation is an Operator. This should never happen.")
 
+const LinearExpansionResultT = Tuple{SymbolicT, SymbolicT, Bool}
 """
     $TYPEDEF
 
@@ -275,14 +276,15 @@ struct LinearExpander
     x::SymbolicT
     arr::Union{SymbolicT, Nothing}
     occursin_cache::Dict{SymbolicT, Bool}
+    result_cache::Dict{SymbolicT, LinearExpansionResultT}
 end
 
 function LinearExpander(ex::SymbolicT)
     @match ex begin
         BSImpl.Term(; f, args) && if f === getindex end => begin
-            LinearExpander(ex, args[1], Dict{SymbolicT, Bool}(ex => true, args[1] => true))
+            LinearExpander(ex, args[1], Dict{SymbolicT, Bool}(ex => true, args[1] => true), Dict{SymbolicT, LinearExpansionResultT}())
         end
-        _ => LinearExpander(ex, nothing, Dict{SymbolicT, Bool}(ex => true))
+        _ => LinearExpander(ex, nothing, Dict{SymbolicT, Bool}(ex => true), Dict{SymbolicT, LinearExpansionResultT}())
     end
 end
 
@@ -301,6 +303,16 @@ function _linear_expansion_occursin(lex::LinearExpander, t::SymbolicT)
     _linear_expansion_predicate(lex, t) && return true
     iscall(t) || return false
     return occursin_cache[t] = any(Base.Fix1(_linear_expansion_occursin, lex), arguments(t))
+end
+
+function _linear_expansion_recurse(lex::LinearExpander, t::SymbolicT)
+    result = get(lex.result_cache, t, nothing)
+    if result isa LinearExpansionResultT
+        return result
+    end
+    result = lex(t)
+    lex.result_cache[t] = result
+    return result
 end
 
 # _linear_expansion always returns `SymbolicT`
@@ -328,7 +340,7 @@ function (lex::LinearExpander)(t::SymbolicT)
                 a_buffer = SArgsT()
                 b_buffer = SArgsT()
                 for (k, v) in dict
-                    a, b, islin = lex(k)
+                    a, b, islin = _linear_expansion_recurse(lex, k)
                     islin || return (COMMON_ZERO, COMMON_ZERO, false)
                     push!(a_buffer, a * v)
                     push!(b_buffer, b * v)
@@ -347,7 +359,7 @@ function (lex::LinearExpander)(t::SymbolicT)
                 dirty = false
                 extras = SArgsT()
                 for (_k, _v) in dict
-                    _a, _b, islin = lex(_k)
+                    _a, _b, islin = _linear_expansion_recurse(lex, _k)
                     islin || return (COMMON_ZERO, COMMON_ZERO, false)
                     _a_zero = _iszero(_a)
                     if _a_zero
@@ -395,7 +407,7 @@ function (lex::LinearExpander)(t::SymbolicT)
         BSImpl.Term(; f, args) => begin
             if f === (-)
                 @assert length(args) == 1
-                a, b, islin = lex(args[1])
+                a, b, islin = _linear_expansion_recurse(lex, args[1])
                 islin || return (COMMON_ZERO, COMMON_ZERO, false)
                 return -a, -b, islin
             elseif f === (^)
@@ -421,12 +433,12 @@ function (lex::LinearExpander)(t::SymbolicT)
                 # scalarizing and indexing leads to the same symbolic variable
                 # which causes a StackOverflowError without this
                 isequal(t, indexed_t) && return (COMMON_ZERO, t, true)
-                return lex(indexed_t)
+                return _linear_expansion_recurse(lex, indexed_t)
             elseif f === ifelse
                 cond, iftrue, iffalse = args
-                truea, trueb, istruelinear = lex(iftrue)
+                truea, trueb, istruelinear = _linear_expansion_recurse(lex, iftrue)
                 istruelinear || return (COMMON_ZERO, t, false)
-                falsea, falseb, isfalselinear = lex(iffalse)
+                falsea, falseb, isfalselinear = _linear_expansion_recurse(lex, iffalse)
                 isfalselinear || return (COMMON_ZERO, t, false)
                 a = isequal(truea, falsea) ? truea : ifelse(cond, truea, falsea)
                 b = isequal(trueb, falseb) ? trueb : ifelse(cond, trueb, falseb)
@@ -435,7 +447,7 @@ function (lex::LinearExpander)(t::SymbolicT)
                 a, b = args
                 sh = SymbolicUtils.shape(a)
                 if !SymbolicUtils.is_array_shape(sh)
-                    return lex(a * b)
+                    return _linear_expansion_recurse(lex, a * b)
                 end
                 if sh isa SymbolicUtils.Unknown
                     return (COMMON_ZERO, t, false)
@@ -447,11 +459,11 @@ function (lex::LinearExpander)(t::SymbolicT)
                     push!(add_buffer, LinearAlgebra.dot(a[i], b[i]))
                 end
                 res = SymbolicUtils.add_worker(VartypeT, add_buffer)
-                return lex(res)
+                return _linear_expansion_recurse(lex, res)
             else
                 for (i, arg) in enumerate(args)
                     _linear_expansion_predicate(lex, arg) && return (COMMON_ZERO, COMMON_ZERO, false)
-                    a, b, islin = lex(arg)
+                    a, b, islin = _linear_expansion_recurse(lex, arg)
                     (_iszero(a) && islin) || return (COMMON_ZERO, COMMON_ZERO, false)
                 end
                 return (COMMON_ZERO, t, true)
@@ -461,7 +473,7 @@ function (lex::LinearExpander)(t::SymbolicT)
             if _linear_expansion_occursin(lex, den)
                 return (COMMON_ZERO, COMMON_ZERO, false)
             end
-            a, b, islin = lex(num)
+            a, b, islin = _linear_expansion_recurse(lex, num)
             islin || return (COMMON_ZERO, COMMON_ZERO, false)
             a = SymbolicUtils.Div{VartypeT}(a, den, false; type, shape)
             b = SymbolicUtils.Div{VartypeT}(b, den, false; type, shape)
@@ -471,7 +483,7 @@ function (lex::LinearExpander)(t::SymbolicT)
             if isempty(output_idx)
                 # is scalar
                 scal = SymbolicUtils.scalarize(t, Val{true}())::SymbolicT
-                return lex(scal)
+                return _linear_expansion_recurse(lex, scal)
             else
                 # TODO: call `_linear_expansion(t.expr, x)` and parse the result
                 return COMMON_ZERO, COMMON_ZERO, false
