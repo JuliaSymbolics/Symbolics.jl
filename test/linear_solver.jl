@@ -1,5 +1,6 @@
 using Symbolics
 using Symbolics: value, unwrap
+import SymbolicUtils as SU
 using LinearAlgebra
 using Test
 
@@ -127,4 +128,24 @@ end
         Symbolics.scalarize(Symbolics.linear_expansion(ex, d)),
         (Symbolics.SConst(4), 3c + dot(arr1, [1, 2]), true)
     )
+end
+
+@testset "`linear_expansion` of multiplication when multiplicand is singular" begin
+    @variables x y
+
+    ex = y * (3 * (x + y) - 3x)
+    @test SU.query(isequal(x), unwrap(ex))
+    @test isequal(expand(ex), 3y^2)
+    a, b, islin = Symbolics.linear_expansion(ex, x)
+    @test isequal(a, 0)
+    @test isequal(b, 3y^2)
+    @test islin
+
+    # Also test case when expression itself is not singular, but a term is
+    ex = y * (3 * (x + y) - 3x) * (x + 3)
+    @test isequal(expand(ex), 3y^2 * x + 9y^2)
+    a, b, islin = Symbolics.linear_expansion(ex, x)
+    @test isequal(a, 3y^2)
+    @test isequal(b, 9y^2)
+    @test islin
 end
