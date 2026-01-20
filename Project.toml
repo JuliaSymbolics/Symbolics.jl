@@ -1,6 +1,6 @@
 name = "Symbolics"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "7.7.0"
+version = "7.7.1"
 authors = ["Shashi Gowda <gowda@mit.edu>"]
 
 [deps]
