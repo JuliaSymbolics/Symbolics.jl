@@ -343,10 +343,27 @@ function (lex::LinearExpander)(t::SymbolicT)
                 a = COMMON_ZERO
                 b = COMMON_ZERO
                 k = COMMON_ZERO
+                newdict = dict
+                dirty = false
+                extras = SArgsT()
                 for (_k, _v) in dict
                     _a, _b, islin = lex(_k)
                     islin || return (COMMON_ZERO, COMMON_ZERO, false)
                     _a_zero = _iszero(_a)
+                    if _a_zero
+                        isequal(_b, _k) && continue
+                        if !dirty
+                            newdict = copy(dict)
+                            dirty = true
+                        end
+                        delete!(newdict, _k)
+                        if SymbolicUtils.ismul(_b)
+                            push!(extras, _b ^ _v)
+                        else
+                            newdict[_b] = _v
+                        end
+                        continue
+                    end
                     _a_zero && continue
                     a === COMMON_ZERO || return (COMMON_ZERO, COMMON_ZERO, false)
                     _isone(_v) || return (COMMON_ZERO, COMMON_ZERO, false)
@@ -354,13 +371,24 @@ function (lex::LinearExpander)(t::SymbolicT)
                     b = _b
                     k = _k
                 end
-
                 if a === COMMON_ZERO
-                    return (COMMON_ZERO, t, true)
+                    dirty || return (COMMON_ZERO, t, true)
+                    b = SymbolicUtils.Mul{VartypeT}(coeff, newdict; type, shape)
+                    if !isempty(extras)
+                        push!(extras, b)
+                        b = SymbolicUtils.mul_worker(VartypeT, extras)
+                    end
+                    return (COMMON_ZERO, b, true)
                 end
-                newdict = copy(dict)
+                if !dirty
+                    newdict = copy(dict)
+                end
                 delete!(newdict, k)
                 tmp = Symbolics.Mul{VartypeT}(coeff, newdict; type, shape)
+                if !isempty(extras)
+                    push!(extras, tmp)
+                    tmp = SymbolicUtils.mul_worker(VartypeT, extras)
+                end
                 return (a * tmp, b * tmp, true)
             end
         end
@@ -382,7 +410,7 @@ function (lex::LinearExpander)(t::SymbolicT)
                 # array
                 arrt = args[1]
                 @match x begin
-                    BSImpl.Term(; f = fx, args = argsx) && if f === getindex end => begin
+                    BSImpl.Term(; f = fx, args = argsx) && if fx === getindex end => begin
                         isequal(arrt, argsx[1]) && return (COMMON_ZERO, t, true)
                     end
                     _ => nothing
