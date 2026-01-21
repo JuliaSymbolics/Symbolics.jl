@@ -277,16 +277,24 @@ struct LinearExpander
     arr::Union{SymbolicT, Nothing}
     occursin_cache::Dict{SymbolicT, Bool}
     result_cache::Dict{SymbolicT, LinearExpansionResultT}
+    strict::Bool
 end
 
-function LinearExpander(ex::SymbolicT)
+"""
+    $TYPEDSIGNATURES
+
+Create a `LinearExpander`. If `strict == true`, `ex` occurring in the condition of `ifelse`
+will not be considered linear.
+"""
+function LinearExpander(ex::SymbolicT; strict = false)
     @match ex begin
         BSImpl.Term(; f, args) && if f === getindex end => begin
-            LinearExpander(ex, args[1], Dict{SymbolicT, Bool}(ex => true, args[1] => true), Dict{SymbolicT, LinearExpansionResultT}())
+            LinearExpander(ex, args[1], Dict{SymbolicT, Bool}(ex => true, args[1] => true), Dict{SymbolicT, LinearExpansionResultT}(), strict)
         end
-        _ => LinearExpander(ex, nothing, Dict{SymbolicT, Bool}(ex => true), Dict{SymbolicT, LinearExpansionResultT}())
+        _ => LinearExpander(ex, nothing, Dict{SymbolicT, Bool}(ex => true), Dict{SymbolicT, LinearExpansionResultT}(), strict)
     end
 end
+LinearExpander(ex::Num; kw...) = LinearExpander(unwrap(ex); kw...)
 
 @inline function _linear_expansion_predicate(lex::LinearExpander, t::SymbolicT)
     (; x, arr) = lex
@@ -325,6 +333,8 @@ function (lex::LinearExpander)(t::Equation)
     # t.rhs - t.lhs = 0
     return (a₂ - a₁, b₂ - b₁, islinear)
 end
+
+(lex::LinearExpander)(t::Num) = lex(unwrap(t))
 
 function (lex::LinearExpander)(t::SymbolicT)
     (; x) = lex
@@ -436,6 +446,9 @@ function (lex::LinearExpander)(t::SymbolicT)
                 return _linear_expansion_recurse(lex, indexed_t)
             elseif f === ifelse
                 cond, iftrue, iffalse = args
+                if lex.strict && _linear_expansion_occursin(lex, cond)
+                    return (COMMON_ZERO, COMMON_ZERO, false)
+                end
                 truea, trueb, istruelinear = _linear_expansion_recurse(lex, iftrue)
                 istruelinear || return (COMMON_ZERO, t, false)
                 falsea, falseb, isfalselinear = _linear_expansion_recurse(lex, iffalse)

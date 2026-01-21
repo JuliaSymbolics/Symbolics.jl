@@ -105,6 +105,11 @@ end
 
     @test !Symbolics.linear_expansion(ifelse(p < 1, p^2, 2p), p)[3]
     @test !Symbolics.linear_expansion(ifelse(p < 1, 2p, p^2), p)[3]
+
+    @testset "Strict mode" begin
+        lex = Symbolics.LinearExpander(p; strict = true)
+        @test !lex(ifelse(p < 1, 1, 2))[3]
+    end
 end
 
 @testset "`linear_expansion` of `LinearAlgebra.dot`" begin
