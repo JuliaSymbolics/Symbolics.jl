@@ -120,3 +120,8 @@ end
     @test_throws DomainError substitute(ForwardDiff.derivative(z -> x^z, 0.5), x => -1.0)
     @test isnan(Symbolics.value(substitute(ForwardDiff.derivative(z -> NaNMath.pow(x, z), 0.5), x => -1.0; fold = Val(true))))
 end
+
+@testset "promote_rule ambiguities" begin
+    @variables y
+    @test ForwardDiff.derivative(x -> promote(x, y)[1], 1) === Num(1)
+end
