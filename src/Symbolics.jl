@@ -78,9 +78,7 @@ const SConst = SymbolicUtils.BSImpl.Const{VartypeT}
 const SSym = SymbolicUtils.Sym{VartypeT}
 const STerm = SymbolicUtils.Term{VartypeT}
 
-# re-export
-
-export simplify, substitute
+export simplify, substitute, substitute_in_deriv, substitute_in_deriv_and_depvar # (re-)export
 
 import AbstractPlutoDingetjes: is_inside_pluto
 const WARNED_LATEXIFY = Ref(false)
@@ -116,7 +114,11 @@ include("complex.jl")
 
 Performs the substitution on `expr` according to rule(s) `s`.
 If `fold=Val(false)`, expressions which can be evaluated won't be evaluated.
+
+See also: [`substitute_in_deriv`](@ref), [`substitute_in_deriv_and_depvar`](@ref).
+
 # Examples
+
 ```jldoctest
 julia> @variables t x y z(t)
 4-element Vector{Num}:
