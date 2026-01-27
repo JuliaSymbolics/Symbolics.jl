@@ -112,7 +112,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     else
         quote
             nd = $(get(defs, :ndims, -1))
-            sh = $(SymbolicUtils.Unknown)(sh)
+            sh = $(SymbolicUtils.Unknown)(nd)
         end
     end
     eltype_expr = get(defs, :eltype, Any)
