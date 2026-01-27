@@ -1,6 +1,7 @@
 using Symbolics
 import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
 import SymbolicUtils: Term, symtype, FnType, BasicSymbolic, promote_symtype, SymReal, Const
+import SymbolicUtils as SU
 using LinearAlgebra
 using Test
 
@@ -444,3 +445,13 @@ end
     @register_symbolic foo1(x::AbstractArray{Int})
     @register_symbolic foo1(x::AbstractVector{Int})
 end
+
+@testset "`@register_array_symbolic` works without size" begin
+    @register_array_symbolic foo3(x) begin
+        eltype = Real
+        ndims = 2
+    end
+    @variables x
+    @test SU.shape(unwrap(foo3(x))) == SU.Unknown(2)
+end
+
