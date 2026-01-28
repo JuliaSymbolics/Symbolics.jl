@@ -1,6 +1,5 @@
 :(function (x,)
-      begin
-          _out = (zeros)(Float64, (4, 4))
+      let _out = (zeros)(Float64, (4, 4))
           var"%_out" = for _2 = 1:1:4
                   for _1 = 1:1:4
                       begin
