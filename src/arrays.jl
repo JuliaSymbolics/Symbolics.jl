@@ -44,8 +44,8 @@ SymbolicUtils.getmetadata(x::Arr, t) = SymbolicUtils.getmetadata(unwrap(x), t)
 SymbolicUtils.hasmetadata(x::Arr, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
 SymbolicUtils.infer_vartype(::Type{Arr{T, N}}) where {T, N} = VartypeT
 
-function (s::SymbolicUtils.Substituter)(x::Arr)
-    Arr(s(unwrap(x)))
+function (s::SymbolicUtils.Substituter)(x::Arr{T, N}) where {T, N}
+    Arr{T, N}(s(unwrap(x)))
 end
 
 maybewrap(T) = has_symwrapper(T) ? wrapper_type(T) : T
