@@ -603,6 +603,7 @@ is_wrapper_type(::Type{T}) where {T <: CallAndWrap} = true
 wraps_type(::Type{T}) where {W, T <: CallAndWrap{W}} = FnType{A, R} where {A, R <: wraps_type(W)}
 iswrapped(::CallAndWrap) = true
 SymbolicUtils.unwrap(x::CallAndWrap) = x.f
+SymbolicUtils.infer_vartype(::Type{CallAndWrap{T}}) where {T} = VartypeT
 SymbolicUtils.symtype(x::CallAndWrap) = symtype(x.f)
 SymbolicIndexingInterface.getname(x::CallAndWrap) = getname(x.f)
 SymbolicIndexingInterface.hasname(x::CallAndWrap) = hasname(x.f)

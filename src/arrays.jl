@@ -42,6 +42,7 @@ SymbolicUtils.symtype(x::Arr) = symtype(unwrap(x))
 SymbolicUtils.setmetadata(x::Arr{T, N}, t, v) where {T, N} = Arr{T, N}(SymbolicUtils.setmetadata(unwrap(x), t, v))
 SymbolicUtils.getmetadata(x::Arr, t) = SymbolicUtils.getmetadata(unwrap(x), t)
 SymbolicUtils.hasmetadata(x::Arr, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
+SymbolicUtils.infer_vartype(::Type{Arr{T, N}}) where {T, N} = VartypeT
 
 function (s::SymbolicUtils.Substituter)(x::Arr)
     Arr(s(unwrap(x)))
