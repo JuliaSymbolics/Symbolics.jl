@@ -388,7 +388,69 @@ function (filt::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
 end
 
 """
-    fixpoint_sub(expr, dict, ::Type{OP} = Nothing; maxiters = 1000)
+    FixpointSubstituter{Fold, #= ... =# } <: SymbolicUtils.Substituter{Fold}
+
+A substituter which repeatedly substitutes an expression until a fixpoint is reached,
+or a maximum number of substitutions in case of circular rules. For example, the rules
+`[x => y, y => x]` will lead to hitting the maximum iterations. This follows
+the same caching rules as [`SymbolicUtils.Substituter`](@ref).
+
+See also: [`fixpoint_sub`](@ref).
+"""
+struct FixpointSubstituter{Fold, S <: SU.Substituter{Fold}} <: SU.Substituter{Fold}
+    wrapped::S
+    maxiters::Int
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Construct a `FixpointSubstituter` from the given substituter `subber`. Optionally specify
+the maximum number of iterations to substitute.
+"""
+function FixpointSubstituter(subber::S; maxiters::Integer = 1000) where {Fold, S <: SU.Substituter{Fold}}
+    return FixpointSubstituter{Fold, S}(subber, maxiters)
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Construct a `FixpointSubstituter`, specifying whether it constant-folds via `Fold`.
+`Op` prevents substitution of expressions inside operators of the given type.
+"""
+function FixpointSubstituter{Fold}(
+    rules, filterer = SU.default_substitute_filter, op::Type{Op} = Nothing; maxiters = 1000,
+    ) where {Fold, Op}
+    fpfilterer = FPSubFilterer{Op}(; fallback_filterer = filterer)
+    return FixpointSubstituter(SU.Substituter{Fold}(rules, fpfilterer); maxiters)
+end
+
+SymbolicUtils.clear_cache!(s::FixpointSubstituter) = SU.clear_cache!(s.wrapped)
+function SymbolicUtils.get_substitution_dict(s::FixpointSubstituter)
+    return SU.get_substitution_dict(s.wrapped)
+end
+
+function (sub::FixpointSubstituter)(ex::SymbolicT)
+    iters = sub.maxiters
+    new_ex = sub.wrapped(ex)
+    while !isequal(ex, new_ex) && iters > 0
+        ex = new_ex
+        new_ex = sub.wrapped(new_ex)
+        iters -= 1
+    end
+
+    if !isequal(ex, new_ex) && iters == 0
+        @warn lazy"""
+        Did not converge after `maxiters = $(sub.maxiters)` substitutions. Either there \
+        is a cycle in the rules or `maxiters` needs to be higher.
+        """
+    end
+
+    return new_ex
+end
+
+"""
+    fixpoint_sub(expr, dict, ::Type{OP} = Nothing; maxiters = 1000, filterer = SymbolicUtils.default_substitute_filter)
 
 Given a symbolic expression, equation or inequality `expr` perform the substitutions in
 `dict` recursively until the expression does not change. Substitutions that depend on one
@@ -398,6 +460,8 @@ specified to prevent substitution of expressions inside `Operator`s of the given
 `maxiters` keyword is used to limit the number of times the substitution can occur to avoid
 infinite loops in cases where the substitutions in `dict` are circular
 (e.g. `[x => y, y => x]`).
+
+See also: [`FixpointSubstituter`](@ref).
 """
 function fixpoint_sub(x, dict, ::Type{OP} = Nothing; maxiters = 1000, filterer = SymbolicUtils.default_substitute_filter, fold::Val{FOLD} = Val{false}(), kw...) where {OP, FOLD}
     if get(kw, :operator, nothing) !== nothing
@@ -407,27 +471,8 @@ function fixpoint_sub(x, dict, ::Type{OP} = Nothing; maxiters = 1000, filterer =
         """, :fixpoint_sub_op_kwarg)
         return fixpoint_sub(x, dict, kw[:operator]; maxiters, filterer, fold)
     end
-    filterer = FPSubFilterer{OP}(; fallback_filterer = filterer)
-    substituter = SymbolicUtils.Substituter{FOLD}(dict, filterer)
-    y = substituter(x)
-    iters = maxiters
-    while !isequal(x, y) && iters > 0
-        y = x
-        x = substituter(x)
-        iters -= 1
-    end
-
-    if !isequal(x, y)
-        @warn "Did not converge after `maxiters = $maxiters` substitutions. Either there is a cycle in the rules or `maxiters` needs to be higher."
-    end
-
-    return x
-end
-function fixpoint_sub(x::SparseMatrixCSC, dict, ::Type{OP} = Nothing; kw...) where {OP}
-    I, J, V = findnz(x)
-    V = fixpoint_sub(V, dict, OP; kw...)
-    m, n = size(x)
-    return sparse(I, J, V, m, n)
+    subber = FixpointSubstituter{FOLD}(dict, filterer, OP; maxiters)
+    return subber(x)
 end
 
 function is_array_of_symbolics(x)
