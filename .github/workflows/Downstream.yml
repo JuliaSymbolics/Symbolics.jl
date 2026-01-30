@@ -41,12 +41,18 @@ jobs:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
       - name: Load this and run the downstream tests
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: 0
         shell: julia --color=yes --project=downstream {0}
         run: |
           using Pkg
           try
             # force it to use this PR's version of the package
-            Pkg.develop(PackageSpec(path="."))  # resolver may fail with main deps
+            if "${{ matrix.package.repo }}" == "ModelingToolkit.jl"
+              Pkg.develop([PackageSpec(path = "."), PackageSpec(path="downstream/lib/ModelingToolkitBase")])
+            else
+              Pkg.develop(PackageSpec(path="."))  # resolver may fail with main deps
+            end
             Pkg.update()
             Pkg.test()  # resolver may fail with test time deps
           catch err
