@@ -529,3 +529,8 @@ end
     @test scal isa Matrix{Num}
     @test isequal(scal, Num[x[1, 1] x[1, 2]; x[2, 1] x[2, 2]])
 end
+
+@testset "Issue#1751: `exp(::Arr)` works" begin
+    @variables x[1:3, 1:3]
+    @test isequal(exp(x), wrap(exp(unwrap(x))))
+end

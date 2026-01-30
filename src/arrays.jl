@@ -106,6 +106,7 @@ for (T1, T2) in [
     end
 end
 
+Base.exp(A::Arr{T, 2}) where {T} = Arr{T, 2}(exp(unwrap(A)))
 Base.inv(A::Arr{T, 2}) where {T} = Arr{T, 2}(inv(unwrap(A)))
 LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
 LinearAlgebra.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
