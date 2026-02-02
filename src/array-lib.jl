@@ -136,6 +136,9 @@ end
 
 Base.:(/)(x1::Num, x2::Arr{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
 
+Base.exp(m::Matrix{Num}) = Arr{Num, 2}(exp(SConst(m)))
+Base.exp(m::Matrix{Complex{Num}}) = Arr{Complex{Num}, 2}(exp(SConst(m)))
+
 #################### MAP-REDUCE ################
 
 SymbolicUtils.@map_methods Arr unwrap wrap
