@@ -1,6 +1,6 @@
 using Symbolics
 using SymbolicUtils, Test
-using Symbolics: symtype, shape, wrap, unwrap, Arr, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize
+using Symbolics: symtype, shape, wrap, unwrap, Arr, jacobian, @variables, value, get_variables, @arrayop, getname, metadata, scalarize, SConst
 using Base: Slice
 using SymbolicUtils: Sym, term, operation, search_variables
 import SymbolicUtils.Code: toexpr
@@ -533,4 +533,5 @@ end
 @testset "Issue#1751: `exp(::Arr)` works" begin
     @variables x[1:3, 1:3]
     @test isequal(exp(x), wrap(exp(unwrap(x))))
+    @test isequal(exp(collect(x)), exp(SConst(collect(unwrap(x)))))
 end
