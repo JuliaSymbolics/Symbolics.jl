@@ -57,9 +57,9 @@ end
 @testset "fixpoint_sub maxiters" begin
     @variables x y
     expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x))
-    @test isequal(expr, x)
-    expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9)
     @test isequal(expr, y)
+    expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9)
+    @test isequal(expr, x)
 end
 
 @testset "Issue#1342 substitute working on called symbolics" begin

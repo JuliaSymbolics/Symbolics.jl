@@ -20,6 +20,7 @@ end
 const RCNum = Union{Num, Complex{Num}}
 
 SymbolicUtils.unwrap(x::Num) = x.val
+SU.infer_vartype(::Type{Num}) = VartypeT
 
 """
     Num(val)

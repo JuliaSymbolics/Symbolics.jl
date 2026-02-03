@@ -21,6 +21,8 @@ function SymbolicUtils.unwrap(a::Complex{<:Num})
     return Term{VartypeT}(complex, SymbolicUtils.ArgsT{vartype(re)}((re, img)); type = Complex{sT}, shape = SymbolicUtils.ShapeVecT())
 end
 
+SymbolicUtils.infer_vartype(::Type{Complex{Num}}) = VartypeT
+
 function Base.Complex{Num}(x::BasicSymbolic{VartypeT})
     Complex{Num}(wrap(real(x)), wrap(imag(x)))
 end

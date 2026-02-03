@@ -34,6 +34,7 @@ wraps_type(::Type{S}) where {T, S <: SymStruct{T}} = T
 iswrapped(::SymStruct{T}) where {T} = true
 
 SymbolicUtils.unwrap(x::SymStruct) = getfield(x, 1)
+SymbolicUtils.infer_vartype(::Type{SymStruct{T}}) where {T} = VartypeT
 
 function field_shape end
 
