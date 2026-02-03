@@ -370,6 +370,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     if !isnothing(optimize) 
         iip_expr = apply_optimization_rules(iip_expr, states, optimize)
+        oop_expr = apply_optimization_rules(oop_expr, states, optimize)
     end
 
     oop_expr = conv(oop_expr, states)
