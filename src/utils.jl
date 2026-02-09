@@ -26,7 +26,7 @@ function is_singleton(e)
         op = operation(e)
         op === getindex && return true
         iscall(op) && return is_singleton(op) # recurse to reach getindex for array element variables
-        return issym(op)
+        return issym(op) && !SymbolicUtils.is_function_symbolic(op)
     else
         return issym(e)
     end
