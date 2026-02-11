@@ -21,31 +21,6 @@ is_derivative
     need a registered derivative. For more information, see the
     [function registration](@ref function_registration) page.
 
-## Substitution in Derivative Expressions
-
-As of Symbolics.jl v7, [`substitute`](@ref) no longer recurses into the arguments of
-`Differential` expressions. For example, `substitute(D(x), Dict(x => y))` will return
-`D(x)` unchanged. This is because SymbolicUtils.jl v4 treats `Operator` subclasses
-(including `Differential`) as substitution boundaries by default.
-
-To substitute inside `Differential` applications, use [`substitute_in_deriv`](@ref) or
-[`substitute_in_deriv_and_depvar`](@ref):
-
-```julia
-using Symbolics
-@variables t x(t) y(t)
-D = Differential(t)
-
-substitute(D(x), Dict(x => y))                   # D(x) — does NOT penetrate
-substitute_in_deriv(D(x), Dict(x => y))           # D(y) — penetrates Differential
-substitute_in_deriv_and_depvar(D(x), Dict(x => y)) # D(y) — also penetrates dependent variables
-```
-
-```@docs
-Symbolics.substitute_in_deriv
-Symbolics.substitute_in_deriv_and_depvar
-```
-
 ## High-Level Differentiation Functions
 
 The following functions are not exported and thus must be accessed in a namespaced
