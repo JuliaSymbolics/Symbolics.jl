@@ -116,7 +116,13 @@ include("complex.jl")
 Performs the substitution on `expr` according to rule(s) `s`.
 If `fold=Val(false)`, expressions which can be evaluated won't be evaluated.
 
-See also: [`substitute_in_deriv`](@ref), [`substitute_in_deriv_and_depvar`](@ref).
+!!! warning "Does not penetrate `Differential`"
+    As of Symbolics.jl v7 (SymbolicUtils.jl v4), `substitute` does **not** recurse into
+    the arguments of `Differential` expressions. For example,
+    `substitute(D(x), Dict(x => y))` returns `D(x)`, not `D(y)`.
+    Use [`substitute_in_deriv`](@ref) or [`substitute_in_deriv_and_depvar`](@ref) to
+    substitute inside `Differential` applications.
+
 
 # Examples
 
