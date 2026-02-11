@@ -123,7 +123,6 @@ If `fold=Val(false)`, expressions which can be evaluated won't be evaluated.
     Use [`substitute_in_deriv`](@ref) or [`substitute_in_deriv_and_depvar`](@ref) to
     substitute inside `Differential` applications.
 
-See also: [`substitute_in_deriv`](@ref), [`substitute_in_deriv_and_depvar`](@ref).
 
 # Examples
 
