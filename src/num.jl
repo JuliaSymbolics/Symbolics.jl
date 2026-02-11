@@ -289,6 +289,12 @@ function LinearAlgebra.lu(
     sym_lu(x; check = check)
 end
 
+function LinearAlgebra.lu(
+        x::Union{Adjoint{<:RCNum}, Transpose{<:RCNum}, Array{<:RCNum}},
+        pivot::Union{LinearAlgebra.PivotingStrategy, Val}; check = true, kw...)
+    sym_lu(x; check = check)
+end
+
 Code.cse(x::Num) = Code.cse(unwrap(x))
 
 ## Documentation

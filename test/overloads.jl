@@ -93,7 +93,7 @@ J = Num[Dx(eqs[1].rhs) Dy(eqs[1].rhs) Dz(eqs[1].rhs)
 
 J = expand_derivatives.(J)
 using LinearAlgebra
-luJ = lu(J,Val(false))
+luJ = lu(J, NoPivot())
 
 @variables M[1:2,1:2]
 inv(M)
