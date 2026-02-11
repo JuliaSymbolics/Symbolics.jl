@@ -15,6 +15,12 @@ and easily understandable to all Julia programmers.
 SymbolicUtils.substitute
 SymbolicUtils.simplify
 ```
+
+!!! note "`substitute` does not penetrate `Differential`"
+    As of Symbolics.jl v7, `substitute` no longer recurses into `Differential` arguments.
+    Use [`substitute_in_deriv`](@ref) or [`substitute_in_deriv_and_depvar`](@ref) instead.
+    See the [Derivatives](@ref) page for details.
+
 Documentation for `rewriter` can be found [here](https://docs.sciml.ai/SymbolicUtils/stable/manual/rewrite/#Rule-based-rewriting), using the `@rule` macro or the `@acrule` macro from SymbolicUtils.jl.
 
 ## Functionality Provided by SymPy.jl Integration
