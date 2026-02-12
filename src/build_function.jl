@@ -6,7 +6,11 @@ struct JuliaTarget <: BuildTargets end
 struct StanTarget <: BuildTargets end
 struct CTarget <: BuildTargets end
 struct MATLABTarget <: BuildTargets end
-struct ReactantTarget <: BuildTargets end
+struct ReactantTarget{R} <: BuildTargets
+    compile_options::R
+end
+
+ReactantTarget() = ReactantTarget(nothing)
 
 abstract type ParallelForm end
 struct SerialForm <: ParallelForm end
