@@ -333,6 +333,10 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 collect(args[1])::Vector{SymbolicT}, collect(args[2])::Vector{SymbolicT}
             )
         end
+        BSImpl.ArrayOp(; output_idx) && if isempty(output_idx) end => begin
+            # Some sort of `mapreduce`
+            arg = SymbolicUtils.scalarize(arg)::SymbolicT
+        end
         _ => nothing
     end
     occursin_info(D.x, arg) || return COMMON_ZERO

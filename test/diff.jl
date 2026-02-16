@@ -674,3 +674,11 @@ end
     @test isequal(Symbolics.derivative(dot(y, x), x[1]), y[1])
     @test isequal(Symbolics.derivative(dot(y, x), y[1]), x[1])
 end
+
+@testset "Derivative of `mapreduce` and similar arrayops" begin
+    @variables x[1:3] y[1:3]
+    @test isequal(Symbolics.derivative(sum(x), x[1]), Symbolics.SConst(1))
+    @test isequal(Symbolics.derivative(prod(x), x[1]), x[2]*x[3])
+    ex = @arrayop () x[i] * y[i]
+    @test isequal(Symbolics.derivative(ex, x[1]), y[1])
+end
