@@ -316,6 +316,29 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         return arg
     end
     isequal(arg, D.x) && return COMMON_ONE
+    @match arg begin
+        BSImpl.Term(; f, args, shape) && if f === (*) && length(args) == 2 && isempty(shape) end => begin
+            @match args[1] begin
+                BSImpl.Term(; f = f2, args = args2) && if f2 === adjoint end => begin
+                    arg = LinearAlgebra.dot(
+                        collect(args2[1])::Vector{SymbolicT},
+                        collect(args[2])::Vector{SymbolicT}
+                    )
+                end
+                _ => nothing
+            end
+        end
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.dot end => begin
+            arg = LinearAlgebra.dot(
+                collect(args[1])::Vector{SymbolicT}, collect(args[2])::Vector{SymbolicT}
+            )
+        end
+        BSImpl.ArrayOp(; output_idx) && if isempty(output_idx) end => begin
+            # Some sort of `mapreduce`
+            arg = SymbolicUtils.scalarize(arg)::SymbolicT
+        end
+        _ => nothing
+    end
     occursin_info(D.x, arg) || return COMMON_ZERO
 
     # We can safely assume `arg` is scalar, else `occursin_info` would have errored.

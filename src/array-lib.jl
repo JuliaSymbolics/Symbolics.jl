@@ -144,6 +144,10 @@ Base.exp(m::Matrix{Complex{Num}}) = Arr{Complex{Num}, 2}(exp(SConst(m)))
 SymbolicUtils.@map_methods Arr unwrap wrap
 SymbolicUtils.@mapreduce_methods Arr unwrap wrap
 
+function LinearAlgebra.dot(x::Arr{T}, y::Arr{T}) where {T}
+    T(LinearAlgebra.dot(unwrap(x), unwrap(y)))
+end
+
 #################### REGISTRATION ################
 
 @register_array_symbolic LinearAlgebra.triu(x::AbstractArray) begin
