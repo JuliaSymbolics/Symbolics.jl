@@ -442,7 +442,7 @@ function (lex::LinearExpander)(t::SymbolicT)
                 # when indexing a registered function/callable symbolic
                 # scalarizing and indexing leads to the same symbolic variable
                 # which causes a StackOverflowError without this
-                isequal(t, indexed_t) && return (COMMON_ZERO, t, true)
+                isequal(t, indexed_t) && return (COMMON_ZERO, COMMON_ZERO, false)
                 return _linear_expansion_recurse(lex, indexed_t)
             elseif f === ifelse
                 cond, iftrue, iffalse = args
