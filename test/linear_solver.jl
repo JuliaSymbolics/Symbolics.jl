@@ -154,3 +154,16 @@ end
     @test isequal(b, 9y^2)
     @test islin
 end
+
+matmulwrapper(a, b) = a * b
+@register_array_symbolic matmulwrapper(a::AbstractMatrix{Real}, b::AbstractVector{Real}) begin
+    size = size(b)
+    eltype = eltype(a)
+    ndims = 1
+end
+
+@testset "`linear_expansion` with `@register_array_symbolic`" begin
+    @variables x[1:3] p[1:3, 1:3]
+    ex = matmulwrapper(p, x)
+    @test !Symbolics.linear_expansion(ex[1], x[1])[3]
+end
