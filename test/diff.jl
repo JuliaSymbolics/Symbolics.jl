@@ -667,3 +667,10 @@ end
     @test isequal(Symbolics.derivative(y'x, x[1]), y[1])
     @test isequal(Symbolics.derivative(y'x, y[1]), x[1])
 end
+
+@testset "Derivative of `LinearAlgebra.dot`" begin
+    @variables x[1:3] y[1:3]
+    @test isequal(Symbolics.derivative(dot(x, x), x[1]), 2x[1])
+    @test isequal(Symbolics.derivative(dot(y, x), x[1]), y[1])
+    @test isequal(Symbolics.derivative(dot(y, x), y[1]), x[1])
+end

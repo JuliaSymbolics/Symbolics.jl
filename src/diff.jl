@@ -328,6 +328,11 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 _ => nothing
             end
         end
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.dot end => begin
+            arg = LinearAlgebra.dot(
+                collect(args[1])::Vector{SymbolicT}, collect(args[2])::Vector{SymbolicT}
+            )
+        end
         _ => nothing
     end
     occursin_info(D.x, arg) || return COMMON_ZERO
