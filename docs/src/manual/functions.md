@@ -116,9 +116,9 @@ Querying the rules defined using this method requires the use of [`@derivative_r
 ### Registration of Array Functions
 
 Similar to scalar functions, array functions can be registered to define new primitives for
-functions which either take in or return arrays. This is done by using the `@register_array_symbolic`
+functions which return arrays. This is done by using the `@register_array_symbolic`
 macro. It acts similarly to the scalar function registration but requires a calculation of the
-input and output sizes. For example, let's assume we wanted to have a function that computes the
+output sizes. For example, let's assume we wanted to have a function that computes the
 solution to `Ax = b`, i.e. a linear solve, using an SVD factorization. In Julia, the code for this
 would be `svdsolve(A,b) = svd(A)\b`. We would create this function as follows:
 
