@@ -1678,6 +1678,6 @@ version = "1.13.0+0"
 
 [[deps.z3_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "GMP_jll", "JLLWrappers", "Libdl", "libcxxwrap_julia_jll"]
-git-tree-sha1 = "05b2581d181288b40ed291e4fa332bee3d3eab98"
+git-tree-sha1 = "4e2c8f811e46a40416778b2057a562582d9221f4"
 uuid = "1bc4e1ec-7839-5212-8f2f-0d16b7bd09bc"
-version = "4.15.8+0"
+version = "4.16.0+0"
