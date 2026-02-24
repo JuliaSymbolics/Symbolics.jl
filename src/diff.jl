@@ -415,6 +415,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 base, exp = args
                 prod_args = (exp, (base ^ Const{VartypeT}(exp - 1))::BasicSymbolic{VartypeT}, executediff(D, base; simplify, throw_no_derivative))
                 return SymbolicUtils.mul_worker(VartypeT, prod_args)
+            elseif f isa SymbolicUtils.Operator # operator applications return a new variable
+                return COMMON_ZERO
             else
                 inner_args = arguments(arg)
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
