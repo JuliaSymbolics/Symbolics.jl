@@ -682,3 +682,11 @@ end
     ex = @arrayop () x[i] * y[i]
     @test isequal(Symbolics.derivative(ex, x[1]), y[1])
 end
+
+struct Op <: SymbolicUtils.Operator end
+
+@testset "Derivative of non-`Differential` operators" begin
+    @variables x
+    ex = Symbolics.STerm(Op(), [x]; type = Real, shape = UnitRange{Int}[])
+    @test SymbolicUtils._iszero(Symbolics.derivative(ex, x))
+end
