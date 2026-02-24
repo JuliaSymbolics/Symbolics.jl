@@ -87,6 +87,12 @@ end
 function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs::PolyadicT...) where {T <: Number}
     return *(a, unwrap(b), unwrap(c), bs...)
 end
+function *(a::LinearAlgebra.Transpose{T, <: AbstractVector}, b::Arr, bs::PolyadicT...) where {T <: Real}
+    return *(a, unwrap(b), bs...)
+end
+function *(a::LinearAlgebra.Transpose{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs::PolyadicT...) where {T <: Real}
+    return *(a, unwrap(b), unwrap(c), bs...)
+end
 function *(a::Number, b::Arr, bs::PolyadicT...)
     return *(unwrap(a), unwrap(b), bs...)
 end
@@ -138,6 +144,10 @@ Base.:(/)(x1::Num, x2::Arr{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
 
 Base.exp(m::Matrix{Num}) = Arr{Num, 2}(exp(SConst(m)))
 Base.exp(m::Matrix{Complex{Num}}) = Arr{Complex{Num}, 2}(exp(SConst(m)))
+
+function LinearAlgebra.transpose(x::Arr{T, N}) where {T, N}
+    return Arr{T, 2}(LinearAlgebra.transpose(unwrap(x)))
+end
 
 #################### MAP-REDUCE ################
 
