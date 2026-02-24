@@ -535,3 +535,12 @@ end
     @test isequal(exp(x), wrap(exp(unwrap(x))))
     @test isequal(exp(collect(x)), exp(SConst(collect(unwrap(x)))))
 end
+
+@testset "`transpose(::Arr) * Arr`" begin
+    @variables x[1:3]
+    t = transpose(x)
+    @test t isa Symbolics.Arr{Num, 2}
+    @test isequal(unwrap(t), transpose(unwrap(x)))
+
+    @test_nowarn t * x
+end
