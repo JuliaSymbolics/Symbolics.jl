@@ -446,6 +446,13 @@ end
     @register_symbolic foo1(x::AbstractVector{Int})
 end
 
+@testset "`@register_symbolic` without `using Symbolics`" begin
+    m = Module()
+    Base.eval(m, :(using Symbolics: @register_symbolic))
+    Base.eval(m, :(f(a, b, c) = a + b + c))
+    @test_nowarn Base.eval(m, :(@register_symbolic f(a::Real, b::Real, c::Real)::Real))
+end
+
 @testset "`@register_array_symbolic` works without size" begin
     @register_array_symbolic foo3(x) begin
         eltype = Real
