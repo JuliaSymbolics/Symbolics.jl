@@ -673,17 +673,17 @@ end
 
 function jacobian(ops, vars; simplify=false, kwargs...)
     ops = vec(scalarize(ops))
-    if ops isa Vector{Num}
-        ops = unwrap.(ops)::Vector{SymbolicT}
-    elseif ops isa Vector{SymbolicT}
+    if ops isa AbstractVector{Num}
+        ops = unwrap.(ops)::AbstractVector{SymbolicT}
+    elseif ops isa AbstractVector{SymbolicT}
     else
-        ops = ops::Vector{eltype(ops)}
+        ops = ops::AbstractVector{eltype(ops)}
     end
     # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
     vars = vec(scalarize(vars))
-    if vars isa Vector{Num}
-        vars = unwrap.(vars)::Vector{SymbolicT}
-    elseif vars isa Vector{SymbolicT}
+    if vars isa AbstractVector{Num}
+        vars = unwrap.(vars)::AbstractVector{SymbolicT}
+    elseif vars isa AbstractVector{SymbolicT}
     else
         error("This should not happen! `vars` must be convertible to Vector{SymbolicT}. \nReceived vars = $vars")
     end
