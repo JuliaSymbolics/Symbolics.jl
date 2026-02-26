@@ -201,6 +201,8 @@ export groebner_basis, is_groebner_basis
 include("taylor.jl")
 export series, taylor, taylor_coeff
 
+include("array-rules.jl")
+
 import Libdl
 include("build_function.jl")
 export build_function
