@@ -111,10 +111,10 @@ include("rewrite-helpers.jl")
 include("complex.jl")
 
 """
-    substitute(expr, s; fold=Val(true))
+    substitute(expr, s; fold=Val(false))
 
 Performs the substitution on `expr` according to rule(s) `s`.
-If `fold=Val(false)`, expressions which can be evaluated won't be evaluated.
+If `fold=Val(true)`, expressions which can be fully evaluated will be evaluated to a number.
 
 !!! warning "Does not penetrate `Differential`"
     As of Symbolics.jl v7 (SymbolicUtils.jl v4), `substitute` does **not** recurse into
@@ -137,8 +137,10 @@ julia> ex = x + y + sin(z)
 (x + y) + sin(z(t))
 julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
 (z(t) + y) + (z(t) ^ 2)
-julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(false))
+julia> substitute(sqrt(2x), Dict([x => 1]))
 sqrt(2)
+julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(true))
+1.4142135623730951
 ```
 """
 substitute
