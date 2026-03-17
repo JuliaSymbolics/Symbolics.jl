@@ -333,6 +333,14 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 collect(args[1])::Vector{SymbolicT}, collect(args[2])::Vector{SymbolicT}
             )
         end
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.norm end => begin
+            add_buffer = SArgsT()
+            arr = args[1]
+            for i in SymbolicUtils.stable_eachindex(arr)
+                push!(add_buffer, abs2(arr[i]))
+            end
+            arg = sqrt(SymbolicUtils.add_worker(VartypeT, add_buffer))
+        end
         BSImpl.ArrayOp(; output_idx) && if isempty(output_idx) end => begin
             # Some sort of `mapreduce`
             arg = SymbolicUtils.scalarize(arg)::SymbolicT
