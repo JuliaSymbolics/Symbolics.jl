@@ -690,3 +690,13 @@ struct Op <: SymbolicUtils.Operator end
     ex = Symbolics.STerm(Op(), [x]; type = Real, shape = UnitRange{Int}[])
     @test SymbolicUtils._iszero(Symbolics.derivative(ex, x))
 end
+
+@testset "Derivative of `LinearAlgebra.norm`" begin
+    @variables x[1:3] y[1:3, 1:3]
+    for i in 1:3
+        @test isequal(Symbolics.derivative(norm(x), x[i]), Symbolics.derivative(norm(collect(x)), x[i]))
+    end
+    for i in 1:3, j in 1:3
+        @test isequal(Symbolics.derivative(norm(y), y[i, j]), Symbolics.derivative(norm(collect(y)), y[i, j]))
+    end
+end
