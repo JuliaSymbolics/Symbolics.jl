@@ -1225,16 +1225,18 @@ version = "0.34.10"
 
 [[deps.StructUtils]]
 deps = ["Dates", "UUIDs"]
-git-tree-sha1 = "28145feabf717c5d65c1d5e09747ee7b1ff3ed13"
+git-tree-sha1 = "fa95b3b097bcef5845c142ea2e085f1b2591e92c"
 uuid = "ec057cc2-7a8d-4b58-b3b3-92acb9f63b42"
-version = "2.6.3"
+version = "2.7.1"
 
     [deps.StructUtils.extensions]
     StructUtilsMeasurementsExt = ["Measurements"]
+    StructUtilsStaticArraysCoreExt = ["StaticArraysCore"]
     StructUtilsTablesExt = ["Tables"]
 
     [deps.StructUtils.weakdeps]
     Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
+    StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
     Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 
 [[deps.StyledStrings]]
@@ -1390,9 +1392,9 @@ uuid = "1cfade01-22cf-5700-b092-accc4b62d6e1"
 version = "0.4.1"
 
 [[deps.UnsafeAtomics]]
-git-tree-sha1 = "b13c4edda90890e5b04ba24e20a310fbe6f249ff"
+git-tree-sha1 = "0f30765c32d66d58e41f4cb5624d4fc8a82ec13b"
 uuid = "013be700-e6cd-48c3-b4a1-df204f14c38f"
-version = "0.3.0"
+version = "0.3.1"
 
     [deps.UnsafeAtomics.extensions]
     UnsafeAtomicsLLVM = ["LLVM"]
