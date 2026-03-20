@@ -163,16 +163,19 @@ end
 @register_array_symbolic LinearAlgebra.triu(x::AbstractArray) begin
     size = size(x)
     eltype = eltype(x)
+    ndims = ndims(x)
 end
 
 @register_array_symbolic LinearAlgebra.tril(x::AbstractArray) begin
     size = size(x)
     eltype = eltype(x)
+    ndims = ndims(x)
 end
 
 @register_array_symbolic LinearAlgebra.normalize(x::AbstractArray) begin
     size = size(x)
     eltype = eltype(x)
+    ndims = ndims(x)
 end
 
 @register_symbolic LinearAlgebra.tr(x::AbstractMatrix)
