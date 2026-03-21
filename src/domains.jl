@@ -1,4 +1,5 @@
-import DomainSets: Domain, Interval, AbstractInterval
+import DomainSets: Domain, Interval, AbstractInterval, infimum, supremum,
+    leftendpoint, rightendpoint
 import Symbolics: value, Sym, Term, Num
 
 struct VarDomainPairing
@@ -17,10 +18,10 @@ Base.:∈(variable::DomainedVar,domain::NTuple{2,Real}) = VarDomainPairing(varia
 # Multiple variables
 Base.:∈(variables::NTuple{N,DomainedVar},domain::Domain) where N = VarDomainPairing(unwrap.(variables),domain)
 
-function infimum(d::AbstractInterval{<:Num})
+function DomainSets.infimum(d::AbstractInterval{<:Num})
     leftendpoint(d)
 end
 
-function supremum(d::AbstractInterval{<:Num})
+function DomainSets.supremum(d::AbstractInterval{<:Num})
     rightendpoint(d)
 end
