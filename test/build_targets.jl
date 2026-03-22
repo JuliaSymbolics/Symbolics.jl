@@ -52,7 +52,12 @@ let
     @variables x y t
     expression = x + y + t
     cfunc = build_function(expression, [x], [y], t; target = Symbolics.CTarget(), expression = Val{true})
-    @test_reference "target_functions/scalar1.c" cfunc
+
+    @test occursin("void diffeqf(double* du, const double* RHS1, const double* RHS2, const double RHS3)", cfunc)
+    m = match(r"du\[0\] = (.+);", cfunc)
+    @test m !== nothing
+    terms = sort(strip.(split(m[1], "+")))
+    @test terms == ["RHS1[0]", "RHS2[0]", "RHS3"]
 end
 
 # Scalar CTarget test with scalar multiplication and powers
@@ -81,7 +86,17 @@ let
     expression = x + y + z
     sfunc = build_function(expression, vcat(x,y), [z], t; target = Symbolics.StanTarget(), expression = Val{true})
 
-    @test_reference "target_functions/scalar1.stan" sfunc
+    # Term ordering in additions depends on hash-based sorting which is
+    # non-deterministic across Julia processes, so we check structurally
+    # rather than using an exact reference file.
+    @test occursin("vector diffeqf(real t,vector internal_var___u,vector internal_var___p)", sfunc)
+    @test occursin("vector[1] internal_var___du;", sfunc)
+    @test occursin("return internal_var___du;", sfunc)
+    # Check that the RHS contains exactly the expected terms
+    m = match(r"internal_var___du\[1\] = (.+);", sfunc)
+    @test m !== nothing
+    terms = sort(strip.(split(m[1], "+")))
+    @test terms == ["internal_var___p[1]", "internal_var___u[1]", "internal_var___u[2]"]
 end
 
 # Matrix MATLABTarget test
@@ -100,5 +115,9 @@ let
     expression = x + y + z
     mfunc = build_function(expression, vcat(x,y,z); target = Symbolics.MATLABTarget(), expression = Val{true})
 
-    @test_reference "target_functions/scalar1.m" mfunc
+    @test occursin("diffeqf = @(internal_var___t,internal_var___u)", mfunc)
+    m = match(r"\[\s*(.+);", mfunc)
+    @test m !== nothing
+    terms = sort(strip.(split(m[1], "+")))
+    @test terms == ["internal_var___u(1)", "internal_var___u(2)", "internal_var___u(3)"]
 end
