@@ -32,26 +32,31 @@ function latexify_derivatives(ex)
         if x.args[1] == :_derivative
             num, den, deg = x.args[2:end]
             if num isa Expr && length(num.args) == 2
-                return Expr(:call, :/,
-                            Expr(:call, :*,
-                                 "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")", num
-                                ),
-                            diffdenom(den)
-                           )
+                return Expr(
+                    :call, :/,
+                    Expr(
+                        :call, :*,
+                        "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")", num
+                    ),
+                    diffdenom(den)
+                )
             else
-                return Expr(:call, :*,
-                            Expr(:call, :/,
-                                 "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")",
-                                 diffdenom(den)
-                                ),
-                            num
-                           )
+                return Expr(
+                    :call, :*,
+                    Expr(
+                        :call, :/,
+                        "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")",
+                        diffdenom(den)
+                    ),
+                    num
+                )
             end
-    elseif x.args[1] === :_integral
-        lower, upper, var_of_int, integrand = x.args[2:end]
-        lower_s = strip(latexify(lower).s, '\$')
-        upper_s = strip(latexify(upper).s, '\$')
-        return Expr(:call, :*,
+        elseif x.args[1] === :_integral
+            lower, upper, var_of_int, integrand = x.args[2:end]
+            lower_s = strip(latexify(lower).s, '\$')
+            upper_s = strip(latexify(upper).s, '\$')
+            return Expr(
+                :call, :*,
                 "\\int_{$lower_s}^{$upper_s)}",
                 var_of_int,
                 integrand
@@ -126,7 +131,7 @@ end
     has_connections = any(x -> hide_lhs(value(x.lhs)), eqs)
     if has_connections
         env --> :equation
-        return map(first∘first∘Latexify.apply_recipe, eqs)
+        return map(first ∘ first ∘ Latexify.apply_recipe, eqs)
     else
         env --> :align
         return wrap.(getfield.(eqs, :lhs)), wrap.(getfield.(eqs, :rhs))
@@ -176,7 +181,7 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
                     pushfirst!(numer, Expr(:call, :^, _toexpr(base), _toexpr(pow)))
                 end
             else
-                newpow = -1*pow
+                newpow = -1 * pow
                 if SymbolicUtils._isone(newpow)
                     pushfirst!(denom, _toexpr(base))
                 else
@@ -206,12 +211,12 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
             return frac_expr
         end
     end
-    if SymbolicUtils.issym(O) 
+    if SymbolicUtils.issym(O)
         sym = string(nameof(O))
         sym = replace(sym, Symbolics.NAMESPACE_SEPARATOR => ".")
 
         # override if the sym has its own latex wrapper
-        symwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) : 
+        symwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) :
             latexwrapper
         sym = symwrapper(sym)
         return Symbol(sym)
@@ -220,21 +225,21 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
 
     op = operation(O)
     args = sorted_arguments(O)
-    latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) : 
+    latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) :
         default_latex_wrapper
 
-    if (op===(*)) && (args[1] === -1)
+    if (op === (*)) && (args[1] === -1)
         arg_mul = Expr(:call, :(*), _toexpr(args[2:end])...)
         return Expr(:call, :(-), arg_mul)
     end
 
     if op isa Differential
-      #  DERIVATIVES LOGIC
+        #  DERIVATIVES LOGIC
         num = args[1]
-        diff_var = op.x 
-        
+        diff_var = op.x
+
         deg = op.order
-        
+
         while iscall(num) && operation(num) isa Differential && isequal(operation(num).x, diff_var)
             inner_op = operation(num)
             deg += inner_op.order
@@ -242,7 +247,7 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
         end
 
         den = deg > 1 ? (diff_var^deg) : diff_var
-        return :(_derivative($(_toexpr(num)), $den, $deg))   
+        return :(_derivative($(_toexpr(num)), $den, $deg))
 
     elseif op isa Integral
         lower = op.domain.domain.left
@@ -273,10 +278,10 @@ _toexpr(x::Integer; latexwrapper = default_latex_wrapper) = x
 _toexpr(x::AbstractFloat; latexwrapper = default_latex_wrapper) = x
 
 function _toexpr(eq::Equation; latexwrapper = default_latex_wrapper)
-    Expr(:(=), _toexpr(eq.lhs), _toexpr(eq.rhs))
+    return Expr(:(=), _toexpr(eq.lhs), _toexpr(eq.rhs))
 end
 
-_toexpr(eqs::AbstractArray; latexwrapper = default_latex_wrapper) = map(eq->_toexpr(eq), eqs)
+_toexpr(eqs::AbstractArray; latexwrapper = default_latex_wrapper) = map(eq -> _toexpr(eq), eqs)
 _toexpr(x::Num; latexwrapper = default_latex_wrapper) = _toexpr(value(x))
 
 function getindex_to_symbol(t)
@@ -284,12 +289,12 @@ function getindex_to_symbol(t)
     args = sorted_arguments(t)
     idxs = args[2:end]
     O = args[1]
-    latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) : 
+    latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) :
         default_latex_wrapper
 
     # this is to ensure X(t)[1] becomes X_1(t) in Latex
     if iscall(O) && SymbolicUtils.issym(operation(O))
-        oop = operation(O)        
+        oop = operation(O)
         oargs = sorted_arguments(O)
         return :($(_toexpr(oop; latexwrapper))[$(idxs...)]($(_toexpr(oargs)...)))
     else
@@ -299,13 +304,13 @@ end
 
 function diffdenom(e)
     e = unwrap(e)
-    if SymbolicUtils.issym(e)
+    return if SymbolicUtils.issym(e)
         LaTeXString("\\mathrm{d}$e")
     elseif SymbolicUtils.ispow(e)
         base, expo = arguments(e)
         suffix = SymbolicUtils._isone(expo) ? "" : "^{$(expo)}"
         LaTeXString("\\mathrm{d}$(base)$(suffix)")
-   elseif SymbolicUtils.ismul(e)
+    elseif SymbolicUtils.ismul(e)
         LaTeXString(prod(diffdenom(arg).s for arg in arguments(e)))
     else
         LaTeXString("\\mathrm{d}$e")
