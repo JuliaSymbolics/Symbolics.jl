@@ -289,7 +289,7 @@ function getindex_to_symbol(t)
     args = sorted_arguments(t)
     idxs = args[2:end]
     O = args[1]
-    latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) :
+    latexwrapper = (O isa SymbolicUtils.BasicSymbolic && hasmetadata(O, SymLatexWrapper)) ? getmetadata(O, SymLatexWrapper) :
         default_latex_wrapper
 
     # this is to ensure X(t)[1] becomes X_1(t) in Latex
