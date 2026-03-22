@@ -80,3 +80,14 @@ Dy = Differential(y)
 @test_reference "latexify_refs/call_with_metadata.txt" latexify(f)
 
 @test !occursin("identity", latexify(Num(π))) # issue #1254
+
+# issue #1820: hasmetadata should not be called on Vector arguments in getindex
+@testset "getindex with vector argument (#1820)" begin
+    @variables kp
+    # Create an expression that indexes a literal vector of symbolic expressions.
+    # This mimics what happens in piecewise/ifelse expressions with vector results.
+    vec_expr = Symbolics.value.(Symbolics.Num[2kp, 3kp^2, kp + 1])
+    getindex_term = SU.term(getindex, vec_expr, 1; type=SU.SymReal)
+    # This should not throw a MethodError about hasmetadata on Vector
+    @test_nowarn latexify(getindex_term)
+end
