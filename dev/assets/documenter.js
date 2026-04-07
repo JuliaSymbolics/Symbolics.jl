@@ -10,15 +10,15 @@ requirejs.config({
     'highlight-julia-repl': 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/julia-repl.min',
   },
   shim: {
-  "highlight-julia": {
-    "deps": [
-      "highlight"
-    ]
-  },
   "headroom-jquery": {
     "deps": [
       "jquery",
       "headroom"
+    ]
+  },
+  "highlight-julia": {
+    "deps": [
+      "highlight"
     ]
   },
   "highlight-julia-repl": {
@@ -30,25 +30,6 @@ requirejs.config({
 ////////////////////////////////////////////////////////////////////////////////
 require([], function() {
 window.MathJax = {
-  "tex": {
-    "packages": [
-      "base",
-      "ams",
-      "autoload",
-      "mathtools",
-      "require"
-    ],
-    "inlineMath": [
-      [
-        "$",
-        "$"
-      ],
-      [
-        "\\(",
-        "\\)"
-      ]
-    ]
-  },
   "loader": {
     "load": [
       "[tex]/require",
@@ -58,6 +39,25 @@ window.MathJax = {
   "options": {
     "ignoreHtmlClass": "tex2jax_ignore",
     "processHtmlClass": "tex2jax_process"
+  },
+  "tex": {
+    "inlineMath": [
+      [
+        "$",
+        "$"
+      ],
+      [
+        "\\(",
+        "\\)"
+      ]
+    ],
+    "packages": [
+      "base",
+      "ams",
+      "autoload",
+      "mathtools",
+      "require"
+    ]
   }
 };
 
