@@ -155,10 +155,42 @@ Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexif
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:Symbolics.RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 
+"""
+    _toexpr_metadata(O, ::Type{Ctx}, val; latexwrapper) -> Union{Nothing, Any}
+
+Hook for customizing Latexify output based on metadata. Return `nothing` to fall back
+to the default behavior. Use `_toexpr_plain` to bypass this hook when composing output.
+"""
+_toexpr_metadata(::Any, ::DataType, @nospecialize(val); latexwrapper = default_latex_wrapper) = nothing
+
+function _toexpr_metadata(O; latexwrapper = default_latex_wrapper)
+    md = SymbolicUtils.metadata(O)
+    md isa AbstractDict || return nothing
+    for (ctx, val) in md
+        out = _toexpr_metadata(O, ctx, val; latexwrapper)
+        out === nothing || return out
+    end
+    return nothing
+end
+
+"""
+    _toexpr_op(op, args; latexwrapper) -> Union{Nothing, Any}
+
+Hook for customizing Latexify output based on the operation of a call. Return `nothing`
+to fall back to the default behavior.
+"""
+_toexpr_op(@nospecialize(op), args; latexwrapper = default_latex_wrapper) = nothing
+
 # `_toexpr` is only used for latexify
 function _toexpr(O; latexwrapper = default_latex_wrapper)
     O = unwrap(O)
     SymbolicUtils.isconst(O) && return value(O)
+    custom = _toexpr_metadata(O; latexwrapper)
+    custom === nothing || return custom
+    return _toexpr_plain(O; latexwrapper)
+end
+
+function _toexpr_plain(O; latexwrapper = default_latex_wrapper)
     if SymbolicUtils.ismul(O)
         m = O
         numer = Any[]
@@ -227,6 +259,9 @@ function _toexpr(O; latexwrapper = default_latex_wrapper)
     args = sorted_arguments(O)
     latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) :
         default_latex_wrapper
+
+    custom_op = _toexpr_op(op, args; latexwrapper)
+    custom_op === nothing || return custom_op
 
     if (op === (*)) && (args[1] === -1)
         arg_mul = Expr(:call, :(*), _toexpr(args[2:end])...)

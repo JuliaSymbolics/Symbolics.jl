@@ -83,6 +83,23 @@ Dy = Differential(y)
 @variables f(..)
 @test_reference "latexify_refs/call_with_metadata.txt" latexify(f)
 
+struct LatexHookCtx end
+function LatexifyExt._toexpr_metadata(O, ::Type{LatexHookCtx}, val; latexwrapper = LatexifyExt.default_latex_wrapper)
+    inner = LatexifyExt._toexpr_plain(O; latexwrapper)
+    return Expr(:call, :_textbf, inner)
+end
+expr = SU.setmetadata(x + y, LatexHookCtx, true)
+@test occursin("\\textbf", latexify(expr).s)
+
+avgf(x) = x
+function LatexifyExt._toexpr_op(::typeof(avgf), args; latexwrapper = LatexifyExt.default_latex_wrapper)
+    inner = LatexifyExt._toexpr_plain(args[1]; latexwrapper)
+    inner_s = strip(latexify(inner).s, '\$')
+    return LaTeXString("\\langle " * inner_s * " \\rangle")
+end
+avg_expr = SU.term(avgf, x + y)
+@test occursin("\\langle", latexify(avg_expr).s)
+
 @test !occursin("identity", latexify(Num(π))) # issue #1254
 
 # issue #1820: hasmetadata should not be called on Vector arguments in getindex
