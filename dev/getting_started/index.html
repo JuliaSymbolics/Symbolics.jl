@@ -109,7 +109,7 @@ y\left( t \right) \\
 \end{equation}
  \]</p><p><code>t</code> is of type <code>Sym{Real}</code>, but the name <code>x</code> refers to an object that represents the <code>Term</code> <code>x(t)</code>. The operation of this expression is itself the object <code>Sym{FnType{Tuple{Real}, Real}}(:x)</code>. The type <code>Sym{FnType{...}}</code> represents a callable object. In this case specifically, it&#39;s a function that takes 1 Real argument (noted by <code>Tuple{Real}</code>) and returns a <code>Real</code> result. You can call such a callable <code>Sym</code> with either a number or a symbolic expression of a permissible type.</p><p>This expression also defines <code>t</code> as an independent variable, while <code>x(t)</code> and <code>y(t)</code> are dependent variables. This is accounted for in differentiation:</p><pre><code class="language-julia hljs">z = x + y*t
 expand_derivatives(D(z))</code></pre><p class="math-container">\[ \begin{equation}
-\frac{\mathrm{d} ~ x\left( t \right)}{\mathrm{d}t} + y\left( t \right) + t ~ \frac{\mathrm{d} ~ y\left( t \right)}{\mathrm{d}t}
+y\left( t \right) + \frac{\mathrm{d} ~ x\left( t \right)}{\mathrm{d}t} + t ~ \frac{\mathrm{d} ~ y\left( t \right)}{\mathrm{d}t}
 \end{equation}
  \]</p><p>Since <code>x</code> and <code>y</code> are time-dependent, they are not automatically eliminated from the expression, and thus the <code>D(x)</code> and <code>D(y)</code> operations still exist in the expanded derivatives for correctness.</p><p>We can also define unrestricted functions:</p><pre><code class="language-julia hljs">@variables g(..)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">1-element Vector{Symbolics.CallAndWrap{Num}}:
  g⋆</code></pre><p>Here, <code>g</code> is a variable that is a function of other variables. Any time that we reference <code>g</code> we have to utilize it as a function:</p><pre><code class="language-julia hljs">z = g(x) + g(y)</code></pre><p class="math-container">\[ \begin{equation}
@@ -141,7 +141,7 @@ Base.remove_linenums!.(f_expr)</code></pre><pre class="documenter-example-output
   end), :(function (ˍ₋out, ˍ₋arg1)
       <span class="sgr90">#= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:383 =#</span> @inbounds begin
               begin
-                  <span class="sgr90">#= /home/runner/.julia/packages/SymbolicUtils/6HFeR/src/code.jl:1110 =#</span> @inbounds begin
+                  <span class="sgr90">#= /home/runner/.julia/packages/SymbolicUtils/uHteK/src/code.jl:1110 =#</span> @inbounds begin
                           ˍ₋out[1] = (+)(ˍ₋arg1[2], (^)(ˍ₋arg1[1], 2))
                           ˍ₋out[2] = (+)(ˍ₋arg1[1], (^)(ˍ₋arg1[2], 2))
                           ˍ₋out
@@ -161,7 +161,7 @@ out</code></pre><pre class="documenter-example-output"><code class="nohighlight 
               #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:381 =#
               begin
                   begin
-                      #= /home/runner/.julia/packages/SymbolicUtils/6HFeR/src/code.jl:1175 =#
+                      #= /home/runner/.julia/packages/SymbolicUtils/uHteK/src/code.jl:1175 =#
                       (SymbolicUtils.Code.create_array)(typeof(ˍ₋arg1), nothing, Val{1}(), Val{(2,)}(), (+)(ˍ₋arg1[2], (^)(ˍ₋arg1[1], 2)), (+)(ˍ₋arg1[1], (^)(ˍ₋arg1[2], 2)))
                   end
               end
@@ -176,14 +176,14 @@ show(A)</code></pre><pre class="documenter-example-output"><code class="nohighli
                       begin
                           (Symbolics.var&quot;#noop#recursive_split##4&quot;())(map(fetch, (begin
                                           let
-                                              task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#291&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0xc437a4e9, 0x1a2dd571, 0xb85e886a, 0xdbb7134b, 0xda2ddf4a), Nothing}(nothing), (var&quot;##out#291&quot;, ˍ₋arg1)))
+                                              task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#291&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x7d7cb695, 0x96bc0cda, 0x2bb666da, 0xbaa28cf3, 0xcd0b1f8e), Nothing}(nothing), (var&quot;##out#291&quot;, ˍ₋arg1)))
                                               task.sticky = false
                                               Base.schedule(task)
                                               task
                                           end
                                       end, begin
                                           let
-                                              task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#291&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x140fdd56, 0xe81ba172, 0x29abc14a, 0x1afe8bfc, 0x741875dc), Nothing}(nothing), (var&quot;##out#291&quot;, ˍ₋arg1)))
+                                              task = Base.Task((Symbolics.Funcall)(RuntimeGeneratedFunctions.RuntimeGeneratedFunction{(Symbol(&quot;##out#291&quot;), :ˍ₋arg1), Symbolics.var&quot;#_RGF_ModTag&quot;, Symbolics.var&quot;#_RGF_ModTag&quot;, (0x98e4ffa1, 0x011d0c0f, 0x0efa028e, 0xba03e59a, 0x2e2adb3f), Nothing}(nothing), (var&quot;##out#291&quot;, ˍ₋arg1)))
                                               task.sticky = false
                                               Base.schedule(task)
                                               task
@@ -215,8 +215,8 @@ out = sparse(rows, cols, zeros(length(cols)), size(sj)...) # pre-allocate, and c
 myf = eval(last(f_expr))
 myf(out, rand(N)) # note that out matches the sparsity structure of sj
 out</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20×10 SparseArrays.SparseMatrixCSC{Float64, Int64} with 16 stored entries:
-⎡⠈⠀⠀⠐⠀⎤
-⎢⠀⠐⠀⠂⠐⎥
-⎢⠠⠈⠀⠀⠀⎥
-⎢⠂⡀⠉⠀⠀⎥
-⎣⠠⠀⡈⠠⠂⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Friday 10 April 2026 05:58">Friday 10 April 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+⎡⠀⠠⠀⠀⠀⎤
+⎢⠈⠂⠀⠄⠔⎥
+⎢⠐⠀⡀⠀⠀⎥
+⎢⠀⡁⠄⠄⢀⎥
+⎣⠈⠀⠄⠁⠀⎦</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../tutorials/auto_parallel/">Automated Sparse Parallelism of Julia Functions via Tracing »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Friday 17 April 2026 09:23">Friday 17 April 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
