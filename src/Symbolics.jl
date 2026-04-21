@@ -200,6 +200,12 @@ export symbolic_linear_solve, solve_for
 include("groebner_basis.jl")
 export groebner_basis, is_groebner_basis
 
+include("polynomial_algebra.jl")
+export resultant, discriminant, sqrfree
+# NOTE: `Symbolics.factor` coexists with `Base.factor` / `Primes.factor`;
+# dispatches on Num/BasicSymbolic. Not exported by name to avoid shadowing
+# users' existing `using Primes` or `using Base` calls at the REPL.
+
 include("taylor.jl")
 export series, taylor, taylor_coeff
 

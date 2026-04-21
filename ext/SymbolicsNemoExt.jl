@@ -29,11 +29,38 @@ function nemo_crude_evaluate(poly::Nemo.MPolyRingElem, varmap)
 end
 
 function nemo_crude_evaluate(poly::Nemo.FracElem, varmap)
-    nemo_crude_evaluate(numerator(poly), varmap) // nemo_crude_evaluate(denominator(poly), varmap)
+    num = nemo_crude_evaluate(numerator(poly), varmap)
+    den = nemo_crude_evaluate(denominator(poly), varmap)
+    # Collapse integer-valued fractions (n//1 → n) so returned expressions
+    # don't carry noisy `1//1` constants — purely a presentation concern;
+    # mathematically identical.
+    if den isa Integer && den == 1
+        return num
+    end
+    num // den
+end
+
+# Nemo's QQFieldElem is the concrete rational type returned as coefficients
+# of polynomials over ℚ. Without this specific method, the FracElem dispatch
+# above would still handle it, but going through `QQFieldElem` directly is
+# cheaper and makes the narrowing explicit.
+function nemo_crude_evaluate(poly::Nemo.QQFieldElem, varmap)
+    n = BigInt(numerator(poly))
+    d = BigInt(denominator(poly))
+    if d == 1
+        return typemin(Int) <= n <= typemax(Int) ? Int(n) : n
+    end
+    return Rational{BigInt}(n, d)
 end
 
 function nemo_crude_evaluate(poly::Nemo.ZZRingElem, varmap)
-    Rational(poly)
+    # Nemo's integer elements were historically wrapped in a Rational; that
+    # leaked into downstream expressions as `n//1` constants which display
+    # awkwardly. Return a plain Int when it fits, BigInt when it doesn't —
+    # both are mathematically identical to the Rational form but render
+    # naturally.
+    n = BigInt(poly)
+    return typemin(Int) <= n <= typemax(Int) ? Int(n) : n
 end
 
 # factor(x^2*y + b*x*y - a*x - a*b)  ->  (x*y - a)*(x + b)
@@ -58,6 +85,43 @@ function Symbolics.factor_use_nemo(poly::Num)
     end
 
     return sym_unit, sym_factors
+end
+
+# Nemo-backed implementation of the Symbolics.factor extension hook. Called by
+# `Symbolics.factor` when the pure-Julia core leaves a residual it cannot
+# prove irreducible (typically degree ≥ 4 with no rational root). Returns a
+# `Vector{Tuple{Num, Int}}` of (factor, multiplicity) pairs whose product
+# equals `residual` — or `nothing` if Nemo fails or the input isn't monic.
+function Symbolics._factor_with_nemo(residual::Num, var)
+    try
+        Symbolics.check_polynomial(residual)
+        mp_polys, poly_to_bs = Symbolics.symbol_to_poly([residual])
+        mp_poly = only(mp_polys)
+        vars = collect(Symbolics.get_variables(residual))
+        isempty(vars) && return nothing
+        bs_to_poly = Bijections.active_inv(poly_to_bs)
+        poly_vars = map(Base.Fix1(getindex, bs_to_poly), vars)
+        _, nemo_vars = Nemo.polynomial_ring(Nemo.QQ, map(string, vars))
+        nemo_poly = mp_poly(poly_vars => nemo_vars)
+        nemo_fac = Nemo.factor(nemo_poly)
+
+        # For a monic residual (what Symbolics.factor feeds us), Nemo's unit
+        # should be the constant polynomial 1. Bail on anything else so the
+        # caller falls back to returning the residual unsplit.
+        nemo_unit = Nemo.unit(nemo_fac)
+        unit_const = Rational(Nemo.coeff(nemo_unit, 1))
+        unit_const == 1 || return nothing
+
+        nemo_to_sym = Dict(nemo_vars .=> vars)
+        result = Tuple{Num, Int}[]
+        for (fac, mult) in nemo_fac.fac
+            p = Symbolics.wrap(nemo_crude_evaluate(fac, nemo_to_sym))
+            push!(result, (p, Int(mult)))
+        end
+        return result
+    catch
+        return nothing
+    end
 end
 
 # Helps with precompilation time
