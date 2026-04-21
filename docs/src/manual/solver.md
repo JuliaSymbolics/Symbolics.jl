@@ -83,6 +83,30 @@ Symbolics.sympy_algebraic_solve
 - [x] Systems of polynomial equations with parameters and positive dimensional systems
 - [ ] Inequalities
 
+### Exact results for transcendental equations
+
+Solutions to transcendental equations at canonical right-hand sides are returned
+in exact symbolic form — the principal value uses `π` (and surds where
+appropriate) rather than a floating-point approximation, and the period
+multiplying the integer parameter is likewise exact:
+
+```julia
+julia> using Symbolics
+
+julia> @variables x;
+
+julia> Symbolics.symbolic_solve(cos(x) ~ 1//2, x)
+1-element Vector{…}:
+ π / 3 + (2π)*var"##N"
+```
+
+The fresh symbolic variable introduced by the solver (shown as `var"##N"`
+above) ranges over the integers, and an `@info` message announcing this is
+emitted each time a periodic family is returned. When the right-hand side is
+not one of the canonical values (e.g. `cos(x) ~ 1//3`), the solver preserves
+the inverse operator symbolically — `acos(1//3)` is left unevaluated — so that
+no floating-point error is introduced by the solve step itself.
+
 ### Expressions we can not solve (but aim to)
 ```
 # Mathematica
