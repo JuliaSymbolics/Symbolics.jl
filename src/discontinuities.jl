@@ -148,7 +148,7 @@ function _approx_min(m, a, b)
 end
 
 function _approx_abs(m, a)
-    a + log1p(exp(-2m * x)) / m
+    a + log1p(exp(-2m * a)) / m
 end
 
 function _approx_ge(m, a, b)
