@@ -38,6 +38,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "View-setting" begin include("stencils.jl") end
         @safetestset "Complex" begin include("complex.jl") end
         @safetestset "Semi-polynomial" begin include("semipoly.jl") end
+        @safetestset "Polynomial Algebra" begin include("polynomial_algebra.jl") end
         @safetestset "Fuzz Arrays" begin include("fuzz-arrays.jl") end
         @safetestset "Differentiation Test" begin include("diff.jl") end
         @safetestset "Utils Test" begin include("utils.jl") end
