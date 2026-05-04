@@ -2,12 +2,12 @@ function (ˍ₋out, u)
     #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:383 =# @inbounds begin
             #= /home/runner/work/Symbolics.jl/Symbolics.jl/src/build_function.jl:383 =#
             begin
-                #= /home/runner/.julia/packages/SymbolicUtils/ARJi6/src/code.jl:1117 =# @inbounds begin
-                        #= /home/runner/.julia/packages/SymbolicUtils/ARJi6/src/code.jl:1113 =#
+                #= /home/runner/.julia/packages/SymbolicUtils/NOusp/src/code.jl:1117 =# @inbounds begin
+                        #= /home/runner/.julia/packages/SymbolicUtils/NOusp/src/code.jl:1113 =#
                         ˍ₋out[1] = (+)((getindex)(u, 1), (*)(-1, (getindex)(u, 3)))
                         ˍ₋out[2] = (+)((*)(-1, (getindex)(u, 2)), (^)((getindex)(u, 1), 2))
                         ˍ₋out[3] = (+)((getindex)(u, 2), (getindex)(u, 3))
-                        #= /home/runner/.julia/packages/SymbolicUtils/ARJi6/src/code.jl:1115 =#
+                        #= /home/runner/.julia/packages/SymbolicUtils/NOusp/src/code.jl:1115 =#
                         ˍ₋out
                     end
             end
