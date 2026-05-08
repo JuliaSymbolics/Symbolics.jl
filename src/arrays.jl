@@ -107,6 +107,10 @@ for (T1, T2) in [
     end
 end
 
+Base.ifelse(x::Num, y::Arr{T, N}, z) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y::Arr{T, N}, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+
 Base.exp(A::Arr{T, 2}) where {T} = Arr{T, 2}(exp(unwrap(A)))
 Base.inv(A::Arr{T, 2}) where {T} = Arr{T, 2}(inv(unwrap(A)))
 LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
