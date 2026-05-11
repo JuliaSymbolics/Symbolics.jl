@@ -1,5 +1,20 @@
 using ModelingToolkit, ParameterizedFunctions
 
+# Build the expected MATLAB string from the actual orderings reported by the
+# `System` (parameter index assignment is determined by MTK and changes from
+# time to time — e.g. PR #1863's `no-sort-addmul` flipped `[d, c]` to
+# `[c, d]`). We look up the index of each named parameter so the test stays
+# stable across reorderings.
+function _matlab_lotka_volterra_expected(sys, a, b, c, d)
+    ps = parameters(sys)
+    idx(p) = findfirst(q -> isequal(q, Symbolics.unwrap(p)), Symbolics.unwrap.(ps))
+    ia, ib, ic, id = idx(a), idx(b), idx(c), idx(d)
+    return "diffeqf = @(internal_var___t,internal_var___u) [\n" *
+        "  internal_var___p($ia) * internal_var___u(1) + -1 * internal_var___p($ib) * internal_var___u(1) * internal_var___u(2);\n" *
+        "  -1 * internal_var___p($ic) * internal_var___u(2) + internal_var___p($id) * internal_var___u(1) * internal_var___u(2);\n" *
+        "];\n"
+end
+
 ### Capture MATLABDiffEq.jl type issues
 @independent_variables t
 @parameters a b c d
@@ -12,11 +27,7 @@ equations(sys)
 matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
                                         parameters(sys),ModelingToolkit.get_iv(sys),
                                         target = ModelingToolkit.MATLABTarget())
-@test matstr == "diffeqf = @(internal_var___t,internal_var___u) [
-  internal_var___p(2) * internal_var___u(1) + -1 * internal_var___p(1) * internal_var___u(1) * internal_var___u(2);
-  -1 * internal_var___p(4) * internal_var___u(2) + internal_var___p(3) * internal_var___u(1) * internal_var___u(2);
-];
-"
+@test matstr == _matlab_lotka_volterra_expected(sys, a, b, c, d)
 
 f = @ode_def_bare LotkaVolterra begin
   dx = a*x - b*x*y
@@ -32,8 +43,9 @@ sys = modelingtoolkitize(prob)
 matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
                                         parameters(sys),ModelingToolkit.get_iv(sys),
                                         target = ModelingToolkit.MATLABTarget())
-@test matstr == "diffeqf = @(internal_var___t,internal_var___u) [
-  internal_var___p(1) * internal_var___u(1) + -1 * internal_var___p(2) * internal_var___u(1) * internal_var___u(2);
-  -1 * internal_var___p(3) * internal_var___u(2) + internal_var___p(4) * internal_var___u(1) * internal_var___u(2);
-];
-"
+# `modelingtoolkitize` names the parameters `α, β, γ, δ` (in declaration
+# order), so look them up by name from the resulting system.
+let ps = parameters(sys)
+    a2, b2, c2, d2 = ps[1], ps[2], ps[3], ps[4]
+    @test matstr == _matlab_lotka_volterra_expected(sys, a2, b2, c2, d2)
+end
