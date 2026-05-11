@@ -21,6 +21,20 @@ vars = @variables a,b,c,d,e,f,g,h,i
 @test isequal(a', a)
 @test isequal(sincos(a), (sin(a), cos(a)))
 
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1763
+@test isequal(sincospi(a), (sinpi(a), cospi(a)))
+@test isinteger(Num(2))
+@test !isinteger(Num(2.5))
+@test !isinteger(a)
+@variables nint::Int
+@test isinteger(nint)
+@variables zcplx::Complex
+# `sinpi(::Complex{Num})` / `cospi(::Complex{Num})` go through `Base`'s
+# complex implementations, which dispatch on `isinteger(::Num)`.
+@test sinpi(zcplx) isa Complex{Num}
+@test cospi(zcplx) isa Complex{Num}
+@test sincospi(zcplx) isa Tuple{Complex{Num}, Complex{Num}}
+
 @test substitute(a ~ b, Dict(a=>1, b=>c)) == (1 ~ c)
 
 # test hashing

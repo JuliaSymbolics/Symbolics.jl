@@ -57,6 +57,24 @@ end
 
 LinearAlgebra.norm(x::Num, p::Real) = abs(x)
 
+# `Base.sincospi(::Real)` explicitly throws a `MethodError` so that subtypes of
+# `Real` (like `Num`) have to opt in. Fall back to a tuple of `sinpi`/`cospi`,
+# both of which are already registered.
+Base.sincospi(x::Num) = (sinpi(x), cospi(x))
+
+# `Base.sinpi(::Complex)` and `Base.cospi(::Complex)` branch on `isinteger` of
+# the real/imaginary parts, so we need `isinteger(::Num)`. For a wrapped
+# constant we can answer exactly; for a symbolic variable whose `symtype` is an
+# `Integer` we know the value must be an integer; otherwise we conservatively
+# return `false` (an unknown real is not assumed to be an integer).
+function Base.isinteger(x::Num)
+    val = unwrap(x)
+    if SymbolicUtils.isconst(val)
+        return isinteger(SymbolicUtils.unwrap_const(val))
+    end
+    return symtype(val) <: Integer
+end
+
 @register_derivative <(x, y) I COMMON_ZERO
 @register_derivative <=(x, y) I COMMON_ZERO
 @register_derivative >(x, y) I COMMON_ZERO
