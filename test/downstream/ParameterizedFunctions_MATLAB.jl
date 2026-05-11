@@ -14,7 +14,7 @@ matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
                                         target = ModelingToolkit.MATLABTarget())
 @test matstr == "diffeqf = @(internal_var___t,internal_var___u) [
   internal_var___p(2) * internal_var___u(1) + -1 * internal_var___p(1) * internal_var___u(1) * internal_var___u(2);
-  -1 * internal_var___p(4) * internal_var___u(2) + internal_var___p(3) * internal_var___u(1) * internal_var___u(2);
+  -1 * internal_var___p(3) * internal_var___u(2) + internal_var___p(4) * internal_var___u(1) * internal_var___u(2);
 ];
 "
 
