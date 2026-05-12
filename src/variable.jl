@@ -404,29 +404,33 @@ See also: [`fixpoint_sub`](@ref).
 struct FixpointSubstituter{Fold, S <: SU.Substituter{Fold}} <: SU.Substituter{Fold}
     wrapped::S
     maxiters::Int
+    warn_maxiters::Bool
 end
 
 """
     $TYPEDSIGNATURES
 
 Construct a `FixpointSubstituter` from the given substituter `subber`. Optionally specify
-the maximum number of iterations to substitute.
+the maximum number of iterations to substitute. Set `warn_maxiters = false` to suppress
+the warning emitted when substitution hits the iteration limit.
 """
-function FixpointSubstituter(subber::S; maxiters::Integer = 1000) where {Fold, S <: SU.Substituter{Fold}}
-    return FixpointSubstituter{Fold, S}(subber, maxiters)
+function FixpointSubstituter(subber::S; maxiters::Integer = 1000, warn_maxiters::Bool = true) where {Fold, S <: SU.Substituter{Fold}}
+    return FixpointSubstituter{Fold, S}(subber, maxiters, warn_maxiters)
 end
 
 """
     $TYPEDSIGNATURES
 
 Construct a `FixpointSubstituter`, specifying whether it constant-folds via `Fold`.
-`Op` prevents substitution of expressions inside operators of the given type.
+`Op` prevents substitution of expressions inside operators of the given type. Set
+`warn_maxiters = false` to suppress the warning emitted when substitution hits the
+iteration limit.
 """
 function FixpointSubstituter{Fold}(
     rules, filterer = SU.default_substitute_filter, op::Type{Op} = Nothing; maxiters = 1000,
-    ) where {Fold, Op}
+    warn_maxiters::Bool = true) where {Fold, Op}
     fpfilterer = FPSubFilterer{Op}(; fallback_filterer = filterer)
-    return FixpointSubstituter(SU.Substituter{Fold}(rules, fpfilterer); maxiters)
+    return FixpointSubstituter(SU.Substituter{Fold}(rules, fpfilterer); maxiters, warn_maxiters)
 end
 
 SymbolicUtils.clear_cache!(s::FixpointSubstituter) = SU.clear_cache!(s.wrapped)
@@ -443,7 +447,7 @@ function (sub::FixpointSubstituter)(ex::SymbolicT)
         iters -= 1
     end
 
-    if !isequal(ex, new_ex) && iters == 0
+    if !isequal(ex, new_ex) && iters == 0 && sub.warn_maxiters
         @warn lazy"""
         Did not converge after `maxiters = $(sub.maxiters)` substitutions. Either there \
         is a cycle in the rules or `maxiters` needs to be higher.
@@ -454,7 +458,7 @@ function (sub::FixpointSubstituter)(ex::SymbolicT)
 end
 
 """
-    fixpoint_sub(expr, dict, ::Type{OP} = Nothing; maxiters = 1000, filterer = SymbolicUtils.default_substitute_filter)
+    fixpoint_sub(expr, dict, ::Type{OP} = Nothing; maxiters = 1000, warn_maxiters = true, filterer = SymbolicUtils.default_substitute_filter)
 
 Given a symbolic expression, equation or inequality `expr` perform the substitutions in
 `dict` recursively until the expression does not change. Substitutions that depend on one
@@ -463,19 +467,20 @@ another will thus be recursively expanded. For example,
 specified to prevent substitution of expressions inside `Operator`s of the given type. The
 `maxiters` keyword is used to limit the number of times the substitution can occur to avoid
 infinite loops in cases where the substitutions in `dict` are circular
-(e.g. `[x => y, y => x]`).
+(e.g. `[x => y, y => x]`). Set `warn_maxiters = false` to suppress the warning emitted
+when the iteration limit is hit.
 
 See also: [`FixpointSubstituter`](@ref).
 """
-function fixpoint_sub(x, dict, ::Type{OP} = Nothing; maxiters = 1000, filterer = SymbolicUtils.default_substitute_filter, fold::Val{FOLD} = Val{false}(), kw...) where {OP, FOLD}
+function fixpoint_sub(x, dict, ::Type{OP} = Nothing; maxiters = 1000, warn_maxiters::Bool = true, filterer = SymbolicUtils.default_substitute_filter, fold::Val{FOLD} = Val{false}(), kw...) where {OP, FOLD}
     if get(kw, :operator, nothing) !== nothing
         Base.depwarn("""
         The `operator` keyword to `fixpoint_sub` is deprecated. Please pass it as the \
         third positional argument instead.
         """, :fixpoint_sub_op_kwarg)
-        return fixpoint_sub(x, dict, kw[:operator]; maxiters, filterer, fold)
+        return fixpoint_sub(x, dict, kw[:operator]; maxiters, warn_maxiters, filterer, fold)
     end
-    subber = FixpointSubstituter{FOLD}(dict, filterer, OP; maxiters)
+    subber = FixpointSubstituter{FOLD}(dict, filterer, OP; maxiters, warn_maxiters)
     return subber(x)
 end
 

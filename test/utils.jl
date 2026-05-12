@@ -62,6 +62,18 @@ end
     @test isequal(expr, x)
 end
 
+@testset "fixpoint_sub warn_maxiters" begin
+    @variables x y
+    # circular rules hit maxiters — warning should fire by default
+    @test_logs (:warn,) Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9)
+    # warn_maxiters = false suppresses the warning
+    @test_logs Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9, warn_maxiters = false)
+    # FixpointSubstituter directly
+    @variables x y
+    subber = Symbolics.FixpointSubstituter{false}(Dict(x => y, y => x); maxiters = 9, warn_maxiters = false)
+    @test_logs isequal(subber(x), x)
+end
+
 @testset "Issue#1342 substitute working on called symbolics" begin
     @variables p(::Real) x y
     arg = unwrap(substitute(p(x), [p => identity]))
