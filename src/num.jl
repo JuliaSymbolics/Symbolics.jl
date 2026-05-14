@@ -113,7 +113,10 @@ evaluates to false. This allows encoding conditional logic in symbolic expressio
 ifelse(a > b, c, 0)  # Returns c if a > b, otherwise 0
 ```
 """
-Base.ifelse(x::Num, y, z) = Num(ifelse(value(x), value(y), value(z)))
+Base.ifelse(x::Num, y, z) = ifelse(unwrap(x), unwrap(y), unwrap(z))
+Base.ifelse(x::Num, y::Num, z) = Num(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y, z::Num) = Num(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y::Num, z::Num) = Num(ifelse(unwrap(x), unwrap(y), unwrap(z)))
 
 Base.promote_rule(::Type{Bool}, ::Type{Num}) = Num
 Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: AbstractIrrational} = Num
