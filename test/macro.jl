@@ -455,3 +455,13 @@ end
     @test SU.shape(unwrap(foo3(x))) == SU.Unknown(2)
 end
 
+struct Bar{T} end
+struct Baz{T} end
+
+@register_symbolic Bar(x::Int)::Bar{Int}
+@register_symbolic Baz(x::String)::Baz{String}
+
+@testset "Registration of struct constructors works correctly" begin
+    @test SU.promote_symtype(Bar, Int) === Bar{Int}
+    @test SU.promote_symtype(Baz, String) === Baz{String}
+end
