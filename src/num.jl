@@ -44,10 +44,10 @@ SymbolicUtils.@number_methods(Num,
 
 Base.:+(x::Num) = x
 function Base.:+(x1::Num, xs::Real...)
-    Num(+(unwrap(x1), xs...))
+    Num(+(unwrap(x1), unwrap.(xs)...))
 end
 function Base.:*(x1::Num, xs::Real...)
-    Num(*(unwrap(x1), xs...))
+    Num(*(unwrap(x1), unwrap.(xs)...))
 end
 
 Base.:-(x::Num) = Num(-(unwrap(x)))
@@ -104,7 +104,7 @@ end
 """
     ifelse(cond::Num, x, y)
 
-Symbolic conditional expression. Returns `x` if `cond` evaluates to true, and `y` if `cond` 
+Symbolic conditional expression. Returns `x` if `cond` evaluates to true, and `y` if `cond`
 evaluates to false. This allows encoding conditional logic in symbolic expressions.
 
 # Examples
@@ -312,10 +312,10 @@ $(TYPEDSIGNATURES)
 
 Return the alignment of printing `x` of type `Num`.
 
-The alignment is a tuple `(left, right)` showing how many characters are needed 
+The alignment is a tuple `(left, right)` showing how many characters are needed
 on either side of an alignment feature. This function returns the text width
-of `x` and `0` to avoid matching special characters, such as `e`and `f`, with 
-the alignment algorithm in Julia Base, which leads to extra white spaces on the 
+of `x` and `0` to avoid matching special characters, such as `e`and `f`, with
+the alignment algorithm in Julia Base, which leads to extra white spaces on the
 left of the characters when displaying array of symbolic variables.
 """
 function Base.alignment(io::IO, x::Num)
