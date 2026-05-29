@@ -675,6 +675,11 @@ numbered_expr(c,args...;kwargs...) = c
 numbered_expr(c::Num,args...;kwargs...) = error("Num found")
 
 
+# The solver introduces "safe" variants of some math functions that handle
+# negative/complex inputs in Julia. They have no C equivalent, so map them back
+# to the standard math.h names when generating C code.
+const c_safe_function_renames = Dict(:ssqrt => :sqrt, :scbrt => :cbrt, :slog => :log)
+
 # Replace certain multiplication and power expressions so they form valid C code
 # Extra factors of 1 are hopefully eliminated by the C compiler
 function coperators(expr)
@@ -683,6 +688,9 @@ function coperators(expr)
         if e isa Expr
             coperators(e)
         end
+    end
+    if expr.head == :call && expr.args[1] isa Symbol
+        expr.args[1] = get(c_safe_function_renames, expr.args[1], expr.args[1])
     end
     for i in eachindex(expr.args)
         if expr.args[i] isa Rational

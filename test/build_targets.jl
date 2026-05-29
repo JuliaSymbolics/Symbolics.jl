@@ -70,6 +70,22 @@ let
 end
 
 
+# Safe solver functions (ssqrt/scbrt/slog) must map to their math.h names in C
+# (https://github.com/JuliaSymbolics/Symbolics.jl/issues/1873)
+let
+    @variables y
+    expression = (1//2) * Symbolics.term(Symbolics.ssqrt, 4y) +
+                 Symbolics.term(Symbolics.scbrt, y) + Symbolics.term(Symbolics.slog, y)
+    cfunc = build_function([expression], y; target = Symbolics.CTarget(), expression = Val{true})
+
+    @test occursin("sqrt(", cfunc)
+    @test occursin("cbrt(", cfunc)
+    @test occursin("log(", cfunc)
+    @test !occursin("ssqrt", cfunc)
+    @test !occursin("scbrt", cfunc)
+    @test !occursin("slog", cfunc)
+end
+
 # Matrix StanTarget test
 let
     @variables x[1:4] y[1:4] z[1:4]
