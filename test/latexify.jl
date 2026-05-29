@@ -47,7 +47,21 @@ Dy = Differential(y)
 
 @test_reference "latexify_refs/equation1.txt" latexify(x ~ y + z)
 @test_reference "latexify_refs/equation2.txt" latexify(x ~ Dx(y + z))
-@test_reference "latexify_refs/equation5.txt" latexify(AA^2 + AA + 1 + X₁)
+
+# The relative order of the two degree-1 terms AA(x) and X₁(x) in this sum is
+# decided by SymbolicUtils' hash-based tie-break, which differs across Julia
+# versions, so no single reference string passes on all of them. Compare the set
+# of additive terms instead of the exact rendered string. (was equation5.txt)
+let
+    body = strip(replace(string(latexify(AA^2 + AA + 1 + X₁)),
+                         "\\begin{equation}" => "", "\\end{equation}" => ""))
+    @test sort(strip.(split(body, " + "))) == sort([
+        "1",
+        "AA\\left( x \\right)",
+        "X_1\\left( x \\right)",
+        "\\left( AA\\left( x \\right) \\right)^{2}",
+    ])
+end
 
 @test_reference "latexify_refs/equation_vec1.txt" latexify(
     [
