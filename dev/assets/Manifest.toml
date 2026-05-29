@@ -388,9 +388,9 @@ version = "0.1.11"
 
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "8f05e9a2e7c2e3eb524102bb2926c5743c07fbe1"
+git-tree-sha1 = "c307cd83373868391f3ac30b41530bc5d5d05d08"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
-version = "2.8.0+0"
+version = "2.8.1+0"
 
 [[deps.ExprTools]]
 git-tree-sha1 = "27415f162e6028e81c72b82ef756bf321213b6ec"
@@ -1320,9 +1320,9 @@ version = "1.4.0"
 
 [[deps.SymbolicUtils]]
 deps = ["AbstractTrees", "ArrayInterface", "Combinatorics", "ConstructionBase", "DataStructures", "Dictionaries", "DocStringExtensions", "DynamicPolynomials", "EnumX", "ExproniconLite", "Graphs", "LinearAlgebra", "MacroTools", "Moshi", "MultivariatePolynomials", "MutableArithmetics", "NaNMath", "PrecompileTools", "ReadOnlyArrays", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "TaskLocalValues", "TermInterface", "WeakCacheSets"]
-git-tree-sha1 = "d2e6e3899c839baf47d585adeab134d7b0486230"
+git-tree-sha1 = "5ef4b7bda1b93c26cff3c9ad025b2696a7e133ab"
 uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
-version = "4.32.0"
+version = "4.33.0"
 
     [deps.SymbolicUtils.extensions]
     SymbolicUtilsChainRulesCoreExt = "ChainRulesCore"
@@ -1666,9 +1666,9 @@ version = "5.15.0+0"
 
 [[deps.libcxxwrap_julia_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "a0b6eb05dde4ededa688ecf05e33caa5bffd42a5"
+git-tree-sha1 = "63f4a7f164d693aa284ba0e5bf7ce4676614e54d"
 uuid = "3eaa8342-bff7-56a5-9981-c04077f7cee7"
-version = "0.14.9+0"
+version = "0.14.10+0"
 
 [[deps.libdecor_jll]]
 deps = ["Artifacts", "Dbus_jll", "JLLWrappers", "Libdl", "Libglvnd_jll", "Pango_jll", "Wayland_jll", "xkbcommon_jll"]
