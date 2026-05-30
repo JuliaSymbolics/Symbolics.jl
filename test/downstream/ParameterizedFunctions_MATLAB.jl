@@ -15,6 +15,18 @@ function _matlab_lotka_volterra_expected(sys, a, b, c, d)
         "];\n"
 end
 
+# The order of operands within commutative `*` (and `+`) follows SymbolicUtils'
+# argument sort, which is benign but version-dependent (e.g. `u(1) * u(2)` vs
+# `u(2) * u(1)`). Compare the two RHS rows modulo that ordering so the test is
+# stable across the CI Julia matrix, mirroring the build_targets tests.
+function _normalize_matlab(matstr)
+    rows = [m[1] for m in eachmatch(r"([^\[\];\n]+);", matstr)]
+    return map(rows) do row
+        summands = sort(map(strip, split(row, " + ")))
+        join(map(s -> join(sort(strip.(split(s, " * "))), " * "), summands), " + ")
+    end
+end
+
 ### Capture MATLABDiffEq.jl type issues
 @independent_variables t
 @parameters a b c d
@@ -27,7 +39,7 @@ equations(sys)
 matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
                                         parameters(sys),ModelingToolkit.get_iv(sys),
                                         target = ModelingToolkit.MATLABTarget())
-@test matstr == _matlab_lotka_volterra_expected(sys, a, b, c, d)
+@test _normalize_matlab(matstr) == _normalize_matlab(_matlab_lotka_volterra_expected(sys, a, b, c, d))
 
 f = @ode_def_bare LotkaVolterra begin
   dx = a*x - b*x*y
@@ -47,5 +59,5 @@ matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
 # order), so look them up by name from the resulting system.
 let ps = parameters(sys)
     a2, b2, c2, d2 = ps[1], ps[2], ps[3], ps[4]
-    @test matstr == _matlab_lotka_volterra_expected(sys, a2, b2, c2, d2)
+    @test _normalize_matlab(matstr) == _normalize_matlab(_matlab_lotka_volterra_expected(sys, a2, b2, c2, d2))
 end
