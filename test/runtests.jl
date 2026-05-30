@@ -12,7 +12,19 @@ end
 function activate_sympy_env()
     Pkg.activate("sympy")
     Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+    # Point PyCall at the Conda.jl Python *before* instantiation precompiles
+    # SymbolicsSymPyExt. SymPy.jl's `pyimport_conda` can then install the `sympy`
+    # module into that Python. Doing this only inside sympy.jl is too late: PyCall
+    # reads its Python config at load/precompile time, so the extension would
+    # already have failed to precompile against a system Python that lacks sympy
+    # (as happens on the CI runners).
+    if get(ENV, "CI", nothing) !== nothing
+        ENV["PYTHON"] = ""
+    end
     Pkg.instantiate()
+    if get(ENV, "CI", nothing) !== nothing
+        Pkg.build("PyCall")
+    end
 end
 
 function activate_sympy_pythoncall_env()

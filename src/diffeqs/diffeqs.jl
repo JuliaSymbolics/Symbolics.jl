@@ -329,7 +329,12 @@ function integrating_factor_solve(eq::SymbolicLinearODE)
     end
     solution = (1 / v) * ((SymbolicUtils._iszero(eq.q) ? 0 : sympy_integrate(eq.q * v, eq.t)) + eq.C[1])
 
-    if !isempty(Symbolics.get_variables(solution, variable(:Integral)))
+    # When SymPy cannot find a closed form it returns an unevaluated `Integral(...)`,
+    # which has no usable symbolic solution. That term comes back as an operation
+    # (not a variable), so the previous `get_variables(:Integral)` check never fired
+    # and the unevaluated integral was silently mangled into a wrong answer by the
+    # `sympy_simplify` below. Detect it on the printed form and bail out instead.
+    if occursin("Integral", string(solution))
         return nothing
     end
     return expand(Symbolics.sympy_simplify(solution))
