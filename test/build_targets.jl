@@ -1,15 +1,65 @@
 using Symbolics, Test
 using ReferenceTests
 
+# The ordering of operands within commutative `+` and `*` in the generated code
+# follows SymbolicUtils' argument sorting, which is benign but has changed across
+# versions (e.g. `a * b` vs `b * a`). To keep these tests stable across the CI
+# Julia/SymbolicUtils matrix we compare structure modulo that ordering rather than
+# byte-for-byte against a reference file. This mirrors the scalar Stan/MATLAB
+# tests further down, which were already converted for the same reason.
+function normalize_terms(rhs)
+    summands = map(strip, split(rhs, " + "))
+    canonical = map(summands) do summand
+        join(sort(map(strip, split(summand, " * "))), " * ")
+    end
+    return sort(canonical)
+end
+
 @variables t a x(t) y(t)
 expr = [a*x - x*y,-3y + x*y]
-@test_reference "target_functions/1.stan" Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.StanTarget())
 
-@test_reference "target_functions/1.c" Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.CTarget(),
+# StanTarget structural test (was target_functions/1.stan)
+let
+    sfunc = Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.StanTarget())
+    @test occursin("vector diffeqf(real t,vector internal_var___u,vector internal_var___p)", sfunc)
+    @test occursin("vector[2] internal_var___du;", sfunc)
+    @test occursin("return internal_var___du;", sfunc)
+    m1 = match(r"internal_var___du\[1\] = (.+);", sfunc)
+    m2 = match(r"internal_var___du\[2\] = (.+);", sfunc)
+    @test m1 !== nothing && m2 !== nothing
+    @test normalize_terms(m1[1]) ==
+        normalize_terms("internal_var___p[1] * internal_var___u[1] + -1 * internal_var___u[1] * internal_var___u[2]")
+    @test normalize_terms(m2[1]) ==
+        normalize_terms("-3 * internal_var___u[2] + internal_var___u[1] * internal_var___u[2]")
+end
+
+# CTarget structural test (was target_functions/1.c)
+let
+    cfunc = Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.CTarget(),
                                      lhsname=:internal_var___du,
                                      rhsnames=[:internal_var___u,:internal_var___p,:t])
+    @test occursin("#include <math.h>", cfunc)
+    @test occursin("void diffeqf(double* internal_var___du, const double* internal_var___u, const double* internal_var___p, const double t)", cfunc)
+    m1 = match(r"internal_var___du\[0\] = (.+);", cfunc)
+    m2 = match(r"internal_var___du\[1\] = (.+);", cfunc)
+    @test m1 !== nothing && m2 !== nothing
+    @test normalize_terms(m1[1]) ==
+        normalize_terms("internal_var___p[0] * internal_var___u[0] + -1 * internal_var___u[0] * internal_var___u[1]")
+    @test normalize_terms(m2[1]) ==
+        normalize_terms("-3 * internal_var___u[1] + internal_var___u[0] * internal_var___u[1]")
+end
 
-@test_reference "target_functions/1.m" Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.MATLABTarget())
+# MATLABTarget structural test (was target_functions/1.m)
+let
+    mfunc = Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.MATLABTarget())
+    @test occursin("diffeqf = @(internal_var___t,internal_var___u)", mfunc)
+    rows = [m[1] for m in eachmatch(r"([^\[\];\n]+);", mfunc)]
+    @test length(rows) == 2
+    @test normalize_terms(rows[1]) ==
+        normalize_terms("internal_var___p(1) * internal_var___u(1) + -1 * internal_var___u(1) * internal_var___u(2)")
+    @test normalize_terms(rows[2]) ==
+        normalize_terms("-3 * internal_var___u(2) + internal_var___u(1) * internal_var___u(2)")
+end
 
 @test Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.CTarget(),
                                      lhsname=:internal_var___du,
