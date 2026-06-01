@@ -1,6 +1,7 @@
 using Symbolics
 using Test
 using Latexify
+using LaTeXStrings
 using ReferenceTests
 import SymbolicUtils as SU
 using Symbolics: VartypeT
@@ -83,8 +84,11 @@ Dy = Differential(y)
 @variables f(..)
 @test_reference "latexify_refs/call_with_metadata.txt" latexify(f)
 
+# The `_toexpr_metadata`/`_toexpr_op` hooks live in `Symbolics`, so downstream code can
+# extend them via `import Symbolics` without `Base.get_extension`. The Latexify-coupled
+# helpers (`_toexpr_plain`, `default_latex_wrapper`) come from the loaded extension.
 struct LatexHookCtx end
-function LatexifyExt._toexpr_metadata(O, ::Type{LatexHookCtx}, val; latexwrapper = LatexifyExt.default_latex_wrapper)
+function Symbolics._toexpr_metadata(O, ::Type{LatexHookCtx}, val; latexwrapper = LatexifyExt.default_latex_wrapper)
     inner = LatexifyExt._toexpr_plain(O; latexwrapper)
     return Expr(:call, :_textbf, inner)
 end
@@ -92,7 +96,7 @@ expr = SU.setmetadata(x + y, LatexHookCtx, true)
 @test occursin("\\textbf", latexify(expr).s)
 
 avgf(x) = x
-function LatexifyExt._toexpr_op(::typeof(avgf), args; latexwrapper = LatexifyExt.default_latex_wrapper)
+function Symbolics._toexpr_op(::typeof(avgf), args; latexwrapper = LatexifyExt.default_latex_wrapper)
     inner = LatexifyExt._toexpr_plain(args[1]; latexwrapper)
     inner_s = strip(latexify(inner).s, '\$')
     return LaTeXString("\\langle " * inner_s * " \\rangle")

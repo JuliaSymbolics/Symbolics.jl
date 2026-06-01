@@ -70,7 +70,15 @@ function latexify_derivatives(ex)
     end
 end
 
-recipe(n) = latexify_derivatives(cleanup_exprs(_toexpr(n)))
+# `latexify_derivatives` can collapse a top-level node into a bare `String` (e.g.
+# `_textbf(...)` -> "\\textbf{...}", reachable both from the array-symbol branch and from
+# a custom `_toexpr_metadata`/`_toexpr_op` hook). Latexify would try to re-parse such a
+# `String` as an expression and fail, so wrap a top-level string as a `LaTeXString`, which
+# is emitted verbatim. Strings nested inside an `Expr` are left untouched.
+_as_latexstring(x) = x
+_as_latexstring(x::AbstractString) = LaTeXString(x)
+
+recipe(n) = _as_latexstring(latexify_derivatives(cleanup_exprs(_toexpr(n))))
 
 @latexrecipe function f(n::Num)
     env --> :equation
@@ -155,37 +163,25 @@ Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexif
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:Symbolics.RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 
-"""
-    _toexpr_metadata(O, ::Type{Ctx}, val; latexwrapper) -> Union{Nothing, Any}
-
-Hook for customizing Latexify output based on metadata. Return `nothing` to fall back
-to the default behavior. Use `_toexpr_plain` to bypass this hook when composing output.
-"""
-_toexpr_metadata(::Any, ::DataType, @nospecialize(val); latexwrapper = default_latex_wrapper) = nothing
-
-function _toexpr_metadata(O; latexwrapper = default_latex_wrapper)
+# Iterate a node's metadata, dispatching to the `Symbolics._toexpr_metadata` hook for
+# each context. The per-context hook (and the `Symbolics._toexpr_op` hook used below) is
+# defined in `Symbolics` so downstream packages can extend it via `import Symbolics`
+# without reaching into this extension with `Base.get_extension`.
+function Symbolics._toexpr_metadata(O; latexwrapper = default_latex_wrapper)
     md = SymbolicUtils.metadata(O)
     md isa AbstractDict || return nothing
     for (ctx, val) in md
-        out = _toexpr_metadata(O, ctx, val; latexwrapper)
+        out = Symbolics._toexpr_metadata(O, ctx, val; latexwrapper)
         out === nothing || return out
     end
     return nothing
 end
 
-"""
-    _toexpr_op(op, args; latexwrapper) -> Union{Nothing, Any}
-
-Hook for customizing Latexify output based on the operation of a call. Return `nothing`
-to fall back to the default behavior.
-"""
-_toexpr_op(@nospecialize(op), args; latexwrapper = default_latex_wrapper) = nothing
-
 # `_toexpr` is only used for latexify
 function _toexpr(O; latexwrapper = default_latex_wrapper)
     O = unwrap(O)
     SymbolicUtils.isconst(O) && return value(O)
-    custom = _toexpr_metadata(O; latexwrapper)
+    custom = Symbolics._toexpr_metadata(O; latexwrapper)
     custom === nothing || return custom
     return _toexpr_plain(O; latexwrapper)
 end
@@ -260,7 +256,7 @@ function _toexpr_plain(O; latexwrapper = default_latex_wrapper)
     latexwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) :
         default_latex_wrapper
 
-    custom_op = _toexpr_op(op, args; latexwrapper)
+    custom_op = Symbolics._toexpr_op(op, args; latexwrapper)
     custom_op === nothing || return custom_op
 
     if (op === (*)) && (args[1] === -1)
