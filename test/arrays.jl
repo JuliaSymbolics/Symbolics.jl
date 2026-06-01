@@ -196,9 +196,10 @@ end
 n = 2
 A = randn(n, n)
 foo(x) = A * x # a function to represent symbolically, note, if this function is defined inside the testset, it's not found by the function fun_eval = eval(fun_ex)
-@register_array_symbolic foo(x::Vector{Real}) begin
+#we use T instead of x to test #1882
+@register_array_symbolic foo(T::Vector{Real}) begin
     size = (n,)
-    eltype = eltype(x)
+    eltype = eltype(T)
     ndims = 1
 end
 

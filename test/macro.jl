@@ -443,7 +443,7 @@ end
 @testset "`@register_symbolic` edge cases" begin
     @register_symbolic foo1(x::AbstractArray)
     @register_symbolic foo1(x::AbstractArray{Int})
-    @register_symbolic foo1(x::AbstractVector{Int})
+    @register_symbolic foo1(T::AbstractVector{Int})
 end
 
 @testset "`@register_array_symbolic` works without size" begin
