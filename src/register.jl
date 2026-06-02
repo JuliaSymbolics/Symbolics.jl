@@ -40,12 +40,13 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
 
     if define_promotion
         type_args = [:($name::$Type) for name in argnames]
+        T = type_T_tag(f,argnames)
         promote_expr = quote
             if $ftype === DataType || $ftype === Union || $ftype === UnionAll
-                function (::$typeof($promote_symtype))(::Type{T}, $(type_args...)) where {T <: $f}
+                function (::$typeof($promote_symtype))(::Type{$T}, $(type_args...)) where {$T <: $f}
                     $ret_type
                 end
-                function (::$(typeof(SymbolicUtils.promote_shape)))(::Type{T}, args::$(SymbolicUtils.ShapeT)...) where {T <: $f}
+                function (::$(typeof(SymbolicUtils.promote_shape)))(::Type{$T}, args::$(SymbolicUtils.ShapeT)...) where {$T <: $f}
                     @nospecialize args
                     $(SymbolicUtils.ShapeVecT)()
                 end
@@ -88,6 +89,18 @@ function destructure_registration_expr(expr)
         :($typeof($f))
     end
     f, ftype, argnames, Ts, ret_type
+end
+
+function type_T_tag(f,argnames)
+    T = :T
+    for i in 1:length(argnames) + 1
+        if T == f || T in argnames
+            T = Symbol(:_,T)
+        else
+            break
+        end
+    end
+    return T
 end
 
 nested_unwrap(x) = unwrap(x)
@@ -184,12 +197,13 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             $shape_expr
             return sh
         end
+        T = type_T_tag(f,argnames)
         promote_expr = quote
             if $ftype === DataType || $ftype === Union || $ftype === UnionAll
-                function (::$typeof($promote_symtype))(::Type{T}, $(type_args...)) where {T <: $f}
+                function (::$typeof($promote_symtype))(::Type{$T}, $(type_args...)) where {$T <: $f}
                     $promote_symtype_body
                 end
-                function (::$(typeof(SymbolicUtils.promote_shape)))(::Type{T}, $(shape_args...)) where {T <: $f}
+                function (::$(typeof(SymbolicUtils.promote_shape)))(::Type{$T}, $(shape_args...)) where {$T <: $f}
                     $promote_shape_body
                 end
             else
