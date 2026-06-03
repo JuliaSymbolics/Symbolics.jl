@@ -216,6 +216,8 @@ include("extra_functions.jl")
 using RecipesBase
 include("plot_recipes.jl")
 
+include("latexify_recipes.jl")
+
 include("semipoly.jl")
 
 
@@ -601,6 +603,7 @@ include("despecialize.jl")
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, option_to_metadata_type, scalarize, shape
 @public unwrap, variable, wrap, linear_expansion, LinearExpander
+@public _toexpr_metadata, _toexpr_op
 
 @setup_workload begin
     fold1 = Val{false}()
