@@ -63,6 +63,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "ForwardDiff Extension Test" begin include("forwarddiff_symbolic_dual_ops.jl") end
         @safetestset "Nested ForwardDiff Sparsity Test" begin include("nested_forwarddiff_sparsity.jl") end
         @safetestset "Build Function Test" begin include("build_function.jl") end
+        @safetestset "Conditionals Test" begin include("conditionals.jl") end
         @safetestset "Codegen Function Test" begin include("codegen_function.jl") end
         @safetestset "Build Function Array Test" begin include("build_function_arrayofarray.jl") end
         @safetestset "Build Function Array Test Named Tuples" begin include("build_function_arrayofarray_named_tuples.jl") end

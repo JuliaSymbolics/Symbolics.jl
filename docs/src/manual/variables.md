@@ -77,6 +77,17 @@ Control flow can be expressed in Symbolics.jl in the following way:
 Base.ifelse(::Num, ::Any, ::Any)
 ```
 
+`ifelse` is the default conditional. Two further variants pin how the conditional is lowered
+by [`build_function`](@ref): `ifelse_eager` always evaluates both branches, while
+`ifelse_branching` emits an `if`/`else` so the untaken branch is never evaluated (useful when
+a branch is only valid when its condition holds). They build the same kind of symbolic
+expression as `ifelse` and differ only at code generation.
+
+```@docs
+Symbolics.ifelse_eager
+Symbolics.ifelse_branching
+```
+
 ## Inspection Functions
 
 ```@docs

@@ -130,3 +130,9 @@ avg_expr = SU.term(avgf, x + y)
     # This should not throw a MethodError about hasmetadata on Vector
     @test_nowarn latexify(getindex_term)
 end
+
+@testset "ifelse_eager / ifelse_branching render" begin
+    @variables a b
+    @test_nowarn latexify(ifelse_eager(a > 0, a^2, 1 / a))
+    @test_nowarn latexify(ifelse_branching(a > 0, a^2, 1 / a))
+end

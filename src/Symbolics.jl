@@ -170,6 +170,9 @@ export @variables, Variable
 include("variable.jl")
 
 function slog end; function ssqrt end; function scbrt end
+# Forward declarations so the linearity/differentiation rules in diff.jl can reference these
+# conditional operators; their methods and codegen are defined in conditionals.jl.
+function ifelse_eager end; function ifelse_branching end
 include("linearity.jl")
 
 using DiffRules, SpecialFunctions, NaNMath
@@ -210,6 +213,9 @@ import Libdl
 include("build_function.jl")
 include("codegen_fn.jl")
 export build_function
+
+export ifelse_eager, ifelse_branching
+include("conditionals.jl")
 
 include("extra_functions.jl")
 
