@@ -327,14 +327,23 @@ function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
         # check if arrived at desired result
         ir[node_idx] === D.x && return result[node_idx]
 
-        # get outneighbors of ir[i] (ir indices of all arguments in the IRStructure)
+        # get outneighbors of ir[node_idx] (ir indices of all arguments in the IRStructure)
         args = SymbolicUtils.AdjView{Int32}(@inbounds ir.dependency_graph.fadjlist[node_idx])
-        
+
         for (args_idx, ir_idx) in enumerate(args)
-            # args_idx: index of argument in arguments(ir[ir_idx]) (used in derivative_idx)
+            # args_idx: index of argument in arguments(ir[node_idx]) (used in derivative_idx)
             # ir_idx: index of argument in the IRStructure
 
-            der_partial = derivative_idx(ir[node_idx], args_idx) # ∂node/∂arg
+            local der_partial # ∂node/∂arg
+
+            @match ir[node_idx] begin
+                BSImpl.AddMul(; coeff, dict, variant) && if variant == SymbolicUtils.AddMulVariant.MUL end => begin
+                    der_partial = prod([ir[arg] for arg in args if arg != ir_idx])
+                end
+                _ => begin
+                    der_partial = derivative_idx(ir[node_idx], args_idx)
+                end
+            end
 
             der_partial === nothing && (der_partial = D(ir[node_idx]))
             # chain rule and product rule: ∂root/∂arg += ∂root/∂node * ∂node/∂arg
