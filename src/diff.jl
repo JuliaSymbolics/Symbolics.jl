@@ -306,6 +306,47 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
     return SymbolicUtils.add_worker(VartypeT, summed_args)
 end
 
+function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
+    @match expr begin
+        BSImpl.Term(; f, args) && if f isa Differential end => begin
+            return D(expr)
+        end
+        _ => nothing
+    end
+
+    ir = IRStructure{VartypeT}()
+
+    populate_ir!(ir, expr)
+
+    # holds intermediate results for every node in the IRStructure
+    result = fill(COMMON_ZERO, length(ir))
+    result[length(ir)] = COMMON_ONE
+    
+    # traverse the IRStructure from outputs to inputs
+    for node_idx in reverse(eachindex(ir))
+        # check if arrived at desired result
+        ir[node_idx] === D.x && return result[node_idx]
+
+        # get outneighbors of ir[i] (ir indices of all arguments in the IRStructure)
+        args = SymbolicUtils.AdjView{Int32}(@inbounds ir.dependency_graph.fadjlist[node_idx])
+        
+        for (args_idx, ir_idx) in enumerate(args)
+            # args_idx: index of argument in arguments(ir[ir_idx]) (used in derivative_idx)
+            # ir_idx: index of argument in the IRStructure
+
+            der_partial = derivative_idx(ir[node_idx], args_idx) # ∂node/∂arg
+
+            der_partial === nothing && (der_partial = D(ir[node_idx]))
+            # chain rule and product rule: ∂root/∂arg += ∂root/∂node * ∂node/∂arg
+            result[ir_idx] += result[node_idx] * der_partial
+        end
+    end
+
+    return COMMON_ZERO # D.x was not found in expr
+end
+
+differentiate(D::Differential, expr::Num) = differentiate(D, unwrap(expr))
+
 """
     executediff(D, arg; simplify=false, occurrences=nothing)
 
