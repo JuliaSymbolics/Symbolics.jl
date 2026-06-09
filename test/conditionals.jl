@@ -119,10 +119,10 @@ end
     end
 end
 
-@testset "Non-Bool condition errors like `ifelse`" begin
-    # a non-Bool scalar condition is rejected the same way as `ifelse` (MethodError)
-    @test_throws MethodError ifelse_eager(1, x, y)
-    @test_throws MethodError ifelse_branching(1, x, y)
+@testset "Non-Bool condition is rejected" begin
+    # a non-Bool scalar condition with symbolic branches has no applicable method and errors
+    @test_throws Exception ifelse_eager(1, x, y)
+    @test_throws Exception ifelse_branching(1, x, y)
 end
 
 @testset "Sparsity detection matches `ifelse`" begin

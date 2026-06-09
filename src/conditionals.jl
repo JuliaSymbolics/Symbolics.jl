@@ -70,7 +70,7 @@ function ifelse_branching end
 # time these methods run the arguments are already evaluated, so the runtime behaviour is
 # identical to `ifelse`; the eager/branching distinction only affects generated code.
 ifelse_eager(cond, x, y) = Base.ifelse(cond, x, y)
-ifelse_branching(cond, x, y) = Base.ifelse(cond, x, y)
+ifelse_branching(cond, x, y) = cond ? x : y
 
 # Type/shape promotion mirrors `ifelse`: the condition must be a `Bool`, both branches must
 # share a shape, and the result type is the promotion of the branch types.
@@ -123,23 +123,9 @@ end
 
 # ---- Code generation ----
 #
-# Both variants dispatch through SymbolicUtils' generic `codegen_function!`/`function_to_expr`
-# fallbacks (the operation is matched on its type), so no SymbolicUtils changes are needed.
-
-# `ifelse_eager` lowers to an eager `ifelse` call: both branches are emitted as ordinary
-# subexpressions and the call selects between them.
-function SU.Code.codegen_function!(
-        ::typeof(ifelse_eager), cs::SU.Code.CodegenState{T},
-        expr::BasicSymbolic{T}, expr_idx::Integer
-) where {T}
-    cond_idx, true_idx, false_idx = SU.Graphs.outneighbors(cs.ir.dependency_graph, expr_idx)
-    return SU.Code.codegen!(
-        cs, expr_idx,
-        Expr(:call, Base.ifelse, cs(cs.ir[cond_idx]),
-            cs(cs.ir[true_idx]), cs(cs.ir[false_idx]))
-    )
-end
-
+# `ifelse_eager` needs no custom lowering: it is a registered function whose definition calls
+# `ifelse`, so the generic fallback lowers it to a plain call that evaluates both branches.
+#
 # `ifelse_branching` lowers to an `if`/`else` whose branch bodies are generated inside their
 # respective arms (via a fresh codegen scope) rather than hoisted before the conditional.
 # Combined with the `cse_inside_expr` definition below, this guarantees the untaken branch is
@@ -164,13 +150,8 @@ function SU.Code.codegen_function!(
     return SU.Code.codegen!(cs, expr_idx, Expr(:if, cond, true_block, false_block))
 end
 
-# Slow `toexpr` path (used by e.g. non-`fast_toexpr` build targets). `toexpr` inlines
-# recursively, so the branching form is naturally lazy here.
-function SU.Code.function_to_expr(::typeof(ifelse_eager), O, st)
-    args = arguments(O)
-    return Expr(
-        :call, Base.ifelse, toexpr(args[1], st), toexpr(args[2], st), toexpr(args[3], st))
-end
+# Slow `toexpr` path (used by non-`fast_toexpr` build targets). `toexpr` inlines recursively,
+# so the branching form is naturally lazy here.
 function SU.Code.function_to_expr(::typeof(ifelse_branching), O, st)
     args = arguments(O)
     return Expr(:if, toexpr(args[1], st), toexpr(args[2], st), toexpr(args[3], st))
