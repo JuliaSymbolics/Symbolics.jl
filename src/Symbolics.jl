@@ -28,7 +28,8 @@ import TermInterface: maketerm, iscall, operation, arguments, metadata
 import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
     FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
     promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
-    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT
+    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT,
+    ifelse_eager, ifelse_branching
 import SymbolicUtils as SU
 
 using SymbolicUtils.Code
@@ -170,9 +171,6 @@ export @variables, Variable
 include("variable.jl")
 
 function slog end; function ssqrt end; function scbrt end
-# Forward declarations so the linearity/differentiation rules in diff.jl can reference these
-# conditional operators; their methods and codegen are defined in conditionals.jl.
-function ifelse_eager end; function ifelse_branching end
 include("linearity.jl")
 
 using DiffRules, SpecialFunctions, NaNMath
@@ -214,7 +212,6 @@ include("build_function.jl")
 include("codegen_fn.jl")
 export build_function
 
-export ifelse_eager, ifelse_branching
 include("conditionals.jl")
 
 include("extra_functions.jl")
