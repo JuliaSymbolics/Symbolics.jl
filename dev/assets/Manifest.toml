@@ -877,9 +877,9 @@ version = "1.8.0"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
-git-tree-sha1 = "9b8215b1ee9e78a293f99797cd31375471b2bcae"
+git-tree-sha1 = "dbd2e8cd2c1c27f0b584f6661b4309609c5a685e"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
-version = "1.1.3"
+version = "1.1.4"
 
 [[deps.Nemo]]
 deps = ["AbstractAlgebra", "FLINT_jll", "LinearAlgebra", "Random", "RandomExtensions", "SHA"]
@@ -1309,9 +1309,9 @@ version = "1.4.0"
 
 [[deps.SymbolicUtils]]
 deps = ["AbstractTrees", "ArrayInterface", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "EnumX", "ExproniconLite", "Graphs", "LinearAlgebra", "MacroTools", "Moshi", "MultivariatePolynomials", "MutableArithmetics", "NaNMath", "PrecompileTools", "ReadOnlyArrays", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "TaskLocalValues", "TermInterface", "WeakCacheSets"]
-git-tree-sha1 = "42edfa09931317cd6b9453f47672ab1afa473d32"
+git-tree-sha1 = "db2dd7feba95f6d94d52e7a63185449d57f808c5"
 uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
-version = "4.34.3"
+version = "4.35.0"
 
     [deps.SymbolicUtils.extensions]
     SymbolicUtilsChainRulesCoreExt = "ChainRulesCore"
