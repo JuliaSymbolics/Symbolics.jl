@@ -307,6 +307,7 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
 end
 
 function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
+    # if expr is wrapped in a Differential, assume that Differential can't be expanded and wrap it again
     @match expr begin
         BSImpl.Term(; f, args) && if f isa Differential end => begin
             return D(expr)
@@ -328,7 +329,7 @@ function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
         ir[node_idx] === D.x && return result[node_idx]
 
         # get outneighbors of ir[node_idx] (ir indices of all arguments in the IRStructure)
-        args = SymbolicUtils.AdjView{Int32}(@inbounds ir.dependency_graph.fadjlist[node_idx])
+        args = SymbolicUtils.Grpahs.outneighbors(ir.dependency_graph, node_idx)
 
         for (args_idx, ir_idx) in enumerate(args)
             # args_idx: index of argument in arguments(ir[node_idx]) (used in derivative_idx)
