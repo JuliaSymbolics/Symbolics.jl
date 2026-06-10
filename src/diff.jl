@@ -328,16 +328,34 @@ function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
         # check if arrived at desired result
         ir[node_idx] === D.x && return result[node_idx]
 
+        result[node_idx] === COMMON_ZERO && continue
+        
         # get outneighbors of ir[node_idx] (ir indices of all arguments in the IRStructure)
         args = SymbolicUtils.Graphs.outneighbors(ir.dependency_graph, node_idx)
 
         for (args_idx, ir_idx) in enumerate(args)
             # args_idx: index of argument in arguments(ir[node_idx]) (used in derivative_idx)
             # ir_idx: index of argument in the IRStructure
+            @match ir[ir_idx] begin
+                BSImpl.Const(;) => continue
+                _ => nothing
+            end
 
             local der_partial # ∂node/∂arg
 
             @match ir[node_idx] begin
+                BSImpl.Term(; f) && if f === getindex end => begin
+                    # node is part of symbolic array
+                    # skip over the node of the symbolic array in the IRStructure, and go directly to arguments
+                    # assume symbolic array is a symbolic function or dependent variable
+
+                    args2 = SymbolicUtils.Graphs.outneighbors(ir.dependency_graph, ir_idx)
+
+                    for ir_idx2 in args2
+                        result[ir_idx2] += result[node_idx] * Differential(ir[ir_idx2])(ir[node_idx])
+                    end
+                    continue
+                end
                 BSImpl.AddMul(; coeff, dict, variant) && if variant == SymbolicUtils.AddMulVariant.MUL end => begin
                     der_partial = prod([ir[arg] for arg in args if arg != ir_idx])
                 end
@@ -346,7 +364,8 @@ function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
                 end
             end
 
-            der_partial === nothing && (der_partial = D(ir[node_idx]))
+            der_partial === nothing && (der_partial = Differential(ir[ir_idx])(ir[node_idx]))
+
             # chain rule and product rule: ∂root/∂arg += ∂root/∂node * ∂node/∂arg
             result[ir_idx] += result[node_idx] * der_partial
         end
