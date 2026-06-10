@@ -401,12 +401,14 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     end
                 end
                 return SymbolicUtils.add_worker(VartypeT, summed_args)
-            elseif f === ifelse
+            elseif f === ifelse || f === ifelse_eager || f === ifelse_branching
                 inner_args = arguments(arg)
                 dtrue = executediff(D, inner_args[2]; throw_no_derivative)
                 dfalse = executediff(D, inner_args[3]; throw_no_derivative)
                 args = SymbolicUtils.ArgsT{VartypeT}((inner_args[1], dtrue, dfalse))
-                return BSImpl.Term{VartypeT}(ifelse, args; type = symtype(arg), shape = shape(arg))
+                # Preserve the conditional variant so the derivative keeps the same
+                # eager/branching lowering behaviour as the primal.
+                return BSImpl.Term{VartypeT}(f, args; type = symtype(arg), shape = shape(arg))
             elseif f isa Differential
                 # The recursive expand_derivatives was not able to remove
                 # a nested Differential. We can attempt to differentiate the
@@ -962,6 +964,8 @@ const linearity_rules = (
       # `ifelse(cond, x, y)` can be written as cond * x + (1 - cond) * y
       # where condition `cond` is considered constant in differentiation
       (@rule ifelse(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)),
+      (@rule ifelse_eager(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)),
+      (@rule ifelse_branching(~cond, ~x, ~y) => (isidx(~x) ? ~x : _scalar) + (isidx(~y) ? ~y : _scalar)),
 
       # Fallback: Unknown functions with arbitrary number of arguments have non-zero partial derivatives
       # Functions with 1 and 2 arguments are already handled above
@@ -978,6 +982,14 @@ const linearity_rules_affine = (
       (@rule ~x::issym => 0),
       # if the condition is dependent on the variable, do not consider this as affine
       (@rule ifelse(~cond, ~x, ~y) => combine_terms_ifelse_affine(
+            isidx(~cond) ? unwrap_const(~cond)::TermCombination : _scalar,
+            isidx(~x) ? unwrap_const(~x)::TermCombination : _scalar,
+            isidx(~y) ? unwrap_const(~y)::TermCombination : _scalar)),
+      (@rule ifelse_eager(~cond, ~x, ~y) => combine_terms_ifelse_affine(
+            isidx(~cond) ? unwrap_const(~cond)::TermCombination : _scalar,
+            isidx(~x) ? unwrap_const(~x)::TermCombination : _scalar,
+            isidx(~y) ? unwrap_const(~y)::TermCombination : _scalar)),
+      (@rule ifelse_branching(~cond, ~x, ~y) => combine_terms_ifelse_affine(
             isidx(~cond) ? unwrap_const(~cond)::TermCombination : _scalar,
             isidx(~x) ? unwrap_const(~x)::TermCombination : _scalar,
             isidx(~y) ? unwrap_const(~y)::TermCombination : _scalar)),

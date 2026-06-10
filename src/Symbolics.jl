@@ -28,7 +28,8 @@ import TermInterface: maketerm, iscall, operation, arguments, metadata
 import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
     FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
     promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
-    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT
+    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT,
+    ifelse_eager, ifelse_branching
 import SymbolicUtils as SU
 
 using SymbolicUtils.Code
@@ -210,6 +211,8 @@ import Libdl
 include("build_function.jl")
 include("codegen_fn.jl")
 export build_function
+
+include("conditionals.jl")
 
 include("extra_functions.jl")
 
