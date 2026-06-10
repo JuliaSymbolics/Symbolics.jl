@@ -329,7 +329,7 @@ function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
         ir[node_idx] === D.x && return result[node_idx]
 
         # get outneighbors of ir[node_idx] (ir indices of all arguments in the IRStructure)
-        args = SymbolicUtils.Grpahs.outneighbors(ir.dependency_graph, node_idx)
+        args = SymbolicUtils.Graphs.outneighbors(ir.dependency_graph, node_idx)
 
         for (args_idx, ir_idx) in enumerate(args)
             # args_idx: index of argument in arguments(ir[node_idx]) (used in derivative_idx)
