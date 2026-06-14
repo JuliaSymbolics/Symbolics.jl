@@ -213,8 +213,8 @@ end
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
 Base.nameof(n::Num) = nameof(value(n))
 
-Base.iszero(x::Num) = SymbolicUtils.fraction_iszero(unwrap(x))
-Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
+Base.iszero(x::Num) = SymbolicUtils._iszero(unwrap(x))
+Base.isone(x::Num) = SymbolicUtils._isone(unwrap(x))
 
 import SymbolicUtils: <ₑ, Term, operation, arguments
 
