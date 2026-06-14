@@ -31,7 +31,7 @@ jobs:
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE1}
           - {user: SciML, repo: NeuralPDE.jl, group: NNPDE2}
           - {user: SciML, repo: DataDrivenDiffEq.jl, group: Core}
-          - {user: SciML, repo: ModelOrderReduction.jl, group: All}
+          - {user: SciML, repo: ModelOrderReduction.jl, group: Core}
 
     steps:
       - uses: actions/checkout@v6
