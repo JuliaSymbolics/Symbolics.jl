@@ -306,32 +306,91 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
     return SymbolicUtils.add_worker(VartypeT, summed_args)
 end
 
-function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
-    # if expr is wrapped in a Differential, assume that Differential can't be expanded and wrap it again
-    @match expr begin
-        BSImpl.Term(; f, args) && if f isa Differential end => begin
-            return D(expr)
+function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT})
+    any(occursin_info.(vars,arg)) || return COMMON_ZERO
+
+    @match arg begin
+        BSImpl.Term(; f) && if f isa Differential end => begin
+            return [Differential(var)(arg) for var in vars]
         end
         _ => nothing
     end
 
     ir = IRStructure{VartypeT}()
-
-    populate_ir!(ir, expr)
+    populate_ir!(ir, arg)
 
     # holds intermediate results for every node in the IRStructure
-    result = fill(COMMON_ZERO, length(ir))
-    result[length(ir)] = COMMON_ONE
-    
-    # traverse the IRStructure from outputs to inputs
-    for node_idx in reverse(eachindex(ir))
-        # check if arrived at desired result
-        ir[node_idx] === D.x && return result[node_idx]
+    result_ir = Vector{Union{SymbolicT, Vector{SymbolicT}}}(undef, length(ir))
+    result = Vector{SymbolicT}(undef, length(vars))
 
-        result[node_idx] === COMMON_ZERO && continue
-        
+    var_set = Set(vars)
+
+    for node_idx in reverse(eachindex(ir))
+        node = ir[node_idx]
+
+        isassigned(result_ir, node_idx) || (result_ir[node_idx] = COMMON_ONE)
+        node ∈ var_set && (result[findfirst(isequal(ir[node_idx]), vars)] = result_ir[node_idx])
+
         # get outneighbors of ir[node_idx] (ir indices of all arguments in the IRStructure)
-        args = SymbolicUtils.Graphs.outneighbors(ir.dependency_graph, node_idx)
+        args = collect(SymbolicUtils.Graphs.outneighbors(ir.dependency_graph, node_idx))
+
+        isempty(args) && continue
+
+        for arg in args
+            isassigned(result_ir, arg) || (result_ir[arg] = (length(ir[arg]) <= 1) ? COMMON_ZERO : fill(COMMON_ZERO, length(ir[arg])))
+        end
+
+        @match node begin
+            BSImpl.Const(;) => continue
+            BSImpl.AddMul(; variant) => begin
+                if variant == SymbolicUtils.AddMulVariant.ADD
+                    result_ir[args] .+= result_ir[node_idx] * COMMON_ONE
+                else
+                    for arg in args
+                        result_ir[arg] += (result_ir[node_idx] * node) / ir[arg]
+                    end
+                end
+                continue
+            end
+            BSImpl.Term(; f) => begin
+                if f === getindex # node is element of an array
+                    # let ∂xᵢ/∂x = eᵢ (standard basis vector) e.g. ∂x₂/∂x = [0,1,...0]
+                    if result_ir[args[1]] isa Array
+                        result_ir[args[1]][value(ir[args[2]])] += result_ir[node_idx]
+                    else
+                        result_ir[args[1]] += result_ir[node_idx]
+                    end
+                    continue
+                elseif f isa BasicSymbolic{VartypeT}
+                    # f is a symbolic function
+                    result_ir[args[1]] += result_ir[node_idx] # ∂x(t)/∂x = 1
+                    for arg in args[2:lastindex(args)]
+                        # ∂x(t)/∂t
+                        der_partial = collect(Differential(ir[arg])(node))
+                        result_ir[arg] += length(node) == 1 ? result_ir[node_idx]*der_partial : LinearAlgebra.dot(result_ir[node_idx], der_partial)
+                    end
+                    continue
+                elseif f isa Differential
+                    # expand_derivatives couldn't remove nested differential
+                    # try differentiating 
+                    filtered_vars = filter(in(keys(ir.definition)),vars)
+                    innerdiffs = differentiate(ir[args[1]], filtered_vars)
+                    for (innerdiff, var) in zip(innerdiffs, filtered_vars)
+                        der = @match innerdiff begin
+                            BSImpl.Term(; f = finner) && if finner isa Differential end => Differential(var)(node)
+                            _ => differentiate(innerdiff, [f.x])
+                        end
+                        if isassigned(result_ir, ir.definition[var]) 
+                            result_ir[ir.definition[var]] += result_ir[node_idx] * der
+                        else
+                            result_ir[ir.definition[var]] = result_ir[node_idx] * der
+                        end
+                    end
+                    continue
+                end
+            end
+            _ => nothing
+        end
 
         for (args_idx, ir_idx) in enumerate(args)
             # args_idx: index of argument in arguments(ir[node_idx]) (used in derivative_idx)
@@ -341,40 +400,27 @@ function differentiate(D::Differential, expr::BasicSymbolic{VartypeT})
                 _ => nothing
             end
 
-            local der_partial # ∂node/∂arg
+            der_partial = derivative_idx.(node, args_idx) # ∂node/∂arg
 
-            @match ir[node_idx] begin
-                BSImpl.Term(; f) && if f === getindex end => begin
-                    # node is part of symbolic array
-                    # skip over the node of the symbolic array in the IRStructure, and go directly to arguments
-                    # assume symbolic array is a symbolic function or dependent variable
-
-                    args2 = SymbolicUtils.Graphs.outneighbors(ir.dependency_graph, ir_idx)
-
-                    for ir_idx2 in args2
-                        result[ir_idx2] += result[node_idx] * Differential(ir[ir_idx2])(ir[node_idx])
-                    end
-                    continue
-                end
-                BSImpl.AddMul(; coeff, dict, variant) && if variant == SymbolicUtils.AddMulVariant.MUL end => begin
-                    der_partial = prod([ir[arg] for arg in args if arg != ir_idx])
-                end
-                _ => begin
-                    der_partial = derivative_idx(ir[node_idx], args_idx)
-                end
-            end
-
-            der_partial === nothing && (der_partial = Differential(ir[ir_idx])(ir[node_idx]))
+            # if der_partial can't be determined, wrap in Differential
+            any(isnothing.(der_partial)) && (der_partial = collect(Differential(ir[ir_idx])(ir[node_idx])))
 
             # chain rule and product rule: ∂root/∂arg += ∂root/∂node * ∂node/∂arg
-            result[ir_idx] += result[node_idx] * der_partial
+            # use dot product when multiplying vectors
+            result_ir[ir_idx] += length(node) == 1 ? result_ir[node_idx]*der_partial : LinearAlgebra.dot(result_ir[node_idx], der_partial)
         end
     end
 
-    return COMMON_ZERO # D.x was not found in expr
+    return result
 end
 
-differentiate(D::Differential, expr::Num) = differentiate(D, unwrap(expr))
+differentiate(arg::SymbolicT, vars::SymbolicT) = differentiate(arg, [vars])
+differentiate(arg::SymbolicT, vars::Num) = differentiate(arg, [unwrap(vars)])
+differentiate(arg::Num, vars::SymbolicT) = differentiate(unwrap(arg), [vars])
+differentiate(arg::SymbolicT, vars::AbstractVector{Num}) = differentiate(arg, unwrap.(vars))
+differentiate(arg::Num, vars::AbstractVector{SymbolicT}) = differentiate(unwrap(arg), vars)
+differentiate(arg::Num, vars::AbstractVector{Num}) = differentiate(unwrap(arg), unwrap.(vars))
+differentiate(arg::Num, vars::Num) = differentiate(unwrap(arg), [unwrap(vars)])
 
 """
     executediff(D, arg; simplify=false, occurrences=nothing)
@@ -405,7 +451,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         return arg
     end
     isequal(arg, D.x) && return COMMON_ONE
-    return differentiate(D, arg)
+    # return only(differentiate(arg, [D.x]))
     @match arg begin
         BSImpl.Term(; f, args, shape) && if f === (*) && length(args) == 2 && isempty(shape) end => begin
             @match args[1] begin
