@@ -41,7 +41,7 @@ function codegen_function(
         ir::IRStructure{VartypeT}, expr, args::Vector;
         nanmath::Bool = true, wrap_code::Tuple = (identity, identity),
         checkbounds = false, iip_config::NTuple{2, Bool} = (true, true), sort_addmul = false,
-        kwargs...
+        optimize = nothing, kwargs...
     )
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
@@ -49,6 +49,8 @@ function codegen_function(
         rewrites[:nanmath] = true
     end
     rewrites[:sort_addmul] = sort_addmul
+
+    ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
 
     if iip_config[1]
         oopfn = wrap_code[1](Func(args, [], expr))
