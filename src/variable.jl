@@ -553,7 +553,7 @@ Create a variable with the given name along with subscripted indices with the
 julia> Symbolics.variable(:x, 4, 2, 0)
 x₄ˏ₂ˏ₀
 
-julia> Symbolics.variable(:x, 4, 2, 0, T=Symbolics.FnType)
+julia> Symbolics.variable(:x, 4, 2, 0, T=Symbolics.FnType{Tuple{Real}, Real, Nothing})
 x₄ˏ₂ˏ₀⋆
 ```
 
