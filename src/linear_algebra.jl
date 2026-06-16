@@ -347,19 +347,37 @@ function (lex::LinearExpander)(t::SymbolicT)
         BSImpl.AddMul(; coeff, dict, variant, type, shape) => begin
             cf = Const{VartypeT}(coeff)
             if variant === SymbolicUtils.AddMulVariant.ADD
+                # `t = coeff + Σ v*k` with each `k = a_k*x + b_k`. Addends free of
+                # `x` have `a_k == 0` and `b_k === k`, so keep them in the original
+                # dict and only splice in the ones that change, instead of re-summing
+                # (re-hashconsing) every addend.
                 a_buffer = SArgsT()
-                b_buffer = SArgsT()
+                b_newdict = dict
+                b_extras = SArgsT()
+                b_dirty = false
                 for (k, v) in dict
                     a, b, islin = _linear_expansion_recurse(lex, k)
                     islin || return (COMMON_ZERO, COMMON_ZERO, false)
-                    push!(a_buffer, a * v)
-                    push!(b_buffer, b * v)
+                    if _iszero(a) && isequal(b, k)
+                        continue
+                    end
+                    if !b_dirty
+                        b_newdict = copy(dict)
+                        b_dirty = true
+                    end
+                    delete!(b_newdict, k)
+                    _iszero(a) || push!(a_buffer, a * v)
+                    _iszero(b) || push!(b_extras, b * v)
                 end
-                if !_iszero(coeff)
-                    push!(b_buffer, cf)
+                a = isempty(a_buffer) ? COMMON_ZERO : SymbolicUtils.add_worker(VartypeT, a_buffer)
+                if !b_dirty
+                    return a, t, true
                 end
-                a = SymbolicUtils.add_worker(VartypeT, a_buffer)
-                b = SymbolicUtils.add_worker(VartypeT, b_buffer)
+                b = SymbolicUtils.Add{VartypeT}(coeff, b_newdict; type, shape)
+                if !isempty(b_extras)
+                    push!(b_extras, b)
+                    b = SymbolicUtils.add_worker(VartypeT, b_extras)
+                end
                 return a, b, true
             else
                 a = COMMON_ZERO
