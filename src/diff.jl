@@ -337,7 +337,7 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT}; throw_no
         isempty(args) && continue
 
         for arg in args
-            isassigned(result_ir, arg) || (result_ir[arg] = (length(ir[arg]) <= 1) ? COMMON_ZERO : fill(COMMON_ZERO, length(ir[arg])))
+            isassigned(result_ir, arg) || (result_ir[arg] = symtype(ir[arg])<:AbstractArray ? fill(COMMON_ZERO, length(ir[arg])) : COMMON_ZERO)
         end
 
         @match node begin
@@ -355,7 +355,7 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT}; throw_no
             BSImpl.Term(; f) => begin
                 if f === getindex # node is element of an array
                     # let ∂xᵢ/∂x = eᵢ (standard basis vector) e.g. ∂x₂/∂x = [0,1,...0]
-                    if result_ir[args[1]] isa Array
+                    if symtype(result_ir[args[1]])<:AbstractArray
                         result_ir[args[1]][value(ir[args[2]])] += result_ir[node_idx]
                     else
                         result_ir[args[1]] += result_ir[node_idx]
@@ -363,11 +363,11 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT}; throw_no
                     continue
                 elseif f isa BasicSymbolic{VartypeT}
                     # f is a symbolic function
-                    result_ir[args[1]] += result_ir[node_idx] # ∂x(t)/∂x = 1
-                    for arg in args[2:lastindex(args)]
+                    # result_ir[args[1]] += result_ir[node_idx] # ∂x(t)/∂x = 1
+                    for (i, arg) in enumerate(args[2:lastindex(args)])
                         # ∂x(t)/∂t
                         der_partial = collect(Differential(ir[arg])(node))
-                        result_ir[arg] += length(node) == 1 ? result_ir[node_idx]*der_partial : LinearAlgebra.dot(result_ir[node_idx], der_partial)
+                        result_ir[arg] += symtype(node)<:AbstractArray ? LinearAlgebra.dot(result_ir[node_idx], der_partial) : result_ir[node_idx]*der_partial
                     end
                     continue
                 elseif f isa Differential
@@ -405,16 +405,16 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT}; throw_no
                 BSImpl.Const(;) => continue
                 _ => nothing
             end
-
-            der_partial = derivative_idx.(node, args_idx) # ∂node/∂arg
+            
+            der_partial = derivative_idx(node, args_idx) # ∂node/∂arg
 
             # if der_partial can't be determined, throw if throw_no_derivative else wrap in Differential
             throw_no_derivative && any(isnothing.(der_partial)) && throw(DerivativeNotDefinedError(arg, args_idx))
-            isnothing(der_partial) && (der_partial = collect(Differential(ir[ir_idx])(ir[node_idx])))
+            isnothing(der_partial) && (der_partial = Differential(ir[ir_idx])(ir[node_idx]))
 
             # chain rule and product rule: ∂root/∂arg += ∂root/∂node * ∂node/∂arg
             # use dot product when multiplying vectors
-            result_ir[ir_idx] += length(node) == 1 ? result_ir[node_idx]*der_partial : LinearAlgebra.dot(result_ir[node_idx], der_partial)
+            result_ir[ir_idx] += symtype(node)<:AbstractArray ? LinearAlgebra.dot(result_ir[node_idx], scalarize(der_partial)) : result_ir[node_idx]*der_partial
         end
     end
 
