@@ -347,7 +347,6 @@ function (lex::LinearExpander)(t::SymbolicT; need_remainder::Bool = true)
     @match t begin
         BSImpl.Term(; f) && if f isa Operator end => throw_bad_expansion()
         BSImpl.AddMul(; coeff, dict, variant, type, shape) => begin
-            cf = Const{VartypeT}(coeff)
             if variant === SymbolicUtils.AddMulVariant.ADD
                 # `t = coeff + Σ v*k` with each `k = a_k*x + b_k`. Addends free of
                 # `x` have `a_k == 0` and `b_k === k`, so keep them in the original
