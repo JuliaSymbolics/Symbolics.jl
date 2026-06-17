@@ -306,7 +306,7 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
     return SymbolicUtils.add_worker(VartypeT, summed_args)
 end
 
-function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT})
+function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT}; throw_no_derivative=false)
     any(occursin_info.(vars,arg)) || return COMMON_ZERO
 
     @match arg begin
@@ -408,8 +408,9 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT})
 
             der_partial = derivative_idx.(node, args_idx) # ∂node/∂arg
 
-            # if der_partial can't be determined, wrap in Differential
-            any(isnothing.(der_partial)) && (der_partial = collect(Differential(ir[ir_idx])(ir[node_idx])))
+            # if der_partial can't be determined, throw if throw_no_derivative else wrap in Differential
+            throw_no_derivative && any(isnothing.(der_partial)) && throw(DerivativeNotDefinedError(arg, args_idx))
+            isnothing(der_partial) && (der_partial = collect(Differential(ir[ir_idx])(ir[node_idx])))
 
             # chain rule and product rule: ∂root/∂arg += ∂root/∂node * ∂node/∂arg
             # use dot product when multiplying vectors
@@ -420,8 +421,8 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT})
     return ifelse_rewriter.(result)
 end
 
-differentiate(arg::Union{SymbolicT, Num}, vars::Union{AbstractVector{SymbolicT}, AbstractVector{Num}}) = differentiate(unwrap(arg), unwrap.(vars))
-differentiate(arg::Union{SymbolicT, Num}, vars::Union{SymbolicT, Num}) = differentiate(unwrap(arg), [unwrap(vars)])
+differentiate(arg::Union{SymbolicT, Num}, vars::Union{AbstractVector{SymbolicT}, AbstractVector{Num}}; kw...) = differentiate(unwrap(arg), unwrap.(vars))
+differentiate(arg::Union{SymbolicT, Num}, vars::Union{SymbolicT, Num}; kw...) = differentiate(unwrap(arg), [unwrap(vars)])
 
 const ifelse_rules = (
     (@acrule ~c*ifelse(~cond, ~a, ~b) => ifelse(~cond, ~c*~a, ~c*~b)),
@@ -460,7 +461,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         return arg
     end
     isequal(arg, D.x) && return COMMON_ONE
-    return only(differentiate(arg, [D.x]))
+    return only(differentiate(arg, [D.x]; throw_no_derivative=throw_no_derivative))
     @match arg begin
         BSImpl.Term(; f, args, shape) && if f === (*) && length(args) == 2 && isempty(shape) end => begin
             @match args[1] begin
