@@ -336,7 +336,9 @@ end
 
 (lex::LinearExpander)(t::Num) = lex(unwrap(t))
 
-function (lex::LinearExpander)(t::SymbolicT)
+const SUPPORTS_LINEAR_EXPANDER_NEED_REMAINDER = true
+
+function (lex::LinearExpander)(t::SymbolicT; need_remainder::Bool = true)
     (; x) = lex
     is_expansion_leaf(t) && return trivial_linear_expansion(t, x)
     isequal(t, x) && return (COMMON_ONE, COMMON_ZERO, true)
@@ -361,15 +363,18 @@ function (lex::LinearExpander)(t::SymbolicT)
                     if _iszero(a) && isequal(b, k)
                         continue
                     end
+                    _iszero(a) || push!(a_buffer, a * v)
+                    # When the caller doesn't need the remainder skip rebuilding it:
+                    need_remainder || continue
                     if !b_dirty
                         b_newdict = copy(dict)
                         b_dirty = true
                     end
                     delete!(b_newdict, k)
-                    _iszero(a) || push!(a_buffer, a * v)
                     _iszero(b) || push!(b_extras, b * v)
                 end
                 a = isempty(a_buffer) ? COMMON_ZERO : SymbolicUtils.add_worker(VartypeT, a_buffer)
+                need_remainder || return (a, COMMON_ZERO, true)
                 if !b_dirty
                     return a, t, true
                 end
