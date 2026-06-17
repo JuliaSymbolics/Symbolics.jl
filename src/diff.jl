@@ -372,7 +372,7 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT})
                     continue
                 elseif f isa Differential
                     # expand_derivatives couldn't remove nested differential
-                    # try differentiating 
+                    # try differentiating argument w.r.t. vars (i.e. reverse the order of differentiation)
                     filtered_vars = filter(in(keys(ir.definition)),vars)
                     innerdiffs = differentiate(ir[args[1]], filtered_vars)
                     for (innerdiff, var) in zip(innerdiffs, filtered_vars)
@@ -386,6 +386,12 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT})
                             result_ir[ir.definition[var]] = result_ir[node_idx] * der
                         end
                     end
+                    continue
+                elseif f === ifelse
+                    # for node = ifelse(cond, x, y), ∂node/∂x = ifelse(cond, 1, 0) and ∂node/∂y = ifelse(cond, 0, 1)
+                    cond = ir[args[1]]
+                    result_ir[args[2]] += result_ir[node_idx] * ifelse(cond, COMMON_ONE, COMMON_ZERO)
+                    result_ir[args[3]] += result_ir[node_idx] * ifelse(cond, COMMON_ZERO, COMMON_ONE)
                     continue
                 end
             end
@@ -411,16 +417,19 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT})
         end
     end
 
-    return result
+    return ifelse_rewriter.(result)
 end
 
-differentiate(arg::SymbolicT, vars::SymbolicT) = differentiate(arg, [vars])
-differentiate(arg::SymbolicT, vars::Num) = differentiate(arg, [unwrap(vars)])
-differentiate(arg::Num, vars::SymbolicT) = differentiate(unwrap(arg), [vars])
-differentiate(arg::SymbolicT, vars::AbstractVector{Num}) = differentiate(arg, unwrap.(vars))
-differentiate(arg::Num, vars::AbstractVector{SymbolicT}) = differentiate(unwrap(arg), vars)
-differentiate(arg::Num, vars::AbstractVector{Num}) = differentiate(unwrap(arg), unwrap.(vars))
-differentiate(arg::Num, vars::Num) = differentiate(unwrap(arg), [unwrap(vars)])
+differentiate(arg::Union{SymbolicT, Num}, vars::Union{AbstractVector{SymbolicT}, AbstractVector{Num}}) = differentiate(unwrap(arg), unwrap.(vars))
+differentiate(arg::Union{SymbolicT, Num}, vars::Union{SymbolicT, Num}) = differentiate(unwrap(arg), [unwrap(vars)])
+
+const ifelse_rules = (
+    (@acrule ~c*ifelse(~cond, ~a, ~b) => ifelse(~cond, ~c*~a, ~c*~b)),
+    (@rule ifelse(~cond, ~a, ~b)/~c => ifelse(~cond, ~a/~c, ~b/~c)),
+    (@acrule ifelse(~cond, ~a, ~b) + ifelse(~cond, ~c, ~d) => ifelse(~cond, ~a+~c, ~b+~d))
+)
+
+const ifelse_rewriter = Fixpoint(Postwalk(Chain(ifelse_rules)))
 
 """
     executediff(D, arg; simplify=false, occurrences=nothing)
@@ -451,7 +460,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         return arg
     end
     isequal(arg, D.x) && return COMMON_ONE
-    # return only(differentiate(arg, [D.x]))
+    return only(differentiate(arg, [D.x]))
     @match arg begin
         BSImpl.Term(; f, args, shape) && if f === (*) && length(args) == 2 && isempty(shape) end => begin
             @match args[1] begin

@@ -255,7 +255,7 @@ expression = sin(x[1] + x[2] + x[3] + x[4]) |> Differential(t) |> expand_derivat
 expression2 = substitute(expression, Dict(collect(Differential(t).(x) .=> ẋ)))
 @test isequal(expression2, expand((ẋ[1] + ẋ[2] + ẋ[3] + ẋ[4])*cos(x[1] + x[2] + x[3] + x[4])))
 
-@test_broken isequal(
+@test isequal(
     Symbolics.derivative(ifelse(signbit(b), b^2, sqrt(b)), b),
     ifelse(signbit(b), 2b,(^(2Symbolics.unwrap(sqrt(b)), -1)))
 )
