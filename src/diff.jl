@@ -691,10 +691,11 @@ All other keyword arguments are forwarded to `expand_derivatives`.
 # because it is a function whose arguments contain `v`.
 function _depends_on(varset::Set{SymbolicT}, v::SymbolicT)
     v in varset && return true
+    full = SymbolicUtils.COMPARE_FULL[]
     for s in varset
         if SymbolicUtils.iscall(s)
             for arg in SymbolicUtils.arguments(s)
-                isequal(arg, v) && return true
+                SymbolicUtils.isequal_bsimpl(arg, v, full) && return true
             end
         end
     end
