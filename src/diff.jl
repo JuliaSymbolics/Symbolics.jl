@@ -393,6 +393,8 @@ function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT}; throw_no
                     result_ir[args[2]] += result_ir[node_idx] * ifelse(cond, COMMON_ONE, COMMON_ZERO)
                     result_ir[args[3]] += result_ir[node_idx] * ifelse(cond, COMMON_ZERO, COMMON_ONE)
                     continue
+                elseif f isa SymbolicUtils.Operator
+                    continue
                 end
             end
             _ => nothing
