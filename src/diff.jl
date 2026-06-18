@@ -306,7 +306,53 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
     return SymbolicUtils.add_worker(VartypeT, summed_args)
 end
 
+const ifelse_rules = (
+    (@acrule ~c*ifelse(~cond, ~a, ~b) => ifelse(~cond, ~c*~a, ~c*~b)),
+    (@rule ifelse(~cond, ~a, ~b)/~c => ifelse(~cond, ~a/~c, ~b/~c)),
+    (@acrule ifelse(~cond, ~a, ~b) + ifelse(~cond, ~c, ~d) => ifelse(~cond, ~a+~c, ~b+~d))
+)
+
+const ifelse_rewriter = Fixpoint(Postwalk(Chain(ifelse_rules)))
+
+function preprocess_vector_array_ops(expr::SymbolicT)
+    return Postwalk(arg -> begin
+        @match arg begin
+        BSImpl.Term(; f, args, shape) && if f === (*) && length(args) == 2 && isempty(shape) end => begin
+            @match args[1] begin
+                BSImpl.Term(; f = f2, args = args2) && if f2 === adjoint end => begin
+                    return LinearAlgebra.dot(
+                        collect(args2[1])::Vector{SymbolicT},
+                        collect(args[2])::Vector{SymbolicT}
+                    )
+                end
+                _ => nothing
+            end
+        end
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.dot end => begin
+            return LinearAlgebra.dot(
+                collect(args[1])::Vector{SymbolicT}, collect(args[2])::Vector{SymbolicT}
+            )
+        end
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.norm end => begin
+            add_buffer = SArgsT()
+            arr = args[1]
+            for i in SymbolicUtils.stable_eachindex(arr)
+                push!(add_buffer, abs2(arr[i]))
+            end
+            return sqrt(SymbolicUtils.add_worker(VartypeT, add_buffer))
+        end
+        BSImpl.ArrayOp(; output_idx) && if isempty(output_idx) end => begin
+            # Some sort of `mapreduce`
+            return SymbolicUtils.scalarize(arg)::SymbolicT
+        end
+        _ => nothing
+    end
+    end)(expr)
+end
+
 function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT}; throw_no_derivative=false)
+    arg = preprocess_vector_array_ops(arg)
+    
     any(occursin_info.(vars,arg)) || return COMMON_ZERO
 
     @match arg begin
@@ -426,14 +472,6 @@ end
 differentiate(arg::Union{SymbolicT, Num}, vars::Union{AbstractVector{SymbolicT}, AbstractVector{Num}}; kw...) = differentiate(unwrap(arg), unwrap.(vars))
 differentiate(arg::Union{SymbolicT, Num}, vars::Union{SymbolicT, Num}; kw...) = differentiate(unwrap(arg), [unwrap(vars)])
 
-const ifelse_rules = (
-    (@acrule ~c*ifelse(~cond, ~a, ~b) => ifelse(~cond, ~c*~a, ~c*~b)),
-    (@rule ifelse(~cond, ~a, ~b)/~c => ifelse(~cond, ~a/~c, ~b/~c)),
-    (@acrule ifelse(~cond, ~a, ~b) + ifelse(~cond, ~c, ~d) => ifelse(~cond, ~a+~c, ~b+~d))
-)
-
-const ifelse_rewriter = Fixpoint(Postwalk(Chain(ifelse_rules)))
-
 """
     executediff(D, arg; simplify=false, occurrences=nothing)
 
@@ -495,7 +533,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
         _ => nothing
     end
-    occursin_info(D.x, arg) || return COMMON_ZERO
+    occursin_info.(D.x, arg) || return COMMON_ZERO
 
     # We can safely assume `arg` is scalar, else `occursin_info` would have errored.
     @match arg begin
