@@ -216,6 +216,13 @@ Base.nameof(n::Num) = nameof(value(n))
 Base.iszero(x::Num) = SymbolicUtils._iszero(unwrap(x))
 Base.isone(x::Num) = SymbolicUtils._isone(unwrap(x))
 
+const COMMON_ZERO_NUM = Num(COMMON_ZERO)
+const COMMON_ONE_NUM = Num(COMMON_ONE)
+Base.zero(::Num) = COMMON_ZERO_NUM
+Base.zero(::Type{Num}) = COMMON_ZERO_NUM
+Base.one(::Num) = COMMON_ONE_NUM
+Base.one(::Type{Num}) = COMMON_ONE_NUM
+
 import SymbolicUtils: <ₑ, Term, operation, arguments
 
 function Base.show(io::IO, n::Num)
