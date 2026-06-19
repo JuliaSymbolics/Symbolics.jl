@@ -687,38 +687,34 @@ an array of variable expressions.
 
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
-# Check if any variable in `varset` depends on `v`, either directly or
-# because it is a function whose arguments contain `v`.
-function _depends_on(varset::Set{SymbolicT}, v::SymbolicT)
-    v in varset && return true
-    full = SymbolicUtils.COMPARE_FULL[]
-    for s in varset
-        if SymbolicUtils.iscall(s)
-            for arg in SymbolicUtils.arguments(s)
-                SymbolicUtils.isequal_bsimpl(arg, v, full) && return true
-            end
-        end
-    end
-    return false
-end
-
 function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
                   simplify=false, scalarize::Union{Val{true}, Val{false}}=Val(true), kwargs...)
     if scalarize isa Val{true}
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
-    # Pre-compute variable sets to skip differentiating trivially zero Jacobian entries
-    op_varsets = Vector{Set{SymbolicT}}(undef, length(ops))
-    for i in eachindex(ops)
-        op_varsets[i] = SymbolicUtils.search_variables(ops[i])
-    end
+    # Pre-compute variable sets to skip differentiating trivially zero Jacobian entries.
+    op_varsets = map(op -> _augment_with_call_args!(SymbolicUtils.search_variables(op)), ops)
     result = fill(COMMON_ZERO, length(ops), length(vars))
     for i in eachindex(ops), j in eachindex(vars)
-        _depends_on(op_varsets[i], vars[j]) || continue
+        (vars[j] in op_varsets[i]) || continue
         result[i, j] = executediff(Differential(vars[j]), ops[i]; simplify, kwargs...)
     end
     return result
+end
+
+function _augment_with_call_args!(vs)
+    extra = SymbolicT[]
+    for s in vs
+        SymbolicUtils.iscall(s) || continue
+        for arg in SymbolicUtils.arguments(s)
+            push!(extra, arg)
+        end
+    end
+    for e in extra
+        push!(vs, e)
+    end
+    return vs
 end
 
 function jacobian(ops, vars; simplify=false, kwargs...)
