@@ -3,7 +3,7 @@
     Integral(domain)
 
 Defines an Integral operator I(ex) which represents the integral of `I` of the
-expression `ex` over the `domain`. Note that the `domain` must be a 
+expression `ex` over the `domain`. Note that the `domain` must be a
 `Symbolics.VarDomainPairing` where the chosen variable is the variable being
 integrated over, i.e. `Integral(x in domain)` means that `I` is the integral
 operator with respect to `dx`.
@@ -68,3 +68,9 @@ function Base.show(io::IO, I::Integral)
 end
 
 Base.:(==)(I1::Integral, I2::Integral) = convert(Bool, simplify(isequal(I1.domain, I2.domain)))
+
+const INTEGRAL_SALT = 0xb7d4e1928c3a6f50
+Base.isequal(I1::Integral, I2::Integral) =
+    isequal(I1.domain.variables, I2.domain.variables) && isequal(I1.domain.domain, I2.domain.domain)
+Base.hash(I::Integral, h::UInt) =
+    hash(I.domain.domain, hash(I.domain.variables, hash(INTEGRAL_SALT, h)))
