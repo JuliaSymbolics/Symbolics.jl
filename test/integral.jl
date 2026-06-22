@@ -6,6 +6,17 @@ I1 = Integral(x in ClosedInterval(1, 5))
 I2 = Integral(x in ClosedInterval(1, 5))
 @test I1 == I2
 
+@test isequal(I1, I2)
+@test hash(I1) == hash(I2)
+@test isequal(I1, deepcopy(I1)) && hash(I1) == hash(deepcopy(I1))
+let I3 = Integral(x in ClosedInterval(1, 6))
+    @test !isequal(I1, I3)
+    @test hash(I1) != hash(I3)
+end
+# As a `Term` operation, content-identical integrals hash-cons together.
+@test isequal(I1(y), I2(y))
+@test hash(I1(y)) == hash(I2(y))
+
 @variables v(..) u(..) x y a b
 
 # test constant integrand
@@ -58,7 +69,7 @@ I = Integral(y in ClosedInterval(1, 2x))
 I = Integral(y in ClosedInterval(1, x))
 @test isequal(expand_derivatives(D(I(1))), 1)
 
-# test shadowing by integration variable 
+# test shadowing by integration variable
 # the result of a definite integral over x does not depend on x
 # anymore unless it appears again in the limits
 I = Integral(x in ClosedInterval(1, 2))
