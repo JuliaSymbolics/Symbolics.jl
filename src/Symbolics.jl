@@ -29,7 +29,7 @@ import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
     FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
     promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
     Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT,
-    ifelse_eager, ifelse_branching
+    ifelse_eager, ifelse_branching, Unknown
 import SymbolicUtils as SU
 
 using SymbolicUtils.Code
@@ -167,7 +167,7 @@ export @register_symbolic, @register_array_symbolic
 include("register.jl")
 
 using SparseArrays
-export @variables, Variable
+export @variables
 include("variable.jl")
 
 function slog end; function ssqrt end; function scbrt end
