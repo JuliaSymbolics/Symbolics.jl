@@ -34,14 +34,14 @@ jobs:
           - {user: SciML, repo: ModelOrderReduction.jl, group: Core}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.julia-version }}
           arch: x64
       - uses: julia-actions/julia-buildpkg@latest
       - name: Clone Downstream
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ matrix.package.user }}/${{ matrix.package.repo }}
           path: downstream
