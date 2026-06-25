@@ -607,6 +607,7 @@ include("despecialize.jl")
 @public get_variables, get_variables!, get_differential_vars, option_to_metadata_type, scalarize, shape
 @public unwrap, variable, wrap, linear_expansion, LinearExpander
 @public _toexpr_metadata, _toexpr_op
+@public value, rhss
 
 @setup_workload begin
     fold1 = Val{false}()
