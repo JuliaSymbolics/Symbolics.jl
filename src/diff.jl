@@ -472,14 +472,14 @@ end
 differentiate(arg::Union{SymbolicT, Num}, vars::Union{AbstractVector{SymbolicT}, AbstractVector{Num}}; kw...) = differentiate(unwrap(arg), unwrap.(vars))
 differentiate(arg::Union{SymbolicT, Num}, vars::Union{SymbolicT, Num}; kw...) = differentiate(unwrap(arg), [unwrap(vars)])
 
-function get_factorable_subgraphs(graph::SymbolicUtils.OrderedDiGraph{Int32}, root_idxs::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})
+function get_factorable_subgraphs(graph::SymbolicUtils.OrderedDiGraph{Int32}, root_idxs::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})::Set{Tuple{Int32, Int32}}
     nodes = SymbolicUtils.Graphs.vertices(graph)
     
     doms = _get_dominators(graph, nodes, root_idxs)
     pdoms = _get_postdominators(graph, nodes, var_idxs)
     
-    function is_factorable_subgraph(subgraph::Tuple{Int64, Int32})
-        !any(isnothing.(subgraph)) && length(SymbolicUtils.Graphs.outneighbors(graph, max(subgraph...))) > 1 && length(SymbolicUtils.Graphs.inneighbors(graph, min(subgraph...))) > 1
+    function is_factorable_subgraph(subgraph::Tuple{Int64, Union{Nothing, Int32}})
+        !isnothing(subgraph[2]) && length(SymbolicUtils.Graphs.outneighbors(graph, max(subgraph...))) > 1 && length(SymbolicUtils.Graphs.inneighbors(graph, min(subgraph...))) > 1
     end
 
     dom_factorable_subgraphs = Set(filter(is_factorable_subgraph, Set(enumerate(doms))))
@@ -494,6 +494,7 @@ function _get_dominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::Abst
 
     function get_common_parent(a::Int32, b::Int32)::Union{Nothing, Int32}
         # move a and b up the graph through their immediate dominators until they meet
+        (isnothing(doms[a]) || isnothing(doms[b])) && return nothing
         while a != b
             !(a < b && a != doms[a]) && !(b < a && b != doms[b]) && return nothing
             while a < b && a != doms[a]
@@ -513,11 +514,14 @@ function _get_dominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::Abst
             node in root_idxs && continue
             
             parents = SymbolicUtils.Graphs.inneighbors(graph, node)
-            new_idom = parents[1]
+            
+            new_idom = first(parents)
 
-            for parent_idx in 2:length(parents)
-                if isassigned(doms, parents[parent_idx])
-                    new_idom = get_common_parent(parents[parent_idx], new_idom)
+            for parent in parents
+                parent == first(parents) && continue
+                if isassigned(doms, parent)
+                    new_idom = get_common_parent(parent, new_idom)
+                    isnothing(new_idom) && break
                 end
             end
 
@@ -562,11 +566,12 @@ function _get_postdominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::
                 pdoms[node] = nothing
                 continue
             end
-            new_pidom = children[1]
+            new_pidom = first(children)
 
             for child_idx in 2:length(children)
                 if isassigned(pdoms, children[child_idx])
                     new_pidom = get_common_child(children[child_idx], new_pidom)
+                    isnothing(new_pidom) && break
                 end
             end
 
@@ -581,11 +586,43 @@ function _get_postdominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::
     return pdoms
 end
 
-function factor_subgraphs(graph::SymbolicUtils.OrderedDiGraph{Int32})
+function calculate_root_reachabilities(ir::IRStructure{VartypeT}, root_idxs::AbstractVector{Int32})
+    reachabilities = Dict{Int32, BitVector}()
+
+    for (i, root) in enumerate(root_idxs)
+        reachable = get_reachability(ir, root)
+        push!(reachable, root)
+        for node in reachable
+            if node ∉ keys(reachabilities)
+                reachabilities[node] = falses(length(root_idxs))
+            end
+            reachabilities[node][i] = 1
+        end
+    end
+
+    return reachabilities
+end
+
+function count_subgraph_uses(ir::IRStructure{VartypeT}, subgraph::Tuple{Int32, Int32}, root_reachabilities::Dict{Int32, BitVector}, var_idxs::AbstractVector{Int32})
+    top_vertex = max(subgraph...)
+    bott_vertex = min(subgraph...)
+
+    reachable = get_reachability(ir, bott_vertex)
+    push!(reachable, bott_vertex)
+    var_reachability = falses(length(var_idxs))
+    for node in reachable
+        if node in var_idxs
+            var_reachability[findfirst(node, var_idxs)] = 1
+        end
+    end
+
+    return sum(root_reachabilities[top_vertex]) * sum(var_reachability)
+end
+
+function factor_subgraphs(ir::IRStructure{VartypeT}, root_idxs::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})
+    graph = ir.dependency_graph
+    root_reachabilities = calculate_root_reachabilities(ir, root_idxs)
     edges = SymbolicUtils.Graphs.edges(graph)
-    counts = Dict{Tuple{Int32, Int32}, Int}
-    altered = Vector{Tuple{Int32, Int32}}
-    
 end
 
 """
