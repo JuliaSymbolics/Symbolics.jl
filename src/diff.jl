@@ -310,7 +310,7 @@ const ifelse_rules = (
     (@acrule ~c*ifelse(~cond, ~a, ~b) => ifelse(~cond, ~c*~a, ~c*~b)),
     (@rule ifelse(~cond, ~a, ~b)/~c => ifelse(~cond, ~a/~c, ~b/~c)),
     (@acrule ifelse(~cond, ~a, ~b) + ifelse(~cond, ~c, ~d) => ifelse(~cond, ~a+~c, ~b+~d))
-)
+) # TODO: get rid of rules
 
 const ifelse_rewriter = Fixpoint(Postwalk(Chain(ifelse_rules)))
 
@@ -471,6 +471,122 @@ end
 
 differentiate(arg::Union{SymbolicT, Num}, vars::Union{AbstractVector{SymbolicT}, AbstractVector{Num}}; kw...) = differentiate(unwrap(arg), unwrap.(vars))
 differentiate(arg::Union{SymbolicT, Num}, vars::Union{SymbolicT, Num}; kw...) = differentiate(unwrap(arg), [unwrap(vars)])
+
+function get_factorable_subgraphs(graph::SymbolicUtils.OrderedDiGraph{Int32}, root_idxs::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})
+    nodes = SymbolicUtils.Graphs.vertices(graph)
+    
+    doms = _get_dominators(graph, nodes, root_idxs)
+    pdoms = _get_postdominators(graph, nodes, var_idxs)
+    
+    function is_factorable_subgraph(subgraph::Tuple{Int64, Int32})
+        !any(isnothing.(subgraph)) && length(SymbolicUtils.Graphs.outneighbors(graph, max(subgraph...))) > 1 && length(SymbolicUtils.Graphs.inneighbors(graph, min(subgraph...))) > 1
+    end
+
+    dom_factorable_subgraphs = Set(filter(is_factorable_subgraph, Set(enumerate(doms))))
+    pdom_factorable_subgraphs = Set(filter(is_factorable_subgraph, Set(enumerate(pdoms))))
+    
+    return union(dom_factorable_subgraphs, pdom_factorable_subgraphs)
+end
+
+function _get_dominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::AbstractVector{Int32}, root_idxs::AbstractVector{Int32})
+    doms = Vector{Union{Nothing, Int32}}(undef, length(nodes))
+    doms[root_idxs] = root_idxs
+
+    function get_common_parent(a::Int32, b::Int32)::Union{Nothing, Int32}
+        # move a and b up the graph through their immediate dominators until they meet
+        while a != b
+            !(a < b && a != doms[a]) && !(b < a && b != doms[b]) && return nothing
+            while a < b && a != doms[a]
+                a = doms[a]
+            end
+            while b < a && b != doms[b]
+                b = doms[b]
+            end
+        end
+        return a
+    end
+
+    changed = true # keeps track of when changes stop happening
+    while changed
+        changed = false
+        for node in reverse(nodes)
+            node in root_idxs && continue
+            
+            parents = SymbolicUtils.Graphs.inneighbors(graph, node)
+            new_idom = parents[1]
+
+            for parent_idx in 2:length(parents)
+                if isassigned(doms, parents[parent_idx])
+                    new_idom = get_common_parent(parents[parent_idx], new_idom)
+                end
+            end
+
+            if doms[node] != new_idom
+                doms[node] = new_idom
+                changed = true
+            end
+        end
+    end
+
+
+    return doms
+end
+
+function _get_postdominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})
+    pdoms = Vector{Union{Nothing, Int32}}(undef, length(nodes))
+    pdoms[var_idxs] = var_idxs
+
+    function get_common_child(a::Int32, b::Int32)::Union{Nothing, Int32}
+        # move a and b up the graph through their immediate dominators until they meet
+        (isnothing(pdoms[a]) || isnothing(pdoms[b])) && return nothing
+        while a != b
+            !(a > b && a != pdoms[a]) && !(b > a && b != pdoms[b]) && return nothing
+            while a > b && a != pdoms[a]
+                a = pdoms[a]
+            end
+            while b > a && b != pdoms[b]
+                b = pdoms[b]
+            end
+        end
+        return a
+    end
+
+    changed = true # keeps track of when changes stop happening
+    while changed
+        changed = false
+        for node in nodes
+            node in var_idxs && continue
+            
+            children = SymbolicUtils.Graphs.outneighbors(graph, node)
+            if isempty(children)
+                pdoms[node] = nothing
+                continue
+            end
+            new_pidom = children[1]
+
+            for child_idx in 2:length(children)
+                if isassigned(pdoms, children[child_idx])
+                    new_pidom = get_common_child(children[child_idx], new_pidom)
+                end
+            end
+
+            if pdoms[node] != new_pidom
+                pdoms[node] = new_pidom
+                changed = true
+            end
+        end
+    end
+
+
+    return pdoms
+end
+
+function factor_subgraphs(graph::SymbolicUtils.OrderedDiGraph{Int32})
+    edges = SymbolicUtils.Graphs.edges(graph)
+    counts = Dict{Tuple{Int32, Int32}, Int}
+    altered = Vector{Tuple{Int32, Int32}}
+    
+end
 
 """
     executediff(D, arg; simplify=false, occurrences=nothing)
