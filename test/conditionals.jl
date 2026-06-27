@@ -49,6 +49,24 @@ end
     end
 end
 
+# Counts how many times it is evaluated; used to detect duplicated computation.
+const FIRE_COUNT = Ref(0)
+fire(v) = (FIRE_COUNT[] += 1; v)
+Symbolics.@register_symbolic fire(v)
+
+@testset "multiply-referenced ifelse_branching is computed once under CSE" begin
+    z = ifelse_branching(x > 0, fire(x)^2, boom(x))
+    f = build_function(sin(z) + cos(z), x; expression = Val{false}, cse = true)
+    FIRE_COUNT[] = 0
+    @test f(2.0) == sin(4.0) + cos(4.0)
+    @test FIRE_COUNT[] == 1     # the shared `if`/`else` ran once; `boom` not at all
+
+    fvec = build_function([sin(z), cos(z)], x; expression = Val{false}, cse = true)[1]
+    FIRE_COUNT[] = 0
+    @test fvec(2.0) == [sin(4.0), cos(4.0)]
+    @test FIRE_COUNT[] == 1
+end
+
 @testset "ifelse_eager evaluates both branches" begin
     for cse in (true, false)
         f = build_function(
