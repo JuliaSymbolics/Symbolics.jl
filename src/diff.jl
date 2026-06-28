@@ -494,13 +494,13 @@ function _get_dominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::Abst
 
     function get_common_parent(a::Int32, b::Int32)::Union{Nothing, Int32}
         # move a and b up the graph through their immediate dominators until they meet
-        (isnothing(doms[a]) || isnothing(doms[b])) && return nothing
         while a != b
+            (isnothing(a) || isnothing(b)) && return nothing
             !(a < b && a != doms[a]) && !(b < a && b != doms[b]) && return nothing
-            while a < b && a != doms[a]
+            while !isnothing(a) && a < b && a != doms[a]
                 a = doms[a]
             end
-            while b < a && b != doms[b]
+            while !isnothing(b) && b < a && b != doms[b]
                 b = doms[b]
             end
         end
@@ -603,7 +603,7 @@ function calculate_root_reachabilities(ir::IRStructure{VartypeT}, root_idxs::Abs
     return reachabilities
 end
 
-function count_subgraph_uses(ir::IRStructure{VartypeT}, subgraph::Tuple{Int32, Int32}, root_reachabilities::Dict{Int32, BitVector}, var_idxs::AbstractVector{Int32})
+function get_subgraph_reachability(ir::IRStructure{VartypeT}, subgraph::Tuple{Int32, Int32}, root_reachabilities::Dict{Int32, BitVector}, var_idxs::AbstractVector{Int32})::Tuple{BitVector, BitVector}
     top_vertex = max(subgraph...)
     bott_vertex = min(subgraph...)
 
@@ -612,17 +612,56 @@ function count_subgraph_uses(ir::IRStructure{VartypeT}, subgraph::Tuple{Int32, I
     var_reachability = falses(length(var_idxs))
     for node in reachable
         if node in var_idxs
-            var_reachability[findfirst(node, var_idxs)] = 1
+            var_reachability[findfirst(isequal(node), var_idxs)] = 1
         end
     end
 
-    return sum(root_reachabilities[top_vertex]) * sum(var_reachability)
+    return root_reachabilities[top_vertex], var_reachability
+end
+
+count_subgraph_uses(reachability::Tuple{BitVector, BitVector}) = sum(reachability[1]) * sum(reachability[2])
+
+function factor_subgraph(ir::IRStructure{VartypeT}, subgraph::Tuple{Int32, Int32})
+    if subgraph[1] > subgraph[2]
+        # top vertex dominates bottom vertex
+
+    else
+        # bottom vertex postdominates top vertex
+    end
 end
 
 function factor_subgraphs(ir::IRStructure{VartypeT}, root_idxs::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})
     graph = ir.dependency_graph
     root_reachabilities = calculate_root_reachabilities(ir, root_idxs)
-    edges = SymbolicUtils.Graphs.edges(graph)
+    subgraphs = get_factorable_subgraphs(graph, root_idxs, var_idxs)
+
+    # maps subgraphs to tuples storing root and var reachability bitvectors
+    reachabilities = Dict{Tuple{Int32, Int32}, Tuple{BitVector, BitVector}}()
+    subgraph_order = Base.By(g -> count_subgraph_uses(reachabilities[g]), Base.Reverse)
+    heap = MutableBinaryHeap(subgraph_order, Tuple{Int32,Int32}[])
+    heap_handles = Dict{Tuple{Int32, Int32}, Int}()
+
+    for subgraph in subgraphs
+        root_reachability, var_reachability = get_subgraph_reachability(ir, subgraph, root_reachabilities, var_idxs)
+        reachabilities[subgraph] = (root_reachability, var_reachability)
+        heap_handles[subgraph] = push!(heap, subgraph)
+    end
+
+    altered = Vector{Tuple{Int32, Int32}}()
+    while !isempty(heap)
+        max_subgraph = pop!(heap)
+        println("factored $max_subgraph")
+
+        for subgraph in subgraphs
+            if any(reachabilities[subgraph][1] .& reachabilities[max_subgraph][1]) && any(reachabilities[subgraph][2] .& reachabilities[max_subgraph][2])
+                push!(altered, subgraph)
+            end
+        end
+        isempty(altered) || (root_reachabilities = calculate_root_reachabilities(ir, root_idxs))
+        for subgraph in altered
+            reachabilities[subgraph] = get_subgraph_reachability(ir, subgraph, root_reachabilities, var_idxs)
+        end
+    end
 end
 
 """
