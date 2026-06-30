@@ -161,6 +161,7 @@ using ConstructionBase
 include("arrays.jl")
 
 export tosymbol, terms, factors
+export gather_factor
 include("utils.jl")
 
 export @register_symbolic, @register_array_symbolic
