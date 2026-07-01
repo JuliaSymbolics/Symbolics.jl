@@ -342,9 +342,9 @@ version = "1.17.0"
 
 [[deps.DomainSets]]
 deps = ["CompositeTypes", "FunctionMaps", "IntervalSets", "LinearAlgebra", "StaticArrays"]
-git-tree-sha1 = "1af39efbaf76fb648432b5efaac0d73af6760407"
+git-tree-sha1 = "c0f576ae49bd2d1bc904b9946f4783db8f0ef530"
 uuid = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"
-version = "0.8.0"
+version = "0.8.1"
 
     [deps.DomainSets.extensions]
     DomainSetsMakieExt = "Makie"
@@ -1311,9 +1311,9 @@ version = "1.4.0"
 
 [[deps.SymbolicUtils]]
 deps = ["AbstractTrees", "ArrayInterface", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "EnumX", "ExproniconLite", "Graphs", "LinearAlgebra", "MacroTools", "Moshi", "MultivariatePolynomials", "MutableArithmetics", "NaNMath", "PrecompileTools", "ReadOnlyArrays", "SciMLPublic", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "TaskLocalValues", "TermInterface", "WeakCacheSets"]
-git-tree-sha1 = "57d542e95ff7c2944a90e9c4e9f0c7ae3ec5c2af"
+git-tree-sha1 = "c90bb50e2bcbe736f57885388b37ffffecc6026b"
 uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
-version = "4.37.2"
+version = "4.38.0"
 
     [deps.SymbolicUtils.extensions]
     SymbolicUtilsChainRulesCoreExt = "ChainRulesCore"
