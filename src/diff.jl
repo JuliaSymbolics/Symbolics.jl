@@ -306,6 +306,364 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
     return SymbolicUtils.add_worker(VartypeT, summed_args)
 end
 
+const ifelse_rules = (
+    (@acrule ~c*ifelse(~cond, ~a, ~b) => ifelse(~cond, ~c*~a, ~c*~b)),
+    (@rule ifelse(~cond, ~a, ~b)/~c => ifelse(~cond, ~a/~c, ~b/~c)),
+    (@acrule ifelse(~cond, ~a, ~b) + ifelse(~cond, ~c, ~d) => ifelse(~cond, ~a+~c, ~b+~d))
+) # TODO: get rid of rules
+
+const ifelse_rewriter = Fixpoint(Postwalk(Chain(ifelse_rules)))
+
+function preprocess_vector_array_ops(expr::SymbolicT)
+    return Postwalk(arg -> begin
+        @match arg begin
+        BSImpl.Term(; f, args, shape) && if f === (*) && length(args) == 2 && isempty(shape) end => begin
+            @match args[1] begin
+                BSImpl.Term(; f = f2, args = args2) && if f2 === adjoint end => begin
+                    return LinearAlgebra.dot(
+                        collect(args2[1])::Vector{SymbolicT},
+                        collect(args[2])::Vector{SymbolicT}
+                    )
+                end
+                _ => nothing
+            end
+        end
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.dot end => begin
+            return LinearAlgebra.dot(
+                collect(args[1])::Vector{SymbolicT}, collect(args[2])::Vector{SymbolicT}
+            )
+        end
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.norm end => begin
+            add_buffer = SArgsT()
+            arr = args[1]
+            for i in SymbolicUtils.stable_eachindex(arr)
+                push!(add_buffer, abs2(arr[i]))
+            end
+            return sqrt(SymbolicUtils.add_worker(VartypeT, add_buffer))
+        end
+        BSImpl.ArrayOp(; output_idx) && if isempty(output_idx) end => begin
+            # Some sort of `mapreduce`
+            return SymbolicUtils.scalarize(arg)::SymbolicT
+        end
+        _ => nothing
+    end
+    end)(expr)
+end
+
+function differentiate(arg::SymbolicT, vars::AbstractVector{SymbolicT}; throw_no_derivative=false)
+    arg = preprocess_vector_array_ops(arg)
+    
+    any(occursin_info.(vars,arg)) || return COMMON_ZERO
+
+    @match arg begin
+        BSImpl.Term(; f) && if f isa Differential end => begin
+            return [Differential(var)(arg) for var in vars]
+        end
+        _ => nothing
+    end
+
+    ir = IRStructure{VartypeT}()
+    populate_ir!(ir, arg)
+
+    # holds intermediate results for every node in the IRStructure
+    result_ir = Vector{Union{SymbolicT, Vector{SymbolicT}}}(undef, length(ir))
+    result = Vector{SymbolicT}(undef, length(vars))
+
+    var_set = Set(vars)
+
+    for node_idx in reverse(eachindex(ir))
+        node = ir[node_idx]
+
+        isassigned(result_ir, node_idx) || (result_ir[node_idx] = COMMON_ONE)
+        node ∈ var_set && (result[findfirst(isequal(ir[node_idx]), vars)] = result_ir[node_idx])
+
+        # get outneighbors of ir[node_idx] (ir indices of all arguments in the IRStructure)
+        args = collect(SymbolicUtils.Graphs.outneighbors(ir.dependency_graph, node_idx))
+
+        isempty(args) && continue
+
+        for arg in args
+            isassigned(result_ir, arg) || (result_ir[arg] = symtype(ir[arg])<:AbstractArray ? fill(COMMON_ZERO, length(ir[arg])) : COMMON_ZERO)
+        end
+
+        @match node begin
+            BSImpl.Const(;) => continue
+            BSImpl.AddMul(; variant) => begin
+                if variant == SymbolicUtils.AddMulVariant.ADD
+                    result_ir[args] .+= result_ir[node_idx] * COMMON_ONE
+                else
+                    for arg in args
+                        result_ir[arg] += (result_ir[node_idx] * node) / ir[arg]
+                    end
+                end
+                continue
+            end
+            BSImpl.Term(; f) => begin
+                if f === getindex # node is element of an array
+                    # let ∂xᵢ/∂x = eᵢ (standard basis vector) e.g. ∂x₂/∂x = [0,1,...0]
+                    if symtype(result_ir[args[1]])<:AbstractArray
+                        result_ir[args[1]][value(ir[args[2]])] += result_ir[node_idx]
+                    else
+                        result_ir[args[1]] += result_ir[node_idx]
+                    end
+                    continue
+                elseif f isa BasicSymbolic{VartypeT}
+                    # f is a symbolic function
+                    # result_ir[args[1]] += result_ir[node_idx] # ∂x(t)/∂x = 1
+                    for (i, arg) in enumerate(args[2:lastindex(args)])
+                        # ∂x(t)/∂t
+                        der_partial = collect(Differential(ir[arg])(node))
+                        result_ir[arg] += symtype(node)<:AbstractArray ? LinearAlgebra.dot(result_ir[node_idx], der_partial) : result_ir[node_idx]*der_partial
+                    end
+                    continue
+                elseif f isa Differential
+                    # expand_derivatives couldn't remove nested differential
+                    # try differentiating argument w.r.t. vars (i.e. reverse the order of differentiation)
+                    filtered_vars = filter(in(keys(ir.definition)),vars)
+                    innerdiffs = differentiate(ir[args[1]], filtered_vars)
+                    for (innerdiff, var) in zip(innerdiffs, filtered_vars)
+                        der = @match innerdiff begin
+                            BSImpl.Term(; f = finner) && if finner isa Differential end => Differential(var)(node)
+                            _ => differentiate(innerdiff, [f.x])
+                        end
+                        if isassigned(result_ir, ir.definition[var]) 
+                            result_ir[ir.definition[var]] += result_ir[node_idx] * der
+                        else
+                            result_ir[ir.definition[var]] = result_ir[node_idx] * der
+                        end
+                    end
+                    continue
+                elseif f === ifelse
+                    # for node = ifelse(cond, x, y), ∂node/∂x = ifelse(cond, 1, 0) and ∂node/∂y = ifelse(cond, 0, 1)
+                    cond = ir[args[1]]
+                    result_ir[args[2]] += result_ir[node_idx] * ifelse(cond, COMMON_ONE, COMMON_ZERO)
+                    result_ir[args[3]] += result_ir[node_idx] * ifelse(cond, COMMON_ZERO, COMMON_ONE)
+                    continue
+                elseif f isa SymbolicUtils.Operator
+                    continue
+                end
+            end
+            _ => nothing
+        end
+
+        for (args_idx, ir_idx) in enumerate(args)
+            # args_idx: index of argument in arguments(ir[node_idx]) (used in derivative_idx)
+            # ir_idx: index of argument in the IRStructure
+            @match ir[ir_idx] begin
+                BSImpl.Const(;) => continue
+                _ => nothing
+            end
+            
+            der_partial = derivative_idx(node, args_idx) # ∂node/∂arg
+
+            # if der_partial can't be determined, throw if throw_no_derivative else wrap in Differential
+            throw_no_derivative && any(isnothing.(der_partial)) && throw(DerivativeNotDefinedError(arg, args_idx))
+            isnothing(der_partial) && (der_partial = Differential(ir[ir_idx])(ir[node_idx]))
+
+            # chain rule and product rule: ∂root/∂arg += ∂root/∂node * ∂node/∂arg
+            # use dot product when multiplying vectors
+            result_ir[ir_idx] += symtype(node)<:AbstractArray ? LinearAlgebra.dot(result_ir[node_idx], scalarize(der_partial)) : result_ir[node_idx]*der_partial
+        end
+    end
+
+    return ifelse_rewriter.(result)
+end
+
+differentiate(arg::Union{SymbolicT, Num}, vars::Union{AbstractVector{SymbolicT}, AbstractVector{Num}}; kw...) = differentiate(unwrap(arg), unwrap.(vars))
+differentiate(arg::Union{SymbolicT, Num}, vars::Union{SymbolicT, Num}; kw...) = differentiate(unwrap(arg), [unwrap(vars)])
+
+function get_factorable_subgraphs(graph::SymbolicUtils.OrderedDiGraph{Int32}, root_idxs::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})::Set{Tuple{Int32, Int32}}
+    nodes = SymbolicUtils.Graphs.vertices(graph)
+    
+    doms = _get_dominators(graph, nodes, root_idxs)
+    pdoms = _get_postdominators(graph, nodes, var_idxs)
+    
+    function is_factorable_subgraph(subgraph::Tuple{Int64, Union{Nothing, Int32}})
+        !isnothing(subgraph[2]) && length(SymbolicUtils.Graphs.outneighbors(graph, max(subgraph...))) > 1 && length(SymbolicUtils.Graphs.inneighbors(graph, min(subgraph...))) > 1
+    end
+
+    dom_factorable_subgraphs = Set(filter(is_factorable_subgraph, Set(enumerate(doms))))
+    pdom_factorable_subgraphs = Set(filter(is_factorable_subgraph, Set(enumerate(pdoms))))
+    
+    return union(dom_factorable_subgraphs, pdom_factorable_subgraphs)
+end
+
+function _get_dominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::AbstractVector{Int32}, root_idxs::AbstractVector{Int32})
+    doms = Vector{Union{Nothing, Int32}}(undef, length(nodes))
+    doms[root_idxs] = root_idxs
+
+    function get_common_parent(a::Int32, b::Int32)::Union{Nothing, Int32}
+        # move a and b up the graph through their immediate dominators until they meet
+        while a != b
+            (isnothing(a) || isnothing(b)) && return nothing
+            !(a < b && a != doms[a]) && !(b < a && b != doms[b]) && return nothing
+            while !isnothing(a) && a < b && a != doms[a]
+                a = doms[a]
+            end
+            while !isnothing(b) && b < a && b != doms[b]
+                b = doms[b]
+            end
+        end
+        return a
+    end
+
+    changed = true # keeps track of when changes stop happening
+    while changed
+        changed = false
+        for node in reverse(nodes)
+            node in root_idxs && continue
+            
+            parents = SymbolicUtils.Graphs.inneighbors(graph, node)
+            
+            new_idom = first(parents)
+
+            for parent in parents
+                parent == first(parents) && continue
+                if isassigned(doms, parent)
+                    new_idom = get_common_parent(parent, new_idom)
+                    isnothing(new_idom) && break
+                end
+            end
+
+            if doms[node] != new_idom
+                doms[node] = new_idom
+                changed = true
+            end
+        end
+    end
+
+
+    return doms
+end
+
+function _get_postdominators(graph::SymbolicUtils.OrderedDiGraph{Int32}, nodes::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})
+    pdoms = Vector{Union{Nothing, Int32}}(undef, length(nodes))
+    pdoms[var_idxs] = var_idxs
+
+    function get_common_child(a::Int32, b::Int32)::Union{Nothing, Int32}
+        # move a and b up the graph through their immediate dominators until they meet
+        (isnothing(pdoms[a]) || isnothing(pdoms[b])) && return nothing
+        while a != b
+            !(a > b && a != pdoms[a]) && !(b > a && b != pdoms[b]) && return nothing
+            while a > b && a != pdoms[a]
+                a = pdoms[a]
+            end
+            while b > a && b != pdoms[b]
+                b = pdoms[b]
+            end
+        end
+        return a
+    end
+
+    changed = true # keeps track of when changes stop happening
+    while changed
+        changed = false
+        for node in nodes
+            node in var_idxs && continue
+            
+            children = SymbolicUtils.Graphs.outneighbors(graph, node)
+            if isempty(children)
+                pdoms[node] = nothing
+                continue
+            end
+            new_pidom = first(children)
+
+            for child_idx in 2:length(children)
+                if isassigned(pdoms, children[child_idx])
+                    new_pidom = get_common_child(children[child_idx], new_pidom)
+                    isnothing(new_pidom) && break
+                end
+            end
+
+            if pdoms[node] != new_pidom
+                pdoms[node] = new_pidom
+                changed = true
+            end
+        end
+    end
+
+
+    return pdoms
+end
+
+function calculate_root_reachabilities(ir::IRStructure{VartypeT}, root_idxs::AbstractVector{Int32})
+    reachabilities = Dict{Int32, BitVector}()
+
+    for (i, root) in enumerate(root_idxs)
+        reachable = get_reachability(ir, root)
+        push!(reachable, root)
+        for node in reachable
+            if node ∉ keys(reachabilities)
+                reachabilities[node] = falses(length(root_idxs))
+            end
+            reachabilities[node][i] = 1
+        end
+    end
+
+    return reachabilities
+end
+
+function get_subgraph_reachability(ir::IRStructure{VartypeT}, subgraph::Tuple{Int32, Int32}, root_reachabilities::Dict{Int32, BitVector}, var_idxs::AbstractVector{Int32})::Tuple{BitVector, BitVector}
+    top_vertex = max(subgraph...)
+    bott_vertex = min(subgraph...)
+
+    reachable = get_reachability(ir, bott_vertex)
+    push!(reachable, bott_vertex)
+    var_reachability = falses(length(var_idxs))
+    for node in reachable
+        if node in var_idxs
+            var_reachability[findfirst(isequal(node), var_idxs)] = 1
+        end
+    end
+
+    return root_reachabilities[top_vertex], var_reachability
+end
+
+count_subgraph_uses(reachability::Tuple{BitVector, BitVector}) = sum(reachability[1]) * sum(reachability[2])
+
+function factor_subgraph(ir::IRStructure{VartypeT}, subgraph::Tuple{Int32, Int32})
+    if subgraph[1] > subgraph[2]
+        # top vertex dominates bottom vertex
+
+    else
+        # bottom vertex postdominates top vertex
+    end
+end
+
+function factor_subgraphs(ir::IRStructure{VartypeT}, root_idxs::AbstractVector{Int32}, var_idxs::AbstractVector{Int32})
+    graph = ir.dependency_graph
+    root_reachabilities = calculate_root_reachabilities(ir, root_idxs)
+    subgraphs = get_factorable_subgraphs(graph, root_idxs, var_idxs)
+
+    # maps subgraphs to tuples storing root and var reachability bitvectors
+    reachabilities = Dict{Tuple{Int32, Int32}, Tuple{BitVector, BitVector}}()
+    subgraph_order = Base.By(g -> count_subgraph_uses(reachabilities[g]), Base.Reverse)
+    heap = MutableBinaryHeap(subgraph_order, Tuple{Int32,Int32}[])
+    heap_handles = Dict{Tuple{Int32, Int32}, Int}()
+
+    for subgraph in subgraphs
+        root_reachability, var_reachability = get_subgraph_reachability(ir, subgraph, root_reachabilities, var_idxs)
+        reachabilities[subgraph] = (root_reachability, var_reachability)
+        heap_handles[subgraph] = push!(heap, subgraph)
+    end
+
+    altered = Vector{Tuple{Int32, Int32}}()
+    while !isempty(heap)
+        max_subgraph = pop!(heap)
+        println("factored $max_subgraph")
+
+        for subgraph in subgraphs
+            if any(reachabilities[subgraph][1] .& reachabilities[max_subgraph][1]) && any(reachabilities[subgraph][2] .& reachabilities[max_subgraph][2])
+                push!(altered, subgraph)
+            end
+        end
+        isempty(altered) || (root_reachabilities = calculate_root_reachabilities(ir, root_idxs))
+        for subgraph in altered
+            reachabilities[subgraph] = get_subgraph_reachability(ir, subgraph, root_reachabilities, var_idxs)
+        end
+    end
+end
+
 """
     executediff(D, arg; simplify=false, occurrences=nothing)
 
@@ -335,6 +693,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         return arg
     end
     isequal(arg, D.x) && return COMMON_ONE
+    return only(differentiate(arg, [D.x]; throw_no_derivative=throw_no_derivative))
     @match arg begin
         BSImpl.Term(; f, args, shape) && if f === (*) && length(args) == 2 && isempty(shape) end => begin
             @match args[1] begin
@@ -366,7 +725,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
         _ => nothing
     end
-    occursin_info(D.x, arg) || return COMMON_ZERO
+    occursin_info.(D.x, arg) || return COMMON_ZERO
 
     # We can safely assume `arg` is scalar, else `occursin_info` would have errored.
     @match arg begin
