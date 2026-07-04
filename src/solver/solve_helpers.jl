@@ -33,9 +33,7 @@ function ssqrt(n)
         return sqrt(n)
     end
 
-    if symtype(n) === Real
-        return term(ssqrt, n)
-    end
+    return term(ssqrt, n)
 end
 
 SymbolicUtils.promote_symtype(::typeof(ssqrt), ::Type{T}) where {T} = T
@@ -57,9 +55,7 @@ function scbrt(n)
         return (n)^(1 / 3)
     end
 
-    if symtype(n) === Real
-        return term(scbrt, n)
-    end
+    return term(scbrt, n)
 end
 
 SymbolicUtils.promote_symtype(::typeof(scbrt), ::Type{T}) where {T} = T

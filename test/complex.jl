@@ -71,3 +71,23 @@ end
     @test rv isa ComplexF64
     @test rv ≈ uv
 end
+
+@testset "substitute a Complex{Num} for a real variable" begin
+    # ssqrt/scbrt (as emitted by symbolic_solve's cubic formula) used to return
+    # `nothing` for complex-symtype arguments, and substituting a complex value
+    # into the real slot of a `complex(re, im)` term used to throw
+    @variables t pd
+    s = Symbolics.wrap(Symbolics.ssqrt(im*sin(t) + pd^2))
+    @test s isa Complex{Num}
+    n3 = Symbolics.wrap(Symbolics.scbrt(-0.25pd + s)) + Symbolics.wrap(Symbolics.scbrt(-0.25pd - s))
+    @test n3 isa Complex{Num}
+    d = -cos(t) + im*sin(t)
+    n4 = substitute(n3, Dict(pd => d))
+    @test n4 isa Complex{Num}
+    rv = unwrap_const(unwrap(substitute(n4, Dict(t => 3); fold = Val(true))))
+    dv = -cos(3.0) + im*sin(3.0)
+    sv = sqrt(im*sin(3.0) + dv^2)
+    refv = (-0.25dv + sv)^(1/3) + (-0.25dv - sv)^(1/3)
+    @test rv isa ComplexF64
+    @test rv ≈ refv
+end
