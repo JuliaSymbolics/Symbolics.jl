@@ -153,11 +153,22 @@ function bigify(n)
     return n
 end
 
+# SymbolicUtils restricts `//` to integer/rational symtypes, but for symbolic
+# arguments `//` builds the same `Div` as `/` anyway. Use `/` for symbolic
+# arguments and keep exact rational division for plain numbers.
+function sdiv(x, y)
+    x, y = unwrap(x), unwrap(y)
+    if x isa BasicSymbolic || y isa BasicSymbolic
+        return x / y
+    end
+    return x // y
+end
+
 function comp_rational(x, y)
     x, y = bigify(unwrap(x)), bigify(unwrap(y))
     if !(unwrap(x) isa AbstractFloat || x isa Complex) &&
        !(unwrap(y) isa AbstractFloat || y isa Complex)
-        r = x // y
+        r = sdiv(x, y)
         return r
     end
 
