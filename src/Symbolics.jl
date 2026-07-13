@@ -610,6 +610,7 @@ include("despecialize.jl")
 @public unwrap, variable, wrap, linear_expansion, LinearExpander
 @public _toexpr_metadata, _toexpr_op
 @public value
+@public CodegenFunctionOptions, codegen_function
 
 @setup_workload begin
     fold1 = Val{false}()

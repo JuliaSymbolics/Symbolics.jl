@@ -289,6 +289,12 @@ end
 
 @testset "`CodegenFunctionOptions` struct interface" begin
     @variables a b c1 c2 c3 d e g
+    @test (@doc Symbolics.CodegenFunctionOptions) !== nothing
+    @test (@doc Symbolics.codegen_function) !== nothing
+    @static if VERSION >= v"1.11"
+        @test Base.ispublic(Symbolics, :CodegenFunctionOptions)
+        @test Base.ispublic(Symbolics, :codegen_function)
+    end
     # `CodegenFunctionOptions` is a single concrete type regardless of which options are set, so
     # functions that thread it through do not recompile per option-combination.
     @test isconcretetype(Symbolics.CodegenFunctionOptions)
