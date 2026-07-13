@@ -545,3 +545,8 @@ end
 
     @test_nowarn t * x
 end
+
+@testset "`getindex(::Arr, ::Num)`" begin
+    @variables t x(t)[1:3] i(t)::Int
+    @test_nowarn x[i]
+end
