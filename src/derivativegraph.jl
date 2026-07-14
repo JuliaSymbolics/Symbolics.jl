@@ -18,7 +18,8 @@ reachable_roots(edge::Edge) = edge.reachable_roots
 vertices(edge::Edge) = (top_vertex(edge), bott_vertex(edge))
 times_used(edge::Edge) = sum(reachable_roots(edge)) * sum(reachable_vars(edge))
 
-struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
+mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
+    subgraph_value::SymbolicT
     top_vertex::T
     bott_vertex::T
     reachable_vars::BitVector
@@ -26,11 +27,11 @@ struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
     dom_pdom_mask::BitVector # represents either dominated or postdominated nodes depending on type of subgraph
 
     function FactorableSubgraph{T, DominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector, dom_mask::BitVector) where {T<:Integer}
-        new{T, DominatorSubgraph}(top_vertex, bott_vertex, reachable_vars, reachable_roots, dom_mask)
+        new{T, DominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, dom_mask)
     end
 
     function FactorableSubgraph{T, PostDominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector, pdom_mask::BitVector) where {T<:Integer}
-        new{T, PostDominatorSubgraph}(top_vertex, bott_vertex, reachable_vars, reachable_roots, pdom_mask)
+        new{T, PostDominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, pdom_mask)
     end
 end
 
@@ -103,9 +104,9 @@ function rem_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
 end
 
 function add_edge!(dg::DerivativeGraph{T}, top_vertex::T, bott_vertex::T, edge_value::SymbolicT) where {T}
-    reachable_vars = reachable_vars(dg, bott_vertex)
-    reachable_roots = reachable_roots(dg, bott_vertex)
-    new_edge = Edge{T}(edge_value, top_vertex, bott_vertex, reachable_vars, reachable_roots)
+    var_reachability = reachable_vars(dg, bott_vertex)
+    root_reachability = reachable_roots(dg, bott_vertex)
+    new_edge = Edge{T}(edge_value, top_vertex, bott_vertex, var_reachability, root_reachability)
 
     add_edge!(dg, new_edge)
 
@@ -423,28 +424,32 @@ function _subgraph_edges(dg::DerivativeGraph{T}, sub::FactorableSubgraph, node::
     visited = Set{Edge{T}}()
     sub_edges = Set{Edge{T}}()
     for edge in forward_edges(dg, sub, node)
-        _subgraph_edges!(sub_edges, dg, sub, edge, visited, dom_mask)
+        sub.subgraph_value += _subgraph_edges!(sub_edges, dg, sub, edge, visited, dom_mask)
     end
 
     return sub_edges
 end
 
 function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}, edge::Edge{T}, visited::Set{Edge{T}}, dom_mask::BitVector) where {T}
-    edge in visited && return edges
+    edge in visited && return COMMON_ZERO
     
     push!(visited, edge)
 
-    forward_vertex(sub, edge) == forward_vertex(sub) && return push!(edges, edge)
-
-    !dom_mask[forward_vertex(sub, edge)] && return edges
-
-    push!(edges, edge)
-
-    for next_edge in forward_edges(dg, sub, edge)
-        _subgraph_edges!(edges, dg, sub, next_edge, visited, dom_mask)
+    if forward_vertex(sub, edge) == forward_vertex(sub)
+        push!(edges, edge)
+        return edge.edge_value
     end
 
-    return edges
+    !dom_mask[forward_vertex(sub, edge)] && return COMMON_ZERO
+
+    push!(edges, edge)
+    path_value = COMMON_ZERO
+    for next_edge in forward_edges(dg, sub, edge)
+        path_value += _subgraph_edges!(edges, dg, sub, next_edge, visited, dom_mask)
+    end
+    path_value *= edge.edge_value
+
+    return path_value
 end
 
 function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph, dom_masks::Vector{BitVector}, pdom_masks::Vector{BitVector}) where {T}
@@ -459,6 +464,3 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph, dom_m
 
     add_edge!(dg, sub.top_vertex, sub.bott_vertex, sub.subgraph_value)
 end
-
-factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph, dom_masks::Vector{BitVector}, pdom_masks::Vector{BitVector}) where {T} = factor_subgraph!(dg, sub, subgraph_edges(dg, sub, dom_masks, pdom_masks), pdom_masks[backward_vertex(sub)])
-factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDominatorSubgraph}, dom_masks::Vector{BitVector}, pdom_masks::Vector{BitVector}) where {T} = factor_subgraph!(dg, sub, subgraph_edges(dg, sub, dom_masks, pdom_masks), dom_masks[backward_vertex(sub)])
