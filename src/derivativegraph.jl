@@ -18,25 +18,6 @@ reachable_roots(edge::Edge) = edge.reachable_roots
 vertices(edge::Edge) = (top_vertex(edge), bott_vertex(edge))
 times_used(edge::Edge) = sum(reachable_roots(edge)) * sum(reachable_vars(edge))
 
-mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
-    subgraph_value::SymbolicT
-    top_vertex::T
-    bott_vertex::T
-    reachable_vars::BitVector
-    reachable_roots::BitVector
-    dom_pdom_mask::BitVector # represents either dominated or postdominated nodes depending on type of subgraph
-
-    function FactorableSubgraph{T, DominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector, dom_mask::BitVector) where {T<:Integer}
-        new{T, DominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, dom_mask)
-    end
-
-    function FactorableSubgraph{T, PostDominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector, pdom_mask::BitVector) where {T<:Integer}
-        new{T, PostDominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, pdom_mask)
-    end
-end
-
-get_edge(sub::FactorableSubgraph{T}) where {T} = Edge{T}(sub.subgraph_value, sub.top_vertex, sub.bott_vertex, sub.reachable_vars, sub.reachable_roots)
-
 struct DerivativeGraph{T<:Integer}
     symbols::Vector{SymbolicT} # postorder -> symbolic expr
     definitions::IdDict{SymbolicT, T} # symbolic expr -> postorder
@@ -184,13 +165,13 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
 
     # assume iscall(expr)
     args = parent(arguments(expr))
-    arg_idx_to_post_idx = IdDict{T, T}()
+    arg_idx_to_post_idx = IdDict{Int, T}()
     sizehint!(arg_idx_to_post_idx, length(args)) # faster?
     for (arg_idx, arg) in enumerate(args)
         if arg in dg.varset
-            arg_idx_to_post_idx[T(arg_idx)] = populate_dergraph_var!(dg, arg, root_idx)
+            arg_idx_to_post_idx[arg_idx] = populate_dergraph_var!(dg, arg, root_idx)
         elseif iscall(arg)
-            arg_idx_to_post_idx[T(arg_idx)] = populate_dergraph!(dg, arg, root_idx)
+            arg_idx_to_post_idx[arg_idx] = populate_dergraph!(dg, arg, root_idx)
         end
     end
 
@@ -348,29 +329,30 @@ function _get_postdominators(dg::DerivativeGraph{T}) where {T}
     return pdoms
 end
 
-function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
-    doms = _get_dominators(dg)
-    pdoms = _get_postdominators(dg)
+mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
+    subgraph_value::SymbolicT
+    top_vertex::T
+    bott_vertex::T
+    reachable_vars::BitVector
+    reachable_roots::BitVector
+    edges::Set{Edge{T}}
 
-    dom_factorable_subgraphs = Set{FactorableSubgraph{T, DominatorSubgraph}}()
-    for (dominated, dominating) in enumerate(doms)
-        if !isnothing(dominating) && length(child_edges(dg, dominating)) > 1 && length(parent_edges(dg, T(dominated))) > 1
-            reachable_vars_mask = reachable_vars(dg, T(dominated))
-            reachable_roots_mask = reachable_roots(dg, dominating)
-            push!(dom_factorable_subgraphs, FactorableSubgraph{T, DominatorSubgraph}(dominating, T(dominated), reachable_vars_mask, reachable_roots_mask, falses(length(dg))))
-        end
+    function FactorableSubgraph{T, DominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector) where {T<:Integer}
+        new{T, DominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, Set{Edge{T}}())
     end
-    pdom_factorable_subgraphs = Set{FactorableSubgraph{T, PostDominatorSubgraph}}()
-    for (postdominated, postdominating) in enumerate(pdoms)
-        if !isnothing(postdominating) && length(parent_edges(dg, postdominating)) > 1 && length(child_edges(dg, T(postdominated))) > 1
-            reachable_vars_mask = reachable_vars(dg, postdominating)
-            reachable_roots_mask = reachable_roots(dg, T(postdominated))
-            push!(pdom_factorable_subgraphs, FactorableSubgraph{T, PostDominatorSubgraph}(postdominating, T(postdominated), reachable_vars_mask, reachable_roots_mask, falses(length(dg))))
-        end
+
+    function FactorableSubgraph{T, PostDominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector) where {T<:Integer}
+        new{T, PostDominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, Set{Edge{T}}())
     end
-    
-    return union(dom_factorable_subgraphs, pdom_factorable_subgraphs)
 end
+
+function FactorableSubgraph{T, S}(dg::DerivativeGraph{T}, top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector, dom_masks::Vector{BitVector}, pdom_masks::Vector{BitVector}) where {T<:Integer, S<:AbstractFactorableSubgraph}
+    sub = FactorableSubgraph{T, S}(top_vertex, bott_vertex, reachable_vars, reachable_roots)
+    populate_subgraph_edges!(dg, sub, dom_masks, pdom_masks)
+    return sub
+end
+
+get_edge(sub::FactorableSubgraph{T}) where {T} = Edge{T}(sub.subgraph_value, sub.top_vertex, sub.bott_vertex, sub.reachable_vars, sub.reachable_roots)
 
 # also works for postdominators
 function calculate_dominance_mask(dominators::Vector{T}) where {T}
@@ -416,8 +398,12 @@ forward_vertex(sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T} = su
 backward_vertex(sub::FactorableSubgraph{T, DominatorSubgraph}) where {T} = sub.bott_vertex
 backward_vertex(sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T} = sub.top_vertex
 
-function subgraph_edges(dg::DerivativeGraph{T}, sub::FactorableSubgraph, dom_masks::Vector{BitVector}, pdom_masks::Vector{BitVector}) where {T}
-    return _subgraph_edges(dg, sub, backward_vertex(sub), select_forward_dominance_mask(sub, dom_masks, pdom_masks))
+function subgraph_edges(sub::FactorableSubgraph)
+    return sub.edges
+end
+
+function populate_subgraph_edges!(dg::DerivativeGraph{T}, sub::FactorableSubgraph, dom_masks::Vector{BitVector}, pdom_masks::Vector{BitVector}) where {T}
+    union!(sub.edges, _subgraph_edges(dg, sub, backward_vertex(sub), select_forward_dominance_mask(sub, dom_masks, pdom_masks)))
 end
 
 function _subgraph_edges(dg::DerivativeGraph{T}, sub::FactorableSubgraph, node::T, dom_mask::BitVector) where {T}
@@ -430,7 +416,7 @@ function _subgraph_edges(dg::DerivativeGraph{T}, sub::FactorableSubgraph, node::
     return sub_edges
 end
 
-function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}, edge::Edge{T}, visited::Set{Edge{T}}, dom_mask::BitVector) where {T}
+function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::FactorableSubgraph{T}, edge::Edge{T}, visited::Set{Edge{T}}, dom_mask::BitVector) where {T}
     edge in visited && return COMMON_ZERO
     
     push!(visited, edge)
@@ -447,17 +433,42 @@ function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::Fact
     for next_edge in forward_edges(dg, sub, edge)
         path_value += _subgraph_edges!(edges, dg, sub, next_edge, visited, dom_mask)
     end
+
     path_value *= edge.edge_value
 
     return path_value
 end
 
+function get_factorable_subgraphs(dg::DerivativeGraph{T}, dom_masks::Vector{BitVector}, pdom_masks::Vector{BitVector}) where {T}
+    doms = _get_dominators(dg)
+    pdoms = _get_postdominators(dg)
+
+    dom_factorable_subgraphs = Set{FactorableSubgraph{T, DominatorSubgraph}}()
+    for (dominated, dominating) in enumerate(doms)
+        if !isnothing(dominating) && length(child_edges(dg, dominating)) > 1 && length(parent_edges(dg, T(dominated))) > 1
+            reachable_vars_mask = reachable_vars(dg, T(dominated))
+            reachable_roots_mask = reachable_roots(dg, dominating)
+            push!(dom_factorable_subgraphs, FactorableSubgraph{T, DominatorSubgraph}(dg, dominating, T(dominated), reachable_vars_mask, reachable_roots_mask, dom_masks, pdom_masks))
+        end
+    end
+    pdom_factorable_subgraphs = Set{FactorableSubgraph{T, PostDominatorSubgraph}}()
+    for (postdominated, postdominating) in enumerate(pdoms)
+        if !isnothing(postdominating) && length(parent_edges(dg, postdominating)) > 1 && length(child_edges(dg, T(postdominated))) > 1
+            reachable_vars_mask = reachable_vars(dg, postdominating)
+            reachable_roots_mask = reachable_roots(dg, T(postdominated))
+            push!(pdom_factorable_subgraphs, FactorableSubgraph{T, PostDominatorSubgraph}(dg, T(postdominated), postdominating, reachable_vars_mask, reachable_roots_mask, dom_masks, pdom_masks))
+        end
+    end
+    
+    return union(dom_factorable_subgraphs, pdom_factorable_subgraphs)
+end
+
 function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph, dom_masks::Vector{BitVector}, pdom_masks::Vector{BitVector}) where {T}
-    sub_edges = subgraph_edges(dg, sub, dom_masks, pdom_masks)
+    sub_edges = subgraph_edges(sub)
     dom_mask = select_backward_dominance_mask(sub, dom_masks, pdom_masks)
     
     for edge in sub_edges
-        if dom_mask[backward_vertex(sub, edge)]
+        if dom_mask[backward_vertex(sub, edge)] || backward_vertex(sub, edge) == backward_vertex(sub)
             rem_edge!(dg, edge)
         end
     end
