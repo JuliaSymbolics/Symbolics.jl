@@ -222,6 +222,50 @@ function populate_root_reachabilities!(dg::DerivativeGraph{T}, node::T, root_idx
     return node
 end
 
+
+function clear_reachabilities!(dg::DerivativeGraph{T}, node::T) where {T}
+    for child_edge in dg.child_edges[node]
+        fill!(child_edge.reachable_roots, false)
+        fill!(child_edge.reachable_vars, false)
+        clear_reachabilities!(dg, child_edge.bott_vertex)
+    end
+
+    return nothing
+end
+
+function repopulate_reachabilities!(dg::DerivativeGraph)
+    
+end
+
+function repopulate_reachabilities!(dg::DerivativeGraph, root_idx::Integer)
+    node = dg.root_idx_to_postorder[root_idx]
+    clear_reachabilities!(dg, node)
+
+    # TODO: handle root = var
+    for child_edge in dg.child_edges[node]
+        repopulate_reachabilities!(dg, child_edge, root_idx)
+    end
+end
+
+function repopulate_reachabilities!(dg::DerivativeGraph{T}, edge::Edge{T}, root_idx::Integer) where {T}
+    # already visited when populating vars
+    if any(edge.reachable_vars)
+        # just populate roots
+        populate_root_reachabilities!(dg, edge.bott_vertex, root_idx)
+    end
+
+    edges = dg.child_edges[edge.bott_vertex]
+    for child_edge in edges
+        child_edge.reachable_vars .|= repopulate_reachabilities!(dg, child_edge, root_idx)
+    end
+
+    if haskey(dg.postorder_to_var_idx, node)
+        edge.reachable_vars[dg.postorder_to_var_idx[node]] = 1
+    end
+
+    return vars_mask
+end
+
 function populate_dergraph_var!(dg::DerivativeGraph{T}, var::SymbolicT, root_idx::Integer) where {T}
     haskey(dg.definitions, var) && return populate_root_reachabilities!(dg, dg.definitions[var], root_idx)
 
@@ -272,9 +316,9 @@ function _get_dominators(dg::DerivativeGraph{T}) where {T}
     while changed
         changed = false
         for node in reverse(eachindex(dg))
-            node in root_idxs && continue
-            
             parents = parent_nodes(dg, node)
+            
+            isempty(parents) && continue
             
             new_idom = first(parents)
 
@@ -378,6 +422,7 @@ function calculate_dominance_mask(dominators::Vector{T}) where {T}
         dom_mask[i] = falses(length(dominators))
     end
     for (node, dom) in enumerate(dominators)
+        isnothing(dom) && continue
         dom_mask[dom][node] = 1
     end
 
@@ -456,6 +501,8 @@ function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::Fact
     return path_value
 end
 
+subgraph_count(sub::FactorableSubgraph) = sum(sub.reachable_roots) * sum(sub.reachable_vars)
+
 function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
     dom_factorable_subgraphs = Set{FactorableSubgraph{T, DominatorSubgraph}}()
     for (dominated, dominating) in enumerate(dg.doms)
@@ -474,7 +521,7 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
         end
     end
     
-    return union(dom_factorable_subgraphs, pdom_factorable_subgraphs)
+    return collect(union(dom_factorable_subgraphs, pdom_factorable_subgraphs))
 end
 
 function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where {T}
@@ -488,4 +535,26 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where
     end
 
     add_edge!(dg, sub.top_vertex, sub.bott_vertex, sub.subgraph_value)
+end
+
+function factor_subgraphs!(dg::DerivativeGraph)
+    subs = get_factorable_subgraphs(dg)
+
+    while !isempty(subs)
+        sub_idx = findmax(subgraph_count, subs)[2]
+        factor_subgraph!(dg, subs[sub_idx])
+
+        # TODO: this could be so much more efficient
+        # update reachabilities
+        repopulate_reachabilities!(dg)
+
+        # update (post)dominators
+        dg.doms .= _get_dominators(dg)
+        dg.pdoms .= _get_postdominators(dg)
+        dg.dom_masks .= calculate_dominance_mask(dg.doms)
+        dg.pdom_masks .= calculate_dominance_mask(dg.pdoms)
+
+        # update subgraphs
+        subs = get_factorable_subgraphs(dg)
+    end
 end
