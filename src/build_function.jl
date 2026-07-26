@@ -5,7 +5,34 @@ abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
 struct StanTarget <: BuildTargets end
 struct CTarget <: BuildTargets end
+
+"""
+    MATLABTarget()
+
+A `build_function` target that generates an anonymous function expression for MATLAB and
+GNU Octave.
+
+# Arguments
+
+None.
+
+# Keywords
+
+None. Pass this target as `target` to [`build_function`](@ref).
+
+# Examples
+
+```julia
+julia> @variables x
+1-element Vector{Num}:
+ x
+
+julia> build_function(x^2, x; target = MATLABTarget()) isa String
+true
+```
+"""
 struct MATLABTarget <: BuildTargets end
+@public MATLABTarget
 
 abstract type ParallelForm end
 struct SerialForm <: ParallelForm end
