@@ -50,6 +50,8 @@ let
 end
 
 # MATLABTarget structural test (was target_functions/1.m)
+@test Base.ispublic(Symbolics, :MATLABTarget)
+
 let
     mfunc = Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.MATLABTarget())
     @test occursin("diffeqf = @(internal_var___t,internal_var___u)", mfunc)

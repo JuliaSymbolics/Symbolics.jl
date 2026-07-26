@@ -34,6 +34,12 @@ Symbolics.codegen_function
 
 ## Target-Specific Definitions
 
+### MATLAB
+
+```@docs
+Symbolics.MATLABTarget
+```
+
 ```@docs
 Symbolics._build_function(target::Symbolics.JuliaTarget,rhss::AbstractArray,args...;kwargs...)
 Symbolics._build_function(target::Symbolics.CTarget,eqs::Array{<:Equation},args...;kwargs...)
