@@ -198,15 +198,15 @@ julia> inverse_laplace(1/s^4, F, s, f, t)
 (1//6)*(t^3)
 ```
 """
-function inverse_laplace(expr, F, s, f, t; rules=nothing)
+function inverse_laplace(expr, F, s, f, t; rules=nothing, warns=true)
     if isequal(expr, 0)
         return 0
     end
     
     # check for partial fractions
-    partial_fractions = partial_frac_decomposition(expr, s)
+    partial_fractions = partial_frac_decomposition(expr, s, warns=warns)
     if partial_fractions !== nothing && !isequal(partial_fractions, expr)
-        return inverse_laplace(partial_fractions, F, s, f, t)
+        return inverse_laplace(partial_fractions, F, s, f, t, warns=warns)
     end
 
     if rules === nothing
@@ -224,7 +224,7 @@ function inverse_laplace(expr, F, s, f, t; rules=nothing)
     
     result = 0
     if length(_terms) == 1 && length(filter(x -> isempty(get_variables(x)), _true_factors(_terms[1]))) == 0
-        @warn "Inverse laplace failed: $expr"
+        warns && @warn "Inverse laplace failed: $expr"
         return nothing # no result
     end
 
@@ -234,11 +234,11 @@ function inverse_laplace(expr, F, s, f, t; rules=nothing)
         constant = filter(x -> isempty(get_variables(x)), factors)
         non_constant = filter(x -> !isempty(get_variables(x)), factors)
         if !isempty(constant)
-            transformed_term = inverse_laplace(prod(non_constant), F, s, f, t, rules=rules)
+            transformed_term = inverse_laplace(prod(non_constant), F, s, f, t, rules=rules, warns=warns)
             isnothing(transformed_term) && return nothing
             result += transformed_term * constant[1]
         else
-            transformed_term = inverse_laplace(term, F, s, f, t, rules=rules)
+            transformed_term = inverse_laplace(term, F, s, f, t, rules=rules, warns=warns)
             isnothing(transformed_term) && return nothing
             result += transformed_term
         end
@@ -247,8 +247,8 @@ function inverse_laplace(expr, F, s, f, t; rules=nothing)
     return result
 end
 
-function inverse_laplace(expr::Equation, F, s, f, t)
-    return inverse_laplace(expr.lhs, F, s, f, t) ~ inverse_laplace(expr.rhs, F, s, f, t)
+function inverse_laplace(expr::Equation, F, s, f, t; warns=true)
+    return inverse_laplace(expr.lhs, F, s, f, t, warns=warns) ~ inverse_laplace(expr.rhs, F, s, f, t, warns=warns)
 end
 
 """
@@ -276,7 +276,7 @@ julia> laplace_solve_ode((Dt^3)(f(t)) - Dt(f(t)) ~ 6 - 3t^2, f, t, [1, 1, 1])
 exp(t) + t^3
 ```
 """
-function laplace_solve_ode(eq, f, t, f0)
+function laplace_solve_ode(eq, f, t, f0; warns=true)
     s = variable(:𝓈)
     @syms 𝓕(s)
 
@@ -305,5 +305,5 @@ function laplace_solve_ode(eq, f, t, f0)
     transformed_soln = simplify(sum(other_terms ./ F_terms))
 
     # perform inverse laplace transform to get f(t)
-    return expand(inverse_laplace(transformed_soln, 𝓕, s, f, t))
+    return expand(inverse_laplace(transformed_soln, 𝓕, s, f, t, warns=warns))
 end

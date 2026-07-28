@@ -17,10 +17,10 @@ import Symbolics: partial_frac_decomposition
 @test isequal(partial_frac_decomposition((6x+5)/((2x-1)^2), x), 3/(2*(x-1//2)) + 2/(x-1//2)^2)
 @test isequal(partial_frac_decomposition((7x^2-17x+38)/((x+6)*(x-1)^2), x), 8/(x+6) + -1/(x-1) + 4/(x-1)^2)
 @test isequal(partial_frac_decomposition((4x^2 - 22x + 7)/((2x+3)*(x-2)^2), x), 2/(x+3//2) + -3/(x-2)^2)
-@test_broken isequal(partial_frac_decomposition((3x^2 + 7x + 28)/(x*(x^2 + x + 7)), x), expand(4/x + (3-x)/(x^2+x+7))) # irrational roots
+@test_broken isequal(partial_frac_decomposition((3x^2 + 7x + 28)/(x*(x^2 + x + 7)), x, warns=false), expand(4/x + (3-x)/(x^2+x+7))) # irrational roots
 @test isequal(partial_frac_decomposition((4x^3 + 16x + 7)/(x^2 + 4)^2, x), 4x/(x^2+4) + 7/(x^2+4)^2)
 
 # check valid expressions
 @test partial_frac_decomposition(sin(x), x) === nothing
 @test partial_frac_decomposition(x^2/(x-1), x) === nothing
-@test partial_frac_decomposition(1/(x^2 + 2), x) === nothing # irrational roots, should eventually be fixed
+@test partial_frac_decomposition(1/(x^2 + 2), x, warns=false) === nothing # irrational roots, should eventually be fixed

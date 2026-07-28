@@ -42,7 +42,7 @@ julia> partial_frac_decomposition((4x^2 - 22x + 7)/((2x+3)*(x-2)^2), x) # non-on
 
 !!! note that irreducible quadratic and repeated linear factors require the `Groebner` package to solve a system of equations
 """
-function partial_frac_decomposition(expr, x)
+function partial_frac_decomposition(expr, x; warns=true)
     A, B = numerator(expr), denominator(expr)
 
     # check if both numerator and denominator are polynomials
@@ -54,7 +54,7 @@ function partial_frac_decomposition(expr, x)
         return nothing
     end
     
-    facs = factorize(B, x)
+    facs = factorize(B, x, warns=warns)
     if facs === nothing
         return nothing
     end
@@ -150,7 +150,7 @@ function count_multiplicities(facs)
 end
 
 # for partial fractions, into linear and irreducible quadratic factors
-function factorize(expr, x)
+function factorize(expr, x; warns=true)
     roots = symbolic_solve(expr, x, dropmultiplicity=false)
 
     counts = count_multiplicities(roots)
@@ -166,7 +166,7 @@ function factorize(expr, x)
             end
 
             if !_iszero(imag(fac_expr))
-                @warn "Encountered issue with complex irrational roots. Returning nothing."
+                warns && @warn "Encountered issue with complex irrational roots. Returning nothing."
                 return nothing
             end
             push!(facs, Factor(real(fac_expr), counts[root], x))
