@@ -46,7 +46,7 @@ function partial_frac_decomposition(expr, x)
     A, B = numerator(expr), denominator(expr)
 
     # check if both numerator and denominator are polynomials
-    if !isequal(polynomial_coeffs(A, [x])[2], 0) || !isequal(polynomial_coeffs(B, [x])[2], 0)
+    if !_iszero(polynomial_coeffs(A, [x])[2]) || !_iszero(polynomial_coeffs(B, [x])[2])
         return nothing
     end
 
@@ -89,8 +89,7 @@ function partial_frac_decomposition(expr, x)
 
             # cover up method
             other_facs = filter(f -> !isequal(f, fac), facs)
-            
-            numerator = rationalize(unwrap(fast_substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root)))) # plug in root to expression without its factor in denominator
+            numerator = rationalize(unwrap_const(substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root)))) # plug in root to expression without its factor in denominator
             push!(result, numerator / fac.expr^fac.multiplicity)
 
             if fac.multiplicity > 1
@@ -100,10 +99,10 @@ function partial_frac_decomposition(expr, x)
     end
 
     # no unknowns, so just return
-    if isequal(get_variables(sum(result)), [x])
+    if isequal(collect(get_variables(sum(result))), [unwrap(x)])
         return sum(result ./ leading_coeff)
     end
-        
+
     lhs = numerator(expr)
     rhs = expand(sum(simplify.(numerator.(result) .* ((B/leading_coeff) ./ denominator.(result))))) # multiply each numerator by the common denominator/its denominator, and sum to get numerator of whole expression
 
@@ -114,7 +113,7 @@ function partial_frac_decomposition(expr, x)
         solution = Dict(variable(:𝒞, 1) => solution)
     end
     
-    return sum(fast_substitute.(result, Ref(solution)) ./ leading_coeff) # fast_substitute solutions back in and sum
+    return sum(substitute.(result, Ref(solution)) ./ leading_coeff) # substitute solutions back in and sum
 end
 
 # increasing from 0 to degree n. doesn't skip powers of x like polynomial_coeffs
@@ -158,9 +157,15 @@ function factorize(expr, x)
     facs = Set()
 
     for root in keys(counts)
-        if !isequal(abs(imag(root)), 0)
+        if !_iszero(imag(root))
             fac_expr = expand((x - root)*(x - conj(root)))
-            if !isequal(imag(fac_expr), 0)
+            if _iszero(real(root))
+                # workaround for purely imaginary roots
+                # otherwise, the fac_expr expansion will be real but imag(fac_expr) doesn't evaluate properly
+                fac_expr = imag(root)^2 + x^2
+            end
+
+            if !_iszero(imag(fac_expr))
                 @warn "Encountered issue with complex irrational roots. Returning nothing."
                 return nothing
             end

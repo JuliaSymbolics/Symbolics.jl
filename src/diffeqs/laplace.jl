@@ -231,11 +231,16 @@ function inverse_laplace(expr, F, s, f, t; rules=nothing)
     # apply linearity by splitting into terms and factoring out constants
     for term in _terms
         factors = _true_factors(term)
-        constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
+        constant = filter(x -> isempty(get_variables(x)), factors)
+        non_constant = filter(x -> !isempty(get_variables(x)), factors)
         if !isempty(constant)
-            result += inverse_laplace(term / constant[1], F, s, f, t, rules=rules) * constant[1]
+            transformed_term = inverse_laplace(prod(non_constant), F, s, f, t, rules=rules)
+            isnothing(transformed_term) && return nothing
+            result += transformed_term * constant[1]
         else
-            result += inverse_laplace(term, F, s, f, t, rules=rules)
+            transformed_term = inverse_laplace(term, F, s, f, t, rules=rules)
+            isnothing(transformed_term) && return nothing
+            result += transformed_term
         end
     end
 
@@ -278,7 +283,7 @@ function laplace_solve_ode(eq, f, t, f0)
     # transform equation
     transformed_eq = laplace(eq, f, t, 𝓕, s)
     # substitute in initial conditions
-    transformed_eq = fast_substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:𝒻0, i-1) => f0[i] for i=1:length(f0)]...))
+    transformed_eq = substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:𝒻0, i-1) => f0[i] for i=1:length(f0)]...))
     transformed_eq = expand(transformed_eq.lhs - transformed_eq.rhs)
 
     # solve for/isolate F(s)

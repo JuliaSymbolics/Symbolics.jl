@@ -721,21 +721,3 @@ function solve_bernoulli(expr, x, t, x0)
 
     return symbolic_solve(solution ~ x^(1-n), x)
 end
-
-# takes into account fractions
-function _true_factors(expr)
-    facs = factors(expr)
-    true_facs::Vector{Num} = []
-    frac_rule = @rule (~x)/(~y) => [~x, 1/~y]
-    for fac in facs
-        frac = frac_rule(fac)
-        if frac !== nothing && !isequal(frac[1], 1)
-            append!(true_facs, _true_factors(frac[1]))
-            append!(true_facs, _true_factors(frac[2]))
-        else
-            push!(true_facs, wrap(fac))
-        end
-    end
-
-    return true_facs
-end
