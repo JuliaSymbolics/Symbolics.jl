@@ -64,16 +64,28 @@ macro register_discontinuity(f, root, left, right)
     args = f.args[2:end]
     fn = esc(f.args[1])
     rootname = gensym(:root)
+    symbolic_check_expr = Expr(:||)
+    for arg in args
+        push!(symbolic_check_expr.args, :($unwrap($arg) isa $SymbolicT))
+    end
     rootfn = :(function $rootname($(args...))
         $root
     end)
     leftname = gensym(:left)
     leftfn = :(function $leftname($(args...))
-        $left
+        result = $left
+        if $symbolic_check_expr
+            result = $SConst(result)
+        end
+        return result
     end)
     rightname = gensym(:right)
     rightfn = :(function $rightname($(args...))
-        $right
+        result = $right
+        if $symbolic_check_expr
+            result = $SConst(result)
+        end
+        return result
     end)
     return quote
         $rootfn
