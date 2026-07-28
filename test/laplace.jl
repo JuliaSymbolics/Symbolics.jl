@@ -26,12 +26,12 @@ Dt = Differential(t)
 @test isequal(laplace_solve_ode((Dt^2)(f(t)) - 3Dt(f(t)) + 2f(t) ~ 4, f, t, [2, 3]), 2 - 3exp(t) + 3exp(2t))
 @test isequal(laplace_solve_ode((Dt^3)(f(t)) - Dt(f(t)) ~ 2, f, t, [4,4,4]), 5exp(t) - exp(-t) - 2t)
 @test isequal(laplace_solve_ode((Dt^3)(f(t)) - Dt(f(t)) ~ 6 - 3t^2, f, t, [1, 1, 1]), exp(t) + t^3)
-@test_broken isequal(laplace_solve_ode((Dt^2)(f(t)) - f(t) ~ 2sin(t), f, t, [0, 0]), (1//2)exp(t) - (1//2)exp(-t) - sin(t)) # unevaluated sqrt's in result
+@test isequal(laplace_solve_ode((Dt^2)(f(t)) - f(t) ~ 2sin(t), f, t, [0, 0]), (1//2)exp(t) - (1//2)exp(-t) - sin(t))
 @test isequal(laplace_solve_ode((Dt^2)(f(t)) + 2Dt(f(t)) ~ 5f(t), f, t, [0, 0]), 0)
-@test_broken isequal(laplace_solve_ode((Dt^2)(f(t)) + f(t) ~ sin(4t), f, t, [0, 0]), (4//15)sin(t) - (1//15)sin(4t)) # unevaluated sqrt's in result
+@test isequal(laplace_solve_ode((Dt^2)(f(t)) + f(t) ~ sin(4t), f, t, [0, 0]), (4//15)sin(t) - (1//15)sin(4t))
 @test isequal(laplace_solve_ode((Dt^2)(f(t)) + Dt(f(t)) ~ 1 + 2t, f, t, [0, 0]), 1 - exp(-t) + t^2 - t)
 @test isequal(laplace_solve_ode((Dt^2)(f(t)) + 4Dt(f(t)) + 3f(t) ~ 6, f, t, [0, 0]), exp(-3t) - 3exp(-t) + 2)
 @test isequal(laplace_solve_ode((Dt^2)(f(t)) - 2Dt(f(t)) ~ 3*(t + exp(2t)), f, t, [0, 0]), (3//8) - (3//4)t - (3//4)t^2 - (3//8)exp(2t) + (3//2)t*exp(2t))
 @test_broken isequal(laplace_solve_ode((Dt^2)(f(t)) - 2Dt(f(t)) ~ 20*exp(-t)*cos(t), f, t, [0, 0]), 3exp(2t) - 5 + 2exp(-t)*cos(t) - 4exp(-t)*sin(t)) # irreducible quadratic in inverse laplace
-@test_broken isequal(laplace_solve_ode((Dt^2)(f(t)) + f(t) ~ 2 + 2cos(t), f, t, [0, 0]), 2 - 2cos(t) + t*sin(t)) # unevaluated sqrt's in result
+@test isequal(laplace_solve_ode((Dt^2)(f(t)) + f(t) ~ 2 + 2cos(t), f, t, [0, 0]), 2 - 2cos(t) + t*sin(t))
 @test isequal(laplace_solve_ode((Dt^2)(f(t)) - Dt(f(t)) ~ 30cos(3t), f, t, [0, 0]), 3exp(t) - 3cos(3t) - sin(3t))

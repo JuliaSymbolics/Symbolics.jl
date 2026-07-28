@@ -424,7 +424,7 @@ function exp_trig_particular_solution(eq::SymbolicLinearODE)
         k += 1
     end
 
-    rrf = expand(simplify(a * exp((r + b * im) * eq.t) * eq.t^k /
+    rrf = expand(simplify(wrap(a) * exp((r + b * im) * eq.t) * eq.t^k /
                            (substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
 
     return is_sin ? imag(rrf) : real(rrf)
