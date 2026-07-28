@@ -30,13 +30,10 @@ end
 Helper function to unwrap derivatives of `f(t)` in `expr` with respect to the differential operator `Dt = Differential(t)`. Returns a tuple `(n, base_expr)`, where `n` is the order of the derivative and `base_expr` is the expression with the derivatives removed. If `expr` does not contain `f(t)` or its derivatives, returns `(0, expr)`.
 """
 function unwrap_der(expr, Dt)
-
-    if reduce_rule(unwrap(expr), Dt) === nothing
-        return 0, expr
+    if iscall(expr) && operation(expr) isa Differential && isequal(operation(expr).x, Dt.x)
+        return operation(expr).order, wrap(arguments(expr)[1])
     end
-
-    order, expr = unwrap_der(reduce_rule(unwrap(expr), Dt), Dt)
-    return order + 1, expr
+    return 0, expr
 end
 
 # takes into account fractions
