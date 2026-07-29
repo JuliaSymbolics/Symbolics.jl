@@ -563,9 +563,9 @@ version = "1.0.2"
 
 [[deps.Groebner]]
 deps = ["AbstractAlgebra", "Atomix", "Combinatorics", "Logging", "Nemo", "PrecompileTools", "Primes", "Printf", "Random", "SmallCollections", "TimerOutputs"]
-git-tree-sha1 = "45b55542d2f8d574de5a67a229a3586fcc04275a"
+git-tree-sha1 = "fe0207cc1b53dae7f4b1659776e8672dd9883516"
 uuid = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
-version = "0.10.4"
+version = "0.10.5"
 weakdeps = ["DynamicPolynomials"]
 
     [deps.Groebner.extensions]
@@ -1337,9 +1337,9 @@ version = "1.4.0"
 
 [[deps.SymbolicUtils]]
 deps = ["AbstractTrees", "ArrayInterface", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "EnumX", "ExproniconLite", "Graphs", "LinearAlgebra", "MacroTools", "Moshi", "MultivariatePolynomials", "MutableArithmetics", "NaNMath", "PrecompileTools", "ReadOnlyArrays", "SciMLPublic", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "TaskLocalValues", "TermInterface", "WeakCacheSets"]
-git-tree-sha1 = "79f5f1c65b7147e0fe0d3c6a65e09a7fddd2a010"
+git-tree-sha1 = "da83feeff244e352cf0b44b81f8d54eacb00910d"
 uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
-version = "4.41.0"
+version = "4.42.0"
 
     [deps.SymbolicUtils.extensions]
     SymbolicUtilsChainRulesCoreExt = "ChainRulesCore"
