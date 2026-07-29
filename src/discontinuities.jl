@@ -151,31 +151,31 @@ value greater or less than the value returned by `f` for the same point.
 """
 function approximation_function end
 
-function _logsumexp(m, a, b)
+function _approx_max(m, a, b)
     if a isa Union{Num, SymbolicT} || b isa Union{Num, SymbolicT}
         return STerm(
-            _logsumexp, SArgsT((m, a, b));
-            type = SU.promote_symtype(_logsumexp, SU.symtype(m), SU.symtype(a), SU.symtype(b)),
+            _approx_max, SArgsT((m, a, b));
+            type = SU.promote_symtype(_approx_max, SU.symtype(m), SU.symtype(a), SU.symtype(b)),
             shape = SU.ShapeVecT()
         )
     end
-    a > b ? (a + log1p(exp(m * (b - a))) / m) : (b + log1p(exp(m * (a - b))) / m)
+    return (a + b + _approx_abs(m, a - b)) / 2
 end
 
-function SU.promote_symtype(::typeof(_logsumexp), M::SU.TypeT, A::SU.TypeT, B::SU.TypeT)
+function SU.promote_symtype(::typeof(_approx_max), M::SU.TypeT, A::SU.TypeT, B::SU.TypeT)
     return SU.promote_symtype(*, SU.promote_symtype(+, A, B), M)
 end
 
-function SU.promote_shape(::typeof(_logsumexp), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
+function SU.promote_shape(::typeof(_approx_max), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
     return SU.ShapeVecT()
 end
 
 function _approx_min(m, a, b)
-    -_logsumexp(m, -a, -b)
+    -_approx_max(m, -a, -b)
 end
 
 function SU.promote_symtype(::typeof(_approx_min), args::SU.TypeT...)
-    return SU.promote_symtype(_logsumexp, args...)
+    return SU.promote_symtype(_approx_max, args...)
 end
 
 function SU.promote_shape(::typeof(_approx_min), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
@@ -183,7 +183,7 @@ function SU.promote_shape(::typeof(_approx_min), @nospecialize(shs::Vararg{SU.Sh
 end
 
 function _approx_abs(m, a)
-    a + log1p(exp(-2m * a)) / m
+    return sqrt(a^2 + 1/(8m + 1))
 end
 
 function SU.promote_symtype(::typeof(_approx_abs), M::SU.TypeT, A::SU.TypeT)
@@ -195,11 +195,11 @@ function SU.promote_shape(::typeof(_approx_abs), @nospecialize(shs::Vararg{SU.Sh
 end
 
 function _approx_ge(m, a, b)
-    (tanh(m * (a - b)) + 1) / 2
+    (tanh(m * ((a - b) + eps(float(typeof(m))))) + 1) / 2
 end
 
 function SU.promote_symtype(::typeof(_approx_ge), args::SU.TypeT...)
-    return SU.promote_symtype(_logsumexp, args...)
+    return SU.promote_symtype(_approx_max, args...)
 end
 
 function SU.promote_shape(::typeof(_approx_ge), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
@@ -209,7 +209,7 @@ end
 _approx_le(m, a, b) = _approx_ge(m, b, a)
 
 function SU.promote_symtype(::typeof(_approx_le), args::SU.TypeT...)
-    return SU.promote_symtype(_logsumexp, args...)
+    return SU.promote_symtype(_approx_max, args...)
 end
 
 function SU.promote_shape(::typeof(_approx_le), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
@@ -253,9 +253,9 @@ function SU.promote_shape(::typeof(_sigder), @nospecialize(sh::SU.ShapeT))
 end
 
 function _approx_eq(m, a, b)
-    # `5m` to try and make `_approx_eq` similarly steep for the same `m` as other
+    # `2m` to try and make `_approx_eq` similarly steep for the same `m` as other
     # approximators.
-    4_sigder(5m * (a - b))
+    4_sigder(2m * (a - b))
 end
 
 function SU.promote_symtype(::typeof(_approx_eq), M::SU.TypeT, A::SU.TypeT, B::SU.TypeT)
@@ -266,12 +266,12 @@ function SU.promote_shape(::typeof(_approx_eq), @nospecialize(sh::Vararg{SU.Shap
     return SU.ShapeVecT()
 end
 
-approximation_function(::typeof(max)) = _logsumexp
-majorization_function(::typeof(max)) = _logsumexp
+approximation_function(::typeof(max)) = _approx_max
+majorization_function(::typeof(max)) = _approx_max
 approximation_function(::typeof(min)) = _approx_min
 minorization_function(::typeof(min)) = _approx_min
-approximation_function(::typeof(NaNMath.max)) = _logsumexp
-majorization_function(::typeof(NaNMath.max)) = _logsumexp
+approximation_function(::typeof(NaNMath.max)) = _approx_max
+majorization_function(::typeof(NaNMath.max)) = _approx_max
 approximation_function(::typeof(NaNMath.min)) = _approx_min
 minorization_function(::typeof(NaNMath.min)) = _approx_min
 approximation_function(::typeof(abs)) = _approx_abs
