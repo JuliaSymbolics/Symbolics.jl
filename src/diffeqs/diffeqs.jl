@@ -367,7 +367,7 @@ function get_rrf_coeff(q, t)
         return a, r_re + r_im * im
     end
 
-    a = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [t])), facs))
+    a = prod([1; filter(fac -> isempty(Symbolics.get_variables(fac, [t])), facs)])
 
     not_a = filter(fac -> !isempty(Symbolics.get_variables(fac, [t])), facs) # should just be e^(rt)
     if length(not_a) != 1
@@ -389,7 +389,7 @@ For finding particular solution when q(t) = a*e^(rt)*cos(bt) (or sin(bt))
 function exp_trig_particular_solution(eq::SymbolicLinearODE)
     facs = _true_factors(eq.q)
 
-    a = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [eq.t])), facs))
+    a = prod([1; filter(fac -> isempty(Symbolics.get_variables(fac, [eq.t])), facs)])
 
     not_a = filter(fac -> !isempty(Symbolics.get_variables(fac, [eq.t])), facs)
 
@@ -424,7 +424,7 @@ function exp_trig_particular_solution(eq::SymbolicLinearODE)
         k += 1
     end
 
-    rrf = expand(simplify(a * exp((r + b * im) * eq.t) * eq.t^k /
+    rrf = expand(simplify(wrap(a) * exp((r + b * im) * eq.t) * eq.t^k /
                            (substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
 
     return is_sin ? imag(rrf) : real(rrf)
@@ -654,7 +654,7 @@ function linearize_bernoulli(expr, x, t, v)
     for term in terms
         if Symbolics.hasderiv(Symbolics.value(term))
             facs = _true_factors(term)
-            leading_coeff = prod(filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs))
+            leading_coeff = prod([1; filter(fac -> !Symbolics.hasderiv(Symbolics.value(fac)), facs)])
             if !isequal(term/leading_coeff, Dt(x))
                 return nothing
             end
@@ -666,10 +666,10 @@ function linearize_bernoulli(expr, x, t, v)
             end
 
             if isequal(x_fac[1], x)
-                p = prod(filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs))
+                p = prod([1; filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs)])
             else
                 n = degree(x_fac[1])
-                q = -prod(filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs))
+                q = -prod([1; filter(fac -> isempty(Symbolics.get_variables(fac, [x])), facs)])
             end
         end
     end
@@ -702,4 +702,22 @@ function solve_bernoulli(expr, x, t)
     end
 
     return simplify(solution^(1//(1-n)))
+end
+
+"""
+Solve Bernoulli equations of the form dx/dt + p(t)x = q(t)x^n with initial condition x(0) = x0
+"""
+function solve_bernoulli(expr, x, t, x0)
+    @variables v
+    eq, n = linearize_bernoulli(expr, x, t, v)
+
+    v0 = x0^(1-n) # convert initial condition from x(0) to v(0)
+
+    ivp = IVP(eq, [v0])
+    solution = solve_IVP(ivp)
+    if solution === nothing
+        return nothing
+    end
+
+    return symbolic_solve(solution ~ x^(1-n), x)
 end

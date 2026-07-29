@@ -54,6 +54,7 @@ makedocs(
                 "manual/solver.md",
                 "manual/groebner.md",
                 "manual/constraint_satisfaction.md",
+                "manual/partial_fractions.md",
             ],
 
             "Calculus" => [
