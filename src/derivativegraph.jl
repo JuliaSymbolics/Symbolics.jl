@@ -21,24 +21,46 @@ times_used(edge::Edge) = sum(reachable_roots(edge)) * sum(reachable_vars(edge))
 # use loose definition of edge equality to allow for edge values changing
 Base.:(==)(a::Edge, b::Edge) = a.top_vertex == b.top_vertex && a.bott_vertex == b.bott_vertex
 
+
+"""
+    $TYPEDEF
+
+Representation of a derivative as a DAG. Nodes represent the expression tree, and edges represent partial derivatives.
+
+Used for the D* AD algorithm.
+
+Postorder numbers refer to the indices of nodes in the graph, where the lowest numbers are variables and the highest are roots. 
+"""
 struct DerivativeGraph{T<:Integer}
-    symbols::Vector{SymbolicT} # postorder -> symbolic expr
-    definitions::IdDict{SymbolicT, T} # symbolic expr -> postorder
-    roots::Vector{SymbolicT}
-    vars::Vector{SymbolicT}
-    varset::Set{SymbolicT} # for fast checking if expr is var
+    symbols::Vector{SymbolicT} # postorder number -> symbolic expression
+    definitions::IdDict{SymbolicT, T} # symbolic expression -> postorder number
+    roots::Vector{SymbolicT} # root index -> root symbolic expression
+    vars::Vector{SymbolicT} # variable index -> variable symbolic expression
+    varset::Set{SymbolicT} # for fast checking if an expression is a variable
     var_idx_to_postorder::Vector{T}
     postorder_to_var_idx::IdDict{T,T}
     root_idx_to_postorder::Vector{T}
     postorder_to_root_idx::IdDict{T,T}
-    parent_edges::Dict{T, Vector{Edge{T}}}
-    child_edges::Dict{T, Vector{Edge{T}}}
-    doms::Vector{Union{Nothing, T}}
-    pdoms::Vector{Union{Nothing, T}}
-    dom_masks::Vector{BitVector}
-    pdom_masks::Vector{BitVector}
+    parent_edges::Dict{T, Vector{Edge{T}}} # node -> parent edges
+    child_edges::Dict{T, Vector{Edge{T}}} # node -> child edges
+    doms::Vector{Union{Nothing, T}} # immediate dominators of nodes
+    pdoms::Vector{Union{Nothing, T}} # immediate postdominators of nodes
+    dom_masks::Vector{BitVector} # BitVectors representing which nodes each node dominates (e.g. dom_masks[dominator][dominated])
+    pdom_masks::Vector{BitVector} # BitVectors representing which nodes each node postdominates (e.g. pdom_masks[postdominator][postdominated])
 end
 
+"""
+    DerivativeGraph(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT}, idx_type::Type=Int32) -> DerivativeGraph
+
+Creates and populates a `DerivativeGraph`.
+
+# Arguments
+
+- `roots::AbstractVector{SymbolicT}`: Expressions to take the derivative of
+- `vars::AbstractVector{SymbolicT}`: Variables to take the derivative with respect to
+- `idx_type::Type`: Integer type used to store indices in the graph
+    (**Default**: `Int32`)
+"""
 function DerivativeGraph(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT}, idx_type::Type=Int32)
     dg = DerivativeGraph{idx_type}(
         SymbolicT[],
@@ -65,8 +87,8 @@ function DerivativeGraph(roots::AbstractVector{SymbolicT}, vars::AbstractVector{
     sizehint!(dg.dom_masks, length(dg.symbols))
     sizehint!(dg.pdom_masks, length(dg.symbols))
 
-    append!(dg.doms, _get_dominators(dg))
-    append!(dg.pdoms, _get_postdominators(dg))
+    append!(dg.doms, get_dominators(dg))
+    append!(dg.pdoms, get_postdominators(dg))
     append!(dg.dom_masks, calculate_dominance_mask(dg.doms))
     append!(dg.pdom_masks, calculate_dominance_mask(dg.pdoms))
 
@@ -151,7 +173,7 @@ function reachable_vars(dg::DerivativeGraph{T}, node::T) where {T}
     return vars_mask
 end
 
-# handles multiplication of >2 arguments
+# handles terms with >2 arguments (e.g. multiplication of 3+ things)
 function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
     @match expr begin
         BSImpl.AddMul(; coeff, dict, variant) => begin
@@ -167,6 +189,7 @@ function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
     end
 end
 
+# called in `DerivativeGraph` constructor to recursively iterate through the graph to fill out edges + reachabilities
 function populate_dergraph!(dg::DerivativeGraph)
     for (root_idx, root) in enumerate(dg.roots)
         local post_idx
@@ -202,6 +225,7 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     dg.child_edges[post_idx] = Edge{T}[]
     dg.parent_edges[post_idx] = Edge{T}[]
 
+    # add new edges
     for (arg_idx, arg_post_idx) in arg_idx_to_post_idx
         partial_der = nary_derivative_idx(expr, arg_idx)
         arg_reachable_vars = reachable_vars(dg, arg_post_idx)
@@ -215,7 +239,6 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     return post_idx
 end
 
-
 function populate_root_reachabilities!(dg::DerivativeGraph{T}, node::T, root_idx::Integer) where {T}
     for child_edge in dg.child_edges[node]
         child_edge.reachable_roots[root_idx] = 1
@@ -223,50 +246,6 @@ function populate_root_reachabilities!(dg::DerivativeGraph{T}, node::T, root_idx
     end
 
     return node
-end
-
-
-function clear_reachabilities!(dg::DerivativeGraph{T}, node::T) where {T}
-    for child_edge in dg.child_edges[node]
-        fill!(child_edge.reachable_roots, false)
-        fill!(child_edge.reachable_vars, false)
-        clear_reachabilities!(dg, child_edge.bott_vertex)
-    end
-
-    return nothing
-end
-
-function repopulate_reachabilities!(dg::DerivativeGraph)
-    
-end
-
-function repopulate_reachabilities!(dg::DerivativeGraph, root_idx::Integer)
-    node = dg.root_idx_to_postorder[root_idx]
-    clear_reachabilities!(dg, node)
-
-    # TODO: handle root = var
-    for child_edge in dg.child_edges[node]
-        repopulate_reachabilities!(dg, child_edge, root_idx)
-    end
-end
-
-function repopulate_reachabilities!(dg::DerivativeGraph{T}, edge::Edge{T}, root_idx::Integer) where {T}
-    # already visited when populating vars
-    if any(edge.reachable_vars)
-        # just populate roots
-        populate_root_reachabilities!(dg, edge.bott_vertex, root_idx)
-    end
-
-    edges = dg.child_edges[edge.bott_vertex]
-    for child_edge in edges
-        child_edge.reachable_vars .|= repopulate_reachabilities!(dg, child_edge, root_idx)
-    end
-
-    if haskey(dg.postorder_to_var_idx, node)
-        edge.reachable_vars[dg.postorder_to_var_idx[node]] = 1
-    end
-
-    return vars_mask
 end
 
 function populate_dergraph_var!(dg::DerivativeGraph{T}, var::SymbolicT, root_idx::Integer) where {T}
@@ -284,6 +263,7 @@ function populate_dergraph_var!(dg::DerivativeGraph{T}, var::SymbolicT, root_idx
     return post_idx
 end
 
+# for visualization purposes - converts a `DerivativeGraph` into an `OrderedDiGraph`
 function generate_graph(dg::DerivativeGraph{T}) where {T}
     g = SymbolicUtils.OrderedDiGraph{T}(length(dg.symbols))
     for node in 1:length(dg.symbols)
@@ -295,12 +275,13 @@ function generate_graph(dg::DerivativeGraph{T}) where {T}
     return g
 end
 
-# https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf
-function _get_dominators(dg::DerivativeGraph{T}) where {T}
+# Follows the algorithm described in this paper: https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf
+function get_dominators(dg::DerivativeGraph{T}) where {T}
     doms = Vector{Union{Nothing, T}}(undef, length(dg))
     root_idxs = root_postorders(dg)
     doms[root_idxs] = root_idxs
 
+    # moves two nodes up the graph until they meet
     function get_common_parent(a::T, b::T)::Union{Nothing, T}
         # move a and b up the graph through their immediate dominators until they meet
         (isnothing(doms[a]) || isnothing(doms[b])) && return nothing
@@ -345,7 +326,7 @@ function _get_dominators(dg::DerivativeGraph{T}) where {T}
     return doms
 end
 
-function _get_postdominators(dg::DerivativeGraph{T}) where {T}
+function get_postdominators(dg::DerivativeGraph{T}) where {T}
     pdoms = Vector{Union{Nothing, T}}(undef, length(dg))
     pdoms[dg.var_idx_to_postorder] = dg.var_idx_to_postorder
 
@@ -395,6 +376,7 @@ function _get_postdominators(dg::DerivativeGraph{T}) where {T}
     return pdoms
 end
 
+# represents a subgraph of a DerivativeGraph, defined by either a dominator or postdominator node. can be factored into a single edge
 mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
     subgraph_value::SymbolicT
     top_vertex::T
@@ -412,7 +394,7 @@ mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
     end
 end
 
-# also works for postdominators
+# Loops through the immediate dominators to fill out the dominance masks. Also works for postdominators.
 function calculate_dominance_mask(dominators::Vector{T}) where {T}
     dom_mask = Vector{BitVector}(undef, length(dominators))
     for i in eachindex(dominators)
@@ -420,6 +402,7 @@ function calculate_dominance_mask(dominators::Vector{T}) where {T}
     end
     for (node, dom) in enumerate(dominators)
         isnothing(dom) && continue
+        # walk up through the dominators
         while true
             dom_mask[dom][node] = 1
             dom == dominators[dom] && break
@@ -430,23 +413,13 @@ function calculate_dominance_mask(dominators::Vector{T}) where {T}
     return dom_mask
 end
 
-function select_forward_dominance_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}) where {T}
-    return dg.dom_masks[forward_vertex(sub)]
-end
+# the following functions allow functions to treat Dominator and PostDominator subgraphs the same by using forward and backward instead of up and down the graph
+# forward is in the direction of dominated to dominating or postdominated to postdominating. i.e. from the factor base to the factor node
+select_forward_dominance_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}) where {T} = dg.dom_masks[forward_vertex(sub)]
+select_forward_dominance_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T} = dg.pdom_masks[forward_vertex(sub)]
+select_backward_dominance_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}) where {T} = dg.pdom_masks[backward_vertex(sub)]
+select_backward_dominance_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T} = dg.dom_masks[backward_vertex(sub)]
 
-function select_forward_dominance_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T}
-    return dg.pdom_masks[forward_vertex(sub)]
-end
-
-function select_backward_dominance_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}) where {T}
-    return dg.pdom_masks[backward_vertex(sub)]
-end
-
-function select_backward_dominance_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T}
-    return dg.dom_masks[backward_vertex(sub)]
-end
-
-# forward is in the direction of dominated to dominating or postdominated to postdominating
 forward_edges(dg::DerivativeGraph{T}, ::FactorableSubgraph{T, DominatorSubgraph}, edge::Edge{T}) where {T} = parent_edges(dg, edge.top_vertex)
 forward_edges(dg::DerivativeGraph{T}, ::FactorableSubgraph{T, PostDominatorSubgraph}, edge::Edge{T}) where {T} = child_edges(dg, edge.bott_vertex)
 forward_edges(dg::DerivativeGraph{T}, ::FactorableSubgraph{T, DominatorSubgraph}, node::T) where {T} = parent_edges(dg, node)
@@ -466,10 +439,11 @@ forward_vertex(sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T} = su
 backward_vertex(sub::FactorableSubgraph{T, DominatorSubgraph}) where {T} = sub.bott_vertex
 backward_vertex(sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T} = sub.top_vertex
 
-function subgraph_edges(sub::FactorableSubgraph)
-    return sub.edges
-end
+subgraph_edges(sub::FactorableSubgraph) = sub.edges
 
+# NOT called in the constructor of `FactorableSubgraph`. Instead, delayed until right before factoring to account for changes to the `DerivativeGraph` from previous factoring
+# Also calculates the subgraph's value
+# Recurses through the subgraph to find all its edges
 function populate_subgraph_edges!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where {T}
     union!(sub.edges, _subgraph_edges(dg, sub, backward_vertex(sub), select_forward_dominance_mask(dg, sub)))
 end
@@ -489,12 +463,13 @@ function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::Fact
     
     push!(visited, edge)
 
+    # reached the end of the subgraph
     if forward_vertex(sub, edge) == forward_vertex(sub)
         push!(edges, edge)
         return edge.edge_value
     end
 
-    !dom_mask[forward_vertex(sub, edge)] && return COMMON_ZERO
+    !dom_mask[forward_vertex(sub, edge)] && return COMMON_ZERO # edge not in subgraph
 
     push!(edges, edge)
     path_value = COMMON_ZERO
@@ -507,8 +482,14 @@ function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::Fact
     return path_value
 end
 
+# the number of times a subgraph is used by all possible partial derivatives
 subgraph_count(sub::FactorableSubgraph) = sum(sub.reachable_roots) * sum(sub.reachable_vars)
 
+"""
+    get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T} -> BinaryHeap
+
+Generates a heap of factorable subgraphs ordered with `FactorOrder` (smallest + most used are factored first).
+"""
 function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
     subs = SymbolicUtils.BinaryHeap{FactorableSubgraph{T, S} where {S<:AbstractFactorableSubgraph}, FactorOrder}()
     for (dominated, dominating) in enumerate(dg.doms)
@@ -530,9 +511,11 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
     return subs
 end
 
+# factors a subgraph from dg, replacing it with a single edge (keeping original edges when necessary)
 function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where {T}
     # TODO: add in case for branching subgraph (factoring creates new subgraph inside of another)
     # TODO: add complete checks if subgraph is still valid
+    # check that the factor and factor base nodes are still a factor and factor base
     (length(backward_edges(dg, sub, forward_vertex(sub))) < 2 || length(forward_edges(dg, sub, backward_vertex(sub))) < 2) && return false
 
     populate_subgraph_edges!(dg, sub)
@@ -540,11 +523,13 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where
     dom_mask = select_backward_dominance_mask(dg, sub)
 
     for edge in sub_edges
+        # if edge is completely contained in the subgraph, remove it
         if dom_mask[backward_vertex(sub, edge)] || backward_vertex(sub, edge) == backward_vertex(sub)
             rem_edge!(dg, edge)
         end
     end
 
+    # add final subgraph edge
     add_edge!(dg, Edge{T}(sub.subgraph_value, sub.top_vertex, sub.bott_vertex, sub.reachable_vars, sub.reachable_roots))
 
     return true
@@ -567,27 +552,33 @@ function factor_order(a::FactorableSubgraph, b::FactorableSubgraph)
     return a_diff < b_diff || (a_diff == b_diff && subgraph_count(a) > subgraph_count(b))
 end
 
+# Factor all subgraphs in the `DerivativeGraph`. This is the key step in the D* algorithm.
 function factor_subgraphs!(dg::DerivativeGraph)
     subs = get_factorable_subgraphs(dg)
 
     while !isempty(subs)
+        # factor the first subgraph according to `FactorOrder``
         sub = pop!(subs)
         factor_subgraph!(dg, sub)
-        # TODO: maybe more efficiently propogate changes to other subgraphs
-        dg.doms .= _get_dominators(dg)
-        dg.pdoms .= _get_postdominators(dg)
+
+        # update dominance after factoring
+        # TODO: more efficiently propogate changes to other subgraphs?
+        dg.doms .= get_dominators(dg)
+        dg.pdoms .= get_postdominators(dg)
         dg.dom_masks .= calculate_dominance_mask(dg.doms)
         dg.pdom_masks .= calculate_dominance_mask(dg.pdoms)
     end
 end
 
 # evaluate a FULLY FACTORED DerivativeGraph
+# currently only accounts for R1->R1 functions by evaluating a single path of edges
 function evaluate_paths(dg::DerivativeGraph)
     if length(dg.roots) == 1 && length(dg.vars) == 1
         return evaluate_path(dg, only(child_edges(dg, dg.root_idx_to_postorder[1])), dg.var_idx_to_postorder[1])
     end
 end
 
+# evaluate the product of single linear path of edges (this represents applying the chain rule)
 function evaluate_path(dg::DerivativeGraph{T}, edge::Edge{T}, goal::T) where T
     edge.bott_vertex == goal && return edge.edge_value
 
@@ -599,6 +590,17 @@ function evaluate_path(dg::DerivativeGraph{T}, edge::Edge{T}, goal::T) where T
     return result * edge.edge_value
 end
 
+"""
+    dstar_derivative(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT}) -> SymbolicT
+
+Computes the derivative of `roots` w.r.t. `vars` using the D* automatic differentiation algorithm using the `DerivativeGraph` data structure.
+
+(see [this paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/main-65.pdf) for more details on the algorithm)
+
+# Arguments
+- `roots::AbstractVector{SymbolicT}`: Vector of expressions to differentate
+- `vars::AbstractVector{SymbolicT}`: Vector of variables to differentate w.r.t.
+"""
 function dstar_derivative(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT})
     dg = DerivativeGraph(roots, vars)
     factor_subgraphs!(dg)
