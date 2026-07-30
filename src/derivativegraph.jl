@@ -590,12 +590,12 @@ function evaluate_path(dg::DerivativeGraph{T}, edge::Edge{T}, goal::T) where T
     return result * edge.edge_value
 end
 
-function derivative(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT})
+function dstar_derivative(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT})
     dg = DerivativeGraph(roots, vars)
     factor_subgraphs!(dg)
 
     return evaluate_paths(dg)
 end
 
-derivative(roots::AbstractVector, vars::AbstractVector) = derivative(unwrap.(roots), unwrap.(vars))
-derivative(root, var) = derivative([root], [var])
+dstar_derivative(roots::AbstractVector, vars::AbstractVector) = dstar_derivative(unwrap.(roots), unwrap.(vars))
+dstar_derivative(root, var) = dstar_derivative([root], [var])
