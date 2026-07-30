@@ -295,6 +295,7 @@ function generate_graph(dg::DerivativeGraph{T}) where {T}
     return g
 end
 
+# https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf
 function _get_dominators(dg::DerivativeGraph{T}) where {T}
     doms = Vector{Union{Nothing, T}}(undef, length(dg))
     root_idxs = root_postorders(dg)
@@ -302,13 +303,13 @@ function _get_dominators(dg::DerivativeGraph{T}) where {T}
 
     function get_common_parent(a::T, b::T)::Union{Nothing, T}
         # move a and b up the graph through their immediate dominators until they meet
+        (isnothing(doms[a]) || isnothing(doms[b])) && return nothing
         while a != b
-            (isnothing(a) || isnothing(b)) && return nothing
             !(a < b && a != doms[a]) && !(b < a && b != doms[b]) && return nothing
-            while !isnothing(a) && a < b && a != doms[a]
+            while a < b && a != doms[a]
                 a = doms[a]
             end
-            while !isnothing(b) && b < a && b != doms[b]
+            while b < a && b != doms[b]
                 b = doms[b]
             end
         end
@@ -419,7 +420,11 @@ function calculate_dominance_mask(dominators::Vector{T}) where {T}
     end
     for (node, dom) in enumerate(dominators)
         isnothing(dom) && continue
-        dom_mask[dom][node] = 1
+        while true
+            dom_mask[dom][node] = 1
+            dom == dominators[dom] && break
+            dom = dominators[dom]
+        end
     end
 
     return dom_mask
