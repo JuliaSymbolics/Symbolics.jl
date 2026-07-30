@@ -568,7 +568,11 @@ function factor_subgraphs!(dg::DerivativeGraph)
     while !isempty(subs)
         sub = pop!(subs)
         factor_subgraph!(dg, sub)
-        # TODO: properly propogate changes to other subgraphs
+        # TODO: maybe more efficiently propogate changes to other subgraphs
+        dg.doms .= _get_dominators(dg)
+        dg.pdoms .= _get_postdominators(dg)
+        dg.dom_masks .= calculate_dominance_mask(dg.doms)
+        dg.pdom_masks .= calculate_dominance_mask(dg.pdoms)
     end
 end
 
