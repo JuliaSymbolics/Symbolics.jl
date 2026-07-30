@@ -411,13 +411,6 @@ mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
     end
 end
 
-# constructs a factorable subgraph and calculates its edges and subgraph value
-function FactorableSubgraph{T, S}(dg::DerivativeGraph{T}, top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector) where {T<:Integer, S<:AbstractFactorableSubgraph}
-    sub = FactorableSubgraph{T, S}(top_vertex, bott_vertex, reachable_vars, reachable_roots)
-    populate_subgraph_edges!(dg, sub)
-    return sub
-end
-
 # also works for postdominators
 function calculate_dominance_mask(dominators::Vector{T}) where {T}
     dom_mask = Vector{BitVector}(undef, length(dominators))
@@ -517,7 +510,7 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
         if !isnothing(dominating) && length(child_edges(dg, dominating)) > 1 && length(parent_edges(dg, T(dominated))) > 1
             reachable_vars_mask = reachable_vars(dg, T(dominated))
             reachable_roots_mask = reachable_roots(dg, dominating)
-            push!(subs, FactorableSubgraph{T, DominatorSubgraph}(dg, dominating, T(dominated), reachable_vars_mask, reachable_roots_mask))
+            push!(subs, FactorableSubgraph{T, DominatorSubgraph}(dominating, T(dominated), reachable_vars_mask, reachable_roots_mask))
         end
     end
 
@@ -525,7 +518,7 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
         if !isnothing(postdominating) && length(parent_edges(dg, postdominating)) > 1 && length(child_edges(dg, T(postdominated))) > 1
             reachable_vars_mask = reachable_vars(dg, postdominating)
             reachable_roots_mask = reachable_roots(dg, T(postdominated))
-            push!(subs, FactorableSubgraph{T, PostDominatorSubgraph}(dg, T(postdominated), postdominating, reachable_vars_mask, reachable_roots_mask))
+            push!(subs, FactorableSubgraph{T, PostDominatorSubgraph}(T(postdominated), postdominating, reachable_vars_mask, reachable_roots_mask))
         end
     end
     
@@ -537,6 +530,7 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where
     # TODO: add complete checks if subgraph is still valid
     (length(backward_edges(dg, sub, forward_vertex(sub))) < 2 || length(forward_edges(dg, sub, backward_vertex(sub))) < 2) && return false
 
+    populate_subgraph_edges!(dg, sub)
     sub_edges = subgraph_edges(sub)
     dom_mask = select_backward_dominance_mask(dg, sub)
 
