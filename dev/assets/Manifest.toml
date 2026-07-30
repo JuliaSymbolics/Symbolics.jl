@@ -246,9 +246,9 @@ uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 version = "1.0.2"
 
 [[deps.CommonWorldInvalidations]]
-git-tree-sha1 = "cde75cb34c9ee07b4c37981b0f32378d0dc19ffe"
+git-tree-sha1 = "ef2022bff55342a8c9846cdf218f62e475f0444d"
 uuid = "f70d9fcc-98c5-4d4a-abd7-e4cdeebd8ca8"
-version = "1.1.1"
+version = "1.1.2"
 
 [[deps.Compat]]
 deps = ["TOML", "UUIDs"]
@@ -563,9 +563,9 @@ version = "1.0.2"
 
 [[deps.Groebner]]
 deps = ["AbstractAlgebra", "Atomix", "Combinatorics", "Logging", "Nemo", "PrecompileTools", "Primes", "Printf", "Random", "SmallCollections", "TimerOutputs"]
-git-tree-sha1 = "fe0207cc1b53dae7f4b1659776e8672dd9883516"
+git-tree-sha1 = "d4d188c6c511a74fc5dac62572aaa47e04c33bcb"
 uuid = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
-version = "0.10.5"
+version = "0.10.6"
 weakdeps = ["DynamicPolynomials"]
 
     [deps.Groebner.extensions]
@@ -1146,9 +1146,9 @@ version = "1.3.1"
 
 [[deps.RuntimeGeneratedFunctions]]
 deps = ["ExprTools", "SHA", "Serialization"]
-git-tree-sha1 = "0e3eba2ca347b001baade9fb830623e04da64b38"
+git-tree-sha1 = "6368773b8b433a5c6d9f8b9427c5fbded65fc8c0"
 uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
-version = "0.5.22"
+version = "0.5.23"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
