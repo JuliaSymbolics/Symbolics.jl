@@ -182,7 +182,7 @@ function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
             else
                 args = copy(parent(arguments(expr)))
                 args[arg_idx] = COMMON_ONE
-                return prod(args)
+                return SymbolicUtils.mul_worker(VartypeT, args)
             end
         end
         _ => return derivative_idx(expr, arg_idx)
@@ -195,7 +195,7 @@ function populate_dergraph!(dg::DerivativeGraph)
         local post_idx
         if root in dg.varset
             post_idx = populate_dergraph_var!(dg, root, root_idx)
-        elseif iscall(root)
+        else
             post_idx = populate_dergraph!(dg, root, root_idx)
         end
 
@@ -207,15 +207,17 @@ end
 function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::Integer) where {T}
     haskey(dg.definitions, expr) && return populate_root_reachabilities!(dg, dg.definitions[expr], root_idx)
 
-    # assume iscall(expr)
+    !iscall(expr) && return
+
     args = parent(arguments(expr))
-    arg_idx_to_post_idx = IdDict{Int, T}()
-    sizehint!(arg_idx_to_post_idx, length(args)) # faster?
+    arg_idx_to_post_idx = Vector{T}(undef, length(args))
     for (arg_idx, arg) in enumerate(args)
         if arg in dg.varset
             arg_idx_to_post_idx[arg_idx] = populate_dergraph_var!(dg, arg, root_idx)
         elseif iscall(arg)
             arg_idx_to_post_idx[arg_idx] = populate_dergraph!(dg, arg, root_idx)
+        else
+            arg_idx_to_post_idx[arg_idx] = T(-1)
         end
     end
 
@@ -226,7 +228,8 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     dg.parent_edges[post_idx] = Edge{T}[]
 
     # add new edges
-    for (arg_idx, arg_post_idx) in arg_idx_to_post_idx
+    for (arg_idx, arg_post_idx) in enumerate(arg_idx_to_post_idx)
+        arg_post_idx == T(-1) && continue
         partial_der = nary_derivative_idx(expr, arg_idx)
         arg_reachable_vars = reachable_vars(dg, arg_post_idx)
         arg_reachable_roots = reachable_roots(dg, arg_post_idx)
@@ -241,8 +244,10 @@ end
 
 function populate_root_reachabilities!(dg::DerivativeGraph{T}, node::T, root_idx::Integer) where {T}
     for child_edge in dg.child_edges[node]
-        child_edge.reachable_roots[root_idx] = 1
-        populate_root_reachabilities!(dg, child_edge.bott_vertex, root_idx)
+        if !child_edge.reachable_roots[root_idx]
+            child_edge.reachable_roots[root_idx] = 1
+            populate_root_reachabilities!(dg, child_edge.bott_vertex, root_idx)
+        end
     end
 
     return node
@@ -384,13 +389,14 @@ mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
     reachable_vars::BitVector
     reachable_roots::BitVector
     edges::Set{Edge{T}}
+    subgraph_count::Int
 
     function FactorableSubgraph{T, DominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector) where {T<:Integer}
-        new{T, DominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, Set{Edge{T}}())
+        new{T, DominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, Set{Edge{T}}(), sum(reachable_vars)*sum(reachable_roots))
     end
 
     function FactorableSubgraph{T, PostDominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector) where {T<:Integer}
-        new{T, PostDominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, Set{Edge{T}}())
+        new{T, PostDominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, Set{Edge{T}}(), sum(reachable_vars)*sum(reachable_roots))
     end
 end
 
@@ -483,7 +489,7 @@ function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::Fact
 end
 
 # the number of times a subgraph is used by all possible partial derivatives
-subgraph_count(sub::FactorableSubgraph) = sum(sub.reachable_roots) * sum(sub.reachable_vars)
+subgraph_count(sub::FactorableSubgraph) = sub.subgraph_count
 
 """
     get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T} -> BinaryHeap
@@ -491,7 +497,7 @@ subgraph_count(sub::FactorableSubgraph) = sum(sub.reachable_roots) * sum(sub.rea
 Generates a heap of factorable subgraphs ordered with `FactorOrder` (smallest + most used are factored first).
 """
 function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
-    subs = SymbolicUtils.BinaryHeap{FactorableSubgraph{T, S} where {S<:AbstractFactorableSubgraph}, FactorOrder}()
+    subs = DataStructures.BinaryHeap{Union{FactorableSubgraph{T, DominatorSubgraph}, FactorableSubgraph{T, PostDominatorSubgraph}}, FactorOrder}()
     for (dominated, dominating) in enumerate(dg.doms)
         if !isnothing(dominating) && length(child_edges(dg, dominating)) > 1 && length(parent_edges(dg, T(dominated))) > 1
             reachable_vars_mask = reachable_vars(dg, T(dominated))
