@@ -37,9 +37,9 @@ struct DerivativeGraph{T<:Integer}
     roots::Vector{SymbolicT} # root index -> root symbolic expression
     vars::Vector{SymbolicT} # variable index -> variable symbolic expression
     varset::Set{SymbolicT} # for fast checking if an expression is a variable
-    var_idx_to_postorder::Vector{T}
+    var_idx_to_postorder::IdDict{Int,T}
     postorder_to_var_idx::IdDict{T,T}
-    root_idx_to_postorder::Vector{T}
+    root_idx_to_postorder::IdDict{Int,T}
     postorder_to_root_idx::IdDict{T,T}
     parent_edges::Dict{T, Vector{Edge{T}}} # node -> parent edges
     child_edges::Dict{T, Vector{Edge{T}}} # node -> child edges
@@ -68,9 +68,9 @@ function DerivativeGraph(roots::AbstractVector{SymbolicT}, vars::AbstractVector{
         roots,
         vars,
         Set(vars),
-        Vector{idx_type}(undef, length(vars)),
+        IdDict{Int, idx_type}(),
         IdDict{idx_type, idx_type}(),
-        Vector{idx_type}(undef, length(roots)),
+        IdDict{Int, idx_type}(),
         IdDict{idx_type, idx_type}(),
         Dict{idx_type, Vector{Edge{idx_type}}}(),
         Dict{idx_type, Vector{Edge{idx_type}}}(),
@@ -82,6 +82,8 @@ function DerivativeGraph(roots::AbstractVector{SymbolicT}, vars::AbstractVector{
 
     populate_dergraph!(dg)
 
+    sizehint!(dg.var_idx_to_postorder, length(vars))
+    sizehint!(dg.root_idx_to_postorder, length(roots))
     sizehint!(dg.doms, length(dg.symbols))
     sizehint!(dg.pdoms, length(dg.symbols))
     sizehint!(dg.dom_masks, length(dg.symbols))
@@ -199,6 +201,8 @@ function populate_dergraph!(dg::DerivativeGraph)
             post_idx = populate_dergraph!(dg, root, root_idx)
         end
 
+        isnothing(post_idx) && continue
+
         dg.root_idx_to_postorder[root_idx] = post_idx
         dg.postorder_to_root_idx[post_idx] = root_idx
     end
@@ -207,7 +211,7 @@ end
 function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::Integer) where {T}
     haskey(dg.definitions, expr) && return populate_root_reachabilities!(dg, dg.definitions[expr], root_idx)
 
-    !iscall(expr) && return
+    !iscall(expr) && return nothing
 
     args = parent(arguments(expr))
     arg_idx_to_post_idx = Vector{T}(undef, length(args))
@@ -284,7 +288,7 @@ end
 function get_dominators(dg::DerivativeGraph{T}) where {T}
     doms = Vector{Union{Nothing, T}}(undef, length(dg))
     root_idxs = root_postorders(dg)
-    doms[root_idxs] = root_idxs
+    doms[collect(values(root_idxs))] = collect(values(root_idxs))
 
     # moves two nodes up the graph until they meet
     function get_common_parent(a::T, b::T)::Union{Nothing, T}
@@ -308,7 +312,10 @@ function get_dominators(dg::DerivativeGraph{T}) where {T}
         for node in reverse(eachindex(dg))
             parents = parent_nodes(dg, node)
             
-            isempty(parents) && continue
+            if isempty(parents)
+                doms[node] = node
+                continue
+            end
             
             new_idom = first(parents)
 
@@ -333,7 +340,7 @@ end
 
 function get_postdominators(dg::DerivativeGraph{T}) where {T}
     pdoms = Vector{Union{Nothing, T}}(undef, length(dg))
-    pdoms[dg.var_idx_to_postorder] = dg.var_idx_to_postorder
+    pdoms[collect(values(dg.var_idx_to_postorder))] = collect(values(dg.var_idx_to_postorder))
 
     function get_common_child(a::T, b::T)::Union{Nothing, T}
         # move a and b up the graph through their immediate dominators until they meet
@@ -354,11 +361,11 @@ function get_postdominators(dg::DerivativeGraph{T}) where {T}
     while changed
         changed = false
         for node in eachindex(dg)
-            node in dg.var_idx_to_postorder && continue
+            haskey(dg.postorder_to_var_idx, node) && continue
 
             children = child_nodes(dg, node)
             if isempty(children)
-                pdoms[node] = nothing
+                pdoms[node] = node
                 continue
             end
             new_pidom = first(children)
@@ -407,9 +414,8 @@ function calculate_dominance_mask(dominators::Vector{T}) where {T}
         dom_mask[i] = falses(length(dominators))
     end
     for (node, dom) in enumerate(dominators)
-        isnothing(dom) && continue
         # walk up through the dominators
-        while true
+        while !isnothing(dom)
             dom_mask[dom][node] = 1
             dom == dominators[dom] && break
             dom = dominators[dom]
@@ -576,30 +582,36 @@ function factor_subgraphs!(dg::DerivativeGraph)
     end
 end
 
-# evaluate a FULLY FACTORED DerivativeGraph
-# currently only accounts for R1->R1 functions by evaluating a single path of edges
-function evaluate_paths(dg::DerivativeGraph)
-    if length(dg.roots) == 1 && length(dg.vars) == 1
-        return evaluate_path(dg, only(child_edges(dg, dg.root_idx_to_postorder[1])), dg.var_idx_to_postorder[1])
-    end
+# evaluate the derivative of root w.r.t. var using a fully factored DerivativeGraph
+function evaluate_path(dg::DerivativeGraph, root::Int, var::Int)
+    haskey(dg.root_idx_to_postorder, root) || return COMMON_ZERO
+    haskey(dg.var_idx_to_postorder, var) || return COMMON_ZERO
+    root_postorder = dg.root_idx_to_postorder[root]
+    var_postorder = dg.var_idx_to_postorder[var]
+
+    root_postorder == var_postorder && return COMMON_ONE
+
+    next_edges = filter(e -> reachable_vars(e)[var], dg.child_edges[root_postorder])
+    isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
+    @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
+
+    return evaluate_path(dg, only(next_edges), var)
 end
 
-# evaluate the product of single linear path of edges (this represents applying the chain rule)
-function evaluate_path(dg::DerivativeGraph{T}, edge::Edge{T}, goal::T) where T
-    edge.bott_vertex == goal && return edge.edge_value
+function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Int)
+    edge.bott_vertex == dg.var_idx_to_postorder[var] && return edge.edge_value # reached var
 
-    result = COMMON_ZERO
-    for child_edge in child_edges(dg, edge.bott_vertex)
-        result += evaluate_path(dg, child_edge, goal)
-    end
+    next_edges = filter(e -> reachable_vars(e)[var], dg.child_edges[edge.bott_vertex])
+    isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
+    @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
 
-    return result * edge.edge_value
+    return evaluate_path(dg, only(next_edges), var) * edge.edge_value
 end
 
 """
-    dstar_derivative(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT}) -> SymbolicT
+    dstar_jacobioan(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT}) -> Matrix{SymbolicT}
 
-Computes the derivative of `roots` w.r.t. `vars` using the D* automatic differentiation algorithm using the `DerivativeGraph` data structure.
+Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differentiation algorithm using the `DerivativeGraph` data structure.
 
 (see [this paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/main-65.pdf) for more details on the algorithm)
 
@@ -607,12 +619,20 @@ Computes the derivative of `roots` w.r.t. `vars` using the D* automatic differen
 - `roots::AbstractVector{SymbolicT}`: Vector of expressions to differentate
 - `vars::AbstractVector{SymbolicT}`: Vector of variables to differentate w.r.t.
 """
-function dstar_derivative(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT})
+function dstar_jacobian(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT})
     dg = DerivativeGraph(roots, vars)
     factor_subgraphs!(dg)
 
-    return evaluate_paths(dg)
+    result = Matrix{SymbolicT}(undef, length(roots), length(vars))
+
+    for root in eachindex(roots)
+        for var in eachindex(vars)
+            result[root, var] = evaluate_path(dg, root, var)
+        end
+    end
+
+    return result
 end
 
-dstar_derivative(roots::AbstractVector, vars::AbstractVector) = dstar_derivative(unwrap.(roots), unwrap.(vars))
-dstar_derivative(root, var) = dstar_derivative([root], [var])
+dstar_jacobian(roots::AbstractVector, vars::AbstractVector) = dstar_jacobian(unwrap.(roots), unwrap.(vars))
+dstar_derivative(root, var) = only(dstar_jacobian([root], [var]))
