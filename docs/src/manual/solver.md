@@ -14,6 +14,13 @@ One other symbolic solver is `symbolic_linear_solve` which is limited compared t
 Symbolics.symbolic_linear_solve
 ```
 
+`symbolic_linear_solve` was previously called `solve_for`, which is still exported but
+deprecated.
+
+```@docs
+Symbolics.solve_for
+```
+
 `symbolic_solve` only supports symbolic, i.e. non-floating point computations, and thus prefers equations
 where the coefficients are integer, rational, or symbolic. Floating point coefficients are transformed into
 rational values and BigInt values are used internally with a potential performance loss, and thus it is recommended

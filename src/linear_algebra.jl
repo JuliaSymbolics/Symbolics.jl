@@ -55,6 +55,21 @@ function sym_lu(A::AbstractMatrix{Num}; check=true)
     LU(F, p, convert(LinearAlgebra.BlasInt, info))
 end
 
+"""
+    solve_for(eqs, vars; simplify = false, check = true)
+
+Deprecated. Use [`Symbolics.symbolic_linear_solve`](@ref) instead, which takes the same
+arguments and returns the same result.
+
+`solve_for` was the original name for Symbolics' linear equation solver. It was renamed to
+`symbolic_linear_solve` when [`Symbolics.symbolic_solve`](@ref) was added, so that the two
+solvers have names that say how they differ: `symbolic_solve` handles nonlinear (polynomial)
+systems and returns all roots, while `symbolic_linear_solve` solves a linear system by
+factorization and returns the single solution.
+
+Calling `solve_for` forwards to `symbolic_linear_solve` and emits a deprecation warning. It
+will be removed in the next breaking release.
+"""
 function solve_for(eq::Any, var::Any; simplify=false, check=true)
     Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for)
     return symbolic_linear_solve(eq, var; simplify=simplify, check=check)

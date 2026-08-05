@@ -14,3 +14,13 @@ Symbolics.NAMESPACE_SEPARATOR
 Symbolics.linear_expansion
 Symbolics.LinearExpander
 ```
+
+## Deprecated
+
+These names are still exported so that existing code keeps working, but each one warns on
+use and will be removed in the next breaking release.
+
+```@docs
+Symbolics.infimum
+Symbolics.supremum
+```

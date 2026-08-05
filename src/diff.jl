@@ -65,6 +65,54 @@ function SymbolicUtils.operator_to_term(::Differential, ex::BasicSymbolic{Vartyp
     return diff2term(ex)
 end
 
+"""
+    is_derivative(x)
+
+Return `true` if `x` is an unapplied derivative term, i.e. an unwrapped symbolic expression
+whose operation is a [`Differential`](@ref). Return `false` for everything else.
+
+Applying a `Differential` does not differentiate immediately: `D(x^2)` is stored as the
+symbolic application of `D` to `x^2` until [`expand_derivatives`](@ref) is called. This
+predicate is the test for "this node is still an unapplied derivative", and is the usual
+building block for finding them inside an expression.
+
+Two things to be aware of when calling it:
+
+  - It only inspects the top node. `D(x) + y` is not a derivative term even though it
+    contains one. Combine it with `Symbolics.hasnode` or `Symbolics.filterchildren` to ask
+    about a whole tree.
+  - It operates on the unwrapped expression tree, so a wrapper such as `Num` must be
+    unwrapped first. `D(x)` returns a `Num`, and `is_derivative` of a `Num` falls through to
+    the catch-all and returns `false`; call `is_derivative(Symbolics.unwrap(D(x)))`
+    instead. Tree walkers like `hasnode` and `filterchildren` unwrap for you, so the common
+    case needs no special handling.
+
+```julia
+julia> using Symbolics
+
+julia> @variables t x(t);
+
+julia> D = Differential(t);
+
+julia> is_derivative(Symbolics.unwrap(D(x)))
+true
+
+julia> is_derivative(D(x))   # a `Num`, not an expression tree
+false
+
+julia> is_derivative(Symbolics.unwrap(D(x) + x))
+false
+
+julia> is_derivative(Symbolics.unwrap(expand_derivatives(D(x^2))))
+false
+
+julia> Symbolics.hasnode(is_derivative, D(x) + x)
+true
+```
+
+See also: [`Differential`](@ref), [`expand_derivatives`](@ref), [`Symbolics.hasnode`](@ref),
+[`Symbolics.filterchildren`](@ref), [`Symbolics.unwrap`](@ref).
+"""
 function is_derivative(x::SymbolicT)
     @match x begin
         BSImpl.Term(; f) && if f isa Differential end => true

@@ -49,3 +49,14 @@ Symbolics.wrap
 Symbolics.unwrap
 ```
 
+### Defining your own wrapper
+
+A package that introduces a new symbolic type registers a wrapper for it with
+`@symbolic_wrap`, and then uses `@wrapped` to make its functions accept both the wrapper and
+raw expression trees in place of the concrete type.
+
+```@docs
+@symbolic_wrap
+@wrapped
+```
+
