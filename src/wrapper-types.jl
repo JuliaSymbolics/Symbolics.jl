@@ -23,6 +23,66 @@ function _get_type_name(x::Union{Symbol, Expr})
     return x.args[1]
 end
 
+"""
+    @symbolic_wrap struct W <: T
+        ...
+    end
+
+Define `W` as the symbolic wrapper type for the symbolic type `T`, and register the
+correspondence between the two with Symbolics.
+
+Symbolic expressions are stored as untyped expression trees (`BasicSymbolic`), but Julia
+code dispatches on types: a function written for `Real` will not accept an expression tree.
+Symbolics bridges the two by *wrapping* an expression tree in a struct that subtypes the
+type the expression stands for. `Num <: Real` is the built-in example — it holds an
+expression tree whose `symtype` is `Real` and can therefore be passed anywhere a `Real` is
+expected. `@symbolic_wrap` is how a package declares its own such pairing, so that
+Symbolics knows to wrap results of that symbolic type in `W` and to unwrap `W` back to the
+expression tree at the boundaries.
+
+The macro takes a struct definition whose supertype is the symbolic type being wrapped. It
+emits the struct unchanged, plus the trait methods that tie `W` and `T` together:
+`Symbolics.has_symwrapper(::Type{<:T})`, `Symbolics.wrapper_type(::Type{<:T}) = W`,
+`Symbolics.is_wrapper_type(::Type{<:W})`, `Symbolics.wraps_type(::Type{W}) = T` and
+`Symbolics.iswrapped(::W)`. Once those exist, [`Symbolics.wrap`](@ref) maps a value of
+symbolic type `T` to a `W`, [`Symbolics.unwrap`](@ref) maps it back, [`@wrapped`](@ref)
+generates wrapper-accepting methods, and `@register_symbolic` knows `W` counts as symbolic.
+
+Two things are the caller's responsibility. `W` must be constructible from the value it
+wraps, because that is how `Symbolics.wrap` builds it, and a `Symbolics.unwrap` method must
+be defined for `W` to get the value back out.
+
+The registration is on the *unparameterized* supertype, so
+`Symbolics.wrapper_type(T{Int})` also returns `W`; if a parameterized wrapper is wanted
+there, add the method by hand.
+
+Only one wrapper may be registered per symbolic type, and `Real` is already taken by `Num`.
+`@symbolic_wrap` is therefore for introducing wrappers over *new* symbolic types, not for
+replacing the built-in ones.
+
+# Example
+
+```julia
+using Symbolics
+
+abstract type AbstractFoo{T} end
+struct Foo{T} <: AbstractFoo{T} end
+
+@symbolic_wrap struct FooWrap{T} <: AbstractFoo{T}
+    val::Foo{T}
+end
+
+Symbolics.unwrap(r::FooWrap) = r.val
+
+wrap(Foo{Int}())            # FooWrap{Int}
+unwrap(wrap(Foo{Int}()))    # Foo{Int}
+```
+
+With that in place, [`@wrapped`](@ref) can generate methods that accept `FooWrap` wherever
+they declare an `AbstractFoo` argument.
+
+See also: [`@wrapped`](@ref), [`Symbolics.wrap`](@ref), [`Symbolics.unwrap`](@ref).
+"""
 macro symbolic_wrap(expr)
     @assert expr isa Expr && expr.head == :struct
     @assert expr.args[2].head == :(<:)
@@ -214,6 +274,65 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
     end |> esc
 end
 
+"""
+    @wrapped function f(x::T, ...) ... end
+    @wrapped f(x::T, ...) = ...
+    @wrapped function f(x::T, ...) ... end false
+
+Given one function definition written against concrete types, generate the additional
+methods that accept symbolic expressions and wrapper types in those argument positions.
+
+A function written as `f(x::Real)` will not accept a `Num`, because `Num` holds an
+expression tree rather than a number, and will not accept a raw `BasicSymbolic` either.
+Writing the symbolic methods by hand means one method per combination of "concrete /
+symbolic / wrapped" across all arguments, each of which has to unwrap its wrapper
+arguments, call the body, and re-wrap the result. `@wrapped` writes that combinatorial
+expansion for you.
+
+The body is emitted once under a private name, and one method of `f` is emitted per element
+of the product of the type options for each argument. For an argument annotated `::T` the
+options are `T` itself, a symbolic expression whose `symtype` is `T`, and — when `T` has a
+wrapper registered via [`@symbolic_wrap`](@ref) — that wrapper type. When `T` is an array
+type, array-of-symbolic and array-of-wrapper options are added as well. Unannotated
+arguments are left as `Any`.
+
+The all-concrete method is deliberately *not* emitted: `@wrapped function f(x::Real)` does
+not define `f(::Real)`. That method is assumed to already exist outside Symbolics (often it
+is the very Base function being extended), and emitting it would be piracy. Consequently
+`f` must have a non-symbolic definition of its own if it is to be called on plain values.
+
+In each generated method, wrapper-typed arguments are unwrapped before the body runs, and
+the result is re-wrapped with [`Symbolics.wrap`](@ref) whenever at least one argument was
+wrapped — so passing `Num`s in gets a `Num` back out, while passing raw `BasicSymbolic`s in
+returns a raw expression. Symbolic arguments additionally get an `@assert` that their
+`symtype` matches the declared annotation, which turns a type mismatch into an error at the
+call rather than a wrong answer downstream.
+
+Keyword arguments are forwarded as declared and are not expanded over; only positional
+arguments participate in the product.
+
+The optional trailing argument (default `true`) controls whether array-typed arguments are
+expanded over their symbolic-array and wrapped-array options. Pass `false` to suppress
+that, which is useful when the method is meant to see the container itself rather than a
+symbolic array.
+
+# Example
+
+Continuing the wrapper from [`@symbolic_wrap`](@ref):
+
+```julia
+@wrapped function foo(f::AbstractFoo, x::Real)
+    x > 1 ? Foo{Int}() : 0
+end
+
+applicable(foo, Foo{Int}(), 2)             # false: the all-concrete method is not emitted
+applicable(foo, Foo{Int}(), wrap(2))       # true
+applicable(foo, wrap(Foo{Int}()), 2)       # true
+applicable(foo, wrap(Foo{Int}()), wrap(2)) # true
+```
+
+See also: [`@symbolic_wrap`](@ref), [`Symbolics.wrap`](@ref), [`Symbolics.unwrap`](@ref).
+"""
 macro wrapped(expr, wrap_arrays = true)
     wrap_func_expr(__module__, expr, wrap_arrays)
 end
