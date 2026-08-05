@@ -68,24 +68,26 @@ end
 """
     is_derivative(x)
 
-Return `true` if `x` is an unapplied derivative term, i.e. an unwrapped symbolic expression
-whose operation is a [`Differential`](@ref). Return `false` for everything else.
+Return `true` if `x` is an unapplied derivative term, i.e. a symbolic expression whose
+operation is a [`Differential`](@ref). Return `false` for everything else.
 
 Applying a `Differential` does not differentiate immediately: `D(x^2)` is stored as the
 symbolic application of `D` to `x^2` until [`expand_derivatives`](@ref) is called. This
 predicate is the test for "this node is still an unapplied derivative", and is the usual
 building block for finding them inside an expression.
 
+Wrapper types are unwrapped first, so the `Num` that `D(x)` returns and the raw expression
+tree `Symbolics.unwrap(D(x))` give the same answer. That holds for any registered wrapper
+([`@symbolic_wrap`](@ref)), including `Arr`.
+
 Two things to be aware of when calling it:
 
   - It only inspects the top node. `D(x) + y` is not a derivative term even though it
     contains one. Combine it with `Symbolics.hasnode` or `Symbolics.filterchildren` to ask
     about a whole tree.
-  - It operates on the unwrapped expression tree, so a wrapper such as `Num` must be
-    unwrapped first. `D(x)` returns a `Num`, and `is_derivative` of a `Num` falls through to
-    the catch-all and returns `false`; call `is_derivative(Symbolics.unwrap(D(x)))`
-    instead. Tree walkers like `hasnode` and `filterchildren` unwrap for you, so the common
-    case needs no special handling.
+  - A `Differential` applied to a `Complex{Num}` distributes over the real and imaginary
+    parts rather than forming one derivative term, so `is_derivative` is `false` for it
+    even though each part is a derivative.
 
 ```julia
 julia> using Symbolics
@@ -94,16 +96,16 @@ julia> @variables t x(t);
 
 julia> D = Differential(t);
 
+julia> is_derivative(D(x))
+true
+
 julia> is_derivative(Symbolics.unwrap(D(x)))
 true
 
-julia> is_derivative(D(x))   # a `Num`, not an expression tree
+julia> is_derivative(D(x) + x)
 false
 
-julia> is_derivative(Symbolics.unwrap(D(x) + x))
-false
-
-julia> is_derivative(Symbolics.unwrap(expand_derivatives(D(x^2))))
+julia> is_derivative(expand_derivatives(D(x^2)))
 false
 
 julia> Symbolics.hasnode(is_derivative, D(x) + x)
@@ -119,7 +121,7 @@ function is_derivative(x::SymbolicT)
         _ => false
     end
 end
-is_derivative(_) = false
+is_derivative(x) = iswrapped(x) && is_derivative(unwrap(x))
 
 Base.:*(D1::ComposedFunction, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2) = D1 ∘ D2
