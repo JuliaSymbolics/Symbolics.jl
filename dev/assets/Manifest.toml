@@ -1325,9 +1325,9 @@ version = "0.3.52"
 
 [[deps.SymbolicLimits]]
 deps = ["SymbolicUtils", "TermInterface"]
-git-tree-sha1 = "ab885203e8395593d65b629bd4023de089e6997b"
+git-tree-sha1 = "90c1f0a9d1c65e462bdb7180c3ea21e0139e9748"
 uuid = "19f23fe9-fdab-4a78-91af-e7b7767979c3"
-version = "1.1.4"
+version = "1.1.5"
 
 [[deps.SymbolicSMT]]
 deps = ["SymbolicUtils", "Symbolics", "Z3"]
@@ -1357,7 +1357,7 @@ version = "4.44.1"
 deps = ["ADTypes", "AbstractPlutoDingetjes", "ArrayInterface", "Bijections", "CommonWorldInvalidations", "ConstructionBase", "DataStructures", "DiffRules", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "IntervalSets", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "Moshi", "MultivariatePolynomials", "MutableArithmetics", "NaNMath", "PrecompileTools", "Preferences", "Primes", "RecipesBase", "Reexport", "RuntimeGeneratedFunctions", "SciMLPublic", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
 path = "/home/runner/work/Symbolics.jl/Symbolics.jl"
 uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
-version = "7.36.0"
+version = "7.37.0"
 
     [deps.Symbolics.extensions]
     SymbolicsD3TreesExt = "D3Trees"
