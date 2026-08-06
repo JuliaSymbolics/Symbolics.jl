@@ -117,6 +117,20 @@ function hasedge(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     return is_child_edge && is_parent_edge
 end
 
+function propogate_var_reachability(dg::DerivativeGraph{T}, node::T) where {T}
+    _parent_edges = parent_edges(dg, node)
+    isempty(_parent_edges) && return nothing
+
+    old_reachability = reachable_vars(first(_parent_edges))
+    new_reachability = reachable_vars(dg, node) # computes reachable_vars from union of child edge reachabilities
+    old_reachability == new_reachability && return nothing
+    
+    for edge in _parent_edges
+        edge.reachable_vars .= new_reachability
+        propogate_var_reachability(dg, top_vertex(edge))
+    end
+end
+
 function rem_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     @assert hasedge(dg, edge) "edge is not in the graph"
     
@@ -125,6 +139,8 @@ function rem_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     bott_parent_edges = parent_edges(dg, bott_vert)
     deleteat!(top_child_edges, findfirst(isequal(edge), top_child_edges))
     deleteat!(bott_parent_edges, findfirst(isequal(edge), bott_parent_edges))
+
+    propogate_var_reachability(dg, top_vert)
 
     return nothing
 end
@@ -143,6 +159,8 @@ function add_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     top_vertex, bott_vertex = vertices(edge)
     push!(dg.child_edges[top_vertex], edge)
     push!(dg.parent_edges[bott_vertex], edge)
+
+    propogate_var_reachability(dg, top_vertex)
 
     return nothing
 end
@@ -296,12 +314,14 @@ function get_dominators(dg::DerivativeGraph{T}) where {T}
         (isnothing(doms[a]) || isnothing(doms[b])) && return nothing
         while a != b
             !(a < b && a != doms[a]) && !(b < a && b != doms[b]) && return nothing
-            while a < b && a != doms[a]
+            while !isnothing(a) && a < b && a != doms[a]
                 a = doms[a]
             end
-            while b < a && b != doms[b]
+            isnothing(a) && return nothing
+            while !isnothing(b) && b < a && b != doms[b]
                 b = doms[b]
             end
+            isnothing(b) && return nothing
         end
         return a
     end
@@ -348,12 +368,14 @@ function get_postdominators(dg::DerivativeGraph{T}) where {T}
         (isnothing(pdoms[a]) || isnothing(pdoms[b])) && return nothing
         while a != b
             !(a > b && a != pdoms[a]) && !(b > a && b != pdoms[b]) && return nothing
-            while a > b && a != pdoms[a]
+            while !isnothing(a) && a > b && a != pdoms[a]
                 a = pdoms[a]
             end
-            while b > a && b != pdoms[b]
+            isnothing(a) && return nothing
+            while !isnothing(b) && b > a && b != pdoms[b]
                 b = pdoms[b]
             end
+            isnothing(b) && return nothing
         end
         return a
     end
