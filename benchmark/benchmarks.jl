@@ -122,8 +122,9 @@ const _Dp = Differential(p)
 const SUITE_AD = SUITE["AD"] = BenchmarkGroup()
 
 for depth in (3, 5, 7, 9, 11)
-    expr = _Dp(_random_expr(Xoshiro(42), _ad_atoms, depth))
-    SUITE_AD["expand_derivatives/depth=$depth"] = @benchmarkable expand_derivatives($expr)
+    expr = _random_expr(Xoshiro(42), _ad_atoms, depth)
+    SUITE_AD["expand_derivatives/depth=$depth"] = @benchmarkable expand_derivatives($(_Dp(expr)))
+    SUITE_AD["dstar_derivative/depth=$depth"] = @benchmarkable Symbolics.dstar_derivative($expr, $p)
 end
 
 # ── linear_expansion ──────────────────────────────────────────────────────────
