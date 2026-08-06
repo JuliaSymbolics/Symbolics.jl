@@ -37,10 +37,10 @@ struct DerivativeGraph{T<:Integer}
     roots::Vector{SymbolicT} # root index -> root symbolic expression
     vars::Vector{SymbolicT} # variable index -> variable symbolic expression
     varset::Set{SymbolicT} # for fast checking if an expression is a variable
-    var_idx_to_postorder::IdDict{Int,T}
-    postorder_to_var_idx::IdDict{T,T}
-    root_idx_to_postorder::IdDict{Int,T}
-    postorder_to_root_idx::IdDict{T,T}
+    var_idx_to_postorder::Dict{Int,T}
+    postorder_to_var_idx::Dict{T,T}
+    root_idx_to_postorder::Dict{Int,T}
+    postorder_to_root_idx::Dict{T,T}
     parent_edges::Dict{T, Vector{Edge{T}}} # node -> parent edges
     child_edges::Dict{T, Vector{Edge{T}}} # node -> child edges
     doms::Vector{Union{Nothing, T}} # immediate dominators of nodes
@@ -287,8 +287,8 @@ end
 # Follows the algorithm described in this paper: https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf
 function get_dominators(dg::DerivativeGraph{T}) where {T}
     doms = Vector{Union{Nothing, T}}(undef, length(dg))
-    root_idxs = root_postorders(dg)
-    doms[collect(values(root_idxs))] = collect(values(root_idxs))
+    root_idxs = collect(values(root_postorders(dg)))
+    doms[root_idxs] = root_idxs
 
     # moves two nodes up the graph until they meet
     function get_common_parent(a::T, b::T)::Union{Nothing, T}
@@ -340,7 +340,8 @@ end
 
 function get_postdominators(dg::DerivativeGraph{T}) where {T}
     pdoms = Vector{Union{Nothing, T}}(undef, length(dg))
-    pdoms[collect(values(dg.var_idx_to_postorder))] = collect(values(dg.var_idx_to_postorder))
+    var_idxs = collect(values(dg.var_idx_to_postorder))
+    pdoms[var_idxs] = var_idxs
 
     function get_common_child(a::T, b::T)::Union{Nothing, T}
         # move a and b up the graph through their immediate dominators until they meet
@@ -595,7 +596,7 @@ function evaluate_path(dg::DerivativeGraph, root::Int, var::Int)
     isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
     @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
 
-    return evaluate_path(dg, only(next_edges), var)
+    return evaluate_path(dg, first(next_edges), var)
 end
 
 function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Int)
@@ -605,7 +606,7 @@ function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Int)
     isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
     @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
 
-    return evaluate_path(dg, only(next_edges), var) * edge.edge_value
+    return evaluate_path(dg, first(next_edges), var) * edge.edge_value
 end
 
 """
