@@ -20,7 +20,7 @@ times_used(edge::Edge) = sum(reachable_roots(edge)) * sum(reachable_vars(edge))
 
 # use loose definition of edge equality to allow for edge values changing
 Base.:(==)(a::Edge, b::Edge) = a.top_vertex == b.top_vertex && a.bott_vertex == b.bott_vertex
-
+Base.hash(e::Edge, h::UInt) = hash((e.top_vertex, e.bott_vertex), h)
 
 """
     $TYPEDEF
@@ -606,7 +606,7 @@ function factor_subgraphs!(dg::DerivativeGraph)
 end
 
 # evaluate the derivative of root w.r.t. var using a fully factored DerivativeGraph
-function evaluate_path(dg::DerivativeGraph, root::Int, var::Int)
+function evaluate_path(dg::DerivativeGraph, root::Int, var::Int, cache::Vector{Dict{Edge,SymbolicT}})
     haskey(dg.root_idx_to_postorder, root) || return COMMON_ZERO
     haskey(dg.var_idx_to_postorder, var) || return COMMON_ZERO
     root_postorder = dg.root_idx_to_postorder[root]
@@ -618,22 +618,19 @@ function evaluate_path(dg::DerivativeGraph, root::Int, var::Int)
     isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
     @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
 
-    cache = Dict{Pair{Edge,Int},SymbolicT}()
-
     return evaluate_path(dg, first(next_edges), var, cache)
 end
 
-function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Int, cache::Dict{Pair{Edge,Int}, SymbolicT})
+function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Int, cache::Vector{Dict{Edge,SymbolicT}})
     edge.bott_vertex == dg.var_idx_to_postorder[var] && return edge.edge_value # reached var
-    edge_var_pair = Pair(edge, var)
-    haskey(cache, edge_var_pair) && return cache[edge_var_pair]
+    haskey(cache[var], edge) && return cache[var][edge]
 
     next_edges = filter(e -> reachable_vars(e)[var], dg.child_edges[edge.bott_vertex])
     isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
     @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
 
     result = evaluate_path(dg, first(next_edges), var, cache) * edge.edge_value
-    cache[edge_var_pair] = result
+    cache[var][edge] = result
 
     return result
 end
@@ -654,10 +651,11 @@ function dstar_jacobian(roots::AbstractVector{SymbolicT}, vars::AbstractVector{S
     factor_subgraphs!(dg)
 
     result = Matrix{SymbolicT}(undef, length(roots), length(vars))
+    cache = [Dict{Edge,SymbolicT}() for _ in eachindex(vars)]
 
     for root in eachindex(roots)
         for var in eachindex(vars)
-            result[root, var] = evaluate_path(dg, root, var)
+            result[root, var] = evaluate_path(dg, root, var, cache)
         end
     end
 
