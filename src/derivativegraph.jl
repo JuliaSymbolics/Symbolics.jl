@@ -596,17 +596,24 @@ function evaluate_path(dg::DerivativeGraph, root::Int, var::Int)
     isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
     @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
 
-    return evaluate_path(dg, first(next_edges), var)
+    cache = Dict{Pair{Edge,Int},SymbolicT}()
+
+    return evaluate_path(dg, first(next_edges), var, cache)
 end
 
-function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Int)
+function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Int, cache::Dict{Pair{Edge,Int}, SymbolicT})
     edge.bott_vertex == dg.var_idx_to_postorder[var] && return edge.edge_value # reached var
+    edge_var_pair = Pair(edge, var)
+    haskey(cache, edge_var_pair) && return cache[edge_var_pair]
 
     next_edges = filter(e -> reachable_vars(e)[var], dg.child_edges[edge.bott_vertex])
     isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
     @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
 
-    return evaluate_path(dg, first(next_edges), var) * edge.edge_value
+    result = evaluate_path(dg, first(next_edges), var, cache) * edge.edge_value
+    cache[edge_var_pair] = result
+
+    return result
 end
 
 """
