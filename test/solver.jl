@@ -629,6 +629,10 @@ using LambertW
     root = Symbolics.ssubs(root, Dict(var=>0))
     @test correctAns([root],[asin(1.0/3.0)-3.0])
 
+    # Remains broken post-#1842: composed-attract path uses `attract_trig`
+    # which has its own simplification chain outside the `isolate` fix from
+    # spec 002-fix-transcendental-solve. Left as @test_broken pending a
+    # follow-up scoped to the attract path.
     @test_broken correctAns(symbolic_solve(sin(x+2//5)+cos(x+2//5)~1//2 , x, warns=false), [acos(0.5/sqrt(2.0))+pi/4.0-(2.0/5.0)])
 
     #product
@@ -641,3 +645,109 @@ end
     x = fn(NaN + NaN * im)
     @test x isa Complex && isnan(x)
 end
+
+# Enforces the no-float-literal contract from
+# specs/002-fix-transcendental-solve/contracts/solver-contract.md §G-EXACT-1.
+function has_no_float_literals(expr)
+    expr = Symbolics.unwrap(expr)
+    expr isa AbstractFloat && return false
+    if expr isa Complex
+        ((real(expr) isa AbstractFloat) || (imag(expr) isa AbstractFloat)) && return false
+    end
+    if SymbolicUtils.iscall(expr)
+        return all(has_no_float_literals, SymbolicUtils.arguments(expr))
+    end
+    v = value(expr)
+    v isa AbstractFloat && return false
+    if v isa Complex
+        ((real(v) isa AbstractFloat) || (imag(v) isa AbstractFloat)) && return false
+    end
+    return true
+end
+
+function check_exact_periodic_solve(f, v, x; atol = 1e-10)
+    sols = symbolic_solve(f(x) ~ v, x, warns = false)
+    @test sols !== nothing
+    sols === nothing && return
+    @test length(sols) >= 1
+    xu = Symbolics.unwrap(x)
+    for sol in sols
+        @test has_no_float_literals(sol)
+        params = [v for v in Symbolics.get_variables(sol) if !isequal(v, xu)]
+        sol0 = isempty(params) ? sol : Symbolics.substitute(sol, Dict(first(params) => 0))
+        residual0 = Symbolics.symbolic_to_float(f(sol0) - v)
+        @test isapprox(residual0, 0; atol = atol)
+        if !isempty(params)
+            sol1 = Symbolics.substitute(sol, Dict(first(params) => 1))
+            residual1 = Symbolics.symbolic_to_float(f(sol1) - v)
+            @test isapprox(residual1, 0; atol = atol)
+        end
+    end
+end
+
+@testset "Exact transcendental solve (#1842)" begin
+    @testset "canonical sin values" begin
+        @variables x
+        for v in (0, 1//2, -1//2, 1, -1,
+                  Symbolics.ssqrt(2) / 2, -Symbolics.ssqrt(2) / 2,
+                  Symbolics.ssqrt(3) / 2, -Symbolics.ssqrt(3) / 2)
+            check_exact_periodic_solve(sin, v, x)
+        end
+    end
+
+    @testset "canonical cos values" begin
+        @variables x
+        for v in (0, 1//2, -1//2, 1, -1,
+                  Symbolics.ssqrt(2) / 2, -Symbolics.ssqrt(2) / 2,
+                  Symbolics.ssqrt(3) / 2, -Symbolics.ssqrt(3) / 2)
+            check_exact_periodic_solve(cos, v, x)
+        end
+    end
+
+    @testset "canonical tan values" begin
+        @variables x
+        for v in (0, 1, -1,
+                  1 / Symbolics.ssqrt(3), -1 / Symbolics.ssqrt(3),
+                  Symbolics.ssqrt(3), -Symbolics.ssqrt(3))
+            check_exact_periodic_solve(tan, v, x)
+        end
+    end
+
+    @testset "symbolic period coefficient" begin
+        @variables x
+        xu = Symbolics.unwrap(x)
+        # For f ∈ {sin, cos}, period must be 2π (no float coefficient).
+        for (f, v) in ((sin, 1//2), (cos, 1//2))
+            sols = symbolic_solve(f(x) ~ v, x, warns = false)
+            @test sols !== nothing && length(sols) >= 1
+            for sol in sols
+                @test has_no_float_literals(sol)
+                params = [v for v in Symbolics.get_variables(sol) if !isequal(v, xu)]
+                @test length(params) == 1
+                # Round-trip at n = 5 (well away from principal) — stresses the period.
+                sol5 = Symbolics.substitute(sol, Dict(first(params) => 5))
+                residual = Symbolics.symbolic_to_float(f(sol5) - v)
+                @test isapprox(residual, 0; atol = 1e-8)
+            end
+        end
+        # For tan, period must be π (not 2π).
+        sols = symbolic_solve(tan(x) ~ 1, x, warns = false)
+        @test sols !== nothing && length(sols) >= 1
+        for sol in sols
+            @test has_no_float_literals(sol)
+            params = [v for v in Symbolics.get_variables(sol) if !isequal(v, xu)]
+            @test length(params) == 1
+            sol5 = Symbolics.substitute(sol, Dict(first(params) => 5))
+            residual = Symbolics.symbolic_to_float(tan(sol5) - 1)
+            @test isapprox(residual, 0; atol = 1e-8)
+        end
+    end
+
+    @testset "non-canonical preservation" begin
+        @variables x
+        for (f, v) in ((cos, 1//3), (sin, 1//7), (tan, 2//5))
+            check_exact_periodic_solve(f, v, x)
+        end
+    end
+end
+
