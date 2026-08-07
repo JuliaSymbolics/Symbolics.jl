@@ -181,6 +181,7 @@ using DiffRules, SpecialFunctions, NaNMath
 export Differential, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
 include("register_derivatives.jl")
 include("diff.jl")
+include("derivativegraph.jl")
 
 export SymbolicsSparsityDetector
 
