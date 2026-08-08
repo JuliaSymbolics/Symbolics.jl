@@ -209,6 +209,8 @@ export series, taylor, taylor_coeff
 export SymStruct, @symstruct
 include("symstruct.jl")
 
+include("array-rules.jl")
+
 import Libdl
 include("build_function.jl")
 include("codegen_fn.jl")
