@@ -458,17 +458,47 @@ function (sub::FixpointSubstituter)(ex::SymbolicT)
 end
 
 """
-    fixpoint_sub(expr, dict, ::Type{OP} = Nothing; maxiters = 1000, warn_maxiters = true, filterer = SymbolicUtils.default_substitute_filter)
+    fixpoint_sub(
+        expr, dict, ::Type{OP} = Nothing;
+        maxiters = 1000,
+        warn_maxiters = true,
+        filterer = SymbolicUtils.default_substitute_filter,
+        fold = Val(false),
+    )
 
-Given a symbolic expression, equation or inequality `expr` perform the substitutions in
-`dict` recursively until the expression does not change. Substitutions that depend on one
-another will thus be recursively expanded. For example,
-`fixpoint_sub(x, Dict(x => y, y => 3))` will return `3`. The `OP` argument can be
-specified to prevent substitution of expressions inside `Operator`s of the given type. The
-`maxiters` keyword is used to limit the number of times the substitution can occur to avoid
-infinite loops in cases where the substitutions in `dict` are circular
-(e.g. `[x => y, y => x]`). Set `warn_maxiters = false` to suppress the warning emitted
-when the iteration limit is hit.
+Recursively apply the substitutions in `dict` until `expr` no longer changes.
+Substitutions that depend on one another are fully expanded. Circular substitutions stop
+after `maxiters` applications.
+
+# Arguments
+
+- `expr`: symbolic expression, equation, inequality, or array to transform.
+- `dict`: substitution rules accepted by [`SymbolicUtils.Substituter`](@ref).
+- `OP`: operator type whose contents should not be substituted. The default `Nothing`
+  does not exclude an operator type.
+
+# Keywords
+
+- `maxiters::Integer = 1000`: maximum number of repeated substitutions.
+- `warn_maxiters::Bool = true`: emit a warning when the iteration limit is reached.
+- `filterer = SymbolicUtils.default_substitute_filter`: predicate controlling which
+  expression nodes may be substituted.
+- `fold::Val = Val(false)`: whether to constant-fold while substituting.
+
+# Returns
+
+The transformed value after reaching a fixpoint or the iteration limit.
+
+# Examples
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables x y;
+
+julia> Symbolics.fixpoint_sub(x, Dict(x => y, y => 3))
+3
+```
 
 See also: [`FixpointSubstituter`](@ref).
 """

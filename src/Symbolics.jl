@@ -616,6 +616,7 @@ include("despecialize.jl")
 @public value
 @public CodegenFunctionOptions, codegen_function
 @public diff2term, map_subscripts
+@public fixpoint_sub
 
 @setup_workload begin
     fold1 = Val{false}()

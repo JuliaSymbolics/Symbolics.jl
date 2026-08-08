@@ -57,6 +57,7 @@ end
 
 @testset "fixpoint_sub maxiters" begin
     @variables x y
+    VERSION >= v"1.11" && @test Base.ispublic(Symbolics, :fixpoint_sub)
     expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x))
     @test isequal(expr, y)
     expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9)
