@@ -166,7 +166,7 @@ function SU.promote_symtype(::typeof(_approx_max), M::SU.TypeT, A::SU.TypeT, B::
     return SU.promote_symtype(*, SU.promote_symtype(+, A, B), M)
 end
 
-function SU.promote_shape(::typeof(_approx_max), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
+function SU.promote_shape(::typeof(_approx_max), @nospecialize(shapes::Vararg{SU.ShapeT, 3}))
     return SU.ShapeVecT()
 end
 
@@ -178,7 +178,7 @@ function SU.promote_symtype(::typeof(_approx_min), args::SU.TypeT...)
     return SU.promote_symtype(_approx_max, args...)
 end
 
-function SU.promote_shape(::typeof(_approx_min), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
+function SU.promote_shape(::typeof(_approx_min), @nospecialize(shapes::Vararg{SU.ShapeT, 3}))
     return SU.ShapeVecT()
 end
 
@@ -190,7 +190,7 @@ function SU.promote_symtype(::typeof(_approx_abs), M::SU.TypeT, A::SU.TypeT)
     return SU.promote_symtype(*, M, A)
 end
 
-function SU.promote_shape(::typeof(_approx_abs), @nospecialize(shs::Vararg{SU.ShapeT, 2}))
+function SU.promote_shape(::typeof(_approx_abs), @nospecialize(shapes::Vararg{SU.ShapeT, 2}))
     return SU.ShapeVecT()
 end
 
@@ -202,7 +202,7 @@ function SU.promote_symtype(::typeof(_approx_ge), args::SU.TypeT...)
     return SU.promote_symtype(_approx_max, args...)
 end
 
-function SU.promote_shape(::typeof(_approx_ge), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
+function SU.promote_shape(::typeof(_approx_ge), @nospecialize(shapes::Vararg{SU.ShapeT, 3}))
     return SU.ShapeVecT()
 end
 
@@ -212,7 +212,7 @@ function SU.promote_symtype(::typeof(_approx_le), args::SU.TypeT...)
     return SU.promote_symtype(_approx_max, args...)
 end
 
-function SU.promote_shape(::typeof(_approx_le), @nospecialize(shs::Vararg{SU.ShapeT, 3}))
+function SU.promote_shape(::typeof(_approx_le), @nospecialize(shapes::Vararg{SU.ShapeT, 3}))
     return SU.ShapeVecT()
 end
 
