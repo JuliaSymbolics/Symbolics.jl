@@ -175,6 +175,8 @@ function reachable_roots(dg::DerivativeGraph{T}, node::T) where {T}
     return roots_mask
 end
 
+is_root_reachable(dg::DerivativeGraph{T}, node::T, root::Integer) where {T} = haskey(dg.root_idx_to_postorder, root) && (dg.root_idx_to_postorder[root] == node || any(e -> reachable_roots(e)[root], parent_edges(dg, node)))
+
 function reachable_vars(dg::DerivativeGraph{T}, node::T) where {T}
     edges = dg.child_edges[node]
     vars_mask = falses(length(dg.vars))
@@ -188,6 +190,8 @@ function reachable_vars(dg::DerivativeGraph{T}, node::T) where {T}
 
     return vars_mask
 end
+
+is_var_reachable(dg::DerivativeGraph{T}, node::T, var::Integer) where {T} = dg.var_idx_to_postorder[var] == node || any(e -> reachable_vars(e)[var], child_edges(dg, node))
 
 # handles terms with >2 arguments (e.g. multiplication of 3+ things)
 function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
@@ -335,7 +339,7 @@ function get_dominators(dg::DerivativeGraph{T}, root::Integer) where {T}
         changed = false
         for node in reverse(eachindex(dg))
             # skip over nodes not reachable from root
-            if !reachable_roots(dg, node)[root]
+            if !is_root_reachable(dg, node, root)
                 doms[node] = nothing
                 continue
             end
@@ -395,7 +399,7 @@ function get_postdominators(dg::DerivativeGraph{T}, var::Integer) where {T}
     while changed
         changed = false
         for node in eachindex(dg)
-            if !reachable_vars(dg, node)[var]
+            if !is_var_reachable(dg, node, var)
                 pdoms[node] = nothing
                 continue
             end
@@ -648,25 +652,37 @@ end
 
 # checks for structural true dominance, masked by variable (used for pdom subgraphs)
 # TODO: optimize
-function is_dominator(dg::DerivativeGraph{T}, dominator::T, dominated::T, var_mask::BitVector) where {T}
+function is_dominator(dg::DerivativeGraph{T}, dominator::T, dominated::T, var_mask::BitVector, cache::Dict{Tuple{T,T}, Bool}=Dict{Tuple{T,T},Bool}()) where {T}
     dominator == dominated && return true
+    cache_key = (dominator, dominated)
+    haskey(cache, cache_key) && return cache[cache_key]
+    cache[cache_key] = false
+
     next_edges = filter(e -> !any(reachable_vars(e) .& .~var_mask), parent_edges(dg, dominated))
+
     isempty(next_edges) && return false
     for parent_edge in next_edges
-        is_dominator(dg, dominator, top_vertex(parent_edge), var_mask) || return false
+        is_dominator(dg, dominator, top_vertex(parent_edge), var_mask, cache) || return false
     end
-    
+
+    cache[cache_key] = true
     return true
 end
 
-function is_postdominator(dg::DerivativeGraph{T}, postdominator::T, postdominated::T, root_mask::BitVector) where {T}
+function is_postdominator(dg::DerivativeGraph{T}, postdominator::T, postdominated::T, root_mask::BitVector, cache::Dict{Tuple{T,T}, Bool}=Dict{Tuple{T,T},Bool}()) where {T}
     postdominator == postdominated && return true
+    cache_key = (postdominator, postdominated)
+    haskey(cache, cache_key) && return cache[cache_key]
+    cache[cache_key] = false
+
     next_edges = filter(e -> !any(reachable_roots(e) .& .~root_mask), child_edges(dg, postdominated))
+
     isempty(next_edges) && return false
     for child_edge in next_edges
-        is_postdominator(dg, postdominator, bott_vertex(child_edge), root_mask) || return false
+        is_postdominator(dg, postdominator, bott_vertex(child_edge), root_mask, cache) || return false
     end
-    
+
+    cache[cache_key] = true
     return true
 end
 
