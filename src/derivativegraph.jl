@@ -43,6 +43,8 @@ struct DerivativeGraph{T<:Integer}
     postorder_to_root_idx::Dict{T,T}
     parent_edges::Dict{T, Vector{Edge{T}}} # node -> parent edges
     child_edges::Dict{T, Vector{Edge{T}}} # node -> child edges
+    dirty_roots::BitVector # roots touched by factoring a subgraph that need to have doms/pdoms recomputed
+    dirty_vars::BitVector # variables touched by factoring a subgraph that need to have doms/pdoms recomputed
 end
 
 """
@@ -69,7 +71,9 @@ function DerivativeGraph(roots::AbstractVector{SymbolicT}, vars::AbstractVector{
         IdDict{Int, idx_type}(),
         IdDict{idx_type, idx_type}(),
         Dict{idx_type, Vector{Edge{idx_type}}}(),
-        Dict{idx_type, Vector{Edge{idx_type}}}()
+        Dict{idx_type, Vector{Edge{idx_type}}}(),
+        trues(length(roots)),
+        trues(length(vars))
     )
 
     populate_dergraph!(dg)
@@ -110,7 +114,10 @@ function propogate_var_reachability(dg::DerivativeGraph{T}, node::T) where {T}
     for edge in _parent_edges
         old_reachability = copy(edge.reachable_vars)
         edge.reachable_vars .&= new_reachability
-        edge.reachable_vars != old_reachability && propogate_var_reachability(dg, top_vertex(edge))
+        if edge.reachable_vars != old_reachability
+            dg.dirty_vars .|= old_reachability .& .~edge.reachable_vars
+            propogate_var_reachability(dg, top_vertex(edge))
+        end
     end
 end
 propogate_var_reachability(dg::DerivativeGraph{T}, edge::Edge{T}) where {T} = propogate_var_reachability(dg, edge.top_vertex)
@@ -125,7 +132,10 @@ function propogate_root_reachability(dg::DerivativeGraph{T}, node::T) where {T}
     for edge in _child_edges
         old_reachability = copy(edge.reachable_roots)
         edge.reachable_roots .&= new_reachability
-        edge.reachable_roots != old_reachability && propogate_root_reachability(dg, bott_vertex(edge))
+        if edge.reachable_roots != old_reachability
+            dg.dirty_roots .|= old_reachability .& .~edge.reachable_roots
+            propogate_root_reachability(dg, bott_vertex(edge))
+        end
     end
 end
 
@@ -133,7 +143,11 @@ propogate_root_reachability(dg::DerivativeGraph{T}, edge::Edge{T}) where {T} = p
 
 function rem_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     @assert hasedge(dg, edge) "edge is not in the graph"
-    
+
+    # removing this edge can only affect doms/pdoms for its roots+vars, so mark them as dirty for recomputation
+    dg.dirty_roots .|= edge.reachable_roots
+    dg.dirty_vars .|= edge.reachable_vars
+
     top_vert, bott_vert = vertices(edge)
     top_child_edges = child_edges(dg, top_vert)
     bott_parent_edges = parent_edges(dg, bott_vert)
@@ -157,6 +171,10 @@ function add_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     top_vertex, bott_vertex = vertices(edge)
     push!(dg.child_edges[top_vertex], edge)
     push!(dg.parent_edges[bott_vertex], edge)
+
+    # adding an edge can only affect doms/pdoms for its roots+vars, so mark them as dirty for recomputation
+    dg.dirty_roots .|= edge.reachable_roots
+    dg.dirty_vars .|= edge.reachable_vars
 
     return nothing
 end
@@ -595,15 +613,27 @@ end
 subgraph_count(sub::FactorableSubgraph) = sub.times_used
 
 """
-    get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T} -> BinaryHeap
+    get_factorable_subgraphs(dg::DerivativeGraph{T};
+        dom_cache=Dict{Int, Vector{Union{Nothing,T}}}(),
+        pdom_cache=Dict{Int, Vector{Union{Nothing,T}}}()) where {T} -> BinaryHeap
 
 Generates a heap of factorable subgraphs ordered with `FactorOrder` (smallest + most used are factored first).
+
+`dom_cache`/`pdom_cache` map root/var index -> the `get_dominators`/`get_postdominators` result for that
+root/var. When supplied (and reused across repeated calls, e.g. from `factor_subgraphs!`), a root/var's
+dominators are only recomputed if `dg.dirty_roots`/`dg.dirty_vars` marks it as changed since it was last
+cached
 """
-function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
+function get_factorable_subgraphs(dg::DerivativeGraph{T};
+        dom_cache::Dict{Int, Vector{Union{Nothing,T}}}=Dict{Int, Vector{Union{Nothing,T}}}(),
+        pdom_cache::Dict{Int, Vector{Union{Nothing,T}}}=Dict{Int, Vector{Union{Nothing,T}}}()) where {T}
     subs = DataStructures.BinaryHeap{Union{FactorableSubgraph{T, DominatorSubgraph}, FactorableSubgraph{T, PostDominatorSubgraph}}, FactorOrder}()
     dom_pairs = Dict{Tuple{T,T}, BitVector}() # maps (dominated, dominating) pairs to the bitmask of all roots that reach the pair
     for root in keys(dg.root_idx_to_postorder)
-        doms = get_dominators(dg, root)
+        # only recompute doms if root is dirty
+        (dg.dirty_roots[root] || !haskey(dom_cache, root)) && (dom_cache[root] = get_dominators(dg, root))
+
+        doms = dom_cache[root]
         for (dominated, dominating) in pairs(doms)
             # check dominated node is a factor base (2+ parents)
             isnothing(dominating) && continue
@@ -627,7 +657,10 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
     # repeat the same process, but for postdominators and variables
     pdom_pairs = Dict{Tuple{T,T}, BitVector}()
     for var in keys(dg.var_idx_to_postorder)
-        pdoms = get_postdominators(dg, var)
+        # only recompute pdoms if var is dirty
+        (dg.dirty_vars[var] || !haskey(pdom_cache, var)) && (pdom_cache[var] = get_postdominators(dg, var))
+
+        pdoms = pdom_cache[var]
         for (postdominated, postdominating) in pairs(pdoms)
             # check postdominated node is a factor base (2+ children)
             isnothing(postdominating) && continue
@@ -646,7 +679,11 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T}) where {T}
         reachable_roots_mask = reachable_roots(dg, T(postdominated))
         push!(subs, FactorableSubgraph{T, PostDominatorSubgraph}(T(postdominated), postdominating, reachable_vars_mask, reachable_roots_mask, var_mask, dg))
     end
-    
+
+    # dom_cache/pdom_cache are now up to date with all roots/vars that were dirty coming in
+    fill!(dg.dirty_roots, false)
+    fill!(dg.dirty_vars, false)
+
     return subs
 end
 
@@ -698,6 +735,10 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where
     sub_edges = subgraph_edges(sub)
 
     for edge in sub_edges
+        # for comparison to determine dirty roots+vars
+        old_roots = copy(edge.reachable_roots)
+        old_vars = copy(edge.reachable_vars)
+
         dom_extra = dominance_mask(sub, edge) .& .~sub.dominance_mask
         nondom_extra = nondominance_mask(sub, edge) .& .~nondominance_mask(sub)
 
@@ -715,6 +756,9 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where
             dominance_mask(sub, edge) .= dom_extra
             nondominance_mask(sub, edge) .= nondom_extra
         end
+
+        dg.dirty_roots .|= old_roots .!= edge.reachable_roots
+        dg.dirty_vars .|= old_vars .!= edge.reachable_vars
     end
 
     # add new subgraph edge, using the dominance_mask for roots/vars as applicable
@@ -750,14 +794,16 @@ function factor_order(a::FactorableSubgraph, b::FactorableSubgraph)
 end
 
 # Factor all subgraphs in the `DerivativeGraph`. This is the key step in the D* algorithm.
-function factor_subgraphs!(dg::DerivativeGraph)
-    subs = get_factorable_subgraphs(dg)
+function factor_subgraphs!(dg::DerivativeGraph{T}) where {T}
+    dom_cache = Dict{Int, Vector{Union{Nothing,T}}}()
+    pdom_cache = Dict{Int, Vector{Union{Nothing,T}}}()
+    subs = get_factorable_subgraphs(dg; dom_cache, pdom_cache)
 
     while !isempty(subs)
         # factor the first subgraph according to `FactorOrder``
         sub = pop!(subs)
         factor_subgraph!(dg, sub)
-        subs = get_factorable_subgraphs(dg)
+        subs = get_factorable_subgraphs(dg; dom_cache, pdom_cache)
     end
 end
 
