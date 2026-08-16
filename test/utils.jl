@@ -65,9 +65,10 @@ end
 end
 
 @testset "public API docstrings" begin
-    for name in (:Arr, :NAMESPACE_SEPARATOR, :get_variables!, :map_subscripts)
-        @test Base.Docs.hasdoc(Symbolics, name)
-    end
+    @test @doc(Symbolics.Arr) !== nothing
+    @test @doc(Symbolics.NAMESPACE_SEPARATOR) !== nothing
+    @test @doc(Symbolics.get_variables!) !== nothing
+    @test @doc(Symbolics.map_subscripts) !== nothing
 end
 
 @testset "fixpoint_sub warn_maxiters" begin
