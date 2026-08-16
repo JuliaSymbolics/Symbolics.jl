@@ -64,6 +64,12 @@ end
     @test isequal(expr, x)
 end
 
+@testset "public API docstrings" begin
+    for name in (:Arr, :NAMESPACE_SEPARATOR, :get_variables!, :map_subscripts)
+        @test Base.Docs.hasdoc(Symbolics, name)
+    end
+end
+
 @testset "fixpoint_sub warn_maxiters" begin
     @variables x y
     # circular rules hit maxiters — warning should fire by default
