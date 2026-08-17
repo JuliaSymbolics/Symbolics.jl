@@ -62,6 +62,47 @@ function get_variables(e; kw...)
     return search_variables(unwrap(e); kw...)
 end
 
+"""
+    get_variables!(buffer, e; kwargs...)
+    get_variables!(buffer, e, varlist; is_atomic = SymbolicUtils.default_is_atomic, kwargs...)
+
+Append the symbolic variables found in `e` to the supplied mutable `buffer` and
+return `buffer`. The expression is unwrapped before traversal, so the returned
+variables are not wrapped in `Num`.
+
+# Arguments
+
+- `buffer`: a mutable collection accepted by
+  [`SymbolicUtils.search_variables!`](@extref SymbolicUtils search_variables!).
+- `e`: the symbolic expression to traverse.
+- `varlist`: an optional collection restricting which expressions are treated
+  as atomic variables.
+
+# Keywords
+
+- `is_atomic`: predicate used with the `varlist` form to select variables.
+- `kwargs...`: keyword arguments forwarded to
+  [`SymbolicUtils.search_variables!`](@extref SymbolicUtils search_variables!).
+
+# Examples
+
+```julia
+julia> using Symbolics
+
+julia> @variables x y
+
+julia> buffer = Set{SymbolicUtils.BasicSymbolic}()
+Set{SymbolicUtils.BasicSymbolic}()
+
+julia> Symbolics.get_variables!(buffer, x + y) === buffer
+true
+
+julia> sort!(collect(buffer), by = string)
+2-element Vector{SymbolicUtils.BasicSymbolic}:
+ x
+ y
+```
+"""
 function get_variables!(buffer, e; kw...)
     return search_variables!(buffer, unwrap(e); kw...)
 end

@@ -1,3 +1,11 @@
+"""
+    NAMESPACE_SEPARATOR
+
+Character used to separate nested symbolic names when Symbolics displays a
+namespace-qualified variable.
+
+The separator is `₊` and is used by variable construction and display code.
+"""
 const NAMESPACE_SEPARATOR = '₊'
 
 hide_lhs(_) = false

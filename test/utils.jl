@@ -64,6 +64,13 @@ end
     @test isequal(expr, x)
 end
 
+@testset "public API docstrings" begin
+    @test @doc(Symbolics.Arr) !== nothing
+    @test @doc(Symbolics.NAMESPACE_SEPARATOR) !== nothing
+    @test @doc(Symbolics.get_variables!) !== nothing
+    @test @doc(Symbolics.map_subscripts) !== nothing
+end
+
 @testset "fixpoint_sub warn_maxiters" begin
     @variables x y
     # circular rules hit maxiters — warning should fire by default
