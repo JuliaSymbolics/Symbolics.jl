@@ -100,6 +100,7 @@ SymbolicUtils.arguments
 
 ```@docs
 Symbolics.get_variables!
+Symbolics.map_subscripts
 Symbolics.getparent
 ```
 
