@@ -27,6 +27,7 @@ Dz = Differential(z)
 @test isequal(dstar_jacobian([x], [x,y,z]), jacobian([x], [x,y,z]))
 @test isequal(dstar_jacobian([x*y*z], [x,y,z]), jacobian([x*y*z], [x,y,z]))
 @test isequal(dstar_jacobian([x*y*z, x+y+z, sqrt(x^2 + y^2 + z^2)], [x,y,z]), jacobian([x*y*z, x+y+z, sqrt(x^2 + y^2 + z^2)], [x,y,z]))
+@test isequal(dstar_jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]), jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]))
 
 # Edge case Jacobian
 @test_broken isequal(dstar_jacobian([x], [x,x]), jacobian([x], [x,x]))
@@ -83,3 +84,6 @@ sh4 = spherical_harmonics(4, sx, sy, sz)
 # (more dominator/postdominator sharing than max_l=4 exercises).
 sh5 = spherical_harmonics(5, sx, sy, sz)
 @test isequal(dstar_jacobian(sh5, sh_vars), jacobian(sh5, sh_vars))
+
+sh13 = spherical_harmonics(13, sx, sy, sz)
+@test_broken isequal(dstar_jacobian(sh13, sh_vars), jacobian(sh13, sh_vars))
