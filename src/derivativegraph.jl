@@ -169,6 +169,7 @@ end
 
 function add_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     top_vertex, bott_vertex = vertices(edge)
+
     push!(dg.child_edges[top_vertex], edge)
     push!(dg.parent_edges[bott_vertex], edge)
 
@@ -271,15 +272,9 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     for (arg_idx, arg_post_idx) in enumerate(arg_idx_to_post_idx)
         arg_post_idx == T(-1) && continue
         partial_der = nary_derivative_idx(expr, arg_idx)
-        # arg_reachable_vars is legitimately arg_post_idx's own aggregate: every parent edge
-        # into a node agrees on "what's reachable below it", so copying it here is correct.
+        # figure out reachable vars from child edges
         arg_reachable_vars = reachable_vars(dg, arg_post_idx)
-        # This edge is brand new - being created for the first time, as part of root_idx's own
-        # traversal. It must NOT inherit reachable_roots(dg, arg_post_idx): if arg_post_idx is a
-        # shared/hash-consed node already visited by an earlier root, that aggregate reflects
-        # OTHER, unrelated edges into arg_post_idx, not "what reaches arg_post_idx by walking
-        # through this specific new edge". Only root_idx does, since nothing else has walked
-        # through it yet.
+        # new edge, so only reachable by the given root
         arg_reachable_roots = falses(length(dg.roots))
         arg_reachable_roots[root_idx] = 1
         new_edge = Edge{T}(partial_der, post_idx, arg_post_idx, arg_reachable_vars, arg_reachable_roots)
@@ -470,6 +465,13 @@ mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
 end
 
 Base.show(io::IO, sub::FactorableSubgraph{T,S}) where {T,S} = print(io, "$S($(sub.top_vertex), $(sub.bott_vertex))")
+
+Base.:(==)(::FactorableSubgraph{T, DominatorSubgraph}, ::FactorableSubgraph{T, PostDominatorSubgraph}) where {T} = false
+Base.:(==)(::FactorableSubgraph{T, PostDominatorSubgraph}, ::FactorableSubgraph{T, DominatorSubgraph}) where {T} = false
+
+Base.:(==)(a::FactorableSubgraph{T, S}, b::FactorableSubgraph{T, S}) where {T, S} = a.top_vertex == b.top_vertex && a.bott_vertex == b.bott_vertex
+Base.hash(e::FactorableSubgraph{T, DominatorSubgraph}, h::UInt) where {T} = hash((e.top_vertex, e.bott_vertex, 0), h)
+Base.hash(e::FactorableSubgraph{T, PostDominatorSubgraph}, h::UInt) where {T} = hash((e.top_vertex, e.bott_vertex, 1), h)
 
 # Loops through the immediate dominators to fill out the dominance masks. Also works for postdominators.
 function calculate_dominance_mask(dominators::Vector{T}) where {T}
@@ -734,26 +736,33 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where
     populate_subgraph_edges!(dg, sub)
     sub_edges = subgraph_edges(sub)
 
+    # TODO: cut this down
+    extras = Dict{Edge{T}, Tuple{BitVector, BitVector}}()
+    for edge in sub_edges
+        dom_extra = dominance_mask(sub, edge) .& .~sub.dominance_mask
+        nondom_extra = nondominance_mask(sub, edge) .& .~nondominance_mask(sub)
+
+        if !any(dom_extra) && !any(nondom_extra)
+            check_dominance(dg, sub, edge) || return false
+        end
+
+        extras[edge] = (dom_extra, nondom_extra)
+    end
+
     for edge in sub_edges
         # for comparison to determine dirty roots+vars
         old_roots = copy(edge.reachable_roots)
         old_vars = copy(edge.reachable_vars)
 
-        dom_extra = dominance_mask(sub, edge) .& .~sub.dominance_mask
-        nondom_extra = nondominance_mask(sub, edge) .& .~nondominance_mask(sub)
-
-        if !any(dom_extra) && !any(nondom_extra) && check_dominance(dg, sub, edge)
+        dom_extra, nondom_extra = extras[edge]
+        if !any(dom_extra) && !any(nondom_extra)
             # edge is completely contained in subgraph
             rem_edge!(dg, edge)
         elseif any(dom_extra) && !any(nondom_extra)
             # connected to another root/var, so just narrow scope to that root/var
             dominance_mask(sub, edge) .= dom_extra
-        elseif !any(dom_extra)
+        elseif any(nondom_extra) && !any(dom_extra)
             # connected to another root/var, so just narrow scope to that root/var
-            nondominance_mask(sub, edge) .= nondom_extra
-        else
-           # rare case - both dom and nondom have extra
-            dominance_mask(sub, edge) .= dom_extra
             nondominance_mask(sub, edge) .= nondom_extra
         end
 
@@ -799,10 +808,16 @@ function factor_subgraphs!(dg::DerivativeGraph{T}) where {T}
     pdom_cache = Dict{Int, Vector{Union{Nothing,T}}}()
     subs = get_factorable_subgraphs(dg; dom_cache, pdom_cache)
 
+    # subgraphs that factor_subgraph! refused to factor (ambiguous classification) so we
+    # don't re-propose and re-refuse the same (top_vertex, bott_vertex, kind) forever
+    rejected = Set{FactorableSubgraph}()
+
     while !isempty(subs)
         # factor the first subgraph according to `FactorOrder``
         sub = pop!(subs)
-        factor_subgraph!(dg, sub)
+        sub in rejected && continue
+
+        factor_subgraph!(dg, sub) || push!(rejected, sub)
         subs = get_factorable_subgraphs(dg; dom_cache, pdom_cache)
     end
 end
@@ -865,4 +880,6 @@ function dstar_jacobian(roots::AbstractVector{SymbolicT}, vars::AbstractVector{S
 end
 
 dstar_jacobian(roots::AbstractVector, vars::AbstractVector) = dstar_jacobian(unwrap.(roots), unwrap.(vars))
-dstar_derivative(root, var) = only(dstar_jacobian([root], [var]))
+dstar_jacobian(root::Union{Num,SymbolicT}, vars::AbstractVector) = dstar_jacobian(unwrap.([root]), unwrap.(vars))
+dstar_jacobian(roots::AbstractVector, var::Union{Num,SymbolicT}) = dstar_jacobian(unwrap.(roots), unwrap.([var]))
+dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}) = only(dstar_jacobian([root], [var]))
