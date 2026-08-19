@@ -170,6 +170,19 @@ end
 function add_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     top_vertex, bott_vertex = vertices(edge)
 
+    # if edge already exists, merge in roots and vars
+    existing_idx = findfirst(isequal(edge), dg.child_edges[top_vertex])
+    if !isnothing(existing_idx)
+        existing = dg.child_edges[top_vertex][existing_idx]
+        existing.reachable_roots .|= edge.reachable_roots
+        existing.reachable_vars .|= edge.reachable_vars
+
+        dg.dirty_roots .|= edge.reachable_roots
+        dg.dirty_vars .|= edge.reachable_vars
+
+        return nothing
+    end
+
     push!(dg.child_edges[top_vertex], edge)
     push!(dg.parent_edges[bott_vertex], edge)
 
@@ -583,17 +596,17 @@ end
 function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::FactorableSubgraph, edge::Edge{T}, cache::Dict{Edge{T}, SymbolicT}) where {T}
     haskey(cache, edge) && return cache[edge]
 
+    edge_dom_mask = dominance_mask(sub, edge)
+    if !any(edge_dom_mask .& sub.dominance_mask) # edge not in subgraph (no overlap)
+        cache[edge] = COMMON_ZERO
+        return COMMON_ZERO
+    end
+
     # reached the end of the subgraph
     if forward_vertex(sub, edge) == forward_vertex(sub)
         push!(edges, edge)
         cache[edge] = edge.edge_value
         return edge.edge_value
-    end
-
-    edge_dom_mask = dominance_mask(sub, edge)
-    if !any(edge_dom_mask .& sub.dominance_mask) # edge not in subgraph (no overlap)
-        cache[edge] = COMMON_ZERO
-        return COMMON_ZERO
     end
 
     # discover all edges, but only sum those part of a group of reachabilities (explained in find_edge_group)
@@ -697,7 +710,7 @@ function is_dominator(dg::DerivativeGraph{T}, dominator::T, dominated::T, var_ma
     haskey(cache, cache_key) && return cache[cache_key]
     cache[cache_key] = false
 
-    next_edges = filter(e -> !any(reachable_vars(e) .& .~var_mask), parent_edges(dg, dominated))
+    next_edges = filter(e -> any(reachable_vars(e) .& var_mask), parent_edges(dg, dominated))
 
     isempty(next_edges) && return false
     for parent_edge in next_edges
@@ -714,7 +727,7 @@ function is_postdominator(dg::DerivativeGraph{T}, postdominator::T, postdominate
     haskey(cache, cache_key) && return cache[cache_key]
     cache[cache_key] = false
 
-    next_edges = filter(e -> !any(reachable_roots(e) .& .~root_mask), child_edges(dg, postdominated))
+    next_edges = filter(e -> any(reachable_roots(e) .& root_mask), child_edges(dg, postdominated))
 
     isempty(next_edges) && return false
     for child_edge in next_edges
