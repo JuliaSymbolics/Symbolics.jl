@@ -28,6 +28,7 @@ Dz = Differential(z)
 @test isequal(dstar_jacobian([x*y*z], [x,y,z]), jacobian([x*y*z], [x,y,z]))
 @test isequal(dstar_jacobian([x*y*z, x+y+z, sqrt(x^2 + y^2 + z^2)], [x,y,z]), jacobian([x*y*z, x+y+z, sqrt(x^2 + y^2 + z^2)], [x,y,z]))
 @test isequal(dstar_jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]), jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]))
+@test isequal(expand.(dstar_jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])), expand.(jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])))
 
 # Edge case Jacobian
 @test_broken isequal(dstar_jacobian([x], [x,x]), jacobian([x], [x,x]))
@@ -86,4 +87,12 @@ sh5 = spherical_harmonics(5, sx, sy, sz)
 @test isequal(dstar_jacobian(sh5, sh_vars), jacobian(sh5, sh_vars))
 
 sh13 = spherical_harmonics(13, sx, sy, sz)
-@test_broken isequal(dstar_jacobian(sh13, sh_vars), jacobian(sh13, sh_vars))
+# large enough that dstar_jacobian and jacobian accumulate floating point errors, so sub in vars and use isapprox
+let
+    dj = dstar_jacobian(sh13, sh_vars)
+    j = jacobian(sh13, sh_vars)
+    subs = Dict(sx => 0.3, sy => 0.5, sz => 0.7)
+    dvals = Symbolics.value.(substitute.(dj, (subs,)))
+    jvals = Symbolics.value.(substitute.(j, (subs,)))
+    @test isapprox(Float64.(dvals), Float64.(jvals); rtol=1e-8)
+end
