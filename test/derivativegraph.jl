@@ -31,9 +31,9 @@ Dz = Differential(z)
 @test isequal(expand.(dstar_jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])), expand.(jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])))
 
 # Edge case Jacobian
-@test_broken isequal(dstar_jacobian([x], [x,x]), jacobian([x], [x,x]))
+@test isequal(dstar_jacobian([x], [x,x]), jacobian([x], [x,x]))
 @test isequal(dstar_jacobian([x,x], [x]), jacobian([x,x], [x]))
-@test_broken isequal(dstar_jacobian([x,x], [x,x]), jacobian([x,x], [x,x]))
+@test isequal(dstar_jacobian([x,x], [x,x]), jacobian([x,x], [x,x]))
 
 # based on use in FastDifferentiation.jl and the D* paper for testing
 function spherical_harmonics(max_l::Integer, x, y, z)
