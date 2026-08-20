@@ -237,7 +237,14 @@ function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
                 return SymbolicUtils.mul_worker(VartypeT, args)
             end
         end
-        _ => return derivative_idx(expr, arg_idx)
+        _ => begin
+            der = derivative_idx(expr, arg_idx)
+            @assert !isnothing(der) """
+            Unable to compute derivative of $expr w.r.t. argument $arg_idx.
+            If this is a user-registered function, make sure to register its derivatives with `@register_derivative`.
+            """
+            return der
+        end
     end
 end
 
@@ -315,9 +322,11 @@ function populate_dergraph_var!(dg::DerivativeGraph{T}, var::SymbolicT, root_idx
     push!(dg.symbols, var)
     post_idx::T = length(dg.symbols) # postorder number
     dg.definitions[var] = post_idx
-    var_idx = findfirst(isequal(var), dg.vars)
-    dg.var_idx_to_postorder[var_idx] = post_idx
-    dg.postorder_to_var_idx[post_idx] = var_idx
+    var_idxs = findall(isequal(var), dg.vars)
+    for var_idx in var_idxs
+        dg.var_idx_to_postorder[var_idx] = post_idx
+    end
+    dg.postorder_to_var_idx[post_idx] = first(var_idxs)
     dg.child_edges[post_idx] = Edge{T}[]
     dg.parent_edges[post_idx] = Edge{T}[]
 
@@ -892,7 +901,8 @@ function dstar_jacobian(roots::AbstractVector{SymbolicT}, vars::AbstractVector{S
     return result
 end
 
-dstar_jacobian(roots::AbstractVector, vars::AbstractVector) = dstar_jacobian(unwrap.(roots), unwrap.(vars))
-dstar_jacobian(root::Union{Num,SymbolicT}, vars::AbstractVector) = dstar_jacobian(unwrap.([root]), unwrap.(vars))
-dstar_jacobian(roots::AbstractVector, var::Union{Num,SymbolicT}) = dstar_jacobian(unwrap.(roots), unwrap.([var]))
+dstar_jacobian(root::Arr, vars::AbstractVector) = dstar_jacobian(scalarize(unwrap(root)), unwrap.(vars))
+dstar_jacobian(roots::AbstractVector{Num}, vars::AbstractVector{Num}) = dstar_jacobian(unwrap.(roots), unwrap.(vars))
+dstar_jacobian(roots::AbstractVector{Num}, vars::AbstractVector{SymbolicT}) = dstar_jacobian(unwrap.(roots), vars)
+dstar_jacobian(roots::AbstractVector{SymbolicT}, vars::AbstractVector{Num}) = dstar_jacobian(roots, unwrap.(vars))
 dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}) = only(dstar_jacobian([root], [var]))
