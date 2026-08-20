@@ -885,7 +885,9 @@ Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differenti
 - `roots::AbstractVector{SymbolicT}`: Vector of expressions to differentate
 - `vars::AbstractVector{SymbolicT}`: Vector of variables to differentate w.r.t.
 """
-function dstar_jacobian(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT})
+function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
+    roots isa Arr && (roots = scalarize(unwrap(roots)))
+    roots isa AbstractVector{Num} && (roots = unwrap.(roots))
     dg = DerivativeGraph(roots, vars)
     factor_subgraphs!(dg)
 
@@ -901,8 +903,24 @@ function dstar_jacobian(roots::AbstractVector{SymbolicT}, vars::AbstractVector{S
     return result
 end
 
-dstar_jacobian(root::Arr, vars::AbstractVector) = dstar_jacobian(scalarize(unwrap(root)), unwrap.(vars))
-dstar_jacobian(roots::AbstractVector{Num}, vars::AbstractVector{Num}) = dstar_jacobian(unwrap.(roots), unwrap.(vars))
-dstar_jacobian(roots::AbstractVector{Num}, vars::AbstractVector{SymbolicT}) = dstar_jacobian(unwrap.(roots), vars)
-dstar_jacobian(roots::AbstractVector{SymbolicT}, vars::AbstractVector{Num}) = dstar_jacobian(roots, unwrap.(vars))
+function dstar_jacobian(roots, vars)
+    # input validation copied from `jacobian`
+    roots = vec(scalarize(roots))
+    if roots isa Vector{Num}
+        roots = unwrap.(roots)::Vector{SymbolicT}
+    elseif roots isa Vector{SymbolicT}
+    else
+        roots = roots::Vector{eltype(roots)}
+    end
+    # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
+    vars = vec(scalarize(vars))
+    if vars isa Vector{Num}
+        vars = unwrap.(vars)::Vector{SymbolicT}
+    elseif vars isa Vector{SymbolicT}
+    else
+        error("This should not happen! `vars` must be convertible to Vector{SymbolicT}. \nReceived vars = $vars")
+    end
+    return dstar_jacobian(roots, vars)
+end
+
 dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}) = only(dstar_jacobian([root], [var]))
