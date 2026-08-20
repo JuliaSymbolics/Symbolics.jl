@@ -35,6 +35,11 @@ Dz = Differential(z)
 @test isequal(dstar_jacobian([x,x], [x]), jacobian([x,x], [x]))
 @test isequal(dstar_jacobian([x,x], [x,x]), jacobian([x,x], [x,x]))
 
+# Array symbolics
+@variables z[1:3]
+@test isequal(dstar_jacobian(z,z), jacobian(z,z))
+@test isequal(dstar_jacobian(2z, z), jacobian(2z, z))
+
 # based on use in FastDifferentiation.jl and the D* paper for testing
 function spherical_harmonics(max_l::Integer, x, y, z)
     Pc = Dict{Tuple{Int,Int}, Any}()
