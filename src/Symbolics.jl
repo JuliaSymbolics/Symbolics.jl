@@ -26,7 +26,7 @@ using Setfield
 using TermInterface
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
-import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
+import SymbolicUtils: Term, Sym, BasicSymbolic, Const,
     FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
     promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
     Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT,
@@ -98,7 +98,7 @@ function warn_load_latexify()
 end
 
 export Num
-import MacroTools: splitdef, combinedef, postwalk, striplines
+import MacroTools: splitdef
 include("wrapper-types.jl")
 
 @recompile_invalidations begin

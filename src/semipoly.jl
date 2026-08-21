@@ -1,4 +1,3 @@
-import SymbolicUtils.Rewriters: RestartedChain
 using DataStructures
 
 export semipolynomial_form, semilinear_form, semiquadratic_form, polynomial_coeffs

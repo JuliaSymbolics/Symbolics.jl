@@ -64,7 +64,7 @@ function unwrap_broadcast(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     Broadcast.Broadcasted{SymbolicUtils.SymBroadcast{VartypeT}}(bc.f, unwrap_broadcasts(bc.args...), bc.axes)
 end
 
-function Broadcast.copy(bc::Broadcast.Broadcasted{SymWrapBroadcast})
+function Base.copy(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     return wrap(copy(unwrap_broadcast(bc)))
 end
 

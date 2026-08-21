@@ -65,7 +65,8 @@ makedocs(
                 "manual/sparsity_detection.md",
                 "manual/limits.md",
             ],
-            
+
+            "API" => "manual/api.md",
             "manual/misc.md",
         ],
         "Comparison Against SymPy" => "comparison.md",

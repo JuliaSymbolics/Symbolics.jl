@@ -119,6 +119,13 @@ SymbolicLimits = "1.1"
 SymbolicUtils = "4.37"
 TermInterface = "2"
 julia = "1.10"
+Libdl = "1"
+LinearAlgebra = "1"
+Markdown = "1"
+SparseArrays = "1"
+Pkg = "1"
+Random = "1"
+Test = "1"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"

@@ -1,4 +1,5 @@
-using SymbolicUtils: FnType, Sym, metadata
+using SymbolicUtils: FnType, Sym
+using TermInterface: metadata
 using Setfield
 
 const IndexMap = Dict{Char,Char}(

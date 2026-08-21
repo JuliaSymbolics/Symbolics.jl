@@ -222,7 +222,7 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
     if op isa Integral
         # check if x occurs in limits
         domain = op.domain
-        lower, upper = unwrap.(DomainSets.endpoints(domain.domain))
+        lower, upper = unwrap.(IntervalSets.endpoints(domain.domain))
         (occursin_info(x, lower) || occursin_info(x, upper)) && return true
 
         # check if x is shadowed by integration variable in integrand
@@ -474,7 +474,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
             elseif f isa Integral && f.domain.domain isa AbstractInterval
                 domain = f.domain.domain
                 domainvars = f.domain.variables
-                a, b = unwrap.(DomainSets.endpoints(domain))
+                a, b = unwrap.(IntervalSets.endpoints(domain))
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
                 inner_function = arguments(arg)[1]
                 if iscall(a) || isequal(a, D.x)
