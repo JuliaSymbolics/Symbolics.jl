@@ -53,6 +53,8 @@ Currently relies mostly on linearity and a rules table. When the rules table doe
 # Examples
 
 ```jldoctest
+julia> using Symbolics
+
 julia> @variables t, s
 2-element Vector{Num}:
  t
@@ -62,7 +64,7 @@ julia> @syms f(t)::Real F(s)::Real
 (f, F)
 
 julia> laplace(exp(4t) + 5, f, t, F, s)
-5 / s + 1 / (-4 + s)
+1 / (-4 + s) + 5 / s
 
 julia> laplace(10 + 4t - t^2, f, t, F, s)
 10 / s + 4 / (s^2) + -2 / (s^3)
@@ -71,7 +73,7 @@ julia> laplace(exp(-2t)*cos(3t) + 5exp(-2t)*sin(3t), f, t, F, s)
 (2 + s) / (9 + (2 + s)^2) + 15 / (9 + (2 + s)^2)
 
 julia> laplace(t^2 * f(t), f, t, F, s) # s-derivative rule
-Differential(s)(Differential(s)(F(s)))
+Differential(s, 2)(F(s))
 
 julia> laplace(5f(t-4), f, t, F, s) # t-shift rule
 5F(s)*exp(-4s)
@@ -180,6 +182,10 @@ Will perform partial fraction decomposition and linearity before applying the in
 # Examples
 
 ```jldoctest
+julia> using Symbolics
+
+julia> import Nemo, Groebner
+
 julia> @variables t, s
 2-element Vector{Num}:
  t
@@ -189,13 +195,13 @@ julia> @syms f(t)::Real F(s)::Real
 (f, F)
 
 julia> inverse_laplace(7/(s+3)^3, F, s, f, t)
-(7//2)*(t^2)*exp(-3t)
+(7//2)*exp(-3t)*(t^2)
 
-julia> inverse_laplace((s+2)/(s^2 - 3s - 4), F, s, f, t) # using partial fraction decomposition
--(1//5)*exp(-t) + (6//5)*exp(4t)
+julia> inverse_laplace((s+2)/(s^2 - 3s - 4), F, s, f, t)
+-(1//5)*exp(-t) + (6//5)*exp((4//1)*t)
 
 julia> inverse_laplace(1/s^4, F, s, f, t)
-(1//6)*(t^3)
+(t^3) / 6
 ```
 """
 function inverse_laplace(expr, F, s, f, t; rules=nothing, warns=true)
@@ -256,21 +262,29 @@ end
     
 Solves the ordinary differential equation `eq` for the function `f(t)` using the Laplace transform method.
     
-`f0` is a vector of initial conditions evaluated at `t=0` (`[f(0), f'(0), f''(0), ...]`, must be same length as order of `eq`).
+    `f0` is a vector of initial conditions evaluated at `t=0` (`[f(0), f'(0), f''(0), ...]`, must be same length as order of `eq`).
 
 # Examples
 
 ```jldoctest
-@variables t, s
-@syms f(t)::Real F(s)::Real
+julia> using Symbolics
 
-Dt = Differential(t)
+julia> @variables t, s
+2-element Vector{Num}:
+ t
+ s
+
+julia> @syms f(t)::Real F(s)::Real
+(f, F)
+
+julia> Dt = Differential(t)
+Differential(t, 1)
 
 julia> laplace_solve_ode(Dt(f(t)) + 3f(t) ~ t^2*exp(-3t) + t*exp(-2t) + t, f, t, [1])
--(1//9) + (1//3)*t + (19//9)*exp(-3t) - exp(-2t) + t*exp(-2t) + (1//3)*(t^3)*exp(-3t)
+-(1//9) - exp((-2//1)*t) + (19//9)*exp((-3//1)*t) + (1//3)*t + exp((-2//1)*t)*t + (1//3)*exp((-3//1)*t)*(t^3)
 
 julia> laplace_solve_ode((Dt^2)(f(t)) + f(t) ~ 2 + 2cos(t), f, t, [0, 0])
-(2//1) - (2//1)*cos(t) + t*sin(t)
+(2//1) - (2//1)*cos(t) + sin(t)*t
 
 julia> laplace_solve_ode((Dt^3)(f(t)) - Dt(f(t)) ~ 6 - 3t^2, f, t, [1, 1, 1])
 exp(t) + t^3

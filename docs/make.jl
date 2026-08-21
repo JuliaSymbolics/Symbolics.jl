@@ -1,11 +1,13 @@
 using Documenter, Symbolics, SymbolicUtils
+import Nemo, Groebner, SymPy
+
+DocMeta.setdocmeta!(Symbolics, :DocTestSetup, :(using Symbolics); recursive = true)
 
 cp("./docs/Manifest.toml", "./docs/src/assets/Manifest.toml", force = true)
 cp("./docs/Project.toml", "./docs/src/assets/Project.toml", force = true)
 
 # Make sure that plots don't throw a bunch of warnings / errors!
 ENV["GKSwstype"] = "100"
-ENV["JULIA_DEBUG"] = "Documenter"
 using Plots
 
 mathengine = MathJax3(Dict(:loader => Dict("load" => ["[tex]/require", "[tex]/mathtools"]),
@@ -21,9 +23,8 @@ mathengine = MathJax3(Dict(:loader => Dict("load" => ["[tex]/require", "[tex]/ma
 makedocs(
     sitename="Symbolics.jl",
     authors="Chris Rackauckas",
-    modules=[Symbolics,SymbolicUtils],
-    clean=true, doctest=false, linkcheck = true,
-    warnonly = [:docs_block, :missing_docs, :cross_references, :linkcheck],
+    modules=[Symbolics],
+    clean=true, doctest=true, linkcheck = true, checkdocs = :public,
     format = Documenter.HTML(assets = ["assets/favicon.ico"],
                              mathengine = mathengine,
                              canonical="https://docs.sciml.ai/Symbolics/stable/"),

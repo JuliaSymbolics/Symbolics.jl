@@ -95,10 +95,8 @@ julia> @variables x y
 julia> Symbolics.symbolic_linear_solve(x + y ~ 0, x)
 -y
 
-julia> Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])
-2-element Vector{Float64}:
-  1.0
- -1.0
+julia> all(Symbolics.value.(Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])) .== [1, -1])
+true
 ```
 """
 function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar case

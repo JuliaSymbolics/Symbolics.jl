@@ -14,16 +14,16 @@ julia> using Symbolics
 julia> @variables x y;
 
 julia> D = Differential(x)
-(D'~x)
+Differential(x, 1)
 
 julia> D(y) # Differentiate y wrt. x
-(D'~x)(y)
+Differential(x, 1)(y)
 
 julia> Dx = Differential(x) * Differential(y) # d^2/dxy operator
-(D'~x(t)) ∘ (D'~y(t))
+Differential(x, 1) ∘ Differential(y, 1)
 
 julia> D3 = Differential(x)^3 # 3rd order differential operator
-(D'~x(t)) ∘ (D'~x(t)) ∘ (D'~x(t))
+Differential(x, 3)
 ```
 """
 struct Differential <: Operator
@@ -113,7 +113,8 @@ true
 ```
 
 See also: [`Differential`](@ref), [`expand_derivatives`](@ref), [`Symbolics.hasnode`](@ref),
-[`Symbolics.filterchildren`](@ref), [`Symbolics.unwrap`](@ref).
+[`Symbolics.filterchildren`](@ref),
+[`SymbolicUtils.unwrap`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap).
 """
 function is_derivative(x::SymbolicT)
     @match x begin
@@ -368,7 +369,7 @@ passed differential and not any other Differentials it encounters.
 - `D::Differential`: The differential to apply
 - `arg::BasicSymbolic`: The symbolic expression to apply the differential on.
 - `simplify::Bool=false`: Whether to simplify the resulting expression using
-    [`SymbolicUtils.simplify`](@ref).
+    [`SymbolicUtils.simplify`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.simplify).
 - `occurrences=nothing`: Information about the occurrences of the independent
     variable in the argument of the derivative. This is used internally for
     optimization purposes.
@@ -578,7 +579,7 @@ and other derivative rules to expand any derivatives it encounters.
 # Arguments
 - `O::BasicSymbolic`: The symbolic expression to expand.
 - `simplify::Bool=false`: Whether to simplify the resulting expression using
-    [`SymbolicUtils.simplify`](@ref).
+    [`SymbolicUtils.simplify`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.simplify).
 
 # Keyword Arguments
 - `throw_no_derivative=false`: Whether to throw if a function with unknown
@@ -589,13 +590,13 @@ and other derivative rules to expand any derivatives it encounters.
 julia> @variables x y z k;
 
 julia> f = k*(abs(x-y)/y-z)^2
-k*((abs(x - y) / y - z)^2)
+k*((-z + abs(x - y) / y)^2)
 
 julia> Dx = Differential(x) # Differentiate wrt x
-(::Differential) (generic function with 2 methods)
+Differential(x, 1)
 
 julia> dfx = expand_derivatives(Dx(f))
-(k*((2abs(x - y)) / y - 2z)*ifelse(signbit(x - y), -1, 1)) / y
+(2ifelse(signbit(x - y), -1, 1)*k*(-z + abs(x - y) / y)) / y
 ```
 """
 function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivative=false)
@@ -673,10 +674,10 @@ julia> @variables x y z;
 julia> Dx = Differential(x); Dy = Differential(y);  # Create differentials wrt. x and y
 
 julia> Dx(z)  # Differentiate z wrt. x
-Differential(x)(z)
+Differential(x, 1)(z)
 
 julia> Dy(z)  # Differentiate z wrt. y
-Differential(y)(z)
+Differential(y, 1)(z)
 ```
 """
 macro derivatives(x...)

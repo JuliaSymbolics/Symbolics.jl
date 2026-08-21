@@ -129,18 +129,24 @@ If `fold=Val(true)`, expressions which can be fully evaluated will be evaluated 
 # Examples
 
 ```jldoctest
+julia> using Symbolics
+
 julia> @variables t x y z(t)
 4-element Vector{Num}:
     t
     x
     y
  z(t)
+
 julia> ex = x + y + sin(z)
-(x + y) + sin(z(t))
+sin(z(t)) + x + y
+
 julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
-(z(t) + y) + (z(t) ^ 2)
+y + z(t) + z(t)^2
+
 julia> substitute(sqrt(2x), Dict([x => 1]))
 sqrt(2)
+
 julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(true))
 1.4142135623730951
 ```

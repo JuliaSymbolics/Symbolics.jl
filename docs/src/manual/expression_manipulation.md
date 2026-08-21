@@ -11,10 +11,9 @@ and easily understandable to all Julia programmers.
 
 ## Functionality Inherited From SymbolicUtils.jl
 
-```@docs
-SymbolicUtils.substitute
-SymbolicUtils.simplify
-```
+The [`substitute`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.substitute)
+and [`simplify`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.simplify)
+functions are provided by SymbolicUtils and reexported by Symbolics.
 Documentation for `rewriter` can be found [here](https://docs.sciml.ai/SymbolicUtils/stable/manual/rewrite/#Rule-based-rewriting), using the `@rule` macro or the `@acrule` macro from SymbolicUtils.jl.
 
 ## Functionality Provided by SymPy.jl Integration
@@ -36,11 +35,7 @@ Symbolics.tosymbol
 Symbolics.diff2term
 Symbolics.degree
 Symbolics.coeff
-Symbolics.replace
-Symbolics.occursin
-Symbolics.filterchildren
 Symbolics.fixpoint_sub
-Symbolics.fast_substitute
 Symbolics.evaluate
 Symbolics.symbolic_to_float
 Symbolics.terms(x)

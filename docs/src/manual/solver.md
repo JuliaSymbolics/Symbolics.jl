@@ -42,7 +42,6 @@ and the user wants the answer in terms of a single variable. Say `log(x) - a == 
 
 ```@docs
 Symbolics.solve_univar
-Symbolics.solve_multivar
 Symbolics.ia_solve
 Symbolics.ia_conditions!
 Symbolics.is_periodic
@@ -107,4 +106,4 @@ Out[3]= {{x -> (I \[Pi] + Log[3])/ProductLog[I \[Pi] + Log[3]]}}
 # References
 
 [^1]: [Rouillier, F. Solving Zero-Dimensional Systems Through the Rational Univariate Representation. AAECC 9, 433–461 (1999).](https://doi.org/10.1007/s002000050114)
-[^2]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
+[^2]: [R. W. Hamming, *Coding and Information Theory*, 1980](https://books.google.com/books/about/Coding_and_information_theory.html?hl=en&id=0d5QAAAAMAAJ).

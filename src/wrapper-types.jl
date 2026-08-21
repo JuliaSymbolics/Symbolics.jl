@@ -45,7 +45,7 @@ emits the struct unchanged, plus the trait methods that tie `W` and `T` together
 `Symbolics.has_symwrapper(::Type{<:T})`, `Symbolics.wrapper_type(::Type{<:T}) = W`,
 `Symbolics.is_wrapper_type(::Type{<:W})`, `Symbolics.wraps_type(::Type{W}) = T` and
 `Symbolics.iswrapped(::W)`. Once those exist, [`Symbolics.wrap`](@ref) maps a value of
-symbolic type `T` to a `W`, [`Symbolics.unwrap`](@ref) maps it back, [`@wrapped`](@ref)
+symbolic type `T` to a `W`, [`SymbolicUtils.unwrap`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap) maps it back, [`@wrapped`](@ref)
 generates wrapper-accepting methods, and `@register_symbolic` knows `W` counts as symbolic.
 
 Two things are the caller's responsibility. `W` must be constructible from the value it
@@ -81,7 +81,8 @@ unwrap(wrap(Foo{Int}()))    # Foo{Int}
 With that in place, [`@wrapped`](@ref) can generate methods that accept `FooWrap` wherever
 they declare an `AbstractFoo` argument.
 
-See also: [`@wrapped`](@ref), [`Symbolics.wrap`](@ref), [`Symbolics.unwrap`](@ref).
+See also: [`@wrapped`](@ref), [`Symbolics.wrap`](@ref),
+[`SymbolicUtils.unwrap`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap).
 """
 macro symbolic_wrap(expr)
     @assert expr isa Expr && expr.head == :struct
@@ -331,7 +332,8 @@ applicable(foo, wrap(Foo{Int}()), 2)       # true
 applicable(foo, wrap(Foo{Int}()), wrap(2)) # true
 ```
 
-See also: [`@symbolic_wrap`](@ref), [`Symbolics.wrap`](@ref), [`Symbolics.unwrap`](@ref).
+See also: [`@symbolic_wrap`](@ref), [`Symbolics.wrap`](@ref),
+[`SymbolicUtils.unwrap`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap).
 """
 macro wrapped(expr, wrap_arrays = true)
     wrap_func_expr(__module__, expr, wrap_arrays)

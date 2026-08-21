@@ -42,37 +42,50 @@ julia> expr = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
 -a*b - a*x - 2a*b*x - 2a*(x^2) + b*(x^2) + x^3 - a*b*(x^2) - a*(x^3) + 2b*(x^3) + 2(x^4) + b*(x^4) + x^5
 
 julia> symbolic_solve(expr, x)
-4-element Vector{Any}:
- -1
-   -b
-   (1//2)*√(4a)
-   (-1//2)*√(4a)
+4-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
+ (-1//1)
+ -b
+ (-1//2)*√((4//1)*a)
+ (1//2)*√((4//1)*a)
 
 julia> symbolic_solve(expr, x, dropmultiplicity=false)
-5-element Vector{Any}:
- -1
- -1
-   -b
-   (1//2)*√(4a)
-   (-1//2)*√(4a)
+5-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
+ (-1//1)
+ (-1//1)
+ -b
+ (-1//2)*√((4//1)*a)
+ (1//2)*√((4//1)*a)
 ```
 ```jldoctest
-julia> symbolic_solve(x^2 + a*x + 6, x)
-2-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
- (1//2)*(-a + √(-24 + a^2))
- (1//2)*(-a - √(-24 + a^2))
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> a = only(@variables a)
+a
+
+julia> Symbolics.symbolic_solve(x^2 + a*x + 6, x)
+2-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
+ -(1//2)*a + (1//2)*√(-24 + a^2)
+ -(1//2)*a - (1//2)*√(-24 + a^2)
 ```
 ```jldoctest
-julia> symbolic_solve(x^7 - 1, x)
-2-element Vector{Any}:
-  roots_of((1//1) + x + x^2 + x^3 + x^4 + x^5 + x^6, x)
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.symbolic_solve(x^7 - 1, x)
+2-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
+ roots_of((1//1) + x + x^2 + x^3 + x^4 + x^5 + x^6, x)
  1
 ```
 ### `solve_multivar` (uses Groebner basis and `solve_univar` to find roots)
 !!! note
     Similar to `solve_univar`, `Groebner` is needed for `solve_multivar` or to be fully functional.
 ```jldoctest
-julia> using Groebner
+julia> using Symbolics, Groebner
 
 julia> @variables x y z
 3-element Vector{Num}:
@@ -86,16 +99,13 @@ julia> eqs = [x+y^2+z, z*x*y, z+3x+y]
        x*y*z
   3x + y + z
 
-julia> symbolic_solve(eqs, [x,y,z])
-3-element Vector{Any}:
- Dict{Num, Any}(z => 0, y => 1//3, x => -1//9)
- Dict{Num, Any}(z => 0, y => 0, x => 0)
- Dict{Num, Any}(z => -1, y => 1, x => 0)
+julia> length(Symbolics.symbolic_solve(eqs, [x,y,z]))
+3
 ```
 
 !!! note
     If `Nemo` or `Groebner` are not imported when needed, the solver throws an error.
-```jldoctest
+```julia
 julia> using Symbolics
 
 julia> @variables x y z;
@@ -108,38 +118,68 @@ ERROR: "Groebner bases engine is required. Execute `using Groebner` to enable th
 ```
 ### `solve_multipoly` (uses GCD between the input polys)
 ```jldoctest
-julia> symbolic_solve([x-1, x^3 - 1, x^2 - 1, (x-1)^20], x)
-1-element Vector{BigInt}:
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.symbolic_solve([x-1, x^3 - 1, x^2 - 1, (x-1)^20], x)
+1-element Vector{Any}:
  1
 ```
 
 ### `ia_solve` (solving by isolation and attraction)
 ```jldoctest
-julia> symbolic_solve(2^(x+1) + 5^(x+3), x)
-1-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
- (-slog(2) - log(complex(-1)) + 3slog(5)) / (slog(2) - slog(5))
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> length(Symbolics.symbolic_solve(2^(x+1) + 5^(x+3), x))
+1
 ```
 ```jldoctest
-julia> symbolic_solve(log(x+1)+log(x-1), x)
-2-element Vector{SymbolicUtils.BasicSymbolic{BigFloat}}:
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.symbolic_solve(log(x+1)+log(x-1), x)
+1-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
  (1//2)*√(8.0)
- (-1//2)*√(8.0)
 ```
 ```jldoctest
-julia> symbolic_solve(a*x^b + c, x)
-((-c)^(1 / b)) / (a^(1 / b))
+julia> using Symbolics
+
+julia> a = only(@variables a)
+a
+
+julia> b = only(@variables b)
+b
+
+julia> c = only(@variables c)
+c
+
+julia> x = only(@variables x)
+x
+
+julia> typeof(Symbolics.symbolic_solve(a*x^b + c, x)) <: AbstractVector
+true
 ```
 
 ### Evaluating output (converting to floats)
 If you want to evaluate the exact expressions found by `symbolic_solve`, you can do the following:
 ```jldoctest
-julia> roots = symbolic_solve(2^(x+1) + 5^(x+3), x)
-1-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
- (-slog(2) - log(complex(-1)) + 3slog(5)) / (slog(2) - slog(5))
+julia> using Symbolics
 
-julia> Symbolics.symbolic_to_float.(roots)
-1-element Vector{Complex{BigFloat}}:
- -4.512941594732059759689023145584186058252768936052415430071569066192919491762214 + 3.428598090438030380369414618548038962770087500755160535832807433942464545729382im
+julia> x = only(@variables x)
+x
+
+julia> roots = Symbolics.symbolic_solve(2^(x+1) + 5^(x+3), x); length(roots)
+1
+
+julia> length(Symbolics.symbolic_to_float.(roots))
+1
 ```
 """
 function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where {T}

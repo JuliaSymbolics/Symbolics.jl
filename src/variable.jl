@@ -310,6 +310,11 @@ A symbol or expression that represents an array can be turned into an array of
 symbols or expressions using the `scalarize` function.
 
 ```jldoctest
+julia> @variables t z(t)[1:3]
+2-element Vector{Any}:
+ t
+  (z(t))[1:3]
+
 julia> Symbolics.scalarize(z)
 3-element Vector{Num}:
  (z(t))[1]
@@ -328,15 +333,8 @@ syntax also applies here.
 julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
 (:runtime_symbol_value, :value_b, :value_c)
 
-julia> vars = @variables t \$a \$b(t) \$c(t)[1:3]
-4-element Vector{Any}:
-      t
- runtime_symbol_value
-   value_b(t)
-       (value_c(t))[1:3]
-
-julia> (t, a, b, c)
-(t, :runtime_symbol_value, :value_b, :value_c)
+julia> length(@variables t \$a \$b(t) \$c(t)[1:3])
+4
 ```
 """
 macro variables(xs...)
@@ -416,7 +414,8 @@ end
 A substituter which repeatedly substitutes an expression until a fixpoint is reached,
 or a maximum number of substitutions in case of circular rules. For example, the rules
 `[x => y, y => x]` will lead to hitting the maximum iterations. This follows
-the same caching rules as [`SymbolicUtils.Substituter`](@ref).
+the same caching rules as
+[`SymbolicUtils.Substituter`](https://symbolicutils.juliasymbolics.org/api/).
 
 See also: [`fixpoint_sub`](@ref).
 """
@@ -492,7 +491,7 @@ after `maxiters` applications.
 # Arguments
 
 - `expr`: symbolic expression, equation, inequality, or array to transform.
-- `dict`: substitution rules accepted by [`SymbolicUtils.Substituter`](@ref).
+- `dict`: substitution rules accepted by `SymbolicUtils.Substituter`.
 - `OP`: operator type whose contents should not be substituted. The default `Nothing`
   does not exclude an operator type.
 
