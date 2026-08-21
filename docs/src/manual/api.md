@@ -38,8 +38,8 @@ Symbolics.sympy_pythoncall_linear_solve
 Symbolics.sympy_pythoncall_simplify
 Symbolics.sympy_pythoncall_to_symbolics
 Symbolics.value
-Symbolics.:≲
-Symbolics.:≳
+Symbolics.≲
+Symbolics.≳
 Symbolics.wrap
 Symbolics.Symbolics
 Symbolics.parse_vars

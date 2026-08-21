@@ -34,7 +34,7 @@ whenever both Symbolics and DomainSets are in scope.
 the next breaking release. Callers should switch to
 
 ```julia
-using DomainSets   # or IntervalSets
+import DomainSets
 infimum(d)
 ```
 
