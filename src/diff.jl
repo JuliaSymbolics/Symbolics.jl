@@ -451,6 +451,26 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     end
                 end
                 return SymbolicUtils.add_worker(VartypeT, summed_args)
+            elseif f isa SymbolicGetproperty
+                # A field access names a leaf of the struct, so `D(s.x)` is left intact
+                # when the base is a dependent variable, as `D(arr[i])` is above.
+                base = arguments(arg)[1]
+                inner_args = arguments(base)
+                summed_args = SymbolicUtils.ArgsT{VartypeT}()
+                sizehint!(summed_args, length(inner_args))
+                for (i, a) in enumerate(inner_args)
+                    der = derivative_idx(base, i)::Union{Nothing, SymbolicT}
+                    if isequal(a, D.x)
+                        der === nothing && return D(arg)
+                        push!(summed_args, unwrap(f(der)))
+                        continue
+                    elseif der === nothing
+                        push!(summed_args, Differential(a)(arg) * executediff(D, a))
+                    else
+                        push!(summed_args, unwrap(f(der)) * executediff(D, a))
+                    end
+                end
+                return SymbolicUtils.add_worker(VartypeT, summed_args)
             elseif f === ifelse || f === ifelse_eager || f === ifelse_branching
                 inner_args = arguments(arg)
                 dtrue = executediff(D, inner_args[2]; throw_no_derivative)
