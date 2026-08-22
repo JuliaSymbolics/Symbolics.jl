@@ -875,15 +875,18 @@ function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Integer, cache::Vec
 end
 
 """
-    dstar_jacobioan(roots::AbstractVector{SymbolicT}, vars::AbstractVector{SymbolicT}) -> Matrix{SymbolicT}
+$(SIGNATURES)
 
-Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differentiation algorithm using the `DerivativeGraph` data structure.
+Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differentiation algorithm using the [`DerivativeGraph`](@ref) data structure.
 
 (see [this paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/main-65.pdf) for more details on the algorithm)
 
+Mostly the same usage as [`jacobian`](@ref). More limited in input expressions (doesn't support `ifelse` or nested differentials), but asymptotically faster for large Rn->Rm expressions.
+
 # Arguments
-- `roots::AbstractVector{SymbolicT}`: Vector of expressions to differentate
-- `vars::AbstractVector{SymbolicT}`: Vector of variables to differentate w.r.t.
+
+- `roots::AbstractVector`: Vector of expressions to differentate or array-type symbolic expression (e.g. function registered with `@register_array_symbolic`)
+- `vars::AbstractVector`: Vector of variables to differentate w.r.t. or single array-type variable (e.g. `@variables x[1:4]`)
 """
 function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
     roots isa Arr && (roots = scalarize(unwrap(roots)))
@@ -923,4 +926,17 @@ function dstar_jacobian(roots, vars)
     return dstar_jacobian(roots, vars)
 end
 
+"""
+$(SIGNATURES)
+
+Computes the derivative of `root` w.r.t. `var` using the D* differentiation algorithm.
+
+Mostly the same usage as [`derivative`](@ref), but more limited in input expressions (doesn't support `ifelse` or nested differentials).
+
+Wrapper for R1->R1 case of `dstar_jacobian`. See [`dstar_jacobian`](@ref) for more information.
+
+# Arguments
+- `root`: Expression to differentate
+- `var`: Variable to differentate w.r.t.
+"""
 dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}) = only(dstar_jacobian([root], [var]))
