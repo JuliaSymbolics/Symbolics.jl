@@ -601,7 +601,7 @@ include("discontinuities.jl")
 include("despecialize.jl")
 
 @public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
-@public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
+@public _parse_vars, derivative, dstar_derivative, gradient, jacobian, sparsejacobian, dstar_jacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, option_to_metadata_type, scalarize, shape
 @public unwrap, variable, wrap, linear_expansion, LinearExpander
 @public _toexpr_metadata, _toexpr_op
