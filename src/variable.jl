@@ -634,7 +634,7 @@ function renamed_metadata(metadata::Union{Nothing, SymbolicUtils.MetadataT}, nam
                 v = v::NTuple{2, Symbol}
                 v = (v[1], name)
             end
-            newmeta = Base.ImmutableDict(newmeta, k, v)
+            newmeta = Base.ImmutableDict{DataType, Any}(newmeta, k, v)
         end
         return newmeta
     end
