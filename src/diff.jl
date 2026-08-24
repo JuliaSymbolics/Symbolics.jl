@@ -456,7 +456,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 # when the base is a dependent variable, as `D(arr[i])` is above.
                 base = arguments(arg)[1]
                 inner_args = arguments(base)
-                summed_args = SymbolicUtils.ArgsT{VartypeT}()
+                summed_args = SArgsT()
                 sizehint!(summed_args, length(inner_args))
                 for (i, a) in enumerate(inner_args)
                     der = derivative_idx(base, i)::Union{Nothing, SymbolicT}
