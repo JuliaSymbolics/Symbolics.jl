@@ -295,3 +295,46 @@ end
     z_arr = getproperty(Symbolics.SymStruct{Record2{Int}}(dt_rec), :z)
     @test isequal(dt_z2, SU.unwrap(z_arr[2]))
 end
+
+struct DiffInner
+    a::Real
+    b::Real
+end
+struct DiffOuter
+    p::Real
+    q::DiffInner
+end
+@symstruct DiffInner
+@symstruct DiffOuter
+
+@testset "differentiating SymStruct field accesses" begin
+    @variables t rec(t)::Record2{Int} out(t)::DiffOuter
+    D = Differential(t)
+
+    # A field access names a leaf of the record, so the derivative stays intact rather
+    # than chain-ruling into a derivative of the record itself.
+    @test isequal(SU.unwrap(expand_derivatives(D(rec.x))), SU.unwrap(D(rec.x)))
+    @test isequal(SU.unwrap(expand_derivatives(D(D(rec.x)))), SU.unwrap(D(D(rec.x))))
+
+    # The chain may mix fields and indices.
+    @test isequal(SU.unwrap(expand_derivatives(D(rec.z[2]))), SU.unwrap(D(rec.z[2])))
+    @test isequal(SU.unwrap(expand_derivatives(D(out.q.a))), SU.unwrap(D(out.q.a)))
+
+    # Leaves compose with the ordinary differentiation rules.
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(rec.x^2))), SU.unwrap(2 * rec.x * D(rec.x)))
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(sin(rec.x)))), SU.unwrap(cos(rec.x) * D(rec.x)))
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(out.p * out.q.a))),
+        SU.unwrap(D(out.p) * out.q.a + out.p * D(out.q.a))
+    )
+
+    # A record that does not depend on the differentiation variable contributes nothing.
+    @variables norec::Record2{Int}
+    @test iszero(expand_derivatives(D(norec.x)))
+
+    # Differentiating with respect to a field itself.
+    @test isequal(
+        SU.unwrap(expand_derivatives(Differential(rec.x)(rec.x^2))), SU.unwrap(2 * rec.x))
+end

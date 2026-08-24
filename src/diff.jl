@@ -357,6 +357,51 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
 end
 
 """
+    $(TYPEDSIGNATURES)
+
+Peel a chain of field accesses and indices (`s.q.z[2]`) down to the symbolic it projects
+from. Returns `x` unchanged if it is not such a projection.
+"""
+function symstruct_projection_root(x)
+    while iscall(x)
+        f = operation(x)
+        f isa SymbolicGetproperty || f === getindex || break
+        x = arguments(x)[1]
+    end
+    return x
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Re-apply the chain of field accesses and indices that takes `root` to `x` onto `value`,
+so that `reproject_symstruct(s.q.a, s, der)` is `der.q.a`.
+"""
+function reproject_symstruct(x, root, value)
+    isequal(x, root) && return value
+    f = operation(x)
+    args = arguments(x)
+    base = reproject_symstruct(args[1], root, value)
+    f isa SymbolicGetproperty && return unwrap(f(base))
+    return base[SymbolicUtils.StableIndex(@views args[2:end])]
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Whether `x` projects a field out of a symbolic struct, possibly through indices.
+"""
+function is_symstruct_projection(x)
+    while iscall(x)
+        f = operation(x)
+        f isa SymbolicGetproperty && return true
+        f === getindex || return false
+        x = arguments(x)[1]
+    end
+    return false
+end
+
+"""
     executediff(D, arg; simplify=false, occurrences=nothing)
 
 Apply the passed Differential D on the passed argument.
@@ -430,6 +475,29 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 # `D.x` because of `occursin_info` and will just return `D(arg)`
                 inner_args = arguments(arg)
                 return chain_diff(D, arg, inner_args; simplify, throw_no_derivative)
+            elseif is_symstruct_projection(arg)
+                # A field access names a leaf of the record. As for `getindex` below, the
+                # derivative distributes over the arguments of the record itself; the whole
+                # projection chain (which may mix fields and indices) is re-applied to each
+                # derivative. `D.x` is known to occur in `arg`, so nothing is searched for.
+                root = symstruct_projection_root(arg)
+                iscall(root) || return D(arg)
+                inner_args = arguments(root)
+                summed_args = SymbolicUtils.ArgsT{VartypeT}()
+                sizehint!(summed_args, length(inner_args))
+                for (i, a) in enumerate(inner_args)
+                    der = derivative_idx(root, i)::Union{Nothing, SymbolicT}
+                    if isequal(a, D.x)
+                        der === nothing && return D(arg)
+                        push!(summed_args, reproject_symstruct(arg, root, der))
+                        continue
+                    elseif der === nothing
+                        push!(summed_args, Differential(a)(arg) * executediff(D, a))
+                    else
+                        push!(summed_args, reproject_symstruct(arg, root, der) * executediff(D, a))
+                    end
+                end
+                return SymbolicUtils.add_worker(VartypeT, summed_args)
             elseif f === getindex
                 arr = arguments(arg)[1]
                 inner_args = arguments(arguments(arg)[1])
@@ -448,26 +516,6 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                         push!(summed_args, Differential(a)(arg) * executediff(D, a))
                     else
                         push!(summed_args, der[idx] * executediff(D, a))
-                    end
-                end
-                return SymbolicUtils.add_worker(VartypeT, summed_args)
-            elseif f isa SymbolicGetproperty
-                # A field access names a leaf of the struct, so `D(s.x)` is left intact
-                # when the base is a dependent variable, as `D(arr[i])` is above.
-                base = arguments(arg)[1]
-                inner_args = arguments(base)
-                summed_args = SArgsT()
-                sizehint!(summed_args, length(inner_args))
-                for (i, a) in enumerate(inner_args)
-                    der = derivative_idx(base, i)::Union{Nothing, SymbolicT}
-                    if isequal(a, D.x)
-                        der === nothing && return D(arg)
-                        push!(summed_args, unwrap(f(der)))
-                        continue
-                    elseif der === nothing
-                        push!(summed_args, Differential(a)(arg) * executediff(D, a))
-                    else
-                        push!(summed_args, unwrap(f(der)) * executediff(D, a))
                     end
                 end
                 return SymbolicUtils.add_worker(VartypeT, summed_args)
