@@ -566,7 +566,7 @@ function find_edge_group(sub::FactorableSubgraph, edges::Vector{Edge{T}}) where 
     isempty(edges) && return BitVector()
     # start with the first edge in the group
     mask = copy(nondominance_mask(sub, edges[1]))
-    group::BitVector = zeros(length(edges))
+    group::BitVector = falses(length(edges))
     group[1] = 1
 
     # loop through edges until the group is unchanged to prevent a scenario where the nondominance looks like {1}, {2,3}, {1,3}, where one loop wouldn't include edge 2
@@ -665,7 +665,7 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T};
             
             dom_pair = (dominated, dominating)
             if !haskey(dom_pairs, dom_pair)
-                dom_pairs[dom_pair] = zeros(length(dg.roots))
+                dom_pairs[dom_pair] = falses(length(dg.roots))
             end
             dom_pairs[dom_pair][root] = 1
         end
@@ -693,7 +693,7 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T};
 
             pdom_pair = (postdominated, postdominating)
             if !haskey(pdom_pairs, pdom_pair)
-                pdom_pairs[pdom_pair] = zeros(length(dg.vars))
+                pdom_pairs[pdom_pair] = falses(length(dg.vars))
             end
             pdom_pairs[pdom_pair][var] = 1
         end
