@@ -476,10 +476,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 inner_args = arguments(arg)
                 return chain_diff(D, arg, inner_args; simplify, throw_no_derivative)
             elseif is_symstruct_projection(arg)
-                # A field access names a leaf of the record. As for `getindex` below, the
-                # derivative distributes over the arguments of the record itself; the whole
-                # projection chain (which may mix fields and indices) is re-applied to each
-                # derivative. `D.x` is known to occur in `arg`, so nothing is searched for.
+                # distribute derivatives over the arguments of the record, and re-apply the projection chain to each derivative
                 root = symstruct_projection_root(arg)
                 iscall(root) || return D(arg)
                 inner_args = arguments(root)
