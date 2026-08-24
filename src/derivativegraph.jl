@@ -679,7 +679,8 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T};
     end
 
     # repeat the same process, but for postdominators and variables
-    pdom_pairs = Dict{Tuple{T,T}, BitVector}()
+    empty!(dom_pairs)
+    pdom_pairs = dom_pairs#Dict{Tuple{T,T}, BitVector}()
     for var in keys(dg.var_idx_to_postorder)
         # only recompute pdoms if var is dirty
         (dg.dirty_vars[var] || !haskey(pdom_cache, var)) && (pdom_cache[var] = get_postdominators(dg, var))
