@@ -712,7 +712,7 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T};
 end
 
 # checks for structural true dominance, masked by variable (used for pdom subgraphs)
-# TODO: optimize
+# needs to be separate from `get_dominators` because it is masked by variable not root (vice versa for pdoms)
 function is_dominator(dg::DerivativeGraph{T}, dominator::T, dominated::T, var_mask::BitVector, cache::Dict{Tuple{T,T}, Bool}=Dict{Tuple{T,T},Bool}()) where {T}
     dominator == dominated && return true
     cache_key = (dominator, dominated)
@@ -758,15 +758,14 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where
     populate_subgraph_edges!(dg, sub)
     sub_edges = subgraph_edges(sub)
 
-    # TODO: cut this down
+    # compute dominance and nondominance masks, and verify subgraph validity
     extras = Dict{Edge{T}, Tuple{BitVector, BitVector}}()
     for edge in sub_edges
         dom_extra = dominance_mask(sub, edge) .& .~sub.dominance_mask
         nondom_extra = nondominance_mask(sub, edge) .& .~nondominance_mask(sub)
 
-        if !any(dom_extra) && !any(nondom_extra)
-            check_dominance(dg, sub, edge) || return false
-        end
+        # if an edge doesn't have any external connections and is not structurally dominated within subgraph, then subgraph isn't valid
+        (!any(dom_extra) && !any(nondom_extra) && !check_dominance(dg, sub, edge)) && return false
 
         extras[edge] = (dom_extra, nondom_extra)
     end
