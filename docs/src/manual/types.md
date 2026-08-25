@@ -48,6 +48,13 @@ typeof(s)
 the [SymbolicUtils wrapper API](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap)
 for their contract and examples.
 
+The Symbolics wrapper dispatch is available through:
+
+```@docs
+Symbolics.Num
+Symbolics.wrap
+```
+
 ### Defining your own wrapper
 
 A package that introduces a new symbolic type registers a wrapper for it with

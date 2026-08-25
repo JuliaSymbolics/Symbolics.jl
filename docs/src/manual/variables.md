@@ -25,6 +25,10 @@ Symbolics.variable
 Symbolics.variables
 Equation
 Base.:~(::Num, ::Num)
+Symbolics.Inequality
+Symbolics.var"≲"
+Symbolics.var"≳"
+Symbolics.value
 ```
 
 ## A note about functions restricted to `Number`s
@@ -107,4 +111,5 @@ For implementing custom variable-creating macros:
 
 ```@docs
 Symbolics._parse_vars
+Symbolics.parse_vars
 ```

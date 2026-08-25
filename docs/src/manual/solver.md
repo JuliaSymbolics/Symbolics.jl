@@ -77,6 +77,8 @@ Symbolics expressions for use in its solvers.
 ```@docs
 Symbolics.sympy_linear_solve
 Symbolics.sympy_algebraic_solve
+Symbolics.sympy_pythoncall_linear_solve
+Symbolics.sympy_pythoncall_algebraic_solve
 ```
 
 ### Feature completeness

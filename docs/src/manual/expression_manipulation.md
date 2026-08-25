@@ -30,6 +30,7 @@ Symbolics.sympy_simplify
 Other additional manipulation functions are given below.
 
 ```@docs
+SymbolicUtils.substitute
 Symbolics.get_variables
 Symbolics.tosymbol
 Symbolics.diff2term
@@ -42,4 +43,11 @@ Symbolics.terms(x)
 Symbolics.factors(x)
 numerator(x::Union{Num, SymbolicUtils.BasicSymbolic})
 denominator(x::Union{Num, SymbolicUtils.BasicSymbolic})
+Symbolics.arguments
+Symbolics.hasnode
+Symbolics.filterchildren
+Symbolics.replacenode
+Symbolics.gather_factor
+Symbolics.FixpointSubstituter
+Symbolics.sympy_pythoncall_simplify
 ```
