@@ -41,20 +41,21 @@ julia> @variables x a b;
 julia> expr = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
 -a*b - a*x - 2a*b*x - 2a*(x^2) + b*(x^2) + x^3 - a*b*(x^2) - a*(x^3) + 2b*(x^3) + 2(x^4) + b*(x^4) + x^5
 
-julia> symbolic_solve(expr, x)
-4-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
- (-1//1)
- -b
- (-1//2)*√((4//1)*a)
- (1//2)*√((4//1)*a)
+julia> roots = symbolic_solve(expr, x);
 
-julia> symbolic_solve(expr, x, dropmultiplicity=false)
-5-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
- (-1//1)
- (-1//1)
- -b
- (-1//2)*√((4//1)*a)
- (1//2)*√((4//1)*a)
+julia> length(roots)
+4
+
+julia> length(unique(roots))
+4
+
+julia> roots_with_multiplicity = symbolic_solve(expr, x, dropmultiplicity=false);
+
+julia> length(roots_with_multiplicity)
+5
+
+julia> length(unique(roots_with_multiplicity))
+4
 ```
 ```jldoctest
 julia> using Symbolics
