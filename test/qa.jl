@@ -1,18 +1,19 @@
 using SciMLTesting
-using Symbolics
 
 run_qa(
     Symbolics;
     ei_kwargs = (;
         # These are upstream names used for compatibility with Base, LinearAlgebra,
         # DiffRules, MacroTools, and NaNMath; those owners do not declare them public.
-        all_qualified_accesses_are_public = (; ignore = (
-            :BlasInt, :Cartesian, :Experimental, :ParseError, :ReshapedArray,
-            :Unknown, :acos, :acosh, :alignment, :asin, :atanh, :checknonsingular,
-            :cos, :diffrule, :diffrules, :eval, :getdoc, :log, :log10, :log1p,
-            :log2, :max, :min, :nocolor, :power_by_squaring, :register_error_hint,
-            :sin, :sqrt, :striplines, :tan,
-        )),
+        all_qualified_accesses_are_public = (;
+            ignore = (
+                :BlasInt, :Cartesian, :Experimental, :ParseError, :ReshapedArray,
+                :Unknown, :acos, :acosh, :alignment, :asin, :atanh, :checknonsingular,
+                :cos, :diffrule, :diffrules, :eval, :getdoc, :log, :log10, :log1p,
+                :log2, :max, :min, :nocolor, :power_by_squaring, :register_error_hint,
+                :sin, :sqrt, :striplines, :tan,
+            ),
+        ),
     ),
     reexports_allow = (
         Symbol("@acrule"), Symbol("@arrayop"), Symbol("@makearray"),
