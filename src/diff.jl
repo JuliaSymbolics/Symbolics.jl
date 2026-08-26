@@ -383,7 +383,7 @@ function reproject_symstruct(x, root, value)
     args = arguments(x)
     base = reproject_symstruct(args[1], root, value)
     f isa SymbolicGetproperty && return unwrap(f(base))
-    return base[SymbolicUtils.StableIndex(@views args[2:end])]
+    return base[SymbolicUtils.StableIndex(x)]
 end
 
 """
