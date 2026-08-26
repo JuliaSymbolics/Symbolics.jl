@@ -45,6 +45,24 @@ function setdefaultval(x, val)
     setmetadata(x, VariableDefaultValue, val)
 end
 
+"""
+    map_subscripts(indices)
+
+Convert the decimal characters in an index to the Unicode subscript
+characters used in symbolic variable names.
+
+# Arguments
+
+- `indices`: an integer or other value whose string representation consists of
+  characters in `-0123456789`.
+
+# Examples
+
+```julia
+julia> Symbolics.map_subscripts(-12)
+"₋₁₂"
+```
+"""
 function map_subscripts(indices)
     str = string(indices)
     join(IndexMap[c] for c in str)
@@ -617,7 +635,7 @@ function renamed_metadata(metadata::Union{Nothing, SymbolicUtils.MetadataT}, nam
                 v = v::NTuple{2, Symbol}
                 v = (v[1], name)
             end
-            newmeta = Base.ImmutableDict(newmeta, k, v)
+            newmeta = Base.ImmutableDict{DataType, Any}(newmeta, k, v)
         end
         return newmeta
     end
