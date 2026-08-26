@@ -26,8 +26,8 @@ Symbolics.variables
 Equation
 Base.:~(::Num, ::Num)
 Symbolics.Inequality
-Symbolics.var"≲"
-Symbolics.var"≳"
+Symbolics.:≲
+Symbolics.:≳
 Symbolics.value
 ```
 
