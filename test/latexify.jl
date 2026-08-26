@@ -77,6 +77,9 @@ end
     ]
 )
 
+@variables s p(s)[1:2] q(s)[1:2] A[1:2, 1:2]
+@test_reference "latexify_refs/equation_vec_array.txt" latexify([q ~ A * p])
+
 @test_reference "latexify_refs/complex1.txt" latexify(x^2 - y^2 + 2im * x * y)
 @test_reference "latexify_refs/complex2.txt" latexify(3im * x)
 @test_reference "latexify_refs/complex3.txt" latexify(1 - x + (1 + 2x) * im; imaginary_unit = "\\mathbb{i}")
