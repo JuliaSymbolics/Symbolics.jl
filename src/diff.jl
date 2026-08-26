@@ -480,7 +480,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 root = symstruct_projection_root(arg)
                 iscall(root) || return D(arg)
                 inner_args = arguments(root)
-                summed_args = SymbolicUtils.ArgsT{VartypeT}()
+                summed_args = SArgsT()
                 sizehint!(summed_args, length(inner_args))
                 for (i, a) in enumerate(inner_args)
                     der = derivative_idx(root, i)::Union{Nothing, SymbolicT}
