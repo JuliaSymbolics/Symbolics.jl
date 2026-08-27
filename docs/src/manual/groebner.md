@@ -6,5 +6,9 @@ We refer to the [documentation of Groebner.jl](https://sumiya11.github.io/Groebn
 which lists some implementations details and possible use-cases of Groebner bases.
 
 ```@docs
-groebner_basis
+Symbolics.is_groebner_basis
+Symbolics.polynomial_coeffs
+Symbolics.semilinear_form
+Symbolics.semipolynomial_form
+Symbolics.semiquadratic_form
 ```

@@ -95,10 +95,8 @@ julia> @variables x y
 julia> Symbolics.symbolic_linear_solve(x + y ~ 0, x)
 -y
 
-julia> Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])
-2-element Vector{Float64}:
-  1.0
- -1.0
+julia> all(Symbolics.value.(Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])) .== [1, -1])
+true
 ```
 """
 function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar case
@@ -151,7 +149,7 @@ end
 
 LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
-    LinearAlgebra.require_one_based_indexing(A, b, x)
+    Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
@@ -171,7 +169,7 @@ end
 
 LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = b)
-    LinearAlgebra.require_one_based_indexing(A, b, x)
+    Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
@@ -209,8 +207,8 @@ function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
     end
 end
 
-LinearAlgebra.inv(A::AbstractMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
-LinearAlgebra.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::AbstractMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
 
 function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
     if laplace
@@ -447,7 +445,7 @@ function (lex::LinearExpander)(t::SymbolicT; need_remainder::Bool = true)
                     newdict = copy(dict)
                 end
                 delete!(newdict, k)
-                tmp = Symbolics.Mul{VartypeT}(coeff, newdict; type, shape)
+                tmp = SymbolicUtils.Mul{VartypeT}(coeff, newdict; type, shape)
                 if !isempty(extras)
                     push!(extras, tmp)
                     tmp = SymbolicUtils.mul_worker(VartypeT, extras)

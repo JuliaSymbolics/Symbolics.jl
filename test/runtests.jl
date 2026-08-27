@@ -37,6 +37,10 @@ if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
 end
 
+if GROUP == "QA"
+    include("qa.jl")
+end
+
 # this needs to be defined at top level
 limit2(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 @register_symbolic limit2(a, N)::Integer

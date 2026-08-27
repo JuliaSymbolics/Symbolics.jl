@@ -1,5 +1,5 @@
-using SymbolicUtils
-using StaticArraysCore
+import StaticArraysCore
+using StaticArraysCore: SArray
 import Base: eltype, length, ndims, size, axes, eachindex
 
 ### Wrapper type for dispatch

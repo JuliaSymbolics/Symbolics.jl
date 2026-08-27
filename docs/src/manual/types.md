@@ -44,9 +44,15 @@ typeof(s)
 
 ## Type Wrapper API
 
+`wrap` and `unwrap` are provided by SymbolicUtils and reexported by Symbolics. See
+the [SymbolicUtils wrapper API](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap)
+for their contract and examples.
+
+The Symbolics wrapper dispatch is available through:
+
 ```@docs
+Symbolics.Num
 Symbolics.wrap
-Symbolics.unwrap
 ```
 
 ### Defining your own wrapper
@@ -59,4 +65,3 @@ raw expression trees in place of the concrete type.
 @symbolic_wrap
 @wrapped
 ```
-

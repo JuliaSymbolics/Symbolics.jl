@@ -5,7 +5,8 @@ using Latexify
 using LaTeXStrings
 using TermInterface
 using SymbolicUtils
-using Symbolics: value, hide_lhs, postwalk, wrap
+using Symbolics: value, hide_lhs, wrap
+using MacroTools: postwalk
 using SymbolicUtils: BSImpl, FnType, unwrap, symtype, BasicSymbolic
 using Moshi.Match: @match
 

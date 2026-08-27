@@ -34,20 +34,20 @@ function (I::Integral)(x::Union{Rational, AbstractIrrational, AbstractFloat, Int
     # of `Interval` so this ends up being type-stable. There doesn't seem to be a way
     # to test this and ensure it remains type-stable.
     if domain isa AnyInterval{Num}
-        a, b = unwrap.(DomainSets.endpoints(domain))
+        a, b = unwrap.(IntervalSets.endpoints(domain))
         return Num((b - a) * x)
     elseif domain isa AnyInterval{SymbolicT}
-        a, b = DomainSets.endpoints(domain)
+        a, b = IntervalSets.endpoints(domain)
         return Num((b - a) * x)
     elseif domain isa AnyInterval{Int}
-        a, b = DomainSets.endpoints(domain)
+        a, b = IntervalSets.endpoints(domain)
         return Num((b - a) * x)
     elseif domain isa AnyInterval{Float64}
-        a, b = DomainSets.endpoints(domain)
+        a, b = IntervalSets.endpoints(domain)
         return Num((b - a) * x)
     else
         # ::NTuple{2, Any} avoids `indexed_iterate` dynamic dispatching
-        a, b = DomainSets.endpoints(domain)::NTuple{2, Any}
+        a, b = IntervalSets.endpoints(domain)::NTuple{2, Any}
         # SConst avoids `*` dynamic dispatching
         return Num(SConst(b - a) * x)
     end
