@@ -146,7 +146,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
     assigns = macroexpand(@__MODULE__, :(Base.Cartesian.@nexprs $N i -> ($argnames[i] = args[i])))
     fexpr = quote
-        @wrapped function $f($(args′...))
+        Symbolics.@wrapped function $f($(args′...))
             args = ($(argnames...),)
             if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
                 args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
