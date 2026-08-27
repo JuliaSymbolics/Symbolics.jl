@@ -38,6 +38,15 @@ wraps_type(::Type{S}) where {T, S <: SymStruct{T}} = T
 iswrapped(::SymStruct{T}) where {T} = true
 
 """
+    $TYPEDSIGNATURES
+
+Return `true` if type `T` is registered as a symbolic struct via [`@symstruct`](@ref).
+"""
+function is_symstruct_type(::Type{T}) where {T}
+    return has_symwrapper(T)::Bool && wrapper_type(T)::DataType === SymStruct{T}
+end
+
+"""
     issymstruct(x) -> Bool
 
 Return `true` if `x` is a `SymStruct` or a symbolic expression whose `symtype` has been
@@ -46,8 +55,7 @@ registered via [`@symstruct`](@ref). Return `false` otherwise.
 issymstruct(x) = false
 issymstruct(x::SymStruct) = true
 function issymstruct(x::SymbolicT)
-    T = symtype(x)
-    return has_symwrapper(T)::Bool && wrapper_type(T)::DataType === SymStruct{T}
+    return is_symstruct_type(symtype(x))
 end
 
 SymbolicUtils.unwrap(x::SymStruct) = getfield(x, 1)
@@ -263,8 +271,13 @@ function _literal_getproperty(sym::SymStruct{T}, ::Val{name}) where {T, name}
     fShape = field_shape(T, Val{name}())
     fname = BSImpl.Const{VartypeT}(name)
     _struct = unwrap(sym)
-    args = ArgsT{VartypeT}((_struct,))
-    val = BSImpl.Term{VartypeT}(SymbolicGetproperty{T, name}(), args; type = fT, shape = fShape)
+    if is_symbolic_zero(_struct)
+        # Every field of a zero struct is itself zero.
+        val = symbolic_zero(fT, fShape)
+    else
+        args = ArgsT{VartypeT}((_struct,))
+        val = BSImpl.Term{VartypeT}(SymbolicGetproperty{T, name}(), args; type = fT, shape = fShape)
+    end
     if has_symwrapper(fT)
         return wrapper_type(fT)(val)
     else
@@ -326,13 +339,13 @@ Return `true` if field `field` of struct type `T` can participate in linear inde
 """
 function symstruct_field_supports_linear_indexing(::Type{T}, ::Val{field}) where {T, field}
     fT = fieldtype(T, field)
-    if has_symwrapper(fT) && wrapper_type(fT) === SymStruct{fT}
+    if is_symstruct_type(fT)
         return symstruct_supports_linear_indexing(fT)
     end
     if fT <: Union{AbstractArray, Tuple}
         efT = eltype(fT)
         return field_shape(T, Val{field}()) isa SU.ShapeVecT && (
-            !has_symwrapper(efT) || wrapper_type(efT) !== SymStruct{efT} ||
+            !is_symstruct_type(efT) ||
                 symstruct_supports_linear_indexing(efT)
         )
     end
@@ -366,7 +379,7 @@ their own [`symstruct_length`](@ref).
 """
 function symstruct_field_length(::Type{T}, ::Val{field}) where {T, field}
     fT = fieldtype(T, field)
-    if has_symwrapper(fT) && wrapper_type(fT) === SymStruct{fT}
+    if is_symstruct_type(fT)
         return symstruct_length(fT)
     end
     # The entire function is well-inferred, and this edge case
@@ -377,7 +390,7 @@ function symstruct_field_length(::Type{T}, ::Val{field}) where {T, field}
     end
     efT = eltype(fT)
     baselen = prod(length, field_shape(T, Val{field}())::SU.ShapeVecT; init = 1)
-    if has_symwrapper(efT) && wrapper_type(efT) === SymStruct{efT}
+    if is_symstruct_type(efT)
         return baselen * symstruct_length(efT)
     end
     return baselen
@@ -424,7 +437,7 @@ Return the range of linear indices within a `SymStruct{T}` that correspond to fi
 function symstruct_field_range(::Type{T}, ::Val{field}) where {T, field}
     return 1:symstruct_field_length(T, Val{field}())
     fT = fieldtype(T, field)
-    if has_symwrapper(fT) && wrapper_type(fT) === SymStruct{fT}
+    if is_symstruct_type(fT)
         return 1:symstruct_length(fT)
     end
     # Same fast-path as in `symstruct_field_length`
@@ -444,7 +457,7 @@ Return the `i`-th scalar symbolic element within field `field` of `s`. For neste
 """
 function symstruct_field_getindex(s::SymStruct{T}, ::Val{field}, i::Integer) where {T, field}
     fT = fieldtype(T, field)
-    if has_symwrapper(fT) && wrapper_type(fT) === SymStruct{fT}
+    if is_symstruct_type(fT)
         return getindex(SymbolicGetproperty{T, field}()(s), i)
     end
     fval = SymbolicGetproperty{T, field}()(s)
@@ -455,7 +468,7 @@ function symstruct_field_getindex(s::SymStruct{T}, ::Val{field}, i::Integer) whe
     end
     fval = unwrap(fval)
     efT = eltype(fT)
-    if has_symwrapper(efT) && wrapper_type(efT) === SymStruct{efT}
+    if is_symstruct_type(efT)
         N = symstruct_length(efT)
         return SymStruct{efT}(fval[SymbolicUtils.stable_eachindex(fval)[div(i - 1, N) + 1]])[mod1(i, N)]
     end

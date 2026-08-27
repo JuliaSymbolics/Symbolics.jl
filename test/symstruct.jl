@@ -338,3 +338,83 @@ end
     @test isequal(
         SU.unwrap(expand_derivatives(Differential(rec.x)(rec.x^2))), SU.unwrap(2 * rec.x))
 end
+
+struct DiffArr
+    a::Real
+    v::Vector{Real}
+end
+struct DiffLoose
+    a::Real
+    w::Vector{Real}
+end
+@symstruct DiffArr begin
+    shape(:v) = [1:3]
+end
+@symstruct DiffLoose
+
+@testset "`is_zeroable`" begin
+    @test Symbolics.is_zeroable(Real)
+    @test Symbolics.is_zeroable(Vector{Real})
+    @test Symbolics.is_zeroable(DiffInner)
+    @test Symbolics.is_zeroable(DiffOuter)
+    @test Symbolics.is_zeroable(DiffLoose)
+    # `Record2` has a `String` field, which has no additive identity.
+    @test !Symbolics.is_zeroable(Record2{Int})
+    @test !Symbolics.is_zeroable(String)
+end
+
+@testset "differentiating a struct that does not depend on the variable" begin
+    @variables t noout::DiffOuter noarr::DiffArr noloose::DiffLoose
+    D = Differential(t)
+
+    # The derivative of a record that does not depend on the differentiation variable is
+    # a zero of the *same* symtype, not a scalar `0`.
+    z = SU.unwrap(expand_derivatives(D(SU.unwrap(noout))))
+    @test Symbolics.is_symbolic_zero(z)
+    @test SU.symtype(z) === DiffOuter
+
+    # Every field of a zero struct is itself zero, recursively.
+    zs = Symbolics.SymStruct{DiffOuter}(z)
+    @test iszero(zs.p)
+    @test SU.symtype(SU.unwrap(zs.q)) === DiffInner
+    @test Symbolics.is_symbolic_zero(SU.unwrap(zs.q))
+    @test iszero(zs.q.a)
+    @test iszero(zs.q.b)
+
+    # A field with a declared shape gives a concrete array of zeros, which folds when
+    # indexed.
+    za = Symbolics.SymStruct{DiffArr}(SU.unwrap(expand_derivatives(D(SU.unwrap(noarr)))))
+    @test SU.symtype(SU.unwrap(za.v)) === Vector{Real}
+    @test SU.shape(SU.unwrap(za.v)) == [1:3]
+    @test Symbolics._iszero(SU.unwrap(za.v))
+    @test all(i -> iszero(za.v[i]), 1:3)
+    @test iszero(za.a)
+
+    # A field whose shape is not known cannot be materialized, so it stays a lazy zero.
+    # Its scalar siblings still fold.
+    zl = Symbolics.SymStruct{DiffLoose}(SU.unwrap(expand_derivatives(D(SU.unwrap(noloose)))))
+    @test SU.symtype(SU.unwrap(zl.w)) === Vector{Real}
+    @test SU.shape(SU.unwrap(zl.w)) == SU.Unknown(1)
+    @test Symbolics.is_symbolic_zero(SU.unwrap(zl.w))
+    @test iszero(zl.a)
+end
+
+@testset "differentiating a struct with no zero" begin
+    @variables t norec::Record2{Int} rec(t)::Record2{Int}
+    D = Differential(t)
+
+    # `Record2` has a `String` field, so the whole record has no zero to return.
+    @test_throws ArgumentError expand_derivatives(D(SU.unwrap(norec)))
+    @test_throws ArgumentError expand_derivatives(D(SU.unwrap(norec.y)))
+
+    # Numeric fields of the same record are unaffected - only the fields that have no
+    # zero are rejected.
+    @test Symbolics._iszero(expand_derivatives(D(SU.unwrap(norec.x))))
+    @test Symbolics._iszero(expand_derivatives(D(SU.unwrap(norec.z[2]))))
+
+    # A record that does depend on the variable is still returned unexpanded, with its
+    # symtype intact.
+    drec = SU.unwrap(expand_derivatives(D(SU.unwrap(rec))))
+    @test isequal(drec, SU.unwrap(D(SU.unwrap(rec))))
+    @test SU.symtype(drec) === Record2{Int}
+end

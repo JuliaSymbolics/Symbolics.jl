@@ -190,9 +190,44 @@ whether `@symstruct ConcreteFoo` is declared or not. The same applies for `foofn
 If you are not using symbolic structs, the registration macros behave exactly as they
 did prior to this feature.
 
+## Differentiation
+
+A field access is a leaf of the symbolic expression, so differentiating one leaves the
+derivative intact rather than chain-ruling into a derivative of the whole struct. Such leaves
+compose with the ordinary differentiation rules.
+
+```@repl symstruct
+@variables t p(t)::Point2D{Real}
+D = Differential(t)
+expand_derivatives(D(p.x^2))
+```
+
+If the struct does not depend on the differentiation variable, the derivative is a zero of the
+struct's own type rather than a scalar `0`, so that the symtype of the expression is preserved.
+Accessing a field of such a zero gives the zero of that field, recursively:
+
+```@repl symstruct
+@variables q::Point2D{Real}
+dq = expand_derivatives(D(SymbolicUtils.unwrap(q)))
+SymbolicUtils.symtype(dq)
+Symbolics.SymStruct{Point2D{Real}}(dq).x
+```
+
+A zero is representable for structs whose fields are numbers, arrays, or other symbolic structs.
+`Symbolics.is_zeroable` reports whether this is the case for a given type; differentiating a
+struct which is not zeroable - one with a `String` field, say - throws instead of returning a
+zero of the wrong type.
+
+Where an array field has a declared `shape`, its zero is a concrete array of zeros, and indexing
+into it folds to a scalar zero. Where the shape is not known, the zero of that field stays
+symbolic, and indexing into it does not currently fold.
+
 ## API
 
 ```@docs
 @symstruct
 SymStruct
+Symbolics.symbolic_zero
+Symbolics.is_zeroable
+Symbolics.SymbolicZero
 ```

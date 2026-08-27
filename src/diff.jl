@@ -402,6 +402,25 @@ function is_symstruct_projection(x)
 end
 
 """
+    $TYPEDSIGNATURES
+
+Return the zero that differentiating `arg` should produce, when `arg` does not depend on the
+differentiation variable. This is `COMMON_ZERO` for the overwhelmingly common case of a
+numeric expression, and otherwise a zero carrying the symtype of `arg` - see
+[`symbolic_zero`](@ref). Throws if `arg` has a symtype with no zero, such as a symbolic
+struct with a `String` field.
+"""
+function differential_zero(arg::BasicSymbolic{VartypeT})
+    T = symtype(arg)
+    T <: Number && return COMMON_ZERO
+    is_zeroable(T) || throw(ArgumentError("""
+        Cannot differentiate the expression `$arg` of symtype `$T`, since that type has no \
+        zero to return for an expression which does not depend on the differentiation \
+        variable."""))
+    return symbolic_zero(T, shape(arg))
+end
+
+"""
     executediff(D, arg; simplify=false, occurrences=nothing)
 
 Apply the passed Differential D on the passed argument.
@@ -461,13 +480,13 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
         _ => nothing
     end
-    occursin_info(D.x, arg) || return COMMON_ZERO
+    occursin_info(D.x, arg) || return differential_zero(arg)
 
     # We can safely assume `arg` is scalar, else `occursin_info` would have errored.
     @match arg begin
         # Const case will never be reached because of `occursin_info`
         # if the sym were equal to `D.x` we wouldn't be here
-        BSImpl.Sym(;) => return COMMON_ZERO
+        BSImpl.Sym(;) => return differential_zero(arg)
         BSImpl.Term(; f, args) => begin
             if f isa BasicSymbolic{VartypeT}
                 # the only case where `f` is a symbolic is if this is a called symbolic
@@ -560,7 +579,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 prod_args = (exp, (base ^ Const{VartypeT}(exp - 1))::BasicSymbolic{VartypeT}, executediff(D, base; simplify, throw_no_derivative))
                 return SymbolicUtils.mul_worker(VartypeT, prod_args)
             elseif f isa SymbolicUtils.Operator # operator applications return a new variable
-                return COMMON_ZERO
+                return differential_zero(arg)
             else
                 inner_args = arguments(arg)
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()

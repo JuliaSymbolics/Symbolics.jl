@@ -208,6 +208,7 @@ export series, taylor, taylor_coeff
 
 export SymStruct, @symstruct
 include("symstruct.jl")
+include("symzero.jl")
 
 import Libdl
 include("build_function.jl")
