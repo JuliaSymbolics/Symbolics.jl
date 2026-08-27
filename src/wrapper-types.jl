@@ -272,7 +272,7 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
     quote
         $impl
         $(methods...)
-    end |> esc
+    end
 end
 
 """
@@ -336,5 +336,5 @@ See also: [`@symbolic_wrap`](@ref), [`Symbolics.wrap`](@ref),
 [`SymbolicUtils.unwrap`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap).
 """
 macro wrapped(expr, wrap_arrays = true)
-    wrap_func_expr(__module__, expr, wrap_arrays)
+    esc(wrap_func_expr(__module__, expr, wrap_arrays))
 end

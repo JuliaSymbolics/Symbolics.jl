@@ -37,7 +37,7 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
             $f($(argnames...))
         end
     end)
-    fexpr = macroexpand(@__MODULE__, :(@wrapped $inner $wrap_arrays))
+    fexpr = wrap_func_expr(__module__, inner, wrap_arrays)
 
     if define_promotion
         type_args = [:($name::$Type) for name in argnames]
@@ -120,7 +120,7 @@ symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(C
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
-function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true)
+function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__)
     def_assignments = MacroTools.rmlines(partial_defs).args
     defs = map(def_assignments) do ex
         @assert ex.head == :(=)
@@ -163,7 +163,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             $f($(argnames...))
         end
     end)
-    fexpr = macroexpand(@__MODULE__, :(@wrapped $inner $wrap_arrays))
+    fexpr = wrap_func_expr(caller, inner, wrap_arrays)
 
     if define_promotion
         is_callable_struct = f isa Expr && f.head == :(::)
@@ -214,7 +214,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
                     $promote_shape_body
                 end
             end
-        end |> esc
+        end
         fexpr = :($fexpr; $promote_expr)
     end
 
@@ -255,5 +255,5 @@ overwriting.
 """
 macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
-    register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays)
+    esc(register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays, __module__))
 end
