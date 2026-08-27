@@ -165,7 +165,26 @@ end
 #################### MAP-REDUCE ################
 
 SymbolicUtils.@map_methods Arr unwrap wrap
-SymbolicUtils.@mapreduce_methods Arr unwrap wrap
+for Tf in (BasicSymbolic, Any), Tr in (BasicSymbolic, Any)
+    @eval begin
+        function Base.mapreduce(f::$Tf, op::$Tr, x::Arr; kw...)
+            return wrap(mapreduce(f, op, unwrap(x); kw...))
+        end
+        function Base.mapreduce(f::$Tf, op::$Tr, x::Arr, xs::Arr...; kw...)
+            return wrap(mapreduce(f, op, unwrap(x), unwrap.(xs)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::AbstractArray, y::Arr, ys::Arr...; kw...
+            )
+            return wrap(mapreduce(f, op, x, unwrap(y), unwrap.(ys)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::BasicSymbolic, y::Arr, ys::Arr...; kw...
+            )
+            return wrap(mapreduce(f, op, x, unwrap(y), unwrap.(ys)...; kw...))
+        end
+    end
+end
 
 function LinearAlgebra.dot(x::Arr{T}, y::Arr{T}) where {T}
     T(LinearAlgebra.dot(unwrap(x), unwrap(y)))

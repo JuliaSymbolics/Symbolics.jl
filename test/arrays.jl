@@ -570,6 +570,14 @@ end
     @test A * x * 2 isa SymbolicUtils.BasicSymbolic
 end
 
+@testset "Arr mapreduce intersections" begin
+    @variables x[1:2] y[1:2]
+
+    @test isequal(scalarize(mapreduce(+, +, x)), x[1] + x[2])
+    @test isequal(scalarize(mapreduce(+, +, x, y)), x[1] + x[2] + y[1] + y[2])
+    @test isequal(scalarize(mapreduce(+, +, [1.0, 2.0], x)), 3.0 + x[1] + x[2])
+end
+
 @testset "`getindex(::Arr, ::Num)`" begin
     @variables t x(t)[1:3] i(t)::Int
     @test_nowarn x[i]
