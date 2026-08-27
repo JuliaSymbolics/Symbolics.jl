@@ -574,19 +574,25 @@ end
 
 @testset "Arr mapreduce intersections" begin
     @variables x[1:2] y[1:2]
+    values = view([1.0, 2.0], :)
 
     @test isequal(scalarize(mapreduce(+, +, x)), x[1] + x[2])
     @test isequal(scalarize(mapreduce(+, +, x, y)), x[1] + x[2] + y[1] + y[2])
     @test isequal(scalarize(mapreduce(+, +, [1.0, 2.0], x)), 3.0 + x[1] + x[2])
+    @test mapreduce(+, +, x, values) isa Num
 end
 
 @testset "Arr map intersections" begin
     @variables x[1:2] y[1:2]
     static_values = SArray{Tuple{2}}((1.0, 2.0))
+    values = view([1.0, 2.0], :)
 
     @test isequal(scalarize(map(+, x)), scalarize(x))
     @test isequal(scalarize(map(+, x, y)), scalarize(x + y))
     @test isequal(scalarize(map(+, static_values, x)), scalarize(static_values + x))
+    @test map(+, x, values) isa Arr
+    @test map(+, unwrap(x), y) isa Arr
+    @test map(+, x, unwrap(y)) isa Arr
 end
 
 @testset "Structured matrix Arr division intersections" begin
@@ -608,6 +614,9 @@ end
     )
 
     for matrix in structured, rhs in (x, X)
+        @test matrix \ rhs isa Arr
+    end
+    for matrix in (X, Num[1 0; 0 1]), rhs in (x, X)
         @test matrix \ rhs isa Arr
     end
 

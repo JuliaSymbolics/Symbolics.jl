@@ -1,4 +1,6 @@
 using SciMLTesting
+import StarAlgebras
+import StaticArrays
 
 symbolic_utils = Symbolics.SymbolicUtils
 basic_symbolic = symbolic_utils.BasicSymbolic{symbolic_utils.SymReal}
@@ -15,7 +17,6 @@ run_qa(
                 symbolic_utils.Code.cse_inside_expr,
                 symbolic_utils.promote_shape,
                 symbolic_utils.promote_symtype,
-                (~),
             ),
         ),
     ),
@@ -28,7 +29,8 @@ run_qa(
                 :Unknown, :acos, :acosh, :alignment, :asin, :atanh, :checknonsingular,
                 :cos, :diffrule, :diffrules, :eval, :getdoc, :log, :log10, :log1p,
                 :log2, :max, :min, :nocolor, :power_by_squaring, :register_error_hint,
-                :AbstractSparseMatrixCSC, :StaticArray, :TypedEndpointsInterval,
+                :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractCoefficients,
+                :Slice, :StaticArray, :TwicePrecision, :TypedEndpointsInterval,
                 :sin, :sqrt, :striplines, :tan,
             ),
         ),

@@ -1,4 +1,9 @@
 import SparseArrays
+import StaticArraysCore
+
+# StaticArrays dispatches on this non-public abstract storage type, so exact
+# intersections with its scalar arithmetic cannot use the public concrete aliases.
+const _StaticArray = StaticArraysCore.StaticArray
 
 @symbolic_wrap struct Num <: Real
     val::BasicSymbolic{VartypeT}
@@ -34,7 +39,10 @@ Num
 const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
-Num(x::Complex) = invoke(Num, Tuple{Number}, x)
+function Num(x::Complex)
+    iszero(imag(x)) || throw(InexactError(:Num, Num, x))
+    return Num(real(x))
+end
 (n::Num)(args...) = Num(value(n)(map(value, args)...))
 # Fixes an inference issue with https://github.com/JuliaApproximation/DomainSets.jl/blob/b68ee034ebcd2e3fc10dd334792cee17a8d5c633/src/domains/point.jl#L13
 # causing `Num(::Any)` to infer as `::Any`
@@ -82,15 +90,15 @@ end
 function Base.:(\)(x1::AbstractArray{<:Real}, x2::Num)
     return \(x1, unwrap(x2))
 end
-function Base.:(\)(x1::Num, x2::Array{<:Real})
+function Base.:(\)(x1::Num, x2::AbstractArray{<:Real})
     return \(unwrap(x1), x2)
 end
 
-function Base.:(/)(x1::Array{<:Real}, x2::Num)
+function Base.:(/)(x1::AbstractArray{<:Real}, x2::Num)
     return /(unwrap(x1), unwrap(x2))
 end
 
-function Base.:(/)(x1::Num, x2::Vector{<:Real})
+function Base.:(/)(x1::Num, x2::AbstractVector{<:Real})
     return /(unwrap(x1), unwrap(x2))
 end
 function Base.:(/)(x1::BitArray, x2::Num)
@@ -101,6 +109,53 @@ function Base.:(/)(x1::Num, x2::BitArray)
 end
 function Base.:(/)(x1::SparseArrays.SparseVector{<:Real}, x2::Num)
     return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::SparseArrays.AbstractCompressedVector{<:Real}, x2::Num
+    )
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::SubArray{
+            T, 1, <:SparseArrays.AbstractSparseMatrixCSC{T, Ti},
+            Tuple{Base.Slice{Base.OneTo{Int}}, Int}, false,
+        }, x2::Num
+    ) where {T <: Real, Ti}
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::Union{
+            SparseArrays.AbstractCompressedVector{T, Ti},
+            SubArray{
+                T, 1, <:SparseArrays.AbstractSparseMatrixCSC{T, Ti},
+                Tuple{Base.Slice{Base.OneTo{Int}}, Int}, false,
+            },
+            SubArray{
+                T, 1, <:SparseArrays.AbstractSparseVector{T, Ti},
+                Tuple{Base.Slice{Base.OneTo{Int}}}, false,
+            },
+        }, x2::Num
+    ) where {T <: Real, Ti}
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::SubArray{
+            T, 1, <:SparseArrays.AbstractSparseVector{T, Ti},
+            Tuple{Base.Slice{Base.OneTo{Int}}}, false,
+        }, x2::Num
+    ) where {T <: Real, Ti}
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::StepRangeLen{<:Real, <:Base.TwicePrecision}, x2::Num
+    )
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(x1::_StaticArray{S, T, N}, x2::Num) where {S <: Tuple, T <: Real, N}
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(\)(x1::Num, x2::_StaticArray{S, T, N}) where {S <: Tuple, T <: Real, N}
+    return SymbolicUtils.term(\, unwrap(x1), x2)
 end
 
 for T in (

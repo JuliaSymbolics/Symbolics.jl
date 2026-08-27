@@ -35,8 +35,8 @@ for D in (
     end
 end
 
-# IntervalSets dispatches `in` on this non-public abstract storage type, so the
-# exact intersection cannot be expressed through its public interval aliases.
+# IntervalSets dispatches on this non-public concrete family, so the public
+# `AbstractInterval` type is not specific enough to resolve the intersection.
 function Base.:∈(variable::DomainedVar, domain::IntervalSets.TypedEndpointsInterval)
     return VarDomainPairing(unwrap(variable), domain)
 end

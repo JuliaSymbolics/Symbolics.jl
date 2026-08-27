@@ -145,6 +145,11 @@ canonequal(a, b) = isequal(simplify(unwrap_const(unwrap(a))), simplify(unwrap_co
 )
 @test isequal((Differential(x) * identity)(t), Differential(x)(t))
 
+struct CallableIdentity end
+(::CallableIdentity)(x) = x
+
+@test isequal((Differential(x) * CallableIdentity())(t), Differential(x)(t))
+
 @test canonequal(
                  Symbolics.derivative(sin(cos(x)), x),
                  -sin(x) * cos(cos(x))

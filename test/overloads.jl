@@ -165,7 +165,9 @@ z2 = c + d * im
 @test isequal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
 
 @testset "Num dispatch intersections" begin
-    @test Num(1 + 2im) isa Num
+    @test Num(1 + 0im) isa Num
+    @test_throws InexactError Num(1 + 2im)
+    @test_throws InexactError convert(Num, 1 + 2im)
     @test (1 + 2im == a) isa Num
     @test (a == 1 + 2im) isa Num
     @test (Base.MathConstants.pi == a) isa Num
@@ -189,18 +191,34 @@ end
     @test bits / a isa BasicSymbolic
     @test a / bits isa BasicSymbolic
     @test sparse_vector / a isa BasicSymbolic
-    @test static_vector / a isa SArray{Tuple{2}, Num, 1, 2}
-    @test a \ static_vector isa SArray{Tuple{2}, Num, 1, 2}
+    @test static_vector / a isa BasicSymbolic
+    @test a \ static_vector isa BasicSymbolic
+    @test view([1.0 2.0; 3.0 4.0], :, :) / a isa BasicSymbolic
+    @test a \ view([1.0, 2.0], :) isa BasicSymbolic
+    @test sparse([1.0 0.0; 0.0 2.0]) / a isa BasicSymbolic
+    @test a / (1:3) isa BasicSymbolic
     @test (a in 1:3) isa BasicSymbolic
     @test (a in static_vector) isa BasicSymbolic
+    for values in (
+            view([1.0, 2.0], :), Diagonal([1.0, 2.0]),
+            Symmetric([1.0 0.0; 0.0 2.0]), adjoint([1.0, 2.0]),
+        )
+        @test (a in values) isa BasicSymbolic
+    end
 
     upper = UpperTriangular(Num[1 1; 0 1])
     upper_rhs = sparsevec([1, 2], Num[2, 1], 2)
     @test ldiv!(upper, upper_rhs) == Num[1, 1]
+    upper_rhs = sparsevec([1, 2], Num[2, 1], 2)
+    upper_output = Num[0, 0]
+    @test ldiv!(upper, upper_rhs, upper_output) == Num[1, 1]
 
     unit_lower = UnitLowerTriangular(Num[1 0; 1 1])
     lower_rhs = sparsevec([1, 2], Num[1, 2], 2)
     @test ldiv!(unit_lower, lower_rhs) == Num[1, 1]
+    lower_rhs = sparsevec([1, 2], Num[1, 2], 2)
+    lower_output = Num[0, 0]
+    @test ldiv!(unit_lower, lower_rhs, lower_output) == Num[1, 1]
 end
 
 @testset "Num scalar method intersections" begin

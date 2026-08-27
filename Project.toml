@@ -49,6 +49,8 @@ HypergeometricFunctions = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
 Latexify = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
 Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
+StarAlgebras = "0c0c59c1-dc5f-42e9-9a8b-b5dc384a6cd1"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
 SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
 
@@ -60,6 +62,8 @@ SymbolicsGroebnerExt = "Groebner"
 SymbolicsHypergeometricFunctionsExt = "HypergeometricFunctions"
 SymbolicsLatexifyExt = ["Latexify", "LaTeXStrings"]
 SymbolicsNemoExt = "Nemo"
+SymbolicsStarAlgebrasExt = "StarAlgebras"
+SymbolicsStaticArraysExt = "StaticArrays"
 SymbolicsSymPyExt = "SymPy"
 SymbolicsSymPyPythonCallExt = "SymPyPythonCall"
 
@@ -108,6 +112,8 @@ SciMLPublic = "1.2.0"
 Setfield = "1"
 SnoopCompile = "3.1"
 SpecialFunctions = "1.8, 2"
+StarAlgebras = "0.3"
+StaticArrays = "1"
 StaticArraysCore = "1.4.3"
 SymPy = "2.2"
 SymPyPythonCall = "0.5"
@@ -143,7 +149,9 @@ ReferenceTests = "324d217c-45ce-50fc-942e-d289b448e8cf"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 SciMLTesting = "09d9d899-5365-40a9-917a-5f67fddea283"
 SnoopCompile = "aa65fe97-06da-5843-b5b1-d5d13cad87d2"
+StarAlgebras = "0c0c59c1-dc5f-42e9-9a8b-b5dc384a6cd1"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SafeTestsets", "SciMLTesting", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "Random", "LambertW", "ComponentArrays", "Nemo", "DynamicQuantities", "D3Trees", "SnoopCompile", "Latexify", "LaTeXStrings", "HypergeometricFunctions"]
+test = ["Test", "SafeTestsets", "SciMLTesting", "Pkg", "PkgBenchmark", "PreallocationTools", "ForwardDiff", "Groebner", "BenchmarkTools", "ReferenceTests", "Random", "LambertW", "ComponentArrays", "Nemo", "DynamicQuantities", "D3Trees", "SnoopCompile", "Latexify", "LaTeXStrings", "HypergeometricFunctions", "StarAlgebras", "StaticArrays"]

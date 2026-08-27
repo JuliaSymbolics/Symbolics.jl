@@ -51,6 +51,12 @@ struct Arr{T,N} <: AbstractArray{T, N}
     end
 end
 
+Base.:~(lhs::Arr, rhs) = _equation(lhs, rhs)
+Base.:~(lhs, rhs::Arr) = _equation(lhs, rhs)
+Base.:~(lhs::Arr, rhs::Arr) = _equation(lhs, rhs)
+Base.:~(lhs::Arr, rhs::_SymbolicEquationOperand) = _equation(lhs, rhs)
+Base.:~(lhs::_SymbolicEquationOperand, rhs::Arr) = _equation(lhs, rhs)
+
 has_symwrapper(::Type{T}) where {T <: AbstractArray} = true
 has_symwrapper(::Type{T}) where {S <: BasicSymbolic, T <: AbstractArray{S}} = false
 wrapper_type(::Type{T}) where {S, N, T <: AbstractArray{S, N}} = Arr{maybewrap(S), N}
@@ -136,7 +142,7 @@ for (T1, T2) in [
     (BasicSymbolic{TreeReal}, Arr{<:Any, 2}),
 ]
     @eval function Base.:(\)(A::$T1, b::$T2)
-        unwrap(A) \ unwrap(b)
+        return wrap(unwrap(A) \ unwrap(b))
     end
 end
 
@@ -165,6 +171,12 @@ end
 function Base.:(\)(
         A::LinearAlgebra.Diagonal{T, StaticArraysCore.SVector{N, T}}, b::Arr{<:Any, 1}
     ) where {T, N}
+    return wrap(unwrap(A) \ unwrap(b))
+end
+function Base.:(\)(
+        A::LinearAlgebra.Diagonal{Num, StaticArraysCore.SVector{N, Num}},
+        b::Arr{Num, 1}
+    ) where {N}
     return wrap(unwrap(A) \ unwrap(b))
 end
 

@@ -87,6 +87,7 @@ for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose), N in (1, 2)
         x::$T{<:Any, <:AbstractVector}, y::Arr{<:Any, $N}
     ) = *(x, unwrap(y))
 end
+# The combined signature resolves the intersection with LinearAlgebra's union method.
 function *(
         x::Union{
             LinearAlgebra.Adjoint{<:Any, <:AbstractVector},
@@ -103,9 +104,6 @@ end
 function *(x::LinearAlgebra.Transpose{T, <:AbstractVector}, y::Arr{T, 1}) where {T <: Real}
     return *(x, unwrap(y))
 end
-# StaticArrays dispatches on this non-public abstract storage type, so exact
-# intersections with its methods cannot be expressed through the public aliases.
-const _StaticArray = StaticArraysCore.StaticArray
 function *(
         x::_StaticArray{Tuple{N, M}, T, 2}, y::Arr{S, 1}
     ) where {N, M, T, S}
@@ -155,6 +153,10 @@ for T1 in [Arr, AbstractArray], T2 in [Arr, AbstractArray]
     T1 == T2 == AbstractArray && continue
     @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Num(unwrap(x1) \ unwrap(x2))
     @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
+    if T1 == Arr
+        @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 1}) = Arr{Num, 1}(unwrap(x1) \ unwrap(x2))
+        @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
+    end
 
     @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
     @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
@@ -169,6 +171,7 @@ const _TriangularNum = Union{
 const _UnitTriangularNum = Union{
     LinearAlgebra.UnitLowerTriangular{Num}, LinearAlgebra.UnitUpperTriangular{Num},
 }
+# The vector cases are dispatch bridges that preserve the underlying dimension error.
 for T in (LinearAlgebra.Diagonal{Num}, _TriangularNum, _UnitTriangularNum), N in (1, 2)
     @eval Base.:(/)(A::Arr{Num, $N}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
 end
@@ -204,6 +207,15 @@ for Tf in (BasicSymbolic, Any)
         function Base.map(f::$Tf, x::Arr, xs::Arr...)
             return wrap(map(f, unwrap(x), unwrap.(xs)...))
         end
+        function Base.map(f::$Tf, x::Arr, y::BasicSymbolic, ys...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::Arr, y::AbstractArray, ys::AbstractArray...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::Arr, y::_StaticArray, ys::AbstractArray...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
         function Base.map(f::$Tf, x::AbstractArray, y::Arr, ys::Arr...)
             return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
         end
@@ -222,6 +234,12 @@ for Tf in (BasicSymbolic, Any), Tr in (BasicSymbolic, Any)
         end
         function Base.mapreduce(f::$Tf, op::$Tr, x::Arr, xs::Arr...; kw...)
             return wrap(mapreduce(f, op, unwrap(x), unwrap.(xs)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::Arr, y::AbstractArray,
+                ys::AbstractArray...; kw...
+            )
+            return wrap(mapreduce(f, op, unwrap(x), y, unwrap.(ys)...; kw...))
         end
         function Base.mapreduce(
                 f::$Tf, op::$Tr, x::AbstractArray, y::Arr, ys::Arr...; kw...

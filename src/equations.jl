@@ -76,15 +76,23 @@ julia> A .~ 3x
 (broadcast(~, A, 3x))[1:3,1:3]
 ```
 """
-function Base.:~(lhs, rhs)
+function _equation(lhs, rhs)
     if (isarraysymbolic(lhs) || isarraysymbolic(rhs)) && ((sl = size(lhs)) != (sr = size(rhs)))
         throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
     else
         Equation(lhs, rhs)
     end
 end
-for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
-    (T != :Complex && S != :Complex) && continue
+const _SymbolicEquationOperand = Union{Num, SymbolicT}
+Base.:~(lhs::_SymbolicEquationOperand, rhs) = _equation(lhs, rhs)
+Base.:~(lhs, rhs::_SymbolicEquationOperand) = _equation(lhs, rhs)
+Base.:~(lhs::_SymbolicEquationOperand, rhs::_SymbolicEquationOperand) = _equation(lhs, rhs)
+
+for T in (:Num, :(Complex{Num}), :Complex, :Number),
+        S in (:Num, :(Complex{Num}), :Complex, :Number)
+    (T in (:Complex, :(Complex{Num})) || S in (:Complex, :(Complex{Num}))) || continue
+    (T in (:Num, :(Complex{Num})) || S in (:Num, :(Complex{Num}))) || continue
+    (T == :Num && S == :Num) && continue
     @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
                                       ai = value(imag(a)), bi = value(imag(b))
         if ar isa Number && br isa Number && ai isa Number && bi isa Number
