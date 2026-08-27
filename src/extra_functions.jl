@@ -36,10 +36,17 @@ for T1 in [Real, Num, BasicSymbolic{VartypeT}], T2 in [AbstractArray, Arr, Basic
     if T1 != Num && T2 != Arr
         continue
     end
+    T1 == Num && T2 == AbstractArray && continue
     @eval function Base.in(x::$T1, y::$T2)
         return in(unwrap(x), unwrap(y))
     end
 end
+Base.in(x::Num, y::Array) = SymbolicUtils.term(in, unwrap(x), y)
+Base.in(x::Num, y::SparseArrays.AbstractSparseArray) = SymbolicUtils.term(in, unwrap(x), y)
+Base.in(x::Num, y::AbstractRange{Num}) = SymbolicUtils.term(in, unwrap(x), y)
+Base.in(x::Num, y::AbstractRange{<:Real}) = SymbolicUtils.term(in, unwrap(x), y)
+Base.in(x::Num, y::AbstractRange{<:Integer}) = SymbolicUtils.term(in, unwrap(x), y)
+Base.in(x::Num, y::_StaticArray) = SymbolicUtils.term(in, unwrap(x), y)
 for (T1, T2) in Iterators.product(Iterators.repeated([AbstractArray, Arr, BasicSymbolic{VartypeT}], 2)...)
     if T1 != Arr && T2 != Arr
         continue
@@ -54,8 +61,25 @@ for (T1, T2) in Iterators.product(Iterators.repeated([AbstractArray, Arr, BasicS
         issubset(unwrap(a), unwrap(b))
     end
 end
+Base.intersect(a::AbstractRange, b::Arr{<:Any, 1}) = intersect(a, unwrap(b))
+Base.intersect(a::Arr{<:Any, 1}, b::AbstractRange) = intersect(unwrap(a), b)
 
 LinearAlgebra.norm(x::Num, p::Real) = abs(x)
+
+for f in (
+        SpecialFunctions.besseli, SpecialFunctions.besselj,
+        SpecialFunctions.besselk, SpecialFunctions.bessely,
+    )
+    @eval begin
+        (f::$(typeof(f)))(a::Num, b::AbstractFloat) = invoke(f, Tuple{Num, Real}, a, b)
+        (f::$(typeof(f)))(a::Num, b::Complex) = invoke(f, Tuple{Num, Number}, a, b)
+    end
+end
+for T in (Signed, Float32, Float64)
+    @eval Base.copysign(a::$T, b::Num) = invoke(copysign, Tuple{Real, Num}, a, b)
+end
+SpecialFunctions.polygamma(a::Integer, b::Num) =
+    invoke(SpecialFunctions.polygamma, Tuple{Real, Num}, a, b)
 
 # `Base.sincospi(::Real)` explicitly throws a `MethodError` so that subtypes of
 # `Real` (like `Num`) have to opt in. Fall back to a tuple of `sinpi`/`cospi`,

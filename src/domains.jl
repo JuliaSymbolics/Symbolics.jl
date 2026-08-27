@@ -17,6 +17,35 @@ Base.:∈(variable::DomainedVar,domain::NTuple{2,Real}) = VarDomainPairing(varia
 # Multiple variables
 Base.:∈(variables::NTuple{N,DomainedVar},domain::Domain) where N = VarDomainPairing(unwrap.(variables),domain)
 
+for D in (
+        typeof(DomainSets.ℕ),
+        DomainSets.Integers,
+        DomainSets.RealNumbers,
+        DomainSets.Rationals,
+        DomainSets.ComplexNumbers,
+        DomainSets.HalfLine{<:Any, :open},
+        DomainSets.HalfLine{<:Any, :closed},
+        DomainSets.NegativeHalfLine{<:Any, :open},
+        DomainSets.NegativeHalfLine{<:Any, :closed},
+    )
+    @eval begin
+        Base.:∈(variable::DomainedVar, domain::$D) = VarDomainPairing(unwrap(variable), domain)
+        Base.:∈(variables::NTuple{N, DomainedVar}, domain::$D) where {N} =
+            VarDomainPairing(unwrap.(variables), domain)
+    end
+end
+
+# IntervalSets dispatches `in` on this non-public abstract storage type, so the
+# exact intersection cannot be expressed through its public interval aliases.
+function Base.:∈(variable::DomainedVar, domain::IntervalSets.TypedEndpointsInterval)
+    return VarDomainPairing(unwrap(variable), domain)
+end
+function Base.:∈(
+        variables::NTuple{N, DomainedVar}, domain::IntervalSets.TypedEndpointsInterval
+    ) where {N}
+    return VarDomainPairing(unwrap.(variables), domain)
+end
+
 """
     Symbolics.infimum(d::AbstractInterval)
 

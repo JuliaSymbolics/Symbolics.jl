@@ -125,8 +125,7 @@ end
 is_derivative(x) = iswrapped(x) && is_derivative(unwrap(x))
 
 Base.:*(D1::ComposedFunction, D2::Differential) = D1 ∘ D2
-Base.:*(D1::Differential, D2) = D1 ∘ D2
-Base.:*(D1::Differential, D2::Differential) = D1 ∘ D2
+Base.:*(D1::Differential, D2::Union{Function, ComposedFunction, Operator}) = D1 ∘ D2
 function Base.:^(D::Differential, n::Integer)
     iszero(n) && return identity
     return Differential(D.x, D.order * n)

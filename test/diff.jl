@@ -143,6 +143,7 @@ canonequal(a, b) = isequal(simplify(unwrap_const(unwrap(a))), simplify(unwrap_co
     (Differential(z) * Differential(y) * Differential(x))(t),
     Differential(z)(Differential(y)(Differential(x)(t)))
 )
+@test isequal((Differential(x) * identity)(t), Differential(x)(t))
 
 @test canonequal(
                  Symbolics.derivative(sin(cos(x)), x),

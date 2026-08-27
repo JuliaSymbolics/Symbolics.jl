@@ -580,6 +580,15 @@ end
     @test isequal(scalarize(mapreduce(+, +, [1.0, 2.0], x)), 3.0 + x[1] + x[2])
 end
 
+@testset "Arr map intersections" begin
+    @variables x[1:2] y[1:2]
+    static_values = SArray{Tuple{2}}((1.0, 2.0))
+
+    @test isequal(scalarize(map(+, x)), scalarize(x))
+    @test isequal(scalarize(map(+, x, y)), scalarize(x + y))
+    @test isequal(scalarize(map(+, static_values, x)), scalarize(static_values + x))
+end
+
 @testset "Structured matrix Arr division intersections" begin
     @variables x[1:2] X[1:2, 1:2]
     bidiagonal = LinearAlgebra.Bidiagonal([1.0, 2.0], [3.0], :U)
@@ -601,9 +610,28 @@ end
     for matrix in structured, rhs in (x, X)
         @test matrix \ rhs isa Arr
     end
+
+    num_bidiagonal = LinearAlgebra.Bidiagonal(Num[1, 2], Num[3], :U)
+    right_divisors = (
+        num_bidiagonal,
+        adjoint(num_bidiagonal),
+        transpose(num_bidiagonal),
+        LinearAlgebra.Diagonal(Num[1, 2]),
+        LinearAlgebra.UpperTriangular(Num[1 2; 0 3]),
+        LinearAlgebra.UnitLowerTriangular(Num[1 0; 2 1]),
+    )
+    for divisor in right_divisors
+        @test_throws ArgumentError x / divisor
+        @test X / divisor isa Arr
+    end
+    @test adjoint(Num[1, 2]) / X isa Arr
+    @test transpose(Num[1, 2]) / X isa Arr
 end
 
 @testset "`getindex(::Arr, ::Num)`" begin
     @variables t x(t)[1:3] i(t)::Int
     @test_nowarn x[i]
+
+    @variables X[1:2, 1:2, 1:2]
+    @test X[i, 1, i] isa SymbolicUtils.BasicSymbolic
 end

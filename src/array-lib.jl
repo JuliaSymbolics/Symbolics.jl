@@ -36,6 +36,9 @@ end
 function Base.getindex(x::Arr, i1, i2, idx::SymIdxT, idxs...)
     wrapper_fn_from_idxs(x, i1, i2, unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
 end
+function Base.getindex(x::Arr, i1::SymIdxT, i2, idx::SymIdxT, idxs...)
+    return wrapper_fn_from_idxs(x, unwrap(i1), i2, unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
+end
 function Base.getindex(x::Arr, i1, i2::SymIdxT, idx::SymIdxT, idxs...)
     wrapper_fn_from_idxs(x, i1, unwrap(i2), unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
 end
@@ -54,6 +57,7 @@ Broadcast.BroadcastStyle(::Type{T}) where {T <: Arr} = SymWrapBroadcast()
 
 Broadcast.BroadcastStyle(::SymWrapBroadcast,
     ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
+Broadcast.BroadcastStyle(::SymWrapBroadcast, ::Broadcast.Unknown) = SymWrapBroadcast()
 Broadcast.BroadcastStyle(::SymbolicUtils.SymBroadcast,
     ::SymWrapBroadcast) = Broadcast.Unknown()
 
@@ -99,8 +103,11 @@ end
 function *(x::LinearAlgebra.Transpose{T, <:AbstractVector}, y::Arr{T, 1}) where {T <: Real}
     return *(x, unwrap(y))
 end
+# StaticArrays dispatches on this non-public abstract storage type, so exact
+# intersections with its methods cannot be expressed through the public aliases.
+const _StaticArray = StaticArraysCore.StaticArray
 function *(
-        x::StaticArraysCore.StaticArray{Tuple{N, M}, T, 2}, y::Arr{S, 1}
+        x::_StaticArray{Tuple{N, M}, T, 2}, y::Arr{S, 1}
     ) where {N, M, T, S}
     return *(x, unwrap(y))
 end
@@ -140,6 +147,9 @@ end
 function +(x1::Arr, x2::Arr, args::AbstractArray...)
     return +(unwrap(x1), unwrap(x2), args...)
 end
+function +(x::Arr, y::_StaticArray)
+    return +(unwrap(x), y)
+end
 
 for T1 in [Arr, AbstractArray], T2 in [Arr, AbstractArray]
     T1 == T2 == AbstractArray && continue
@@ -153,6 +163,30 @@ end
 
 Base.:(/)(x1::Num, x2::Arr{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
 
+const _TriangularNum = Union{
+    LinearAlgebra.LowerTriangular{Num}, LinearAlgebra.UpperTriangular{Num},
+}
+const _UnitTriangularNum = Union{
+    LinearAlgebra.UnitLowerTriangular{Num}, LinearAlgebra.UnitUpperTriangular{Num},
+}
+for T in (LinearAlgebra.Diagonal{Num}, _TriangularNum, _UnitTriangularNum), N in (1, 2)
+    @eval Base.:(/)(A::Arr{Num, $N}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
+end
+for T in (
+        LinearAlgebra.Bidiagonal{Num},
+        LinearAlgebra.Adjoint{Num, <:LinearAlgebra.Bidiagonal},
+        LinearAlgebra.Transpose{Num, <:LinearAlgebra.Bidiagonal},
+    )
+    @eval Base.:(/)(A::Arr{Num, 2}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
+end
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose)
+    @eval function Base.:(/)(
+            A::$T{Num, <:AbstractVector}, B::Arr{Num, 2}
+        )
+        return Arr{Num, 2}(unwrap(A) / unwrap(B))
+    end
+end
+
 Base.exp(m::Matrix{Num}) = Arr{Num, 2}(exp(SConst(m)))
 Base.exp(m::Matrix{Complex{Num}}) = Arr{Complex{Num}, 2}(exp(SConst(m)))
 
@@ -162,7 +196,25 @@ end
 
 #################### MAP-REDUCE ################
 
-SymbolicUtils.@map_methods Arr unwrap wrap
+for Tf in (BasicSymbolic, Any)
+    @eval begin
+        function Base.map(f::$Tf, x::Arr)
+            return wrap(map(f, unwrap(x)))
+        end
+        function Base.map(f::$Tf, x::Arr, xs::Arr...)
+            return wrap(map(f, unwrap(x), unwrap.(xs)...))
+        end
+        function Base.map(f::$Tf, x::AbstractArray, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::_StaticArray, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::BasicSymbolic, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
+    end
+end
 for Tf in (BasicSymbolic, Any), Tr in (BasicSymbolic, Any)
     @eval begin
         function Base.mapreduce(f::$Tf, op::$Tr, x::Arr; kw...)

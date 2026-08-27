@@ -143,6 +143,8 @@ end
 const _HermitianOrSymmetric = Union{
     LinearAlgebra.Hermitian{T, S}, LinearAlgebra.Symmetric{T, S},
 } where {T, S}
+# SparseArrays dispatches `\` on this non-public abstract storage type, so exact
+# intersections with its methods cannot be expressed through `SparseMatrixCSC`.
 for T in (
             LinearAlgebra.Bidiagonal,
             LinearAlgebra.Diagonal,

@@ -1,3 +1,5 @@
+import SparseArrays
+
 @symbolic_wrap struct Num <: Real
     val::BasicSymbolic{VartypeT}
 
@@ -67,7 +69,7 @@ for (T1, T2) in Iterators.product([Num, Integer], [Num, Integer])
     end
 end
 
-for f in [\, ^]
+for f in [^]
     @eval function (::$(typeof(f)))(x1::AbstractArray{<:Real}, x2::Num)
         $f(x1, unwrap(x2))
     end
@@ -77,12 +79,28 @@ for f in [\, ^]
     end
 end
 
-function Base.:(/)(x1::AbstractArray{<:Real}, x2::Num)
-    /(unwrap(x1), unwrap(x2))
+function Base.:(\)(x1::AbstractArray{<:Real}, x2::Num)
+    return \(x1, unwrap(x2))
+end
+function Base.:(\)(x1::Num, x2::Array{<:Real})
+    return \(unwrap(x1), x2)
 end
 
-function Base.:(/)(x1::Num, x2::AbstractVector{<:Real})
-    /(unwrap(x1), unwrap(x2))
+function Base.:(/)(x1::Array{<:Real}, x2::Num)
+    return /(unwrap(x1), unwrap(x2))
+end
+
+function Base.:(/)(x1::Num, x2::Vector{<:Real})
+    return /(unwrap(x1), unwrap(x2))
+end
+function Base.:(/)(x1::BitArray, x2::Num)
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(x1::Num, x2::BitArray)
+    return SymbolicUtils.term(/, unwrap(x1), x2)
+end
+function Base.:(/)(x1::SparseArrays.SparseVector{<:Real}, x2::Num)
+    return SymbolicUtils.term(/, x1, unwrap(x2))
 end
 
 for T in (
@@ -100,10 +118,10 @@ for T in (
     )
     @eval begin
         function Base.:(/)(x1::$T{S}, x2::Num) where {S <: Real}
-            return invoke(/, Tuple{AbstractArray{<:Real}, Num}, x1, x2)
+            return SymbolicUtils.term(/, x1, unwrap(x2))
         end
         function Base.:(\)(x1::Num, x2::$T{S}) where {S <: Real}
-            return invoke(\, Tuple{Num, AbstractArray{<:Real}}, x1, x2)
+            return SymbolicUtils.term(\, unwrap(x1), x2)
         end
     end
 end
@@ -118,12 +136,12 @@ for T in (LinearAlgebra.LowerTriangular, LinearAlgebra.UpperTriangular)
         function Base.:(/)(
                 x1::$T{S, A}, x2::Num
             ) where {S <: Real, A <: _StridedMatrixStorage}
-            return invoke(/, Tuple{AbstractArray{<:Real}, Num}, x1, x2)
+            return SymbolicUtils.term(/, x1, unwrap(x2))
         end
         function Base.:(\)(
                 x1::Num, x2::$T{S, A}
             ) where {S <: Real, A <: _StridedMatrixStorage}
-            return invoke(\, Tuple{Num, AbstractArray{<:Real}}, x1, x2)
+            return SymbolicUtils.term(\, unwrap(x1), x2)
         end
     end
 end

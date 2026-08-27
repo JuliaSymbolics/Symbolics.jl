@@ -11,6 +11,7 @@ run_qa(
                 :Unknown, :acos, :acosh, :alignment, :asin, :atanh, :checknonsingular,
                 :cos, :diffrule, :diffrules, :eval, :getdoc, :log, :log10, :log1p,
                 :log2, :max, :min, :nocolor, :power_by_squaring, :register_error_hint,
+                :AbstractSparseMatrixCSC, :StaticArray, :TypedEndpointsInterval,
                 :sin, :sqrt, :striplines, :tan,
             ),
         ),

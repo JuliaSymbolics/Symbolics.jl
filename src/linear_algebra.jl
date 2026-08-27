@@ -147,7 +147,10 @@ function _solve(A::AbstractMatrix{Num}, b::Union{AbstractArray{Num}, AbstractArr
     do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
 
-LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
+LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{BasicSymbolic, RCNum}}, b::StridedVector{<:Union{BasicSymbolic, RCNum}}, x::AbstractVector{<:Union{BasicSymbolic, RCNum}} = b) = symsub!(A, b, x)
+LinearAlgebra.ldiv!(A::UpperTriangular{T, <:StridedMatrix{T}}, b::SparseVector{<:Union{BasicSymbolic, RCNum}}) where {T <: Union{BasicSymbolic, RCNum}} = symsub!(A, b, b)
+LinearAlgebra.ldiv!(A::UpperTriangular{T, <:Adjoint{T, <:StridedMatrix{T}}}, b::SparseVector{<:Union{BasicSymbolic, RCNum}}) where {T <: Union{BasicSymbolic, RCNum}} = symsub!(A, b, b)
+LinearAlgebra.ldiv!(A::UpperTriangular{T, <:Transpose{T, <:StridedMatrix{T}}}, b::SparseVector{<:Union{BasicSymbolic, RCNum}}) where {T <: Union{BasicSymbolic, RCNum}} = symsub!(A, b, b)
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
@@ -167,7 +170,10 @@ function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     x
 end
 
-LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
+LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{BasicSymbolic, RCNum}}, b::StridedVector{<:Union{BasicSymbolic, RCNum}}, x::AbstractVector{<:Union{BasicSymbolic, RCNum}} = b) = symsub!(A, b, x)
+LinearAlgebra.ldiv!(A::UnitLowerTriangular{T, <:StridedMatrix{T}}, b::SparseVector{<:Union{BasicSymbolic, RCNum}}) where {T <: Union{BasicSymbolic, RCNum}} = symsub!(A, b, b)
+LinearAlgebra.ldiv!(A::UnitLowerTriangular{T, <:Adjoint{T, <:StridedMatrix{T}}}, b::SparseVector{<:Union{BasicSymbolic, RCNum}}) where {T <: Union{BasicSymbolic, RCNum}} = symsub!(A, b, b)
+LinearAlgebra.ldiv!(A::UnitLowerTriangular{T, <:Transpose{T, <:StridedMatrix{T}}}, b::SparseVector{<:Union{BasicSymbolic, RCNum}}) where {T <: Union{BasicSymbolic, RCNum}} = symsub!(A, b, b)
 function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = b)
     Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)

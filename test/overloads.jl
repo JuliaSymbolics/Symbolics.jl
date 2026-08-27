@@ -1,7 +1,9 @@
 using Symbolics: Sym, FnType, Term, value, scalarize
 using Symbolics
 using LinearAlgebra
-using SparseArrays: sparse
+using SparseArrays: sparse, sparsevec
+using StaticArraysCore: SArray
+import SpecialFunctions
 using Test
 using SymbolicUtils: BasicSymbolic, evaluate
 
@@ -177,6 +179,42 @@ z2 = c + d * im
         @test (SymbolicUtils.:<ₑ(a, value)) isa Bool
         @test (SymbolicUtils.:<ₑ(value, a)) isa Bool
     end
+end
+
+@testset "Num package-array intersections" begin
+    bits = BitVector([true, false])
+    sparse_vector = sparsevec([1], [1.0], 2)
+    static_vector = SArray{Tuple{2}}((1.0, 2.0))
+
+    @test bits / a isa BasicSymbolic
+    @test a / bits isa BasicSymbolic
+    @test sparse_vector / a isa BasicSymbolic
+    @test static_vector / a isa SArray{Tuple{2}, Num, 1, 2}
+    @test a \ static_vector isa SArray{Tuple{2}, Num, 1, 2}
+    @test (a in 1:3) isa BasicSymbolic
+    @test (a in static_vector) isa BasicSymbolic
+
+    upper = UpperTriangular(Num[1 1; 0 1])
+    upper_rhs = sparsevec([1, 2], Num[2, 1], 2)
+    @test ldiv!(upper, upper_rhs) == Num[1, 1]
+
+    unit_lower = UnitLowerTriangular(Num[1 0; 1 1])
+    lower_rhs = sparsevec([1, 2], Num[1, 2], 2)
+    @test ldiv!(unit_lower, lower_rhs) == Num[1, 1]
+end
+
+@testset "Num scalar method intersections" begin
+    for f in (
+            SpecialFunctions.besseli, SpecialFunctions.besselj,
+            SpecialFunctions.besselk, SpecialFunctions.bessely,
+        )
+        @test f(a, 1.0) isa Num
+        @test f(a, 1.0im) isa Num
+    end
+    @test copysign(1, a) isa Num
+    @test copysign(1.0f0, a) isa Num
+    @test copysign(1.0, a) isa Num
+    @test SpecialFunctions.polygamma(1, a) isa Num
 end
 
 @testset "Num structured-array intersections" begin
