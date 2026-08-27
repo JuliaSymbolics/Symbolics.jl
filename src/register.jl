@@ -28,7 +28,7 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
     ret_type = isnothing(ret_type) ? Real : ret_type
     N = length(args′)
     symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
-    fexpr = :(Symbolics.@wrapped function $f($(args′...))
+    inner = :(function $f($(args′...))
         args = ($(argnames...),)
         if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
             args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
@@ -36,7 +36,8 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
         else
             $f($(argnames...))
         end
-    end $wrap_arrays)
+    end)
+    fexpr = macroexpand(@__MODULE__, :(@wrapped $inner $wrap_arrays))
 
     if define_promotion
         type_args = [:($name::$Type) for name in argnames]
@@ -145,25 +146,24 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     N = length(args′)
     symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
     assigns = macroexpand(@__MODULE__, :(Base.Cartesian.@nexprs $N i -> ($argnames[i] = args[i])))
-    fexpr = quote
-        Symbolics.@wrapped function $f($(args′...))
-            args = ($(argnames...),)
-            if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
-                args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
-                $assigns
-                $shape_expr
-                eltype = $eltype ∘ $symtype
-                type = if nd == -1
-                    $container_type{$eltype_expr}
-                else
-                    $container_type{$eltype_expr, nd}
-                end
-                $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type, shape = sh)
+    inner = :(function $f($(args′...))
+        args = ($(argnames...),)
+        if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
+            args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
+            $assigns
+            $shape_expr
+            eltype = $eltype ∘ $symtype
+            type = if nd == -1
+                $container_type{$eltype_expr}
             else
-                $f($(argnames...))
+                $container_type{$eltype_expr, nd}
             end
-        end $wrap_arrays
-    end |> esc
+            $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type, shape = sh)
+        else
+            $f($(argnames...))
+        end
+    end)
+    fexpr = macroexpand(@__MODULE__, :(@wrapped $inner $wrap_arrays))
 
     if define_promotion
         is_callable_struct = f isa Expr && f.head == :(::)
