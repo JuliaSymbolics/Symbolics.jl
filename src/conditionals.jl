@@ -13,8 +13,7 @@ for op in (:ifelse_eager, :ifelse_branching)
             unwrap(c), unwrap(x), unwrap(y)))
         $op(c::Num, x, y::Arr{T, N}) where {T, N} = Arr{T, N}($op(
             unwrap(c), unwrap(x), unwrap(y)))
-        $op(c::Num, x::Arr{T, N}, y::Arr{T, N}) where {T, N} = Arr{T, N}($op(
-            unwrap(c), unwrap(x), unwrap(y)))
+        $op(c::Num, x::Arr, y::Arr) = Arr($op(unwrap(c), unwrap(x), unwrap(y)))
         # Disambiguate mixed scalar/array branches (intersections of the methods above).
         $op(c::Num, x::Num, y::Arr{T, N}) where {T, N} = Arr{T, N}($op(
             unwrap(c), unwrap(x), unwrap(y)))
