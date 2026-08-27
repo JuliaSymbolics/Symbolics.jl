@@ -70,53 +70,66 @@ end
 
 #################### POLYADIC ################
 
-const PolyadicT = Union{AbstractArray{<:Number}, Number}
-
-function *(x::Arr, args::PolyadicT...)
-    return *(unwrap(x), args...)
+*(x::Arr, y::Number) = *(unwrap(x), unwrap(y))
+*(x::Number, y::Arr) = *(unwrap(x), unwrap(y))
+*(x::Arr, y::BasicSymbolic{VartypeT}) = *(unwrap(x), y)
+*(x::Arr, y::Arr) = *(unwrap(x), unwrap(y))
+*(x::Arr, y::AbstractMatrix) = *(unwrap(x), y)
+*(x::Arr, y::AbstractVector) = *(unwrap(x), y)
+*(x::AbstractMatrix, y::Arr) = *(x, unwrap(y))
+*(x::LinearAlgebra.Diagonal, y::Arr) = *(x, unwrap(y))
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose), N in (1, 2)
+    @eval *(
+        x::$T{<:Any, <:AbstractVector}, y::Arr{<:Any, $N}
+    ) = *(x, unwrap(y))
 end
-function *(x::Arr, y::Number, args::PolyadicT...)
-    return *(unwrap(x), unwrap(y), args...)
+function *(
+        x::Union{
+            LinearAlgebra.Adjoint{<:Any, <:AbstractVector},
+            LinearAlgebra.Transpose{<:Any, <:AbstractVector},
+        }, y::Arr{<:Any, 1}
+    )
+    return *(x, unwrap(y))
 end
-function *(a::PolyadicT, b::Arr, bs::PolyadicT...)
-    return *(a, unwrap(b), bs...)
+function *(x::LinearAlgebra.Adjoint{T, <:AbstractVector}, y::Arr{S, 1}) where {
+        T <: Number, S <: Number,
+    }
+    return *(x, unwrap(y))
 end
-function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, bs::PolyadicT...) where {T <: Number}
-    return *(a, unwrap(b), bs...)
+function *(x::LinearAlgebra.Transpose{T, <:AbstractVector}, y::Arr{T, 1}) where {T <: Real}
+    return *(x, unwrap(y))
 end
-function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs::PolyadicT...) where {T <: Number}
-    return *(a, unwrap(b), unwrap(c), bs...)
+function *(
+        x::StaticArraysCore.StaticArray{Tuple{N, M}, T, 2}, y::Arr{S, 1}
+    ) where {N, M, T, S}
+    return *(x, unwrap(y))
 end
-function *(a::LinearAlgebra.Transpose{T, <: AbstractVector}, b::Arr, bs::PolyadicT...) where {T <: Real}
-    return *(a, unwrap(b), bs...)
+function *(
+        x::Arr, y::Union{
+            LinearAlgebra.Adjoint{<:Any, <:AbstractVector},
+            LinearAlgebra.Transpose{<:Any, <:AbstractVector},
+        }
+    )
+    return *(unwrap(x), y)
 end
-function *(a::LinearAlgebra.Transpose{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs::PolyadicT...) where {T <: Real}
-    return *(a, unwrap(b), unwrap(c), bs...)
+function *(
+        x::LinearAlgebra.Adjoint{<:Number, <:AbstractVector}, y::Arr,
+        z::AbstractVector{<:Number}
+    )
+    return *(x, unwrap(y), unwrap(z))
 end
-function *(a::Number, b::Arr, bs::PolyadicT...)
-    return *(unwrap(a), unwrap(b), bs...)
+function *(
+        x::LinearAlgebra.Transpose{<:Real, <:AbstractVector}, y::Arr,
+        z::AbstractVector{<:Real}
+    )
+    return *(x, unwrap(y), unwrap(z))
 end
-function *(x1::Arr, x2::BasicSymbolic{VartypeT}, args::PolyadicT...)
-    return *(unwrap(x1), x2, args...)
+function *(
+        x::Union{Real, Complex}, y::Arr{T, 2}, z::Arr{S, 1}
+    ) where {T <: Union{Real, Complex}, S <: Union{Real, Complex}}
+    return *(unwrap(x), unwrap(y), unwrap(z))
 end
-function *(x1::Arr, x2::Arr, args::PolyadicT...)
-    return *(unwrap(x1), unwrap(x2), args...)
-end
-function *(x1::Arr, x2::AbstractMatrix, args::PolyadicT...)
-    return *(unwrap(x1), x2, args...)
-end
-function *(x1::Arr, x2::AbstractVector, args::PolyadicT...)
-    return *(unwrap(x1), x2, args...)
-end
-function *(x1::AbstractMatrix, x2::Arr, args::PolyadicT...)
-    return *(x1, unwrap(x2), args...)
-end
-function *(x1::Arr, x2::Arr, x3::Arr, args::PolyadicT...)
-    return *(unwrap(x1), unwrap(x2), unwrap(x3), args...)
-end
-function *(x1::Arr, x2::Arr, x3::Arr, x4::Arr, args::PolyadicT...)
-    return *(unwrap(x1), unwrap(x2), unwrap(x3), unwrap(x4), args...)
-end
+*(x::Arr, y::Arr, z::Number) = *(unwrap(x), unwrap(y), unwrap(z))
 
 function +(x::Arr, args::AbstractArray...)
     return +(unwrap(x), args...)

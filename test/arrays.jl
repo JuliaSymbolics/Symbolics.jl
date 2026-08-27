@@ -4,7 +4,8 @@ using Symbolics: symtype, shape, wrap, unwrap, Arr, jacobian, @variables, value,
 using Base: Slice
 using SymbolicUtils: Sym, term, operation, search_variables
 import SymbolicUtils.Code: toexpr
-import LinearAlgebra: dot, Adjoint, cross, diagm, eigmax, eigmin
+import LinearAlgebra: dot, Adjoint, cross, Diagonal, diagm, eigmax, eigmin
+using StaticArraysCore: SArray
 import ..limit2
 
 struct TestMetaT end
@@ -553,6 +554,20 @@ end
     @test isequal(unwrap(t), transpose(unwrap(x)))
 
     @test_nowarn t * x
+end
+
+@testset "Arr multiplication intersections" begin
+    @variables x[1:2] A[1:2, 1:2]
+    values = [1.0, 2.0]
+    static_matrix = SArray{Tuple{2, 2}, Float64, 2, 4}((1.0, 0.0, 0.0, 1.0))
+
+    @test Diagonal(values) * x isa SymbolicUtils.BasicSymbolic
+    @test transpose(values) * x isa SymbolicUtils.BasicSymbolic
+    @test adjoint(values) * x isa SymbolicUtils.BasicSymbolic
+    @test static_matrix * x isa SymbolicUtils.BasicSymbolic
+    @test x * transpose(values) isa SymbolicUtils.BasicSymbolic
+    @test 2 * A * x isa SymbolicUtils.BasicSymbolic
+    @test A * x * 2 isa SymbolicUtils.BasicSymbolic
 end
 
 @testset "`getindex(::Arr, ::Num)`" begin
