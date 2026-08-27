@@ -145,8 +145,6 @@ for T1 in [Arr, AbstractArray], T2 in [Arr, AbstractArray]
     T1 == T2 == AbstractArray && continue
     @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Num(unwrap(x1) \ unwrap(x2))
     @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
-    @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 1}) = Arr{Num, 1}(unwrap(x1) \ unwrap(x2))
-    @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
 
     @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
     @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))

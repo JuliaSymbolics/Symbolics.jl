@@ -4,8 +4,10 @@ using Symbolics: symtype, shape, wrap, unwrap, Arr, jacobian, @variables, value,
 using Base: Slice
 using SymbolicUtils: Sym, term, operation, search_variables
 import SymbolicUtils.Code: toexpr
+import LinearAlgebra
 import LinearAlgebra: dot, Adjoint, cross, Diagonal, diagm, eigmax, eigmin
 using StaticArraysCore: SArray
+using SparseArrays: sparse
 import ..limit2
 
 struct TestMetaT end
@@ -576,6 +578,29 @@ end
     @test isequal(scalarize(mapreduce(+, +, x)), x[1] + x[2])
     @test isequal(scalarize(mapreduce(+, +, x, y)), x[1] + x[2] + y[1] + y[2])
     @test isequal(scalarize(mapreduce(+, +, [1.0, 2.0], x)), 3.0 + x[1] + x[2])
+end
+
+@testset "Structured matrix Arr division intersections" begin
+    @variables x[1:2] X[1:2, 1:2]
+    bidiagonal = LinearAlgebra.Bidiagonal([1.0, 2.0], [3.0], :U)
+    sparse_matrix = sparse([1.0 0.0; 0.0 2.0])
+    structured = (
+        bidiagonal,
+        adjoint(bidiagonal),
+        LinearAlgebra.Diagonal([1.0, 2.0]),
+        LinearAlgebra.Diagonal(SArray{Tuple{2}}((1.0, 2.0))),
+        LinearAlgebra.SymTridiagonal([1.0, 2.0], [3.0]),
+        LinearAlgebra.Symmetric([1.0 2.0; 2.0 3.0]),
+        LinearAlgebra.Hermitian([1.0 2.0; 2.0 3.0]),
+        LinearAlgebra.UpperTriangular([1.0 2.0; 0.0 3.0]),
+        LinearAlgebra.UnitLowerTriangular([1.0 0.0; 2.0 1.0]),
+        sparse_matrix,
+        transpose(sparse_matrix),
+    )
+
+    for matrix in structured, rhs in (x, X)
+        @test matrix \ rhs isa Arr
+    end
 end
 
 @testset "`getindex(::Arr, ::Num)`" begin

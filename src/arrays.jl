@@ -1,4 +1,5 @@
 import StaticArraysCore
+import SparseArrays
 using StaticArraysCore: SArray
 import Base: eltype, length, ndims, size, axes, eachindex
 
@@ -137,6 +138,32 @@ for (T1, T2) in [
     @eval function Base.:(\)(A::$T1, b::$T2)
         unwrap(A) \ unwrap(b)
     end
+end
+
+const _HermitianOrSymmetric = Union{
+    LinearAlgebra.Hermitian{T, S}, LinearAlgebra.Symmetric{T, S},
+} where {T, S}
+for T in (
+            LinearAlgebra.Bidiagonal,
+            LinearAlgebra.Diagonal,
+            LinearAlgebra.SymTridiagonal,
+            _HermitianOrSymmetric,
+            Union{LinearAlgebra.LowerTriangular, LinearAlgebra.UpperTriangular},
+            Union{LinearAlgebra.UnitLowerTriangular, LinearAlgebra.UnitUpperTriangular},
+            Union{
+                LinearAlgebra.Adjoint{<:Any, <:LinearAlgebra.Bidiagonal},
+                LinearAlgebra.Transpose{<:Any, <:LinearAlgebra.Bidiagonal},
+            },
+            SparseArrays.AbstractSparseMatrixCSC,
+            LinearAlgebra.Adjoint{<:Any, <:SparseArrays.AbstractSparseMatrixCSC},
+            LinearAlgebra.Transpose{<:Any, <:SparseArrays.AbstractSparseMatrixCSC},
+        ), N in (1, 2)
+    @eval Base.:(\)(A::$T, b::Arr{<:Any, $N}) = wrap(unwrap(A) \ unwrap(b))
+end
+function Base.:(\)(
+        A::LinearAlgebra.Diagonal{T, StaticArraysCore.SVector{N, T}}, b::Arr{<:Any, 1}
+    ) where {T, N}
+    return wrap(unwrap(A) \ unwrap(b))
 end
 
 Base.ifelse(x::Num, y::Arr{T, N}, z) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
