@@ -346,6 +346,7 @@ const _fail = Dict()
 getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Num}) = ScalarSymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{Complex{Symbolics.Num}}) = ScalarSymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr{T, N}}) where {T, N} = ArraySymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr{T}}) where {T} = ArraySymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr}) = ArraySymbolic()
