@@ -85,6 +85,66 @@ function Base.:(/)(x1::Num, x2::AbstractVector{<:Real})
     /(unwrap(x1), unwrap(x2))
 end
 
+for T in (
+        LinearAlgebra.Bidiagonal,
+        LinearAlgebra.Diagonal,
+        LinearAlgebra.Hermitian,
+        LinearAlgebra.LowerTriangular,
+        LinearAlgebra.Symmetric,
+        LinearAlgebra.SymTridiagonal,
+        LinearAlgebra.Tridiagonal,
+        LinearAlgebra.UnitLowerTriangular,
+        LinearAlgebra.UnitUpperTriangular,
+        LinearAlgebra.UpperHessenberg,
+        LinearAlgebra.UpperTriangular,
+    )
+    @eval begin
+        function Base.:(/)(x1::$T{S}, x2::Num) where {S <: Real}
+            return invoke(/, Tuple{AbstractArray{<:Real}, Num}, x1, x2)
+        end
+        function Base.:(\)(x1::Num, x2::$T{S}) where {S <: Real}
+            return invoke(\, Tuple{Num, AbstractArray{<:Real}}, x1, x2)
+        end
+    end
+end
+
+const _StridedMatrixStorage = Union{
+    Base.StridedMatrix,
+    LinearAlgebra.Adjoint{<:Any, <:Base.StridedMatrix},
+    LinearAlgebra.Transpose{<:Any, <:Base.StridedMatrix},
+}
+for T in (LinearAlgebra.LowerTriangular, LinearAlgebra.UpperTriangular)
+    @eval begin
+        function Base.:(/)(
+                x1::$T{S, A}, x2::Num
+            ) where {S <: Real, A <: _StridedMatrixStorage}
+            return invoke(/, Tuple{AbstractArray{<:Real}, Num}, x1, x2)
+        end
+        function Base.:(\)(
+                x1::Num, x2::$T{S, A}
+            ) where {S <: Real, A <: _StridedMatrixStorage}
+            return invoke(\, Tuple{Num, AbstractArray{<:Real}}, x1, x2)
+        end
+    end
+end
+
+function Base.:(^)(x1::AbstractMatrix{T}, x2::Num) where {T <: Real}
+    return invoke(^, Tuple{AbstractArray{<:Real}, Num}, x1, x2)
+end
+function Base.:(^)(x1::Num, x2::AbstractMatrix{<:Real})
+    return invoke(^, Tuple{Num, AbstractArray{<:Real}}, x1, x2)
+end
+for T in (
+        LinearAlgebra.Diagonal,
+        LinearAlgebra.Hermitian,
+        LinearAlgebra.Symmetric,
+        LinearAlgebra.SymTridiagonal,
+    )
+    @eval function Base.:(^)(x1::$T{S}, x2::Num) where {S <: Real}
+        return SymbolicUtils.term(^, x1, unwrap(x2))
+    end
+end
+
 Base.conj(x::Num) = x
 Base.transpose(x::Num) = x
 

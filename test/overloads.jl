@@ -3,7 +3,7 @@ using Symbolics
 using LinearAlgebra
 using SparseArrays: sparse
 using Test
-using SymbolicUtils: evaluate
+using SymbolicUtils: BasicSymbolic, evaluate
 
 a, b, c = :runtime_symbol_value, :value_b, :value_c
 vars = @variables t $a $b(t) $c(t)[1:3]
@@ -177,6 +177,30 @@ z2 = c + d * im
         @test (SymbolicUtils.:<ₑ(a, value)) isa Bool
         @test (SymbolicUtils.:<ₑ(value, a)) isa Bool
     end
+end
+
+@testset "Num structured-array intersections" begin
+    structured = (
+        Bidiagonal([1.0, 2.0], [3.0], :U),
+        Diagonal([1.0, 2.0]),
+        Tridiagonal([1.0], [2.0, 3.0], [4.0]),
+        SymTridiagonal([1.0, 2.0], [3.0]),
+        Symmetric([1.0 2.0; 2.0 3.0]),
+        Hermitian([1.0 2.0; 2.0 3.0]),
+        UpperHessenberg([1.0 2.0; 3.0 4.0]),
+        UpperTriangular([1.0 2.0; 0.0 3.0]),
+        LowerTriangular([1.0 0.0; 2.0 3.0]),
+        UnitUpperTriangular([1.0 2.0; 0.0 1.0]),
+        UnitLowerTriangular([1.0 0.0; 2.0 1.0]),
+    )
+    for matrix in structured
+        @test (matrix / a) isa BasicSymbolic
+        @test (a \ matrix) isa BasicSymbolic
+    end
+    for matrix in (structured[2], structured[4], structured[5], structured[6])
+        @test (matrix^a) isa BasicSymbolic
+    end
+    @test (a^[1.0 0.0; 0.0 1.0]) isa BasicSymbolic
 end
 
 @test isequal((0 ~ a+0*im), 0 ~ a)
