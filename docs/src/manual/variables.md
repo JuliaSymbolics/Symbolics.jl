@@ -24,7 +24,7 @@ Instead, one needs to use `SymbolicUtils.iscall` to check if `arguments` and
 Symbolics.variable
 Symbolics.variables
 Equation
-Base.:~(::Num, ::Num)
+Base.:~
 Symbolics.Inequality
 Symbolics.:≲
 Symbolics.:≳

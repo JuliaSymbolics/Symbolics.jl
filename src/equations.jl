@@ -48,11 +48,19 @@ end
 lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
 
+function _equation(lhs, rhs)
+    return if (isarraysymbolic(lhs) || isarraysymbolic(rhs)) && ((sl = size(lhs)) != (sr = size(rhs)))
+        throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
+    else
+        Equation(lhs, rhs)
+    end
+end
+const _SymbolicEquationOperand = Union{Num, SymbolicT}
+
 """
 $(TYPEDSIGNATURES)
 
-Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
-`Num` and a `Number`.
+Create an [`Equation`](@ref) when at least one operand is symbolic.
 
 # Examples
 
@@ -76,14 +84,6 @@ julia> A .~ 3x
 (broadcast(~, A, 3x))[1:3,1:3]
 ```
 """
-function _equation(lhs, rhs)
-    if (isarraysymbolic(lhs) || isarraysymbolic(rhs)) && ((sl = size(lhs)) != (sr = size(rhs)))
-        throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
-    else
-        Equation(lhs, rhs)
-    end
-end
-const _SymbolicEquationOperand = Union{Num, SymbolicT}
 Base.:~(lhs::_SymbolicEquationOperand, rhs) = _equation(lhs, rhs)
 Base.:~(lhs, rhs::_SymbolicEquationOperand) = _equation(lhs, rhs)
 Base.:~(lhs::_SymbolicEquationOperand, rhs::_SymbolicEquationOperand) = _equation(lhs, rhs)
