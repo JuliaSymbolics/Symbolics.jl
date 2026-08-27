@@ -32,6 +32,7 @@ Num
 const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
+Num(x::Complex) = invoke(Num, Tuple{Number}, x)
 (n::Num)(args...) = Num(value(n)(map(value, args)...))
 # Fixes an inference issue with https://github.com/JuliaApproximation/DomainSets.jl/blob/b68ee034ebcd2e3fc10dd334792cee17a8d5c633/src/domains/point.jl#L13
 # causing `Num(::Any)` to infer as `::Any`
@@ -198,6 +199,7 @@ function Base.:/(x::Complex{Num}, y::Complex{Num})
     Complex((a*c + b*d)/den, (b*c - a*d)/den)
 end
 Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
+Base.:^(z::Complex{Num}, n::Bool) = invoke(^, Tuple{Complex{Num}, Integer}, z, n)
 Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
 function Base.show(io::IO, z::Complex{<:Num})
@@ -235,6 +237,12 @@ Base.promote_rule(::Type{BigFloat}, ::Type{Num}) = Num
 <ₑ(s::Num, x) = value(s) <ₑ value(x)
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
+for T in (Real, Complex, BasicSymbolic)
+    @eval begin
+        <ₑ(s::Num, x::$T) = value(s) <ₑ value(x)
+        <ₑ(s::$T, x::Num) = value(s) <ₑ value(x)
+    end
+end
 
 function Num(q::AbstractIrrational)
     args = SymbolicUtils.ArgsT{VartypeT}((q,))
@@ -284,6 +292,15 @@ end
     vb = value(b)
     isequal(va, vb)::Bool
 end (AbstractFloat, Number, BasicSymbolic)
+
+for f in (:(==), :isequal)
+    @eval begin
+        Base.$f(a::Complex, b::Num) = invoke(Base.$f, Tuple{Number, Num}, a, b)
+        Base.$f(a::Num, b::Complex) = invoke(Base.$f, Tuple{Num, Number}, a, b)
+    end
+end
+Base.:(==)(a::AbstractIrrational, b::Num) = invoke(==, Tuple{Number, Num}, a, b)
+Base.:(==)(a::Num, b::AbstractIrrational) = invoke(==, Tuple{Num, Number}, a, b)
 
 Base.to_index(x::Num) = Base.to_index(value(x))
 

@@ -162,6 +162,23 @@ z2 = c + d * im
 @test isequal(2 - z1, Complex(2 - a, -b))
 @test isequal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
 
+@testset "Num dispatch intersections" begin
+    @test Num(1 + 2im) isa Num
+    @test (1 + 2im == a) isa Num
+    @test (a == 1 + 2im) isa Num
+    @test (Base.MathConstants.pi == a) isa Num
+    @test (a == Base.MathConstants.pi) isa Num
+    @test !isequal(1 + 2im, a)
+    @test !isequal(a, 1 + 2im)
+    @test isequal((Complex(a, b)^false), Complex(1, 0))
+    @test promote_type(Complex{Float64}, Num) === Complex{Num}
+
+    for value in (1.0, 1 + 2im, unwrap(a))
+        @test (SymbolicUtils.:<ₑ(a, value)) isa Bool
+        @test (SymbolicUtils.:<ₑ(value, a)) isa Bool
+    end
+end
+
 @test isequal((0 ~ a+0*im), 0 ~ a)
 @test isequal((im ~ b+c*im), [0 ~ b; 1 ~ c])
 @test isequal((0 ~ z1), [0 ~ a, 0 ~ b])
