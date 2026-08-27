@@ -1,7 +1,24 @@
 using SciMLTesting
 
+symbolic_utils = Symbolics.SymbolicUtils
+basic_symbolic = symbolic_utils.BasicSymbolic{symbolic_utils.SymReal}
+basic_symbolic_wrapper = getfield(parentmodule(basic_symbolic), nameof(basic_symbolic))
+
 run_qa(
     Symbolics;
+    aqua_kwargs = (;
+        # Shared public interfaces are jointly owned; binary `~` constructs equations.
+        piracies = (;
+            treat_as_own = (
+                basic_symbolic_wrapper,
+                symbolic_utils.arguments,
+                symbolic_utils.Code.cse_inside_expr,
+                symbolic_utils.promote_shape,
+                symbolic_utils.promote_symtype,
+                (~),
+            ),
+        ),
+    ),
     ei_kwargs = (;
         # These are upstream names used for compatibility with Base, LinearAlgebra,
         # DiffRules, MacroTools, and NaNMath; those owners do not declare them public.
