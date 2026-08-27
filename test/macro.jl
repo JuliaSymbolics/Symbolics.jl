@@ -179,6 +179,14 @@ let
     @test Symbolics.getname(Symbolics.rename(y[2], :u)) === :u
 end
 
+@testset "renamed metadata" begin
+    metadata = Base.ImmutableDict{DataType, Any}(
+        Symbolics.VariableSource, (:variables, :x),
+    )
+    renamed = Symbolics.renamed_metadata(metadata, :y)
+    @test renamed[Symbolics.VariableSource] === (:variables, :y)
+end
+
 let
     s = :y
     x = (1:2,1:3)

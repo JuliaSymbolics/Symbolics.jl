@@ -25,6 +25,10 @@ Symbolics.variable
 Symbolics.variables
 Equation
 Base.:~(::Num, ::Num)
+Symbolics.Inequality
+Symbolics.:≲
+Symbolics.:≳
+Symbolics.value
 ```
 
 ## A note about functions restricted to `Number`s
@@ -77,19 +81,28 @@ Control flow can be expressed in Symbolics.jl in the following way:
 Base.ifelse(::Num, ::Any, ::Any)
 ```
 
+`ifelse` is the default conditional. Two further variants pin how the conditional is lowered
+by [`build_function`](@ref): `ifelse_eager` always evaluates both branches, while
+`ifelse_branching` emits an `if`/`else` so the untaken branch is never evaluated (useful when
+a branch is only valid when its condition holds). They build the same kind of symbolic
+expression as `ifelse` and differ only at code generation.
+
+These functions are provided by SymbolicUtils and reexported by Symbolics. Their
+contracts and examples are documented in the [SymbolicUtils conditional API]
+(https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.ifelse_eager).
+
 ## Inspection Functions
 
-```@docs
-SymbolicUtils.iscall
-SymbolicUtils.operation
-SymbolicUtils.arguments
-```
+The expression-tree interface is owned by TermInterface. See its documentation for
+the contracts of [`iscall`](https://github.com/JuliaSymbolics/TermInterface.jl),
+[`operation`](https://github.com/JuliaSymbolics/TermInterface.jl), and
+[`arguments`](https://github.com/JuliaSymbolics/TermInterface.jl).
 
 ## Variable Utilities
 
 ```@docs
 Symbolics.get_variables!
-Symbolics.getparent
+Symbolics.map_subscripts
 ```
 
 ## Variable Parsing
@@ -98,4 +111,5 @@ For implementing custom variable-creating macros:
 
 ```@docs
 Symbolics._parse_vars
+Symbolics.parse_vars
 ```

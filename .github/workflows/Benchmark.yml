@@ -13,7 +13,7 @@ jobs:
   benchmark:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - run: |
@@ -23,3 +23,4 @@ jobs:
           julia-version: '1'
           rev: '${{ github.event.pull_request.base.sha }},${{ github.sha }}'
           bench-on: '${{ github.sha }}'
+          job-summary: '${{ github.event.pull_request.head.repo.fork }}'

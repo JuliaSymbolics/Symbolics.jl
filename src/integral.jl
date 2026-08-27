@@ -3,7 +3,7 @@
     Integral(domain)
 
 Defines an Integral operator I(ex) which represents the integral of `I` of the
-expression `ex` over the `domain`. Note that the `domain` must be a 
+expression `ex` over the `domain`. Note that the `domain` must be a
 `Symbolics.VarDomainPairing` where the chosen variable is the variable being
 integrated over, i.e. `Integral(x in domain)` means that `I` is the integral
 operator with respect to `dx`.
@@ -34,20 +34,20 @@ function (I::Integral)(x::Union{Rational, AbstractIrrational, AbstractFloat, Int
     # of `Interval` so this ends up being type-stable. There doesn't seem to be a way
     # to test this and ensure it remains type-stable.
     if domain isa AnyInterval{Num}
-        a, b = unwrap.(DomainSets.endpoints(domain))
+        a, b = unwrap.(IntervalSets.endpoints(domain))
         return Num((b - a) * x)
     elseif domain isa AnyInterval{SymbolicT}
-        a, b = DomainSets.endpoints(domain)
+        a, b = IntervalSets.endpoints(domain)
         return Num((b - a) * x)
     elseif domain isa AnyInterval{Int}
-        a, b = DomainSets.endpoints(domain)
+        a, b = IntervalSets.endpoints(domain)
         return Num((b - a) * x)
     elseif domain isa AnyInterval{Float64}
-        a, b = DomainSets.endpoints(domain)
+        a, b = IntervalSets.endpoints(domain)
         return Num((b - a) * x)
     else
         # ::NTuple{2, Any} avoids `indexed_iterate` dynamic dispatching
-        a, b = DomainSets.endpoints(domain)::NTuple{2, Any}
+        a, b = IntervalSets.endpoints(domain)::NTuple{2, Any}
         # SConst avoids `*` dynamic dispatching
         return Num(SConst(b - a) * x)
     end
@@ -68,3 +68,21 @@ function Base.show(io::IO, I::Integral)
 end
 
 Base.:(==)(I1::Integral, I2::Integral) = convert(Bool, simplify(isequal(I1.domain, I2.domain)))
+
+const INTEGRAL_SALT = 0xb7d4e1928c3a6f50
+function _isequal_integral_domain(
+        d1::IntervalSets.AbstractInterval, d2::IntervalSets.AbstractInterval
+    )
+    if eltype(d1) <: Union{Num, SymbolicT} || eltype(d2) <: Union{Num, SymbolicT}
+        return IntervalSets.closedendpoints(d1) == IntervalSets.closedendpoints(d2) &&
+            isequal(IntervalSets.endpoints(d1), IntervalSets.endpoints(d2))
+    end
+    return isequal(d1, d2)
+end
+_isequal_integral_domain(d1, d2) = isequal(d1, d2)
+
+Base.isequal(I1::Integral, I2::Integral) =
+    isequal(I1.domain.variables, I2.domain.variables) &&
+    _isequal_integral_domain(I1.domain.domain, I2.domain.domain)
+Base.hash(I::Integral, h::UInt) =
+    hash(I.domain.domain, hash(I.domain.variables, hash(INTEGRAL_SALT, h)))

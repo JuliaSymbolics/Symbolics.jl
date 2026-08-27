@@ -1,14 +1,18 @@
-function nterms(t::SymbolicT)
-    if iscall(t)
-        return sum(nterms, arguments(t))
-    else
-        return 1
+function nterms(t::SymbolicT, cache::Base.IdDict{SymbolicT, Int} = Base.IdDict{SymbolicT, Int}())
+    closure = let t = t, cache = cache
+        function __closure()
+            iscall(t) || return 1
+            return sum(Base.Fix2(nterms, cache), arguments(t))
+        end
     end
+    get!(closure, cache, t)
 end
 nterms(t::Num) = nterms(unwrap(t))
+nterms(t::Num, cache) = nterms(unwrap(t), cache)
 
 # Soft pivoted
 function sym_lu(A::AbstractMatrix{Num}; check=true)
+    nterms_cache = Base.IdDict{SymbolicT, Int}()
     SINGULAR = typemax(Int)
     m, n = size(A)
     F = Matrix{Num}(undef, size(A)...)
@@ -20,7 +24,7 @@ function sym_lu(A::AbstractMatrix{Num}; check=true)
         kp = k
         amin = SINGULAR
         for i in k:m
-            absi = _iszero(F[i, k]) ? SINGULAR : nterms(F[i,k])
+            absi = _iszero(F[i, k]) ? SINGULAR : nterms(F[i,k], nterms_cache)
             if absi < amin
                 kp = i
                 amin = absi
@@ -51,6 +55,21 @@ function sym_lu(A::AbstractMatrix{Num}; check=true)
     LU(F, p, convert(LinearAlgebra.BlasInt, info))
 end
 
+"""
+    solve_for(eqs, vars; simplify = false, check = true)
+
+Deprecated. Use [`Symbolics.symbolic_linear_solve`](@ref) instead, which takes the same
+arguments and returns the same result.
+
+`solve_for` was the original name for Symbolics' linear equation solver. It was renamed to
+`symbolic_linear_solve` when [`Symbolics.symbolic_solve`](@ref) was added, so that the two
+solvers have names that say how they differ: `symbolic_solve` handles nonlinear (polynomial)
+systems and returns all roots, while `symbolic_linear_solve` solves a linear system by
+factorization and returns the single solution.
+
+Calling `solve_for` forwards to `symbolic_linear_solve` and emits a deprecation warning. It
+will be removed in the next breaking release.
+"""
 function solve_for(eq::Any, var::Any; simplify=false, check=true)
     Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for)
     return symbolic_linear_solve(eq, var; simplify=simplify, check=check)
@@ -76,10 +95,8 @@ julia> @variables x y
 julia> Symbolics.symbolic_linear_solve(x + y ~ 0, x)
 -y
 
-julia> Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])
-2-element Vector{Float64}:
-  1.0
- -1.0
+julia> all(Symbolics.value.(Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])) .== [1, -1])
+true
 ```
 """
 function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar case
@@ -132,7 +149,7 @@ end
 
 LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
-    LinearAlgebra.require_one_based_indexing(A, b, x)
+    Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
@@ -152,7 +169,7 @@ end
 
 LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = b)
-    LinearAlgebra.require_one_based_indexing(A, b, x)
+    Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
@@ -190,8 +207,8 @@ function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
     end
 end
 
-LinearAlgebra.inv(A::AbstractMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
-LinearAlgebra.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::AbstractMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
 
 function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
     if laplace
@@ -336,7 +353,9 @@ end
 
 (lex::LinearExpander)(t::Num) = lex(unwrap(t))
 
-function (lex::LinearExpander)(t::SymbolicT)
+const SUPPORTS_LINEAR_EXPANDER_NEED_REMAINDER = true
+
+function (lex::LinearExpander)(t::SymbolicT; need_remainder::Bool = true)
     (; x) = lex
     is_expansion_leaf(t) && return trivial_linear_expansion(t, x)
     isequal(t, x) && return (COMMON_ONE, COMMON_ZERO, true)
@@ -345,21 +364,41 @@ function (lex::LinearExpander)(t::SymbolicT)
     @match t begin
         BSImpl.Term(; f) && if f isa Operator end => throw_bad_expansion()
         BSImpl.AddMul(; coeff, dict, variant, type, shape) => begin
-            cf = Const{VartypeT}(coeff)
             if variant === SymbolicUtils.AddMulVariant.ADD
+                # `t = coeff + Σ v*k` with each `k = a_k*x + b_k`. Addends free of
+                # `x` have `a_k == 0` and `b_k === k`, so keep them in the original
+                # dict and only splice in the ones that change, instead of re-summing
+                # (re-hashconsing) every addend.
                 a_buffer = SArgsT()
-                b_buffer = SArgsT()
+                b_newdict = dict
+                b_extras = SArgsT()
+                b_dirty = false
                 for (k, v) in dict
                     a, b, islin = _linear_expansion_recurse(lex, k)
                     islin || return (COMMON_ZERO, COMMON_ZERO, false)
-                    push!(a_buffer, a * v)
-                    push!(b_buffer, b * v)
+                    if _iszero(a) && isequal(b, k)
+                        continue
+                    end
+                    _iszero(a) || push!(a_buffer, a * v)
+                    # When the caller doesn't need the remainder skip rebuilding it:
+                    need_remainder || continue
+                    if !b_dirty
+                        b_newdict = copy(dict)
+                        b_dirty = true
+                    end
+                    delete!(b_newdict, k)
+                    _iszero(b) || push!(b_extras, b * v)
                 end
-                if !_iszero(coeff)
-                    push!(b_buffer, cf)
+                a = isempty(a_buffer) ? COMMON_ZERO : SymbolicUtils.add_worker(VartypeT, a_buffer)
+                need_remainder || return (a, COMMON_ZERO, true)
+                if !b_dirty
+                    return a, t, true
                 end
-                a = SymbolicUtils.add_worker(VartypeT, a_buffer)
-                b = SymbolicUtils.add_worker(VartypeT, b_buffer)
+                b = SymbolicUtils.Add{VartypeT}(coeff, b_newdict; type, shape)
+                if !isempty(b_extras)
+                    push!(b_extras, b)
+                    b = SymbolicUtils.add_worker(VartypeT, b_extras)
+                end
                 return a, b, true
             else
                 a = COMMON_ZERO
@@ -406,7 +445,7 @@ function (lex::LinearExpander)(t::SymbolicT)
                     newdict = copy(dict)
                 end
                 delete!(newdict, k)
-                tmp = Symbolics.Mul{VartypeT}(coeff, newdict; type, shape)
+                tmp = SymbolicUtils.Mul{VartypeT}(coeff, newdict; type, shape)
                 if !isempty(extras)
                     push!(extras, tmp)
                     tmp = SymbolicUtils.mul_worker(VartypeT, extras)

@@ -1,4 +1,5 @@
-using SymbolicUtils: FnType, Sym, metadata
+using SymbolicUtils: FnType, Sym
+using TermInterface: metadata
 using Setfield
 
 const IndexMap = Dict{Char,Char}(
@@ -45,6 +46,24 @@ function setdefaultval(x, val)
     setmetadata(x, VariableDefaultValue, val)
 end
 
+"""
+    map_subscripts(indices)
+
+Convert the decimal characters in an index to the Unicode subscript
+characters used in symbolic variable names.
+
+# Arguments
+
+- `indices`: an integer or other value whose string representation consists of
+  characters in `-0123456789`.
+
+# Examples
+
+```julia
+julia> Symbolics.map_subscripts(-12)
+"₋₁₂"
+```
+"""
 function map_subscripts(indices)
     str = string(indices)
     join(IndexMap[c] for c in str)
@@ -291,6 +310,11 @@ A symbol or expression that represents an array can be turned into an array of
 symbols or expressions using the `scalarize` function.
 
 ```jldoctest
+julia> @variables t z(t)[1:3]
+2-element Vector{Any}:
+ t
+  (z(t))[1:3]
+
 julia> Symbolics.scalarize(z)
 3-element Vector{Num}:
  (z(t))[1]
@@ -309,15 +333,8 @@ syntax also applies here.
 julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
 (:runtime_symbol_value, :value_b, :value_c)
 
-julia> vars = @variables t \$a \$b(t) \$c(t)[1:3]
-4-element Vector{Any}:
-      t
- runtime_symbol_value
-   value_b(t)
-       (value_c(t))[1:3]
-
-julia> (t, a, b, c)
-(t, :runtime_symbol_value, :value_b, :value_c)
+julia> length(@variables t \$a \$b(t) \$c(t)[1:3])
+4
 ```
 """
 macro variables(xs...)
@@ -397,7 +414,8 @@ end
 A substituter which repeatedly substitutes an expression until a fixpoint is reached,
 or a maximum number of substitutions in case of circular rules. For example, the rules
 `[x => y, y => x]` will lead to hitting the maximum iterations. This follows
-the same caching rules as [`SymbolicUtils.Substituter`](@ref).
+the same caching rules as
+[`SymbolicUtils.Substituter`](https://symbolicutils.juliasymbolics.org/api/).
 
 See also: [`fixpoint_sub`](@ref).
 """
@@ -458,17 +476,47 @@ function (sub::FixpointSubstituter)(ex::SymbolicT)
 end
 
 """
-    fixpoint_sub(expr, dict, ::Type{OP} = Nothing; maxiters = 1000, warn_maxiters = true, filterer = SymbolicUtils.default_substitute_filter)
+    fixpoint_sub(
+        expr, dict, ::Type{OP} = Nothing;
+        maxiters = 1000,
+        warn_maxiters = true,
+        filterer = SymbolicUtils.default_substitute_filter,
+        fold = Val(false),
+    )
 
-Given a symbolic expression, equation or inequality `expr` perform the substitutions in
-`dict` recursively until the expression does not change. Substitutions that depend on one
-another will thus be recursively expanded. For example,
-`fixpoint_sub(x, Dict(x => y, y => 3))` will return `3`. The `OP` argument can be
-specified to prevent substitution of expressions inside `Operator`s of the given type. The
-`maxiters` keyword is used to limit the number of times the substitution can occur to avoid
-infinite loops in cases where the substitutions in `dict` are circular
-(e.g. `[x => y, y => x]`). Set `warn_maxiters = false` to suppress the warning emitted
-when the iteration limit is hit.
+Recursively apply the substitutions in `dict` until `expr` no longer changes.
+Substitutions that depend on one another are fully expanded. Circular substitutions stop
+after `maxiters` applications.
+
+# Arguments
+
+- `expr`: symbolic expression, equation, inequality, or array to transform.
+- `dict`: substitution rules accepted by `SymbolicUtils.Substituter`.
+- `OP`: operator type whose contents should not be substituted. The default `Nothing`
+  does not exclude an operator type.
+
+# Keywords
+
+- `maxiters::Integer = 1000`: maximum number of repeated substitutions.
+- `warn_maxiters::Bool = true`: emit a warning when the iteration limit is reached.
+- `filterer = SymbolicUtils.default_substitute_filter`: predicate controlling which
+  expression nodes may be substituted.
+- `fold::Val = Val(false)`: whether to constant-fold while substituting.
+
+# Returns
+
+The transformed value after reaching a fixpoint or the iteration limit.
+
+# Examples
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables x y;
+
+julia> Symbolics.fixpoint_sub(x, Dict(x => y, y => 3))
+3
+```
 
 See also: [`FixpointSubstituter`](@ref).
 """
@@ -553,7 +601,7 @@ Create a variable with the given name along with subscripted indices with the
 julia> Symbolics.variable(:x, 4, 2, 0)
 x₄ˏ₂ˏ₀
 
-julia> Symbolics.variable(:x, 4, 2, 0, T=Symbolics.FnType)
+julia> Symbolics.variable(:x, 4, 2, 0, T=Symbolics.FnType{Tuple{Real}, Real, Nothing})
 x₄ˏ₂ˏ₀⋆
 ```
 
@@ -586,7 +634,7 @@ function renamed_metadata(metadata::Union{Nothing, SymbolicUtils.MetadataT}, nam
                 v = v::NTuple{2, Symbol}
                 v = (v[1], name)
             end
-            newmeta = Base.ImmutableDict(newmeta, k, v)
+            newmeta = Base.ImmutableDict{DataType, Any}(newmeta, k, v)
         end
         return newmeta
     end

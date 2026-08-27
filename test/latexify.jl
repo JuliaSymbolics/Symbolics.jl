@@ -77,6 +77,9 @@ end
     ]
 )
 
+@variables s p(s)[1:2] q(s)[1:2] A[1:2, 1:2]
+@test_reference "latexify_refs/equation_vec_array.txt" latexify([q ~ A * p])
+
 @test_reference "latexify_refs/complex1.txt" latexify(x^2 - y^2 + 2im * x * y)
 @test_reference "latexify_refs/complex2.txt" latexify(3im * x)
 @test_reference "latexify_refs/complex3.txt" latexify(1 - x + (1 + 2x) * im; imaginary_unit = "\\mathbb{i}")
@@ -129,4 +132,10 @@ avg_expr = SU.term(avgf, x + y)
     getindex_term = SU.term(getindex, vec_expr, 1; type=SU.SymReal)
     # This should not throw a MethodError about hasmetadata on Vector
     @test_nowarn latexify(getindex_term)
+end
+
+@testset "ifelse_eager / ifelse_branching render" begin
+    @variables a b
+    @test_nowarn latexify(ifelse_eager(a > 0, a^2, 1 / a))
+    @test_nowarn latexify(ifelse_branching(a > 0, a^2, 1 / a))
 end

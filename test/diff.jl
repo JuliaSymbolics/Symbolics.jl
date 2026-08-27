@@ -397,6 +397,28 @@ let
     @test Symbolics.is_derivative(Symbolics.unwrap(D(X + 2a*Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(D(X) + D(Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(my_f(X, D(Y))))
+
+    # Wrapper types give the same answer as the expression they wrap (#1942).
+    @test !Symbolics.is_derivative(D)
+    @test !Symbolics.is_derivative(t)
+    @test !Symbolics.is_derivative(X)
+    @test !Symbolics.is_derivative(1)
+    @test Symbolics.is_derivative(D(X))
+    @test !Symbolics.is_derivative(D(X) + 3)
+    @test Symbolics.is_derivative(D(X + 2a * Y))
+    @test !Symbolics.is_derivative(D(X) + D(Y))
+    @test !Symbolics.is_derivative(my_f(X, D(Y)))
+    @test !Symbolics.is_derivative(expand_derivatives(D(X^2)))
+
+    @variables Z(t)[1:3]
+    @test Symbolics.is_derivative(D(Z))
+    @test !Symbolics.is_derivative(Z)
+
+    # `Differential` distributes over the parts of a `Complex{Num}`, so the result is a
+    # `complex` term rather than a single derivative term.
+    @variables W(t)::Complex
+    @test !Symbolics.is_derivative(D(W))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(D(W)))
 end
 
 # Zeroth derivative (#1163)

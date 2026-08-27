@@ -18,6 +18,7 @@ jobs:
       matrix:
         group:
           - Core
+          - QA
           - Downstream
           - GroebnerExt
           - SymPy
@@ -26,7 +27,7 @@ jobs:
         version:
           - '1'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - run: |
@@ -34,7 +35,7 @@ jobs:
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.version }}
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6
         env:
           cache-name: cache-artifacts
         with:
@@ -51,6 +52,6 @@ jobs:
         with:
           force_latest_compatible_version: 'false'
       - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         with:
           file: lcov.info

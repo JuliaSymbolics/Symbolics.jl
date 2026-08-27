@@ -21,26 +21,26 @@ function Base.getindex(x::Arr{T, N}, idx::CartesianIndex{N}) where {T, N}
     end
 end
 function Base.getindex(x::Arr, idx...)
-    wrapper_fn_from_idxs(x, idx...)(unwrap(x)[idx...])
+    wrapper_fn_from_idxs(x, idx...)(unwrap(x)[unwrap.(idx)...])
 end
 const SymIdxT = Union{Num, BasicSymbolic{VartypeT}}
 function Base.getindex(x::Arr, idx::SymIdxT, idxs...)
-    wrapper_fn_from_idxs(x, unwrap(idx), idxs...)(unwrap(x)[idx, idxs...])
+    wrapper_fn_from_idxs(x, unwrap(idx), idxs...)(unwrap(x)[unwrap(idx), unwrap.(idxs)...])
 end
 function Base.getindex(x::Arr, i1, idx::SymIdxT, idxs...)
-    wrapper_fn_from_idxs(x, i1, unwrap(idx), idxs...)(unwrap(x)[i1, idx, idxs...])
+    wrapper_fn_from_idxs(x, i1, unwrap(idx), idxs...)(unwrap(x)[(i1), unwrap(idx), unwrap.(idxs)...])
 end
 function Base.getindex(x::Arr, i1::SymIdxT, idx::SymIdxT, idxs...)
-    wrapper_fn_from_idxs(x, unwrap(i1), unwrap(idx), idxs...)(unwrap(x)[i1, idx, idxs...])
+    wrapper_fn_from_idxs(x, unwrap(i1), unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(idx), unwrap.(idxs)...])
 end
 function Base.getindex(x::Arr, i1, i2, idx::SymIdxT, idxs...)
-    wrapper_fn_from_idxs(x, i1, i2, unwrap(idx), idxs...)(unwrap(x)[i1, i2, idx, idxs...])
+    wrapper_fn_from_idxs(x, i1, i2, unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
 end
 function Base.getindex(x::Arr, i1, i2::SymIdxT, idx::SymIdxT, idxs...)
-    wrapper_fn_from_idxs(x, i1, unwrap(i2), unwrap(idx), idxs...)(unwrap(x)[i1, i2, idx, idxs...])
+    wrapper_fn_from_idxs(x, i1, unwrap(i2), unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
 end
 function Base.getindex(x::Arr, i1::SymIdxT, i2::SymIdxT, idx::SymIdxT, idxs...)
-    wrapper_fn_from_idxs(x, unwrap(i1), unwrap(i2), unwrap(idx), idxs...)(unwrap(x)[i1, i2, idx, idxs...])
+    wrapper_fn_from_idxs(x, unwrap(i1), unwrap(i2), unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
 end
 
 import Base: +, -, *
@@ -64,7 +64,7 @@ function unwrap_broadcast(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     Broadcast.Broadcasted{SymbolicUtils.SymBroadcast{VartypeT}}(bc.f, unwrap_broadcasts(bc.args...), bc.axes)
 end
 
-function Broadcast.copy(bc::Broadcast.Broadcasted{SymWrapBroadcast})
+function Base.copy(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     return wrap(copy(unwrap_broadcast(bc)))
 end
 
@@ -179,3 +179,9 @@ end
 end
 
 @register_symbolic LinearAlgebra.tr(x::AbstractMatrix)
+
+# Eigenvalues of a symbolic matrix have no closed form, so `eigmax`/`eigmin`
+# build unevaluated symbolic terms (like `tr`) rather than computing numerically;
+# without this they fall through to `eigvals!`, which errors on a symbolic matrix.
+@register_symbolic LinearAlgebra.eigmax(x::AbstractMatrix)
+@register_symbolic LinearAlgebra.eigmin(x::AbstractMatrix)

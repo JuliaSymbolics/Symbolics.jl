@@ -1,9 +1,41 @@
-using SymbolicUtils
-using StaticArraysCore
+import StaticArraysCore
+using StaticArraysCore: SArray
 import Base: eltype, length, ndims, size, axes, eachindex
 
 ### Wrapper type for dispatch
 
+"""
+    Arr{T, N}(expr)
+
+Array wrapper used by Symbolics to dispatch array-valued symbolic expressions as
+`AbstractArray{T, N}`.
+
+# Fields
+
+- `value::BasicSymbolic`: the unwrapped symbolic expression represented by the
+  array.
+
+# Arguments
+
+- `expr`: an array-valued symbolic expression whose symbolic type is compatible
+  with `Array{T, N}`.
+
+The one-argument constructor `Arr(expr)` infers `T` and `N` from `expr`. In
+ordinary user code, array variables are created with [`@variables`](@ref), and
+`Arr` is primarily useful when defining dispatch for array-valued symbolic
+operations.
+
+# Examples
+
+```julia
+julia> using Symbolics
+
+julia> @variables A[1:2, 1:3]
+
+julia> A isa Symbolics.Arr{<:Any, 2}
+true
+```
+"""
 struct Arr{T,N} <: AbstractArray{T, N}
     value::BasicSymbolic{VartypeT}
 

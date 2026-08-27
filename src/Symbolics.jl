@@ -3,51 +3,65 @@ $(DocStringExtensions.README)
 """
 module Symbolics
 
-using PrecompileTools
+import PrecompileTools
+using PrecompileTools: @compile_workload, @setup_workload
 
 import PrecompileTools: @recompile_invalidations
 
 @recompile_invalidations begin
     import CommonWorldInvalidations
 
-using DocStringExtensions, Markdown
+import DocStringExtensions, Markdown
+using DocStringExtensions: FIELDS, SIGNATURES, TYPEDEF, TYPEDSIGNATURES
 
-using LinearAlgebra
+import LinearAlgebra
+using LinearAlgebra: Adjoint, Eigen, I, LU, LowerTriangular, SingularException,
+    Transpose, UnitLowerTriangular, UpperTriangular, cond, det, diag, diagm, isdiag,
+    istril, istriu, lu, mul!, norm, tril
 
-using Primes
+import Primes
 
-using Reexport
-
-using Setfield
+import Setfield
 
     import DomainSets: Domain, DomainSets
+    import IntervalSets
 
-using TermInterface
+import TermInterface
+using TermInterface: sorted_arguments
 import TermInterface: maketerm, iscall, operation, arguments, metadata
 
-import SymbolicUtils: Term, Add, Mul, Sym, Div, BasicSymbolic, Const,
+import SymbolicUtils: Term, Sym, BasicSymbolic, Const,
     FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
     promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
-    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT
+    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT,
+    ifelse_eager, ifelse_branching, Unknown
 import SymbolicUtils as SU
 
-using SymbolicUtils.Code
+import SymbolicUtils.Code
+using SymbolicUtils.Code: Assignment, AtIndex, DestructuredArgs, Func, Let,
+    LiteralExpr, MakeArray, SetArray, SpawnFetch
 
 import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 import SymbolicUtils.Code: toexpr
 
 import ArrayInterface
-using RuntimeGeneratedFunctions
+import RuntimeGeneratedFunctions
+using RuntimeGeneratedFunctions: @RuntimeGeneratedFunction, RuntimeGeneratedFunction, drop_expr
 import MacroTools
 
-using SymbolicIndexingInterface
+import SymbolicIndexingInterface
+using SymbolicIndexingInterface: ArraySymbolic, NotSymbolic, ScalarSymbolic, getname,
+    hasname, symbolic_type
 
 import SymbolicLimits
 
 using ADTypes: ADTypes
 
-using SymbolicUtils
+import SymbolicUtils
+using SymbolicUtils: @acrule, @syms, IRStructure, SafeReal, SymReal, TreeReal, expand,
+    flatten_fractions, getmetadata, hasmetadata, setmetadata, simplify,
+    simplify_fractions, term, vartype
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
 import SciMLPublic: @public
@@ -57,7 +71,15 @@ using Moshi.Match: @match
 import Preferences: @load_preference
 end
 
-@reexport using SymbolicUtils
+using SymbolicUtils: @arrayop, @makearray, @rule, BS, Rewriters, RuleSet,
+    arguments, get_reachability, ifelse_branching, ifelse_eager, iscall, istree,
+    operation, populate_ir!, print_ir, quick_cancel, substitute, unwrap_const
+export @acrule, @arrayop, @makearray, @rule, @syms, BS, IRStructure, Rewriters, RuleSet,
+    SafeReal, SymReal, SymbolicUtils, TreeReal, Unknown, arguments, expand,
+    flatten_fractions, get_reachability, getmetadata, hasmetadata, ifelse_branching,
+    ifelse_eager, iscall, istree, operation, populate_ir!, print_ir, quick_cancel,
+    scalarize, setmetadata, shape, simplify, simplify_fractions, sorted_arguments,
+    substitute, term, unwrap, unwrap_const, vartype
 const DEFAULT_VARTYPE_PREF = @load_preference("vartype", "SymReal")
 const VartypeT = @static if DEFAULT_VARTYPE_PREF == "SymReal"
     SymReal
@@ -96,7 +118,7 @@ function warn_load_latexify()
 end
 
 export Num
-import MacroTools: splitdef, combinedef, postwalk, striplines
+import MacroTools: splitdef
 include("wrapper-types.jl")
 
 @recompile_invalidations begin
@@ -127,18 +149,24 @@ If `fold=Val(true)`, expressions which can be fully evaluated will be evaluated 
 # Examples
 
 ```jldoctest
+julia> using Symbolics
+
 julia> @variables t x y z(t)
 4-element Vector{Num}:
     t
     x
     y
  z(t)
+
 julia> ex = x + y + sin(z)
-(x + y) + sin(z(t))
+sin(z(t)) + x + y
+
 julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
-(z(t) + y) + (z(t) ^ 2)
+y + z(t) + z(t)^2
+
 julia> substitute(sqrt(2x), Dict([x => 1]))
 sqrt(2)
+
 julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(true))
 1.4142135623730951
 ```
@@ -156,23 +184,28 @@ import DynamicPolynomials as DP
 import MultivariatePolynomials as MP
 import MutableArithmetics as MA
 
-using ConstructionBase
+import ConstructionBase
 include("arrays.jl")
 
 export tosymbol, terms, factors
+export gather_factor
 include("utils.jl")
 
 export @register_symbolic, @register_array_symbolic
 include("register.jl")
 
-using SparseArrays
-export @variables, Variable
+import SparseArrays
+using SparseArrays: AbstractSparseArray, AbstractSparseVector, SparseMatrixCSC,
+    SparseVector, findnz, issparse, nnz, sparse
+export @variables
 include("variable.jl")
 
 function slog end; function ssqrt end; function scbrt end
+import DiffRules, SpecialFunctions, NaNMath
+using SpecialFunctions: airyai, airyaiprime, airybi, airybiprime, besselj0, besselj1,
+    bessely0, bessely1, beta, dawson, digamma, erf, erfc, erfcinv, erfcx, erfi,
+    erfinv, expinti, gamma, invdigamma, lbeta, lgamma, trigamma
 include("linearity.jl")
-
-using DiffRules, SpecialFunctions, NaNMath
 
 
 export Differential, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
@@ -192,7 +225,7 @@ include("integral.jl")
 
 include("array-lib.jl")
 
-using LogExpFunctions
+import LogExpFunctions
 include("logexpfunctions-lib.jl")
 
 include("linear_algebra.jl")
@@ -212,9 +245,12 @@ include("build_function.jl")
 include("codegen_fn.jl")
 export build_function
 
+include("conditionals.jl")
+
 include("extra_functions.jl")
 
-using RecipesBase
+import RecipesBase
+using RecipesBase: @recipe
 include("plot_recipes.jl")
 
 include("latexify_recipes.jl")
@@ -229,6 +265,9 @@ include("error_hints.jl")
 
 include("limits.jl")
 export limit
+
+include("partialfractions.jl")
+export partial_frac_decomposition
 
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
@@ -270,7 +309,8 @@ export symbolic_solve
 include("diffeqs/diffeqs.jl")
 include("diffeqs/systems.jl")
 include("diffeqs/diffeq_helpers.jl")
-export SymbolicLinearODE, symbolic_solve_ode, solve_linear_ode_system, solve_symbolic_IVP
+include("diffeqs/laplace.jl")
+export SymbolicLinearODE, symbolic_solve_ode, solve_linear_ode_system, solve_symbolic_IVP, laplace, inverse_laplace, laplace_solve_ode
 
 # Sympy Functions
 
@@ -600,11 +640,15 @@ include("discontinuities.jl")
 
 include("despecialize.jl")
 
-@public Arr, NAMESPACE_SEPARATOR, Unknown, VariableDefaultValue, VariableSource
+@public Arr, NAMESPACE_SEPARATOR, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, dstar_derivative, gradient, jacobian, sparsejacobian, dstar_jacobian, hessian, sparsehessian
-@public get_variables, get_variables!, get_differential_vars, option_to_metadata_type, scalarize, shape
-@public unwrap, variable, wrap, linear_expansion, LinearExpander
+@public get_variables, get_variables!, get_differential_vars, option_to_metadata_type
+@public variable, wrap, linear_expansion, LinearExpander
 @public _toexpr_metadata, _toexpr_op
+@public value
+@public CodegenFunctionOptions, codegen_function
+@public diff2term, map_subscripts
+@public fixpoint_sub
 
 @setup_workload begin
     fold1 = Val{false}()

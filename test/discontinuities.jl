@@ -29,6 +29,15 @@ end
     end
 end
 
+@testset "@register_discontinuities wraps in Const for symbolic arguments" begin
+    @variables x
+    @syms y::Real
+    @test Symbolics.left_continuous_function(<=)(x, y) isa Symbolics.SymbolicT
+    @test Symbolics.right_continuous_function(<=)(x, y) isa Symbolics.SymbolicT
+    @test Symbolics.left_continuous_function(<=)(x, 1) isa Symbolics.SymbolicT
+    @test Symbolics.right_continuous_function(<=)(1, y) isa Symbolics.SymbolicT
+end
+
 @testset "approximation/majorization/minorization registrations" begin
     for f in (max, NaNMath.max)
         @test approximation_function(f) isa Function

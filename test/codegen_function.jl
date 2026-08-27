@@ -286,3 +286,40 @@ end
     @test allequal(iipexprs)
 end
 
+
+@testset "`CodegenFunctionOptions` struct interface" begin
+    @variables a b c1 c2 c3 d e g
+    @test (@doc Symbolics.CodegenFunctionOptions) !== nothing
+    @test (@doc Symbolics.codegen_function) !== nothing
+    @static if VERSION >= v"1.11"
+        @test Base.ispublic(Symbolics, :CodegenFunctionOptions)
+        @test Base.ispublic(Symbolics, :codegen_function)
+    end
+    # `CodegenFunctionOptions` is a single concrete type regardless of which options are set, so
+    # functions that thread it through do not recompile per option-combination.
+    @test isconcretetype(Symbolics.CodegenFunctionOptions)
+    o1 = Symbolics.CodegenFunctionOptions(; nanmath = true)
+    o2 = Symbolics.CodegenFunctionOptions(;
+        nanmath = false, wrap_code = (x -> x, x -> x), checkbounds = true,
+        iip_config = (true, false), sort_addmul = true, skipzeros = true, optimize = nothing)
+    @test typeof(o1) === typeof(o2) === Symbolics.CodegenFunctionOptions
+
+    # scalar/vector path: keyword form and struct form are identical
+    kw = Symbolics.codegen_function(ir, [sqrt(a), sin(b)], [[a, b]]; nanmath = true, sort_addmul = true)
+    st = Symbolics.codegen_function(ir, [sqrt(a), sin(b)], [[a, b]],
+        Symbolics.CodegenFunctionOptions(; nanmath = true, sort_addmul = true))
+    @test string(kw) == string(st)
+
+    # array path: keyword form and struct form are identical
+    h = [a + b, c1 * c2, d / e]
+    args = [[a], [b], [c1, c2, c3], [d], [e], [g]]
+    kw2 = Symbolics.codegen_function(ir, h, args; skipzeros = true, checkbounds = true, sort_addmul = true)
+    st2 = Symbolics.codegen_function(ir, h, args,
+        Symbolics.CodegenFunctionOptions(; skipzeros = true, checkbounds = true, sort_addmul = true))
+    @test string(kw2) == string(st2)
+
+    # unknown keyword arguments are dropped (backwards compatible with the old `kwargs...` sink)
+    with_bogus = Symbolics.codegen_function(ir, [sqrt(a)], [[a]]; nanmath = true, sort_addmul = true, bogus = 42)
+    without = Symbolics.codegen_function(ir, [sqrt(a)], [[a]]; nanmath = true, sort_addmul = true)
+    @test string(with_bogus) == string(without)
+end

@@ -1,4 +1,5 @@
 using ModelingToolkit, ParameterizedFunctions
+import Symbolics
 
 # Build the expected MATLAB string from the actual orderings reported by the
 # `System` (parameter index assignment is determined by MTK and changes from
@@ -38,7 +39,7 @@ eqs = [D(x) ~ a*x - b*x*y
 equations(sys)
 matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
                                         parameters(sys),ModelingToolkit.get_iv(sys),
-                                        target = ModelingToolkit.MATLABTarget())
+                                        target = Symbolics.MATLABTarget())
 @test _normalize_matlab(matstr) == _normalize_matlab(_matlab_lotka_volterra_expected(sys, a, b, c, d))
 
 f = @ode_def_bare LotkaVolterra begin
@@ -54,7 +55,7 @@ sys = modelingtoolkitize(prob)
 [eq.rhs for eq ∈ equations(sys)]
 matstr = Symbolics.build_function(map(x->x.rhs,equations(sys)),unknowns(sys),
                                         parameters(sys),ModelingToolkit.get_iv(sys),
-                                        target = ModelingToolkit.MATLABTarget())
+                                        target = Symbolics.MATLABTarget())
 # `modelingtoolkitize` names the parameters `α, β, γ, δ` (in declaration
 # order), so look them up by name from the resulting system.
 let ps = parameters(sys)

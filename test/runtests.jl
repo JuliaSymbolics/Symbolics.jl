@@ -37,6 +37,10 @@ if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
 end
 
+if GROUP == "QA"
+    include("qa.jl")
+end
+
 # this needs to be defined at top level
 limit2(a, N) = a == N + 1 ? 1 : a == 0 ? N : a
 @register_symbolic limit2(a, N)::Integer
@@ -64,6 +68,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "ForwardDiff Extension Test" begin include("forwarddiff_symbolic_dual_ops.jl") end
         @safetestset "Nested ForwardDiff Sparsity Test" begin include("nested_forwarddiff_sparsity.jl") end
         @safetestset "Build Function Test" begin include("build_function.jl") end
+        @safetestset "Conditionals Test" begin include("conditionals.jl") end
         @safetestset "Codegen Function Test" begin include("codegen_function.jl") end
         @safetestset "Build Function Array Test" begin include("build_function_arrayofarray.jl") end
         @safetestset "Build Function Array Test Named Tuples" begin include("build_function_arrayofarray_named_tuples.jl") end
@@ -81,6 +86,8 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Taylor Series Test" begin include("taylor.jl") end
         @safetestset "Discontinuity registration test" begin include("discontinuities.jl") end
         @safetestset "ODE solver test" begin include("diffeqs.jl") end
+        @safetestset "Laplace transform test" begin include("laplace.jl") end
+        @safetestset "Partial Fraction Decomposition Test" begin include("partialfractions.jl") end
     end
 end
 
