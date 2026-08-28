@@ -64,6 +64,9 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
         @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
         @safetestset "Overloading Test" begin include("overloads.jl") end
+        @safetestset "Dispatch Smoke Test" begin
+            include("dispatch_smoke.jl")
+        end
         @safetestset "ForwardDiff Extension Test" begin include("forwarddiff_symbolic_dual_ops.jl") end
         @safetestset "Nested ForwardDiff Sparsity Test" begin include("nested_forwarddiff_sparsity.jl") end
         @safetestset "Build Function Test" begin include("build_function.jl") end

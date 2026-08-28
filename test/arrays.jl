@@ -4,7 +4,10 @@ using Symbolics: symtype, shape, wrap, unwrap, Arr, jacobian, @variables, value,
 using Base: Slice
 using SymbolicUtils: Sym, term, operation, search_variables
 import SymbolicUtils.Code: toexpr
-import LinearAlgebra: dot, Adjoint, cross, diagm, eigmax, eigmin
+import LinearAlgebra
+import LinearAlgebra: dot, Adjoint, cross, Diagonal, diagm, eigmax, eigmin
+using StaticArraysCore: SArray
+using SparseArrays: sparse
 import ..limit2
 
 struct TestMetaT end
@@ -555,7 +558,116 @@ end
     @test_nowarn t * x
 end
 
+@testset "Arr multiplication intersections" begin
+    @variables x[1:2] A[1:2, 1:2]
+    values = [1.0, 2.0]
+    static_matrix = SArray{Tuple{2, 2}, Float64, 2, 4}((1.0, 0.0, 0.0, 1.0))
+
+    @test Diagonal(values) * x isa SymbolicUtils.BasicSymbolic
+    @test transpose(values) * x isa SymbolicUtils.BasicSymbolic
+    @test adjoint(values) * x isa SymbolicUtils.BasicSymbolic
+    @test static_matrix * x isa SymbolicUtils.BasicSymbolic
+    @test x * transpose(values) isa SymbolicUtils.BasicSymbolic
+    @test 2 * A * x isa SymbolicUtils.BasicSymbolic
+    @test A * x * 2 isa SymbolicUtils.BasicSymbolic
+end
+
+@testset "Arr mapreduce intersections" begin
+    @variables x[1:2] y[1:2]
+    values = view([1.0, 2.0], :)
+
+    @test isequal(scalarize(mapreduce(+, +, x)), x[1] + x[2])
+    @test isequal(scalarize(mapreduce(+, +, x, y)), x[1] + x[2] + y[1] + y[2])
+    @test isequal(scalarize(mapreduce(+, +, [1.0, 2.0], x)), 3.0 + x[1] + x[2])
+    @test mapreduce(+, +, x, values) isa Num
+end
+
+@testset "Arr map intersections" begin
+    @variables x[1:2] y[1:2]
+    static_values = SArray{Tuple{2}}((1.0, 2.0))
+    values = view([1.0, 2.0], :)
+
+    @test isequal(scalarize(map(+, x)), scalarize(x))
+    @test isequal(scalarize(map(+, x, y)), scalarize(x + y))
+    @test isequal(scalarize(map(+, static_values, x)), scalarize(static_values + x))
+    @test map(+, x, values) isa Arr
+    @test map(+, unwrap(x), y) isa Arr
+    @test map(+, x, unwrap(y)) isa Arr
+end
+
+@testset "Structured matrix Arr division intersections" begin
+    @variables x[1:2] X[1:2, 1:2]
+    bidiagonal = LinearAlgebra.Bidiagonal([1.0, 2.0], [3.0], :U)
+    sparse_matrix = sparse([1.0 0.0; 0.0 2.0])
+    structured = (
+        bidiagonal,
+        adjoint(bidiagonal),
+        LinearAlgebra.Diagonal([1.0, 2.0]),
+        LinearAlgebra.Diagonal(SArray{Tuple{2}}((1.0, 2.0))),
+        LinearAlgebra.SymTridiagonal([1.0, 2.0], [3.0]),
+        LinearAlgebra.Symmetric([1.0 2.0; 2.0 3.0]),
+        LinearAlgebra.Hermitian([1.0 2.0; 2.0 3.0]),
+        LinearAlgebra.UpperTriangular([1.0 2.0; 0.0 3.0]),
+        LinearAlgebra.UnitLowerTriangular([1.0 0.0; 2.0 1.0]),
+        sparse_matrix,
+        transpose(sparse_matrix),
+    )
+
+    for matrix in structured, rhs in (x, X)
+        @test matrix \ rhs isa Arr
+    end
+    for matrix in (X, Num[1 0; 0 1]), rhs in (x, X)
+        @test matrix \ rhs isa Arr
+    end
+
+    num_bidiagonal = LinearAlgebra.Bidiagonal(Num[1, 2], Num[3], :U)
+    right_divisors = (
+        num_bidiagonal,
+        adjoint(num_bidiagonal),
+        transpose(num_bidiagonal),
+        LinearAlgebra.Diagonal(Num[1, 2]),
+        LinearAlgebra.UpperTriangular(Num[1 2; 0 3]),
+        LinearAlgebra.UnitLowerTriangular(Num[1 0; 2 1]),
+    )
+    for divisor in right_divisors
+        @test_throws ArgumentError x / divisor
+        @test X / divisor isa Arr
+    end
+    @test adjoint(Num[1, 2]) / X isa Arr
+    @test transpose(Num[1, 2]) / X isa Arr
+end
+
 @testset "`getindex(::Arr, ::Num)`" begin
     @variables t x(t)[1:3] i(t)::Int
     @test_nowarn x[i]
+
+    @variables X[1:2, 1:2, 1:2]
+    @test X[i, 1, i] isa SymbolicUtils.BasicSymbolic
+end
+
+@testset "Arr survives Base generic fallbacks" begin
+    @variables x A[1:2, 1:2] b[1:2]
+    M = [1.0 2.0; 3.0 4.0]
+    @test copy(A) isa Symbolics.Arr{Num, 2}
+    @test isequal(copy(A), A)
+    @test A / M isa Symbolics.Arr{Num, 2}
+    @test M / A isa Symbolics.Arr{Num, 2}
+    @test A^x isa Symbolics.Arr
+    @test b * adjoint(reshape([1.0, 2.0], 2, 1)) isa SymbolicUtils.BasicSymbolic
+    @test b * transpose(reshape([1.0, 2.0], 2, 1)) isa SymbolicUtils.BasicSymbolic
+    @test_throws ErrorException ifelse(x > 0, b, A)
+    @test_throws ErrorException ifelse(x > 0, A, b)
+end
+
+@testset "Bridged mixed symbolic/numeric terms evaluate" begin
+    @variables x A[1:2, 1:2] b[1:2]
+    M = [1.0 2.0; 3.0 4.0]
+    Dg = LinearAlgebra.Diagonal([1.0, 2.0])
+    oop(expr, args...) = build_function(expr, args...; expression = Val{false})[1]
+    @test oop(Dg / x, x)(2.0) == LinearAlgebra.Diagonal([0.5, 1.0])
+    @test oop(Dg \ b, b)([2.0, 4.0]) == [2.0, 2.0]
+    @test oop(2 * A * [1.0, 2.0], A)([1.0 0.0; 0.0 1.0]) == [2.0, 4.0]
+    @test oop(A / M, A)([1.0 0.0; 0.0 1.0]) ≈ inv(M)
+    @test build_function(x in 1:3, x; expression = Val{false})(5) === false
+    @test build_function(x in 1:3, x; expression = Val{false})(2) === true
 end

@@ -126,10 +126,13 @@ end
 end
 
 @testset "Mixed scalar/array branches dispatch unambiguously" begin
-    @variables v[1:3]
-    for op in (ifelse_eager, ifelse_branching)
+    @variables v[1:3] complex_v[1:3]::Complex
+    for op in (ifelse, ifelse_eager, ifelse_branching)
         # same-shape array branches build fine
         @test operation(unwrap(op(x > 0, v, v))) === op
+        result = op(x > 0, v, complex_v)
+        @test result isa Symbolics.Arr{Complex{Num}, 1}
+        @test operation(unwrap(result)) === op
         # mismatched scalar/array branches are shape-invalid: dispatch resolves to a
         # concrete method that then raises a shape error, rather than an ambiguity MethodError
         @test_throws ErrorException op(x > 0, x, v)

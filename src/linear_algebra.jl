@@ -147,7 +147,6 @@ function _solve(A::AbstractMatrix{Num}, b::Union{AbstractArray{Num}, AbstractArr
     do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
 
-LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
@@ -167,7 +166,6 @@ function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     x
 end
 
-LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{BasicSymbolic,RCNum}}, b::AbstractVector{<:Union{BasicSymbolic,RCNum}}, x::AbstractVector{<:Union{BasicSymbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = b)
     Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
@@ -186,7 +184,20 @@ function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = 
     x
 end
 
-minor(B, j) = @view B[2:end, 1:size(B,2) .!= j]
+const _SymEltype = Union{BasicSymbolic, RCNum}
+# The two-argument methods mirror LinearAlgebra's own signatures so that its strided and
+# sparse `ldiv!` methods do not take precedence over the symbolic substitution.
+for T in (UpperTriangular, UnitLowerTriangular)
+    @eval begin
+        LinearAlgebra.ldiv!(A::$T{<:_SymEltype}, b::StridedVector{<:_SymEltype}) = symsub!(A, b, b)
+        LinearAlgebra.ldiv!(A::$T{<:_SymEltype}, b::AbstractVector{<:_SymEltype}, x::AbstractVector{<:_SymEltype}) = symsub!(A, b, x)
+    end
+    for S in (:(StridedMatrix{E}), :(Adjoint{E, <:StridedMatrix{E}}), :(Transpose{E, <:StridedMatrix{E}}))
+        @eval LinearAlgebra.ldiv!(A::$T{E, <:$S}, b::SparseVector{<:_SymEltype}) where {E <: _SymEltype} = symsub!(A, b, b)
+    end
+end
+
+minor(B, j) = @view B[2:end, 1:size(B, 2) .!= j]
 minor(B, i, j) = @view B[1:size(B,1) .!= i, 1:size(B,2) .!= j]
 function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
     if laplace

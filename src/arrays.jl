@@ -1,4 +1,5 @@
 import StaticArraysCore
+import SparseArrays
 using StaticArraysCore: SArray
 import Base: eltype, length, ndims, size, axes, eachindex
 
@@ -135,15 +136,57 @@ for (T1, T2) in [
     (BasicSymbolic{TreeReal}, Arr{<:Any, 2}),
 ]
     @eval function Base.:(\)(A::$T1, b::$T2)
-        unwrap(A) \ unwrap(b)
+        return wrap(unwrap(A) \ unwrap(b))
     end
+end
+
+const _HermitianOrSymmetric = Union{
+    LinearAlgebra.Hermitian{T, S}, LinearAlgebra.Symmetric{T, S},
+} where {T, S}
+# SparseArrays dispatches `\` on this non-public abstract storage type, so exact
+# intersections with its methods cannot be expressed through `SparseMatrixCSC`.
+for T in (
+            LinearAlgebra.Bidiagonal,
+            LinearAlgebra.Diagonal,
+            LinearAlgebra.SymTridiagonal,
+            _HermitianOrSymmetric,
+            Union{LinearAlgebra.LowerTriangular, LinearAlgebra.UpperTriangular},
+            Union{LinearAlgebra.UnitLowerTriangular, LinearAlgebra.UnitUpperTriangular},
+            Union{
+                LinearAlgebra.Adjoint{<:Any, <:LinearAlgebra.Bidiagonal},
+                LinearAlgebra.Transpose{<:Any, <:LinearAlgebra.Bidiagonal},
+            },
+            SparseArrays.AbstractSparseMatrixCSC,
+            LinearAlgebra.Adjoint{<:Any, <:SparseArrays.AbstractSparseMatrixCSC},
+            LinearAlgebra.Transpose{<:Any, <:SparseArrays.AbstractSparseMatrixCSC},
+        ), N in (1, 2)
+    @eval Base.:(\)(A::$T, b::Arr{<:Any, $N}) = wrap(unwrap(A) \ unwrap(b))
+end
+function Base.:(\)(
+        A::LinearAlgebra.Diagonal{T, StaticArraysCore.SVector{N, T}}, b::Arr{<:Any, 1}
+    ) where {T, N}
+    return wrap(unwrap(A) \ unwrap(b))
+end
+function Base.:(\)(
+        A::LinearAlgebra.Diagonal{Num, StaticArraysCore.SVector{N, Num}},
+        b::Arr{Num, 1}
+    ) where {N}
+    return wrap(unwrap(A) \ unwrap(b))
 end
 
 Base.ifelse(x::Num, y::Arr{T, N}, z) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
 Base.ifelse(x::Num, y, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
-Base.ifelse(x::Num, y::Arr{T, N}, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+function Base.ifelse(x::Num, y::Arr, z::Arr)
+    size(y) == size(z) || error("Both branches of `ifelse` must have the same shape.")
+    return Arr(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+end
+Base.ifelse(x::Num, y::Arr{T, N}, z::Num) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y::Num, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
 
 Base.exp(A::Arr{T, 2}) where {T} = Arr{T, 2}(exp(unwrap(A)))
+Base.:^(A::Arr{<:Any, 2}, x::Num) = wrap(unwrap(A)^unwrap(x))
+# `Arr` has no `similar`; Base generics that `copy` an intermediate (e.g. `/`) need this.
+Base.copy(x::Arr) = wrap(copy(unwrap(x)))
 Base.inv(A::Arr{T, 2}) where {T} = Arr{T, 2}(inv(unwrap(A)))
 LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
 LinearAlgebra.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))

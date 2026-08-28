@@ -36,6 +36,9 @@ end
 function Base.getindex(x::Arr, i1, i2, idx::SymIdxT, idxs...)
     wrapper_fn_from_idxs(x, i1, i2, unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
 end
+function Base.getindex(x::Arr, i1::SymIdxT, i2, idx::SymIdxT, idxs...)
+    return wrapper_fn_from_idxs(x, unwrap(i1), i2, unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
+end
 function Base.getindex(x::Arr, i1, i2::SymIdxT, idx::SymIdxT, idxs...)
     wrapper_fn_from_idxs(x, i1, unwrap(i2), unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
 end
@@ -54,6 +57,7 @@ Broadcast.BroadcastStyle(::Type{T}) where {T <: Arr} = SymWrapBroadcast()
 
 Broadcast.BroadcastStyle(::SymWrapBroadcast,
     ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
+Broadcast.BroadcastStyle(::SymWrapBroadcast, ::Broadcast.Unknown) = SymWrapBroadcast()
 Broadcast.BroadcastStyle(::SymbolicUtils.SymBroadcast,
     ::SymWrapBroadcast) = Broadcast.Unknown()
 
@@ -70,53 +74,83 @@ end
 
 #################### POLYADIC ################
 
-const PolyadicT = Union{AbstractArray{<:Number}, Number}
-
-function *(x::Arr, args::PolyadicT...)
-    return *(unwrap(x), args...)
+*(x::Arr, y::Number) = *(unwrap(x), unwrap(y))
+*(x::Number, y::Arr) = *(unwrap(x), unwrap(y))
+*(x::Arr, y::BasicSymbolic{VartypeT}) = *(unwrap(x), y)
+*(x::Arr, y::Arr) = *(unwrap(x), unwrap(y))
+*(x::Arr, y::AbstractMatrix) = *(unwrap(x), y)
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose)
+    @eval *(x::Arr{<:Any, 1}, y::$T{<:Any, <:AbstractMatrix}) = *(unwrap(x), y)
 end
-function *(x::Arr, y::Number, args::PolyadicT...)
-    return *(unwrap(x), unwrap(y), args...)
+*(x::Arr, y::AbstractVector) = *(unwrap(x), y)
+*(x::AbstractMatrix, y::Arr) = *(x, unwrap(y))
+*(x::LinearAlgebra.Diagonal, y::Arr) = *(x, unwrap(y))
+*(x::Arr{<:Any, 2}, y::LinearAlgebra.Diagonal) = *(unwrap(x), y)
+const _Triangular = Union{
+    LinearAlgebra.LowerTriangular, LinearAlgebra.UnitLowerTriangular,
+    LinearAlgebra.UnitUpperTriangular, LinearAlgebra.UpperTriangular,
+}
+# Julia 1.10's LinearAlgebra dispatches on the non-public abstract `AbstractTriangular`;
+# later versions use the concrete union, which needs the second set of methods.
+for T in (LinearAlgebra.AbstractTriangular, _Triangular), N in (1, 2)
+    @eval *(x::$T, y::Arr{<:Any, $N}) = *(x, unwrap(y))
 end
-function *(a::PolyadicT, b::Arr, bs::PolyadicT...)
-    return *(a, unwrap(b), bs...)
+for T in (LinearAlgebra.AbstractTriangular, _Triangular)
+    @eval *(x::Arr{<:Any, 2}, y::$T) = *(unwrap(x), y)
 end
-function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, bs::PolyadicT...) where {T <: Number}
-    return *(a, unwrap(b), bs...)
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose), N in (1, 2)
+    @eval *(
+        x::$T{<:Any, <:AbstractVector}, y::Arr{<:Any, $N}
+    ) = *(x, unwrap(y))
 end
-function *(a::LinearAlgebra.Adjoint{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs::PolyadicT...) where {T <: Number}
-    return *(a, unwrap(b), unwrap(c), bs...)
+# The combined signature resolves the intersection with LinearAlgebra's union method.
+function *(
+        x::Union{
+            LinearAlgebra.Adjoint{<:Any, <:AbstractVector},
+            LinearAlgebra.Transpose{<:Any, <:AbstractVector},
+        }, y::Arr{<:Any, 1}
+    )
+    return *(x, unwrap(y))
 end
-function *(a::LinearAlgebra.Transpose{T, <: AbstractVector}, b::Arr, bs::PolyadicT...) where {T <: Real}
-    return *(a, unwrap(b), bs...)
+function *(x::LinearAlgebra.Adjoint{T, <:AbstractVector}, y::Arr{S, 1}) where {
+        T <: Number, S <: Number,
+    }
+    return *(x, unwrap(y))
 end
-function *(a::LinearAlgebra.Transpose{T, <: AbstractVector}, b::Arr, c::AbstractVector, bs::PolyadicT...) where {T <: Real}
-    return *(a, unwrap(b), unwrap(c), bs...)
+function *(x::LinearAlgebra.Transpose{T, <:AbstractVector}, y::Arr{T, 1}) where {T <: Real}
+    return *(x, unwrap(y))
 end
-function *(a::Number, b::Arr, bs::PolyadicT...)
-    return *(unwrap(a), unwrap(b), bs...)
+function *(
+        x::_StaticArray{Tuple{N, M}, T, 2}, y::Arr{S, 1}
+    ) where {N, M, T, S}
+    return *(x, unwrap(y))
 end
-function *(x1::Arr, x2::BasicSymbolic{VartypeT}, args::PolyadicT...)
-    return *(unwrap(x1), x2, args...)
+function *(
+        x::Arr, y::Union{
+            LinearAlgebra.Adjoint{<:Any, <:AbstractVector},
+            LinearAlgebra.Transpose{<:Any, <:AbstractVector},
+        }
+    )
+    return *(unwrap(x), y)
 end
-function *(x1::Arr, x2::Arr, args::PolyadicT...)
-    return *(unwrap(x1), unwrap(x2), args...)
+function *(
+        x::LinearAlgebra.Adjoint{<:Number, <:AbstractVector}, y::Arr,
+        z::AbstractVector{<:Number}
+    )
+    return *(x, unwrap(y), unwrap(z))
 end
-function *(x1::Arr, x2::AbstractMatrix, args::PolyadicT...)
-    return *(unwrap(x1), x2, args...)
+function *(
+        x::LinearAlgebra.Transpose{<:Real, <:AbstractVector}, y::Arr,
+        z::AbstractVector{<:Real}
+    )
+    return *(x, unwrap(y), unwrap(z))
 end
-function *(x1::Arr, x2::AbstractVector, args::PolyadicT...)
-    return *(unwrap(x1), x2, args...)
+function *(
+        x::Union{Real, Complex}, y::Arr{T, 2}, z::Arr{S, 1}
+    ) where {T <: Union{Real, Complex}, S <: Union{Real, Complex}}
+    return *(unwrap(x), unwrap(y), unwrap(z))
 end
-function *(x1::AbstractMatrix, x2::Arr, args::PolyadicT...)
-    return *(x1, unwrap(x2), args...)
-end
-function *(x1::Arr, x2::Arr, x3::Arr, args::PolyadicT...)
-    return *(unwrap(x1), unwrap(x2), unwrap(x3), args...)
-end
-function *(x1::Arr, x2::Arr, x3::Arr, x4::Arr, args::PolyadicT...)
-    return *(unwrap(x1), unwrap(x2), unwrap(x3), unwrap(x4), args...)
-end
+*(x::Arr, y::Arr, z::Number) = *(unwrap(x), unwrap(y), unwrap(z))
 
 function +(x::Arr, args::AbstractArray...)
     return +(unwrap(x), args...)
@@ -127,13 +161,18 @@ end
 function +(x1::Arr, x2::Arr, args::AbstractArray...)
     return +(unwrap(x1), unwrap(x2), args...)
 end
+function +(x::Arr, y::_StaticArray)
+    return +(unwrap(x), y)
+end
 
 for T1 in [Arr, AbstractArray], T2 in [Arr, AbstractArray]
     T1 == T2 == AbstractArray && continue
     @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Num(unwrap(x1) \ unwrap(x2))
     @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
-    @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 1}) = Arr{Num, 1}(unwrap(x1) \ unwrap(x2))
-    @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
+    if T1 == Arr
+        @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 1}) = Arr{Num, 1}(unwrap(x1) \ unwrap(x2))
+        @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
+    end
 
     @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
     @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
@@ -141,6 +180,31 @@ for T1 in [Arr, AbstractArray], T2 in [Arr, AbstractArray]
 end
 
 Base.:(/)(x1::Num, x2::Arr{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
+
+const _TriangularNum = Union{
+    LinearAlgebra.LowerTriangular{Num}, LinearAlgebra.UpperTriangular{Num},
+}
+const _UnitTriangularNum = Union{
+    LinearAlgebra.UnitLowerTriangular{Num}, LinearAlgebra.UnitUpperTriangular{Num},
+}
+# The vector cases are dispatch bridges that preserve the underlying dimension error.
+for T in (LinearAlgebra.Diagonal{Num}, _TriangularNum, _UnitTriangularNum), N in (1, 2)
+    @eval Base.:(/)(A::Arr{Num, $N}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
+end
+for T in (
+        LinearAlgebra.Bidiagonal{Num},
+        LinearAlgebra.Adjoint{Num, <:LinearAlgebra.Bidiagonal},
+        LinearAlgebra.Transpose{Num, <:LinearAlgebra.Bidiagonal},
+    )
+    @eval Base.:(/)(A::Arr{Num, 2}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
+end
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose)
+    @eval function Base.:(/)(
+            A::$T{Num, <:AbstractVector}, B::Arr{Num, 2}
+        )
+        return Arr{Num, 2}(unwrap(A) / unwrap(B))
+    end
+end
 
 Base.exp(m::Matrix{Num}) = Arr{Num, 2}(exp(SConst(m)))
 Base.exp(m::Matrix{Complex{Num}}) = Arr{Complex{Num}, 2}(exp(SConst(m)))
@@ -151,8 +215,60 @@ end
 
 #################### MAP-REDUCE ################
 
-SymbolicUtils.@map_methods Arr unwrap wrap
-SymbolicUtils.@mapreduce_methods Arr unwrap wrap
+for Tf in (BasicSymbolic, Any)
+    @eval begin
+        function Base.map(f::$Tf, x::Arr)
+            return wrap(map(f, unwrap(x)))
+        end
+        function Base.map(f::$Tf, x::Arr, xs::Arr...)
+            return wrap(map(f, unwrap(x), unwrap.(xs)...))
+        end
+        function Base.map(f::$Tf, x::Arr, y::BasicSymbolic, ys...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::Arr, y::AbstractArray, ys::AbstractArray...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::Arr, y::_StaticArray, ys::AbstractArray...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::AbstractArray, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::_StaticArray, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::BasicSymbolic, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
+    end
+end
+for Tf in (BasicSymbolic, Any), Tr in (BasicSymbolic, Any)
+    @eval begin
+        function Base.mapreduce(f::$Tf, op::$Tr, x::Arr; kw...)
+            return wrap(mapreduce(f, op, unwrap(x); kw...))
+        end
+        function Base.mapreduce(f::$Tf, op::$Tr, x::Arr, xs::Arr...; kw...)
+            return wrap(mapreduce(f, op, unwrap(x), unwrap.(xs)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::Arr, y::AbstractArray,
+                ys::AbstractArray...; kw...
+            )
+            return wrap(mapreduce(f, op, unwrap(x), y, unwrap.(ys)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::AbstractArray, y::Arr, ys::Arr...; kw...
+            )
+            return wrap(mapreduce(f, op, x, unwrap(y), unwrap.(ys)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::BasicSymbolic, y::Arr, ys::Arr...; kw...
+            )
+            return wrap(mapreduce(f, op, x, unwrap(y), unwrap.(ys)...; kw...))
+        end
+    end
+end
 
 function LinearAlgebra.dot(x::Arr{T}, y::Arr{T}) where {T}
     T(LinearAlgebra.dot(unwrap(x), unwrap(y)))

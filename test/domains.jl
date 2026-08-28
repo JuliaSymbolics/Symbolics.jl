@@ -1,6 +1,7 @@
 using Symbolics, Test
 import Symbolics: VarDomainPairing
 import DomainSets: Interval, Ball, infimum, supremum, radius, center
+import DomainSets
 
 domain = Interval(0, 1)
 @test infimum(domain) == 0
@@ -24,6 +25,23 @@ domains = [t ∈ Interval(0.0,1.0),
 @syms y z
 @test ((x,y) ∈ Ball(2.0, [0,0])) isa VarDomainPairing
 @test ((x,y,z) ∈ Ball(1.5, [1,2,3])) isa VarDomainPairing
+
+specific_domains = (
+    DomainSets.ℕ,
+    DomainSets.Integers(),
+    DomainSets.RealNumbers(),
+    DomainSets.Rationals(),
+    DomainSets.ComplexNumbers(),
+    DomainSets.HalfLine{Float64, :open}(),
+    DomainSets.HalfLine{Float64, :closed}(),
+    DomainSets.NegativeHalfLine{Float64, :open}(),
+    DomainSets.NegativeHalfLine{Float64, :closed}(),
+)
+for specific_domain in specific_domains
+    @test (t ∈ specific_domain) isa VarDomainPairing
+    @test ((t, x) ∈ specific_domain) isa VarDomainPairing
+end
+@test ((t, x) ∈ domain) isa VarDomainPairing
 
 # Test tuple gets converted to Interval
 var_domain_pair = t ∈ (0,1)
