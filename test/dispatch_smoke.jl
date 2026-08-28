@@ -3,6 +3,7 @@
 # the point is that each call resolves to a method and returns.
 using Symbolics, LinearAlgebra, SparseArrays, Test
 using StaticArraysCore: SArray
+using StaticArrays: SHermitianCompact
 using Symbolics: SpecialFunctions
 
 @variables x y z t
@@ -55,6 +56,8 @@ const CALLS = [
     "view(sp, :, 1) / x" => () -> view(sp, :, 1) / x,
     "sv / x" => () -> sv / x,
     "S / x" => () -> S / x,
+    "SHermitianCompact / x" => () -> SHermitianCompact{2}(SArray{Tuple{3}}((1.0, 2.0, 3.0))) / x,
+    "x \\ SHermitianCompact" => () -> x \ SHermitianCompact{2}(SArray{Tuple{3}}((1.0, 2.0, 3.0))),
     "(0.0:0.5:1.0) / x" => () -> (0.0:0.5:1.0) / x,
     "BitVector / x" => () -> BitVector([1, 0]) / x,
     "A / Dgn" => () -> A / Dgn,

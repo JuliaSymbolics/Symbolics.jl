@@ -658,3 +658,16 @@ end
     @test_throws ErrorException ifelse(x > 0, b, A)
     @test_throws ErrorException ifelse(x > 0, A, b)
 end
+
+@testset "Bridged mixed symbolic/numeric terms evaluate" begin
+    @variables x A[1:2, 1:2] b[1:2]
+    M = [1.0 2.0; 3.0 4.0]
+    Dg = LinearAlgebra.Diagonal([1.0, 2.0])
+    oop(expr, args...) = build_function(expr, args...; expression = Val{false})[1]
+    @test oop(Dg / x, x)(2.0) == LinearAlgebra.Diagonal([0.5, 1.0])
+    @test oop(Dg \ b, b)([2.0, 4.0]) == [2.0, 2.0]
+    @test oop(2 * A * [1.0, 2.0], A)([1.0 0.0; 0.0 1.0]) == [2.0, 4.0]
+    @test oop(A / M, A)([1.0 0.0; 0.0 1.0]) ≈ inv(M)
+    @test build_function(x in 1:3, x; expression = Val{false})(5) === false
+    @test build_function(x in 1:3, x; expression = Val{false})(2) === true
+end
