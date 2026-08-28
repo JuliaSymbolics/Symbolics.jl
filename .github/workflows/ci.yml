@@ -28,7 +28,7 @@ jobs:
           - '1'
         include:
           - group: QA
-            version: 'lts'
+            version: '1.10'
     steps:
       - uses: actions/checkout@v7
         with:
