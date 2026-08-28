@@ -79,9 +79,25 @@ end
 *(x::Arr, y::BasicSymbolic{VartypeT}) = *(unwrap(x), y)
 *(x::Arr, y::Arr) = *(unwrap(x), unwrap(y))
 *(x::Arr, y::AbstractMatrix) = *(unwrap(x), y)
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose)
+    @eval *(x::Arr{<:Any, 1}, y::$T{<:Any, <:AbstractMatrix}) = *(unwrap(x), y)
+end
 *(x::Arr, y::AbstractVector) = *(unwrap(x), y)
 *(x::AbstractMatrix, y::Arr) = *(x, unwrap(y))
 *(x::LinearAlgebra.Diagonal, y::Arr) = *(x, unwrap(y))
+*(x::Arr{<:Any, 2}, y::LinearAlgebra.Diagonal) = *(unwrap(x), y)
+const _Triangular = Union{
+    LinearAlgebra.LowerTriangular, LinearAlgebra.UnitLowerTriangular,
+    LinearAlgebra.UnitUpperTriangular, LinearAlgebra.UpperTriangular,
+}
+# Julia 1.10's LinearAlgebra dispatches on the non-public abstract `AbstractTriangular`;
+# later versions use the concrete union, which needs the second set of methods.
+for T in (LinearAlgebra.AbstractTriangular, _Triangular), N in (1, 2)
+    @eval *(x::$T, y::Arr{<:Any, $N}) = *(x, unwrap(y))
+end
+for T in (LinearAlgebra.AbstractTriangular, _Triangular)
+    @eval *(x::Arr{<:Any, 2}, y::$T) = *(unwrap(x), y)
+end
 for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose), N in (1, 2)
     @eval *(
         x::$T{<:Any, <:AbstractVector}, y::Arr{<:Any, $N}

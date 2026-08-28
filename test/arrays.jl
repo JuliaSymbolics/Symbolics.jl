@@ -644,3 +644,17 @@ end
     @variables X[1:2, 1:2, 1:2]
     @test X[i, 1, i] isa SymbolicUtils.BasicSymbolic
 end
+
+@testset "Arr survives Base generic fallbacks" begin
+    @variables x A[1:2, 1:2] b[1:2]
+    M = [1.0 2.0; 3.0 4.0]
+    @test copy(A) isa Symbolics.Arr{Num, 2}
+    @test isequal(copy(A), A)
+    @test A / M isa Symbolics.Arr{Num, 2}
+    @test M / A isa Symbolics.Arr{Num, 2}
+    @test A^x isa Symbolics.Arr
+    @test b * adjoint(reshape([1.0, 2.0], 2, 1)) isa SymbolicUtils.BasicSymbolic
+    @test b * transpose(reshape([1.0, 2.0], 2, 1)) isa SymbolicUtils.BasicSymbolic
+    @test_throws ErrorException ifelse(x > 0, b, A)
+    @test_throws ErrorException ifelse(x > 0, A, b)
+end

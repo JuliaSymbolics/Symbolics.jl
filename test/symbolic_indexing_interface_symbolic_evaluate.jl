@@ -34,4 +34,4 @@ expr4 = D(x) ~ 3x + y
 @test isequal(symbolic_evaluate(expr4, Dict(x => 3)), D(3) ~ 9 + y)
 @test isequal(symbolic_evaluate(expr4, Dict(x => 3); operator = Operator), D(x) ~ y + 9)
 @test isequal(symbolic_evaluate(expr4, Dict(x => 1, D(x) => 2)), 2 ~ 3 + y)
-@test isequal(symbolic_evaluate(expr4, Dict(x => 1, D(x) => 2, y => 3)), Equation(2, 6))
+@test isequal(symbolic_evaluate(expr4, Dict(x => 1, D(x) => 2, y => 3)), 2 ~ 6)

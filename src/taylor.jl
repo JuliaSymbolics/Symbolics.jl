@@ -74,10 +74,7 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
             return taylor_coeff(f, x, n; rationalize, kwargs...)
         else
             # return new equation with coefficients of each side
-            return Equation(
-                taylor_coeff(f.lhs, x, n; rationalize, kwargs...),
-                taylor_coeff(f.rhs, x, n; rationalize, kwargs...),
-            )
+            return taylor_coeff(f.lhs, x, n; rationalize, kwargs...) ~ taylor_coeff(f.rhs, x, n; rationalize, kwargs...)
         end
     elseif ismissing(n)
         # assume user wants maximum order in the expression

@@ -368,3 +368,12 @@ sx = fill(x, 3)
 @test isequal(scalarize(X + sX), scalarize(X) + sX)
 @test isequal(scalarize(X * sX), scalarize(X) * sX)
 @test isequal(scalarize(X * sx), scalarize(X) * sx)
+
+@testset "Equations from nonsymbolic operands" begin
+    @variables x y
+    @test (1 ~ 3) isa Equation
+    @test (nothing ~ nothing) isa Equation
+    @test ([x, y] ~ [1, 2]) isa Equation
+    @test isequal(substitute(x ~ y, Dict(x => 1, y => 2)), Equation(1, 2))
+    @test copysign(1 // 2, x) isa Num
+end

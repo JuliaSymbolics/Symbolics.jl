@@ -324,7 +324,7 @@ end
     @test isequal(value(only(symbolic_solve([x + a, a - 1], x))), -1)
     @test isequal(symbolic_solve([x - a, y + a], [x, y]), [Dict(y => -a, x => a)])
     @test isequal(symbolic_solve([x*y - a, x*y + x], [x, y]), [Dict(y => Const{SymReal}(-1), x => -a)])
-    @test symbolic_solve([x * y - a, Equation(1, 3)], [x, y]) === nothing
+    @test symbolic_solve([x*y - a, 1 ~ 3], [x, y]) === nothing
 
     @test isnothing(symbolic_solve([x*y - 1, sin(x)], [x, y]))
 

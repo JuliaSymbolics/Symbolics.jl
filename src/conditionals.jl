@@ -13,7 +13,10 @@ for op in (:ifelse_eager, :ifelse_branching)
             unwrap(c), unwrap(x), unwrap(y)))
         $op(c::Num, x, y::Arr{T, N}) where {T, N} = Arr{T, N}($op(
             unwrap(c), unwrap(x), unwrap(y)))
-        $op(c::Num, x::Arr, y::Arr) = Arr($op(unwrap(c), unwrap(x), unwrap(y)))
+        function $op(c::Num, x::Arr, y::Arr)
+            size(x) == size(y) || error("Both branches of `ifelse` must have the same shape.")
+            return Arr($op(unwrap(c), unwrap(x), unwrap(y)))
+        end
         # Disambiguate mixed scalar/array branches (intersections of the methods above).
         $op(c::Num, x::Num, y::Arr{T, N}) where {T, N} = Arr{T, N}($op(
             unwrap(c), unwrap(x), unwrap(y)))

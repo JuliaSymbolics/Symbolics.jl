@@ -48,19 +48,11 @@ end
 lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
 
-function _equation(lhs, rhs)
-    return if (isarraysymbolic(lhs) || isarraysymbolic(rhs)) && ((sl = size(lhs)) != (sr = size(rhs)))
-        throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
-    else
-        Equation(lhs, rhs)
-    end
-end
-const _SymbolicEquationOperand = Union{Num, SymbolicT}
-
 """
 $(TYPEDSIGNATURES)
 
-Create an [`Equation`](@ref) when at least one operand is symbolic.
+Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
+`Num` and a `Number`.
 
 # Examples
 
@@ -84,15 +76,15 @@ julia> A .~ 3x
 (broadcast(~, A, 3x))[1:3,1:3]
 ```
 """
-Base.:~(lhs::_SymbolicEquationOperand, rhs) = _equation(lhs, rhs)
-Base.:~(lhs, rhs::_SymbolicEquationOperand) = _equation(lhs, rhs)
-Base.:~(lhs::_SymbolicEquationOperand, rhs::_SymbolicEquationOperand) = _equation(lhs, rhs)
-
-for T in (:Num, :(Complex{Num}), :Complex, :Number),
-        S in (:Num, :(Complex{Num}), :Complex, :Number)
-    (T in (:Complex, :(Complex{Num})) || S in (:Complex, :(Complex{Num}))) || continue
-    (T in (:Num, :(Complex{Num})) || S in (:Num, :(Complex{Num}))) || continue
-    (T == :Num && S == :Num) && continue
+function Base.:~(lhs, rhs)
+    if (isarraysymbolic(lhs) || isarraysymbolic(rhs)) && ((sl = size(lhs)) != (sr = size(rhs)))
+        throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
+    else
+        Equation(lhs, rhs)
+    end
+end
+for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
+    (T != :Complex && S != :Complex) && continue
     @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
                                       ai = value(imag(a)), bi = value(imag(b))
         if ar isa Number && br isa Number && ai isa Number && bi isa Number

@@ -1,5 +1,4 @@
 using SciMLTesting
-import StarAlgebras
 import StaticArrays
 
 symbolic_utils = Symbolics.SymbolicUtils
@@ -9,9 +8,11 @@ basic_symbolic_wrapper = getfield(parentmodule(basic_symbolic), nameof(basic_sym
 run_qa(
     Symbolics;
     aqua_kwargs = (;
-        # Shared public interfaces are jointly owned; binary `~` constructs equations.
+        # Shared SymbolicUtils interfaces are jointly owned. Base has no binary `~`, so
+        # Symbolics' equation operator cannot collide with anything it does not own.
         piracies = (;
             treat_as_own = (
+                Base.:~,
                 basic_symbolic_wrapper,
                 symbolic_utils.arguments,
                 symbolic_utils.Code.cse_inside_expr,
@@ -29,7 +30,7 @@ run_qa(
                 :Unknown, :acos, :acosh, :alignment, :asin, :atanh, :checknonsingular,
                 :cos, :diffrule, :diffrules, :eval, :getdoc, :log, :log10, :log1p,
                 :log2, :max, :min, :nocolor, :power_by_squaring, :register_error_hint,
-                :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractCoefficients,
+                :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractTriangular,
                 :Slice, :StaticArray, :TwicePrecision, :TypedEndpointsInterval,
                 :sin, :sqrt, :striplines, :tan,
             ),

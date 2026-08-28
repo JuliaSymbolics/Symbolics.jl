@@ -79,7 +79,7 @@ for f in (
         (f::$(typeof(f)))(a::Num, b::Complex) = invoke(f, Tuple{Num, Number}, a, b)
     end
 end
-for T in (Signed, Float32, Float64)
+for T in (Signed, Rational, Float32, Float64)
     @eval Base.copysign(a::$T, b::Num) = invoke(copysign, Tuple{Real, Num}, a, b)
 end
 SpecialFunctions.polygamma(a::Integer, b::Num) =

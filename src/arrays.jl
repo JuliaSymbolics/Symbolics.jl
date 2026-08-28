@@ -51,12 +51,6 @@ struct Arr{T,N} <: AbstractArray{T, N}
     end
 end
 
-Base.:~(lhs::Arr, rhs) = _equation(lhs, rhs)
-Base.:~(lhs, rhs::Arr) = _equation(lhs, rhs)
-Base.:~(lhs::Arr, rhs::Arr) = _equation(lhs, rhs)
-Base.:~(lhs::Arr, rhs::_SymbolicEquationOperand) = _equation(lhs, rhs)
-Base.:~(lhs::_SymbolicEquationOperand, rhs::Arr) = _equation(lhs, rhs)
-
 has_symwrapper(::Type{T}) where {T <: AbstractArray} = true
 has_symwrapper(::Type{T}) where {S <: BasicSymbolic, T <: AbstractArray{S}} = false
 wrapper_type(::Type{T}) where {S, N, T <: AbstractArray{S, N}} = Arr{maybewrap(S), N}
@@ -182,11 +176,17 @@ end
 
 Base.ifelse(x::Num, y::Arr{T, N}, z) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
 Base.ifelse(x::Num, y, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
-Base.ifelse(x::Num, y::Arr, z::Arr) = Arr(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+function Base.ifelse(x::Num, y::Arr, z::Arr)
+    size(y) == size(z) || error("Both branches of `ifelse` must have the same shape.")
+    return Arr(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+end
 Base.ifelse(x::Num, y::Arr{T, N}, z::Num) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
 Base.ifelse(x::Num, y::Num, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
 
 Base.exp(A::Arr{T, 2}) where {T} = Arr{T, 2}(exp(unwrap(A)))
+Base.:^(A::Arr{<:Any, 2}, x::Num) = wrap(unwrap(A)^unwrap(x))
+# `Arr` has no `similar`; Base generics that `copy` an intermediate (e.g. `/`) need this.
+Base.copy(x::Arr) = wrap(copy(unwrap(x)))
 Base.inv(A::Arr{T, 2}) where {T} = Arr{T, 2}(inv(unwrap(A)))
 LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
 LinearAlgebra.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
