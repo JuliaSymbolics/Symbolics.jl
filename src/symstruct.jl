@@ -240,6 +240,33 @@ Return the name of the struct field accessed by `f`.
 """
 field_name(::SymbolicGetproperty{T, field}) where {T, field} = field
 
+"""
+    $(TYPEDSIGNATURES)
+
+A field access is a variable in its own right, exactly as an array element is: it names a
+leaf of the record. Without this, variable search stops at the record, so an expression in
+`rec.x` reports `rec` -- which is not what the leaves of a scalarized system are keyed on.
+"""
+function SymbolicUtils.operation_is_atomic(::SymbolicGetproperty, args)
+    return SymbolicUtils.default_is_atomic(args[1])
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+A field access is named through the record it projects out of, exactly as an array element
+is named through its array. Without this, anything that gates on `hasname` (code
+generation, in particular) sees a struct projection as anonymous.
+"""
+SymbolicUtils.operation_hasname(::SymbolicGetproperty, args) = hasname(args[1])
+
+"""
+    $(TYPEDSIGNATURES)
+
+See [`SymbolicUtils.operation_hasname`](@ref).
+"""
+SymbolicUtils.operation_getname(::SymbolicGetproperty, args) = getname(args[1])
+
 function (f::SymbolicGetproperty{T})(x::SymbolicT) where {T}
     unwrap(f(SymStruct{T}(x)))
 end

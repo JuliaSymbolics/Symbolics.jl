@@ -418,3 +418,16 @@ end
     @test isequal(drec, SU.unwrap(D(SU.unwrap(rec))))
     @test SU.symtype(drec) === Record2{Int}
 end
+
+using SymbolicIndexingInterface: SymbolicIndexingInterface as SII
+
+@testset "field accesses are named through their record" begin
+    @variables rec::Record2{Int} nest::Record2{Record2{Int}}
+    @test SII.hasname(SU.unwrap(rec.x))
+    # Named through the record, exactly as an array element is named through its array.
+    @test SII.getname(SU.unwrap(rec.x)) === :rec
+    @test SII.getname(SU.unwrap(rec.y)) === :rec
+    # Composes through nesting and through array-valued fields.
+    @test SII.getname(SU.unwrap(rec.z[2])) === :rec
+    @test SII.getname(SU.unwrap(nest.z[1].x)) === :nest
+end
