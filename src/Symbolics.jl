@@ -733,6 +733,6 @@ include("despecialize.jl")
     end
 end
 
-precompile(Tuple{typeof(Base.:(^)), SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymbolicUtils.SymReal}, Int64})
+precompile(Tuple{typeof(Base.:(^)), SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymbolicUtils.SymReal}, Int})
 
 end # module

@@ -138,7 +138,7 @@ end
 Base.nameof(D::Differential) = :Differential
 
 Base.:(==)(D1::Differential, D2::Differential) = isequal(D1.x, D2.x) && isequal(D1.order, D2.order)
-Base.hash(D::Differential, u::UInt) = hash(D.order, hash(D.x, xor(u, 0xdddddddddddddddd)))
+Base.hash(D::Differential, u::UInt) = hash(D.order, hash(D.x, xor(u, 0xdddddddddddddddd % UInt)))
 
 """
     $(TYPEDSIGNATURES)

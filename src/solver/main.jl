@@ -331,7 +331,7 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
         expr = unwrap(simplify((copy(wrap(expression)))))
         args = arguments(expr)
         operation = SymbolicUtils.operation(expr)
-        if isequal(operation, ^) && SymbolicUtils.isconst(args[2]) && (a2 = unwrap_const(args[2]); a2 isa Int64)
+        if isequal(operation, ^) && SymbolicUtils.isconst(args[2]) && (a2 = unwrap_const(args[2]); a2 isa Integer)
             expression = wrap(args[1])
             mult_n = a2
         end
