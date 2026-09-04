@@ -69,7 +69,7 @@ end
 
 Base.:(==)(I1::Integral, I2::Integral) = convert(Bool, simplify(isequal(I1.domain, I2.domain)))
 
-const INTEGRAL_SALT = 0xb7d4e1928c3a6f50
+const INTEGRAL_SALT = 0xb7d4e1928c3a6f50 % UInt
 function _isequal_integral_domain(
         d1::IntervalSets.AbstractInterval, d2::IntervalSets.AbstractInterval
     )
