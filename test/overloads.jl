@@ -1,9 +1,11 @@
 using Symbolics: Sym, FnType, Term, value, scalarize
 using Symbolics
 using LinearAlgebra
-using SparseArrays: sparse
+using SparseArrays: sparse, sparsevec
+using StaticArraysCore: SArray
+import SpecialFunctions
 using Test
-using SymbolicUtils: evaluate
+using SymbolicUtils: BasicSymbolic, evaluate
 
 a, b, c = :runtime_symbol_value, :value_b, :value_c
 vars = @variables t $a $b(t) $c(t)[1:3]
@@ -162,6 +164,101 @@ z2 = c + d * im
 @test isequal(2 - z1, Complex(2 - a, -b))
 @test isequal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
 
+@testset "Num dispatch intersections" begin
+    @test Num(1 + 0im) isa Num
+    @test_throws InexactError Num(1 + 2im)
+    @test_throws InexactError convert(Num, 1 + 2im)
+    @test (1 + 2im == a) isa Num
+    @test (a == 1 + 2im) isa Num
+    @test (Base.MathConstants.pi == a) isa Num
+    @test (a == Base.MathConstants.pi) isa Num
+    @test !isequal(1 + 2im, a)
+    @test !isequal(a, 1 + 2im)
+    @test isequal((Complex(a, b)^false), Complex(1, 0))
+    @test promote_type(Complex{Float64}, Num) === Complex{Num}
+
+    for value in (1.0, 1 + 2im, unwrap(a))
+        @test (SymbolicUtils.:<ₑ(a, value)) isa Bool
+        @test (SymbolicUtils.:<ₑ(value, a)) isa Bool
+    end
+end
+
+@testset "Num package-array intersections" begin
+    bits = BitVector([true, false])
+    sparse_vector = sparsevec([1], [1.0], 2)
+    static_vector = SArray{Tuple{2}}((1.0, 2.0))
+
+    @test bits / a isa BasicSymbolic
+    @test a / bits isa BasicSymbolic
+    @test sparse_vector / a isa BasicSymbolic
+    @test static_vector / a isa BasicSymbolic
+    @test a \ static_vector isa BasicSymbolic
+    @test view([1.0 2.0; 3.0 4.0], :, :) / a isa BasicSymbolic
+    @test a \ view([1.0, 2.0], :) isa BasicSymbolic
+    @test sparse([1.0 0.0; 0.0 2.0]) / a isa BasicSymbolic
+    @test a / (1:3) isa BasicSymbolic
+    @test (a in 1:3) isa BasicSymbolic
+    @test (a in static_vector) isa BasicSymbolic
+    for values in (
+            view([1.0, 2.0], :), Diagonal([1.0, 2.0]),
+            Symmetric([1.0 0.0; 0.0 2.0]), adjoint([1.0, 2.0]),
+        )
+        @test (a in values) isa BasicSymbolic
+    end
+
+    upper = UpperTriangular(Num[1 1; 0 1])
+    upper_rhs = sparsevec([1, 2], Num[2, 1], 2)
+    @test ldiv!(upper, upper_rhs) == Num[1, 1]
+    upper_rhs = sparsevec([1, 2], Num[2, 1], 2)
+    upper_output = Num[0, 0]
+    @test ldiv!(upper, upper_rhs, upper_output) == Num[1, 1]
+
+    unit_lower = UnitLowerTriangular(Num[1 0; 1 1])
+    lower_rhs = sparsevec([1, 2], Num[1, 2], 2)
+    @test ldiv!(unit_lower, lower_rhs) == Num[1, 1]
+    lower_rhs = sparsevec([1, 2], Num[1, 2], 2)
+    lower_output = Num[0, 0]
+    @test ldiv!(unit_lower, lower_rhs, lower_output) == Num[1, 1]
+end
+
+@testset "Num scalar method intersections" begin
+    for f in (
+            SpecialFunctions.besseli, SpecialFunctions.besselj,
+            SpecialFunctions.besselk, SpecialFunctions.bessely,
+        )
+        @test f(a, 1.0) isa Num
+        @test f(a, 1.0im) isa Num
+    end
+    @test copysign(1, a) isa Num
+    @test copysign(1.0f0, a) isa Num
+    @test copysign(1.0, a) isa Num
+    @test SpecialFunctions.polygamma(1, a) isa Num
+end
+
+@testset "Num structured-array intersections" begin
+    structured = (
+        Bidiagonal([1.0, 2.0], [3.0], :U),
+        Diagonal([1.0, 2.0]),
+        Tridiagonal([1.0], [2.0, 3.0], [4.0]),
+        SymTridiagonal([1.0, 2.0], [3.0]),
+        Symmetric([1.0 2.0; 2.0 3.0]),
+        Hermitian([1.0 2.0; 2.0 3.0]),
+        UpperHessenberg([1.0 2.0; 3.0 4.0]),
+        UpperTriangular([1.0 2.0; 0.0 3.0]),
+        LowerTriangular([1.0 0.0; 2.0 3.0]),
+        UnitUpperTriangular([1.0 2.0; 0.0 1.0]),
+        UnitLowerTriangular([1.0 0.0; 2.0 1.0]),
+    )
+    for matrix in structured
+        @test (matrix / a) isa BasicSymbolic
+        @test (a \ matrix) isa BasicSymbolic
+    end
+    for matrix in (structured[2], structured[4], structured[5], structured[6])
+        @test (matrix^a) isa BasicSymbolic
+    end
+    @test (a^[1.0 0.0; 0.0 1.0]) isa BasicSymbolic
+end
+
 @test isequal((0 ~ a+0*im), 0 ~ a)
 @test isequal((im ~ b+c*im), [0 ~ b; 1 ~ c])
 @test isequal((0 ~ z1), [0 ~ a, 0 ~ b])
@@ -271,3 +368,12 @@ sx = fill(x, 3)
 @test isequal(scalarize(X + sX), scalarize(X) + sX)
 @test isequal(scalarize(X * sX), scalarize(X) * sX)
 @test isequal(scalarize(X * sx), scalarize(X) * sx)
+
+@testset "Equations from nonsymbolic operands" begin
+    @variables x y
+    @test (1 ~ 3) isa Equation
+    @test (nothing ~ nothing) isa Equation
+    @test ([x, y] ~ [1, 2]) isa Equation
+    @test isequal(substitute(x ~ y, Dict(x => 1, y => 2)), Equation(1, 2))
+    @test copysign(1 // 2, x) isa Num
+end

@@ -69,6 +69,13 @@ end
     @test @doc(Symbolics.NAMESPACE_SEPARATOR) !== nothing
     @test @doc(Symbolics.get_variables!) !== nothing
     @test @doc(Symbolics.map_subscripts) !== nothing
+    @test @doc(Symbolics.@symbolic_wrap) !== nothing
+    @test @doc(Symbolics.@wrapped) !== nothing
+end
+
+@testset "wrapper macro public API" begin
+    VERSION >= v"1.11" && @test Base.ispublic(Symbolics, Symbol("@symbolic_wrap"))
+    VERSION >= v"1.11" && @test Base.ispublic(Symbolics, Symbol("@wrapped"))
 end
 
 @testset "fixpoint_sub warn_maxiters" begin

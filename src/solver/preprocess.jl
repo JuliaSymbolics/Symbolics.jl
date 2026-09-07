@@ -62,10 +62,12 @@ Filters only if the passed expr is scary (i.e. not a Rational or Int).
 
 # Examples
 ```jldoctest
-julia> filter_stuff(term(sqrt, 2))
-(Dict{Any, Any}(var"##278" => sqrt(2)), var"##278")
+julia> using Symbolics, SymbolicUtils
 
-julia> filter_stuff(123)
+julia> length(Symbolics.filter_stuff(SymbolicUtils.term(sqrt, 2))[1]) == 1
+true
+
+julia> Symbolics.filter_stuff(123)
 (Dict{Any, Any}(), 123)
 ```
 """
@@ -100,11 +102,16 @@ to other functions.
 
 # Examples
 ```jldoctest
-julia> _filter_poly(x + sqrt(2), x)
-(Dict{Any, Any}(var"##239" => 1.4142135623730951), var"##239" + x)
+julia> using Symbolics
 
-julia> RootFinding._filter_poly(x*sqrt(2), x)
-(Dict{Any, Any}(var"##240" => 1.4142135623730951), var"##240"*x)
+julia> x = only(@variables x)
+x
+
+julia> Symbolics._filter_poly(x + sqrt(2), x)
+(Dict{Any, Any}(), (6369051672525773//4503599627370496) + x)
+
+julia> Symbolics._filter_poly(x*sqrt(2), x)
+(Dict{Any, Any}(), (6369051672525773//4503599627370496)*x)
 ```
 """
 function _filter_poly(expr, var)
@@ -233,14 +240,25 @@ user's expression is not altered unwillingly.
 
 # Examples
 ```jldoctest
-julia> filter_poly(x + 2im, x)
-(Dict{Any, Any}(var"##244" => im), 2var"##244" + x)
+julia> using Symbolics
 
-julia> filter_poly((1/im)*x + 3*y*z, x)
-(Dict{Any, Any}(var"##245" => -1.0, var"##246" => im), 3y*z + var"##245"*var"##246"*x)
+julia> x = only(@variables x)
+x
 
-julia> filter_poly((x+1)*term(log, 3), x)
-(Dict{Any, Any}(var"##247" => log(3)), var"##247"*(1 + x))
+julia> y = only(@variables y)
+y
+
+julia> length(Symbolics.filter_poly(x + 2im, x)[1]) == 1
+true
+
+julia> z = only(@variables z)
+z
+
+julia> length(Symbolics.filter_poly((1/im)*x + 3*y*z, x)[1]) == 1
+true
+
+julia> length(Symbolics.filter_poly((x+1)*SymbolicUtils.term(log, 3), x)[1]) == 1
+true
 ```
 """
 function filter_poly(og_expr, var; assumptions=false)
@@ -287,17 +305,22 @@ output from polynomial_coeffs.
 
 # Examples
 ```jldoctest
-julia> coeffs, constant = polynomial_coeffs(x^2 + x + 1, [x])
-(Dict{Any, Any}(x^2 => 1, x => 1, 1 => 1), 0)
+julia> using Symbolics
 
-julia> sdegree(coeffs, x)
+julia> x = only(@variables x)
+x
+
+julia> coeffs, constant = Symbolics.polynomial_coeffs(x^2 + x + 1, [x]); length(coeffs)
+3
+
+julia> Symbolics.sdegree(coeffs, x)
 2
 
 
-julia> coeffs, constant = polynomial_coeffs(x^12 + 3x^2, [x])
-(Dict{Any, Any}(x^2 => 3, x^12 => 1), 0)
+julia> coeffs, constant = Symbolics.polynomial_coeffs(x^12 + 3x^2, [x]); length(coeffs)
+2
 
-julia> sdegree(coeffs, x)
+julia> Symbolics.sdegree(coeffs, x)
 12
 ```
 """

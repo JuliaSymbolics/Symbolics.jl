@@ -73,7 +73,7 @@ variables are not wrapped in `Num`.
 # Arguments
 
 - `buffer`: a mutable collection accepted by
-  [`SymbolicUtils.search_variables!`](@extref SymbolicUtils search_variables!).
+  [`SymbolicUtils.search_variables!`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.search_variables!).
 - `e`: the symbolic expression to traverse.
 - `varlist`: an optional collection restricting which expressions are treated
   as atomic variables.
@@ -82,7 +82,7 @@ variables are not wrapped in `Num`.
 
 - `is_atomic`: predicate used with the `varlist` form to select variables.
 - `kwargs...`: keyword arguments forwarded to
-  [`SymbolicUtils.search_variables!`](@extref SymbolicUtils search_variables!).
+  [`SymbolicUtils.search_variables!`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.search_variables!).
 
 # Examples
 
@@ -134,16 +134,23 @@ Note that the returned differential variables are not wrapped in the `Num` type.
 
 # Examples
 ```jldoctest
-julia> @variables t x u(x, t);
+julia> using Symbolics
 
-julia> D = Differential(x); Dt = Differential(t);
+julia> vars = @variables t x u(x, t); length(vars)
+3
+
+julia> D = Differential(x)
+Differential(x, 1)
+
+julia> Dt = Differential(t)
+Differential(t, 1)
 
 julia> expr = D(u) + Dt(u) + u + sin(D(u));
 
 julia> Symbolics.get_differential_vars(expr; sort = true)
-2-element Vector{SymbolicUtils.BasicSymbolic}:
- Differential(x)(u(x, t))
- Differential(t)(u(x, t))
+2-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{T} where T}:
+ Differential(t, 1)(u(x, t))
+ Differential(x, 1)(u(x, t))
 ```
 """
 function get_differential_vars(e::Num, varlist = nothing; sort::Bool = false)
@@ -195,10 +202,19 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```jldoctest
-julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
+julia> using Symbolics
+
+julia> vars = @variables x t u(x, t) z(t)[1:2]; length(vars)
+4
+
+julia> Dt = Differential(t)
+Differential(t, 1)
+
+julia> Dx = Differential(x)
+Differential(x, 1)
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
-uˍtx(x, t)
+uˍxt(x, t)
 
 julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
 (zˍt(t))[1]
@@ -772,10 +788,10 @@ For multiple symbols, collection is applied sequentially left-to-right.
 julia> @variables a b x;
 
 julia> gather_factor(a*b*x + a*b + b*x, x)
-a*b + (a*b + b)*x
+a*b + (b + a*b)*x
 
 julia> gather_factor(a*b*x + a*b + b*x, b)
-(a*x + a + x)*b
+(a + x + a*x)*b
 
 julia> gather_factor(x^2 + 2x + 1, x)
 1 + 2x + x^2

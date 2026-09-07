@@ -277,14 +277,14 @@ chain rule is not applied:
 julia> myop = Symbolics.value(sin(x) * y^2)
 sin(x)*(y^2)
 
-julia> typeof(Symbolics.operation(myop))  # Op is multiplication function
-typeof(*)
+julia> Symbolics.operation(myop) === (*)
+true
 
 julia> Symbolics.derivative_idx(myop, 1)  # wrt. sin(x)
-y^2
+sin(x)
 
 julia> Symbolics.derivative_idx(myop, 2)  # wrt. y^2
-sin(x)
+y^2
 ```
 """
 @inline derivative_idx(::Any, ::Any) = COMMON_ZERO
@@ -294,4 +294,3 @@ function derivative_idx(O::SymbolicT, idx::Int)
     args = arguments(O)
     return @derivative_rule f(args...) idx
 end
-

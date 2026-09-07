@@ -18,6 +18,8 @@ Symbolics.jl gives functions which allow for translating to and from SymPy expre
 ```@docs
 Symbolics.symbolics_to_sympy
 Symbolics.sympy_to_symbolics
+Symbolics.symbolics_to_sympy_pythoncall
+Symbolics.sympy_pythoncall_to_symbolics
 ```
 
 In addition, many of the features pages include docstrings for functionality given by this bridge.
@@ -30,6 +32,8 @@ These functions all have `sympy` in the name, and includes:
 * `sympy_limit`
 * `sympy_simplify`
 * `sympy_ode_solve`
+* `sympy_pythoncall_to_symbolics`
+* `sympy_pythoncall_simplify`
 
 ## Using Symbolics.jl with Mathematica / Wolfram's MathLink
 

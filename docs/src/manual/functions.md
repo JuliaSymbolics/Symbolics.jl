@@ -139,7 +139,25 @@ Now using the function `svdsolve` with symbolic array variables will be kept laz
 svdsolve(A,b)
 ```
 
-Note that at this time array derivatives cannot be defined.
+Derivatives of registered array functions are defined with [`@register_derivative`](@ref);
+the derivative expression is the Jacobian, which is a single column when differentiating with
+respect to a scalar argument. Differentiation with respect to array-valued arguments is not
+yet supported.
+
+```@example polar_derivative
+using Symbolics
+
+polar(r, θ) = [r * cos(θ), r * sin(θ)]
+@register_array_symbolic polar(r::Real, θ::Real) begin
+    size = (2,)
+    eltype = Real
+end
+@register_derivative polar(r, θ) 1 Symbolics.SConst([cos(θ), sin(θ)])
+@register_derivative polar(r, θ) 2 Symbolics.SConst([-r * sin(θ), r * cos(θ)])
+
+@variables r θ
+Symbolics.scalarize(Symbolics.derivative(polar(r, θ)[2], θ))
+```
 
 ## Registration API
 

@@ -13,6 +13,8 @@ Symbolics.NAMESPACE_SEPARATOR
 ```@docs
 Symbolics.linear_expansion
 Symbolics.LinearExpander
+Symbolics._toexpr_metadata
+Symbolics._toexpr_op
 ```
 
 ## Deprecated

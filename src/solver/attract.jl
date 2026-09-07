@@ -13,7 +13,12 @@ false if not.
 
 # Examples
 ```jldoctest
-julia> detect_addlogs(log(x+1) + log(x-1), x)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.detect_addlogs(log(x+1) + log(x-1), x)
 true
 ```
 """
@@ -53,7 +58,12 @@ Returns true if found, false if not.
 
 # Examples
 ```jldoctest
-julia> detect_exponential(2*3^(x+1) + 5^(x^2 + 3), x)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.detect_exponential(2*3^(x+1) + 5^(x^2 + 3), x)
 true
 ```
 """
@@ -102,8 +112,13 @@ When attracted, it returns an slog.
 
 # Examples
 ```jldoctest
-julia> RootFinding.attract_logs(log(x+1)+log(x-1), x)
-Main.RootFinding.slog(-1 + x^2)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.attract_logs(log(x+1)+log(x-1), x)[1]
+slog(-1 + x^2)
 ```
 """
 function attract_logs(lhs, var)
@@ -145,8 +160,13 @@ number of occurrences of x in the expression.
 
 # Examples
 ```jldoctest
-julia> attract_exponential(2^(x+1) + 5^(x+3), x)
-Main.RootFinding.slog(2) + log(complex(-1)) - 3Main.RootFinding.slog(5) + x*Main.RootFinding.slog(2) - x*Main.RootFinding.slog(5)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.attract_exponential(2^(x+1) + 5^(x+3), x)
+slog(-1) - slog(2) + 3slog(5) + slog(5)*x - slog(2)*x
 ```
 """
 function attract_exponential(lhs, var)
@@ -180,13 +200,18 @@ of x in the lhs.
 
 # Examples
 ```jldoctest
-julia> attract_trig(2sin(x)cos(x), x)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.attract_trig(2sin(x)cos(x), x)
 sin(2x)
 
-julia> attract_trig(sin(x)^2 + cos(x)^2, x)
+julia> Symbolics.attract_trig(sin(x)^2 + cos(x)^2, x)
 1
 
-julia> RootFinding.attract_trig(cosh(x)^2 + sinh(x)^2, x)
+julia> Symbolics.attract_trig(cosh(x)^2 + sinh(x)^2, x)
 cosh(2x)
 """
 function attract_trig(lhs, var)

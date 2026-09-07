@@ -1,4 +1,4 @@
-using SpecialFunctions
+import SpecialFunctions
 import Base.Broadcast
 
 const linearity_map_1 = IdDict{Function, Bool}()

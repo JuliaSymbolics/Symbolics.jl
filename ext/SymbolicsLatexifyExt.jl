@@ -5,7 +5,8 @@ using Latexify
 using LaTeXStrings
 using TermInterface
 using SymbolicUtils
-using Symbolics: value, hide_lhs, postwalk, wrap
+using Symbolics: value, hide_lhs, wrap
+using MacroTools: postwalk
 using SymbolicUtils: BSImpl, FnType, unwrap, symtype, BasicSymbolic
 using Moshi.Match: @match
 
@@ -80,6 +81,11 @@ _as_latexstring(x::AbstractString) = LaTeXString(x)
 
 recipe(n) = _as_latexstring(latexify_derivatives(cleanup_exprs(_toexpr(n))))
 
+function align_side(n)
+    wrapped = wrap(n)
+    return wrapped isa Symbolics.Arr ? recipe(n) : wrapped
+end
+
 @latexrecipe function f(n::Num)
     env --> :equation
     mult_symbol --> "~"
@@ -142,7 +148,7 @@ end
         return map(first ∘ first ∘ Latexify.apply_recipe, eqs)
     else
         env --> :align
-        return wrap.(getfield.(eqs, :lhs)), wrap.(getfield.(eqs, :rhs))
+        return align_side.(getfield.(eqs, :lhs)), align_side.(getfield.(eqs, :rhs))
     end
 end
 

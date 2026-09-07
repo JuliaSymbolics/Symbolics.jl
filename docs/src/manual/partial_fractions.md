@@ -4,6 +4,6 @@ Partial fraction decomposition is performed using the cover-up method. This invo
 
 It is often used when solving integrals or performing an inverse Laplace transform (see [`inverse_laplace`](@ref)).
 
-```docs
+```@docs
 Symbolics.partial_frac_decomposition
 ```

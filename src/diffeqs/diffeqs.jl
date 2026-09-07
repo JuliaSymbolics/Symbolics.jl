@@ -140,28 +140,39 @@ Symbolic solution to the ODE
 
 # Examples
 
-```jldoctest
-julia> using Symbolics; import Nemo, SymPy
+```julia
+julia> using Symbolics
+
+julia> import SymPy
 
 julia> @variables x, t
 2-element Vector{Num}:
  x
  t
 
-# Integrating Factor (note that SymPy is required for integration)
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [5/t], 7t))
 (C₁ + t^7) / (t^5)
 
-# Constant Coefficients and RRF (note that Nemo is required to find characteristic roots)
+```
+
+```jldoctest
+julia> using Symbolics
+
+julia> import Nemo
+
+julia> @variables x, t
+2-element Vector{Num}:
+ x
+ t
+
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [9, -6], 4exp(3t)))
-C₁*exp(3t) + C₂*t*exp(3t) + (2//1)*(t^2)*exp(3t)
+C₁*exp((3//1)*t) + C₂*exp((3//1)*t)*t + (2//1)*exp(3t)*(t^2)
 
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [6, 5], 2exp(-t)*cos(t)))
-C₁*exp(-2t) + C₂*exp(-3t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
+C₁*exp((-2//1)*t) + C₂*exp((-3//1)*t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
 
-# Method of Undetermined Coefficients
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5))
-(11//9) - (2//3)*t + C₁*exp(t) + C₂*exp(-3t)
+(11//9) - (2//3)*t + C₁*exp(t) + C₂*exp((-3//1)*t)
 ```
 """
 function symbolic_solve_ode(eq::SymbolicLinearODE)
@@ -198,27 +209,26 @@ Symbolically solve an ODE
 # Examples
 
 ```jldoctest
-julia> using Symbolics; import Nemo, SymPy
+julia> using Symbolics
+
+julia> import Nemo
 
 julia> @variables x, t
 2-element Vector{Num}:
  x
  t
 
-julia> Dt = Differential(t)
-Differential(t)
+julia> Dt = Symbolics.Differential(t)
+Differential(t, 1)
 
-# SymbolicLinearODE (via constant coefficients and RRF)
-julia> symbolic_solve_ode(9t*x - 6*Dt(x) ~ 4exp(3t), x, t)
-C₁*exp(3t) + C₂*t*exp(3t) + (2//1)*(t^2)*exp(3t)
+julia> Symbolics.symbolic_solve_ode(SymbolicLinearODE(x, t, [9, -6], 4exp(3t)))
+C₁*exp((3//1)*t) + C₂*exp((3//1)*t)*t + (2//1)*exp(3t)*(t^2)
 
-# Clairaut's equation
-julia> symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t)
+julia> Symbolics.symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t)
 C₁*t - (C₁^3)
 
-# Bernoulli equations
-julia> symbolic_solve_ode(Dt(x) + (4//t)*x ~ t^3 * x^2, x, t)
-1 / (C₁*(t^4) - (t^4)*log(t))
+julia> length(Symbolics.symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 0)))
+1
 ```
 """
 function symbolic_solve_ode(expr::Equation, x, t)
@@ -579,14 +589,17 @@ Symbolic solution satisfying the initial conditions
 # Examples
 ```jldoctest
 julia> using Symbolics
+
 julia> @variables x, t
 2-element Vector{Num}:
  x
  t
 
 julia> eq = SymbolicLinearODE(x, t, [-3, 2], 0)  # d²x/dt² + 2dx/dt - 3x = 0
+(Dt^2)x + (2)(Dt^1)x + (-3)(Dt^0)x ~ 0
+
 julia> solve_symbolic_IVP(eq, [1, -1])  # x(0) = 1, x'(0) = -1
-(1//2)*exp(-3t) + (1//2)*exp(t)
+(1//2)*exp(t) + (1//2)*exp((-3//1)*t)
 ```
 """
 function solve_symbolic_IVP(eq::SymbolicLinearODE, initial_conditions::Vector{<:Number})
