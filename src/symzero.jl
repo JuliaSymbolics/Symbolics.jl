@@ -122,10 +122,10 @@ function symbolic_zero(::Type{T}, @nospecialize(sh) = shape_from_type(T)) where 
 end
 
 function _throw_not_zeroable(@nospecialize(T::Type))
-    throw(ArgumentError("""
-        Cannot construct a symbolic zero of type `$T`, since it has no additive identity. \
-        This typically happens when differentiating a symbolic struct with a field whose \
-        type is neither a `Number`, an array, nor another symbolic struct."""))
+    throw(ArgumentError(LazyString(
+        "Cannot construct a symbolic zero of type `", T, "`, since it has no additive ",
+        "identity. This typically happens when differentiating a symbolic struct with a ",
+        "field whose type is neither a `Number`, an array, nor another symbolic struct.")))
 end
 
 function SymbolicUtils.show_call(io::IO, @nospecialize(f::SymbolicZero), x::SymbolicT)
@@ -135,8 +135,8 @@ end
 function SymbolicUtils.Code.function_to_expr(@nospecialize(f::SymbolicZero), x::SymbolicT, st)
     out = get(st.rewrites, x, nothing)
     out === nothing || return out
-    throw(ArgumentError("""
-        Cannot generate code for the symbolic zero of type `$(symzero_type(f))`, since it \
-        has no concrete value. Access its fields or index into it to obtain values which \
-        can be code generated."""))
+    throw(ArgumentError(LazyString(
+        "Cannot generate code for the symbolic zero of type `", symzero_type(f),
+        "`, since it has no concrete value. Access its fields or index into it to obtain ",
+        "values which can be code generated.")))
 end

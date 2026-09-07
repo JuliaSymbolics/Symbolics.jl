@@ -413,10 +413,6 @@ struct with a `String` field.
 function differential_zero(arg::BasicSymbolic{VartypeT})
     T = symtype(arg)
     T <: Number && return COMMON_ZERO
-    is_zeroable(T) || throw(ArgumentError("""
-        Cannot differentiate the expression `$arg` of symtype `$T`, since that type has no \
-        zero to return for an expression which does not depend on the differentiation \
-        variable."""))
     return symbolic_zero(T, shape(arg))
 end
 
