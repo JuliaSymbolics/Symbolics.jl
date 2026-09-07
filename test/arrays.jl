@@ -671,3 +671,28 @@ end
     @test build_function(x in 1:3, x; expression = Val{false})(5) === false
     @test build_function(x in 1:3, x; expression = Val{false})(2) === true
 end
+
+@testset "Issue#1975: `dims` reductions do not mutate their argument's shape" begin
+    @variables A[1:5, 1:4] W[1:3, 1:4, 1:5]
+    reductions = [
+        "sum(A, dims = 1)" => (A, x -> sum(x, dims = 1), (1, 4)),
+        "sum(A, dims = 2)" => (A, x -> sum(x, dims = 2), (5, 1)),
+        "sum(sin, A, dims = 1)" => (A, x -> sum(sin, x, dims = 1), (1, 4)),
+        "prod(A, dims = 2)" => (A, x -> prod(x, dims = 2), (5, 1)),
+        "maximum(A, dims = 1)" => (A, x -> maximum(x, dims = 1), (1, 4)),
+        "minimum(A, dims = 2)" => (A, x -> minimum(x, dims = 2), (5, 1)),
+        "mapreduce(sin, +, A, dims = 2)" => (A, x -> mapreduce(sin, +, x, dims = 2), (5, 1)),
+        "sum(W, dims = 3)" => (W, x -> sum(x, dims = 3), (3, 4, 1)),
+    ]
+    @testset "$name" for (name, (x, f, sz)) in reductions
+        before = copy(shape(unwrap(x)))
+        @test size(f(x)) == sz
+        @test shape(unwrap(x)) == before
+    end
+
+    @variables C[1:5, 1:4] D[1:5, 1:4]
+    sum(C, dims = 1)
+    sum(C, dims = 2)
+    @test size(C[1:5, 1:4]) == (5, 4)
+    @test_nowarn C ~ D
+end
