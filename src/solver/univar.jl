@@ -55,8 +55,8 @@ function get_roots_deg3(expression, x)
     T = term(scbrt, (R - term(ssqrt, (Q^3 + R^2))))
 
     root1 = S + T - (b / (3 * a))
-    root2 = -((S + T) / 2) - (b // (3 * a)) + (im * (term(ssqrt, 3)) / 2) * (S - T)
-    root3 = -((S + T) / 2) - (b // (3 * a)) - (im * (term(ssqrt, 3)) / 2) * (S - T)
+    root2 = -((S + T) / 2) - sdiv(b, 3 * a) + (im * (term(ssqrt, 3)) / 2) * (S - T)
+    root3 = -((S + T) / 2) - sdiv(b, 3 * a) - (im * (term(ssqrt, 3)) / 2) * (S - T)
 
     return [root1, root2, root3]
 end
@@ -70,11 +70,11 @@ function get_roots_deg4(expression, x)
     results = (bigify(unwrap(ssubs(get(coeffs, x^i, 0), subs))) for i in 4:-1:0)
     a, b, c, d, e = results
 
-    p = (8(a * c) - 3(b^2)) // (8(a^2))
+    p = sdiv(8(a * c) - 3(b^2), 8(a^2))
 
-    q = (b^3 - 4(a * b * c) + 8(d * a^2)) // (8 * a^3)
+    q = sdiv(b^3 - 4(a * b * c) + 8(d * a^2), 8 * a^3)
 
-    r = (-3(b^4) + 256(e * a^3) - 64(d * b * a^2) + 16(c * (b^2) * a)) // (256 * a^4)
+    r = sdiv(-3(b^4) + 256(e * a^3) - 64(d * b * a^2) + 16(c * (b^2) * a), 256 * a^4)
 
     m = gensym()
     m = (@variables $m)[1]
@@ -98,7 +98,7 @@ function get_roots_deg4(expression, x)
 
     arr = get_yroots(m, p, q)
     for i in eachindex(arr)
-        arr[i] -= unwrap(b // 4a)
+        arr[i] -= unwrap(sdiv(b, 4a))
     end
 
     return arr
