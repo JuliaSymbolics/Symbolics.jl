@@ -66,9 +66,9 @@ Numbers are always zeroable. An array type is zeroable if its element type is, a
 symbolic struct type is zeroable if every one of its fields is. Everything else - notably
 `String` fields, which have no additive identity - is not.
 """
-is_zeroable(::Type{T}) where {T} = _is_zeroable(T, Base.IdSet{Any}())
+is_zeroable(T::Type) = _is_zeroable(T, Base.IdSet{SU.TypeT}())
 
-function _is_zeroable(::Type{T}, seen::Base.IdSet{SU.TypeT}) where {T}
+function _is_zeroable(T::Type, seen::Base.IdSet{SU.TypeT})
     T <: Number && return true
     # Guards against types which are recursive through an array field, e.g.
     # `struct Tree; kids::Vector{Tree}; end`.
