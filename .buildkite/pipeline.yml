@@ -1,7 +1,7 @@
 steps:
   - label: "Julia 1"
     plugins:
-      - JuliaCI/julia#v1:
+      - QuantumSavory/julia#v1.14:
           version: "1"
       - JuliaCI/julia-test#v1:
            coverage: false # 1000x slowdown
