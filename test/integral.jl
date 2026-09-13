@@ -37,10 +37,10 @@ I = Integral(x in ClosedInterval(a, b))
 @test isequal(I(1//2), 1//2 * (b - a))
 
 # test complex integrand
-@test I(2im) isa Complex{Num}
-@test isequal(I(2im), 2im * (b - a))
-@test isequal(I(1 + 2.1im), (1 + 2.1im)*(b - a))
-@test I(x + im*x) isa Complex{Num}
+@test I(2im) isa Symbolics.SymbolicNumber
+@test iszero(simplify(I(2im) - 2im * (b - a)))
+@test iszero(simplify(I(1 + 2.1im) - (1 + 2.1im)*(b - a)))
+@test I(x + im*x) isa Symbolics.SymbolicNumber
 
 D = Differential(x)
 Dxx = Differential(x)^2

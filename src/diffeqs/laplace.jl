@@ -82,6 +82,10 @@ julia> laplace(log(t), f, t, F, s) # fallback to definition
 Integral(t, 0.0 .. Inf)(exp(-s*t)*log(t))
 ```
 """
+function laplace(expr::SymbolicNumber, f, t, F, s; rules=nothing)
+    return wrap(laplace(unwrap(expr), f, t, F, s; rules))
+end
+
 function laplace(expr, f, t, F, s; rules=nothing)
     expr = expand(expr)
 
@@ -149,6 +153,7 @@ end
 inverse_transform_rules(F, s, f, t) = Symbolics.Chain([
     @rule 1/s => 1
     @rule 1/(~a + s) => exp(-~a * t)
+    @rule 1/(~a - s) => -exp(~a * t)
     @rule 1/s^(~n) => t^(~n-1) / factorial(~n-1)
     @rule 1/(2 * s^(3/2)) => sqrt(t)/term(term(sqrt, pi))
     @rule 1/(~a + s^2) => sin(processed_sqrt(~a) * t)/processed_sqrt(~a)

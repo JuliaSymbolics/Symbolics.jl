@@ -1,5 +1,3 @@
-Base.:^(a::Complex{<:Real}, b::Num) = Symbolics.Pow(a, b)
-
 # The solver builds roots from Nemo factor dictionaries, whose iteration order is
 # hash-dependent, so without an explicit sort the returned root order can change
 # across Julia versions and processes. Numeric roots sort in ascending order with

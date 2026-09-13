@@ -9,13 +9,17 @@ function nterms(t::SymbolicT, cache::Base.IdDict{SymbolicT, Int} = Base.IdDict{S
 end
 nterms(t::Num) = nterms(unwrap(t))
 nterms(t::Num, cache) = nterms(unwrap(t), cache)
+nterms(t::SymbolicNumber) = nterms(unwrap(t))
+nterms(t::SymbolicNumber, cache) = nterms(unwrap(t), cache)
+
+const WrappedSymbolicNumber = Union{RCNum, SymbolicNumber}
 
 # Soft pivoted
-function sym_lu(A::AbstractMatrix{Num}; check=true)
+function sym_lu(A::AbstractMatrix{T}; check=true) where {T <: WrappedSymbolicNumber}
     nterms_cache = Base.IdDict{SymbolicT, Int}()
     SINGULAR = typemax(Int)
     m, n = size(A)
-    F = Matrix{Num}(undef, size(A)...)
+    F = Matrix{T}(undef, size(A)...)
     copyto!(F, A)
     minmn = min(m, n)
     p = Vector{LinearAlgebra.BlasInt}(undef, minmn)
@@ -127,7 +131,9 @@ function __solve(a::SymbolicT, b::SymbolicT, simplify::Bool)
     end
     return a \ -b
 end
-__solve(a::Num, b::Num, simplify::Bool) = Num(__solve(unwrap(a), unwrap(b), simplify))
+function __solve(a::Union{Num, SymbolicNumber}, b::Union{Num, SymbolicNumber}, simplify::Bool)
+    wrap(__solve(unwrap(a), unwrap(b), simplify))
+end
 
 symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq], var; x...)
 symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq, [var]; x...))
@@ -184,7 +190,7 @@ function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = 
     x
 end
 
-const _SymEltype = Union{BasicSymbolic, RCNum}
+const _SymEltype = Union{BasicSymbolic, WrappedSymbolicNumber}
 # The two-argument methods mirror LinearAlgebra's own signatures so that its strided and
 # sparse `ldiv!` methods do not take precedence over the symbolic substitution.
 for T in (UpperTriangular, UnitLowerTriangular)
@@ -199,7 +205,7 @@ end
 
 minor(B, j) = @view B[2:end, 1:size(B, 2) .!= j]
 minor(B, i, j) = @view B[1:size(B,1) .!= i, 1:size(B,2) .!= j]
-function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
+function LinearAlgebra.det(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace=true)
     if laplace
         n = LinearAlgebra.checksquare(A)
         if n == 1
@@ -218,10 +224,10 @@ function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
     end
 end
 
-Base.inv(A::AbstractMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
-Base.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::StridedMatrix{<:WrappedSymbolicNumber}; laplace=true) = _invl(A; laplace=laplace)
 
-function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
+function _invl(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace=true)
     if laplace
 		n = LinearAlgebra.checksquare(A)
         A⁻¹ = similar(A)
@@ -253,7 +259,7 @@ When `islinear`, return `a` and `b` such that `a * x + b == t`. Instead of calli
 """
 function linear_expansion(t, x::Num)
     a, b, islin = linear_expansion(t, unwrap(x))
-    Num(a), Num(b), islin
+    wrap(a), wrap(b), islin
 end
 
 @inline function linear_expansion(t, x::SymbolicT)

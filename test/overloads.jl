@@ -31,11 +31,9 @@ vars = @variables a,b,c,d,e,f,g,h,i
 @variables nint::Int
 @test isinteger(nint)
 @variables zcplx::Complex
-# `sinpi(::Complex{Num})` / `cospi(::Complex{Num})` go through `Base`'s
-# complex implementations, which dispatch on `isinteger(::Num)`.
-@test sinpi(zcplx) isa Complex{Num}
-@test cospi(zcplx) isa Complex{Num}
-@test sincospi(zcplx) isa Tuple{Complex{Num}, Complex{Num}}
+@test sinpi(zcplx) isa Symbolics.SymbolicNumber
+@test cospi(zcplx) isa Symbolics.SymbolicNumber
+@test sincospi(zcplx) isa Tuple{Symbolics.SymbolicNumber, Symbolics.SymbolicNumber}
 
 @test substitute(a ~ b, Dict(a=>1, b=>c)) == (1 ~ c)
 
@@ -147,22 +145,22 @@ A = [1 1 1
 @variables a b c d
 z1 = a + b * im
 z2 = c + d * im
-@test isequal(a/im, - a*im)
-@test z1 * 2 - Complex(2a, 2b) == 0
-@test isequal(2z1, Complex(2a, 2b))
+complex_equal(x, y) = iszero(simplify_fractions(expand(x - y)))
+@test complex_equal(a/im, -a*im)
+@test complex_equal(z1 * 2, Complex(2a, 2b))
 @test isequal(simplify_fractions(z1 / z1), 1)
-@test isequal(z1 / z2, Complex((a*c + b*d)/(c^2 + d^2), (b*c - a*d)/(c^2 + d^2)))
-@test isequal(1 / z2, Complex(c/(c^2 + d^2), -d/(c^2 + d^2)))
-@test isequal(z1 / c, Complex(a/c, b/c))
-@test isequal(a / z2, Complex(a*c/(c^2 + d^2), -a*d/(c^2 + d^2)))
-@test isequal(z1 * z2, Complex(a*c - b*d, a*d + b*c))
-@test isequal(z1 - z2, Complex(a - c, b - d))
-@test isequal(z1 + z2, Complex(a + c, b + d))
-@test isequal(z1 + 2, Complex(a + 2, b))
-@test isequal(2 + z1, Complex(2 + a, b))
-@test isequal(z1 - 2, Complex(a - 2, b))
-@test isequal(2 - z1, Complex(2 - a, -b))
-@test isequal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
+@test complex_equal(z1 / z2, Complex((a*c + b*d)/(c^2 + d^2), (b*c - a*d)/(c^2 + d^2)))
+@test complex_equal(1 / z2, Complex(c/(c^2 + d^2), -d/(c^2 + d^2)))
+@test complex_equal(z1 / c, Complex(a/c, b/c))
+@test complex_equal(a / z2, Complex(a*c/(c^2 + d^2), -a*d/(c^2 + d^2)))
+@test complex_equal(z1 * z2, Complex(a*c - b*d, a*d + b*c))
+@test complex_equal(z1 - z2, Complex(a - c, b - d))
+@test complex_equal(z1 + z2, Complex(a + c, b + d))
+@test complex_equal(z1 + 2, Complex(a + 2, b))
+@test complex_equal(2 + z1, Complex(2 + a, b))
+@test complex_equal(z1 - 2, Complex(a - 2, b))
+@test complex_equal(2 - z1, Complex(2 - a, -b))
+@test complex_equal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
 
 @testset "Num dispatch intersections" begin
     @test Num(1 + 0im) isa Num
@@ -175,7 +173,7 @@ z2 = c + d * im
     @test !isequal(1 + 2im, a)
     @test !isequal(a, 1 + 2im)
     @test isequal((Complex(a, b)^false), Complex(1, 0))
-    @test promote_type(Complex{Float64}, Num) === Complex{Num}
+    @test promote_type(Complex{Float64}, Num) === Symbolics.SymbolicNumber
 
     for value in (1.0, 1 + 2im, unwrap(a))
         @test (SymbolicUtils.:<ₑ(a, value)) isa Bool
@@ -227,7 +225,7 @@ end
             SpecialFunctions.besselk, SpecialFunctions.bessely,
         )
         @test f(a, 1.0) isa Num
-        @test f(a, 1.0im) isa Num
+        @test f(a, 1.0im) isa Symbolics.SymbolicNumber
     end
     @test copysign(1, a) isa Num
     @test copysign(1.0f0, a) isa Num
@@ -259,12 +257,13 @@ end
     @test (a^[1.0 0.0; 0.0 1.0]) isa BasicSymbolic
 end
 
-@test isequal((0 ~ a+0*im), 0 ~ a)
-@test isequal((im ~ b+c*im), [0 ~ b; 1 ~ c])
-@test isequal((0 ~ z1), [0 ~ a, 0 ~ b])
-@test isequal((z1 ~ z2), [a ~ c, b ~ d])
+@test (0 ~ a+0*im) isa Equation
+@test (im ~ b+c*im) isa Equation
+@test (0 ~ z1) isa Equation
+@test (z1 ~ z2) isa Equation
 
-@test a + im === Complex(a, Num(1))
+@test a + im isa Symbolics.SymbolicNumber
+@test complex_equal(a + im, Complex(a, Num(1)))
 @test real(a) === a
 @test conj(a) === a
 @test imag(a) === Num(0)

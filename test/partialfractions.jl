@@ -23,4 +23,4 @@ import Symbolics: partial_frac_decomposition
 # check valid expressions
 @test partial_frac_decomposition(sin(x), x) === nothing
 @test partial_frac_decomposition(x^2/(x-1), x) === nothing
-@test partial_frac_decomposition(1/(x^2 + 2), x, warns=false) === nothing # irrational roots, should eventually be fixed
+@test isequal(partial_frac_decomposition(1/(x^2 + 2), x, warns=false), 1/(x^2 + 2)) # already in partial-fraction form over an irreducible real quadratic

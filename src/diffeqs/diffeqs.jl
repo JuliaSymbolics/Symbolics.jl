@@ -424,20 +424,29 @@ function exp_trig_particular_solution(eq::SymbolicLinearODE)
         return nothing
     end
 
-    # do complex rrf
-    # figure out how many times p needs to be differentiated before denominator isn't 0
+    # Do the complex response formula but project it analytically onto real Cartesian
+    # components. Keeping p(r + ib) = u + iv separate avoids both atomic `real(exp(z))`
+    # nodes and floating-point Complex division for exact coefficients.
     k = 0
     @variables 𝓈
     p = characteristic_polynomial(eq, 𝓈)
     Ds = Differential(𝓈)
-    while SymbolicUtils._iszero(substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))
+    z = r + b * im
+    denominator = substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => z))
+    while SymbolicUtils._iszero(denominator)
         k += 1
+        denominator = substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => z))
     end
 
-    rrf = expand(simplify(wrap(a) * exp((r + b * im) * eq.t) * eq.t^k /
-                           (substitute_in_deriv(expand_derivatives((Ds^k)(p)), Dict(𝓈 => r+b*im)))))
-
-    return is_sin ? imag(rrf) : real(rrf)
+    u, v = reim(denominator)
+    bt = b * eq.t
+    trig_response = if is_sin
+        u * sin(bt) - v * cos(bt)
+    else
+        u * cos(bt) + v * sin(bt)
+    end
+    response = wrap(a) * exp(r * eq.t) * eq.t^k * trig_response / (u^2 + v^2)
+    return expand(simplify(response))
 end
 
 """
