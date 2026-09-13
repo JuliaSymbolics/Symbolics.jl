@@ -43,7 +43,11 @@ C = Symbolics.variables(:C, 1:5)
 
 ## constant coefficients, nth-order
 @test isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [-1], 0)), C[1]*exp(t))
-@test isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [-4, 3], 0)), C[1]*exp(-4t) + C[2]*exp(t))
+let sol = symbolic_solve_ode(SymbolicLinearODE(x, t, [-4, 3], 0))
+    expected = C[1]*exp(-4t) + C[2]*exp(t)
+    swapped = C[1]*exp(t) + C[2]*exp(-4t)
+    @test isequal(sol, expected) || isequal(sol, swapped)
+end
 
 ## first order (solving via integrating factor can be found in test/sympy.jl)
 @test isequal(evalsol.(symbolic_solve_ode(SymbolicLinearODE(x, t, [1], 2sin(t)))), C[1]*exp(-t) + sin(t) - cos(t))

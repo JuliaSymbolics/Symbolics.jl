@@ -1,4 +1,3 @@
-Base.:^(a::Complex{<:Real}, b::Num) = Symbolics.Pow(a, b)
 """
     symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
 

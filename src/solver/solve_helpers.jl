@@ -33,9 +33,7 @@ function ssqrt(n)
         return sqrt(n)
     end
 
-    if symtype(n) === Real
-        return term(ssqrt, n)
-    end
+    return term(ssqrt, n)
 end
 
 SymbolicUtils.promote_symtype(::typeof(ssqrt), ::Type{T}) where {T} = T
@@ -49,7 +47,7 @@ function scbrt(n)
     n = unwrap(n)
 
     if n isa Real
-    isnan(n) && return n
+        isnan(n) && return n
         return cbrt(n)
     end
 
@@ -57,9 +55,7 @@ function scbrt(n)
         return (n)^(1 / 3)
     end
 
-    if symtype(n) === Real
-        return term(scbrt, n)
-    end
+    return term(scbrt, n)
 end
 
 SymbolicUtils.promote_symtype(::typeof(scbrt), ::Type{T}) where {T} = T
@@ -157,11 +153,22 @@ function bigify(n)
     return n
 end
 
+# `//` is exact rational construction, not generic symbolic division. Solver formulas
+# can contain symbolic coefficients, so keep `//` for plain exact numbers and use `/`
+# whenever either operand is symbolic.
+function sdiv(x, y)
+    x, y = unwrap(x), unwrap(y)
+    if x isa BasicSymbolic || y isa BasicSymbolic
+        return x / y
+    end
+    return x // y
+end
+
 function comp_rational(x, y)
     x, y = bigify(unwrap(x)), bigify(unwrap(y))
     if !(unwrap(x) isa AbstractFloat || x isa Complex) &&
        !(unwrap(y) isa AbstractFloat || y isa Complex)
-        r = x // y
+        r = sdiv(x, y)
         return r
     end
 
