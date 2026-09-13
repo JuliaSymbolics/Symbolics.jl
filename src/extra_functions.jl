@@ -76,7 +76,7 @@ for f in (
     )
     @eval begin
         (f::$(typeof(f)))(a::Num, b::AbstractFloat) = invoke(f, Tuple{Num, Real}, a, b)
-        (f::$(typeof(f)))(a::Num, b::Complex) = invoke(f, Tuple{Num, Number}, a, b)
+        (f::$(typeof(f)))(a::Num, b::Complex) = wrap(f(unwrap(a), b))
     end
 end
 for T in (Signed, Rational, Float32, Float64)

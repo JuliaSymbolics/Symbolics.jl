@@ -182,6 +182,17 @@ Returns a tuple of two elements:
 """
 polynomial_coeffs(expr, vars) = semipolynomial_form(expr, vars, Inf)
 
+# Coefficient extraction works on raw symbolic expressions. Wrap only at the container
+# boundary, then promote to one homogeneous wrapper type. Real-only forms therefore retain
+# `Num`, while the presence of any genuinely complex coefficient promotes the container to
+# `SymbolicNumber` without falling back to `Number` or `Any` storage.
+function _wrap_semipoly_coefficients(xs)
+    isempty(xs) && return Num[]
+    ys = wrap.(xs)
+    T = mapreduce(typeof, promote_type, ys)
+    return T.(ys)
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -195,7 +206,7 @@ function semilinear_form(exprs::AbstractArray, vars)
 
     I = Int[]
     J = Int[]
-    V = Num[]
+    V = BasicSymbolic{VartypeT}[]
 
     for (i, d) in enumerate(ds)
         for (k, v) in d
@@ -205,7 +216,7 @@ function semilinear_form(exprs::AbstractArray, vars)
         end
     end
 
-    sparse(I,J,V, length(exprs), length(vars)), wrap.(nls)
+    sparse(I, J, _wrap_semipoly_coefficients(V), length(exprs), length(vars)), wrap.(nls)
 end
 
 """
@@ -231,14 +242,14 @@ function semiquadratic_form(exprs, vars)
     m, n = length(exprs), length(vars)
     I1 = Int[]
     J1 = Int[]
-    V1 = Num[]
+    V1 = BasicSymbolic{VartypeT}[]
 
     I2 = Int[]
     J2 = Int[]
-    V2 = Num[]
+    V2 = BasicSymbolic{VartypeT}[]
 
     v2_I = Int[]
-    v2_V = Num[]
+    v2_V = BasicSymbolic{VartypeT}[]
 
     for (i, d) in enumerate(ds)
         for (k, v) in d
@@ -272,10 +283,13 @@ function semiquadratic_form(exprs, vars)
         end
     end
 
+    V1 = _wrap_semipoly_coefficients(V1)
+    V2 = _wrap_semipoly_coefficients(V2)
+    v2_V = _wrap_semipoly_coefficients(v2_V)
 
     #v2 = SparseVector(div(n * (n + 1), 2), v2_I, v2_V) # When it works in the future
     # until then
-    v2 = zeros(Num, div(n * (n + 1), 2))
+    v2 = zeros(eltype(v2_V), div(n * (n + 1), 2))
     v2[v2_I] .= v2_V
 
     tuple(sparse(I1,J1,V1, m, n),

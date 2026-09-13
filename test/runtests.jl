@@ -53,6 +53,10 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "SymStruct" begin include("symstruct.jl") end
         @safetestset "View-setting" begin include("stencils.jl") end
         @safetestset "Complex" begin include("complex.jl") end
+        @safetestset "Complex issue regressions" begin include("complex_issue_regressions.jl") end
+        @safetestset "Extended complex regressions" begin include("complex_issue_regressions_extended.jl") end
+        @safetestset "Complex feature surfaces" begin include("complex_surface_regressions.jl") end
+        @safetestset "Historical complex PR regressions" begin include("complex_historical_pr_regressions.jl") end
         @safetestset "Semi-polynomial" begin include("semipoly.jl") end
         @safetestset "Fuzz Arrays" begin include("fuzz-arrays.jl") end
         @safetestset "Differentiation Test" begin include("diff.jl") end

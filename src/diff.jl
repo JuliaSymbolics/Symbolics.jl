@@ -38,7 +38,7 @@ struct Differential <: Operator
             _ => new(x, order)
         end
     end
-    Differential(x::Union{Num, Arr}, order = 1) = Differential(unwrap(x), order)
+    Differential(x::Union{Num, SymbolicNumber, Arr}, order = 1) = Differential(unwrap(x), order)
     Differential(::CallAndWrap, order = 1) = throw(ArgumentError("Cannot take derivative with respect to a symbolic function."))
     Differential(::Union{AbstractFloat, Integer}) = error("D(::Number) is not a valid derivative. Derivatives must be taken w.r.t. symbolic variables.")
 end
@@ -53,6 +53,7 @@ end
 
 (D::Differential)(::Union{AbstractFloat, Integer}) = Num(COMMON_ZERO)
 (D::Differential)(x::Num) = Num(D(unwrap(x)))
+(D::Differential)(x::SymbolicNumber) = wrap(D(unwrap(x)))
 (D::Differential)(x::Arr{T, N}) where {T, N} = Arr{T, N}(D(unwrap(x)))
 (D::Differential)(x::Complex{Num}) = Complex{Num}(Num(D(unwrap(real(x)))), Num(D(unwrap(imag(x)))))
 SymbolicUtils.isbinop(f::Differential) = false
@@ -451,7 +452,13 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     end
                 end
                 return SymbolicUtils.add_worker(VartypeT, summed_args)
-            elseif f === ifelse || f === ifelse_eager || f === ifelse_branching
+            elseif f === conj || f === real || f === imag
+        if symtype(D.x) <: Real
+            inner = executediff(D, args[1]; simplify, throw_no_derivative)
+            return f(inner)
+        end
+        return D(arg)
+    elseif f === ifelse || f === ifelse_eager || f === ifelse_branching
                 inner_args = arguments(arg)
                 dtrue = executediff(D, inner_args[2]; throw_no_derivative)
                 dfalse = executediff(D, inner_args[3]; throw_no_derivative)
@@ -619,7 +626,10 @@ function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivativ
     end
 end
 function expand_derivatives(n::Num, simplify=false; kwargs...)
-    Num(expand_derivatives(value(n), simplify; kwargs...))
+    wrap(expand_derivatives(value(n), simplify; kwargs...))
+end
+function expand_derivatives(n::SymbolicNumber, simplify=false; kwargs...)
+    wrap(expand_derivatives(value(n), simplify; kwargs...))
 end
 function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
     re = expand_derivatives(real(n), simplify; kwargs...)

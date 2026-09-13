@@ -97,6 +97,17 @@ end
     return recipe(value(n))
 end
 
+@latexrecipe function f(n::Symbolics.SymbolicNumber)
+    env --> :equation
+    mult_symbol --> "~"
+    fmt --> FancyNumberFormatter(5)
+    index --> :subscript
+    snakecase --> true
+    safescripts --> true
+
+    return recipe(unwrap(n))
+end
+
 @latexrecipe function f(z::Complex{Num})
     env --> :equation
     mult_symbol --> "~"
@@ -163,11 +174,11 @@ end
     end
 end
 
-Base.show(io::IO, ::MIME"text/latex", x::Symbolics.RCNum) = print(io, "\$\$ " * latexify(x) * " \$\$")
+Base.show(io::IO, ::MIME"text/latex", x::Symbolics.SymbolicScalar) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::SymbolicUtils.BasicSymbolic) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:Symbolics.RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
+Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:Symbolics.SymbolicScalar}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 
 # Iterate a node's metadata, dispatching to the `Symbolics._toexpr_metadata` hook for
 # each context. The per-context hook (and the `Symbolics._toexpr_op` hook used below) is
