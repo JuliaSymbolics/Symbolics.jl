@@ -67,15 +67,38 @@ end
                    parallel=nothing,
                    kwargs...)
 
-Generates a numerically-usable function from a Symbolics `Num`.
+Generates a numerically-usable function from a Symbolics `Num`, a symbolic
+array (`Arr`), or an `AbstractArray` of `Num`s.
 
 Arguments:
 
-- `ex`: The `Num` to compile
+- `ex`: The `Num`, `Arr`, or `AbstractArray` of `Num`s to compile
 - `args`: The arguments of the function
 - `expression`: Whether to generate code or whether to generate the compiled form.
   By default, `expression = Val{true}`, which means that the code for the
   function is returned. If `Val{false}`, then the returned value is compiled.
+
+Return Value:
+
+- If `ex` is a scalar, a single function `f(args...)` is returned which
+  computes the value of the expression.
+- If `ex` is an `AbstractArray` or an `Arr`, a 2-tuple of functions `(f, f!)`
+  is returned:
+    - `f(args...)`: the out-of-place function, which computes and returns the
+      output array.
+    - `f!(out, args...)`: the in-place function, which mutates `out` with the
+      result and returns it.
+
+When `expression = Val{true}`, these are returned as `Expr`s which can be
+`eval`ed into functions. When `expression = Val{false}`, the returned
+functions are compiled `RuntimeGeneratedFunction`s which can be called
+directly, e.g.:
+
+```julia
+f, f! = build_function(ex, args...; expression = Val{false})
+f(args)        # out-of-place evaluation
+f!(out, args)  # in-place evaluation
+```
 
 Keyword Arguments:
 
