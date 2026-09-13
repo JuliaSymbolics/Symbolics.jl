@@ -41,7 +41,7 @@ excels in many areas due to purposeful design decisions:
   [SymbolicUtils.jl](https://github.com/JuliaSymbolics/SymbolicUtils.jl),
   parallelism comes from Julia Base libraries, Dagger.jl, etc.
   SciML Tools like
-  [DataDrivenDiffEq.jl](https://datadriven.sciml.ai/dev/) can reconstruct
+  [DataDrivenDiffEq.jl](https://docs.sciml.ai/DataDrivenDiffEq/stable/) can reconstruct
   symbolic expressions from neural networks and data, while
   [NeuralPDE.jl](https://github.com/SciML/NeuralPDE.jl)
   can automatically solve partial differential equations from symbolic

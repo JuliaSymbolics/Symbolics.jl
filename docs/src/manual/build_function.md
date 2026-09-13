@@ -22,7 +22,23 @@ give back the function handle.
 build_function
 ```
 
+## Low-Level Code Generation
+
+Consumers that already maintain a `SymbolicUtils.IRStructure` can generate Julia function
+expressions directly with `codegen_function`.
+
+```@docs
+Symbolics.CodegenFunctionOptions
+Symbolics.codegen_function
+```
+
 ## Target-Specific Definitions
+
+### MATLAB
+
+```@docs
+Symbolics.MATLABTarget
+```
 
 ```@docs
 Symbolics._build_function(target::Symbolics.JuliaTarget,rhss::AbstractArray,args...;kwargs...)

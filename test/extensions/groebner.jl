@@ -51,12 +51,11 @@ truebasis = [
     x5^5 - 1
 ]
 basis = expand.(groebner_basis(system))
-# monomial order can change, returning different but still valid bases
-@test_broken isequal(basis, truebasis)
+@test isequal(basis, truebasis)
 @test Symbolics.is_groebner_basis(basis)
 
 basis = expand.(groebner_basis(system, linalg=:deterministic))
-@test_broken isequal(basis, truebasis)
+@test isequal(basis, truebasis)
 @test Symbolics.is_groebner_basis(basis)
 
 N = 45671930739135174346839766056203605080877915151
@@ -73,7 +72,7 @@ truebasis = [
     x4^4 - N
 ]
 basis = expand.(groebner_basis(system))
-@test_broken isequal(expand.(basis), truebasis)
+@test isequal(expand.(basis), truebasis)
 @test Symbolics.is_groebner_basis(basis)
 
 # issues/1323

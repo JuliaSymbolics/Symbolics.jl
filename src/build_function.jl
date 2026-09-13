@@ -5,7 +5,34 @@ abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
 struct StanTarget <: BuildTargets end
 struct CTarget <: BuildTargets end
+
+"""
+    MATLABTarget()
+
+A `build_function` target that generates an anonymous function expression for MATLAB and
+GNU Octave.
+
+# Arguments
+
+None.
+
+# Keywords
+
+None. Pass this target as `target` to [`build_function`](@ref).
+
+# Examples
+
+```julia
+julia> @variables x
+1-element Vector{Num}:
+ x
+
+julia> build_function(x^2, x; target = MATLABTarget()) isa String
+true
+```
+"""
 struct MATLABTarget <: BuildTargets end
+@public MATLABTarget
 
 abstract type ParallelForm end
 struct SerialForm <: ParallelForm end
@@ -675,6 +702,11 @@ numbered_expr(c,args...;kwargs...) = c
 numbered_expr(c::Num,args...;kwargs...) = error("Num found")
 
 
+# The solver introduces "safe" variants of some math functions that handle
+# negative/complex inputs in Julia. They have no C equivalent, so map them back
+# to the standard math.h names when generating C code.
+const c_safe_function_renames = Dict(:ssqrt => :sqrt, :scbrt => :cbrt, :slog => :log)
+
 # Replace certain multiplication and power expressions so they form valid C code
 # Extra factors of 1 are hopefully eliminated by the C compiler
 function coperators(expr)
@@ -683,6 +715,9 @@ function coperators(expr)
         if e isa Expr
             coperators(e)
         end
+    end
+    if expr.head == :call && expr.args[1] isa Symbol
+        expr.args[1] = get(c_safe_function_renames, expr.args[1], expr.args[1])
     end
     for i in eachindex(expr.args)
         if expr.args[i] isa Rational

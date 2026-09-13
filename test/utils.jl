@@ -1,8 +1,9 @@
 using Symbolics
-import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap, 
+import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap,
                   isblock, flatten_expr!, get_variables, get_differential_vars,
-                  is_singleton, diff2term, tosymbol, lower_varname, 
+                  is_singleton, diff2term, tosymbol, lower_varname,
                   degree, coeff
+using Symbolics: gather_factor
 import SymbolicUtils
 using SymbolicUtils: symtype
 using SparseArrays
@@ -56,10 +57,37 @@ end
 
 @testset "fixpoint_sub maxiters" begin
     @variables x y
+    VERSION >= v"1.11" && @test Base.ispublic(Symbolics, :fixpoint_sub)
     expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x))
     @test isequal(expr, y)
     expr = Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9)
     @test isequal(expr, x)
+end
+
+@testset "public API docstrings" begin
+    @test @doc(Symbolics.Arr) !== nothing
+    @test @doc(Symbolics.NAMESPACE_SEPARATOR) !== nothing
+    @test @doc(Symbolics.get_variables!) !== nothing
+    @test @doc(Symbolics.map_subscripts) !== nothing
+    @test @doc(Symbolics.@symbolic_wrap) !== nothing
+    @test @doc(Symbolics.@wrapped) !== nothing
+end
+
+@testset "wrapper macro public API" begin
+    VERSION >= v"1.11" && @test Base.ispublic(Symbolics, Symbol("@symbolic_wrap"))
+    VERSION >= v"1.11" && @test Base.ispublic(Symbolics, Symbol("@wrapped"))
+end
+
+@testset "fixpoint_sub warn_maxiters" begin
+    @variables x y
+    # circular rules hit maxiters — warning should fire by default
+    @test_logs (:warn,) Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9)
+    # warn_maxiters = false suppresses the warning
+    @test_logs Symbolics.fixpoint_sub(x, Dict(x => y, y => x); maxiters = 9, warn_maxiters = false)
+    # FixpointSubstituter directly
+    @variables x y
+    subber = Symbolics.FixpointSubstituter{false}(Dict(x => y, y => x); maxiters = 9, warn_maxiters = false)
+    @test_logs isequal(subber(x), x)
 end
 
 @testset "Issue#1342 substitute working on called symbolics" begin
@@ -128,6 +156,51 @@ end
     expr2 = x^2 + 3x + 2
     @test coeff(expr2, x) == 3
     @test coeff(expr2, x^2) == 1
+end
+
+@testset "gather_factor" begin
+    @variables a b x y
+
+    # basic single-variable collection
+    @test isequal(expand(gather_factor(3x + 2x, x) - 5x), 0)
+
+    # issue example: collect w.r.t. x
+    expr = a*b*x + a*b + b*x
+    gx = gather_factor(expr, x)
+    @test isequal(expand(gx - expr), 0)
+    @test isequal(Symbolics.coeff(gx, x), a*b + b)
+    # constant part (x^0) should equal a*b; verify via expand after subtracting
+    @test isequal(expand(gx - (a*b + b)*x - a*b), 0)
+
+    # collect w.r.t. b
+    gb = gather_factor(expr, b)
+    @test isequal(expand(gb - expr), 0)
+    @test isequal(Symbolics.coeff(gb, b), a*x + a + x)
+
+    # quadratic in x
+    quad = x^2 + 2x + 1
+    gq = gather_factor(quad, x)
+    @test isequal(expand(gq - quad), 0)
+    @test isequal(Symbolics.coeff(gq, x^2), 1)
+    @test isequal(Symbolics.coeff(gq, x), 2)
+
+    # higher-degree terms
+    expr2 = a*x^2 + b*x^2 + a*x
+    gx2 = gather_factor(expr2, x)
+    @test isequal(expand(gx2 - expr2), 0)
+    @test isequal(Symbolics.coeff(gx2, x^2), a + b)
+    @test isequal(Symbolics.coeff(gx2, x), a)
+
+    # constant-only expression (no sym)
+    @test isequal(gather_factor(a*b, x), a*b)
+
+    # expr is already just sym
+    @test isequal(gather_factor(x, x), x)
+
+    # multi-symbol: sequential collection
+    expr3 = a*x + b*x + a*y + b*y
+    gxy = gather_factor(expr3, [x, y])
+    @test isequal(expand(gxy - expr3), 0)
 end
 
 @testset "diff2term" begin

@@ -12,7 +12,19 @@ end
 function activate_sympy_env()
     Pkg.activate("sympy")
     Pkg.develop(PackageSpec(path=dirname(@__DIR__)))
+    # Point PyCall at the Conda.jl Python *before* instantiation precompiles
+    # SymbolicsSymPyExt. SymPy.jl's `pyimport_conda` can then install the `sympy`
+    # module into that Python. Doing this only inside sympy.jl is too late: PyCall
+    # reads its Python config at load/precompile time, so the extension would
+    # already have failed to precompile against a system Python that lacks sympy
+    # (as happens on the CI runners).
+    if get(ENV, "CI", nothing) !== nothing
+        ENV["PYTHON"] = ""
+    end
     Pkg.instantiate()
+    if get(ENV, "CI", nothing) !== nothing
+        Pkg.build("PyCall")
+    end
 end
 
 function activate_sympy_pythoncall_env()
@@ -23,6 +35,10 @@ end
 
 if haskey(ENV, "BENCHMARK_ONLY")
     include("benchmark.jl")
+end
+
+if GROUP == "QA"
+    include("qa.jl")
 end
 
 # this needs to be defined at top level
@@ -48,9 +64,13 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Is Linear or Affine Test" begin include("islinear_affine.jl") end
         @safetestset "Linear Solver Test" begin include("linear_solver.jl") end
         @safetestset "Overloading Test" begin include("overloads.jl") end
+        @safetestset "Dispatch Smoke Test" begin
+            include("dispatch_smoke.jl")
+        end
         @safetestset "ForwardDiff Extension Test" begin include("forwarddiff_symbolic_dual_ops.jl") end
         @safetestset "Nested ForwardDiff Sparsity Test" begin include("nested_forwarddiff_sparsity.jl") end
         @safetestset "Build Function Test" begin include("build_function.jl") end
+        @safetestset "Conditionals Test" begin include("conditionals.jl") end
         @safetestset "Codegen Function Test" begin include("codegen_function.jl") end
         @safetestset "Build Function Array Test" begin include("build_function_arrayofarray.jl") end
         @safetestset "Build Function Array Test Named Tuples" begin include("build_function_arrayofarray_named_tuples.jl") end
@@ -68,15 +88,13 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Taylor Series Test" begin include("taylor.jl") end
         @safetestset "Discontinuity registration test" begin include("discontinuities.jl") end
         @safetestset "ODE solver test" begin include("diffeqs.jl") end
+        @safetestset "Laplace transform test" begin include("laplace.jl") end
+        @safetestset "Partial Fraction Decomposition Test" begin include("partialfractions.jl") end
     end
 end
 
 if GROUP == "All" || GROUP == "GroebnerExt"
     @safetestset "Groebner extension Test" begin include("extensions/groebner.jl") end
-end
-
-if GROUP == "All" || GROUP == "LuxExt"
-    @safetestset "Lux extension Test" begin include("extensions/lux.jl") end
 end
 
 if GROUP == "All" || GROUP == "D3TreesExt"

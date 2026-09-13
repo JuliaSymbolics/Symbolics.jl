@@ -62,6 +62,47 @@ function get_variables(e; kw...)
     return search_variables(unwrap(e); kw...)
 end
 
+"""
+    get_variables!(buffer, e; kwargs...)
+    get_variables!(buffer, e, varlist; is_atomic = SymbolicUtils.default_is_atomic, kwargs...)
+
+Append the symbolic variables found in `e` to the supplied mutable `buffer` and
+return `buffer`. The expression is unwrapped before traversal, so the returned
+variables are not wrapped in `Num`.
+
+# Arguments
+
+- `buffer`: a mutable collection accepted by
+  [`SymbolicUtils.search_variables!`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.search_variables!).
+- `e`: the symbolic expression to traverse.
+- `varlist`: an optional collection restricting which expressions are treated
+  as atomic variables.
+
+# Keywords
+
+- `is_atomic`: predicate used with the `varlist` form to select variables.
+- `kwargs...`: keyword arguments forwarded to
+  [`SymbolicUtils.search_variables!`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.search_variables!).
+
+# Examples
+
+```julia
+julia> using Symbolics
+
+julia> @variables x y
+
+julia> buffer = Set{SymbolicUtils.BasicSymbolic}()
+Set{SymbolicUtils.BasicSymbolic}()
+
+julia> Symbolics.get_variables!(buffer, x + y) === buffer
+true
+
+julia> sort!(collect(buffer), by = string)
+2-element Vector{SymbolicUtils.BasicSymbolic}:
+ x
+ y
+```
+"""
 function get_variables!(buffer, e; kw...)
     return search_variables!(buffer, unwrap(e); kw...)
 end
@@ -93,16 +134,23 @@ Note that the returned differential variables are not wrapped in the `Num` type.
 
 # Examples
 ```jldoctest
-julia> @variables t x u(x, t);
+julia> using Symbolics
 
-julia> D = Differential(x); Dt = Differential(t);
+julia> vars = @variables t x u(x, t); length(vars)
+3
+
+julia> D = Differential(x)
+Differential(x, 1)
+
+julia> Dt = Differential(t)
+Differential(t, 1)
 
 julia> expr = D(u) + Dt(u) + u + sin(D(u));
 
 julia> Symbolics.get_differential_vars(expr; sort = true)
-2-element Vector{SymbolicUtils.BasicSymbolic}:
- Differential(x)(u(x, t))
- Differential(t)(u(x, t))
+2-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{T} where T}:
+ Differential(t, 1)(u(x, t))
+ Differential(x, 1)(u(x, t))
 ```
 """
 function get_differential_vars(e::Num, varlist = nothing; sort::Bool = false)
@@ -154,10 +202,19 @@ Convert a differential variable to a `Term`. Note that it only takes a `Term`
 not a `Num`.
 
 ```jldoctest
-julia> @variables x t u(x, t) z(t)[1:2]; Dt = Differential(t); Dx = Differential(x);
+julia> using Symbolics
+
+julia> vars = @variables x t u(x, t) z(t)[1:2]; length(vars)
+4
+
+julia> Dt = Differential(t)
+Differential(t, 1)
+
+julia> Dx = Differential(x)
+Differential(x, 1)
 
 julia> Symbolics.diff2term(Symbolics.value(Dx(Dt(u))))
-uˍtx(x, t)
+uˍxt(x, t)
 
 julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
 (zˍt(t))[1]
@@ -481,21 +538,32 @@ function symbol_to_poly(sympolys::AbstractArray)
 
     # standardize input
     stdsympolys = map(unwrap, sympolys)
-    sort!(stdsympolys, lt=(<ₑ))
+    sort!(stdsympolys, lt = (<ₑ))
 
     symidx = findfirst(x -> x isa BasicSymbolic, stdsympolys)
     varT = vartype(stdsympolys[symidx])
 
     poly_to_bs = Bijections.Bijection{SymbolicUtils.PolyVarT, BasicSymbolic{varT}}()
     bs_to_poly = Bijections.active_inv(poly_to_bs)
+
+    vars = BasicSymbolic{varT}[]
+    for f in stdsympolys
+        append!(vars, get_variables(f))
+    end
+    unique!(vars)
+    sort!(vars, lt = (<ₑ))
+    for var in vars
+        SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, var)
+    end
+
     polyforms = map(f -> as_concrete_polynomial(SymbolicUtils.to_poly!(poly_to_bs, bs_to_poly, f)), stdsympolys)
     # Discover common coefficient type
-    commontype = mapreduce(coefftype, promote_type, polyforms, init=Int)
-    @assert commontype <: Union{Integer,Rational} "Only integer and rational coefficients are supported as input."
+    commontype = mapreduce(coefftype, promote_type, polyforms, init = Int)
+    @assert commontype <: Union{Integer, Rational} "Only integer and rational coefficients are supported as input."
 
     polynoms = map(Base.Fix1(poly_to_coefftype, commontype), polyforms)
 
-    polynoms, poly_to_bs
+    return polynoms, poly_to_bs
 end
 
 #=
@@ -677,3 +745,107 @@ end
 vartype_from_args(::BasicSymbolic{T}, args...) where {T} = T
 vartype_from_args(_, args...) = vartype_from_args(args...)
 vartype_from_args() = error("Cannot infer `vartype`.")
+
+# Returns (pow, rest) such that term = sym^pow * rest.
+# `rest` is a Number when sym^pow accounts for all symbolic content; otherwise a Num.
+function _gather_split(term, sym)
+    isequal(term, sym) && return 1, 1
+    if !ismul(term)
+        return 0, wrap(term)
+    end
+    pow = 0
+    for (k, v) in term.dict
+        if isequal(k, sym)
+            pow = v
+            break
+        end
+    end
+    iszero(pow) && return 0, wrap(term)
+    # Reconstruct the factor that remains after cancelling sym^pow.
+    rest = term.coeff
+    for (k, v) in term.dict
+        isequal(k, sym) && continue
+        rest = rest * wrap(k)^v   # promotes to Num on first symbolic factor
+    end
+    return pow, rest
+end
+
+"""
+    gather_factor(expr, sym)
+    gather_factor(expr, syms::AbstractArray)
+
+Collect the additive terms of `expr` by grouping them according to the powers
+of `sym` that they contain. Equivalent to SymPy's `collect`.
+
+Operates directly on the `dict`-based representation of the `Add` / `Mul`
+IR nodes for efficiency.
+
+For multiple symbols, collection is applied sequentially left-to-right.
+
+# Examples
+
+```jldoctest
+julia> @variables a b x;
+
+julia> gather_factor(a*b*x + a*b + b*x, x)
+a*b + (b + a*b)*x
+
+julia> gather_factor(a*b*x + a*b + b*x, b)
+(a + x + a*x)*b
+
+julia> gather_factor(x^2 + 2x + 1, x)
+1 + 2x + x^2
+```
+"""
+function gather_factor(expr, sym)
+    expr = expand(unwrap(expr))
+    sym  = unwrap(sym)
+
+    # power-of-sym => accumulated symbolic coefficient
+    powers = Dict{Number, Any}()
+
+    function _accum!(pow, contrib)
+        prev = get(powers, pow, nothing)
+        powers[pow] = prev === nothing ? contrib : prev + contrib
+    end
+
+    if isadd(expr)
+        if !iszero(expr.coeff)
+            _accum!(0, expr.coeff)
+        end
+        for (term, num_coeff) in expr.dict
+            pow, rest = _gather_split(term, sym)
+            _accum!(pow, num_coeff * rest)
+        end
+    else
+        pow, rest = _gather_split(expr, sym)
+        _accum!(pow, rest)
+    end
+
+    # Reconstruct: Σ coeff_n * sym^n
+    sym_w  = wrap(sym)
+    result = nothing
+    for (pow, c) in powers
+        term_part = if iszero(pow)
+            c isa Num ? c : wrap(c)
+        elseif isone(pow)
+            c * sym_w
+        else
+            c * sym_w^pow
+        end
+        result = result === nothing ? term_part : result + term_part
+    end
+    return result === nothing ? wrap(0) : result
+end
+
+"""
+    gather_factor(expr, syms::AbstractArray)
+
+Apply [`gather_factor`](@ref) sequentially for each element of `syms`.
+"""
+function gather_factor(expr, syms::AbstractArray)
+    for sym in syms
+        expr = gather_factor(expr, sym)
+    end
+    return expr
+end

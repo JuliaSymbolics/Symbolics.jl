@@ -1,3 +1,10 @@
+import SparseArrays
+import StaticArraysCore
+
+# StaticArrays dispatches on this non-public abstract storage type, so exact
+# intersections with its scalar arithmetic cannot use the public concrete aliases.
+const _StaticArray = StaticArraysCore.StaticArray
+
 @symbolic_wrap struct Num <: Real
     val::BasicSymbolic{VartypeT}
 
@@ -32,6 +39,10 @@ Num
 const show_numwrap = Ref(false)
 
 Num(x::Num) = x # ideally this should never be called
+function Num(x::Complex)
+    iszero(imag(x)) || throw(InexactError(:Num, Num, x))
+    return Num(real(x))
+end
 (n::Num)(args...) = Num(value(n)(map(value, args)...))
 # Fixes an inference issue with https://github.com/JuliaApproximation/DomainSets.jl/blob/b68ee034ebcd2e3fc10dd334792cee17a8d5c633/src/domains/point.jl#L13
 # causing `Num(::Any)` to infer as `::Any`
@@ -44,10 +55,10 @@ SymbolicUtils.@number_methods(Num,
 
 Base.:+(x::Num) = x
 function Base.:+(x1::Num, xs::Real...)
-    Num(+(unwrap(x1), xs...))
+    Num(+(unwrap(x1), unwrap.(xs)...))
 end
 function Base.:*(x1::Num, xs::Real...)
-    Num(*(unwrap(x1), xs...))
+    Num(*(unwrap(x1), unwrap.(xs)...))
 end
 
 Base.:-(x::Num) = Num(-(unwrap(x)))
@@ -66,7 +77,7 @@ for (T1, T2) in Iterators.product([Num, Integer], [Num, Integer])
     end
 end
 
-for f in [\, ^]
+for f in [^]
     @eval function (::$(typeof(f)))(x1::AbstractArray{<:Real}, x2::Num)
         $f(x1, unwrap(x2))
     end
@@ -76,12 +87,135 @@ for f in [\, ^]
     end
 end
 
+function Base.:(\)(x1::AbstractArray{<:Real}, x2::Num)
+    return \(x1, unwrap(x2))
+end
+function Base.:(\)(x1::Num, x2::AbstractArray{<:Real})
+    return \(unwrap(x1), x2)
+end
+
 function Base.:(/)(x1::AbstractArray{<:Real}, x2::Num)
-    /(unwrap(x1), unwrap(x2))
+    return /(unwrap(x1), unwrap(x2))
 end
 
 function Base.:(/)(x1::Num, x2::AbstractVector{<:Real})
-    /(unwrap(x1), unwrap(x2))
+    return /(unwrap(x1), unwrap(x2))
+end
+function Base.:(/)(x1::BitArray, x2::Num)
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(x1::Num, x2::BitArray)
+    return SymbolicUtils.term(/, unwrap(x1), x2)
+end
+function Base.:(/)(x1::SparseArrays.SparseVector{<:Real}, x2::Num)
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::SparseArrays.AbstractCompressedVector{<:Real}, x2::Num
+    )
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::SubArray{
+            T, 1, <:SparseArrays.AbstractSparseMatrixCSC{T, Ti},
+            Tuple{Base.Slice{Base.OneTo{Int}}, Int}, false,
+        }, x2::Num
+    ) where {T <: Real, Ti}
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::Union{
+            SparseArrays.AbstractCompressedVector{T, Ti},
+            SubArray{
+                T, 1, <:SparseArrays.AbstractSparseMatrixCSC{T, Ti},
+                Tuple{Base.Slice{Base.OneTo{Int}}, Int}, false,
+            },
+            SubArray{
+                T, 1, <:SparseArrays.AbstractSparseVector{T, Ti},
+                Tuple{Base.Slice{Base.OneTo{Int}}}, false,
+            },
+        }, x2::Num
+    ) where {T <: Real, Ti}
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::SubArray{
+            T, 1, <:SparseArrays.AbstractSparseVector{T, Ti},
+            Tuple{Base.Slice{Base.OneTo{Int}}}, false,
+        }, x2::Num
+    ) where {T <: Real, Ti}
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(
+        x1::StepRangeLen{<:Real, <:Base.TwicePrecision}, x2::Num
+    )
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(/)(x1::_StaticArray{S, T, N}, x2::Num) where {S <: Tuple, T <: Real, N}
+    return SymbolicUtils.term(/, x1, unwrap(x2))
+end
+function Base.:(\)(x1::Num, x2::_StaticArray{S, T, N}) where {S <: Tuple, T <: Real, N}
+    return SymbolicUtils.term(\, unwrap(x1), x2)
+end
+
+for T in (
+        LinearAlgebra.Bidiagonal,
+        LinearAlgebra.Diagonal,
+        LinearAlgebra.Hermitian,
+        LinearAlgebra.LowerTriangular,
+        LinearAlgebra.Symmetric,
+        LinearAlgebra.SymTridiagonal,
+        LinearAlgebra.Tridiagonal,
+        LinearAlgebra.UnitLowerTriangular,
+        LinearAlgebra.UnitUpperTriangular,
+        LinearAlgebra.UpperHessenberg,
+        LinearAlgebra.UpperTriangular,
+    )
+    @eval begin
+        function Base.:(/)(x1::$T{S}, x2::Num) where {S <: Real}
+            return SymbolicUtils.term(/, x1, unwrap(x2))
+        end
+        function Base.:(\)(x1::Num, x2::$T{S}) where {S <: Real}
+            return SymbolicUtils.term(\, unwrap(x1), x2)
+        end
+    end
+end
+
+const _StridedMatrixStorage = Union{
+    Base.StridedMatrix,
+    LinearAlgebra.Adjoint{<:Any, <:Base.StridedMatrix},
+    LinearAlgebra.Transpose{<:Any, <:Base.StridedMatrix},
+}
+for T in (LinearAlgebra.LowerTriangular, LinearAlgebra.UpperTriangular)
+    @eval begin
+        function Base.:(/)(
+                x1::$T{S, A}, x2::Num
+            ) where {S <: Real, A <: _StridedMatrixStorage}
+            return SymbolicUtils.term(/, x1, unwrap(x2))
+        end
+        function Base.:(\)(
+                x1::Num, x2::$T{S, A}
+            ) where {S <: Real, A <: _StridedMatrixStorage}
+            return SymbolicUtils.term(\, unwrap(x1), x2)
+        end
+    end
+end
+
+function Base.:(^)(x1::AbstractMatrix{T}, x2::Num) where {T <: Real}
+    return invoke(^, Tuple{AbstractArray{<:Real}, Num}, x1, x2)
+end
+function Base.:(^)(x1::Num, x2::AbstractMatrix{<:Real})
+    return invoke(^, Tuple{Num, AbstractArray{<:Real}}, x1, x2)
+end
+for T in (
+        LinearAlgebra.Diagonal,
+        LinearAlgebra.Hermitian,
+        LinearAlgebra.Symmetric,
+        LinearAlgebra.SymTridiagonal,
+    )
+    @eval function Base.:(^)(x1::$T{S}, x2::Num) where {S <: Real}
+        return SymbolicUtils.term(^, x1, unwrap(x2))
+    end
 end
 
 Base.conj(x::Num) = x
@@ -104,7 +238,7 @@ end
 """
     ifelse(cond::Num, x, y)
 
-Symbolic conditional expression. Returns `x` if `cond` evaluates to true, and `y` if `cond` 
+Symbolic conditional expression. Returns `x` if `cond` evaluates to true, and `y` if `cond`
 evaluates to false. This allows encoding conditional logic in symbolic expressions.
 
 # Examples
@@ -113,7 +247,10 @@ evaluates to false. This allows encoding conditional logic in symbolic expressio
 ifelse(a > b, c, 0)  # Returns c if a > b, otherwise 0
 ```
 """
-Base.ifelse(x::Num, y, z) = Num(ifelse(value(x), value(y), value(z)))
+Base.ifelse(x::Num, y, z) = ifelse(unwrap(x), unwrap(y), unwrap(z))
+Base.ifelse(x::Num, y::Num, z) = Num(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y, z::Num) = Num(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y::Num, z::Num) = Num(ifelse(unwrap(x), unwrap(y), unwrap(z)))
 
 Base.promote_rule(::Type{Bool}, ::Type{Num}) = Num
 Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: AbstractIrrational} = Num
@@ -195,6 +332,7 @@ function Base.:/(x::Complex{Num}, y::Complex{Num})
     Complex((a*c + b*d)/den, (b*c - a*d)/den)
 end
 Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
+Base.:^(z::Complex{Num}, n::Bool) = invoke(^, Tuple{Complex{Num}, Integer}, z, n)
 Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
 function Base.show(io::IO, z::Complex{<:Num})
@@ -210,8 +348,15 @@ end
 SymbolicUtils.symtype(n::Num) = symtype(value(n))
 Base.nameof(n::Num) = nameof(value(n))
 
-Base.iszero(x::Num) = SymbolicUtils.fraction_iszero(unwrap(x))
-Base.isone(x::Num) = SymbolicUtils.fraction_isone(unwrap(x))
+Base.iszero(x::Num) = SymbolicUtils._iszero(unwrap(x))
+Base.isone(x::Num) = SymbolicUtils._isone(unwrap(x))
+
+const COMMON_ZERO_NUM = Num(COMMON_ZERO)
+const COMMON_ONE_NUM = Num(COMMON_ONE)
+Base.zero(::Num) = COMMON_ZERO_NUM
+Base.zero(::Type{Num}) = COMMON_ZERO_NUM
+Base.one(::Num) = COMMON_ONE_NUM
+Base.one(::Type{Num}) = COMMON_ONE_NUM
 
 import SymbolicUtils: <ₑ, Term, operation, arguments
 
@@ -225,6 +370,12 @@ Base.promote_rule(::Type{BigFloat}, ::Type{Num}) = Num
 <ₑ(s::Num, x) = value(s) <ₑ value(x)
 <ₑ(s, x::Num) = value(s) <ₑ value(x)
 <ₑ(s::Num, x::Num) = value(s) <ₑ value(x)
+for T in (Real, Complex, BasicSymbolic)
+    @eval begin
+        <ₑ(s::Num, x::$T) = value(s) <ₑ value(x)
+        <ₑ(s::$T, x::Num) = value(s) <ₑ value(x)
+    end
+end
 
 function Num(q::AbstractIrrational)
     args = SymbolicUtils.ArgsT{VartypeT}((q,))
@@ -275,6 +426,15 @@ end
     isequal(va, vb)::Bool
 end (AbstractFloat, Number, BasicSymbolic)
 
+for f in (:(==), :isequal)
+    @eval begin
+        Base.$f(a::Complex, b::Num) = invoke(Base.$f, Tuple{Number, Num}, a, b)
+        Base.$f(a::Num, b::Complex) = invoke(Base.$f, Tuple{Num, Number}, a, b)
+    end
+end
+Base.:(==)(a::AbstractIrrational, b::Num) = invoke(==, Tuple{Number, Num}, a, b)
+Base.:(==)(a::Num, b::AbstractIrrational) = invoke(==, Tuple{Num, Number}, a, b)
+
 Base.to_index(x::Num) = Base.to_index(value(x))
 
 Base.hash(x::Num, h::UInt) = hash(unwrap(x), h)::UInt
@@ -309,10 +469,10 @@ $(TYPEDSIGNATURES)
 
 Return the alignment of printing `x` of type `Num`.
 
-The alignment is a tuple `(left, right)` showing how many characters are needed 
+The alignment is a tuple `(left, right)` showing how many characters are needed
 on either side of an alignment feature. This function returns the text width
-of `x` and `0` to avoid matching special characters, such as `e`and `f`, with 
-the alignment algorithm in Julia Base, which leads to extra white spaces on the 
+of `x` and `0` to avoid matching special characters, such as `e`and `f`, with
+the alignment algorithm in Julia Base, which leads to extra white spaces on the
 left of the characters when displaying array of symbolic variables.
 """
 function Base.alignment(io::IO, x::Num)

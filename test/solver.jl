@@ -196,6 +196,13 @@ end
     @test all(isapprox.(arr_known_roots, r_novar, atol=0.00001))
 end
 
+@testset "Higher degree univar" begin
+    expr = -b + a*x + c*x - d*x^2 + b*x^3 - a*x^4 - x^5
+    root = only(symbolic_solve(expr, x))
+    @test operation(root) === Symbolics.RootsOf
+    @test isequal(arguments(root), [Symbolics.unwrap(expr), Symbolics.unwrap(x)])
+end
+
 @testset "Complex coeffs univar" begin
     expr = x^4 + sqrt(complex(-2//1))
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))

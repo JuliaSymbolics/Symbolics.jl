@@ -179,6 +179,14 @@ let
     @test Symbolics.getname(Symbolics.rename(y[2], :u)) === :u
 end
 
+@testset "renamed metadata" begin
+    metadata = Base.ImmutableDict{DataType, Any}(
+        Symbolics.VariableSource, (:variables, :x),
+    )
+    renamed = Symbolics.renamed_metadata(metadata, :y)
+    @test renamed[Symbolics.VariableSource] === (:variables, :y)
+end
+
 let
     s = :y
     x = (1:2,1:3)
@@ -443,7 +451,7 @@ end
 @testset "`@register_symbolic` edge cases" begin
     @register_symbolic foo1(x::AbstractArray)
     @register_symbolic foo1(x::AbstractArray{Int})
-    @register_symbolic foo1(x::AbstractVector{Int})
+    @register_symbolic foo1(T::AbstractVector{Int})
 end
 
 @testset "`@register_array_symbolic` works without size" begin
@@ -455,3 +463,13 @@ end
     @test SU.shape(unwrap(foo3(x))) == SU.Unknown(2)
 end
 
+struct Bar{T} end
+struct Baz{T} end
+
+@register_symbolic Bar(x::Int)::Bar{Int}
+@register_symbolic Baz(x::String)::Baz{String}
+
+@testset "Registration of struct constructors works correctly" begin
+    @test SU.promote_symtype(Bar, Int) === Bar{Int}
+    @test SU.promote_symtype(Baz, String) === Baz{String}
+end

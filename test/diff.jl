@@ -143,6 +143,8 @@ canonequal(a, b) = isequal(simplify(unwrap_const(unwrap(a))), simplify(unwrap_co
     (Differential(z) * Differential(y) * Differential(x))(t),
     Differential(z)(Differential(y)(Differential(x)(t)))
 )
+@test isequal((Differential(x) * identity)(t), Differential(x)(t))
+@test_throws MethodError Differential(x) * 2
 
 @test canonequal(
                  Symbolics.derivative(sin(cos(x)), x),
@@ -397,6 +399,28 @@ let
     @test Symbolics.is_derivative(Symbolics.unwrap(D(X + 2a*Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(D(X) + D(Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(my_f(X, D(Y))))
+
+    # Wrapper types give the same answer as the expression they wrap (#1942).
+    @test !Symbolics.is_derivative(D)
+    @test !Symbolics.is_derivative(t)
+    @test !Symbolics.is_derivative(X)
+    @test !Symbolics.is_derivative(1)
+    @test Symbolics.is_derivative(D(X))
+    @test !Symbolics.is_derivative(D(X) + 3)
+    @test Symbolics.is_derivative(D(X + 2a * Y))
+    @test !Symbolics.is_derivative(D(X) + D(Y))
+    @test !Symbolics.is_derivative(my_f(X, D(Y)))
+    @test !Symbolics.is_derivative(expand_derivatives(D(X^2)))
+
+    @variables Z(t)[1:3]
+    @test Symbolics.is_derivative(D(Z))
+    @test !Symbolics.is_derivative(Z)
+
+    # `Differential` distributes over the parts of a `Complex{Num}`, so the result is a
+    # `complex` term rather than a single derivative term.
+    @variables W(t)::Complex
+    @test !Symbolics.is_derivative(D(W))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(D(W)))
 end
 
 # Zeroth derivative (#1163)
@@ -705,4 +729,24 @@ end
     for i in 1:3, j in 1:3
         @test isequal(Symbolics.derivative(norm(y), y[i, j]), Symbolics.derivative(norm(collect(y)), y[i, j]))
     end
+end
+
+# `recursive_hasoperator` on `ArrayMaker` (issue: was not handled, always returned false)
+@testset "`recursive_hasoperator` with `ArrayMaker`" begin
+    @variables t x(t)[1:2]
+    D = Differential(t)
+
+    arr_with_deriv = @makearray arr[1:2] begin
+        arr[1:1] => Symbolics.SConst([unwrap(D(x[1]))])
+        arr[2:2] => [unwrap(x[2])]
+    end
+    @test SymbolicUtils.isarraymaker(arr_with_deriv)
+    @test Symbolics.hasderiv(arr_with_deriv)
+
+    arr_no_deriv = @makearray arr[1:2] begin
+        arr[1:1] => Symbolics.SConst([unwrap(x[1])])
+        arr[2:2] => [unwrap(x[2])]
+    end
+    @test SymbolicUtils.isarraymaker(arr_no_deriv)
+    @test !Symbolics.hasderiv(arr_no_deriv)
 end
