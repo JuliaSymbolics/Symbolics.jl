@@ -301,3 +301,9 @@ end
 # without this they fall through to `eigvals!`, which errors on a symbolic matrix.
 @register_symbolic LinearAlgebra.eigmax(x::AbstractMatrix)
 @register_symbolic LinearAlgebra.eigmin(x::AbstractMatrix)
+
+# `logdet` of a symbolic matrix likewise has no closed form; without this it
+# reaches a numeric factorization and errors. `logdet` rather than `log(det(x))`
+# because the two differ for a negative determinant, and callers that analyse the
+# expression need the atom preserved.
+@register_symbolic LinearAlgebra.logdet(x::AbstractMatrix)
