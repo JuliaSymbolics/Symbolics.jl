@@ -163,6 +163,30 @@ end
     @test all(arr_solve_roots .≈ arr_known_roots)
 end
 
+@testset "Deg 3/4 univar, non-rational coefficients" begin
+    # the `//` in the cubic/quartic formulas only accepts integer/rational
+    # symtypes, so float or symbolic coefficients used to throw a MethodError
+    expr = x^3 + 0.5x + 1.0
+    for arr in (eval.(Symbolics.toexpr.(Symbolics.get_roots_deg3(expr, x))),
+                eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+        @test length(arr) == 3
+        @test all(r -> abs(r^3 + 0.5r + 1.0) < 1e-10, arr)
+    end
+
+    expr = x^4 + 0.5x + 1.0
+    arr = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
+    @test length(arr) == 4
+    @test all(r -> abs(r^4 + 0.5r + 1.0) < 1e-10, arr)
+
+    # symbolic coefficients
+    @variables t
+    expr = x^3 + x^2*cos(t) + x*sin(t) + 1
+    roots = Symbolics.get_roots_deg3(expr, x)
+    @test length(roots) == 3
+    r = unwrap_const(value(substitute(Symbolics.wrap(roots[2]), Dict(t => 2); fold = Val(true))))
+    @test abs(r^3 + r^2*cos(2.0) + r*sin(2.0) + 1) < 1e-10
+end
+
 @testset "Deg 4 univar" begin
     expr = x^4 + 1
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
