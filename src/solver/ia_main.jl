@@ -103,7 +103,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                     for i in eachindex(rhs)
                         for k in 0:(a2 - 1)
                             r = ^(rhs[i], (1 // power))
-                            c = *(2 * (k), pi) * im / power
+                            c = *(2 * (k), Symbolics.term(*, Base.MathConstants.pi)) * im / power
                             root = r * Base.MathConstants.e^c
                             push!(new_roots, root)
                         end
@@ -136,12 +136,12 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                 new_var = (@variables $new_var)[1]
                 period = fundamental_period(oper)
                 rhs = map(
-                    sol -> invop(sol) +
+                    sol -> Symbolics.term(invop, sol; type = Real) +
                            *(period, new_var),
                     rhs)
                 @info string(new_var) * " ϵ" * " Ζ"
             else
-                rhs = map(sol -> invop(sol), rhs)
+                rhs = map(sol -> Symbolics.term(invop, sol; type = Real), rhs)
             end
         end
 
