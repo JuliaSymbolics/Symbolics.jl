@@ -66,9 +66,9 @@ Numbers are always zeroable. An array type is zeroable if its element type is, a
 symbolic struct type is zeroable if every one of its fields is. Everything else - notably
 `String` fields, which have no additive identity - is not.
 """
-is_zeroable(T::Type) = _is_zeroable(T, Base.IdSet{SU.TypeT}())
+Base.@assume_effects :foldable is_zeroable(T::Type) = _is_zeroable(T, Base.IdSet{SU.TypeT}())
 
-function _is_zeroable(T::Type, seen::Base.IdSet{SU.TypeT})
+Base.@assume_effects :foldable function _is_zeroable(T::Type, seen::Base.IdSet{SU.TypeT})
     T <: Number && return true
     # Guards against types which are recursive through an array field, e.g.
     # `struct Tree; kids::Vector{Tree}; end`.
@@ -135,6 +135,25 @@ end
 function SymbolicUtils.Code.function_to_expr(@nospecialize(f::SymbolicZero), x::SymbolicT, st)
     out = get(st.rewrites, x, nothing)
     out === nothing || return out
+    throw(ArgumentError(LazyString(
+        "Cannot generate code for the symbolic zero of type `", symzero_type(f),
+        "`, since it has no concrete value. Access its fields or index into it to obtain ",
+        "values which can be code generated.")))
+end
+
+"""
+    $TYPEDSIGNATURES
+
+The `codegen_function!` counterpart of the `function_to_expr` method above, for the newer
+code generation path. Without it a lazy zero falls through to the generic implementation,
+which emits a call to the operation - and since `SymbolicZero` is callable, that silently
+generates code returning a symbolic instead of erroring. Checking `cs.rewrites` is handled
+by the caller here, so this only has to reject what is left.
+"""
+function SymbolicUtils.Code.codegen_function!(
+        @nospecialize(f::SymbolicZero), cs::SymbolicUtils.Code.CodegenState{T},
+        expr::BasicSymbolic{T}, expr_idx::Integer
+    ) where {T}
     throw(ArgumentError(LazyString(
         "Cannot generate code for the symbolic zero of type `", symzero_type(f),
         "`, since it has no concrete value. Access its fields or index into it to obtain ",
