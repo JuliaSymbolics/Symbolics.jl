@@ -351,6 +351,21 @@ end
     shape(:v) = [1:3]
 end
 @symstruct DiffLoose
+# Recursive through an array field, which the type walk in `is_zeroable` has to terminate on.
+struct DiffRec
+    a::Real
+    kids::Vector{DiffRec}
+end
+@symstruct DiffRec
+
+"""
+Return `true` if inference constant-folds the zero-argument `f` to the literal `val`.
+"""
+function folds_to(f, val)
+    ci, _ = only(Base.code_typed(f, (); optimize = true))
+    ret = ci.code[end]
+    return ret isa Core.ReturnNode && isdefined(ret, :val) && ret.val === val
+end
 
 @testset "`is_zeroable`" begin
     @test Symbolics.is_zeroable(Real)
@@ -358,9 +373,22 @@ end
     @test Symbolics.is_zeroable(DiffInner)
     @test Symbolics.is_zeroable(DiffOuter)
     @test Symbolics.is_zeroable(DiffLoose)
+    @test Symbolics.is_zeroable(DiffRec)
     # `Record2` has a `String` field, which has no additive identity.
     @test !Symbolics.is_zeroable(Record2{Int})
     @test !Symbolics.is_zeroable(String)
+
+    # The type walk must happen at compile time, so that callers which branch on
+    # `is_zeroable` do not pay for it at runtime. This relies on the `:foldable`
+    # annotation on `is_zeroable`; inference cannot derive it, because the walk is
+    # recursive.
+    @test folds_to(() -> Symbolics.is_zeroable(Real), true)
+    @test folds_to(() -> Symbolics.is_zeroable(Vector{Real}), true)
+    @test folds_to(() -> Symbolics.is_zeroable(DiffInner), true)
+    @test folds_to(() -> Symbolics.is_zeroable(DiffOuter), true)
+    @test folds_to(() -> Symbolics.is_zeroable(DiffRec), true)
+    @test folds_to(() -> Symbolics.is_zeroable(Record2{Int}), false)
+    @test folds_to(() -> Symbolics.is_zeroable(String), false)
 end
 
 @testset "differentiating a struct that does not depend on the variable" begin
