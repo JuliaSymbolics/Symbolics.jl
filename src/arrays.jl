@@ -213,6 +213,14 @@ function LinearAlgebra.norm(A::Arr{T}, p::Real) where {T}
     end
 end
 
+# A scalarized vector is an ordinary `AbstractVector{<:Num}`, not an `Arr`, so it
+# missed the methods above and fell into the generic implementation, which expands
+# to `sqrt(sum(abs2, v))`. That is a different expression: the `norm` atom is gone,
+# which matters to anything analysing the result rather than evaluating it.
+function LinearAlgebra.norm(v::AbstractVector{<:Num}, p::Real = 2)
+    return wrap(Symbolics.term(norm, map(unwrap, v), p; type = Real))
+end
+
 function SymbolicUtils.scalarize(x::Arr{T, N}, ::Val{toplevel}) where {toplevel, T, N}
     scal = SymbolicUtils.scalarize(unwrap(x), Val{toplevel}())::(AbstractArray{_T, N} where {_T})
     if is_wrapper_type(T)
