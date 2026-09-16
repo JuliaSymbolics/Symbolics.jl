@@ -131,7 +131,7 @@ end
         # same-shape array branches build fine
         @test operation(unwrap(op(x > 0, v, v))) === op
         result = op(x > 0, v, complex_v)
-        @test result isa Symbolics.Arr{Complex{Num}, 1}
+        @test result isa Symbolics.Arr{Symbolics.SymbolicNumber, 1}
         @test operation(unwrap(result)) === op
         # mismatched scalar/array branches are shape-invalid: dispatch resolves to a
         # concrete method that then raises a shape error, rather than an ambiguity MethodError

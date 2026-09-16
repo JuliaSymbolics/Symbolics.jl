@@ -9,18 +9,13 @@ const _StaticArray = StaticArraysCore.StaticArray
     val::BasicSymbolic{VartypeT}
 
     function Num(ex::BasicSymbolic{VartypeT})
-        # need `<: Number` instead of `<: Real` to allow the primitive `@number_methods`
-        # methods below to infer. They could be made to infer `Union{Complex{Num}, Num}`
-        # by manually checking the `symtype` of the result and branching instead of using
-        # `wrap`. However, this causes issues with LinearAlgebra methods because it
-        # preallocates a buffer using the inferred result type, and then tries to
-        # e.g. set an integer into it, which fails because `convert(::Type{Union{..}}, ::T)`
-        # doesn't work.
-        @assert symtype(ex) <: Number
+        @assert symtype(ex) <: Real
         return new(Const{VartypeT}(ex))
     end
     function Num(ex::Number)
-        return new(Const{VartypeT}(unwrap(ex)))
+        raw = unwrap(ex)
+        @assert symtype(raw) <: Real
+        return new(Const{VartypeT}(raw))
     end
 end
 
@@ -255,71 +250,7 @@ Base.ifelse(x::Num, y::Num, z::Num) = Num(ifelse(unwrap(x), unwrap(y), unwrap(z)
 Base.promote_rule(::Type{Bool}, ::Type{Num}) = Num
 Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: AbstractIrrational} = Num
 Base.promote_rule(::Type{Complex{Num}}, ::Type{Num}) = Complex{Num}
-for C in [Complex, Complex{Bool}]
-    @eval begin
-        function Base.:*(x::Num, z::$C)
-            x = unwrap(x)
-            rx = real(x)
-            ix = imag(x)
-            rz = real(z)
-            iz = imag(z)
-            Complex(Num(rx * rz - ix * iz), Num(rx * iz + ix * rz))
-        end
-        function Base.:*(z::$C, x::Num)
-            x = unwrap(x)
-            rx = real(x)
-            ix = imag(x)
-            rz = real(z)
-            iz = imag(z)
-            Complex(Num(rx * rz - ix * iz), Num(rx * iz + ix * rz))
-        end
-        function Base.:/(x::Num, z::$C)
-            x = unwrap(x)
-            rz, iz = reim(z)
-            den = rz^2 + iz^2
-            rx = real(x)
-            ix = imag(x)
-            return Complex(Num((rx * rz + ix * iz) / den), Num((ix * rz - rx * iz) / den))
-        end
-        function Base.:/(z::$C, x::Num)
-            x = unwrap(x)
-            rz, iz = reim(z)
-            rx = real(x)
-            ix = imag(x)
-            den = rx^2 + ix^2
-            return Complex(Num((rx * rz + ix * iz) / den), Num((rx * iz - ix * rz) / den))
-        end
-        function Base.:+(x::Num, z::$C)
-            x = unwrap(x)
-            rx = real(x)
-            ix = imag(x)
-            rz, iz = reim(z)
-            return Complex(Num(rx + rz), Num(ix + iz))
-        end
-        function Base.:+(z::$C, x::Num)
-            x = unwrap(x)
-            rx = real(x)
-            ix = imag(x)
-            rz, iz = reim(z)
-            return Complex(Num(rx + rz), Num(ix + iz))
-        end
-        function Base.:-(x::Num, z::$C)
-            x = unwrap(x)
-            rx = real(x)
-            ix = imag(x)
-            rz, iz = reim(z)
-            return Complex(Num(rx - rz), Num(ix - iz))
-        end
-        function Base.:-(z::$C, x::Num)
-            x = unwrap(x)
-            rx = real(x)
-            ix = imag(x)
-            rz, iz = reim(z)
-            return Complex(Num(rz - rx), Num(iz - ix))
-        end
-    end
-end
-
+Base.promote_rule(::Type{Num}, ::Type{Complex{Num}}) = Complex{Num}
 function Base.inv(z::Complex{Num})
     a, b = reim(z)
     den = a^2 + b^2
@@ -365,7 +296,7 @@ function Base.show(io::IO, n::Num)
     show_numwrap[] ? print(io, :(Num($(value(n))))) : Base.show(io, value(n))
 end
 
-Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: Number} = Num
+Base.promote_rule(::Type{T}, ::Type{Num}) where {T <: Real} = Num
 Base.promote_rule(::Type{BigFloat}, ::Type{Num}) = Num
 <ₑ(s::Num, x) = value(s) <ₑ value(x)
 <ₑ(s, x::Num) = value(s) <ₑ value(x)

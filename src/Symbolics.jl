@@ -623,7 +623,6 @@ function __init__()
         end
     end
     SymbolicUtils.hashcons(RootsOf, true)
-    SymbolicUtils.hashcons(IM, true)
     SymbolicUtils.hashcons(COMMON_ONE, true)
     SymbolicUtils.hashcons(COMMON_ZERO, true)
     SymbolicUtils.hashcons(IIP_OUTSYM, true)

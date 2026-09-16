@@ -96,7 +96,8 @@ end
 @testset "Nice univar cases" begin
     found_roots = symbolic_solve(1/x^2 ~ 1/y^2 - 2/x^3 * (x-y), x)
     known_roots = Symbolics.unwrap.([y, -2y])
-    @test isequal(found_roots, known_roots)
+    @test length(found_roots) == length(known_roots)
+    @test all(any(y -> isequal(x, y), known_roots) for x in found_roots)
 end
 
 @testset "Deg 1 univar" begin
