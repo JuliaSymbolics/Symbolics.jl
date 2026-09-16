@@ -99,6 +99,16 @@ end
     @test isequal(found_roots, known_roots)
 end
 
+@testset "Deterministic root order" begin
+    # Root order must not depend on hash/dictionary iteration order, which varies
+    # across Julia versions. Numeric roots sort ascending, complex conjugate pairs
+    # sort positive-imaginary-part first, and symbolic roots sort with `<ₑ`.
+    @test isequal(Symbolics.value.(symbolic_solve(x^3 - 6x^2 + 11x - 6, x)), [1, 2, 3])
+    @test isequal(Symbolics.value.(symbolic_solve((x - 5)*(x + 1)*(x - 2), x)), [-1, 2, 5])
+    @test isequal(Symbolics.value.(symbolic_solve(x^2 + x - 6, x)), [-3, 2])
+    @test isequal(Symbolics.value.(symbolic_solve(x^2 + 1, x)), [im, -im])
+end
+
 @testset "Deg 1 univar" begin
     @test isequal(unwrap_const(only(symbolic_solve(x+1, x))), -1)
 

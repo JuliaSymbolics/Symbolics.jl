@@ -204,6 +204,14 @@ end
 function Base.:(^)(x1::AbstractMatrix{T}, x2::Num) where {T <: Real}
     return invoke(^, Tuple{AbstractArray{<:Real}, Num}, x1, x2)
 end
+function Base.:(^)(
+        x1::Union{
+            LinearAlgebra.Hermitian{<:Real}, LinearAlgebra.Symmetric{<:Real},
+            LinearAlgebra.SymTridiagonal{<:Real},
+        }, x2::Num
+    )
+    return invoke(^, Tuple{AbstractArray{<:Real}, Num}, x1, x2)
+end
 function Base.:(^)(x1::Num, x2::AbstractMatrix{<:Real})
     return invoke(^, Tuple{Num, AbstractArray{<:Real}}, x1, x2)
 end

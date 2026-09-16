@@ -198,6 +198,15 @@ for T in (
     )
     @eval Base.:(/)(A::Arr{Num, 2}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
 end
+if isdefined(LinearAlgebra, :UpperHessenberg)
+    for T in (
+            LinearAlgebra.UpperHessenberg{Num},
+            LinearAlgebra.Adjoint{Num, <:LinearAlgebra.UpperHessenberg{Num}},
+            LinearAlgebra.Transpose{Num, <:LinearAlgebra.UpperHessenberg{Num}},
+        )
+        @eval Base.:(/)(A::Arr{Num, 2}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
+    end
+end
 for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose)
     @eval function Base.:(/)(
             A::$T{Num, <:AbstractVector}, B::Arr{Num, 2}
@@ -209,8 +218,8 @@ end
 Base.exp(m::Matrix{Num}) = Arr{Num, 2}(exp(SConst(m)))
 Base.exp(m::Matrix{Complex{Num}}) = Arr{Complex{Num}, 2}(exp(SConst(m)))
 
-function LinearAlgebra.transpose(x::Arr{T, N}) where {T, N}
-    return Arr{T, 2}(LinearAlgebra.transpose(unwrap(x)))
+function Base.transpose(x::Arr{T, N}) where {T, N}
+    return Arr{T, 2}(Base.transpose(unwrap(x)))
 end
 
 #################### MAP-REDUCE ################

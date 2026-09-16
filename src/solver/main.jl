@@ -1,4 +1,26 @@
 Base.:^(a::Complex{<:Real}, b::Num) = Symbolics.Pow(a, b)
+
+# The solver builds roots from Nemo factor dictionaries, whose iteration order is
+# hash-dependent, so without an explicit sort the returned root order can change
+# across Julia versions and processes. Numeric roots sort in ascending order with
+# conjugate pairs ordered positive-imaginary-part first (the convention
+# `const_coeff_solve` relies on when assigning constants to cos/sin terms), and
+# symbolic roots sort with the canonical term order.
+function lt_roots(a, b)
+    va, vb = value(a), value(b)
+    if va isa Complex && vb isa Complex
+        return (real(va), -imag(va)) < (real(vb), -imag(vb))
+    elseif va isa Real && vb isa Real
+        return va < vb
+    elseif va isa Number && vb isa Number
+        return va <ₑ vb
+    else
+        va isa Number && return true
+        vb isa Number && return false
+        return a <ₑ b
+    end
+end
+
 """
     symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
 
@@ -224,6 +246,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
                ia_solve(expr, x, warns = warns)
         isequal(sols, nothing) && return nothing
         sols = map(postprocess_root, sols)
+        sort!(sols, lt = lt_roots)
         return sols
     elseif expr_univar
         all_vars = get_variables(expr)
