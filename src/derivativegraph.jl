@@ -2,7 +2,10 @@ abstract type AbstractFactorableSubgraph end
 abstract type DominatorSubgraph <: AbstractFactorableSubgraph end
 abstract type PostDominatorSubgraph <: AbstractFactorableSubgraph end
 
-struct Edge{T<:Integer}
+# `mutable` so edges have object identity: two edges between the same vertices
+# represent different path sets (e.g. a factored subgraph edge alongside a
+# preexisting edge) and must be distinguishable, like FastDifferentiation's `PathEdge`
+mutable struct Edge{T<:Integer}
     edge_value::SymbolicT
     top_vertex::T
     bott_vertex::T
@@ -17,10 +20,6 @@ reachable_vars(edge::Edge) = edge.reachable_vars
 reachable_roots(edge::Edge) = edge.reachable_roots
 vertices(edge::Edge) = (top_vertex(edge), bott_vertex(edge))
 times_used(edge::Edge) = sum(reachable_roots(edge)) * sum(reachable_vars(edge))
-
-# use loose definition of edge equality to allow for edge values changing
-Base.:(==)(a::Edge, b::Edge) = a.top_vertex == b.top_vertex && a.bott_vertex == b.bott_vertex
-Base.hash(e::Edge, h::UInt) = hash((e.top_vertex, e.bott_vertex), h)
 
 """
     $TYPEDEF
@@ -170,19 +169,8 @@ end
 function add_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     top_vertex, bott_vertex = vertices(edge)
 
-    # if edge already exists, merge in roots and vars
-    existing_idx = findfirst(isequal(edge), dg.child_edges[top_vertex])
-    if !isnothing(existing_idx)
-        existing = dg.child_edges[top_vertex][existing_idx]
-        existing.reachable_roots .|= edge.reachable_roots
-        existing.reachable_vars .|= edge.reachable_vars
-
-        dg.dirty_roots .|= edge.reachable_roots
-        dg.dirty_vars .|= edge.reachable_vars
-
-        return nothing
-    end
-
+    # parallel edges between the same vertices are allowed: they are distinct
+    # objects covering disjoint sets of paths, so never merge them
     push!(dg.child_edges[top_vertex], edge)
     push!(dg.parent_edges[bott_vertex], edge)
 
@@ -331,18 +319,6 @@ function populate_dergraph_var!(dg::DerivativeGraph{T}, var::SymbolicT, root_idx
     dg.parent_edges[post_idx] = Edge{T}[]
 
     return post_idx
-end
-
-# for visualization purposes - converts a `DerivativeGraph` into an `OrderedDiGraph`
-function generate_graph(dg::DerivativeGraph{T}) where {T}
-    g = SymbolicUtils.OrderedDiGraph{T}(length(dg.symbols))
-    for node in 1:length(dg.symbols)
-        for edge in dg.child_edges[node]
-            SymbolicUtils.Graphs.add_edge!(g, edge.top_vertex, edge.bott_vertex)
-        end
-    end
-
-    return g
 end
 
 # Follows the algorithm described in this paper: https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf
@@ -551,86 +527,74 @@ sub_edge_reachable_roots(sub::FactorableSubgraph{T, PostDominatorSubgraph}) wher
 sub_edge_reachable_vars(sub::FactorableSubgraph{T, DominatorSubgraph}) where {T} = copy(nondominance_mask(sub))
 sub_edge_reachable_vars(sub::FactorableSubgraph{T, PostDominatorSubgraph}) where {T} = copy(sub.dominance_mask)
 
+# When factoring a subgraph, an edge whose reachability extends outside the
+# subgraph in the dominance direction must keep serving those outside paths.
+# `outside_edge` creates a parallel edge carrying `dom_extra` (the dominance
+# reachability outside the subgraph) together with the edge's full
+# nondominance reachability; the original edge is then narrowed to the
+# in-subgraph dominance part and the outside nondominance part. This is the
+# analogue of FastDifferentiation's `add_non_dom_edges!`/`reset_edge_masks!`.
+outside_edge(sub::FactorableSubgraph{T, DominatorSubgraph}, edge::Edge{T}, dom_extra::BitVector) where {T} =
+    Edge{T}(edge.edge_value, edge.top_vertex, edge.bott_vertex, copy(edge.reachable_vars), dom_extra)
+outside_edge(sub::FactorableSubgraph{T, PostDominatorSubgraph}, edge::Edge{T}, dom_extra::BitVector) where {T} =
+    Edge{T}(edge.edge_value, edge.top_vertex, edge.bott_vertex, dom_extra, copy(edge.reachable_roots))
+
 subgraph_edges(sub::FactorableSubgraph) = sub.edges
 
-# NOT called in the constructor of `FactorableSubgraph`. Instead, delayed until right before factoring to account for changes to the `DerivativeGraph` from previous factoring
-# Also calculates the subgraph's value
-# Recurses through the subgraph to find all its edges
-function populate_subgraph_edges!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where {T}
-    union!(sub.edges, _subgraph_edges(dg, sub, backward_vertex(sub)))
+# all nodes reachable from `start` moving through `sub` along in-subgraph edges
+# only; `forward` chooses the factor-base-to-factor-node direction
+function _subgraph_reachable(dg::DerivativeGraph{T}, sub::FactorableSubgraph, start::T, forward::Bool) where {T}
+    seen = Set{T}([start])
+    stack = T[start]
+    while !isempty(stack)
+        node = pop!(stack)
+        for e in (forward ? forward_edges(dg, sub, node) : backward_edges(dg, sub, node))
+            test_edge(sub, e) || continue
+            next = forward ? forward_vertex(sub, e) : backward_vertex(sub, e)
+            next in seen && continue
+            push!(seen, next)
+            push!(stack, next)
+        end
+    end
+    return seen
 end
 
-# finds edges with overlapping nondominance reachabilities for combining paths
-# this prevents combining the same relationship twice, such as where one branch is from a previous factored subgraph and the others are part of a subgraph of a different type (dom/pdom) being factored between the same nodes
-function find_edge_group(sub::FactorableSubgraph, edges::Vector{Edge{T}}) where {T}
-    isempty(edges) && return BitVector()
-    # start with the first edge in the group
-    mask = copy(nondominance_mask(sub, edges[1]))
-    group::BitVector = falses(length(edges))
-    group[1] = 1
+# accumulate `sum` into `node`'s path-product total and propagate it forward once
+# every in-subgraph backward edge has contributed (cf. FastDifferentiation's
+# `_evaluate_branching_subgraph`)
+function _vertex_sum!(dg::DerivativeGraph{T}, sub::FactorableSubgraph, sum::SymbolicT, node::T, counts::Dict{T,T}, vertex_sums::Dict{T,SymbolicT}) where {T}
+    vertex_sums[node] = get(vertex_sums, node, COMMON_ZERO) + sum
+    (counts[node] -= 1) == 0 || return
+    for e in forward_edges(dg, sub, node)
+        e in sub.edges || continue
+        _vertex_sum!(dg, sub, vertex_sums[node] * e.edge_value, forward_vertex(sub, e), counts, vertex_sums)
+    end
+end
 
-    # loop through edges until the group is unchanged to prevent a scenario where the nondominance looks like {1}, {2,3}, {1,3}, where one loop wouldn't include edge 2
-    changed = true
-    while changed
-        changed = false
-        for (i,edge) in pairs(edges)
-            group[i] && continue # edge not already in group
-            nondom_mask = nondominance_mask(sub, edge)
-            if any(nondom_mask .& mask) # any overlap
-                changed = true
-                mask .|= nondom_mask
-                group[i] = 1
-            end
+# NOT called in the constructor of `FactorableSubgraph`. Instead, delayed until right before factoring to account for changes to the `DerivativeGraph` from previous factoring
+# collects all edges on in-subgraph paths between the factor base and factor
+# node, and computes the subgraph's value as the sum of all such path products
+# via a vertex-sum DP (correct whether or not in-subgraph paths rejoin)
+function populate_subgraph_edges!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where {T}
+    empty!(sub.edges)
+    fwd_ok = _subgraph_reachable(dg, sub, backward_vertex(sub), true)
+    bwd_ok = _subgraph_reachable(dg, sub, forward_vertex(sub), false)
+    for node in fwd_ok
+        for e in forward_edges(dg, sub, node)
+            test_edge(sub, e) && forward_vertex(sub, e) in bwd_ok && push!(sub.edges, e)
         end
     end
 
-    return group
-end
-
-function _subgraph_edges(dg::DerivativeGraph{T}, sub::FactorableSubgraph, node::T) where {T}
-    cache = Dict{Edge{T}, SymbolicT}()
-    sub_edges = Set{Edge{T}}()
-
-    # discover all edges, but only sum those part of a group of reachabilities (explained in find_edge_group)
-    edges = forward_edges(dg, sub, node)
-    edge_group_mask = find_edge_group(sub, edges)
-    for (in_group,edge) in zip(edge_group_mask,edges)
-        sub.subgraph_value += _subgraph_edges!(sub_edges, dg, sub, edge, cache)*in_group
+    counts = Dict{T,T}()
+    for e in sub.edges
+        node = forward_vertex(sub, e)
+        counts[node] = get(counts, node, zero(T)) + one(T)
     end
-
-    return sub_edges
-end
-
-
-function _subgraph_edges!(edges::Set{Edge{T}}, dg::DerivativeGraph{T}, sub::FactorableSubgraph, edge::Edge{T}, cache::Dict{Edge{T}, SymbolicT}) where {T}
-    haskey(cache, edge) && return cache[edge]
-
-    edge_dom_mask = dominance_mask(sub, edge)
-    if !any(edge_dom_mask .& sub.dominance_mask) # edge not in subgraph (no overlap)
-        cache[edge] = COMMON_ZERO
-        return COMMON_ZERO
-    end
-
-    # reached the end of the subgraph
-    if forward_vertex(sub, edge) == forward_vertex(sub)
-        push!(edges, edge)
-        cache[edge] = edge.edge_value
-        return edge.edge_value
-    end
-
-    # discover all edges, but only sum those part of a group of reachabilities (explained in find_edge_group)
-    push!(edges, edge)
-    path_value = COMMON_ZERO
-    next_edges = forward_edges(dg, sub, edge)
-    edge_group_mask = find_edge_group(sub, next_edges)
-    for (in_group,next_edge) in zip(edge_group_mask,next_edges)
-        path_value += _subgraph_edges!(edges, dg, sub, next_edge, cache)*in_group
-    end
-
-    path_value *= edge.edge_value
-
-    cache[edge] = path_value
-    return path_value
+    counts[backward_vertex(sub)] = one(T)
+    vertex_sums = Dict{T,SymbolicT}()
+    _vertex_sum!(dg, sub, COMMON_ONE, backward_vertex(sub), counts, vertex_sums)
+    sub.subgraph_value = get(vertex_sums, forward_vertex(sub), COMMON_ZERO)
+    return nothing
 end
 
 # the number of times a subgraph is used by all possible partial derivatives
@@ -712,81 +676,127 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T};
     return subs
 end
 
-# checks for structural true dominance, masked by variable (used for pdom subgraphs)
-# needs to be separate from `get_dominators` because it is masked by variable not root (vice versa for pdoms)
-function is_dominator(dg::DerivativeGraph{T}, dominator::T, dominated::T, var_mask::BitVector, cache::Dict{Tuple{T,T}, Bool}=Dict{Tuple{T,T},Bool}()) where {T}
-    dominator == dominated && return true
-    cache_key = (dominator, dominated)
-    haskey(cache, cache_key) && return cache[cache_key]
-    cache[cache_key] = false
-
-    next_edges = filter(e -> any(reachable_vars(e) .& var_mask), parent_edges(dg, dominated))
-
-    isempty(next_edges) && return false
-    for parent_edge in next_edges
-        is_dominator(dg, dominator, top_vertex(parent_edge), var_mask, cache) || return false
+# nondominance-direction reachability of `edge` along paths that bypass the factor
+# base: for a dominator subgraph, the vars reachable from the edge's lower
+# endpoint without passing through the dominated node (the paper's `b pdom e.1`
+# test); for a postdominator subgraph, the roots reachable from the edge's upper
+# endpoint without passing through the postdominated node (`b dom e.2`)
+function bypass_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}, edge::Edge{T}) where {T}
+    reach = falses(length(dg.vars))
+    seen = falses(length(dg.symbols))
+    stack = T[edge.bott_vertex]
+    while !isempty(stack)
+        node = pop!(stack)
+        (node == sub.bott_vertex || seen[node]) && continue
+        seen[node] = true
+        var_idx = get(dg.postorder_to_var_idx, node, nothing)
+        var_idx !== nothing && (reach[var_idx] = true)
+        for child_edge in child_edges(dg, node)
+            push!(stack, child_edge.bott_vertex)
+        end
     end
+    return reach
+end
 
-    cache[cache_key] = true
+function bypass_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDominatorSubgraph}, edge::Edge{T}) where {T}
+    reach = falses(length(dg.roots))
+    seen = falses(length(dg.symbols))
+    stack = T[edge.top_vertex]
+    while !isempty(stack)
+        node = pop!(stack)
+        (node == sub.top_vertex || seen[node]) && continue
+        seen[node] = true
+        root_idx = get(dg.postorder_to_root_idx, node, nothing)
+        root_idx !== nothing && (reach[root_idx] = true)
+        for parent_edge in parent_edges(dg, node)
+            push!(stack, parent_edge.top_vertex)
+        end
+    end
+    return reach
+end
+
+# an edge is on a valid path within `sub` iff its reachability covers all of the
+# subgraph's dominance and nondominance masks. Every in-subgraph edge must serve
+# the full (dominance x nondominance) pair set, or the single factored edge could
+# not represent the subgraph's value for all of the pairs it claims.
+test_edge(sub::FactorableSubgraph, edge::Edge) =
+    all(sub.dominance_mask .<= dominance_mask(sub, edge)) &&
+    all(nondominance_mask(sub) .<= nondominance_mask(sub, edge))
+
+# the unique valid next edge on an in-subgraph path from `edge` toward the factor
+# node, or `nothing` if the path ends or branches
+function next_valid_edge(dg::DerivativeGraph, sub::FactorableSubgraph, edge::Edge)
+    next = nothing
+    for e in forward_edges(dg, sub, edge)
+        test_edge(sub, e) || continue
+        next === nothing || return nothing
+        next = e
+    end
+    return next
+end
+
+# whether `start_edge` lies on an unbroken, unbranched in-subgraph path from the
+# factor base to the factor node
+function isa_connected_path(dg::DerivativeGraph, sub::FactorableSubgraph, start_edge::Edge)
+    test_edge(sub, start_edge) || return false
+    edge = start_edge
+    while forward_vertex(sub, edge) != forward_vertex(sub)
+        edge = next_valid_edge(dg, sub, edge)
+        edge === nothing && return false
+    end
     return true
 end
 
-function is_postdominator(dg::DerivativeGraph{T}, postdominator::T, postdominated::T, root_mask::BitVector, cache::Dict{Tuple{T,T}, Bool}=Dict{Tuple{T,T},Bool}()) where {T}
-    postdominator == postdominated && return true
-    cache_key = (postdominator, postdominated)
-    haskey(cache, cache_key) && return cache[cache_key]
-    cache[cache_key] = false
-
-    next_edges = filter(e -> any(reachable_roots(e) .& root_mask), child_edges(dg, postdominated))
-
-    isempty(next_edges) && return false
-    for child_edge in next_edges
-        is_postdominator(dg, postdominator, bott_vertex(child_edge), root_mask, cache) || return false
+# the largest number of `edges` sharing a single (dominance, nondominance) pair.
+# Parallel edges with disjoint coverage are one path split across edge objects,
+# not distinct paths, and must not be treated as a factorable branch.
+function shared_path_count(sub::FactorableSubgraph, edges::Vector{Edge{T}}) where {T}
+    counts = zeros(Int, length(sub.dominance_mask), length(nondominance_mask(sub)))
+    for e in edges
+        dom = dominance_mask(sub, e) .& sub.dominance_mask
+        nondom = nondominance_mask(sub, e) .& nondominance_mask(sub)
+        for d in findall(dom), n in findall(nondom)
+            counts[d, n] += 1
+        end
     end
-
-    cache[cache_key] = true
-    return true
+    return isempty(counts) ? 0 : maximum(counts)
 end
 
-check_dominance(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}, edge::Edge{T}) where {T} = is_postdominator(dg, sub.bott_vertex, edge.bott_vertex, sub.dominance_mask)
-check_dominance(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDominatorSubgraph}, edge::Edge{T}) where {T} = is_dominator(dg, sub.top_vertex, edge.top_vertex, sub.dominance_mask)
+# whether `sub` is still a factorable subgraph: prior factoring may have deleted
+# or narrowed its edges (cf. FastDifferentiation's `subgraph_exists`)
+function subgraph_exists(dg::DerivativeGraph, sub::FactorableSubgraph)
+    fwd = forward_edges(dg, sub, backward_vertex(sub))
+    bwd = backward_edges(dg, sub, forward_vertex(sub))
+    (shared_path_count(sub, fwd) >= 2 && count(e -> test_edge(sub, e), bwd) >= 2) || return false
+    return count(e -> isa_connected_path(dg, sub, e), fwd) >= 2
+end
 
 # factors a subgraph from dg, replacing it with a single edge (keeping original edges when necessary)
 function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where {T}
     # check that the factor and factor base nodes are still a factor and factor base
-    (length(backward_edges(dg, sub, forward_vertex(sub))) < 2 || length(forward_edges(dg, sub, backward_vertex(sub))) < 2) && return false
+    subgraph_exists(dg, sub) || return false
 
     populate_subgraph_edges!(dg, sub)
     sub_edges = subgraph_edges(sub)
-
-    # compute dominance and nondominance masks, and verify subgraph validity
-    extras = Dict{Edge{T}, Tuple{BitVector, BitVector}}()
-    for edge in sub_edges
-        dom_extra = dominance_mask(sub, edge) .& .~sub.dominance_mask
-        nondom_extra = nondominance_mask(sub, edge) .& .~nondominance_mask(sub)
-
-        # if an edge doesn't have any external connections and is not structurally dominated within subgraph, then subgraph isn't valid
-        (!any(dom_extra) && !any(nondom_extra) && !check_dominance(dg, sub, edge)) && return false
-
-        extras[edge] = (dom_extra, nondom_extra)
-    end
 
     for edge in sub_edges
         # for comparison to determine dirty roots+vars
         old_roots = copy(edge.reachable_roots)
         old_vars = copy(edge.reachable_vars)
 
-        dom_extra, nondom_extra = extras[edge]
-        if !any(dom_extra) && !any(nondom_extra)
-            # edge is completely contained in subgraph
-            rem_edge!(dg, edge)
-        elseif any(dom_extra) && !any(nondom_extra)
-            # connected to another root/var, so just narrow scope to that root/var
-            dominance_mask(sub, edge) .= dom_extra
-        elseif any(nondom_extra) && !any(dom_extra)
-            # connected to another root/var, so just narrow scope to that root/var
-            nondominance_mask(sub, edge) .= nondom_extra
-        end
+        # dominance-direction reachability outside the subgraph is split off onto a
+        # parallel edge (cf. FastDifferentiation's `add_non_dom_edges!`)
+        dom_extra = dominance_mask(sub, edge) .& .~sub.dominance_mask
+        any(dom_extra) && add_edge!(dg, outside_edge(sub, edge, dom_extra))
+
+        # the original edge keeps its in-subgraph dominance reachability and only
+        # the nondominance reachability of paths that bypass the factor base or
+        # leave the subgraph entirely (cf. FastDifferentiation's `reset_edge_masks!`)
+        dominance_mask(sub, edge) .&= sub.dominance_mask
+        nondominance_mask(sub, edge) .&= bypass_mask(dg, sub, edge) .| .~nondominance_mask(sub)
+
+        # once either mask is empty the edge is completely absorbed by the subgraph edge
+        (!any(edge.reachable_roots) || !any(edge.reachable_vars)) && rem_edge!(dg, edge)
 
         dg.dirty_roots .|= old_roots .!= edge.reachable_roots
         dg.dirty_vars .|= old_vars .!= edge.reachable_vars
@@ -811,7 +821,7 @@ end
 struct FactorOrder <: Base.Order.Ordering
 end
 
-Base.lt(::FactorOrder, a, b) = factor_order(a, b)
+Base.Order.lt(::FactorOrder, a, b) = factor_order(a, b)
 Base.isless(::FactorOrder, a, b) = factor_order(a, b)
 
 function factor_order(a::FactorableSubgraph, b::FactorableSubgraph)
@@ -825,21 +835,29 @@ function factor_order(a::FactorableSubgraph, b::FactorableSubgraph)
 end
 
 # Factor all subgraphs in the `DerivativeGraph`. This is the key step in the D* algorithm.
+# Factorable subgraphs are recomputed after each factoring because factoring can create
+# new factorable subgraphs; `subgraph_exists` validates each proposal lazily so stale
+# proposals and parallel edges covering disjoint (root, var) pairs are not re-factored.
 function factor_subgraphs!(dg::DerivativeGraph{T}) where {T}
     dom_cache = Dict{Int, Vector{Union{Nothing,T}}}()
     pdom_cache = Dict{Int, Vector{Union{Nothing,T}}}()
     subs = get_factorable_subgraphs(dg; dom_cache, pdom_cache)
-
-    # subgraphs that factor_subgraph! refused to factor (ambiguous classification) so we
-    # don't re-propose and re-refuse the same (top_vertex, bott_vertex, kind) forever
     rejected = Set{FactorableSubgraph}()
+    factored = Set{Tuple{T,T,DataType,BitVector}}()
 
     while !isempty(subs)
-        # factor the first subgraph according to `FactorOrder``
+        # factor the first subgraph according to `FactorOrder`
         sub = pop!(subs)
         sub in rejected && continue
 
-        factor_subgraph!(dg, sub) || push!(rejected, sub)
+        # an identical proposal was already factored: any remaining parallel edges
+        # cover disjoint (root, var) pairs, so re-factoring cannot make progress
+        signature = (sub.top_vertex, sub.bott_vertex, typeof(sub), copy(sub.dominance_mask))
+        if signature in factored || !factor_subgraph!(dg, sub)
+            push!(rejected, sub)
+            continue
+        end
+        push!(factored, signature)
         subs = get_factorable_subgraphs(dg; dom_cache, pdom_cache)
     end
 end
@@ -853,22 +871,18 @@ function evaluate_path(dg::DerivativeGraph, root::Integer, var::Integer, cache::
 
     root_postorder == var_postorder && return COMMON_ONE
 
-    next_edges = filter(e -> reachable_vars(e)[var], dg.child_edges[root_postorder])
-    isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
-    @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
-
-    return evaluate_path(dg, first(next_edges), var, cache)
+    # sum the products of all paths from root to var (the factored graph is a
+    # sum-of-products representation; parallel edges are distinct summands)
+    next_edges = filter(e -> reachable_roots(e)[root] && reachable_vars(e)[var], dg.child_edges[root_postorder])
+    return sum(e -> evaluate_path(dg, e, root, var, cache), next_edges; init=COMMON_ZERO)
 end
 
-function evaluate_path(dg::DerivativeGraph, edge::Edge, var::Integer, cache::Vector{Dict{Edge,SymbolicT}})
+function evaluate_path(dg::DerivativeGraph, edge::Edge, root::Integer, var::Integer, cache::Vector{Dict{Edge,SymbolicT}})
     edge.bott_vertex == dg.var_idx_to_postorder[var] && return edge.edge_value # reached var
     haskey(cache[var], edge) && return cache[var][edge]
 
-    next_edges = filter(e -> reachable_vars(e)[var], dg.child_edges[edge.bott_vertex])
-    isempty(next_edges) && return COMMON_ZERO # path from root to var does not exist
-    @assert length(next_edges) == 1 "Error in graph factoring. There is >1 path from root to var."
-
-    result = evaluate_path(dg, first(next_edges), var, cache) * edge.edge_value
+    next_edges = filter(e -> reachable_roots(e)[root] && reachable_vars(e)[var], dg.child_edges[edge.bott_vertex])
+    result = sum(e -> evaluate_path(dg, e, root, var, cache), next_edges; init=COMMON_ZERO) * edge.edge_value
     cache[var][edge] = result
 
     return result

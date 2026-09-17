@@ -46,6 +46,7 @@ import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 import SymbolicUtils.Code: toexpr
 
 import ArrayInterface
+import DataStructures
 import RuntimeGeneratedFunctions
 using RuntimeGeneratedFunctions: @RuntimeGeneratedFunction, RuntimeGeneratedFunction, drop_expr
 import MacroTools

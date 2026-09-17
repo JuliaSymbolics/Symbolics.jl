@@ -30,6 +30,22 @@ Dz = Differential(z)
 @test isequal(dstar_jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]), jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]))
 @test isequal(expand.(dstar_jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])), expand.(jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])))
 
+# Regression tests for parallel edges and edge splitting: factoring creates edges
+# that may share endpoints with existing edges and whose reachability extends
+# outside the factored subgraph; those outside paths must be preserved
+p = x + y
+q = x - y
+r = p * q
+s = p / q
+t = r + s
+u = r * s
+@test isequal(expand.(dstar_jacobian([t, u, t * u], [x, y])), expand.(jacobian([t, u, t * u], [x, y])))
+@test isequal(expand.(dstar_jacobian([t, u, t * u, t * u + u], [x, y])), expand.(jacobian([t, u, t * u, t * u + u], [x, y])))
+u2 = x^2 + x
+@test isequal(expand.(dstar_jacobian([u2^2, u2 * x^2], [x])), expand.(jacobian([u2^2, u2 * x^2], [x])))
+@test isequal(expand.(dstar_jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x])), expand.(jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x])))
+@test isequal(dstar_derivative(atan(x, x), x), expand_derivatives(Differential(x)(atan(x, x))))
+
 # Edge case Jacobian
 @test isequal(dstar_jacobian([x], [x,x]), jacobian([x], [x,x]))
 @test isequal(dstar_jacobian([x,x], [x]), jacobian([x,x], [x]))
