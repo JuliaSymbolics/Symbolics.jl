@@ -29,6 +29,14 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 """
 struct VariableSource <: AbstractVariableMetadata end
 
+"""
+    $TYPEDEF
+
+Symbolic metadata key for storing the domain or assumptions of a symbolic variable.
+"""
+struct VariableDomain <: AbstractVariableMetadata end
+
+
 function setdefaultval(x, val)
     val === nothing && return x
     sh = shape(x)
@@ -267,6 +275,9 @@ of `x`.
 function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
+
+option_to_metadata_type(::Val{:domain}) = VariableDomain
+
 
 # add enough additional methods that the compiler gives up on specializing this
 # and downstream definitions don't cause massive invalidation.
