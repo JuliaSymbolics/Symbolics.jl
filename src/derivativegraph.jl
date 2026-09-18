@@ -21,6 +21,27 @@ reachable_roots(edge::Edge) = edge.reachable_roots
 vertices(edge::Edge) = (top_vertex(edge), bott_vertex(edge))
 times_used(edge::Edge) = sum(reachable_roots(edge)) * sum(reachable_vars(edge))
 
+# scratch buffers reused across graph traversals (subgraph reachability walks,
+# factor-base bypass checks, shared-path detection, subgraph edge collection) to
+# avoid allocating per call. Buffers are grown lazily to `length(dg.symbols)`.
+struct DGScratch{T<:Integer}
+    seen::Vector{BitVector} # two reachability seen-sets (forward and backward walks are live simultaneously)
+    stack::Vector{T} # DFS stack
+    pairs::Set{Tuple{Int,Int}} # has_shared_path pair set
+    counts::Dict{T,T} # populate_subgraph_edges! in-degree counts
+    vterms::Dict{T,Vector{SymbolicT}} # populate_subgraph_edges! per-node sum terms
+end
+
+DGScratch{T}() where {T} = DGScratch{T}(BitVector[BitVector(), BitVector()], T[],
+    Set{Tuple{Int,Int}}(), Dict{T,T}(), Dict{T,Vector{SymbolicT}}())
+
+# grow `buf` to at least `n` bits and reset it to all false
+function _seen_buf!(buf::BitVector, n::Integer)
+    length(buf) < n && resize!(buf, n)
+    fill!(buf, false)
+    return buf
+end
+
 """
     $TYPEDEF
 
@@ -44,6 +65,7 @@ struct DerivativeGraph{T<:Integer}
     child_edges::Dict{T, Vector{Edge{T}}} # node -> child edges
     dirty_roots::BitVector # roots touched by factoring a subgraph that need to have doms/pdoms recomputed
     dirty_vars::BitVector # variables touched by factoring a subgraph that need to have doms/pdoms recomputed
+    scratch::DGScratch{T} # reusable traversal buffers
 end
 
 """
@@ -72,7 +94,8 @@ function DerivativeGraph(roots::AbstractVector{SymbolicT}, vars::AbstractVector{
         Dict{idx_type, Vector{Edge{idx_type}}}(),
         Dict{idx_type, Vector{Edge{idx_type}}}(),
         trues(length(roots)),
-        trues(length(vars))
+        trues(length(vars)),
+        DGScratch{idx_type}()
     )
 
     populate_dergraph!(dg)
@@ -545,9 +568,10 @@ subgraph_edges(sub::FactorableSubgraph) = sub.edges
 # all nodes reachable from `start` moving through `sub` along in-subgraph edges
 # only; `forward` chooses the factor-base-to-factor-node direction
 function _subgraph_reachable(dg::DerivativeGraph{T}, sub::FactorableSubgraph, start::T, forward::Bool) where {T}
-    seen = falses(length(dg.symbols))
+    seen = _seen_buf!(dg.scratch.seen[forward ? 1 : 2], length(dg.symbols))
     seen[start] = true
-    stack = T[start]
+    stack = empty!(dg.scratch.stack)
+    push!(stack, start)
     while !isempty(stack)
         node = pop!(stack)
         for e in (forward ? forward_edges(dg, sub, node) : backward_edges(dg, sub, node))
@@ -590,13 +614,13 @@ function populate_subgraph_edges!(dg::DerivativeGraph{T}, sub::FactorableSubgrap
         end
     end
 
-    counts = Dict{T,T}()
+    counts = empty!(dg.scratch.counts)
     for e in sub.edges
         node = forward_vertex(sub, e)
         counts[node] = get(counts, node, zero(T)) + one(T)
     end
     counts[backward_vertex(sub)] = one(T)
-    vertex_terms = Dict{T,Vector{SymbolicT}}()
+    vertex_terms = empty!(dg.scratch.vterms)
     _vertex_sum!(dg, sub, COMMON_ONE, backward_vertex(sub), counts, vertex_terms)
     sub.subgraph_value = haskey(vertex_terms, forward_vertex(sub)) ?
         SymbolicUtils.add_worker(VartypeT, vertex_terms[forward_vertex(sub)]) : COMMON_ZERO
@@ -689,8 +713,9 @@ end
 # endpoint without passing through the postdominated node (`b dom e.2`)
 function bypass_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, DominatorSubgraph}, edge::Edge{T}) where {T}
     reach = falses(length(dg.vars))
-    seen = falses(length(dg.symbols))
-    stack = T[edge.bott_vertex]
+    seen = _seen_buf!(dg.scratch.seen[1], length(dg.symbols))
+    stack = empty!(dg.scratch.stack)
+    push!(stack, edge.bott_vertex)
     while !isempty(stack)
         node = pop!(stack)
         (node == sub.bott_vertex || seen[node]) && continue
@@ -706,8 +731,9 @@ end
 
 function bypass_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDominatorSubgraph}, edge::Edge{T}) where {T}
     reach = falses(length(dg.roots))
-    seen = falses(length(dg.symbols))
-    stack = T[edge.top_vertex]
+    seen = _seen_buf!(dg.scratch.seen[1], length(dg.symbols))
+    stack = empty!(dg.scratch.stack)
+    push!(stack, edge.top_vertex)
     while !isempty(stack)
         node = pop!(stack)
         (node == sub.top_vertex || seen[node]) && continue
@@ -767,7 +793,7 @@ end
 # Parallel edges with disjoint coverage are one path split across edge objects,
 # not distinct paths, and must not be treated as a factorable branch.
 function has_shared_path(sub::FactorableSubgraph, edges::Vector{Edge{T}}) where {T}
-    seen = Set{Tuple{Int, Int}}()
+    seen = empty!(sub.dg.scratch.pairs)
     sub_nondom = nondominance_mask(sub)
     for e in edges
         for d in findall(dominance_mask(sub, e))
