@@ -132,3 +132,48 @@ let
     jvals = Symbolics.value.(substitute.(j, (subs,)))
     @test isapprox(Float64.(dvals), Float64.(jvals); rtol=1e-8)
 end
+
+# Random-DAG fuzzing: random expression trees with shared subexpressions and
+# occasional duplicate arguments/roots/vars, compared against jacobian numerically
+@testset "fuzz" begin
+    using Random
+    Random.seed!(7)
+    @variables fx fy fz
+    fsubs = Dict(fx => 2.3, fy => 0.7, fz => 1.1)
+
+    function rand_expr(depth, pool)
+        depth <= 0 && return rand(vcat([fx, fy, fz], pool))
+        a = rand_expr(depth - 1, pool)
+        b = rand_expr(depth - 1, pool)
+        rand() < 0.3 && (b = a) # duplicate arguments exercise identical-child edges
+        rand([+, -, *, /])(a, b)
+    end
+    # expression construction itself can throw (e.g. Num integer-division edge
+    # cases); fall back to a variable
+    safe_expr(d, p) = try rand_expr(d, p) catch; fx end
+
+    evaluated = 0
+    for _ in 1:50
+        pool = [safe_expr(rand(1:2), Num[]) for _ in 1:rand(1:3)]
+        roots = [safe_expr(rand(2:4), pool) for _ in 1:rand(1:3)]
+        rand() < 0.4 && length(roots) > 1 && push!(roots, rand(roots))
+        vars = [fx, fy, fz]
+        rand() < 0.3 && (vars = [vars; rand(vars)])
+
+        j = try
+            jacobian(roots, vars)
+        catch
+            continue
+        end
+        dj = dstar_jacobian(roots, vars)
+        @test size(dj) == size(j)
+
+        jvals = Float64.(Symbolics.value.(substitute.(j, (fsubs,); fold = Val(true))))
+        dvals = Float64.(Symbolics.value.(substitute.(dj, (fsubs,); fold = Val(true))))
+        all(isfinite, jvals) && all(isfinite, dvals) || continue
+        evaluated += 1
+        @test isapprox(dvals, jvals; rtol = 1e-6)
+    end
+    # guard against the generator producing nothing usable
+    @test evaluated > 20
+end
