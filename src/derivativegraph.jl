@@ -276,10 +276,14 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     dg.child_edges[post_idx] = Edge{T}[]
     dg.parent_edges[post_idx] = Edge{T}[]
 
-    # add new edges
+    # add new edges; partial derivatives of identical arguments are summed into a
+    # single edge (the total derivative w.r.t. that argument)
+    partial_ders = Dict{T, SymbolicT}()
     for (arg_idx, arg_post_idx) in enumerate(arg_idx_to_post_idx)
         arg_post_idx == T(-1) && continue
-        partial_der = nary_derivative_idx(expr, arg_idx)
+        partial_ders[arg_post_idx] = get(partial_ders, arg_post_idx, COMMON_ZERO) + nary_derivative_idx(expr, arg_idx)
+    end
+    for (arg_post_idx, partial_der) in partial_ders
         # figure out reachable vars from child edges
         arg_reachable_vars = reachable_vars(dg, arg_post_idx)
         # new edge, so only reachable by the given root
