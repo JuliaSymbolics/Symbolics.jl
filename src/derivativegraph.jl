@@ -545,15 +545,16 @@ subgraph_edges(sub::FactorableSubgraph) = sub.edges
 # all nodes reachable from `start` moving through `sub` along in-subgraph edges
 # only; `forward` chooses the factor-base-to-factor-node direction
 function _subgraph_reachable(dg::DerivativeGraph{T}, sub::FactorableSubgraph, start::T, forward::Bool) where {T}
-    seen = Set{T}([start])
+    seen = falses(length(dg.symbols))
+    seen[start] = true
     stack = T[start]
     while !isempty(stack)
         node = pop!(stack)
         for e in (forward ? forward_edges(dg, sub, node) : backward_edges(dg, sub, node))
             test_edge(sub, e) || continue
             next = forward ? forward_vertex(sub, e) : backward_vertex(sub, e)
-            next in seen && continue
-            push!(seen, next)
+            seen[next] && continue
+            seen[next] = true
             push!(stack, next)
         end
     end
@@ -583,9 +584,9 @@ function populate_subgraph_edges!(dg::DerivativeGraph{T}, sub::FactorableSubgrap
     empty!(sub.edges)
     fwd_ok = _subgraph_reachable(dg, sub, backward_vertex(sub), true)
     bwd_ok = _subgraph_reachable(dg, sub, forward_vertex(sub), false)
-    for node in fwd_ok
+    for node in T.(findall(fwd_ok))
         for e in forward_edges(dg, sub, node)
-            test_edge(sub, e) && forward_vertex(sub, e) in bwd_ok && push!(sub.edges, e)
+            test_edge(sub, e) && bwd_ok[forward_vertex(sub, e)] && push!(sub.edges, e)
         end
     end
 
