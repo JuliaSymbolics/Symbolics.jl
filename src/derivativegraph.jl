@@ -299,13 +299,22 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     # add new edges; partial derivatives of identical arguments are summed into a
     # single edge (the total derivative w.r.t. that argument)
     partial_ders = Dict{T, SymbolicT}()
+    reachable_masks = Dict{T, BitVector}()
     for (arg_idx, arg_post_idx) in enumerate(arg_idx_to_post_idx)
         arg_post_idx == T(-1) && continue
-        partial_ders[arg_post_idx] = get(partial_ders, arg_post_idx, COMMON_ZERO) + nary_derivative_idx(expr, arg_idx)
+        arg_reachable_vars = get!(() -> reachable_vars(dg, arg_post_idx), reachable_masks, arg_post_idx)
+        if any(arg_reachable_vars)
+            existing = get(partial_ders, arg_post_idx, nothing)
+            partial_ders[arg_post_idx] = isnothing(existing) ? nary_derivative_idx(expr, arg_idx) : existing + nary_derivative_idx(expr, arg_idx)
+        else
+            # the edge can never reach a var, so its value can never pass a
+            # mask check and is never read; don't bother computing the partial
+            partial_ders[arg_post_idx] = COMMON_ZERO
+        end
     end
     for (arg_post_idx, partial_der) in partial_ders
         # figure out reachable vars from child edges
-        arg_reachable_vars = reachable_vars(dg, arg_post_idx)
+        arg_reachable_vars = reachable_masks[arg_post_idx]
         # new edge, so only reachable by the given root
         arg_reachable_roots = falses(length(dg.roots))
         arg_reachable_roots[root_idx] = 1
