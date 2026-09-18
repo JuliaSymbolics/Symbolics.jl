@@ -227,10 +227,7 @@ function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
         end
         _ => begin
             der = derivative_idx(expr, arg_idx)
-            @assert !isnothing(der) """
-            Unable to compute derivative of $expr w.r.t. argument $arg_idx.
-            If this is a user-registered function, make sure to register its derivatives with `@register_derivative`.
-            """
+            isnothing(der) && throw(DerivativeNotDefinedError(expr, arg_idx))
             return der
         end
     end
