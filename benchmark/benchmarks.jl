@@ -127,6 +127,53 @@ for depth in (3, 5, 7, 9, 11)
     SUITE_AD["dstar_derivative/depth=$depth"] = @benchmarkable Symbolics.dstar_derivative($expr, $p)
 end
 
+# ── symbolic AD: dstar_jacobian vs jacobian ───────────────────────────────────
+
+@variables dx dy dz dw shx shy shz
+
+# shared subexpression chain: p=x+y, q=x-y, r=pq, s=p/q, t=r+s, u=rs
+_dj_p = dx + dy; _dj_q = dx - dy; _dj_r = _dj_p * _dj_q; _dj_s = _dj_p / _dj_q
+_dj_t = _dj_r + _dj_s; _dj_u = _dj_r * _dj_s
+
+# spherical harmonics Y(l, m) for l < max_l — heavily shared polynomial structure
+function _spherical_harmonics(max_l::Integer, x, y, z)
+    Pc = Dict{Tuple{Int,Int}, Any}(); Cc = Dict{Int, Any}(); Sc = Dict{Int, Any}()
+    P(l, m) = get!(Pc, (l, m)) do
+        if l == 0 && m == 0; 1.0
+        elseif l == m; (1 - 2m) * P(m - 1, m - 1)
+        elseif l == m + 1; (2m + 1) * z * P(m, m)
+        else; ((2l - 1) / (l - m)) * z * P(l - 1, m) - ((l + m - 1) / (l - m)) * P(l - 2, m)
+        end
+    end
+    C(m) = get!(Cc, m) do; m == 0 ? 1 : x * S(m - 1) + y * C(m - 1); end
+    S(m) = get!(Sc, m) do; m == 0 ? 0 : x * C(m - 1) - y * S(m - 1); end
+    factorial_approx(n) = sqrt(2π * n) * (n / ℯ * sqrt(n * sinh(1 / n) + 1 / (810 * n^6)))^n
+    N(l, m) = m == 0 ? sqrt(2l + 1 / (4π)) : sqrt((2l + 1) / 2π * factorial_approx(l - m) / factorial_approx(l + m))
+    Y(l, m) = m < 0 ? N(l, -m) * P(l, -m) * S(-m) : N(l, m) * P(l, m) * C(m)
+    unwrap.([Y(l, m) for l in 0:max_l-1 for m in -l:l])
+end
+
+const SUITE_DJ = SUITE["dstar_jacobian"] = BenchmarkGroup()
+
+# "sparse"/"mixed": roots contain subtrees with no vars — edges into them can
+# never reach a requested var, exercising D*'s dead-edge handling
+const _DJ_WORKLOADS = [
+    ("simple", unwrap.([sin(dx)*dx^2 + dx]),                    unwrap.([dx])),
+    ("shared", unwrap.([(dx^2+dy^2)^2, (dx^2+dy^2)^2*dy]),      unwrap.([dx,dy])),
+    ("pq",     unwrap.([_dj_t, _dj_u, _dj_t*_dj_u]),            unwrap.([dx,dy])),
+    ("sparse", unwrap.([dx*(dy^3 + sin(dy) + cos(dy*dz)) + dx*(dz^2 + exp(dz*dw)) + sin(dx)*(dy + dz),
+                        dx*log(dy + dz) + dx^2*(dw + dy)]),     unwrap.([dx])),
+    ("mixed",  unwrap.([dx^2 + sin(dz), dy*cos(dz), dx*dy]),    unwrap.([dx,dy])),
+    ("sh4",    _spherical_harmonics(4, shx, shy, shz),          unwrap.([shx,shy,shz])),
+    ("sh5",    _spherical_harmonics(5, shx, shy, shz),          unwrap.([shx,shy,shz])),
+    ("sh8",    _spherical_harmonics(8, shx, shy, shz),          unwrap.([shx,shy,shz])),
+]
+
+for (name, roots, vars) in _DJ_WORKLOADS
+    SUITE_DJ["$name/dstar"] = @benchmarkable Symbolics.dstar_jacobian($roots, $vars)
+    SUITE_DJ["$name/jacobian"] = @benchmarkable jacobian($roots, $vars)
+end
+
 # ── linear_expansion ──────────────────────────────────────────────────────────
 
 @variables r           # scalar unknown
