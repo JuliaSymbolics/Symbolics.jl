@@ -716,13 +716,23 @@ function bypass_mask(dg::DerivativeGraph{T}, sub::FactorableSubgraph{T, PostDomi
     return reach
 end
 
+# `a ⊆ b` for equal-length BitVectors, without allocating (broadcast `.<=`
+# materializes a temporary BitVector and `test_edge` is called in inner loops)
+@inline function _mask_subset(a::BitVector, b::BitVector)
+    ac, bc = a.chunks, b.chunks
+    @inbounds for i in eachindex(ac)
+        iszero(ac[i] & ~bc[i]) || return false
+    end
+    return true
+end
+
 # an edge is on a valid path within `sub` iff its reachability covers all of the
 # subgraph's dominance and nondominance masks. Every in-subgraph edge must serve
 # the full (dominance x nondominance) pair set, or the single factored edge could
 # not represent the subgraph's value for all of the pairs it claims.
 test_edge(sub::FactorableSubgraph, edge::Edge) =
-    all(sub.dominance_mask .<= dominance_mask(sub, edge)) &&
-    all(nondominance_mask(sub) .<= nondominance_mask(sub, edge))
+    _mask_subset(sub.dominance_mask, dominance_mask(sub, edge)) &&
+    _mask_subset(nondominance_mask(sub), nondominance_mask(sub, edge))
 
 # the unique valid next edge on an in-subgraph path from `edge` toward the factor
 # node, or `nothing` if the path ends or branches
@@ -883,16 +893,24 @@ function evaluate_path(dg::DerivativeGraph, root::Integer, var::Integer, cache::
 
     # sum the products of all paths from root to var (the factored graph is a
     # sum-of-products representation; parallel edges are distinct summands)
-    next_edges = filter(e -> reachable_roots(e)[root] && reachable_vars(e)[var], dg.child_edges[root_postorder])
-    return sum(e -> evaluate_path(dg, e, root, var, cache), next_edges; init=COMMON_ZERO)
+    result = COMMON_ZERO
+    for e in dg.child_edges[root_postorder]
+        (reachable_roots(e)[root] && reachable_vars(e)[var]) || continue
+        result += evaluate_path(dg, e, root, var, cache)
+    end
+    return result
 end
 
 function evaluate_path(dg::DerivativeGraph, edge::Edge, root::Integer, var::Integer, cache::Vector{Dict{Edge,SymbolicT}})
     edge.bott_vertex == dg.var_idx_to_postorder[var] && return edge.edge_value # reached var
     haskey(cache[var], edge) && return cache[var][edge]
 
-    next_edges = filter(e -> reachable_roots(e)[root] && reachable_vars(e)[var], dg.child_edges[edge.bott_vertex])
-    result = sum(e -> evaluate_path(dg, e, root, var, cache), next_edges; init=COMMON_ZERO) * edge.edge_value
+    result = COMMON_ZERO
+    for e in dg.child_edges[edge.bott_vertex]
+        (reachable_roots(e)[root] && reachable_vars(e)[var]) || continue
+        result += evaluate_path(dg, e, root, var, cache)
+    end
+    result *= edge.edge_value
     cache[var][edge] = result
 
     return result
