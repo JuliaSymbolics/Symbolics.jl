@@ -560,15 +560,18 @@ function _subgraph_reachable(dg::DerivativeGraph{T}, sub::FactorableSubgraph, st
     return seen
 end
 
-# accumulate `sum` into `node`'s path-product total and propagate it forward once
-# every in-subgraph backward edge has contributed (cf. FastDifferentiation's
-# `_evaluate_branching_subgraph`)
-function _vertex_sum!(dg::DerivativeGraph{T}, sub::FactorableSubgraph, sum::SymbolicT, node::T, counts::Dict{T,T}, vertex_sums::Dict{T,SymbolicT}) where {T}
-    vertex_sums[node] = get(vertex_sums, node, COMMON_ZERO) + sum
+# accumulate `sum` into `node`'s path-product terms and propagate their total
+# forward once every in-subgraph backward edge has contributed (cf.
+# FastDifferentiation's `_evaluate_branching_subgraph`). Terms are collected per
+# node and summed once with `add_worker` rather than building an intermediate
+# `Add` per contributing edge.
+function _vertex_sum!(dg::DerivativeGraph{T}, sub::FactorableSubgraph, sum::SymbolicT, node::T, counts::Dict{T,T}, vertex_terms::Dict{T,Vector{SymbolicT}}) where {T}
+    push!(get!(()->SymbolicT[], vertex_terms, node), sum)
     (counts[node] -= 1) == 0 || return
+    total = SymbolicUtils.add_worker(VartypeT, vertex_terms[node])
     for e in forward_edges(dg, sub, node)
         e in sub.edges || continue
-        _vertex_sum!(dg, sub, vertex_sums[node] * e.edge_value, forward_vertex(sub, e), counts, vertex_sums)
+        _vertex_sum!(dg, sub, total * e.edge_value, forward_vertex(sub, e), counts, vertex_terms)
     end
 end
 
@@ -592,9 +595,10 @@ function populate_subgraph_edges!(dg::DerivativeGraph{T}, sub::FactorableSubgrap
         counts[node] = get(counts, node, zero(T)) + one(T)
     end
     counts[backward_vertex(sub)] = one(T)
-    vertex_sums = Dict{T,SymbolicT}()
-    _vertex_sum!(dg, sub, COMMON_ONE, backward_vertex(sub), counts, vertex_sums)
-    sub.subgraph_value = get(vertex_sums, forward_vertex(sub), COMMON_ZERO)
+    vertex_terms = Dict{T,Vector{SymbolicT}}()
+    _vertex_sum!(dg, sub, COMMON_ONE, backward_vertex(sub), counts, vertex_terms)
+    sub.subgraph_value = haskey(vertex_terms, forward_vertex(sub)) ?
+        SymbolicUtils.add_worker(VartypeT, vertex_terms[forward_vertex(sub)]) : COMMON_ZERO
     return nothing
 end
 
@@ -897,24 +901,24 @@ function evaluate_path(dg::DerivativeGraph{T}, root::Integer, var::Integer, cach
 
     # sum the products of all paths from root to var (the factored graph is a
     # sum-of-products representation; parallel edges are distinct summands)
-    result = COMMON_ZERO
+    terms = SymbolicT[]
     for e in dg.child_edges[root_postorder]
         (reachable_roots(e)[root] && reachable_vars(e)[var]) || continue
-        result += evaluate_path(dg, e, root, var, cache)
+        push!(terms, evaluate_path(dg, e, root, var, cache))
     end
-    return result
+    return isempty(terms) ? COMMON_ZERO : SymbolicUtils.add_worker(VartypeT, terms)
 end
 
 function evaluate_path(dg::DerivativeGraph{T}, edge::Edge{T}, root::Integer, var::Integer, cache::Vector{Dict{Edge{T},SymbolicT}}) where {T}
     edge.bott_vertex == dg.var_idx_to_postorder[var] && return edge.edge_value # reached var
     haskey(cache[var], edge) && return cache[var][edge]
 
-    result = COMMON_ZERO
+    terms = SymbolicT[]
     for e in dg.child_edges[edge.bott_vertex]
         (reachable_roots(e)[root] && reachable_vars(e)[var]) || continue
-        result += evaluate_path(dg, e, root, var, cache)
+        push!(terms, evaluate_path(dg, e, root, var, cache))
     end
-    result *= edge.edge_value
+    result = (isempty(terms) ? COMMON_ZERO : SymbolicUtils.add_worker(VartypeT, terms)) * edge.edge_value
     cache[var][edge] = result
 
     return result
