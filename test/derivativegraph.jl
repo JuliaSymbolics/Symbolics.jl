@@ -61,6 +61,11 @@ u2 = x^2 + x
 @test isequal(expand.(dstar_jacobian([t, u], [x, y, x])), expand.(jacobian([t, u], [x, y, x])))
 @test isequal(expand.(dstar_jacobian([t, u, t * u], [x, y, y, x])), expand.(jacobian([t, u, t * u], [x, y, y, x])))
 
+# Unregistered functions throw `DerivativeNotDefinedError` instead of asserting
+unregistered_fn(a) = a
+@register_symbolic unregistered_fn(a)
+@test_throws Symbolics.DerivativeNotDefinedError dstar_derivative(unregistered_fn(x), x)
+
 # Array symbolics
 @variables z[1:3]
 @test isequal(dstar_jacobian(z,z), jacobian(z,z))
