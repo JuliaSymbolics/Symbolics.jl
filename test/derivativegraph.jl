@@ -44,7 +44,11 @@ u = r * s
 u2 = x^2 + x
 @test isequal(expand.(dstar_jacobian([u2^2, u2 * x^2], [x])), expand.(jacobian([u2^2, u2 * x^2], [x])))
 @test isequal(expand.(dstar_jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x])), expand.(jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x])))
+# Duplicate arguments: partial derivatives for identical argument positions are
+# summed into a single edge
 @test isequal(dstar_derivative(atan(x, x), x), expand_derivatives(Differential(x)(atan(x, x))))
+@test isequal(dstar_derivative(x^x, x), expand_derivatives(Differential(x)(x^x)))
+@test isequal(dstar_derivative(x^x * y + atan(x, x), x), expand_derivatives(Differential(x)(x^x * y + atan(x, x))))
 
 # Edge case Jacobian
 @test isequal(dstar_jacobian([x], [x,x]), jacobian([x], [x,x]))
