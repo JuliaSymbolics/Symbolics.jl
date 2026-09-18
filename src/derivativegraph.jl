@@ -32,7 +32,7 @@ struct DGScratch{T<:Integer}
     vterms::Dict{T,Vector{SymbolicT}} # populate_subgraph_edges! per-node sum terms
 end
 
-DGScratch{T}() where {T} = DGScratch{T}(BitVector[BitVector(), BitVector()], T[],
+DGScratch{T}() where {T} = DGScratch{T}(BitVector[BitVector(), BitVector(), BitVector()], T[],
     Set{Tuple{Int,Int}}(), Dict{T,T}(), Dict{T,Vector{SymbolicT}}())
 
 # grow `buf` to at least `n` bits and reset it to all false
@@ -357,8 +357,30 @@ end
 # Follows the algorithm described in this paper: https://www.cs.tufts.edu/comp/150FP/archive/keith-cooper/dom14.pdf
 function get_dominators(dg::DerivativeGraph{T}, root::Integer) where {T}
     doms = Vector{Union{Nothing, T}}(undef, length(dg))
-    root_idxs = collect(values(root_postorders(dg)))
-    doms[root_idxs] = root_idxs
+    fill!(doms, nothing)
+    for ri in values(root_postorders(dg))
+        doms[ri] = ri
+    end
+    # roots whose expressions aren't calls have no postorder entry
+    haskey(dg.root_idx_to_postorder, root) || return doms
+
+    # nodes reachable from `root`, computed once up front rather than via
+    # is_root_reachable inside the fixpoint loop
+    reach = _seen_buf!(dg.scratch.seen[3], length(dg.symbols))
+    stack = empty!(dg.scratch.stack)
+    root_node = dg.root_idx_to_postorder[root]
+    reach[root_node] = true
+    push!(stack, root_node)
+    while !isempty(stack)
+        node = pop!(stack)
+        for e in child_edges(dg, node)
+            reachable_roots(e)[root] || continue
+            b = bott_vertex(e)
+            reach[b] && continue
+            reach[b] = true
+            push!(stack, b)
+        end
+    end
 
     # moves two nodes up the graph until they meet
     function get_common_parent(a::T, b::T)::Union{Nothing, T}
@@ -383,27 +405,29 @@ function get_dominators(dg::DerivativeGraph{T}, root::Integer) where {T}
         changed = false
         for node in reverse(eachindex(dg))
             # skip over nodes not reachable from root
-            if !is_root_reachable(dg, node, root)
+            if !reach[node]
                 doms[node] = nothing
                 continue
             end
 
-            # filter parents by root
-            parents = [top_vertex(e) for e in parent_edges(dg, node) if reachable_roots(e)[root]]
-            
-            if isempty(parents)
-                doms[node] = node
-                continue
-            end
-            
-            new_idom = first(parents)
-
-            for parent in parents
-                parent == first(parents) && continue
-                if isassigned(doms, parent)
+            # intersect over parents reachable from root, without allocating
+            new_idom::Union{Nothing, T} = nothing
+            first_parent = true
+            for e in parent_edges(dg, node)
+                reachable_roots(e)[root] || continue
+                parent = top_vertex(e)
+                if first_parent
+                    new_idom = parent
+                    first_parent = false
+                elseif isassigned(doms, parent)
                     new_idom = get_common_parent(parent, new_idom)
                     isnothing(new_idom) && break
                 end
+            end
+
+            if first_parent
+                doms[node] = node
+                continue
             end
 
             if doms[node] != new_idom
@@ -419,8 +443,27 @@ end
 
 function get_postdominators(dg::DerivativeGraph{T}, var::Integer) where {T}
     pdoms = Vector{Union{Nothing, T}}(undef, length(dg))
-    var_idxs = collect(values(dg.var_idx_to_postorder))
-    pdoms[var_idxs] = var_idxs
+    for vi in values(dg.var_idx_to_postorder)
+        pdoms[vi] = vi
+    end
+
+    # nodes that can reach `var`, computed once up front rather than via
+    # is_var_reachable inside the fixpoint loop
+    reach = _seen_buf!(dg.scratch.seen[3], length(dg.symbols))
+    stack = empty!(dg.scratch.stack)
+    var_node = dg.var_idx_to_postorder[var]
+    reach[var_node] = true
+    push!(stack, var_node)
+    while !isempty(stack)
+        node = pop!(stack)
+        for e in parent_edges(dg, node)
+            reachable_vars(e)[var] || continue
+            t = top_vertex(e)
+            reach[t] && continue
+            reach[t] = true
+            push!(stack, t)
+        end
+    end
 
     function get_common_child(a::T, b::T)::Union{Nothing, T}
         # move a and b up the graph through their immediate dominators until they meet
@@ -443,24 +486,29 @@ function get_postdominators(dg::DerivativeGraph{T}, var::Integer) where {T}
     while changed
         changed = false
         for node in eachindex(dg)
-            if !is_var_reachable(dg, node, var)
+            if !reach[node]
                 pdoms[node] = nothing
                 continue
             end
-            
-            children = [bott_vertex(e) for e in child_edges(dg, node) if reachable_vars(e)[var]]
 
-            if isempty(children)
-                pdoms[node] = node
-                continue
-            end
-            new_pidom = first(children)
-
-            for child_idx in 2:length(children)
-                if isassigned(pdoms, children[child_idx])
-                    new_pidom = get_common_child(children[child_idx], new_pidom)
+            # intersect over children that can reach var, without allocating
+            new_pidom::Union{Nothing, T} = nothing
+            first_child = true
+            for e in child_edges(dg, node)
+                reachable_vars(e)[var] || continue
+                child = bott_vertex(e)
+                if first_child
+                    new_pidom = child
+                    first_child = false
+                elseif isassigned(pdoms, child)
+                    new_pidom = get_common_child(child, new_pidom)
                     isnothing(new_pidom) && break
                 end
+            end
+
+            if first_child
+                pdoms[node] = node
+                continue
             end
 
             if pdoms[node] != new_pidom
