@@ -836,29 +836,38 @@ function factor_order(a::FactorableSubgraph, b::FactorableSubgraph)
 end
 
 # Factor all subgraphs in the `DerivativeGraph`. This is the key step in the D* algorithm.
-# Factorable subgraphs are recomputed after each factoring because factoring can create
-# new factorable subgraphs; `subgraph_exists` validates each proposal lazily so stale
-# proposals and parallel edges covering disjoint (root, var) pairs are not re-factored.
+# Each heap of candidate subgraphs is drained completely (cf. FastDifferentiation's
+# single-pass `factor!`): `subgraph_exists` validates proposals lazily against the
+# current edges, so stale proposals are skipped. A proposal's masks remain valid while
+# stale because factoring preserves the graph's (root, var) pair set. The heap is only
+# recomputed after a full drain that made progress, to pick up candidates created or
+# resurrected by earlier factorings.
 function factor_subgraphs!(dg::DerivativeGraph{T}) where {T}
     dom_cache = Dict{Int, Vector{Union{Nothing,T}}}()
     pdom_cache = Dict{Int, Vector{Union{Nothing,T}}}()
     subs = get_factorable_subgraphs(dg; dom_cache, pdom_cache)
-    rejected = Set{FactorableSubgraph}()
+    rejected = Set{Tuple{T,T,DataType,BitVector}}()
     factored = Set{Tuple{T,T,DataType,BitVector}}()
 
     while !isempty(subs)
-        # factor the first subgraph according to `FactorOrder`
-        sub = pop!(subs)
-        sub in rejected && continue
+        made_progress = false
+        while !isempty(subs)
+            # factor the first subgraph according to `FactorOrder`
+            sub = pop!(subs)
 
-        # an identical proposal was already factored: any remaining parallel edges
-        # cover disjoint (root, var) pairs, so re-factoring cannot make progress
-        signature = (sub.top_vertex, sub.bott_vertex, typeof(sub), copy(sub.dominance_mask))
-        if signature in factored || !factor_subgraph!(dg, sub)
-            push!(rejected, sub)
-            continue
+            # an identical proposal was already factored or rejected: any remaining
+            # parallel edges cover disjoint (root, var) pairs, so re-factoring
+            # cannot make progress
+            signature = (sub.top_vertex, sub.bott_vertex, typeof(sub), copy(sub.dominance_mask))
+            (signature in factored || signature in rejected) && continue
+            if factor_subgraph!(dg, sub)
+                push!(factored, signature)
+                made_progress = true
+            else
+                push!(rejected, signature)
+            end
         end
-        push!(factored, signature)
+        made_progress || break
         subs = get_factorable_subgraphs(dg; dom_cache, pdom_cache)
     end
 end
