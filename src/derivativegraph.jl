@@ -909,19 +909,35 @@ Mostly the same usage as [`jacobian`](@ref). More limited in input expressions (
 function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
     roots isa Arr && (roots = scalarize(unwrap(roots)))
     roots isa AbstractVector{Num} && (roots = unwrap.(roots))
-    dg = DerivativeGraph(roots, vars)
+
+    # deduplicate roots; a duplicate root would populate the graph with an
+    # identical subgraph and can cause redundant factoring proposals
+    unique_roots = similar(roots, 0)
+    root_map = Vector{Int}(undef, length(roots))
+    seen = Dict{SymbolicT, Int}()
+    for (root_idx, root) in enumerate(roots)
+        unique_idx = get(seen, root, 0)
+        if unique_idx == 0
+            push!(unique_roots, root)
+            unique_idx = length(unique_roots)
+            seen[root] = unique_idx
+        end
+        root_map[root_idx] = unique_idx
+    end
+
+    dg = DerivativeGraph(unique_roots, vars)
     factor_subgraphs!(dg)
 
-    result = Matrix{SymbolicT}(undef, length(roots), length(vars))
+    result = Matrix{SymbolicT}(undef, length(unique_roots), length(vars))
     cache = [Dict{Edge,SymbolicT}() for _ in eachindex(vars)]
 
-    for root in eachindex(roots)
+    for root in eachindex(unique_roots)
         for var in eachindex(vars)
             result[root, var] = evaluate_path(dg, root, var, cache)
         end
     end
 
-    return result
+    return result[root_map, :]
 end
 
 function dstar_jacobian(roots, vars)
