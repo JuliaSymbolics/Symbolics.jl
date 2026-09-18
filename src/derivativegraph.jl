@@ -758,19 +758,23 @@ function isa_connected_path(dg::DerivativeGraph, sub::FactorableSubgraph, start_
     return true
 end
 
-# the largest number of `edges` sharing a single (dominance, nondominance) pair.
+# whether any two of `edges` share a single (dominance, nondominance) pair.
 # Parallel edges with disjoint coverage are one path split across edge objects,
 # not distinct paths, and must not be treated as a factorable branch.
-function shared_path_count(sub::FactorableSubgraph, edges::Vector{Edge{T}}) where {T}
-    counts = zeros(Int, length(sub.dominance_mask), length(nondominance_mask(sub)))
+function has_shared_path(sub::FactorableSubgraph, edges::Vector{Edge{T}}) where {T}
+    seen = Set{Tuple{Int, Int}}()
+    sub_nondom = nondominance_mask(sub)
     for e in edges
-        dom = dominance_mask(sub, e) .& sub.dominance_mask
-        nondom = nondominance_mask(sub, e) .& nondominance_mask(sub)
-        for d in findall(dom), n in findall(nondom)
-            counts[d, n] += 1
+        for d in findall(dominance_mask(sub, e))
+            sub.dominance_mask[d] || continue
+            for n in findall(nondominance_mask(sub, e))
+                sub_nondom[n] || continue
+                (d, n) in seen && return true
+                push!(seen, (d, n))
+            end
         end
     end
-    return isempty(counts) ? 0 : maximum(counts)
+    return false
 end
 
 # whether `sub` is still a factorable subgraph: prior factoring may have deleted
@@ -778,7 +782,7 @@ end
 function subgraph_exists(dg::DerivativeGraph, sub::FactorableSubgraph)
     fwd = forward_edges(dg, sub, backward_vertex(sub))
     bwd = backward_edges(dg, sub, forward_vertex(sub))
-    (shared_path_count(sub, fwd) >= 2 && count(e -> test_edge(sub, e), bwd) >= 2) || return false
+    (has_shared_path(sub, fwd) && count(e -> test_edge(sub, e), bwd) >= 2) || return false
     return count(e -> isa_connected_path(dg, sub, e), fwd) >= 2
 end
 
@@ -883,7 +887,7 @@ function factor_subgraphs!(dg::DerivativeGraph{T}) where {T}
 end
 
 # evaluate the derivative of root w.r.t. var using a fully factored DerivativeGraph
-function evaluate_path(dg::DerivativeGraph, root::Integer, var::Integer, cache::Vector{Dict{Edge,SymbolicT}})
+function evaluate_path(dg::DerivativeGraph{T}, root::Integer, var::Integer, cache::Vector{Dict{Edge{T},SymbolicT}}) where {T}
     haskey(dg.root_idx_to_postorder, root) || return COMMON_ZERO
     haskey(dg.var_idx_to_postorder, var) || return COMMON_ZERO
     root_postorder = dg.root_idx_to_postorder[root]
@@ -901,7 +905,7 @@ function evaluate_path(dg::DerivativeGraph, root::Integer, var::Integer, cache::
     return result
 end
 
-function evaluate_path(dg::DerivativeGraph, edge::Edge, root::Integer, var::Integer, cache::Vector{Dict{Edge,SymbolicT}})
+function evaluate_path(dg::DerivativeGraph{T}, edge::Edge{T}, root::Integer, var::Integer, cache::Vector{Dict{Edge{T},SymbolicT}}) where {T}
     edge.bott_vertex == dg.var_idx_to_postorder[var] && return edge.edge_value # reached var
     haskey(cache[var], edge) && return cache[var][edge]
 
@@ -968,7 +972,8 @@ function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
     factor_subgraphs!(dg)
 
     result = Matrix{SymbolicT}(undef, length(unique_roots), length(unique_vars))
-    cache = [Dict{Edge,SymbolicT}() for _ in eachindex(unique_vars)]
+    idx_type = keytype(dg.child_edges)
+    cache = [Dict{Edge{idx_type},SymbolicT}() for _ in eachindex(unique_vars)]
 
     for root in eachindex(unique_roots)
         for var in eachindex(unique_vars)
