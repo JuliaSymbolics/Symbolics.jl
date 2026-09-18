@@ -925,19 +925,34 @@ function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
         root_map[root_idx] = unique_idx
     end
 
-    dg = DerivativeGraph(unique_roots, vars)
+    # deduplicate vars the same way; a duplicate var maps several var indices to
+    # the same node, and only one gets its reachability bit propagated
+    unique_vars = similar(vars, 0)
+    var_map = Vector{Int}(undef, length(vars))
+    empty!(seen)
+    for (var_idx, var) in enumerate(vars)
+        unique_idx = get(seen, var, 0)
+        if unique_idx == 0
+            push!(unique_vars, var)
+            unique_idx = length(unique_vars)
+            seen[var] = unique_idx
+        end
+        var_map[var_idx] = unique_idx
+    end
+
+    dg = DerivativeGraph(unique_roots, unique_vars)
     factor_subgraphs!(dg)
 
-    result = Matrix{SymbolicT}(undef, length(unique_roots), length(vars))
-    cache = [Dict{Edge,SymbolicT}() for _ in eachindex(vars)]
+    result = Matrix{SymbolicT}(undef, length(unique_roots), length(unique_vars))
+    cache = [Dict{Edge,SymbolicT}() for _ in eachindex(unique_vars)]
 
     for root in eachindex(unique_roots)
-        for var in eachindex(vars)
+        for var in eachindex(unique_vars)
             result[root, var] = evaluate_path(dg, root, var, cache)
         end
     end
 
-    return result[root_map, :]
+    return result[root_map, var_map]
 end
 
 function dstar_jacobian(roots, vars)

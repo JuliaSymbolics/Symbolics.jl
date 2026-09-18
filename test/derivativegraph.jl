@@ -55,9 +55,11 @@ u2 = x^2 + x
 @test isequal(dstar_jacobian([x,x], [x]), jacobian([x,x], [x]))
 @test isequal(dstar_jacobian([x,x], [x,x]), jacobian([x,x], [x,x]))
 
-# Duplicate roots are deduplicated before graph construction
+# Duplicate roots and vars are deduplicated before graph construction
 @test isequal(expand.(dstar_jacobian([t, u, t * u, t * u], [x, y])), expand.(jacobian([t, u, t * u, t * u], [x, y])))
 @test isequal(expand.(dstar_jacobian([u2^2, u2 * x^2, u2^2], [x])), expand.(jacobian([u2^2, u2 * x^2, u2^2], [x])))
+@test isequal(expand.(dstar_jacobian([t, u], [x, y, x])), expand.(jacobian([t, u], [x, y, x])))
+@test isequal(expand.(dstar_jacobian([t, u, t * u], [x, y, y, x])), expand.(jacobian([t, u, t * u], [x, y, y, x])))
 
 # Array symbolics
 @variables z[1:3]
