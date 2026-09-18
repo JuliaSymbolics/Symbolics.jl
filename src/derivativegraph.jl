@@ -19,7 +19,6 @@ bott_vertex(edge::Edge) = edge.bott_vertex
 reachable_vars(edge::Edge) = edge.reachable_vars
 reachable_roots(edge::Edge) = edge.reachable_roots
 vertices(edge::Edge) = (top_vertex(edge), bott_vertex(edge))
-times_used(edge::Edge) = sum(reachable_roots(edge)) * sum(reachable_vars(edge))
 
 # scratch buffers reused across graph traversals (subgraph reachability walks,
 # factor-base bypass checks, shared-path detection, subgraph edge collection) to
@@ -114,8 +113,6 @@ root_postorders(dg::DerivativeGraph) = dg.root_idx_to_postorder
 # these return references to the internal data structures, not for external use
 parent_edges(dg::DerivativeGraph{T}, node::T) where {T} = dg.parent_edges[node]
 child_edges(dg::DerivativeGraph{T}, node::T) where {T} = dg.child_edges[node]
-parent_nodes(dg::DerivativeGraph{T}, node::T) where {T} = top_vertex.(parent_edges(dg, node))
-child_nodes(dg::DerivativeGraph{T}, node::T) where {T} = bott_vertex.(child_edges(dg, node))
 
 function hasedge(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     is_child_edge = edge in child_edges(dg, top_vertex(edge))
@@ -126,7 +123,7 @@ function hasedge(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     return is_child_edge && is_parent_edge
 end
 
-function propogate_var_reachability(dg::DerivativeGraph{T}, node::T) where {T}
+function propagate_var_reachability(dg::DerivativeGraph{T}, node::T) where {T}
     _parent_edges = parent_edges(dg, node)
     isempty(_parent_edges) && return nothing
 
@@ -138,13 +135,13 @@ function propogate_var_reachability(dg::DerivativeGraph{T}, node::T) where {T}
         edge.reachable_vars .&= new_reachability
         if edge.reachable_vars != old_reachability
             dg.dirty_vars .|= old_reachability .& .~edge.reachable_vars
-            propogate_var_reachability(dg, top_vertex(edge))
+            propagate_var_reachability(dg, top_vertex(edge))
         end
     end
 end
-propogate_var_reachability(dg::DerivativeGraph{T}, edge::Edge{T}) where {T} = propogate_var_reachability(dg, edge.top_vertex)
+propagate_var_reachability(dg::DerivativeGraph{T}, edge::Edge{T}) where {T} = propagate_var_reachability(dg, edge.top_vertex)
 
-function propogate_root_reachability(dg::DerivativeGraph{T}, node::T) where {T}
+function propagate_root_reachability(dg::DerivativeGraph{T}, node::T) where {T}
     _child_edges = child_edges(dg, node)
     isempty(_child_edges) && return nothing
 
@@ -156,12 +153,12 @@ function propogate_root_reachability(dg::DerivativeGraph{T}, node::T) where {T}
         edge.reachable_roots .&= new_reachability
         if edge.reachable_roots != old_reachability
             dg.dirty_roots .|= old_reachability .& .~edge.reachable_roots
-            propogate_root_reachability(dg, bott_vertex(edge))
+            propagate_root_reachability(dg, bott_vertex(edge))
         end
     end
 end
 
-propogate_root_reachability(dg::DerivativeGraph{T}, edge::Edge{T}) where {T} = propogate_root_reachability(dg, edge.bott_vertex)
+propagate_root_reachability(dg::DerivativeGraph{T}, edge::Edge{T}) where {T} = propagate_root_reachability(dg, edge.bott_vertex)
 
 function rem_edge!(dg::DerivativeGraph{T}, edge::Edge{T}) where {T}
     @assert hasedge(dg, edge) "edge is not in the graph"
@@ -218,8 +215,6 @@ function reachable_roots(dg::DerivativeGraph{T}, node::T) where {T}
     return roots_mask
 end
 
-is_root_reachable(dg::DerivativeGraph{T}, node::T, root::Integer) where {T} = haskey(dg.root_idx_to_postorder, root) && (dg.root_idx_to_postorder[root] == node || any(e -> reachable_roots(e)[root], parent_edges(dg, node)))
-
 function reachable_vars(dg::DerivativeGraph{T}, node::T) where {T}
     edges = dg.child_edges[node]
     vars_mask = falses(length(dg.vars))
@@ -233,8 +228,6 @@ function reachable_vars(dg::DerivativeGraph{T}, node::T) where {T}
 
     return vars_mask
 end
-
-is_var_reachable(dg::DerivativeGraph{T}, node::T, var::Integer) where {T} = dg.var_idx_to_postorder[var] == node || any(e -> reachable_vars(e)[var], child_edges(dg, node))
 
 # handles terms with >2 arguments (e.g. multiplication of 3+ things)
 function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
@@ -552,24 +545,6 @@ Base.:(==)(a::FactorableSubgraph{T, S}, b::FactorableSubgraph{T, S}) where {T, S
 Base.hash(e::FactorableSubgraph{T, DominatorSubgraph}, h::UInt) where {T} = hash((e.top_vertex, e.bott_vertex, 0), h)
 Base.hash(e::FactorableSubgraph{T, PostDominatorSubgraph}, h::UInt) where {T} = hash((e.top_vertex, e.bott_vertex, 1), h)
 
-# Loops through the immediate dominators to fill out the dominance masks. Also works for postdominators.
-function calculate_dominance_mask(dominators::Vector{T}) where {T}
-    dom_mask = Vector{BitVector}(undef, length(dominators))
-    for i in eachindex(dominators)
-        dom_mask[i] = falses(length(dominators))
-    end
-    for (node, dom) in enumerate(dominators)
-        # walk up through the dominators
-        while !isnothing(dom)
-            dom_mask[dom][node] = 1
-            dom == dominators[dom] && break
-            dom = dominators[dom]
-        end
-    end
-
-    return dom_mask
-end
-
 # the following functions allow functions to treat Dominator and PostDominator subgraphs the same by using forward and backward instead of up and down the graph
 # forward is in the direction of dominated to dominating or postdominated to postdominating. i.e. from the factor base to the factor node
 forward_edges(dg::DerivativeGraph{T}, ::FactorableSubgraph{T, DominatorSubgraph}, edge::Edge{T}) where {T} = parent_edges(dg, edge.top_vertex)
@@ -730,8 +705,7 @@ function get_factorable_subgraphs(dg::DerivativeGraph{T};
     end
 
     # repeat the same process, but for postdominators and variables
-    empty!(dom_pairs)
-    pdom_pairs = dom_pairs#Dict{Tuple{T,T}, BitVector}()
+    pdom_pairs = empty!(dom_pairs)
     for var in keys(dg.var_idx_to_postorder)
         # only recompute pdoms if var is dirty
         (dg.dirty_vars[var] || !haskey(pdom_cache, var)) && (pdom_cache[var] = get_postdominators(dg, var))
@@ -910,12 +884,12 @@ function factor_subgraph!(dg::DerivativeGraph{T}, sub::FactorableSubgraph) where
     add_edge!(dg, sub_edge)
 
     # propagate changes to reachability only after fully factoring subgraph
-    propogate_root_reachability(dg, sub_edge)
-    propogate_var_reachability(dg, sub_edge)
+    propagate_root_reachability(dg, sub_edge)
+    propagate_var_reachability(dg, sub_edge)
 
     for edge in sub_edges
-        propogate_root_reachability(dg, edge)
-        propogate_var_reachability(dg, edge)
+        propagate_root_reachability(dg, edge)
+        propagate_var_reachability(dg, edge)
     end
     return true
 end
