@@ -155,6 +155,20 @@ end
     @test islin
 end
 
+@testset "`linear_expansion` remainder is free of `x` inside opaque calls" begin
+    @variables x h w c g(..)
+    # The `x`-coefficients inside `g`'s argument cancel (`-h*x + h*x`), so the
+    # argument is affine in `x` with a zero coefficient. The remainder must
+    # still be rewritten to the `x`-free form; returning the original argument
+    # leaks `x` into `b`, which breaks consumers that treat `b` as constant.
+    ex = g(-h * x + ifelse(c > 0, h * x, h * x) + w)
+    a, b, islin = Symbolics.linear_expansion(ex, x)
+    @test islin
+    @test iszero(a)
+    @test isequal(b, g(w))
+    @test !SU.query(isequal(unwrap(x)), unwrap(b))
+end
+
 matmulwrapper(a, b) = a * b
 @register_array_symbolic matmulwrapper(a::AbstractMatrix{Real}, b::AbstractVector{Real}) begin
     size = size(b)
