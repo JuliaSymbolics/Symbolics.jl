@@ -536,7 +536,7 @@ function (lex::LinearExpander)(t::SymbolicT; need_remainder::Bool = true)
                     # free of `x`.
                     if need_remainder && !isequal(b, arg)
                         if !dirty
-                            newargs = collect(args)
+                            newargs = copy(args)
                             dirty = true
                         end
                         newargs[i] = b
