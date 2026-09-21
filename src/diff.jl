@@ -902,7 +902,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
 
     # `arrdict[arr]` maps a lazy array to the columns of its element vars
     # `arr[k]`, since occurrences of `arr`/`arr[i]` mark all of them.
-    arrdict = Dict{Any, Vector{Int}}()
+    arrdict = Dict{SymbolicT, Vector{Int}}()
     for (j, v) in enumerate(u)
         v isa SymbolicT && is_scalar_indexed(v) || continue
         push!(get!(Vector{Int}, arrdict, arguments(v)[1]), j)
