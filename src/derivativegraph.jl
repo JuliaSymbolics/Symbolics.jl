@@ -236,9 +236,17 @@ function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
             if variant == SymbolicUtils.AddMulVariant.ADD
                 return COMMON_ONE
             else
-                args = copy(parent(arguments(expr)))
-                args[arg_idx] = COMMON_ONE
-                return SymbolicUtils.mul_worker(VartypeT, args)
+                # `arguments` materializes `dict` entries in order, preceded by
+                # `coeff` when it isn't 1; drop this argument's dict entry and
+                # rebuild via the fast `Mul` ctor rather than re-canonicalizing
+                # all factors through `mul_worker`
+                args = parent(arguments(expr))
+                key_pos = arg_idx - (length(args) - length(dict))
+                newdict = copy(dict)
+                for (i, k) in enumerate(keys(dict))
+                    i == key_pos && (delete!(newdict, k); break)
+                end
+                return SymbolicUtils.Mul{VartypeT}(coeff, newdict; type = symtype(expr), shape = shape(expr))
             end
         end
         _ => begin
