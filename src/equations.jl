@@ -49,10 +49,61 @@ lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
 
 """
+$(TYPEDEF)
+
+A two-element vector of [`Equation`](@ref)s produced by [`~`](@ref) when either
+side is complex-valued and both the real and imaginary parts contain symbols.
+
+A complex `~` cannot produce a single `Equation`: the real and imaginary parts
+of the two sides are equated separately. `SplitComplexEquation` holds the two
+resulting equations — `eqs[1]` relates the real parts and `eqs[2]` the
+imaginary parts — while `eqs.original` is the original unsplit equation. It is
+an `AbstractVector{Equation}`, so it iterates, indexes and flattens (e.g. with
+`vcat` or `reduce(vcat, ...)`) exactly like the `Vector{Equation}` it replaced,
+while remaining distinguishable from a user-written vector of equations via
+[`iscomplexsplit`](@ref) or `x isa SplitComplexEquation`.
+
+# Fields
+$(FIELDS)
+"""
+struct SplitComplexEquation <: AbstractVector{Equation}
+    """The equation between the real parts of the two sides."""
+    real_eq::Equation
+    """The equation between the imaginary parts of the two sides."""
+    imag_eq::Equation
+    """The unsplit equation between the original complex-valued sides."""
+    original::Equation
+end
+
+Base.size(::SplitComplexEquation) = (2,)
+
+function Base.getindex(eqs::SplitComplexEquation, i::Int)
+    i == 1 && return eqs.real_eq
+    i == 2 && return eqs.imag_eq
+    throw(BoundsError(eqs, i))
+end
+
+Base.iterate(eqs::SplitComplexEquation, state::Int = 1) =
+    state > 2 ? nothing : (eqs[state], state + 1)
+
+"""
+$(TYPEDSIGNATURES)
+
+Check whether `x` is a [`SplitComplexEquation`](@ref): a real/imaginary
+equation pair produced by a complex [`~`](@ref), as opposed to a plain vector
+of user-written equations.
+"""
+iscomplexsplit(x) = x isa SplitComplexEquation
+
+"""
 $(TYPEDSIGNATURES)
 
 Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
 `Num` and a `Number`.
+
+When either side is complex-valued such that both the real and imaginary parts
+contain symbols, `~` instead returns a [`SplitComplexEquation`](@ref) holding
+the real-part and imaginary-part equations.
 
 # Examples
 
@@ -94,8 +145,7 @@ for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
         elseif ai isa Number && bi isa Number
             ar ~ br
         else
-            [ar ~ br
-            ai ~ bi]
+            SplitComplexEquation(ar ~ br, ai ~ bi, Equation(a, b))
         end
     end
 end

@@ -1,3 +1,14 @@
+## 7.42.0
+
+### Behavior changes
+
+- `lhs ~ rhs` with a complex-valued side now returns a `SplitComplexEquation`
+  instead of a plain `Vector{Equation}` when both the real and imaginary parts
+  contain symbols. The new type is an `AbstractVector{Equation}` holding the
+  real-part and imaginary-part equations plus the original unsplit equation, so
+  iteration, indexing and `vcat` behave as before, but the result is now
+  distinguishable from a user-written vector of equations via `iscomplexsplit`.
+
 ## 7.37.0
 
 ### Behavior changes
