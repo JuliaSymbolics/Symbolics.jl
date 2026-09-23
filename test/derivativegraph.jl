@@ -1,6 +1,7 @@
 using Symbolics
 using SymbolicUtils
 using Test
+using LinearAlgebra
 using Symbolics: value, unwrap, dstar_derivative, dstar_jacobian, jacobian
 
 # Standard derivative
@@ -65,6 +66,44 @@ u2 = x^2 + x
 unregistered_fn(a) = a
 @register_symbolic unregistered_fn(a)
 @test_throws Symbolics.DerivativeNotDefinedError dstar_derivative(unregistered_fn(x), x)
+
+# Cases mirrored from test/diff.jl that exercise paths not covered above
+@testset "diff.jl parity" begin
+    @variables t σ ρ β alpha delta x1 x2 x3 b
+    @test isequal(expand.(dstar_jacobian([σ*(y-x), x*(ρ-z)-y, x*y - β*z], [x,y,z])),
+                  expand.(jacobian([σ*(y-x), x*(ρ-z)-y, x*y - β*z], [x,y,z])))
+    # registered scalar functions
+    for ex in [csch(t), hypot(x, y), Symbolics.ssqrt(1 + x^2), Symbolics.scbrt(1 + x^2),
+               Symbolics.slog(1 + x^2), acos(x), abs2(x), x^(alpha - 1)]
+        var = only(intersect(Symbolics.get_variables(ex), Symbolics.unwrap.([t, x])))
+        @test isequal(expand(Symbolics.unwrap(dstar_derivative(ex, var))),
+                      expand(expand_derivatives(Differential(var)(ex))))
+    end
+    # issue #252: symbolic exponent inside a larger expression
+    tmp = beta * (alpha * exp(x1) * x2^(alpha - 1) + 1 - delta) / x3
+    @test isequal(expand.(dstar_jacobian([tmp], [x1, x2])), expand.(jacobian([tmp], [x1, x2])))
+    # literal constants as roots differentiate to zero rows
+    @test isequal(dstar_jacobian([t, x, 42], [t, x]), jacobian([t, x, 42], [t, x]))
+    # `ifelse` with a non-comparison condition function (diff.jl)
+    @test isequal(dstar_derivative(ifelse(signbit(b), b^2, sqrt(b)), b),
+                  Symbolics.derivative(ifelse(signbit(b), b^2, sqrt(b)), b))
+    # unregistered function nested inside a registered one still throws
+    unreg_inner(a) = a
+    @register_symbolic unreg_inner(a)
+    @test_throws Symbolics.DerivativeNotDefinedError dstar_derivative(hypot(x, unreg_inner(x)), x)
+    # distinct elements of an array variable are independent
+    @variables xv[1:3]
+    xvc = collect(xv)
+    @test isequal(dstar_jacobian([xvc[1]], xvc[2:3]), jacobian([xvc[1]], xvc[2:3]))
+    # eager array operations scalarize before graph construction
+    @variables yv[1:3]
+    yvc = collect(yv)
+    @test isequal(dstar_jacobian([LinearAlgebra.dot(yvc, xvc)], xvc),
+                  jacobian([LinearAlgebra.dot(yvc, xvc)], xvc))
+    @test isequal(dstar_jacobian([xvc' * xvc], xvc), jacobian([xvc' * xvc], xvc))
+    @test isequal(dstar_jacobian([sum(xvc), prod(xvc)], xvc),
+                  jacobian([sum(xvc), prod(xvc)], xvc))
+end
 
 # `ifelse`: conditions are treated as piecewise-constant (matching
 # `expand_derivatives`) and excluded from the derivative graph; branch partials
