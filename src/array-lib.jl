@@ -316,3 +316,7 @@ end
 # because the two differ for a negative determinant, and callers that analyse the
 # expression need the atom preserved.
 @register_symbolic LinearAlgebra.logdet(x::AbstractMatrix)
+
+# The default (p = 2) operator norm is the largest singular value, which has no closed
+# form; without this it reaches `svdvals!` and errors on a symbolic matrix.
+@register_symbolic LinearAlgebra.opnorm(x::AbstractMatrix)
