@@ -790,6 +790,35 @@ end
         sparse([1, 1], [1, 3], true, 1, 4)
 end
 
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/2004
+@testset "Sparsity of array slices" begin
+    # a slice reads only the elements it names, like the scalar equivalent
+    @variables x1 x2 x3 y1
+    ref = Symbolics.jacobian_sparsity(
+        [y1 * x1, sum([x1, x2] .* [1, 1])], [x1, x2, x3, y1])
+    @variables x[1:3] y
+    @test Symbolics.jacobian_sparsity(
+        [y * x[1], sum(x[1:2] .* [1, 1])], [x[1], x[2], x[3], y]) == ref
+    @test Symbolics.jacobian_sparsity([sum(x[2:3] .* [1, 1])], [x[1], x[2], x[3]]) ==
+        sparse([1, 1], [2, 3], true)
+
+    # a colon reads the whole array
+    @test Symbolics.jacobian_sparsity([sum(x[:] .* [1, 1, 1])], [x[1], x[2], x[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+
+    @variables z[1:2, 1:3]
+    zs = vec([z[a, b] for a in 1:2, b in 1:3]) # z[1,1], z[2,1], z[1,2], ...
+    @test Symbolics.jacobian_sparsity([sum(z[1, 1:2] .* [1, 1])], zs) ==
+        sparse([1, 1], [1, 3], true, 1, 6)
+    @test Symbolics.jacobian_sparsity([sum(z[:, 2] .* [1, 1])], zs) ==
+        sparse([1, 1], [3, 4], true, 1, 6)
+
+    # slices of a dependent array variable too
+    @variables t xt(t)[1:3]
+    @test Symbolics.jacobian_sparsity([sum(xt[1:2] .* [1, 1])], collect(xt)) ==
+        sparse([1, 1], [1, 2], true, 1, 3)
+end
+
 struct Op <: SymbolicUtils.Operator end
 
 @testset "Derivative of non-`Differential` operators" begin
