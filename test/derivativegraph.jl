@@ -121,6 +121,31 @@ unregistered_fn(a) = a
     obj = sum(abs2, xv .- aarr) + (x - 1)^2
     @test isequal(dstar_jacobian([obj], [xvc; x]),
                   Symbolics.jacobian([Symbolics.scalarize(obj)], [xvc; x]))
+    # `getindex` of a registered array function (diff.jl "Derivatives of
+    # indexed array expressions") — the node's children are the call's args
+    # and the partial is the registered array derivative indexed at the element
+    @register_array_symbolic dg_foo(x, y) begin
+        size = (2,)
+        eltype = Real
+        ndims = 1
+    end
+    @register_array_symbolic dg_dfoo1(x, y) begin
+        size = (2,)
+        eltype = Real
+        ndims = 1
+    end
+    @register_array_symbolic dg_dfoo2(x, y) begin
+        size = (2,)
+        eltype = Real
+        ndims = 1
+    end
+    @register_derivative dg_foo(x, y) 1 dg_dfoo1(x, y)
+    @register_derivative dg_foo(x, y) 2 dg_dfoo2(x, y)
+    aex = dg_foo(x + 2y, y)
+    @test isequal(dstar_derivative(aex[1], x), Symbolics.derivative(aex[1], x))
+    @test isequal(dstar_derivative(aex[1], y), Symbolics.derivative(aex[1], y))
+    @test isequal(dstar_derivative(aex[2] + aex[1]^2 * y, x),
+                  Symbolics.derivative(aex[2] + aex[1]^2 * y, x))
 end
 
 # `ifelse`: conditions are treated as piecewise-constant (matching
