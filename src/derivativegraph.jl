@@ -273,7 +273,8 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
 
     args = parent(arguments(expr))
     arg_idx_to_post_idx = Vector{T}(undef, length(args))
-    for (arg_idx, arg) in enumerate(args)
+    for arg_idx in reverse(eachindex(args))
+        arg = args[arg_idx]
         if arg in dg.varset
             arg_idx_to_post_idx[arg_idx] = populate_dergraph_var!(dg, arg, root_idx)
         elseif iscall(arg)
@@ -523,16 +524,16 @@ mutable struct FactorableSubgraph{T<:Integer, S<:AbstractFactorableSubgraph}
     reachable_vars::BitVector
     reachable_roots::BitVector
     dominance_mask::BitVector
-    edges::Vector{Edge{T}}
+    edges::OrderedCollections.OrderedSet{Edge{T}}
     dg::DerivativeGraph{T}
     times_used::Int
 
     function FactorableSubgraph{T, DominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector, dominance_mask::BitVector, dg::DerivativeGraph{T}) where {T<:Integer}
-        new{T, DominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, dominance_mask, Edge{T}[], dg, sum(dominance_mask)*sum(reachable_vars))
+        new{T, DominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, dominance_mask, OrderedCollections.OrderedSet{Edge{T}}(), dg, sum(dominance_mask)*sum(reachable_vars))
     end
 
     function FactorableSubgraph{T, PostDominatorSubgraph}(top_vertex::T, bott_vertex::T, reachable_vars::BitVector, reachable_roots::BitVector, dominance_mask::BitVector, dg::DerivativeGraph{T}) where {T<:Integer}
-        new{T, PostDominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, dominance_mask, Edge{T}[], dg, sum(dominance_mask)*sum(reachable_roots))
+        new{T, PostDominatorSubgraph}(COMMON_ZERO, top_vertex, bott_vertex, reachable_vars, reachable_roots, dominance_mask, OrderedCollections.OrderedSet{Edge{T}}(), dg, sum(dominance_mask)*sum(reachable_roots))
     end
 end
 

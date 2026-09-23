@@ -47,6 +47,7 @@ import SymbolicUtils.Code: toexpr
 
 import ArrayInterface
 import DataStructures
+import OrderedCollections
 import RuntimeGeneratedFunctions
 using RuntimeGeneratedFunctions: @RuntimeGeneratedFunction, RuntimeGeneratedFunction, drop_expr
 import MacroTools
