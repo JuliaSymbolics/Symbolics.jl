@@ -249,6 +249,12 @@ function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
                 return SymbolicUtils.Mul{VartypeT}(coeff, newdict; type = symtype(expr), shape = shape(expr))
             end
         end
+        BSImpl.Term(; f, args) && if f isa BasicSymbolic{VartypeT} end => begin
+            # called symbolic functions / dependent variables (`x(t)`,
+            # `u(x,y)`): the partial for arg `i` is the symbolic derivative
+            # term `Differential(arg_i)(expr)`, like `chain_diff`
+            return Differential(args[arg_idx])(expr)
+        end
         BSImpl.Term(; f, args) && if f === getindex end => begin
             # for `getindex(fcall, idx...)` nodes `populate_dergraph!` made the
             # call's scalar arguments the children, so `arg_idx` indexes the
@@ -300,18 +306,31 @@ end
 # called in `DerivativeGraph` constructor to recursively iterate through the graph to fill out edges + reachabilities
 function populate_dergraph!(dg::DerivativeGraph)
     for (root_idx, root) in enumerate(dg.roots)
-        local post_idx
-        if root in dg.varset
-            post_idx = populate_dergraph_var!(dg, root, root_idx)
-        else
-            post_idx = populate_dergraph!(dg, root, root_idx)
-        end
-
+        post_idx = _populate_dispatch(dg, root, root_idx)
         isnothing(post_idx) && continue
-
         dg.root_idx_to_postorder[root_idx] = post_idx
         dg.postorder_to_root_idx[post_idx] = root_idx
     end
+end
+
+# three-way dispatch: plain vars are leaves; dependent variables — called
+# symbolic functions like `x(t)` that are also in `vars` — get a var node that
+# still expands through its call arguments (matching `jacobian`, where
+# `d(x(t))/dt` stays `xˍt` even when `x(t)` is a differentiated variable);
+# everything else is a regular node
+function _populate_dispatch(dg::DerivativeGraph{T}, term::SymbolicT, root_idx::Integer) where {T}
+    if term in dg.varset
+        if iscall(term) && operation(term) isa BasicSymbolic{VartypeT}
+            return populate_dergraph_depvar!(dg, term, root_idx)
+        end
+        return populate_dergraph_var!(dg, term, root_idx)
+    end
+    return populate_dergraph!(dg, term, root_idx)
+end
+
+function populate_dergraph_depvar!(dg::DerivativeGraph{T}, var::SymbolicT, root_idx::Integer) where {T}
+    haskey(dg.definitions, var) && return populate_root_reachabilities!(dg, dg.definitions[var], root_idx)
+    return _populate_node!(dg, var, root_idx)
 end
 
 function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::Integer) where {T}
@@ -323,8 +342,7 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     expanded = _expand_array_term(expr)
     isleaf = false
     if expanded !== nothing
-        post_idx = expanded in dg.varset ? populate_dergraph_var!(dg, expanded, root_idx) :
-                                           populate_dergraph!(dg, expanded, root_idx)
+        post_idx = _populate_dispatch(dg, expanded, root_idx)
         if post_idx !== nothing
             dg.definitions[expr] = post_idx
             return post_idx
@@ -335,6 +353,11 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
 
     !iscall(expr) && return nothing
 
+    return _populate_node!(dg, expr, root_idx; isleaf)
+end
+
+function _populate_node!(dg::DerivativeGraph{T}, expr::SymbolicT,
+                         root_idx::Integer; isleaf::Bool = false) where {T}
     args = parent(arguments(expr))
     op = operation(expr)
     # `getindex(fcall, idx...)` on an array-valued call (e.g. a function
@@ -361,10 +384,8 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
         arg = args[arg_idx]
         if isleaf || arg_idx == cond_idx
             arg_idx_to_post_idx[arg_idx] = T(-1)
-        elseif arg in dg.varset
-            arg_idx_to_post_idx[arg_idx] = populate_dergraph_var!(dg, arg, root_idx)
-        elseif iscall(arg)
-            arg_idx_to_post_idx[arg_idx] = populate_dergraph!(dg, arg, root_idx)
+        elseif arg in dg.varset || iscall(arg)
+            arg_idx_to_post_idx[arg_idx] = _populate_dispatch(dg, arg, root_idx)
         else
             arg_idx_to_post_idx[arg_idx] = T(-1)
         end
@@ -375,15 +396,32 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     dg.definitions[expr] = post_idx
     dg.child_edges[post_idx] = Edge{T}[]
     dg.parent_edges[post_idx] = Edge{T}[]
+    if expr in dg.varset
+        # dependent variable: the node is a leaf for its own column
+        var_idxs = findall(isequal(expr), dg.vars)
+        for var_idx in var_idxs
+            dg.var_idx_to_postorder[var_idx] = post_idx
+        end
+        dg.postorder_to_var_idx[post_idx] = first(var_idxs)
+    end
 
     # add new edges; partial derivatives of identical arguments are summed into a
     # single edge (the total derivative w.r.t. that argument)
     partial_ders = Dict{T, SymbolicT}()
     reachable_masks = Dict{T, BitVector}()
+    # for called symbolic functions, `chain_diff` returns a single `D(arg)`
+    # when the diff var is a direct argument — a var at duplicated argument
+    # positions must contribute its `Differential(arg)(expr)` only once
+    called_fn = op isa BasicSymbolic
+    seen_var_args = Set{SymbolicT}()
     for (arg_idx, arg_post_idx) in enumerate(arg_idx_to_post_idx)
         arg_post_idx == T(-1) && continue
         arg_reachable_vars = get!(() -> reachable_vars(dg, arg_post_idx), reachable_masks, arg_post_idx)
         if any(arg_reachable_vars)
+            if called_fn && (arg = args[arg_idx]) in dg.varset
+                arg in seen_var_args && continue
+                push!(seen_var_args, arg)
+            end
             existing = get(partial_ders, arg_post_idx, nothing)
             partial_ders[arg_post_idx] = isnothing(existing) ? nary_derivative_idx(expr, arg_idx) : existing + nary_derivative_idx(expr, arg_idx)
         else

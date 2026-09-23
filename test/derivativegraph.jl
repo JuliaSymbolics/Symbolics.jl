@@ -160,6 +160,38 @@ unregistered_fn(a) = a
                   Symbolics.derivative(t * Differential(y)(x) + x^2, x))
 end
 
+# Called symbolic functions / dependent variables: partials are symbolic
+# `Differential(arg_i)(expr)` edge values, reproducing `chain_diff`
+@testset "depvars" begin
+    @variables t x y x(t) y(t) z(t) u(..) w(..)
+    @test isequal(dstar_derivative(x, t), Symbolics.derivative(x, t))
+    @test isequal(dstar_derivative(sin(x), t), Symbolics.derivative(sin(x), t))
+    @test isequal(dstar_derivative(u(x), t), Symbolics.derivative(u(x), t))
+    @test isequal(dstar_derivative(w(x, y), x), Symbolics.derivative(w(x, y), x))
+    @test isequal(dstar_derivative(w(x, y), t), Symbolics.derivative(w(x, y), t))
+    @test isequal(dstar_derivative(w(x, x), x), Symbolics.derivative(w(x, x), x))
+    @test isequal(dstar_derivative(w(x, x), t), Symbolics.derivative(w(x, x), t))
+    # diff.jl chain-rule testset: Dt(f(y(t))) = Dt(y) * Dy(f) — nested calls
+    # need a separately-declared callable since `x` is bound to the `x(t)` term
+    @variables f(..)
+    @test isequal(dstar_derivative(f(y), t), expand_derivatives(Differential(t)(f(y))))
+    @test isequal(dstar_derivative(f(y, z), t), expand_derivatives(Differential(t)(f(y, z))))
+    # a depvar in the varset has dual role: leaf for its own column, but still
+    # expands through its call arguments for other columns — `d(x(t))/dt`
+    # stays `xˍt` even when `x(t)` is itself a differentiated variable
+    @test isequal(dstar_jacobian([x], [x, t]), jacobian([x], [x, t]))
+    @test isequal(dstar_jacobian([w(x, y)], [x, t]),
+                  [Symbolics.derivative(w(x, y), x) Symbolics.derivative(w(x, y), t)])
+    # a composed expression differentiates through every depvar consistently
+    # with `derivative` (ordinary `jacobian` under-reports nested depvars —
+    # `jacobian([w(x,y)],[t])` returns 0 where `derivative` expands, a
+    # `search_variables` pre-filter artifact)
+    expr = sin(x) * w(x, y) + z^2
+    vars = [x, t, z]
+    expected = [Symbolics.derivative(expr, v) for v in vars]'
+    @test isequal(expand.(dstar_jacobian([expr], vars)), expand.(expected))
+end
+
 # `ifelse`: conditions are treated as piecewise-constant (matching
 # `expand_derivatives`) and excluded from the derivative graph; branch partials
 # become `ifelse(c, 1, 0)`/`ifelse(c, 0, 1)` edge values. `simplify` does not
