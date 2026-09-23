@@ -140,7 +140,7 @@ end
     return recipe(n)
 end
 
-@latexrecipe function f(eqs::Vector{Equation})
+@latexrecipe function f(eqs::AbstractVector{Equation})
     index --> :subscript
     has_connections = any(x -> hide_lhs(value(x.lhs)), eqs)
     if has_connections
@@ -166,7 +166,7 @@ end
 Base.show(io::IO, ::MIME"text/latex", x::Symbolics.RCNum) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::SymbolicUtils.BasicSymbolic) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::Equation) = print(io, "\$\$ " * latexify(x) * " \$\$")
-Base.show(io::IO, ::MIME"text/latex", x::Vector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
+Base.show(io::IO, ::MIME"text/latex", x::AbstractVector{Equation}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:Symbolics.RCNum}) = print(io, "\$\$ " * latexify(x) * " \$\$")
 
 # Iterate a node's metadata, dispatching to the `Symbolics._toexpr_metadata` hook for

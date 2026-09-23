@@ -173,7 +173,7 @@ julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(true))
 """
 substitute
 
-export Equation
+export Equation, SplitComplexEquation, iscomplexsplit
 include("equations.jl")
 
 export Inequality, ≲, ≳
