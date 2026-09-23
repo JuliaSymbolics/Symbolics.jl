@@ -95,7 +95,7 @@ function _first_unequal(a, b)
                     r !== nothing && return r
                 end
                 da.coeff == db.coeff || return (a, b)
-            else  # Term and other arg-based variants
+            elseif iscall(a) && iscall(b)  # Term and other arg-based variants
                 aa = SymbolicUtils.arguments(a)
                 bb = SymbolicUtils.arguments(b)
                 if length(aa) == length(bb)
@@ -126,7 +126,21 @@ function _dump_node_fields(io, label, n)
     end
 end
 
-function dstar_eq_jac(dstar_out, jac_out)
+# dump the post-factoring derivative graph: every node's outgoing edges with
+# their values and reachability masks — shows which subgraphs were factored
+function _dump_dg(io, roots, vars)
+    dg = Symbolics.DerivativeGraph(Symbolics.unwrap.(roots), Symbolics.unwrap.(vars))
+    Symbolics.factor_subgraphs!(dg)
+    for i in eachindex(dg)
+        println(io, "  node ", i, ": ", repr(dg.symbols[i]))
+        for e in dg.child_edges[i]
+            println(io, "    -> ", e.bott_vertex, "  val=", repr(e.edge_value),
+                "  rv=", findall(e.reachable_vars), " rr=", findall(e.reachable_roots))
+        end
+    end
+end
+
+function dstar_eq_jac(dstar_out, jac_out, roots = nothing, vars = nothing)
     d = dstar_out isa AbstractArray ? vec(dstar_out) : [dstar_out]
     j = jac_out isa AbstractArray ? vec(jac_out) : [jac_out]
     ok = true
@@ -148,6 +162,14 @@ function dstar_eq_jac(dstar_out, jac_out)
         println("dstar expanded: ", repr(ed))
         println("jac   expanded: ", repr(ej))
         println("isequal raw:    ", isequal(d[i], j[i]))
+        if roots !== nothing
+            println("factored derivative graph:")
+            try
+                _dump_dg(stdout, roots, vars)
+            catch err
+                println("  dg dump threw: ", sprint(showerror, err))
+            end
+        end
         try
             println("simplify(expand(d-j)): ", repr(simplify(expand(d[i] - j[i]))))
         catch err
@@ -189,7 +211,7 @@ D = Differential(x)
 @test isequal(expand(dstar_derivative(sin(cos(x))*cos(cos(x)), x)), expand_derivatives(D(sin(cos(x))*cos(cos(x)))))
 @test isequal(expand(dstar_derivative(cos(sin(exp(2x)) + cos(exp(2x))), x)), expand(expand_derivatives(D(cos(sin(exp(2x)) + cos(exp(2x)))))))
 @test isequal(expand(dstar_derivative(2sin(x^4 - x) + 3cos(2x), x)), expand(expand_derivatives(D(2sin(x^4 - x) + 3cos(2x)))))
-@test dstar_eq_jac(dstar_derivative(2x*exp(x) + 2*exp(x), x), expand(expand_derivatives(D(2x*exp(x) + 2*exp(x)))))
+@test dstar_eq_jac(dstar_derivative(2x*exp(x) + 2*exp(x), x), expand(expand_derivatives(D(2x*exp(x) + 2*exp(x)))), [2x*exp(x) + 2*exp(x)], [x])
 
 # Standard Jacobian
 @variables x y z
@@ -204,7 +226,7 @@ Dz = Differential(z)
 @test isequal(dstar_jacobian([x*y*z], [x,y,z]), jacobian([x*y*z], [x,y,z]))
 @test isequal(dstar_jacobian([x*y*z, x+y+z, sqrt(x^2 + y^2 + z^2)], [x,y,z]), jacobian([x*y*z, x+y+z, sqrt(x^2 + y^2 + z^2)], [x,y,z]))
 @test isequal(dstar_jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]), jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]))
-@test dstar_eq_jac(dstar_jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y]), jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y]))
+@test dstar_eq_jac(dstar_jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y]), jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y]), [(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])
 
 # Regression tests for parallel edges and edge splitting: factoring creates edges
 # that may share endpoints with existing edges and whose reachability extends
@@ -215,11 +237,11 @@ r = p * q
 s = p / q
 t = r + s
 u = r * s
-@test dstar_eq_jac(dstar_jacobian([t, u, t * u], [x, y]), jacobian([t, u, t * u], [x, y]))
-@test dstar_eq_jac(dstar_jacobian([t, u, t * u, t * u + u], [x, y]), jacobian([t, u, t * u, t * u + u], [x, y]))
+@test dstar_eq_jac(dstar_jacobian([t, u, t * u], [x, y]), jacobian([t, u, t * u], [x, y]), [t, u, t * u], [x, y])
+@test dstar_eq_jac(dstar_jacobian([t, u, t * u, t * u + u], [x, y]), jacobian([t, u, t * u, t * u + u], [x, y]), [t, u, t * u, t * u + u], [x, y])
 u2 = x^2 + x
-@test dstar_eq_jac(dstar_jacobian([u2^2, u2 * x^2], [x]), jacobian([u2^2, u2 * x^2], [x]))
-@test dstar_eq_jac(dstar_jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x]), jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x]))
+@test dstar_eq_jac(dstar_jacobian([u2^2, u2 * x^2], [x]), jacobian([u2^2, u2 * x^2], [x]), [u2^2, u2 * x^2], [x])
+@test dstar_eq_jac(dstar_jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x]), jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x]), [u2^2, u2 * x^2, u2 * x^2 + u2], [x])
 # Duplicate arguments: partial derivatives for identical argument positions are
 # summed into a single edge
 @test isequal(dstar_derivative(atan(x, x), x), expand_derivatives(Differential(x)(atan(x, x))))
@@ -232,10 +254,10 @@ u2 = x^2 + x
 @test isequal(dstar_jacobian([x,x], [x,x]), jacobian([x,x], [x,x]))
 
 # Duplicate roots and vars are deduplicated before graph construction
-@test dstar_eq_jac(dstar_jacobian([t, u, t * u, t * u], [x, y]), jacobian([t, u, t * u, t * u], [x, y]))
-@test dstar_eq_jac(dstar_jacobian([u2^2, u2 * x^2, u2^2], [x]), jacobian([u2^2, u2 * x^2, u2^2], [x]))
-@test dstar_eq_jac(dstar_jacobian([t, u], [x, y, x]), jacobian([t, u], [x, y, x]))
-@test dstar_eq_jac(dstar_jacobian([t, u, t * u], [x, y, y, x]), jacobian([t, u, t * u], [x, y, y, x]))
+@test dstar_eq_jac(dstar_jacobian([t, u, t * u, t * u], [x, y]), jacobian([t, u, t * u, t * u], [x, y]), [t, u, t * u, t * u], [x, y])
+@test dstar_eq_jac(dstar_jacobian([u2^2, u2 * x^2, u2^2], [x]), jacobian([u2^2, u2 * x^2, u2^2], [x]), [u2^2, u2 * x^2, u2^2], [x])
+@test dstar_eq_jac(dstar_jacobian([t, u], [x, y, x]), jacobian([t, u], [x, y, x]), [t, u], [x, y, x])
+@test dstar_eq_jac(dstar_jacobian([t, u, t * u], [x, y, y, x]), jacobian([t, u, t * u], [x, y, y, x]), [t, u, t * u], [x, y, y, x])
 
 # Unregistered functions throw `DerivativeNotDefinedError` instead of asserting
 unregistered_fn(a) = a
