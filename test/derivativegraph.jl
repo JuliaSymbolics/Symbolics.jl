@@ -66,6 +66,31 @@ unregistered_fn(a) = a
 @register_symbolic unregistered_fn(a)
 @test_throws Symbolics.DerivativeNotDefinedError dstar_derivative(unregistered_fn(x), x)
 
+# `ifelse`: conditions are treated as piecewise-constant (matching
+# `expand_derivatives`) and excluded from the derivative graph; branch partials
+# become `ifelse(c, 1, 0)`/`ifelse(c, 0, 1)` edge values. `simplify` does not
+# distribute scalars into branches, so compare numerically via `toexpr`/`eval`.
+eval_subs(ex, subs) = eval(Symbolics.toexpr(substitute(Symbolics.unwrap(ex), subs; fold = Val(true))))
+@testset "ifelse" begin
+    exprs = [
+        ifelse(x > 0, x^2, y),
+        ifelse(x^2 > 1, x^2, y),                  # subexpr shared between condition and branches
+        ifelse(x > 0, ifelse(x > 1, x^2, x), y),  # nested
+        Symbolics.ifelse_eager(x > 0, x^2, y),
+        Symbolics.ifelse_branching(x > 0, x^2, y),
+        max(x, y),                                # ifelse inside an edge value
+    ]
+    for ex in exprs
+        dj = dstar_jacobian([ex], [x, y])
+        j = jacobian([ex], [x, y])
+        for subs in (Dict(x => -1.5, y => 0.7), Dict(x => 2.3, y => -0.2))
+            @test isapprox(eval_subs.(dj, (subs,)), eval_subs.(j, (subs,)))
+        end
+    end
+    # a variable occurring only in the condition has zero derivative
+    @test isequal(only(dstar_jacobian([ifelse(z > 0, x, y)], [z])), 0)
+end
+
 # Array symbolics
 @variables z[1:3]
 @test isequal(dstar_jacobian(z,z), jacobian(z,z))

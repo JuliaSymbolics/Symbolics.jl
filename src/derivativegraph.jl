@@ -273,9 +273,17 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
 
     args = parent(arguments(expr))
     arg_idx_to_post_idx = Vector{T}(undef, length(args))
+    # `ifelse` conditions are treated as piecewise-constant, matching
+    # `expand_derivatives` (`D(ifelse(c,a,b)) == ifelse(c,D(a),D(b))`). The
+    # condition is excluded from the graph entirely so non-differentiable
+    # subterms (comparisons) are never traversed.
+    op = operation(expr)
+    cond_idx = op === ifelse || op === ifelse_eager || op === ifelse_branching ? 1 : 0
     for arg_idx in reverse(eachindex(args))
         arg = args[arg_idx]
-        if arg in dg.varset
+        if arg_idx == cond_idx
+            arg_idx_to_post_idx[arg_idx] = T(-1)
+        elseif arg in dg.varset
             arg_idx_to_post_idx[arg_idx] = populate_dergraph_var!(dg, arg, root_idx)
         elseif iscall(arg)
             arg_idx_to_post_idx[arg_idx] = populate_dergraph!(dg, arg, root_idx)
@@ -990,7 +998,7 @@ Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differenti
 
 (see [this paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/main-65.pdf) for more details on the algorithm)
 
-Mostly the same usage as [`jacobian`](@ref). More limited in input expressions (doesn't support `ifelse` or nested differentials), but asymptotically faster for large Rn->Rm expressions.
+Mostly the same usage as [`jacobian`](@ref). More limited in input expressions (doesn't support nested differentials), but asymptotically faster for large Rn->Rm expressions.
 
 # Arguments
 
@@ -1075,7 +1083,7 @@ $(SIGNATURES)
 
 Computes the derivative of `root` w.r.t. `var` using the D* differentiation algorithm.
 
-Mostly the same usage as [`derivative`](@ref), but more limited in input expressions (doesn't support `ifelse` or nested differentials).
+Mostly the same usage as [`derivative`](@ref), but more limited in input expressions (doesn't support nested differentials).
 
 Wrapper for R1->R1 case of `dstar_jacobian`. See [`dstar_jacobian`](@ref) for more information.
 
