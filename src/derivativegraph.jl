@@ -1064,7 +1064,10 @@ function dstar_jacobian(roots, vars)
     else
         error("This should not happen! `vars` must be convertible to Vector{SymbolicT}. \nReceived vars = $vars")
     end
-    return dstar_jacobian(roots, vars)
+    _res = dstar_jacobian(roots, vars)
+    res = similar(_res, Num)
+    map!(Num, res, _res)
+    return res
 end
 
 """
@@ -1080,4 +1083,4 @@ Wrapper for R1->R1 case of `dstar_jacobian`. See [`dstar_jacobian`](@ref) for mo
 - `root`: Expression to differentate
 - `var`: Variable to differentate w.r.t.
 """
-dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}) = only(dstar_jacobian([root], [var]))
+dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}) = Num(only(dstar_jacobian(unwrap.([root]), unwrap.([var]))))
