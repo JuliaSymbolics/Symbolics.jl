@@ -103,6 +103,24 @@ unregistered_fn(a) = a
     @test isequal(dstar_jacobian([xvc' * xvc], xvc), jacobian([xvc' * xvc], xvc))
     @test isequal(dstar_jacobian([sum(xvc), prod(xvc)], xvc),
                   jacobian([sum(xvc), prod(xvc)], xvc))
+    # `norm`/`dot` on unscalarized array variables expand eagerly, matching
+    # `executediff` (diff.jl "Derivative of norm"/"dot" testsets)
+    @variables yarr[1:3] aarr[1:3]
+    yarr_c, aarr_c = collect(yarr), collect(aarr)
+    @test isequal(dstar_jacobian([norm(xv)], xvc), jacobian([norm(xv)], xvc))
+    @test isequal(dstar_jacobian([norm(xv)^2], xvc), jacobian([norm(xv)^2], xvc))
+    @test isequal(dstar_jacobian([dot(yarr, xv)], xvc), jacobian([dot(yarr, xv)], xvc))
+    # lazy array reductions are scalarized during graph construction
+    @test isequal(dstar_derivative(sum(abs2, xv .- aarr), xvc[1]),
+                  Symbolics.derivative(sum(abs2, xv .- aarr), xvc[1]))
+    @test isequal(dstar_jacobian([sum(xv)], xvc), jacobian([sum(xv)], xvc))
+    @test isequal(dstar_jacobian([sum(abs2, xv .- aarr)], xvc),
+                  jacobian([sum(abs2, xv .- aarr)], xvc))
+    # scalarizing also handles reductions nested inside scalar expressions,
+    # which `jacobian` rejects (issue #1990) — intentional extra capability
+    obj = sum(abs2, xv .- aarr) + (x - 1)^2
+    @test isequal(dstar_jacobian([obj], [xvc; x]),
+                  Symbolics.jacobian([Symbolics.scalarize(obj)], [xvc; x]))
 end
 
 # `ifelse`: conditions are treated as piecewise-constant (matching
