@@ -146,6 +146,18 @@ unregistered_fn(a) = a
     @test isequal(dstar_derivative(aex[1], y), Symbolics.derivative(aex[1], y))
     @test isequal(dstar_derivative(aex[2] + aex[1]^2 * y, x),
                   Symbolics.derivative(aex[2] + aex[1]^2 * y, x))
+    # `Operator` applications act as fresh variables and differentiate to
+    # zero, matching `executediff` (diff.jl "non-Differential operators")
+    struct DGOp <: SymbolicUtils.Operator end
+    op_ex = Symbolics.STerm(DGOp(), [x]; type = Real, shape = UnitRange{Int}[])
+    @test isequal(dstar_derivative(op_ex, x), Symbolics.derivative(op_ex, x))
+    @test isequal(dstar_derivative(op_ex * x + sin(op_ex), x),
+                  Symbolics.derivative(op_ex * x + sin(op_ex), x))
+    # nested `Differential` terms are `Operator` applications too
+    @test isequal(dstar_derivative(Differential(y)(x), x),
+                  Symbolics.derivative(Differential(y)(x), x))
+    @test isequal(dstar_derivative(t * Differential(y)(x) + x^2, x),
+                  Symbolics.derivative(t * Differential(y)(x) + x^2, x))
 end
 
 # `ifelse`: conditions are treated as piecewise-constant (matching

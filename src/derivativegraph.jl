@@ -353,6 +353,10 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     # condition is excluded from the graph entirely so non-differentiable
     # subterms (comparisons) are never traversed.
     cond_idx = op === ifelse || op === ifelse_eager || op === ifelse_branching ? 1 : 0
+    # operator applications (`Differential`, `Integral`, user-defined
+    # `Operator`s) act as fresh variables — `executediff` differentiates them
+    # to zero, so they are leaves here
+    isleaf |= op isa SymbolicUtils.Operator
     for arg_idx in reverse(eachindex(args))
         arg = args[arg_idx]
         if isleaf || arg_idx == cond_idx
