@@ -249,6 +249,21 @@ function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
                 return SymbolicUtils.Mul{VartypeT}(coeff, newdict; type = symtype(expr), shape = shape(expr))
             end
         end
+        BSImpl.Term(; f, args) && if f === getindex end => begin
+            # for `getindex(fcall, idx...)` nodes `populate_dergraph!` made the
+            # call's scalar arguments the children, so `arg_idx` indexes the
+            # call's args; the partial is the call's registered (array-valued)
+            # derivative indexed at `idx`, like `executediff`'s getindex branch
+            if iscall(args[1]) && SymbolicUtils.is_array_shape(shape(args[1])) &&
+                    all(_is_scalar_literal, @view args[2:end])
+                der = derivative_idx(args[1], arg_idx)
+                isnothing(der) && throw(DerivativeNotDefinedError(args[1], arg_idx))
+                return der[SymbolicUtils.StableIndex(@views args[2:end])]
+            end
+            der = derivative_idx(expr, arg_idx)
+            isnothing(der) && throw(DerivativeNotDefinedError(expr, arg_idx))
+            return der
+        end
         _ => begin
             der = derivative_idx(expr, arg_idx)
             isnothing(der) && throw(DerivativeNotDefinedError(expr, arg_idx))
@@ -321,12 +336,22 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     !iscall(expr) && return nothing
 
     args = parent(arguments(expr))
+    op = operation(expr)
+    # `getindex(fcall, idx...)` on an array-valued call (e.g. a function
+    # registered with `@register_array_symbolic`): the node's children are the
+    # call's scalar arguments, and `nary_derivative_idx` indexes the call's
+    # registered partials at `idx`. Element `getindex` on a plain array `Sym`
+    # (`x[1]`) is left alone — it is a leaf or a var.
+    if op === getindex && length(args) >= 2 && iscall(args[1]) &&
+            SymbolicUtils.is_array_shape(shape(args[1])) &&
+            all(_is_scalar_literal, @view args[2:end])
+        args = parent(arguments(args[1]))
+    end
     arg_idx_to_post_idx = Vector{T}(undef, length(args))
     # `ifelse` conditions are treated as piecewise-constant, matching
     # `expand_derivatives` (`D(ifelse(c,a,b)) == ifelse(c,D(a),D(b))`). The
     # condition is excluded from the graph entirely so non-differentiable
     # subterms (comparisons) are never traversed.
-    op = operation(expr)
     cond_idx = op === ifelse || op === ifelse_eager || op === ifelse_branching ? 1 : 0
     for arg_idx in reverse(eachindex(args))
         arg = args[arg_idx]
