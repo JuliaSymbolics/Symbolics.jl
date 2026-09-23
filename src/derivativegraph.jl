@@ -257,6 +257,31 @@ function nary_derivative_idx(expr::SymbolicT, arg_idx::Integer)
     end
 end
 
+# Array-valued term heads that have no per-argument derivative rules but expand
+# to ordinary scalar expressions, mirroring `executediff`'s preprocessing in
+# `src/diff.jl`: `norm(v)` -> `sqrt(sum(abs2, v))`, `dot(a, b)` and scalar
+# `ArrayOp`s (mapreduce-style) -> their eager scalarization.
+function _expand_array_term(ex)
+    @match ex begin
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.norm end => begin
+            add_buffer = SArgsT()
+            arr = args[1]
+            for i in SymbolicUtils.stable_eachindex(arr)
+                push!(add_buffer, abs2(arr[i]))
+            end
+            return sqrt(SymbolicUtils.add_worker(VartypeT, add_buffer))
+        end
+        BSImpl.Term(; f, args) && if f === LinearAlgebra.dot end => begin
+            return LinearAlgebra.dot(
+                collect(args[1])::Vector{SymbolicT}, collect(args[2])::Vector{SymbolicT})
+        end
+        BSImpl.ArrayOp(; output_idx) && if isempty(output_idx) end => begin
+            return SymbolicUtils.scalarize(ex)::SymbolicT
+        end
+        _ => nothing
+    end
+end
+
 # called in `DerivativeGraph` constructor to recursively iterate through the graph to fill out edges + reachabilities
 function populate_dergraph!(dg::DerivativeGraph)
     for (root_idx, root) in enumerate(dg.roots)
@@ -277,6 +302,22 @@ end
 function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::Integer) where {T}
     haskey(dg.definitions, expr) && return populate_root_reachabilities!(dg, dg.definitions[expr], root_idx)
 
+    # `norm`/`dot`/scalar `ArrayOp` terms expand to ordinary scalar
+    # expressions; the expansion's subgraph computes the same value, so the
+    # node for `expr` is simply the expansion's root
+    expanded = _expand_array_term(expr)
+    isleaf = false
+    if expanded !== nothing
+        post_idx = expanded in dg.varset ? populate_dergraph_var!(dg, expanded, root_idx) :
+                                           populate_dergraph!(dg, expanded, root_idx)
+        if post_idx !== nothing
+            dg.definitions[expr] = post_idx
+            return post_idx
+        end
+        # degenerate expansion (e.g. a constant); treat `expr` as a leaf
+        isleaf = true
+    end
+
     !iscall(expr) && return nothing
 
     args = parent(arguments(expr))
@@ -289,7 +330,7 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
     cond_idx = op === ifelse || op === ifelse_eager || op === ifelse_branching ? 1 : 0
     for arg_idx in reverse(eachindex(args))
         arg = args[arg_idx]
-        if arg_idx == cond_idx
+        if isleaf || arg_idx == cond_idx
             arg_idx_to_post_idx[arg_idx] = T(-1)
         elseif arg in dg.varset
             arg_idx_to_post_idx[arg_idx] = populate_dergraph_var!(dg, arg, root_idx)
