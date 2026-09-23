@@ -76,6 +76,7 @@ eval_subs(ex, subs) = eval(Symbolics.toexpr(substitute(Symbolics.unwrap(ex), sub
         ifelse(x > 0, x^2, y),
         ifelse(x^2 > 1, x^2, y),                  # subexpr shared between condition and branches
         ifelse(x > 0, ifelse(x > 1, x^2, x), y),  # nested
+        ifelse(x > 0, x^-1, y),                   # branch derivative Inf at boundary
         Symbolics.ifelse_eager(x > 0, x^2, y),
         Symbolics.ifelse_branching(x > 0, x^2, y),
         max(x, y),                                # ifelse inside an edge value
@@ -87,6 +88,12 @@ eval_subs(ex, subs) = eval(Symbolics.toexpr(substitute(Symbolics.unwrap(ex), sub
             @test isapprox(eval_subs.(dj, (subs,)), eval_subs.(j, (subs,)))
         end
     end
+    # the condition must stay a genuine select: with a branch whose derivative
+    # is Inf at the boundary, the guard multiplying the path product would
+    # poison the result (`0*Inf` = NaN where the select gives 0)
+    d = dstar_derivative(ifelse(x > 0, x^-1, y), x)
+    @test isequal(d, ifelse(x > 0, -1 / x^2, 0))
+    @test eval_subs(d, Dict(x => 0.0, y => 0.7)) == 0
     # a variable occurring only in the condition has zero derivative
     @test isequal(only(dstar_jacobian([ifelse(z > 0, x, y)], [z])), 0)
 end
