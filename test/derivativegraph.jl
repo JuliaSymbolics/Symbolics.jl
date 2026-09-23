@@ -65,7 +65,30 @@ function _first_unequal(a, b)
                 used = falses(length(kb))
                 for (ka, ca) in da.dict
                     idx = findfirst(i -> !used[i] && isequal(kb[i], ka), eachindex(kb))
-                    idx === nothing && return (ka, "no matching key in jac")
+                    if idx === nothing
+                        # no isequal key — descend into the best-matching jac key
+                        # (same storage variant; for Divs prefer same denominator)
+                        # to expose the inner divergence
+                        ua = Symbolics.unwrap(ka)
+                        uad = ua isa SymbolicUtils.BasicSymbolic ? getfield(ua, :data) : nothing
+                        best = nothing
+                        for i in eachindex(kb)
+                            used[i] && continue
+                            ub = Symbolics.unwrap(kb[i])
+                            ub isa SymbolicUtils.BasicSymbolic || continue
+                            dbk = getfield(ub, :data)
+                            uad !== nothing && typeof(dbk) === typeof(uad) || continue
+                            best === nothing && (best = kb[i])
+                            # prefer a Div whose denominator matches
+                            if hasproperty(dbk, :num) && isequal(dbk.den, uad.den)
+                                best = kb[i]
+                                break
+                            end
+                        end
+                        best === nothing && return (ka, "no matching key in jac")
+                        r = _first_unequal(ka, best)
+                        return r === nothing ? (ka, best) : r
+                    end
                     used[idx] = true
                     ca == vb[idx] || return (ka, "coeff $ca vs $(vb[idx])")
                     r = _first_unequal(ka, kb[idx])
