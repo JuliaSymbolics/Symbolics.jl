@@ -74,17 +74,25 @@ eval_subs(ex, subs) = eval(Symbolics.toexpr(substitute(Symbolics.unwrap(ex), sub
 @testset "ifelse" begin
     exprs = [
         ifelse(x > 0, x^2, y),
+        ifelse(x > 0, x^2, x^3),                  # both branches have nonzero derivatives
         ifelse(x^2 > 1, x^2, y),                  # subexpr shared between condition and branches
         ifelse(x > 0, ifelse(x > 1, x^2, x), y),  # nested
+        ifelse(x > 0, ifelse(y > 0, x^2, y), x),  # nested, distinct conditions per path
         ifelse(x > 0, x^-1, y),                   # branch derivative Inf at boundary
-        Symbolics.ifelse_eager(x > 0, x^2, y),
+        ifelse(x > 0, 1 / x, 1 / y),              # Div edge values under the guard
+        y / ifelse(x > 0, x, 1),                  # ifelse node in a denominator
+        ifelse(x > 0, x^2, y) * ifelse(x > 1, x, x),  # product: guard * non-guard ifelse value
+        ifelse(x > 0, x^2, y) + ifelse(y > 0, y^2, x),  # distinct conditions must not merge
+        ifelse(ifelse(x > 0, y > 0, x < 0), x^2, y),    # ifelse inside a condition stays opaque
+        Symbolics.ifelse_eager(x > 0, x^2, x^3),
         Symbolics.ifelse_branching(x > 0, x^2, y),
         max(x, y),                                # ifelse inside an edge value
     ]
     for ex in exprs
         dj = dstar_jacobian([ex], [x, y])
         j = jacobian([ex], [x, y])
-        for subs in (Dict(x => -1.5, y => 0.7), Dict(x => 2.3, y => -0.2))
+        for subs in (Dict(x => -1.5, y => 0.7), Dict(x => 2.3, y => -0.2),
+                     Dict(x => 0.0, y => 0.7))
             @test isapprox(eval_subs.(dj, (subs,)), eval_subs.(j, (subs,)))
         end
     end
@@ -94,6 +102,28 @@ eval_subs(ex, subs) = eval(Symbolics.toexpr(substitute(Symbolics.unwrap(ex), sub
     d = dstar_derivative(ifelse(x > 0, x^-1, y), x)
     @test isequal(d, ifelse(x > 0, -1 / x^2, 0))
     @test eval_subs(d, Dict(x => 0.0, y => 0.7)) == 0
+    # complementary selects on the same condition merge into one, matching
+    # `expand_derivatives`' `ifelse(c, Da, Db)` form exactly
+    @test isequal(dstar_derivative(ifelse(x > 0, x^2, x^3), x),
+                  expand_derivatives(Differential(x)(ifelse(x > 0, x^2, x^3))))
+    @test isequal(dstar_derivative(ifelse(x > 0, x^2, x^3), x), ifelse(x > 0, 2x, 3x^2))
+    # derivative w.r.t. a var reached through only one branch keeps the guard
+    # on that branch's side
+    @test isequal(dstar_derivative(ifelse(x > 0, x^2, y), y), ifelse(x > 0, 0, 1))
+    @test isequal(dstar_derivative(y / ifelse(x > 0, x, 1), x),
+                  ifelse(x > 0, -y / ifelse(x > 0, x, 1)^2, 0))
+    # the `ifelse` variant is preserved through the fold
+    @test isequal(dstar_derivative(Symbolics.ifelse_branching(x > 0, x^-1, y), x),
+                  Symbolics.ifelse_branching(x > 0, -1 / x^2, 0))
+    @test isequal(dstar_derivative(Symbolics.ifelse_eager(x > 0, x^2, x^3), x),
+                  Symbolics.ifelse_eager(x > 0, 2x, 3x^2))
+    # `ifelse_branching` lowers to real control flow, so a dead-zone DomainError
+    # in the untaken branch must never execute — this fails if the guard were
+    # left as a product factor evaluating `sqrt(-1.5)` unconditionally
+    f_sqrt = eval(Symbolics.build_function(
+        dstar_derivative(Symbolics.ifelse_branching(x > 0, sqrt(x), y), x), x, y))
+    @test f_sqrt(-1.5, 0.7) == 0
+    @test f_sqrt(4.0, 0.7) == 0.25
     # a variable occurring only in the condition has zero derivative
     @test isequal(only(dstar_jacobian([ifelse(z > 0, x, y)], [z])), 0)
 end

@@ -1061,8 +1061,33 @@ function _fold_ifelse_guards(ex)
                 newdict[k2] = v
             end
             changed || return ex
-            ctor = variant == SymbolicUtils.AddMulVariant.ADD ? SymbolicUtils.Add : SymbolicUtils.Mul
-            return ctor{VartypeT}(coeff, newdict; type = symtype(ex), shape = shape(ex))
+            if variant == SymbolicUtils.AddMulVariant.ADD
+                # f(c,A,0)+f(c,0,B) selects exactly one of A,B — merge into
+                # f(c,A,B) to match the `ifelse(c, Da, Db)` form
+                for (k, v) in collect(newdict)
+                    haskey(newdict, k) || continue
+                    iscall(k) || continue
+                    f = operation(k)
+                    (f === ifelse || f === ifelse_eager || f === ifelse_branching) || continue
+                    args = SymbolicUtils.arguments(k)
+                    _iszero(args[2]) || continue
+                    for (k2, v2) in collect(newdict)
+                        (k2 === k || !haskey(newdict, k2) || !iscall(k2)) && continue
+                        operation(k2) === f || continue
+                        args2 = SymbolicUtils.arguments(k2)
+                        (isequal(args2[1], args[1]) && _iszero(args2[3])) || continue
+                        # v*f(c,0,B)+v2*f(c,A,0) = f(c,v2*A,v*B)
+                        merged = f(args[1], v2 * args2[2], v * args[3])
+                        delete!(newdict, k)
+                        delete!(newdict, k2)
+                        newdict[merged] = get(newdict, merged, 0) + 1
+                        break
+                    end
+                end
+                isempty(newdict) && return coeff
+                return SymbolicUtils.Add{VartypeT}(coeff, newdict; type = symtype(ex), shape = shape(ex))
+            end
+            return SymbolicUtils.Mul{VartypeT}(coeff, newdict; type = symtype(ex), shape = shape(ex))
         end
         BSImpl.Div(; num, den, simplified) => begin
             n2 = _fold_ifelse_guards(num)
