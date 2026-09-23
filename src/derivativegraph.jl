@@ -999,6 +999,81 @@ function evaluate_path(dg::DerivativeGraph{T}, edge::Edge{T}, root::Integer, var
     return result
 end
 
+# if `ex` is a branch-guard partial `f(c, 1, 0)`/`f(c, 0, 1)` for an
+# `ifelse`-family op `f`, returns `(f, c, is_then_branch)`; else `nothing`
+function _ifelse_guard(ex)
+    iscall(ex) || return nothing
+    f = operation(ex)
+    (f === ifelse || f === ifelse_eager || f === ifelse_branching) || return nothing
+    args = SymbolicUtils.arguments(ex)
+    _isone(args[2]) && _iszero(args[3]) && return (f, args[1], true)
+    _iszero(args[2]) && _isone(args[3]) && return (f, args[1], false)
+    return nothing
+end
+
+# if `ex`'s numerator product contains a branch-guard factor `f(c,1,0)` or
+# `f(c,0,1)`, strips it and returns `(f, c, is_then_branch, rest)`; else
+# `nothing`. Guards only ever appear as product factors — including `Div`
+# numerators, since they multiply but never divide.
+function _strip_ifelse_guard(ex)
+    g = _ifelse_guard(ex)
+    g === nothing || return (g..., COMMON_ONE)
+    @match ex begin
+        BSImpl.AddMul(; coeff, dict, variant) && if variant == SymbolicUtils.AddMulVariant.MUL end => begin
+            for k in keys(dict)
+                g = _ifelse_guard(k)
+                g === nothing && continue
+                rest = copy(dict)
+                delete!(rest, k)
+                return (g..., SymbolicUtils.Mul{VartypeT}(coeff, rest; type = symtype(ex), shape = shape(ex)))
+            end
+            return nothing
+        end
+        BSImpl.Div(; num, den, simplified) => begin
+            r = _strip_ifelse_guard(num)
+            r === nothing && return nothing
+            f, c, is_then, stripped = r
+            return (f, c, is_then, SymbolicUtils.Div{VartypeT}(stripped, den, simplified; type = symtype(ex), shape = shape(ex)))
+        end
+        _ => nothing
+    end
+end
+
+# Branch-guard edge values multiply the whole downstream path product, so raw
+# output contains `f(c,1,0)*X`-style factors. Folding them into
+# `f(c,X,0)`/`f(c,0,X)` keeps the condition a genuine select — untaken branches
+# are never evaluated and a dead-zone `0*Inf`/`0*NaN` cannot poison the result —
+# matching `expand_derivatives`' `ifelse(c, Da, Db)` form.
+function _fold_ifelse_guards(ex)
+    r = _strip_ifelse_guard(ex)
+    if r !== nothing
+        f, c, is_then, rest = r
+        folded = _fold_ifelse_guards(rest)
+        return is_then ? f(c, folded, COMMON_ZERO) : f(c, COMMON_ZERO, folded)
+    end
+    @match ex begin
+        BSImpl.AddMul(; coeff, dict, variant) => begin
+            newdict = empty(dict)
+            changed = false
+            for (k, v) in dict
+                k2 = _fold_ifelse_guards(k)
+                changed |= k2 !== k
+                newdict[k2] = v
+            end
+            changed || return ex
+            ctor = variant == SymbolicUtils.AddMulVariant.ADD ? SymbolicUtils.Add : SymbolicUtils.Mul
+            return ctor{VartypeT}(coeff, newdict; type = symtype(ex), shape = shape(ex))
+        end
+        BSImpl.Div(; num, den, simplified) => begin
+            n2 = _fold_ifelse_guards(num)
+            d2 = _fold_ifelse_guards(den)
+            (n2 === num && d2 === den) && return ex
+            return SymbolicUtils.Div{VartypeT}(n2, d2, simplified; type = symtype(ex), shape = shape(ex))
+        end
+        _ => ex
+    end
+end
+
 """
 $(SIGNATURES)
 
@@ -1054,9 +1129,16 @@ function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
     idx_type = keytype(dg.child_edges)
     cache = [Dict{Edge{idx_type},SymbolicT}() for _ in eachindex(unique_vars)]
 
+    has_ifelse = any(dg.symbols) do s
+        iscall(s) || return false
+        o = operation(s)
+        o === ifelse || o === ifelse_eager || o === ifelse_branching
+    end
+
     for root in eachindex(unique_roots)
         for var in eachindex(unique_vars)
-            result[root, var] = evaluate_path(dg, root, var, cache)
+            r = evaluate_path(dg, root, var, cache)
+            result[root, var] = has_ifelse ? _fold_ifelse_guards(r) : r
         end
     end
 
