@@ -757,6 +757,15 @@ end
     # a literal `arr[k]` occurrence must not mark the other elements
     @test nnz(Symbolics.jacobian_sparsity([x[2]^2], [x[1]])) == 0
     @test Symbolics.jacobian_sparsity([x[2]^2], [x[1], x[2]]) == sparse([1], [2], true)
+    # the same holds when the indexee is a symbolic call like `u(t)`
+    @variables t u(t)[1:3] k::Int
+    @test Symbolics.jacobian_sparsity([u[1] + u[2], u[3]], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 2], [1, 2, 3], true)
+    # a non-literal index or a whole-array occurrence still marks all elements
+    @test Symbolics.jacobian_sparsity([u[k]], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+    @test Symbolics.jacobian_sparsity([sum(u)], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
     @test Symbolics.exprs_occur_in(
         Symbolics.unwrap.([x[1], x[2], x[3], y]), Symbolics.unwrap(obj)) ==
         Bool[1, 1, 1, 1]
