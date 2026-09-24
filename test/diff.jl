@@ -777,6 +777,19 @@ end
                          Num[-2a[1] + 2x[1], -2a[2] + 2x[2], -2a[3] + 2x[3], 2(-1 + y)]))
 end
 
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/2005
+@testset "Sparsity of dependent array element accesses" begin
+    # `x(t)[k]` reads one element, just like `x[k]` for a bare array
+    @variables t x(t)[1:3]
+    xs = collect(x)
+    @test isequal(Symbolics.sparsejacobian([xs[1] * xs[2], xs[3]], xs).nzval,
+                  Num[xs[2], xs[1], 1])
+
+    # the independent variable inside `x(t)` is still seen
+    @test Symbolics.jacobian_sparsity([xs[2] * t], [t, xs[1], xs[2], xs[3]]) ==
+        sparse([1, 1], [1, 3], true, 1, 4)
+end
+
 struct Op <: SymbolicUtils.Operator end
 
 @testset "Derivative of non-`Differential` operators" begin

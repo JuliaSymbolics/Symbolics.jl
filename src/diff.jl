@@ -936,19 +936,6 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
             push!(J, j)
         end
         x isa SymbolicT || return
-        if is_scalar_indexed(x)
-            arr = arguments(x)[1]
-            j = get(dict, arr, -1)
-            if j != -1
-                push!(I, i[])
-                push!(J, j)
-            end
-            # a literal `arr[k]` marks only itself (via `dict`); a non-literal
-            # index refers to elements of `arr` generically
-            all(_is_scalar_literal, Iterators.drop(arguments(x), 1)) && return
-            x = arr
-            is_indexee = false
-        end
         is_indexee && return
         for j in get(arrdict, x, ())
             push!(I, i[])
