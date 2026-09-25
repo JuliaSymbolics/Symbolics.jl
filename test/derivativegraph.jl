@@ -80,7 +80,7 @@ unregistered_fn(a) = a
                       expand(expand_derivatives(Differential(var)(ex))))
     end
     # issue #252: symbolic exponent inside a larger expression
-    tmp = beta * (alpha * exp(x1) * x2^(alpha - 1) + 1 - delta) / x3
+    tmp = β * (alpha * exp(x1) * x2^(alpha - 1) + 1 - delta) / x3
     @test isequal(expand.(dstar_jacobian([tmp], [x1, x2])), expand.(jacobian([tmp], [x1, x2])))
     # literal constants as roots differentiate to zero rows
     @test isequal(dstar_jacobian([t, x, 42], [t, x]), jacobian([t, x, 42], [t, x]))
@@ -190,6 +190,64 @@ end
     vars = [x, t, z]
     expected = [Symbolics.derivative(expr, v) for v in vars]'
     @test isequal(expand.(dstar_jacobian([expr], vars)), expand.(expected))
+end
+
+# `Differential` terms: `expand_derivatives`-resolvable ones populate their
+# expansion's subgraph; residuals (differentials of opaque called functions)
+# get edges to the inner expr's children with `executediff`-computed partials
+@testset "differentials" begin
+    @variables t x y x(t) y(t) z(t) u(..) w(..)
+    D = Differential
+    # resolvable differentials expand during construction
+    @test isequal(dstar_derivative(sin(D(y)(x^2 + y)), x),
+                  expand_derivatives(D(x)(sin(D(y)(x^2 + y)))))
+    @test isequal(dstar_derivative(D(y)(x^2 + y), t), 0)
+    @test isequal(dstar_derivative(D(y)(x), x), Symbolics.derivative(D(y)(x), x))
+    @test isequal(dstar_derivative(t * D(y)(x) + x^2, x),
+                  Symbolics.derivative(t * D(y)(x) + x^2, x))
+    # residual differentials of called functions
+    @test isequal(dstar_derivative(D(y)(u(x, y)), x),
+                  expand_derivatives(D(x)(D(y)(u(x, y)))))
+    @test isequal(dstar_derivative(D(y)(u(x, y)), y),
+                  expand_derivatives(D(y)(D(y)(u(x, y)))))
+    @test isequal(dstar_derivative(D(y)(u(x, y)), z), 0)
+    # differentiation through a residual is exact up to partial-derivative
+    # ordering: `D_x(D_y(u))` vs ordinary's commuted `D_y(D_x(u))` — same value,
+    # different term order (`isequal` is structural)
+    @test isequal(dstar_derivative(D(y)(u(x, y)), t),
+                  D(x)(D(y)(u(x, y))) * expand_derivatives(D(t)(x)) +
+                  D(y)(D(y)(u(x, y))) * expand_derivatives(D(t)(y)))
+    @test isequal(dstar_derivative(sin(D(y)(u(x, y))), t),
+                  cos(D(y)(u(x, y))) * dstar_derivative(D(y)(u(x, y)), t))
+    # nested differentials: same-iv produces higher-order terms, cross-iv nests
+    # residual-on-residual, both matching the ordinary path term-for-term
+    @test isequal(dstar_derivative(D(x)(D(x)(u(x))), t),
+                  expand_derivatives(D(t)(D(x)(D(x)(u(x))))))
+    @test isequal(dstar_derivative(D(x)(D(y)(u(x, y))), x),
+                  expand_derivatives(D(x)(D(x)(D(y)(u(x, y))))))
+    @test isequal(dstar_derivative(D(x)(D(y)(u(x, y))), y),
+                  expand_derivatives(D(y)(D(x)(D(y)(u(x, y))))))
+    # diff.jl: the derivative of an expression built from differential terms
+    # itself produces nested differentials
+    @variables b(t)
+    Dt = Differential(t)
+    expr = b - Dt(b)^2 * Dt(Dt(b))
+    @test isequal(dstar_derivative(expr, t), expand_derivatives(Dt(expr)))
+    @test isequal(dstar_derivative(Dt(Dt(t)), t), expand_derivatives(Dt(Dt(Dt(t)))))
+    # nested differentials inside a larger expression
+    @test isequal(dstar_derivative(sin(D(x)(D(y)(u(x, y)))), t),
+                  cos(D(x)(D(y)(u(x, y)))) * dstar_derivative(D(x)(D(y)(u(x, y))), t))
+    # differentials as call arguments: `w` depends on `x` both directly and
+    # through `D_y(u)`, so the chain rule has both terms — `derivative` drops
+    # the mediated term for direct depvar args (an occurrence-detection quirk;
+    # its `t`-derivative keeps the term), D* keeps the complete sum
+    dxy = D(x)(D(y)(u(x, y)))
+    @test isequal(dstar_derivative(w(x, D(y)(u(x, y))), x),
+                  D(x)(w(x, D(y)(u(x, y)))) + dxy * D(D(y)(u(x, y)))(w(x, D(y)(u(x, y)))))
+    # a `Differential` term used as a variable still expands through its inner
+    # expression for other columns
+    @test isequal(dstar_jacobian([D(y)(u(x, y))], [D(y)(u(x, y)), x]),
+                  [1 expand_derivatives(D(x)(D(y)(u(x, y))))])
 end
 
 # `ifelse`: conditions are treated as piecewise-constant (matching
