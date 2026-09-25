@@ -317,11 +317,17 @@ end
 # symbolic functions like `x(t)` that are also in `vars` — get a var node that
 # still expands through its call arguments (matching `jacobian`, where
 # `d(x(t))/dt` stays `xˍt` even when `x(t)` is a differentiated variable);
-# everything else is a regular node
+# `Differential` vars similarly keep their edges; everything else is a regular
+# node
 function _populate_dispatch(dg::DerivativeGraph{T}, term::SymbolicT, root_idx::Integer) where {T}
     if term in dg.varset
-        if iscall(term) && operation(term) isa BasicSymbolic{VartypeT}
-            return populate_dergraph_depvar!(dg, term, root_idx)
+        if iscall(term)
+            op = operation(term)
+            if op isa BasicSymbolic{VartypeT}
+                return populate_dergraph_depvar!(dg, term, root_idx)
+            elseif op isa Differential
+                return populate_dergraph!(dg, term, root_idx)
+            end
         end
         return populate_dergraph_var!(dg, term, root_idx)
     end
@@ -353,7 +359,79 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
 
     !iscall(expr) && return nothing
 
+    if operation(expr) isa Differential
+        return _populate_differential!(dg, expr, root_idx)
+    end
+
     return _populate_node!(dg, expr, root_idx; isleaf)
+end
+
+# `Differential` terms: resolvable ones (e.g. `Differential(y)(x^2 + y)`) are
+# populated as their `expand_derivatives` output's subgraph. Residuals —
+# differentials of opaque subexpressions like `Differential(y)(u(x,y))` or
+# nested `Differential(x)(Differential(y)(u))` — still depend on the inner
+# expression's dependencies: `executediff` commutes the outer `Differential`
+# onto the inner's derivative (diff.jl). The node's children are therefore the
+# inner expression's children plus the differential's own variable `f.x` (a
+# residual's derivative w.r.t. `f.x` is `f(expr)` even when `f.x` does not
+# occur under `inner`). Edge values reuse `executediff` on the atom itself so
+# the same-iv wrap and opaque fallbacks match the ordinary differentiator.
+function _populate_differential!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::Integer) where {T}
+    is_var = expr in dg.varset
+    # a `Differential` in `vars` is atomic for its own column, so it skips
+    # expansion (the expansion's node is not the var node)
+    if !is_var
+        expanded = expand_derivatives(expr)
+        if !isequal(expanded, expr)
+            expanded_post = _populate_dispatch(dg, expanded, root_idx)
+            if !isnothing(expanded_post)
+                dg.definitions[expr] = expanded_post
+                return expanded_post
+            end
+            # expansion collapsed to a constant/leaf (e.g. `D(y)(x)` with `x`
+            # independent of `y`): the node has no children
+            push!(dg.symbols, expr)
+            leaf_post::T = length(dg.symbols)
+            dg.definitions[expr] = leaf_post
+            dg.child_edges[leaf_post] = Edge{T}[]
+            dg.parent_edges[leaf_post] = Edge{T}[]
+            return leaf_post
+        end
+    end
+
+    f = operation(expr)
+    inner = only(arguments(expr))
+    child_posts = T[]
+    if inner in dg.varset || iscall(inner)
+        inner_post = _populate_dispatch(dg, inner, root_idx)
+        if !isnothing(inner_post)
+            append!(child_posts, (edge.bott_vertex for edge in dg.child_edges[inner_post]))
+        end
+    end
+    if f.x in dg.varset
+        fx_post = _populate_dispatch(dg, f.x, root_idx)
+        isnothing(fx_post) || fx_post in child_posts || push!(child_posts, fx_post)
+    end
+
+    push!(dg.symbols, expr)
+    post_idx::T = length(dg.symbols)
+    dg.definitions[expr] = post_idx
+    dg.child_edges[post_idx] = Edge{T}[]
+    dg.parent_edges[post_idx] = Edge{T}[]
+    is_var && _register_var!(dg, expr, post_idx)
+
+    for child_post in child_posts
+        mask = reachable_vars(dg, child_post)
+        any(mask) || continue
+        partial = executediff(Differential(dg.symbols[child_post]), expr)
+        roots = falses(length(dg.roots))
+        roots[root_idx] = 1
+        edge = Edge{T}(partial, post_idx, child_post, mask, roots)
+        push!(dg.child_edges[post_idx], edge)
+        push!(dg.parent_edges[child_post], edge)
+    end
+
+    return post_idx
 end
 
 function _populate_node!(dg::DerivativeGraph{T}, expr::SymbolicT,
@@ -376,9 +454,9 @@ function _populate_node!(dg::DerivativeGraph{T}, expr::SymbolicT,
     # condition is excluded from the graph entirely so non-differentiable
     # subterms (comparisons) are never traversed.
     cond_idx = op === ifelse || op === ifelse_eager || op === ifelse_branching ? 1 : 0
-    # operator applications (`Differential`, `Integral`, user-defined
-    # `Operator`s) act as fresh variables — `executediff` differentiates them
-    # to zero, so they are leaves here
+    # operator applications (`Integral`, user-defined `Operator`s) act as fresh
+    # variables — `executediff` differentiates them to zero, so they are leaves
+    # here (`Differential` is handled separately in `populate_dergraph!`)
     isleaf |= op isa SymbolicUtils.Operator
     for arg_idx in reverse(eachindex(args))
         arg = args[arg_idx]
@@ -396,14 +474,7 @@ function _populate_node!(dg::DerivativeGraph{T}, expr::SymbolicT,
     dg.definitions[expr] = post_idx
     dg.child_edges[post_idx] = Edge{T}[]
     dg.parent_edges[post_idx] = Edge{T}[]
-    if expr in dg.varset
-        # dependent variable: the node is a leaf for its own column
-        var_idxs = findall(isequal(expr), dg.vars)
-        for var_idx in var_idxs
-            dg.var_idx_to_postorder[var_idx] = post_idx
-        end
-        dg.postorder_to_var_idx[post_idx] = first(var_idxs)
-    end
+    expr in dg.varset && _register_var!(dg, expr, post_idx)
 
     # add new edges; partial derivatives of identical arguments are summed into a
     # single edge (the total derivative w.r.t. that argument)
@@ -455,17 +526,24 @@ function populate_root_reachabilities!(dg::DerivativeGraph{T}, node::T, root_idx
     return node
 end
 
+# registers `expr`'s node as the graph node for every matching entry in
+# `dg.vars` (a var may appear multiple times)
+function _register_var!(dg::DerivativeGraph{T}, expr::SymbolicT, post_idx::T) where {T}
+    var_idxs = findall(isequal(expr), dg.vars)
+    for var_idx in var_idxs
+        dg.var_idx_to_postorder[var_idx] = post_idx
+    end
+    dg.postorder_to_var_idx[post_idx] = first(var_idxs)
+    return nothing
+end
+
 function populate_dergraph_var!(dg::DerivativeGraph{T}, var::SymbolicT, root_idx::Integer) where {T}
     haskey(dg.definitions, var) && return populate_root_reachabilities!(dg, dg.definitions[var], root_idx)
 
     push!(dg.symbols, var)
     post_idx::T = length(dg.symbols) # postorder number
     dg.definitions[var] = post_idx
-    var_idxs = findall(isequal(var), dg.vars)
-    for var_idx in var_idxs
-        dg.var_idx_to_postorder[var_idx] = post_idx
-    end
-    dg.postorder_to_var_idx[post_idx] = first(var_idxs)
+    _register_var!(dg, var, post_idx)
     dg.child_edges[post_idx] = Edge{T}[]
     dg.parent_edges[post_idx] = Edge{T}[]
 
@@ -1214,7 +1292,7 @@ Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differenti
 
 (see [this paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/main-65.pdf) for more details on the algorithm)
 
-Mostly the same usage as [`jacobian`](@ref). More limited in input expressions (doesn't support nested differentials), but asymptotically faster for large Rn->Rm expressions.
+Mostly the same usage as [`jacobian`](@ref), but asymptotically faster for large Rn->Rm expressions. `Integral` terms and complex expressions are not supported.
 
 # Arguments
 
@@ -1306,7 +1384,7 @@ $(SIGNATURES)
 
 Computes the derivative of `root` w.r.t. `var` using the D* differentiation algorithm.
 
-Mostly the same usage as [`derivative`](@ref), but more limited in input expressions (doesn't support nested differentials).
+Mostly the same usage as [`derivative`](@ref), but asymptotically faster for large Rn->Rm expressions. `Integral` terms and complex expressions are not supported.
 
 Wrapper for R1->R1 case of `dstar_jacobian`. See [`dstar_jacobian`](@ref) for more information.
 
