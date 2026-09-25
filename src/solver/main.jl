@@ -205,7 +205,19 @@ julia> length(Symbolics.symbolic_to_float.(roots))
 1
 ```
 """
-function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where {T}
+function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true, return_assumptions = false) where {T}
+    if return_assumptions
+        assumptions = Any[]
+        sols = task_local_storage(:symbolic_solve_assumptions, assumptions) do
+            _symbolic_solve(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+        end
+        return (sols, assumptions)
+    else
+        return _symbolic_solve(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+    end
+end
+
+function _symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where {T}
     expr_univar = false
     x_univar = false
 
@@ -286,6 +298,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 end
 
 function symbolic_solve(expr; x...)
+
     if expr isa Vector
         expr = convert(Vector{Any}, expr)
         for i in eachindex(expr)
