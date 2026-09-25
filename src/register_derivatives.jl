@@ -253,6 +253,15 @@ end
 end
 @register_derivative one(x) 1 COMMON_ZERO
 
+# `ifelse` conditions are treated as piecewise-constant and have no partial
+# derivative; branch partials preserve the variant for correct lowering
+@register_derivative ifelse(c, a, b) 2 ifelse(c, one(a), zero(a))
+@register_derivative ifelse(c, a, b) 3 ifelse(c, zero(b), one(b))
+@register_derivative ifelse_eager(c, a, b) 2 ifelse_eager(c, one(a), zero(a))
+@register_derivative ifelse_eager(c, a, b) 3 ifelse_eager(c, zero(b), one(b))
+@register_derivative ifelse_branching(c, a, b) 2 ifelse_branching(c, one(a), zero(a))
+@register_derivative ifelse_branching(c, a, b) 3 ifelse_branching(c, zero(b), one(b))
+
 """
 $(SIGNATURES)
 

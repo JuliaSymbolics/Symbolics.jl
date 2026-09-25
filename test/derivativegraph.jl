@@ -1,0 +1,298 @@
+using Symbolics
+using SymbolicUtils
+using Test
+using LinearAlgebra
+using Symbolics: value, unwrap, dstar_derivative, dstar_jacobian, jacobian
+
+# Standard derivative
+@variables x
+D = Differential(x)
+
+@test isequal(dstar_derivative(x, x), expand_derivatives(D(x)))
+@test isequal(dstar_derivative(2x, x), expand_derivatives(D(2x)))
+@test isequal(dstar_derivative(x^2, x), expand_derivatives(D(x^2)))
+@test isequal(expand(dstar_derivative(sin(cos(x))*cos(cos(x)), x)), expand_derivatives(D(sin(cos(x))*cos(cos(x)))))
+@test isequal(expand(dstar_derivative(cos(sin(exp(2x)) + cos(exp(2x))), x)), expand(expand_derivatives(D(cos(sin(exp(2x)) + cos(exp(2x)))))))
+@test isequal(expand(dstar_derivative(2sin(x^4 - x) + 3cos(2x), x)), expand(expand_derivatives(D(2sin(x^4 - x) + 3cos(2x)))))
+@test isequal(expand(dstar_derivative(2x*exp(x) + 2*exp(x), x)), expand(expand_derivatives(D(2x*exp(x) + 2*exp(x)))))
+
+# Standard Jacobian
+@variables x y z
+Dx = Differential(x)
+Dy = Differential(y)
+Dz = Differential(z)
+
+@test isequal(dstar_jacobian([x,y], [x,y]), jacobian([x,y], [x,y]))
+@test isequal(dstar_jacobian([x,y,z], [x,y,z]), jacobian([x,y,z], [x,y,z]))
+@test isequal(dstar_jacobian([x,y,z], [x]), jacobian([x,y,z], [x]))
+@test isequal(dstar_jacobian([x], [x,y,z]), jacobian([x], [x,y,z]))
+@test isequal(dstar_jacobian([x*y*z], [x,y,z]), jacobian([x*y*z], [x,y,z]))
+@test isequal(dstar_jacobian([x*y*z, x+y+z, sqrt(x^2 + y^2 + z^2)], [x,y,z]), jacobian([x*y*z, x+y+z, sqrt(x^2 + y^2 + z^2)], [x,y,z]))
+@test isequal(dstar_jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]), jacobian([(x^2+y^2)^2, (x^2+y^2)^2 * y], [x,y]))
+@test isequal(expand.(dstar_jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])), expand.(jacobian([(x^2 + y^2)*y, (x^2+y^2)*x^2 + (x^2+y^2)*y^2], [x,y])))
+
+# Regression tests for parallel edges and edge splitting: factoring creates edges
+# that may share endpoints with existing edges and whose reachability extends
+# outside the factored subgraph; those outside paths must be preserved
+p = x + y
+q = x - y
+r = p * q
+s = p / q
+t = r + s
+u = r * s
+@test isequal(expand.(dstar_jacobian([t, u, t * u], [x, y])), expand.(jacobian([t, u, t * u], [x, y])))
+@test isequal(expand.(dstar_jacobian([t, u, t * u, t * u + u], [x, y])), expand.(jacobian([t, u, t * u, t * u + u], [x, y])))
+u2 = x^2 + x
+@test isequal(expand.(dstar_jacobian([u2^2, u2 * x^2], [x])), expand.(jacobian([u2^2, u2 * x^2], [x])))
+@test isequal(expand.(dstar_jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x])), expand.(jacobian([u2^2, u2 * x^2, u2 * x^2 + u2], [x])))
+# Duplicate arguments: partial derivatives for identical argument positions are
+# summed into a single edge
+@test isequal(dstar_derivative(atan(x, x), x), expand_derivatives(Differential(x)(atan(x, x))))
+@test isequal(dstar_derivative(x^x, x), expand_derivatives(Differential(x)(x^x)))
+@test isequal(dstar_derivative(x^x * y + atan(x, x), x), expand_derivatives(Differential(x)(x^x * y + atan(x, x))))
+
+# Edge case Jacobian
+@test isequal(dstar_jacobian([x], [x,x]), jacobian([x], [x,x]))
+@test isequal(dstar_jacobian([x,x], [x]), jacobian([x,x], [x]))
+@test isequal(dstar_jacobian([x,x], [x,x]), jacobian([x,x], [x,x]))
+
+# Duplicate roots and vars are deduplicated before graph construction
+@test isequal(expand.(dstar_jacobian([t, u, t * u, t * u], [x, y])), expand.(jacobian([t, u, t * u, t * u], [x, y])))
+@test isequal(expand.(dstar_jacobian([u2^2, u2 * x^2, u2^2], [x])), expand.(jacobian([u2^2, u2 * x^2, u2^2], [x])))
+@test isequal(expand.(dstar_jacobian([t, u], [x, y, x])), expand.(jacobian([t, u], [x, y, x])))
+@test isequal(expand.(dstar_jacobian([t, u, t * u], [x, y, y, x])), expand.(jacobian([t, u, t * u], [x, y, y, x])))
+
+# Unregistered functions throw `DerivativeNotDefinedError` instead of asserting
+unregistered_fn(a) = a
+@register_symbolic unregistered_fn(a)
+@test_throws Symbolics.DerivativeNotDefinedError dstar_derivative(unregistered_fn(x), x)
+
+# Cases mirrored from test/diff.jl that exercise paths not covered above
+@testset "diff.jl parity" begin
+    @variables t σ ρ β alpha delta x1 x2 x3 b
+    @test isequal(expand.(dstar_jacobian([σ*(y-x), x*(ρ-z)-y, x*y - β*z], [x,y,z])),
+                  expand.(jacobian([σ*(y-x), x*(ρ-z)-y, x*y - β*z], [x,y,z])))
+    # registered scalar functions
+    for ex in [csch(t), hypot(x, y), Symbolics.ssqrt(1 + x^2), Symbolics.scbrt(1 + x^2),
+               Symbolics.slog(1 + x^2), acos(x), abs2(x), x^(alpha - 1)]
+        var = only(intersect(Symbolics.get_variables(ex), Symbolics.unwrap.([t, x])))
+        @test isequal(expand(Symbolics.unwrap(dstar_derivative(ex, var))),
+                      expand(expand_derivatives(Differential(var)(ex))))
+    end
+    # issue #252: symbolic exponent inside a larger expression
+    tmp = beta * (alpha * exp(x1) * x2^(alpha - 1) + 1 - delta) / x3
+    @test isequal(expand.(dstar_jacobian([tmp], [x1, x2])), expand.(jacobian([tmp], [x1, x2])))
+    # literal constants as roots differentiate to zero rows
+    @test isequal(dstar_jacobian([t, x, 42], [t, x]), jacobian([t, x, 42], [t, x]))
+    # `ifelse` with a non-comparison condition function (diff.jl)
+    @test isequal(dstar_derivative(ifelse(signbit(b), b^2, sqrt(b)), b),
+                  Symbolics.derivative(ifelse(signbit(b), b^2, sqrt(b)), b))
+    # unregistered function nested inside a registered one still throws
+    unreg_inner(a) = a
+    @register_symbolic unreg_inner(a)
+    @test_throws Symbolics.DerivativeNotDefinedError dstar_derivative(hypot(x, unreg_inner(x)), x)
+    # distinct elements of an array variable are independent
+    @variables xv[1:3]
+    xvc = collect(xv)
+    @test isequal(dstar_jacobian([xvc[1]], xvc[2:3]), jacobian([xvc[1]], xvc[2:3]))
+    # eager array operations scalarize before graph construction
+    @variables yv[1:3]
+    yvc = collect(yv)
+    @test isequal(dstar_jacobian([LinearAlgebra.dot(yvc, xvc)], xvc),
+                  jacobian([LinearAlgebra.dot(yvc, xvc)], xvc))
+    @test isequal(dstar_jacobian([xvc' * xvc], xvc), jacobian([xvc' * xvc], xvc))
+    @test isequal(dstar_jacobian([sum(xvc), prod(xvc)], xvc),
+                  jacobian([sum(xvc), prod(xvc)], xvc))
+    # `norm`/`dot` on unscalarized array variables expand eagerly, matching
+    # `executediff` (diff.jl "Derivative of norm"/"dot" testsets)
+    @variables yarr[1:3] aarr[1:3]
+    yarr_c, aarr_c = collect(yarr), collect(aarr)
+    @test isequal(dstar_jacobian([norm(xv)], xvc), jacobian([norm(xv)], xvc))
+    @test isequal(dstar_jacobian([norm(xv)^2], xvc), jacobian([norm(xv)^2], xvc))
+    @test isequal(dstar_jacobian([dot(yarr, xv)], xvc), jacobian([dot(yarr, xv)], xvc))
+    # lazy array reductions are scalarized during graph construction
+    @test isequal(dstar_derivative(sum(abs2, xv .- aarr), xvc[1]),
+                  Symbolics.derivative(sum(abs2, xv .- aarr), xvc[1]))
+    @test isequal(dstar_jacobian([sum(xv)], xvc), jacobian([sum(xv)], xvc))
+    @test isequal(dstar_jacobian([sum(abs2, xv .- aarr)], xvc),
+                  jacobian([sum(abs2, xv .- aarr)], xvc))
+    # scalarizing also handles reductions nested inside scalar expressions,
+    # which `jacobian` rejects (issue #1990) — intentional extra capability
+    obj = sum(abs2, xv .- aarr) + (x - 1)^2
+    @test isequal(dstar_jacobian([obj], [xvc; x]),
+                  Symbolics.jacobian([Symbolics.scalarize(obj)], [xvc; x]))
+end
+
+# `ifelse`: conditions are treated as piecewise-constant (matching
+# `expand_derivatives`) and excluded from the derivative graph; branch partials
+# become `ifelse(c, 1, 0)`/`ifelse(c, 0, 1)` edge values. `simplify` does not
+# distribute scalars into branches, so compare numerically via `toexpr`/`eval`.
+eval_subs(ex, subs) = eval(Symbolics.toexpr(substitute(Symbolics.unwrap(ex), subs; fold = Val(true))))
+@testset "ifelse" begin
+    exprs = [
+        ifelse(x > 0, x^2, y),
+        ifelse(x > 0, x^2, x^3),                  # both branches have nonzero derivatives
+        ifelse(x^2 > 1, x^2, y),                  # subexpr shared between condition and branches
+        ifelse(x > 0, ifelse(x > 1, x^2, x), y),  # nested
+        ifelse(x > 0, ifelse(y > 0, x^2, y), x),  # nested, distinct conditions per path
+        ifelse(x > 0, x^-1, y),                   # branch derivative Inf at boundary
+        ifelse(x > 0, 1 / x, 1 / y),              # Div edge values under the guard
+        y / ifelse(x > 0, x, 1),                  # ifelse node in a denominator
+        ifelse(x > 0, x^2, y) * ifelse(x > 1, x, x),  # product: guard * non-guard ifelse value
+        ifelse(x > 0, x^2, y) + ifelse(y > 0, y^2, x),  # distinct conditions must not merge
+        ifelse(ifelse(x > 0, y > 0, x < 0), x^2, y),    # ifelse inside a condition stays opaque
+        Symbolics.ifelse_eager(x > 0, x^2, x^3),
+        Symbolics.ifelse_branching(x > 0, x^2, y),
+        max(x, y),                                # ifelse inside an edge value
+    ]
+    for ex in exprs
+        dj = dstar_jacobian([ex], [x, y])
+        j = jacobian([ex], [x, y])
+        for subs in (Dict(x => -1.5, y => 0.7), Dict(x => 2.3, y => -0.2),
+                     Dict(x => 0.0, y => 0.7))
+            @test isapprox(eval_subs.(dj, (subs,)), eval_subs.(j, (subs,)))
+        end
+    end
+    # the condition must stay a genuine select: with a branch whose derivative
+    # is Inf at the boundary, the guard multiplying the path product would
+    # poison the result (`0*Inf` = NaN where the select gives 0)
+    d = dstar_derivative(ifelse(x > 0, x^-1, y), x)
+    @test isequal(d, ifelse(x > 0, -1 / x^2, 0))
+    @test eval_subs(d, Dict(x => 0.0, y => 0.7)) == 0
+    # complementary selects on the same condition merge into one, matching
+    # `expand_derivatives`' `ifelse(c, Da, Db)` form exactly
+    @test isequal(dstar_derivative(ifelse(x > 0, x^2, x^3), x),
+                  expand_derivatives(Differential(x)(ifelse(x > 0, x^2, x^3))))
+    @test isequal(dstar_derivative(ifelse(x > 0, x^2, x^3), x), ifelse(x > 0, 2x, 3x^2))
+    # derivative w.r.t. a var reached through only one branch keeps the guard
+    # on that branch's side
+    @test isequal(dstar_derivative(ifelse(x > 0, x^2, y), y), ifelse(x > 0, 0, 1))
+    @test isequal(dstar_derivative(y / ifelse(x > 0, x, 1), x),
+                  ifelse(x > 0, -y / ifelse(x > 0, x, 1)^2, 0))
+    # the `ifelse` variant is preserved through the fold
+    @test isequal(dstar_derivative(Symbolics.ifelse_branching(x > 0, x^-1, y), x),
+                  Symbolics.ifelse_branching(x > 0, -1 / x^2, 0))
+    @test isequal(dstar_derivative(Symbolics.ifelse_eager(x > 0, x^2, x^3), x),
+                  Symbolics.ifelse_eager(x > 0, 2x, 3x^2))
+    # `ifelse_branching` lowers to real control flow, so a dead-zone DomainError
+    # in the untaken branch must never execute — this fails if the guard were
+    # left as a product factor evaluating `sqrt(-1.5)` unconditionally
+    f_sqrt = eval(Symbolics.build_function(
+        dstar_derivative(Symbolics.ifelse_branching(x > 0, sqrt(x), y), x), x, y))
+    @test f_sqrt(-1.5, 0.7) == 0
+    @test f_sqrt(4.0, 0.7) == 0.25
+    # a variable occurring only in the condition has zero derivative
+    @test isequal(only(dstar_jacobian([ifelse(z > 0, x, y)], [z])), 0)
+end
+
+# Array symbolics
+@variables z[1:3]
+@test isequal(dstar_jacobian(z,z), jacobian(z,z))
+@test isequal(dstar_jacobian(2z, z), jacobian(2z, z))
+
+# based on use in FastDifferentiation.jl and the D* paper for testing
+function spherical_harmonics(max_l::Integer, x, y, z)
+    Pc = Dict{Tuple{Int,Int}, Any}()
+    Cc = Dict{Int, Any}()
+    Sc = Dict{Int, Any}()
+
+    function P(l, m)
+        get!(Pc, (l, m)) do
+            if l == 0 && m == 0
+                1.0
+            elseif l == m
+                (1 - 2m) * P(m - 1, m - 1)
+            elseif l == m + 1
+                (2m + 1) * z * P(m, m)
+            else
+                ((2l - 1) / (l - m)) * z * P(l - 1, m) - ((l + m - 1) / (l - m)) * P(l - 2, m)
+            end
+        end
+    end
+
+    function C(m)
+        get!(Cc, m) do
+            m == 0 ? 1 : x * S(m - 1) + y * C(m - 1)
+        end
+    end
+
+    function S(m)
+        get!(Sc, m) do
+            m == 0 ? 0 : x * C(m - 1) - y * S(m - 1)
+        end
+    end
+
+    factorial_approx(n) = sqrt(2π * n) * (n / ℯ * sqrt(n * sinh(1 / n) + 1 / (810 * n^6)))^n
+    N(l, m) = m == 0 ? sqrt(2l + 1 / (4π)) : sqrt((2l + 1) / 2π * factorial_approx(l - m) / factorial_approx(l + m))
+    Y(l, m) = m < 0 ? N(l, -m) * P(l, -m) * S(-m) : N(l, m) * P(l, m) * C(m)
+
+    return Num[Num(Y(l, m)) for l in 0:max_l-1 for m in -l:l]
+end
+
+@variables sx sy sz
+sh_vars = [sx, sy, sz]
+
+# max_l=4 -> 16 expressions
+sh4 = spherical_harmonics(4, sx, sy, sz)
+@test isequal(dstar_jacobian(sh4, sh_vars), jacobian(sh4, sh_vars))
+
+# max_l=5 -> 25 expressions
+# (more dominator/postdominator sharing than max_l=4 exercises).
+sh5 = spherical_harmonics(5, sx, sy, sz)
+@test isequal(dstar_jacobian(sh5, sh_vars), jacobian(sh5, sh_vars))
+
+sh13 = spherical_harmonics(13, sx, sy, sz)
+# large enough that dstar_jacobian and jacobian accumulate floating point errors, so sub in vars and use isapprox
+let
+    dj = dstar_jacobian(sh13, sh_vars)
+    j = jacobian(sh13, sh_vars)
+    subs = Dict(sx => 0.3, sy => 0.5, sz => 0.7)
+    dvals = Symbolics.value.(substitute.(dj, (subs,)))
+    jvals = Symbolics.value.(substitute.(j, (subs,)))
+    @test isapprox(Float64.(dvals), Float64.(jvals); rtol=1e-8)
+end
+
+# Random-DAG fuzzing: random expression trees with shared subexpressions and
+# occasional duplicate arguments/roots/vars, compared against jacobian numerically
+@testset "fuzz" begin
+    using Random
+    Random.seed!(7)
+    @variables fx fy fz
+    fsubs = Dict(fx => 2.3, fy => 0.7, fz => 1.1)
+
+    function rand_expr(depth, pool)
+        depth <= 0 && return rand(vcat([fx, fy, fz], pool))
+        a = rand_expr(depth - 1, pool)
+        b = rand_expr(depth - 1, pool)
+        rand() < 0.3 && (b = a) # duplicate arguments exercise identical-child edges
+        rand([+, -, *, /])(a, b)
+    end
+    # expression construction itself can throw (e.g. Num integer-division edge
+    # cases); fall back to a variable
+    safe_expr(d, p) = try rand_expr(d, p) catch; fx end
+
+    evaluated = 0
+    for _ in 1:50
+        pool = [safe_expr(rand(1:2), Num[]) for _ in 1:rand(1:3)]
+        roots = [safe_expr(rand(2:4), pool) for _ in 1:rand(1:3)]
+        rand() < 0.4 && length(roots) > 1 && push!(roots, rand(roots))
+        vars = [fx, fy, fz]
+        rand() < 0.3 && (vars = [vars; rand(vars)])
+
+        j = try
+            jacobian(roots, vars)
+        catch
+            continue
+        end
+        dj = dstar_jacobian(roots, vars)
+        @test size(dj) == size(j)
+
+        jvals = Float64.(Symbolics.value.(substitute.(j, (fsubs,); fold = Val(true))))
+        dvals = Float64.(Symbolics.value.(substitute.(dj, (fsubs,); fold = Val(true))))
+        all(isfinite, jvals) && all(isfinite, dvals) || continue
+        evaluated += 1
+        @test isapprox(dvals, jvals; rtol = 1e-6)
+    end
+    # guard against the generator producing nothing usable
+    @test evaluated > 20
+end
