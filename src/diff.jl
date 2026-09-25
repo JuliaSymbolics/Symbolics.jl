@@ -185,12 +185,12 @@ occursin_info(x::BasicSymbolic{VartypeT}, expr, fail::Bool = true) = false
     end
 end
 
-# `idx` is a literal scalar index like the `Const`-wrapped `2` in `arr[2]`,
-# as opposed to a symbolic index or a range.
-@inline _is_scalar_literal(idx::Integer) = true
-@inline _is_scalar_literal(idx::BasicSymbolic{VartypeT}) =
-    SymbolicUtils.isconst(idx) && unwrap_const(idx) isa Integer
-@inline _is_scalar_literal(idx) = false
+# `idx` is a literal index like the `Const`-wrapped `2` in `arr[2]` or `1:2` in
+# `arr[1:2]`, as opposed to a symbolic index.
+@inline _is_literal_index(idx::Union{Integer, AbstractVector{<:Integer}, Colon}) = true
+@inline _is_literal_index(idx::BasicSymbolic{VartypeT}) =
+    SymbolicUtils.isconst(idx) && _is_literal_index(unwrap_const(idx))
+@inline _is_literal_index(idx) = false
 
 function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT}, fail::Bool = true)
     shexpr = shape(expr)
@@ -921,13 +921,16 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     function r(x, is_indexee::Bool = false)
         if iscall(x)
             args = arguments(x)
-            # A literal `arr[k]` is an element access, not a whole-array
+            # A literal `arr[1]` or `arr[1:2]` is element access, not a whole-array
             # occurrence; `arr` itself is an indexee and only contributes the
             # variables inside it, not a dependency on every element.
             literal_idx = operation(x) === getindex && length(args) > 1 &&
-                all(_is_scalar_literal, Iterators.drop(args, 1))
+                all(_is_literal_index, Iterators.drop(args, 1))
             for (k, y) in enumerate(args)
                 r(y, literal_idx && k == 1)
+            end
+            if literal_idx && !is_scalar_indexed(x)
+                foreach(r ∘ Base.Fix1(getindex, x), SU.stable_eachindex(x)) # if `x` is e.g. `arr[1:2]`, also visit `arr[1]` and `arr[2]` (only the latter are in `vars`)
             end
         end
         j = get(dict, x, -1)
@@ -936,19 +939,6 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
             push!(J, j)
         end
         x isa SymbolicT || return
-        if is_scalar_indexed(x)
-            arr = arguments(x)[1]
-            j = get(dict, arr, -1)
-            if j != -1
-                push!(I, i[])
-                push!(J, j)
-            end
-            # a literal `arr[k]` marks only itself (via `dict`); a non-literal
-            # index refers to elements of `arr` generically
-            all(_is_scalar_literal, Iterators.drop(arguments(x), 1)) && return
-            x = arr
-            is_indexee = false
-        end
         is_indexee && return
         for j in get(arrdict, x, ())
             push!(I, i[])
