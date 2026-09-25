@@ -224,6 +224,20 @@ end
         xtt_true = diff2term(unwrap(D(D(x[1]))))
         @test isequal(xtt, xtt_true)
     end
+    @testset "array indexing" begin
+        for dims in ((4,), (3, 4))
+            @variables t x(t)[(1:n for n in dims)...]
+            D = Differential(t)
+            indices = length(dims) == 1 ?
+                ((2,), (2:3,), (1:2:3,), (:,)) :
+                ((2, 1), (2:3, 1), (1:2:3, 2), (:, 2:3), (1:2, 2:3))
+            for idx in indices
+                @test isequal(diff2term(D(x[idx...])), diff2term(D(x))[idx...])
+                @test isequal(diff2term(D(D(x[idx...]))), diff2term(D(D(x)))[idx...])
+            end
+        end
+    end
+
 end
 
 @testset "get_differential_vars" begin

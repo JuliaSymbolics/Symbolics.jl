@@ -294,4 +294,9 @@ end
     @test SU.symtype(dt_z2) === Int
     z_arr = getproperty(Symbolics.SymStruct{Record2{Int}}(dt_rec), :z)
     @test isequal(dt_z2, SU.unwrap(z_arr[2]))
+    for indices in (1:2, 1:2:3)
+        @test isequal(
+            Symbolics.diff2term(D(SU.unwrap(rec.z[indices]))), SU.unwrap(z_arr[indices])
+        )
+    end
 end
