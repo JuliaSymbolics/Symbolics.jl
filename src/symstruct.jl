@@ -117,6 +117,11 @@ it will be treated as a scalar.
 macro symstruct(T, opts = Expr(:block))
     block = Expr(:block)
     where_args = Expr[]
+    raw_T = T
+    raw_where = Any[]
+    if Meta.isexpr(T, :curly)
+        append!(raw_where, @view(T.args[2:end]))
+    end
     nocurly_name = T
     if Meta.isexpr(T, :curly)
         for x in @view(T.args[2:end])
@@ -135,6 +140,8 @@ macro symstruct(T, opts = Expr(:block))
             isconcretetype($temp_typevar) ? $SymStruct{$temp_typevar} : $SymStruct{<:$temp_typevar}
         end
     end)
+
+    push!(block.args, __record_ctors_expr(raw_T, raw_where))
 
     @assert Meta.isexpr(opts, :block) """
     Options to `@symstruct` must be specified as a `begin...end` block. Got $opts.
@@ -169,6 +176,57 @@ macro symstruct(T, opts = Expr(:block))
     end
 
     return block
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Build the expression which registers constructor methods producing a [`record_literal`](@ref)
+when any argument is symbolic.
+
+One method is defined per non-empty subset of argument positions that are symbolic. A
+single varargs method would not do: the struct's own `T(::Any, ..., ::Any)` constructor is
+more specific than any `Vararg` signature, so it would always win. Each generated method
+repeats the struct's own type parameters - `(::Type{Record{V}})(...) where {V}`, not
+`(::Type{S})(...) where {S <: Record}`, which would be ambiguous with it - and is strictly
+more specific in its symbolic positions. The methods for larger subsets resolve the
+ambiguities between the smaller ones. Fully concrete construction therefore still reaches
+the struct's own constructor, and any validation it performs is preserved.
+
+The method count is `2^nfields - 1`, so this is skipped for structs with more than
+`RECORD_LITERAL_MAX_FIELDS` fields; those use [`record_literal`](@ref) explicitly.
+"""
+function __record_ctors_expr(raw_T, raw_where)
+    type_expr = QuoteNode(raw_T)
+    # The field count is looked up on the base type: `raw_T` may mention type parameters
+    # which are not bound in the calling module.
+    raw_base = Meta.isexpr(raw_T, :curly) ? raw_T.args[1] : raw_T
+    where_expr = Expr(:vect)
+    append!(where_expr.args, map(QuoteNode, raw_where))
+    quote
+        let T = $(esc(raw_base)), type_expr = $type_expr, where_args = $where_expr
+            nf = try
+                fieldcount(T)
+            catch
+                0
+            end
+            if 0 < nf <= $RECORD_LITERAL_MAX_FIELDS
+                argnames = [Symbol(:a, i) for i in 1:nf]
+                argtuple = Expr(:tuple)
+                append!(argtuple.args, argnames)
+                for mask in 1:((1 << nf) - 1)
+                    call = Expr(:call, Expr(:(::), :RT, Expr(:curly, :Type, type_expr)))
+                    for i in 1:nf
+                        argtype = (mask >> (i - 1)) & 1 == 1 ? $RecordLiteralArg : Any
+                        push!(call.args, Expr(:(::), argnames[i], argtype))
+                    end
+                    sig = isempty(where_args) ? call : Expr(:where, call, where_args...)
+                    body = Expr(:call, $record_literal, :RT, argtuple)
+                    Base.eval(@__MODULE__, Expr(:function, sig, body))
+                end
+            end
+        end
+    end
 end
 
 function __field_shape_expr(T::Union{Symbol, Expr}, field::QuoteNode,
@@ -263,8 +321,15 @@ function _literal_getproperty(sym::SymStruct{T}, ::Val{name}) where {T, name}
     fShape = field_shape(T, Val{name}())
     fname = BSImpl.Const{VartypeT}(name)
     _struct = unwrap(sym)
-    args = ArgsT{VartypeT}((_struct,))
-    val = BSImpl.Term{VartypeT}(SymbolicGetproperty{T, name}(), args; type = fT, shape = fShape)
+    if is_record_literal(_struct)
+        # Field access folds through a struct literal to the corresponding field
+        # expression, exactly as indexing folds through an `array_literal`.
+        val = arguments(_struct)[Base.fieldindex(T, name)::Int]
+    else
+        args = ArgsT{VartypeT}((_struct,))
+        val = BSImpl.Term{VartypeT}(
+            SymbolicGetproperty{T, name}(), args; type = fT, shape = fShape)
+    end
     if has_symwrapper(fT)
         return wrapper_type(fT)(val)
     else
