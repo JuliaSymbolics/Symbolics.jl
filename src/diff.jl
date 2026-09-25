@@ -930,7 +930,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
                 r(y, literal_idx && k == 1)
             end
             if literal_idx && !is_scalar_indexed(x)
-                foreach(r, scalarize(x)) # if `x` is e.g. `arr[1:2]`, also visit `arr[1]` and `arr[2]` (only the latter are in `vars`)
+                foreach(r ∘ Base.Fix1(getindex, x), SU.stable_eachindex(x)) # if `x` is e.g. `arr[1:2]`, also visit `arr[1]` and `arr[2]` (only the latter are in `vars`)
             end
         end
         j = get(dict, x, -1)
