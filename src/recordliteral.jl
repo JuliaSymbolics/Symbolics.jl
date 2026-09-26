@@ -54,8 +54,13 @@ function is_record_literal(x::SymbolicT)
     end
 end
 
-# A literal of fully concrete fields is just the value, so the operation is the constructor.
-(::RecordLiteral{T})(args...) where {T} = T(args...)
+# Applying the operation to fully concrete fields gives the value itself. With a symbolic
+# field it gives back a literal - which the constructor methods `@symstruct` registers
+# would also do, but only for structs narrow enough to have been given them.
+function (::RecordLiteral{T})(args...) where {T}
+    any(a -> unwrap(a) isa SymbolicT, args) && return record_literal(T, args)
+    return T(args...)
+end
 
 SymbolicUtils.promote_symtype(::RecordLiteral{T}, args::SymbolicUtils.TypeT...) where {T} = T
 function SymbolicUtils.promote_shape(::RecordLiteral, @nospecialize(args::SU.ShapeT...))

@@ -82,6 +82,19 @@ end
     @test_throws ArgumentError record_literal(RLPair, (1.0,))
 end
 
+@testset "applying the operation does not rely on the generated constructors" begin
+    # Concrete fields give the value itself, for a struct of either width.
+    @test Symbolics.RecordLiteral{RLPair}()(1.0, 2.0) == RLPair(1.0, 2.0)
+    @test Symbolics.RecordLiteral{RLWide}()(ntuple(i -> i, 9)...) == RLWide(ntuple(i -> i, 9)...)
+
+    # A symbolic field gives a literal. For `RLPair` the registered constructor would do
+    # this anyway; `RLWide` has none, so the operation has to build it itself.
+    @test is_record_literal(unwrap(Symbolics.RecordLiteral{RLPair}()(unwrap(q1), 2.0)))
+    wide = Symbolics.RecordLiteral{RLWide}()(unwrap(q1), ntuple(i -> i + 1, 8)...)
+    @test is_record_literal(unwrap(wide))
+    @test SU.symtype(unwrap(wide)) === RLWide
+end
+
 @testset "a single array-valued field is not read as a field list" begin
     # The field list is a `Tuple`; anything else is one field value. Without that, an
     # array-valued field of a one-field struct is mistaken for two fields.
