@@ -918,17 +918,16 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
 
-    function r(x)
+    function r(x, is_indexee::Bool = false)
         if iscall(x)
             args = arguments(x)
             # A literal `arr[k]` is an element access, not a whole-array
-            # occurrence; skip `arr` itself only when it is a bare symbol.
-            skip_arr = operation(x) === getindex && length(args) > 1 &&
-                !iscall(args[1]) &&
+            # occurrence; `arr` itself is an indexee and only contributes the
+            # variables inside it, not a dependency on every element.
+            literal_idx = operation(x) === getindex && length(args) > 1 &&
                 all(_is_scalar_literal, Iterators.drop(args, 1))
             for (k, y) in enumerate(args)
-                (skip_arr && k == 1) && continue
-                r(y)
+                r(y, literal_idx && k == 1)
             end
         end
         j = get(dict, x, -1)
@@ -948,7 +947,9 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
             # index refers to elements of `arr` generically
             all(_is_scalar_literal, Iterators.drop(arguments(x), 1)) && return
             x = arr
+            is_indexee = false
         end
+        is_indexee && return
         for j in get(arrdict, x, ())
             push!(I, i[])
             push!(J, j)

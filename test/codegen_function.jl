@@ -287,6 +287,44 @@ end
 end
 
 
+@testset "Issue#1999: out-of-place codegen over multiple sparse matrices" begin
+    @variables x1999 y1999
+    vals = [2.0, 3.0]
+    # different nonzero counts
+    mats_diff = [
+        sparse([1, 2], [1, 2], [x1999, y1999], 2, 2),
+        sparse([1], [1], [x1999 + y1999], 2, 2),
+    ]
+    expected_diff = [sparse([2.0 0.0; 0.0 3.0]), sparse([5.0 0.0; 0.0 0.0])]
+    # equal nonzero counts but different sparsity patterns
+    mats_same = [
+        sparse([1], [1], [x1999], 2, 2),
+        sparse([2], [2], [y1999], 2, 2),
+    ]
+    expected_same = [sparse([2.0 0.0; 0.0 0.0]), sparse([0.0 0.0; 0.0 3.0])]
+    for (name, mats, expected) in (("different nonzero counts", mats_diff, expected_diff),
+            ("equal nonzero counts, different patterns", mats_same, expected_same))
+        @testset "$name" begin
+            f_bf = let _f = eval(Symbolics.build_function(mats, [x1999, y1999])[1])
+                (args...) -> @invokelatest _f(args...)
+            end
+            f_cg = let _f = eval(Symbolics.codegen_function(ir, mats, [[x1999, y1999]]; sort_addmul = true)[1])
+                (args...) -> @invokelatest _f(args...)
+            end
+            for f in (f_bf, f_cg)
+                got = f(vals)
+                @test length(got) == length(expected)
+                for (g, e) in zip(got, expected)
+                    @test g isa SparseMatrixCSC
+                    @test Matrix(g) == Matrix(e)
+                    @test g.rowval == e.rowval
+                    @test g.colptr == e.colptr
+                end
+            end
+        end
+    end
+end
+
 @testset "`CodegenFunctionOptions` struct interface" begin
     @variables a b c1 c2 c3 d e g
     @test (@doc Symbolics.CodegenFunctionOptions) !== nothing

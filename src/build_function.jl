@@ -550,7 +550,7 @@ function _make_sparse_array(arr, similarto)
         return term(setparent, nzmap(Returns(true), arr), newarr)
     else
         newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))})
-        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), false)
+        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), true)
     end
 end
 
