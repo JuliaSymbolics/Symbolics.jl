@@ -43,6 +43,7 @@ for T1 in [Real, Num, BasicSymbolic{VartypeT}], T2 in [AbstractArray, Arr, Basic
 end
 Base.in(x::Num, y::AbstractArray) = SymbolicUtils.term(in, unwrap(x), y)
 Base.in(x::Num, y::Array) = SymbolicUtils.term(in, unwrap(x), y)
+Base.in(x::Num, y::Base.ReshapedArray) = SymbolicUtils.term(in, unwrap(x), y)
 Base.in(x::Num, y::SparseArrays.AbstractSparseArray) = SymbolicUtils.term(in, unwrap(x), y)
 Base.in(x::Num, y::AbstractRange{Num}) = SymbolicUtils.term(in, unwrap(x), y)
 Base.in(x::Num, y::AbstractRange{<:Real}) = SymbolicUtils.term(in, unwrap(x), y)
