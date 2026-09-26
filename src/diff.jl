@@ -185,6 +185,13 @@ occursin_info(x::BasicSymbolic{VartypeT}, expr, fail::Bool = true) = false
     end
 end
 
+# `idx` is a literal scalar index like the `Const`-wrapped `2` in `arr[2]`,
+# as opposed to a symbolic index or a range.
+@inline _is_scalar_literal(idx::Integer) = true
+@inline _is_scalar_literal(idx::BasicSymbolic{VartypeT}) =
+    SymbolicUtils.isconst(idx) && unwrap_const(idx) isa Integer
+@inline _is_scalar_literal(idx) = false
+
 function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT}, fail::Bool = true)
     shexpr = shape(expr)
     isix = is_scalar_indexed(x)
@@ -193,7 +200,13 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
     if SymbolicUtils.is_array_shape(shexpr)
         fail && error("Differentiation with array expressions is not yet supported")
         if isix
-            return isequal(expr, arguments(x)[1]) || SymbolicUtils.query(isequal(x), expr)
+            arr = arguments(x)[1]
+            (isequal(expr, arr) || SymbolicUtils.query(isequal(x), expr)) && return true
+            # `x` occurs only via `arr` inside a composite lazy array expression;
+            # the derivative would need scalarization, which we do not do implicitly.
+            SymbolicUtils.query(isequal(arr), expr) &&
+                error("Differentiation of `$x` inside lazy array expressions is not supported; scalarize the expression with `Symbolics.scalarize` first")
+            return false
         end
         return SymbolicUtils.query(isequal(x), expr)
     end
@@ -747,8 +760,11 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
     op_varsets = map(op -> _augment_with_call_args!(SymbolicUtils.search_variables(op)), ops)
     result = fill(COMMON_ZERO, length(ops), length(vars))
     for i in eachindex(ops), j in eachindex(vars)
-        (vars[j] in op_varsets[i]) || continue
-        result[i, j] = executediff(Differential(vars[j]), ops[i]; simplify, kwargs...)
+        v = vars[j]
+        # `arr[k]` also occurs when the lazy array `arr` is in the variable set.
+        (v in op_varsets[i] ||
+            (is_scalar_indexed(v) && (arguments(v)[1] in op_varsets[i]))) || continue
+        result[i, j] = executediff(Differential(v), ops[i]; simplify, kwargs...)
     end
     return result
 end
@@ -884,6 +900,14 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     end
     dict = Dict(zip(u, 1:length(u)))
 
+    # `arrdict[arr]` maps a lazy array to the columns of its element vars
+    # `arr[k]`, since occurrences of `arr`/`arr[i]` mark all of them.
+    arrdict = Dict{SymbolicT, Vector{Int}}()
+    for (j, v) in enumerate(u)
+        v isa SymbolicT && is_scalar_indexed(v) || continue
+        push!(get!(Vector{Int}, arrdict, arguments(v)[1]), j)
+    end
+
     i = Ref(1)
     I = Int[]
     J = Int[]
@@ -894,14 +918,39 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
 
-    function r(x)
+    function r(x, is_indexee::Bool = false)
         if iscall(x)
-            for y in arguments(x)
-                r(y)
+            args = arguments(x)
+            # A literal `arr[k]` is an element access, not a whole-array
+            # occurrence; `arr` itself is an indexee and only contributes the
+            # variables inside it, not a dependency on every element.
+            literal_idx = operation(x) === getindex && length(args) > 1 &&
+                all(_is_scalar_literal, Iterators.drop(args, 1))
+            for (k, y) in enumerate(args)
+                r(y, literal_idx && k == 1)
             end
         end
         j = get(dict, x, -1)
         if j != -1
+            push!(I, i[])
+            push!(J, j)
+        end
+        x isa SymbolicT || return
+        if is_scalar_indexed(x)
+            arr = arguments(x)[1]
+            j = get(dict, arr, -1)
+            if j != -1
+                push!(I, i[])
+                push!(J, j)
+            end
+            # a literal `arr[k]` marks only itself (via `dict`); a non-literal
+            # index refers to elements of `arr` generically
+            all(_is_scalar_literal, Iterators.drop(arguments(x), 1)) && return
+            x = arr
+            is_indexee = false
+        end
+        is_indexee && return
+        for j in get(arrdict, x, ())
             push!(I, i[])
             push!(J, j)
         end
@@ -1075,6 +1124,12 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
     @assert !(expr isa AbstractArray)
     expr = value(expr)
     u = map(value, vars)
+    # element vars inside lazy array expressions are invisible to the linearity
+    # analysis; `occursin_info` throws for those rather than returning a
+    # silently wrong pattern
+    for ui in u
+        ui isa SymbolicT && is_scalar_indexed(ui) && occursin_info(ui, expr)
+    end
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
     f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
     lp = unwrap_const(linearity_propagator(f))

@@ -198,6 +198,15 @@ for T in (
     )
     @eval Base.:(/)(A::Arr{Num, 2}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
 end
+if isdefined(LinearAlgebra, :UpperHessenberg)
+    for T in (
+            LinearAlgebra.UpperHessenberg{Num},
+            LinearAlgebra.Adjoint{Num, <:LinearAlgebra.UpperHessenberg{Num}},
+            LinearAlgebra.Transpose{Num, <:LinearAlgebra.UpperHessenberg{Num}},
+        )
+        @eval Base.:(/)(A::Arr{Num, 2}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
+    end
+end
 for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose)
     @eval function Base.:(/)(
             A::$T{Num, <:AbstractVector}, B::Arr{Num, 2}
@@ -209,8 +218,8 @@ end
 Base.exp(m::Matrix{Num}) = Arr{Num, 2}(exp(SConst(m)))
 Base.exp(m::Matrix{Complex{Num}}) = Arr{Complex{Num}, 2}(exp(SConst(m)))
 
-function LinearAlgebra.transpose(x::Arr{T, N}) where {T, N}
-    return Arr{T, 2}(LinearAlgebra.transpose(unwrap(x)))
+function Base.transpose(x::Arr{T, N}) where {T, N}
+    return Arr{T, 2}(Base.transpose(unwrap(x)))
 end
 
 #################### MAP-REDUCE ################
@@ -301,3 +310,13 @@ end
 # without this they fall through to `eigvals!`, which errors on a symbolic matrix.
 @register_symbolic LinearAlgebra.eigmax(x::AbstractMatrix)
 @register_symbolic LinearAlgebra.eigmin(x::AbstractMatrix)
+
+# `logdet` of a symbolic matrix likewise has no closed form; without this it
+# reaches a numeric factorization and errors. `logdet` rather than `log(det(x))`
+# because the two differ for a negative determinant, and callers that analyse the
+# expression need the atom preserved.
+@register_symbolic LinearAlgebra.logdet(x::AbstractMatrix)
+
+# The default (p = 2) operator norm is the largest singular value, which has no closed
+# form; without this it reaches `svdvals!` and errors on a symbolic matrix.
+@register_symbolic LinearAlgebra.opnorm(x::AbstractMatrix)

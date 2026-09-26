@@ -162,6 +162,23 @@ for T in (
         ), N in (1, 2)
     @eval Base.:(\)(A::$T, b::Arr{<:Any, $N}) = wrap(unwrap(A) \ unwrap(b))
 end
+if isdefined(LinearAlgebra, :UpperHessenberg)
+    for N in (1, 2)
+        @eval function Base.:(\)(
+                A::Union{
+                    LinearAlgebra.UpperHessenberg,
+                    LinearAlgebra.Adjoint{T, S} where {
+                        T, S <: (LinearAlgebra.UpperHessenberg{T, S2} where {S2 <: AbstractMatrix{T}}),
+                    },
+                    LinearAlgebra.Transpose{T, S} where {
+                        T, S <: (LinearAlgebra.UpperHessenberg{T, S2} where {S2 <: AbstractMatrix{T}}),
+                    },
+                }, b::Arr{<:Any, $N}
+            )
+            return wrap(unwrap(A) \ unwrap(b))
+        end
+    end
+end
 function Base.:(\)(
         A::LinearAlgebra.Diagonal{T, StaticArraysCore.SVector{N, T}}, b::Arr{<:Any, 1}
     ) where {T, N}
@@ -189,8 +206,8 @@ Base.:^(A::Arr{<:Any, 2}, x::Num) = wrap(unwrap(A)^unwrap(x))
 Base.copy(x::Arr) = wrap(copy(unwrap(x)))
 Base.inv(A::Arr{T, 2}) where {T} = Arr{T, 2}(inv(unwrap(A)))
 LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
-LinearAlgebra.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
-LinearAlgebra.adjoint(A::Arr{T, 1}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
+Base.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
+Base.adjoint(A::Arr{T, 1}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
 function LinearAlgebra.norm(A::Arr{T}) where {T}
     if is_wrapper_type(T)
         T(norm(unwrap(A)))
@@ -211,6 +228,14 @@ function LinearAlgebra.norm(A::Arr{T}, p::Real) where {T}
     else
         norm(unwrap(A), unwrap(p))
     end
+end
+
+# A scalarized vector is an ordinary `AbstractVector{<:Num}`, not an `Arr`, so it
+# missed the methods above and fell into the generic implementation, which expands
+# to `sqrt(sum(abs2, v))`. That is a different expression: the `norm` atom is gone,
+# which matters to anything analysing the result rather than evaluating it.
+function LinearAlgebra.norm(v::AbstractVector{<:Num}, p::Real = 2)
+    return wrap(Symbolics.term(norm, map(unwrap, v), p; type = Real))
 end
 
 function SymbolicUtils.scalarize(x::Arr{T, N}, ::Val{toplevel}) where {toplevel, T, N}
