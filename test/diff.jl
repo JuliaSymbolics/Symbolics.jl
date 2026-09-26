@@ -712,30 +712,22 @@ end
     @test isequal(Symbolics.derivative(sqrt(ex), x[1]), y[1] / 2sqrt(ex))
 end
 
-# Derivatives of lazy array reductions w.r.t. the elements of the reduced arrays
-# used to silently return zero; they now error instead (issue #1990).
 @testset "Derivatives of lazy reductions w.r.t. array elements" begin
     @variables x[1:3] y a[1:3]
     obj = sum(abs2, x .- a) + (y - 1)^2
 
-    # differentiating element vars through lazy reductions nested in scalar
-    # expressions is unsupported and must error rather than return wrong zeros
-    @test_throws ErrorException Symbolics.gradient(obj, [x[1], x[2], x[3], y])
-    @test_throws ErrorException Symbolics.gradient(
-        sum((x .- a) .^ 2) + (y - 1)^2, [x[1], x[2], x[3], y])
-    @test_throws ErrorException Symbolics.derivative(sqrt(sum(abs2, x .- a)), x[1])
-    @test_throws ErrorException Symbolics.jacobian([obj], [x[1], x[2], x[3], y])
-    @test_throws ErrorException Symbolics.hessian(obj, [x[1], x[2], x[3], y])
-    @test_throws ErrorException Symbolics.hessian_sparsity(obj, [x[1], x[2], x[3], y])
-    @test_throws ErrorException Symbolics.hessian_sparsity(
-        sum(abs2, x .- a), [x[1], x[2], x[3]])
+    vars = [x[1], x[2], x[3], y]
+    expected = Num[-2a[1] + 2x[1], -2a[2] + 2x[2], -2a[3] + 2x[3], 2(-1 + y)]
+    for ex in (obj, sum((x .- a) .^ 2) + (y - 1)^2, Symbolics.scalarize(obj))
+        @test all(iszero, simplify.(Symbolics.gradient(ex, vars) - expected))
+        @test all(iszero, simplify.(Symbolics.jacobian([ex], vars) - permutedims(expected)))
+        @test isequal(Symbolics.hessian(ex, vars), 2Matrix{Num}(I, 4, 4))
+        @test Symbolics.hessian_sparsity(ex, vars) == sparse(I, 4, 4)
+    end
+    expected_sqrt = (x[1] - a[1]) / sqrt(sum(abs2, x .- a))
+    @test iszero(simplify(Symbolics.derivative(sqrt(sum(abs2, x .- a)), x[1]) - expected_sqrt))
+    @test Symbolics.hessian_sparsity(sum(abs2, x .- a), vars[1:3]) == sparse(I, 3, 3)
 
-    # scalarizing first makes the same derivatives computable
-    @test isequal(Symbolics.gradient(Symbolics.scalarize(obj), [x[1], x[2], x[3], y]),
-                  Num[-2a[1] + 2x[1], -2a[2] + 2x[2], -2a[3] + 2x[3], 2(-1 + y)])
-
-    # differentiating a lazy reduction directly still works (it is expanded
-    # internally), as do bare-array arguments and literal elements
     @test isequal(Symbolics.derivative(sum(abs2, x .- a), x[1]), -2a[1] + 2x[1])
     @test isequal(Symbolics.derivative(x[1] * sum(x), x[2]), x[1])
     @test isequal(Symbolics.jacobian([sum(x)], [x[1], x[2], x[3]]), Num[1 1 1])
