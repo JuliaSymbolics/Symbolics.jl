@@ -86,9 +86,14 @@ res = [(1//2) - (1//2)*(R^2) + R^4, S - R + (2//1)*(R^3)]
 # Groebner does not yet work with constant ideals
 @test_broken groebner_basis([1])
 
+using SymbolicUtils: unwrap_const
+
 @testset "symbolic_solve on a complex ~" begin
     @variables a b
     eqs = a + im * b ~ 1 + 2im
-    @test isequal(symbolic_solve(eqs, [a, b]), [Dict(a => 1, b => 2)])
-    @test isequal(symbolic_solve(eqs), [Dict(a => 1, b => 2)])
+    for sols in (symbolic_solve(eqs, [a, b]), symbolic_solve(eqs))
+        sol = only(sols)
+        @test isequal(unwrap_const(sol[a]), 1)
+        @test isequal(unwrap_const(sol[b]), 2)
+    end
 end
