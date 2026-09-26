@@ -51,20 +51,29 @@ end
     @test !hasname(x + y)
 end
 
-@testset "complex ~ returns a marked SplitComplexEquation" begin
+@testset "complex ~ still returns a plain Vector{Equation}" begin
+    @variables x y
+    p = x + im * y ~ 1 + 2im
+    @test p isa Vector{Equation}
+    @test isequal(p, Equation[x ~ 1, y ~ 2])
+    push!(p, x ~ 3)
+    @test length(p) == 3
+    p[1] = y ~ 4
+    @test isequal(p[1], y ~ 4)
+end
+
+@testset "split_complex_equation returns a SplitComplexEquation" begin
     @variables t x y
     @variables ψ(..) w::Complex
     Dx = Differential(t)
 
-    # numeric, symbolic, and dependent-variable sides all produce the marked type
-    p_num = x + im * y ~ 1 + 2im
-    p_sym = im ~ x + y * im
-    p_dep = Dx(ψ(t, 1)) ~ im * ψ(t, 1)
-    p_z = z ~ w
+    p_num = split_complex_equation(x + im * y, 1 + 2im)
+    p_sym = split_complex_equation(im, x + y * im)
+    p_dep = split_complex_equation(Dx(ψ(t, 1)), im * ψ(t, 1))
+    p_z = split_complex_equation(z, w)
     for p in (p_num, p_sym, p_dep, p_z)
         @test p isa SplitComplexEquation
         @test p isa AbstractVector{Equation}
-        @test iscomplexsplit(p)
         @test length(p) == 2
         @test size(p) == (2,)
         @test eltype(p) == Equation
@@ -73,12 +82,17 @@ end
         @test p.original isa Equation
     end
     @test isequal(p_num, Equation[x ~ 1, y ~ 2])
+    @test isequal(p_sym, Equation[0 ~ x, 1 ~ y])
     @test isequal(p_dep, Equation[Dx(ψ(t, 1)) ~ 0, 0 ~ ψ(t, 1)])
     @test isequal(p_z, Equation[real(z) ~ real(w), imag(z) ~ imag(w)])
     @test p_dep.original == Equation(Dx(ψ(t, 1)), im * ψ(t, 1))
     @test p_num.original == Equation(x + im * y, 1 + 2im)
 
-    # behaves like the Vector{Equation} it replaced
+    # the marked pair holds the same equations as ~
+    for (a, b) in ((x + im * y, 1 + 2im), (im, x + y * im), (Dx(ψ(t, 1)), im * ψ(t, 1)), (z, w))
+        @test isequal(collect(split_complex_equation(a, b)), a ~ b)
+    end
+
     @test [e for e in p_dep] == [p_dep[1], p_dep[2]]
     @test collect(p_dep) isa Vector{Equation}
     @test p_dep[end] == p_dep[2]
@@ -100,17 +114,14 @@ end
     @test isequal(p_dep, collect(p_dep))
     @test hash(p_dep) == hash(collect(p_dep))
 
-    # recombining the parts recovers the original complex equation
-    recombined = (Num(p_z[1].lhs) + im * Num(p_z[2].lhs)) ~
-        (Num(p_z[1].rhs) + im * Num(p_z[2].rhs))
-    @test iscomplexsplit(recombined)
-    @test recombined.original == p_z.original
+    # user-written groupings and the output of ~ are not marked
+    @test !(Equation[p_dep[1], p_dep[2]] isa SplitComplexEquation)
+    @test !((Dx(ψ(t, 1)) ~ im * ψ(t, 1)) isa SplitComplexEquation)
 
-    # user-written groupings and non-split results are not marked
-    @test !iscomplexsplit(Equation[p_dep[1], p_dep[2]])
-    @test !iscomplexsplit([x ~ 1, y ~ 2])
-    @test !iscomplexsplit(x ~ y)
-    @test !iscomplexsplit(p_dep[1])
-    @test (x ~ 1 + 2im) isa Equation
-    @test (ψ(t) ~ 2im) isa Equation
+    # without a split, the result is the same single Equation as ~
+    @test isequal(split_complex_equation(x, 1 + 2im), x ~ 1 + 2im)
+    @test split_complex_equation(x, 1 + 2im) isa Equation
+    @test isequal(split_complex_equation(ψ(t), 2im), ψ(t) ~ 2im)
+    @test isequal(split_complex_equation(x, y), x ~ y)
+    @test_throws ErrorException split_complex_equation(1 + 2im, 3im)
 end
