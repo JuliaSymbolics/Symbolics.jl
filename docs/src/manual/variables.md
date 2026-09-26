@@ -26,7 +26,7 @@ Symbolics.variables
 Equation
 Base.:~(::Num, ::Num)
 SplitComplexEquation
-iscomplexsplit
+split_complex_equation
 Symbolics.Inequality
 Symbolics.:≲
 Symbolics.:≳
