@@ -473,3 +473,26 @@ struct Baz{T} end
     @test SU.promote_symtype(Bar, Int) === Bar{Int}
     @test SU.promote_symtype(Baz, String) === Baz{String}
 end
+
+@testset "`domain` metadata" begin
+    @variables x [domain = (10, Inf)]
+    @test Symbolics.getmetadata(unwrap(x), Symbolics.VariableDomain) == (10, Inf)
+
+    @variables y [domain = v -> v > 0]
+    predicate = Symbolics.getmetadata(unwrap(y), Symbolics.VariableDomain)
+    @test predicate(1)
+    @test !predicate(-1)
+
+    # For array variables the key is attached to the array symbol itself, not to the
+    # scalars obtained by indexing it.
+    @variables z[1:3] [domain = (0, 1)]
+    @test Symbolics.getmetadata(unwrap(z), Symbolics.VariableDomain) == (0, 1)
+    @test !Symbolics.hasmetadata(unwrap(z[1]), Symbolics.VariableDomain)
+
+    # The key is opt-in: variables declared without `domain` carry no such metadata.
+    @variables w
+    @test !Symbolics.hasmetadata(unwrap(w), Symbolics.VariableDomain)
+    @test Symbolics.getmetadata(unwrap(w), Symbolics.VariableDomain, nothing) === nothing
+
+    @test Symbolics.option_to_metadata_type(Val(:domain)) === Symbolics.VariableDomain
+end

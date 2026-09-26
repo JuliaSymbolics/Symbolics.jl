@@ -32,7 +32,19 @@ struct VariableSource <: AbstractVariableMetadata end
 """
     $TYPEDEF
 
-Symbolic metadata key for storing the domain or assumptions of a symbolic variable.
+Symbolic metadata key for storing the domain or assumptions of a symbolic variable. Set
+through the `domain` option of [`@variables`](@ref):
+
+```julia
+@variables x [domain = (10, Inf)]
+@variables y [domain = v -> v > 0]
+```
+
+The value is stored as given and is not interpreted by Symbolics itself; consumers such as
+simplification rules decide what to make of it. Two conventions are in use: a `(lo, hi)`
+tuple describing an interval, and a predicate called on a candidate value. Note that
+Symbolics also has a separate, unrelated domain concept for `x ∈ Interval(...)` pairings
+(see `Symbolics.VarDomainPairing`).
 """
 struct VariableDomain <: AbstractVariableMetadata end
 
