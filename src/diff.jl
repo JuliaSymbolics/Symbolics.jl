@@ -215,13 +215,9 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
     isequal(x, expr) && return true
 
     @match expr begin
-        BSImpl.ArrayOp(; expr, term) && if term === nothing end => begin
-            aop_pred = let x = x, isix = isix
-                function _aop_pred(ex::SymbolicT)
-                    isequal(ex, x) || isix && iscall(ex) && operation(ex) === getindex && isequal(arguments(ex)[1], arguments(x)[1])
-                end
-            end
-            return SU.query(aop_pred, expr)
+        BSImpl.ArrayOp(; output_idx) && if isempty(output_idx) end => begin
+            # Scalar reductions must expose element dependencies before the chain rule.
+            return occursin_info(x, SymbolicUtils.scalarize(expr), fail)
         end
         _ => nothing
     end
@@ -1122,14 +1118,8 @@ julia> Symbolics.hessian_sparsity(expr, vars)
 """
 function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity_propagator = linearity_propagator)
     @assert !(expr isa AbstractArray)
-    expr = value(expr)
+    expr = SymbolicUtils.scalarize(value(expr))
     u = map(value, vars)
-    # element vars inside lazy array expressions are invisible to the linearity
-    # analysis; `occursin_info` throws for those rather than returning a
-    # silently wrong pattern
-    for ui in u
-        ui isa SymbolicT && is_scalar_indexed(ui) && occursin_info(ui, expr)
-    end
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
     f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
     lp = unwrap_const(linearity_propagator(f))
