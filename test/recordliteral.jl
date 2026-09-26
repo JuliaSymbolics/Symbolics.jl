@@ -28,6 +28,11 @@ struct RLParam{V}
 end
 @symstruct RLParam{V}
 
+struct RLArrField
+    v::Vector{Float64}
+end
+@symstruct RLArrField
+
 # Nine fields, one more than `RECORD_LITERAL_MAX_FIELDS`, so no methods are generated.
 struct RLWide
     a1::Int; a2::Int; a3::Int; a4::Int; a5::Int
@@ -75,6 +80,18 @@ end
     @test RLWide(args...) isa RLWide
     @test is_record_literal(unwrap(record_literal(RLWide, args)))
     @test_throws ArgumentError record_literal(RLPair, (1.0,))
+end
+
+@testset "a single array-valued field is not read as a field list" begin
+    # The field list is a `Tuple`; anything else is one field value. Without that, an
+    # array-valued field of a one-field struct is mistaken for two fields.
+    lit = record_literal(RLArrField, [1.0, 2.0])
+    @test is_record_literal(lit)
+    @test length(SU.arguments(lit)) == 1
+    @test SU.symtype(lit) === RLArrField
+
+    # A tuple is still read as the field list.
+    @test length(SU.arguments(record_literal(RLPair, (1.0, 2.0)))) == 2
 end
 
 @testset "field access folds through a literal" begin

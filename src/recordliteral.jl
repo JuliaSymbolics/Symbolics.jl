@@ -73,7 +73,7 @@ literal when any argument is symbolic. This function is the explicit spelling, a
 only one available for structs with more than `$(RECORD_LITERAL_MAX_FIELDS)` fields, where
 generating those methods would be prohibitive.
 """
-function record_literal(::Type{T}, args) where {T}
+function record_literal(::Type{T}, args::Tuple) where {T}
     nf = fieldcount(T)
     if length(args) != nf
         throw(ArgumentError(LazyString(
