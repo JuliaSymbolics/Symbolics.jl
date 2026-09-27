@@ -430,6 +430,17 @@ function differential_zero(arg::BasicSymbolic{VartypeT})
 end
 
 """
+    $TYPEDSIGNATURES
+
+Whether the derivative `x` is zero, in either representation [`differential_zero`](@ref)
+produces. A derivative of non-numeric symtype is a lazy [`SymbolicZero`](@ref) rather than
+a constant, which `_iszero` does not recognise - it only sees through constants. A term
+whose derivative is zero contributes nothing, whatever its symtype, so the two are treated
+alike here.
+"""
+_iszero_derivative(x) = _iszero(x) || is_symbolic_zero(x)
+
+"""
     executediff(D, arg; simplify=false, occurrences=nothing)
 
 Apply the passed Differential D on the passed argument.
@@ -595,7 +606,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
 
                 for (i, iarg) in enumerate(inner_args)
                     t2 = executediff(D, iarg; simplify, throw_no_derivative)::SymbolicT
-                    _iszero(t2) && continue
+                    _iszero_derivative(t2) && continue
                     t = derivative_idx(arg, i)::Union{Nothing, SymbolicT}
                     if t === nothing
                         throw_no_derivative && throw(DerivativeNotDefinedError(arg, i))
@@ -615,7 +626,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     summed_args = SymbolicUtils.ArgsT{VartypeT}()
                     for iarg in inner_args
                         t2 = executediff(D, iarg; simplify, throw_no_derivative)
-                        _iszero(t2) && continue
+                        _iszero_derivative(t2) && continue
                         push!(summed_args, t2)
                     end
                     return SymbolicUtils.add_worker(VartypeT, summed_args)
@@ -629,7 +640,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
 
                     for (i, iarg) in enumerate(inner_args)
                             t2 = executediff(D, iarg; simplify, throw_no_derivative)
-                            _iszero(t2) && continue
+                            _iszero_derivative(t2) && continue
                         try
                             inner_args[i] = t2
                             push!(summed_args, SymbolicUtils.mul_worker(VartypeT, inner_args))

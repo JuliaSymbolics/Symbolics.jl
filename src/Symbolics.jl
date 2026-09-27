@@ -649,6 +649,7 @@ include("despecialize.jl")
 @public CodegenFunctionOptions, codegen_function
 @public diff2term, map_subscripts
 @public fixpoint_sub
+@public symbolic_zero, is_zeroable, SymbolicZero
 
 @setup_workload begin
     fold1 = Val{false}()
