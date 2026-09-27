@@ -658,3 +658,39 @@ end
     x = fn(NaN + NaN * im)
     @test x isa Complex && isnan(x)
 end
+
+@testset "exact_div keeps `//` for numbers and accepts symbolics" begin
+    @variables a
+    # Numbers keep exact rational division; `/` there would return a float and
+    # the closed-form root formulas rely on the exactness.
+    @test Symbolics.exact_div(3, 8) === 3 // 8
+    @test Symbolics.exact_div(3 // 4, 2) === 3 // 8
+    @test Symbolics.exact_div(big(3), 8) == 3 // 8
+    @test Symbolics.exact_div(1.5, 2) === 0.75
+
+    # `//` has no method for a symbolic operand, which is the bug this replaces.
+    @test_throws MethodError value(a) // 8
+    @test isequal(Symbolics.exact_div(1, value(a)), 1 / value(a))
+    @test isequal(Symbolics.exact_div(value(a), 2), value(a) / 2)
+end
+
+@testset "parametric cubics and quartics have closed-form roots" begin
+    @variables x a A1 A4
+
+    # Both used to throw `MethodError: no method matching //(::BigInt,
+    # ::BasicSymbolic)` from the closed-form formulas in `univar.jl`.
+    @test length(Symbolics.get_roots_deg3(value(a * x^3 + 2x + 1), value(x))) == 3
+    @test length(Symbolics.get_roots_deg4(value(a^2 * x^4 + 1), value(x))) == 4
+
+    for ex in [x^4 + a, a * x^4 + 1, x^4 + a * x + 1, A1^2 * x^4 + A4^2]
+        roots = symbolic_solve(ex, x)
+        @test roots !== nothing
+        @test length(roots) == 4
+    end
+
+    # Numeric quartics are unaffected. `correctAns` above is local to its own
+    # testset, so the comparison is spelled out here.
+    numeric = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x^4 - 3x^2 + 2, x))))
+    expected = sort_roots([-sqrt(2.0), -1.0, 1.0, sqrt(2.0)])
+    @test all(isapprox.(numeric, expected; atol = 1.0e-6))
+end
