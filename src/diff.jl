@@ -466,12 +466,12 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 end
                 return SymbolicUtils.add_worker(VartypeT, summed_args)
             elseif f === conj || f === real || f === imag
-        if symtype(D.x) <: Real
-            inner = executediff(D, args[1]; simplify, throw_no_derivative)
-            return f(inner)
-        end
-        return D(arg)
-    elseif f === ifelse || f === ifelse_eager || f === ifelse_branching
+                if symtype(D.x) <: Real
+                    inner = executediff(D, args[1]; simplify, throw_no_derivative)
+                    return f(inner)
+                end
+                return D(arg)
+            elseif f === ifelse || f === ifelse_eager || f === ifelse_branching
                 inner_args = arguments(arg)
                 dtrue = executediff(D, inner_args[2]; throw_no_derivative)
                 dfalse = executediff(D, inner_args[3]; throw_no_derivative)
@@ -584,7 +584,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
     end
 end
-executediff(D::Differential, arg::Num; kw...) = executediff(D, unwrap(arg); kw...)
+executediff(D::Differential, arg::Union{Num, SymbolicNumber, Complex{Num}}; kw...) = executediff(D, _diff_raw(arg); kw...)
 executediff(D::Differential, arg::Number; kw...) = COMMON_ZERO
 
 """
@@ -639,10 +639,10 @@ function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivativ
     end
 end
 function expand_derivatives(n::Num, simplify=false; kwargs...)
-    wrap(expand_derivatives(value(n), simplify; kwargs...))
+    return wrap(expand_derivatives(value(n), simplify; kwargs...))
 end
-function expand_derivatives(n::SymbolicNumber, simplify=false; kwargs...)
-    wrap(expand_derivatives(value(n), simplify; kwargs...))
+function expand_derivatives(n::SymbolicNumber, simplify = false; kwargs...)
+    return wrap(expand_derivatives(value(n), simplify; kwargs...))
 end
 function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
     re = expand_derivatives(real(n), simplify; kwargs...)
@@ -709,6 +709,14 @@ end
 
 ### Jacobians & Hessians
 
+_diff_raw(x) = Const{VartypeT}(unwrap(x))
+_diff_raw(z::Complex{Num}) = unwrap(real(z)) + im * unwrap(imag(z))
+
+function _wrap_diff_result(A::AbstractArray)
+    W = all(x -> symtype(x) <: Real, A) ? Num : SymbolicNumber
+    return map!(W, similar(A, W), A)
+end
+
 """
 $(SIGNATURES)
 
@@ -722,14 +730,15 @@ A helper function for computing the derivative of the expression `O` with respec
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function derivative(O, var; simplify=false, kwargs...)
+    d(o) = expand_derivatives(Differential(var)(_diff_raw(o)), simplify; kwargs...)
     if O isa AbstractArray
-        Num[Num(expand_derivatives(Differential(var)(unwrap(o)), simplify; kwargs...)) for o in O]
+        _wrap_diff_result(SymbolicT[d(o) for o in O])
     else
-        Num(expand_derivatives(Differential(var)(unwrap(O)), simplify; kwargs...))
+        wrap(d(O))
     end
 end
-derivative(f::Function, var::Union{SymbolicT, Num}) = derivative(f(var), var)
-derivative(::Function, x::Any) = throw(TypeError(:derivative, "2nd argument", Union{Num, SymbolicT}, x))
+derivative(f::Function, var::Union{SymbolicT, Num, SymbolicNumber}) = derivative(f(var), var)
+derivative(::Function, x::Any) = throw(TypeError(:derivative, "2nd argument", Union{Num, SymbolicNumber, SymbolicT}, x))
 
 """
 $(SIGNATURES)
@@ -744,7 +753,8 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function gradient(O, vars::AbstractVector; simplify=false, kwargs...)
-    Num[Num(expand_derivatives(Differential(vars[vi])(unwrap(O)),simplify; kwargs...)) for vi in eachindex(vars)]
+    O = _diff_raw(O)
+    return _wrap_diff_result(SymbolicT[expand_derivatives(Differential(vars[vi])(O), simplify; kwargs...) for vi in eachindex(vars)])
 end
 
 """
@@ -766,6 +776,7 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
+    ops = map(_diff_raw, ops)
     # Pre-compute variable sets to skip differentiating trivially zero Jacobian entries.
     op_varsets = map(op -> _augment_with_call_args!(SymbolicUtils.search_variables(op)), ops)
     result = fill(COMMON_ZERO, length(ops), length(vars))
@@ -794,25 +805,14 @@ function _augment_with_call_args!(vs)
 end
 
 function jacobian(ops, vars; simplify=false, kwargs...)
-    ops = vec(scalarize(ops))
-    if ops isa Vector{Num}
-        ops = unwrap.(ops)::Vector{SymbolicT}
-    elseif ops isa Vector{SymbolicT}
-    else
-        ops = ops::Vector{eltype(ops)}
-    end
+    ops = SymbolicT[_diff_raw(o) for o in vec(scalarize(ops))]
     # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
-    vars = vec(scalarize(vars))
-    if vars isa Vector{Num}
-        vars = unwrap.(vars)::Vector{SymbolicT}
-    elseif vars isa Vector{SymbolicT}
-    else
+    vars = map(unwrap, vec(scalarize(vars)))
+    if !(vars isa Vector{SymbolicT})
         error("This should not happen! `vars` must be convertible to Vector{SymbolicT}. \nReceived vars = $vars")
     end
     _res = jacobian(ops, vars; simplify=simplify, scalarize=Val(false), kwargs...)
-    res = similar(_res, Num)
-    map!(Num, res, _res)
-    return res
+    return _wrap_diff_result(_res)
 end
 
 function faster_maybe_scalarize!(arg::Vector)
@@ -863,13 +863,13 @@ function sparsejacobian_vals(ops::AbstractVector, vars::AbstractVector, I::Abstr
     ops = faster_maybe_scalarize!(ops)
     vars = faster_maybe_scalarize!(vars)
 
-    exprs = Num[]
+    exprs = SymbolicT[]
     sizehint!(exprs, length(I))
 
     for (i,j) in zip(I, J)
-        push!(exprs, Num(expand_derivatives(Differential(vars[j])(ops[i]), simplify; kwargs...)))
+        push!(exprs, expand_derivatives(Differential(vars[j])(_diff_raw(ops[i])), simplify; kwargs...))
     end
-    exprs
+    return _wrap_diff_result(exprs)
 end
 
 """
@@ -1037,16 +1037,15 @@ All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function hessian(O, vars::AbstractVector; simplify=false, kwargs...)
     vars = map(value, vars)
-    first_derivs = map(value, vec(jacobian([values(O)], vars; simplify=simplify, kwargs...)))
+    first_derivs = vec(jacobian([values(O)], vars; simplify = simplify, kwargs...))
     n = length(vars)
-    H = Array{Num, 2}(undef,(n, n))
-    fill!(H, 0)
+    H = fill(COMMON_ZERO, n, n)
     for i=1:n
         for j=1:i
             H[j, i] = H[i, j] = expand_derivatives(Differential(vars[i])(first_derivs[j]), simplify; kwargs...)
         end
     end
-    H
+    return _wrap_diff_result(H)
 end
 
 hessian(O, vars::Arr; kwargs...) = hessian(O, collect(vars); kwargs...)
@@ -1209,7 +1208,7 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function sparsehessian(op, vars::AbstractVector; simplify::Bool=false, full::Bool=true, kwargs...)
-    op = value(op)
+    op = _diff_raw(op)
     vars = map(value, vars)
     S = hessian_sparsity(op, vars, full=full)
     I, J, _ = findnz(S)
@@ -1240,9 +1239,9 @@ All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::AbstractVector; simplify::Bool=false, kwargs...)
     vars = Symbolics.scalarize(vars)
+    op = _diff_raw(op)
 
-    exprs = Array{Num}(undef, length(I))
-    fill!(exprs, 0)
+    exprs = fill(COMMON_ZERO, length(I))
 
     prev_j = 0
     d = nothing
@@ -1255,5 +1254,5 @@ function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::Abst
         exprs[k] = expr
         prev_j = j
     end
-    exprs
+    return _wrap_diff_result(exprs)
 end

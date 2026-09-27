@@ -24,12 +24,11 @@ run_qa(
     ei_kwargs = (;
         # These are upstream names used for compatibility with Base, LinearAlgebra,
         # DiffRules, MacroTools, and NaNMath; those owners do not declare them public.
-        # `DefaultSubstituter` is the concrete substitution protocol needed to let a
-        # `Num` widen after complex replacement; `promote_op(matprod, ...)` is Julia's
-        # element-type inference hook used to keep SymbolicNumber matrix products concrete.
+        # `promote_op(matprod, ...)` is Julia's element-type inference hook used to keep
+        # SymbolicNumber matrix products concrete.
         all_qualified_accesses_are_public = (;
             ignore = (
-                :BlasInt, :Cartesian, :DefaultSubstituter, :Experimental, :ParseError,
+                :BlasInt, :Cartesian, :Experimental, :ParseError,
                 :ReshapedArray, :Unknown, :acos, :acosh, :alignment, :asin, :atanh,
                 :checknonsingular, :cos, :diffrule, :diffrules, :eval, :getdoc, :log,
                 :log10, :log1p, :log2, :matprod, :max, :min, :nocolor,

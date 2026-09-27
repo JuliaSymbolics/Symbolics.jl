@@ -15,7 +15,7 @@ nterms(t::SymbolicNumber, cache) = nterms(unwrap(t), cache)
 const WrappedSymbolicNumber = Union{RCNum, SymbolicNumber}
 
 # Soft pivoted
-function sym_lu(A::AbstractMatrix{T}; check=true) where {T <: WrappedSymbolicNumber}
+function sym_lu(A::AbstractMatrix{T}; check = true) where {T <: WrappedSymbolicNumber}
     nterms_cache = Base.IdDict{SymbolicT, Int}()
     SINGULAR = typemax(Int)
     m, n = size(A)
@@ -132,7 +132,7 @@ function __solve(a::SymbolicT, b::SymbolicT, simplify::Bool)
     return a \ -b
 end
 function __solve(a::Union{Num, SymbolicNumber}, b::Union{Num, SymbolicNumber}, simplify::Bool)
-    wrap(__solve(unwrap(a), unwrap(b), simplify))
+    return wrap(__solve(unwrap(a), unwrap(b), simplify))
 end
 
 symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq], var; x...)
@@ -205,7 +205,7 @@ end
 
 minor(B, j) = @view B[2:end, 1:size(B, 2) .!= j]
 minor(B, i, j) = @view B[1:size(B,1) .!= i, 1:size(B,2) .!= j]
-function LinearAlgebra.det(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace=true)
+function LinearAlgebra.det(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace = true)
     if laplace
         n = LinearAlgebra.checksquare(A)
         if n == 1
@@ -224,10 +224,10 @@ function LinearAlgebra.det(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace=t
     end
 end
 
-Base.inv(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace=true) = _invl(A; laplace=laplace)
-Base.inv(A::StridedMatrix{<:WrappedSymbolicNumber}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace = true) = _invl(A; laplace = laplace)
+Base.inv(A::StridedMatrix{<:WrappedSymbolicNumber}; laplace = true) = _invl(A; laplace = laplace)
 
-function _invl(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace=true)
+function _invl(A::AbstractMatrix{<:WrappedSymbolicNumber}; laplace = true)
     if laplace
 		n = LinearAlgebra.checksquare(A)
         A⁻¹ = similar(A)
@@ -259,7 +259,7 @@ When `islinear`, return `a` and `b` such that `a * x + b == t`. Instead of calli
 """
 function linear_expansion(t, x::Num)
     a, b, islin = linear_expansion(t, unwrap(x))
-    wrap(a), wrap(b), islin
+    return wrap(a), wrap(b), islin
 end
 
 @inline function linear_expansion(t, x::SymbolicT)

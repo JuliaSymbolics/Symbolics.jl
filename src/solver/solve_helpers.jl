@@ -153,9 +153,6 @@ function bigify(n)
     return n
 end
 
-# `//` is exact rational construction, not generic symbolic division. Solver formulas
-# can contain symbolic coefficients, so keep `//` for plain exact numbers and use `/`
-# whenever either operand is symbolic.
 function sdiv(x, y)
     x, y = unwrap(x), unwrap(y)
     if x isa BasicSymbolic || y isa BasicSymbolic

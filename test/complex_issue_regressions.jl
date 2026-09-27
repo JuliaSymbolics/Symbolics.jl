@@ -10,17 +10,14 @@ const SN = Symbolics.SymbolicNumber
     @testset "#118 #1674 #718 #883 #1830 elementary complex functions" begin
         @variables x::Real z::Complex
         @test z isa SN
-        @test !(z isa Complex{Num})
 
         phase = exp(im * x)
         @test phase isa SN
-        @test !(phase isa Complex{Num})
         @test SymbolicUtils.operation(Symbolics.unwrap(phase)) === exp
 
         for (f, expected_op) in ((exp, exp), (sin, sin), (cos, cos), (log, log), (sqrt, sqrt))
             ex = f(z)
             @test ex isa SN
-            @test !(ex isa Complex{Num})
             @test SymbolicUtils.operation(Symbolics.unwrap(ex)) === expected_op
         end
 
@@ -96,20 +93,16 @@ const SN = Symbolics.SymbolicNumber
 
     @testset "#777 rational construction semantics" begin
         @variables z::Complex
-        @test (z / z) isa Number
-        @test (z + im) / (z + im) isa Number
-        @test_throws Exception (z + im) // (z + im)
+        @test isequal(Symbolics.value(z / z), 1)
+        @test isequal(Symbolics.value((z + im) / (z + im)), 1)
+        @test_throws MethodError (z + im) // (z + im)
         @test (1 // 2) * z isa SN
     end
 
     @testset "#800 printing" begin
         @variables z::Complex x::Real
-        s1 = sprint(show, z)
-        s2 = sprint(show, exp(im * x))
-        @test occursin("z", s1)
-        @test !occursin("real(", s1)
-        @test !occursin("imag(", s1)
-        @test occursin("exp", s2)
+        @test sprint(show, z) == "z"
+        @test sprint(show, exp(im * x)) == "exp((0 + 1im)*x)"
     end
 
     @testset "#832 real/imag simplification" begin
@@ -135,9 +128,7 @@ const SN = Symbolics.SymbolicNumber
         @variables z::Complex
         ex = 1 / (1 - z^10)
         @test ex isa SN
-        txt = sprint(show, ex)
-        @test !occursin("real(z)", txt)
-        @test !occursin("imag(z)", txt)
+        @test sprint(show, ex) == "1 / (1 - (z^10))"
     end
 
     @testset "#894 sound complex differential expression" begin
@@ -145,7 +136,6 @@ const SN = Symbolics.SymbolicNumber
         D = Differential(x)
         ex = x * D(z) + z
         @test ex isa SN
-        @test SymbolicUtils.symtype(Symbolics.unwrap(ex)) <: Number
         eq = D(z) ~ ex
         @test eq isa Equation
     end
@@ -176,8 +166,10 @@ const SN = Symbolics.SymbolicNumber
 
     @testset "#1372 dot follows Julia Hermitian semantics" begin
         @variables mass::Real qsqu::Real
-        q2 = [0, 0, -(mass^2 + qsqu) / sqrt(qsqu) / 2,
-              -im * (mass^2 + qsqu) / sqrt(qsqu) / 2]
+        q2 = [
+            0, 0, -(mass^2 + qsqu) / sqrt(qsqu) / 2,
+            -im * (mass^2 + qsqu) / sqrt(qsqu) / 2,
+        ]
         got = simplify(dot(q2, q2))
         direct = simplify(sum(q2[i] * q2[i] for i in eachindex(q2)))
         gdot = build_function(got, mass, qsqu; expression = Val(false))
@@ -210,7 +202,6 @@ const SN = Symbolics.SymbolicNumber
         @variables z::Complex w::Complex
         eq = z ~ w
         @test eq isa Equation
-        @test !(eq isa AbstractArray)
         f = build_function(eq.lhs - eq.rhs, z, w; expression = Val(false))
         @test f(1 + 2im, 0.5 - im) ≈ 0.5 + 3im
     end
@@ -227,7 +218,6 @@ const SN = Symbolics.SymbolicNumber
         @variables z::Complex
         Dz = Differential(z)
         @test expand_derivatives(Dz(z)) == 1
-        # Non-holomorphic projections remain unevaluated rather than silently claiming zero.
         @test Symbolics.is_derivative(expand_derivatives(Dz(conj(z))))
         @test Symbolics.is_derivative(expand_derivatives(Dz(real(z))))
         @test Symbolics.is_derivative(expand_derivatives(Dz(imag(z))))

@@ -209,7 +209,7 @@ LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
 Base.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
 Base.adjoint(A::Arr{T, 1}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
 function LinearAlgebra.norm(A::Arr{T}) where {T}
-    if T <: SymbolicScalar
+    return if T <: SymbolicScalar
         wrap(norm(unwrap(A)))
     elseif is_wrapper_type(T)
         T(norm(unwrap(A)))
@@ -218,7 +218,7 @@ function LinearAlgebra.norm(A::Arr{T}) where {T}
     end
 end
 function LinearAlgebra.norm(A::Arr{T}, p::Num) where {T}
-    if T <: SymbolicScalar
+    return if T <: SymbolicScalar
         wrap(norm(unwrap(A), unwrap(p)))
     elseif is_wrapper_type(T)
         T(norm(unwrap(A), unwrap(p)))
@@ -227,7 +227,7 @@ function LinearAlgebra.norm(A::Arr{T}, p::Num) where {T}
     end
 end
 function LinearAlgebra.norm(A::Arr{T}, p::Real) where {T}
-    if T <: SymbolicScalar
+    return if T <: SymbolicScalar
         wrap(norm(unwrap(A), unwrap(p)))
     elseif is_wrapper_type(T)
         T(norm(unwrap(A), unwrap(p)))

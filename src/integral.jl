@@ -52,9 +52,6 @@ function (I::Integral)(x::Union{Rational, AbstractIrrational, AbstractFloat, Int
         return Num(SConst(b - a) * x)
     end
 end
-# Explicit Cartesian symbolic values remain Cartesian; ordinary numerical complex
-# constants are integrated atomically by multiplying the interval measure once, rather
-# than splitting and re-expanding their real and imaginary parts.
 (I::Integral)(x::Complex{Num}) = Complex{Num}(I(real(x)), I(imag(x)))
 (I::Integral)(x::Complex) = I(1) * x
 function (I::Integral)(x)

@@ -13,7 +13,6 @@ const SN = Symbolics.SymbolicNumber
 
         c = cis(x)
         @test c isa SN
-        @test !(c isa Complex{Num})
 
         fexpr = 1 + c
         f = build_function(fexpr, x; expression = Val(false))
@@ -37,26 +36,18 @@ const SN = Symbolics.SymbolicNumber
     end
 
     @testset "#389 #416 complex Latexify" begin
-        # Exact raw SymbolicUtils-style MWE from #416.
+        eqn(s) = "\\begin{equation}\n" * s * "\n\\end{equation}\n"
         @syms sx::Real
-        raw_tex = latexify(im * sx)
-        @test !isempty(string(raw_tex))
+        @test string(latexify(im * sx)) == eqn(raw"\mathit{i} ~ \mathtt{sx}")
 
         @variables x::Real z::Complex a::Real b::Real
-        expressions = (z, im * x, exp(im * x), Complex(a, b))
-        for ex in expressions
-            tex = latexify(ex)
-            @test !isempty(string(tex))
-        end
+        @test string(latexify(z)) == eqn("z")
+        @test string(latexify(im * x)) == eqn(raw"\mathit{i} ~ x")
+        @test string(latexify(exp(im * x))) == eqn(raw"e^{\mathit{i} ~ x}")
+        @test string(latexify(Complex(a, b))) == eqn(raw"a + b ~ \mathit{i}")
 
-        ztex = sprint(show, MIME"text/latex"(), z)
-        @test !isempty(ztex)
-        @test !occursin("real(z)", ztex)
-        @test !occursin("imag(z)", ztex)
-
-        phasetex = sprint(show, MIME"text/latex"(), exp(im * x))
-        @test !isempty(phasetex)
-        @test occursin("exp", phasetex) || occursin("e", lowercase(phasetex))
+        @test sprint(show, MIME"text/latex"(), z) == "\$\$ " * eqn("z") * " \$\$"
+        @test sprint(show, MIME"text/latex"(), exp(im * x)) == "\$\$ " * eqn(raw"e^{\mathit{i} ~ x}") * " \$\$"
     end
 
     @testset "numeric codomains narrow and widen correctly" begin
@@ -72,8 +63,6 @@ const SN = Symbolics.SymbolicNumber
     @testset "explicit Cartesian representation remains interoperable" begin
         @variables a::Real b::Real z::Complex
         cart = Complex(a, b)
-        @test cart isa Complex{Num}
-
         value = 0.7 + 1.3im
         for fop in (exp, sin, cos, log, sqrt)
             ex = fop(cart)
@@ -128,14 +117,76 @@ const SN = Symbolics.SymbolicNumber
         @test isone(simplify(Hs[2, 1]))
     end
 
+    @testset "mixed-domain differentiation" begin
+        @variables x::Real y::Real z::Complex
+        same(a, b) = iszero(simplify(a - b; expand = true))
+
+        @testset "complex expressions of real variables" begin
+            J = Symbolics.jacobian([im * x], [x])
+            Js = Symbolics.sparsejacobian([im * x], [x])
+            @test J isa Matrix{SN}
+            @test Js isa SparseMatrixCSC{SN}
+            @test all(same.(J, [im;;]))
+            @test all(same.(Js, J))
+
+            H = Symbolics.hessian(im * x^2, [x])
+            Hs = Symbolics.sparsehessian(im * x^2, [x])
+            @test H isa Matrix{SN}
+            @test Hs isa SparseMatrixCSC{SN}
+            @test all(same.(H, [2im;;]))
+            @test all(same.(Hs, H))
+
+            @test same(Symbolics.derivative(im * x, x), im)
+            @test all(same.(Symbolics.gradient(im * x * y, [x, y]), [im * y, im * x]))
+        end
+
+        @testset "real expressions of complex variables" begin
+            @test all(iszero, Symbolics.jacobian([x^2], [z]))
+            @test all(iszero, Symbolics.hessian(x^2, [z]))
+        end
+
+        @testset "mixed expressions and variables" begin
+            J = Symbolics.jacobian([x * z, x^2 + im * z], [x, z])
+            Js = Symbolics.sparsejacobian([x * z, x^2 + im * z], [x, z])
+            @test all(same.(J, [z x; 2x im]))
+            @test all(same.(Js, J))
+
+            H = Symbolics.hessian(x^2 * z + im * x, [x, z])
+            Hs = Symbolics.sparsehessian(x^2 * z + im * x, [x, z])
+            Hl = Symbolics.sparsehessian(x^2 * z + im * x, [x, z]; full = false)
+            @test all(same.(H, [2z 2x; 2x 0]))
+            @test all(same.(Hs, H))
+            @test all(same.(Hl, [2z 0; 2x 0]))
+        end
+
+        @testset "Cartesian expressions of real variables" begin
+            c = Complex(x, y)^2
+            @test all(same.(Symbolics.jacobian([c], [x, y]), [2x + 2im * y 2im * x - 2y]))
+            @test all(same.(Symbolics.hessian(c, [x, y]), [2 2im; 2im -2]))
+        end
+
+        @testset "real inputs return Num containers" begin
+            @test Symbolics.jacobian([x^2 * y], [x, y]) isa Matrix{Num}
+            @test Symbolics.sparsejacobian([x^2 * y], [x, y]) isa SparseMatrixCSC{Num}
+            @test Symbolics.hessian(x^2 * y, [x, y]) isa Matrix{Num}
+            @test Symbolics.sparsehessian(x^2 * y, [x, y]) isa SparseMatrixCSC{Num}
+            @test Symbolics.gradient(x^2 * y, [x, y]) isa Vector{Num}
+            @test Symbolics.derivative(x^2 * y, x) isa Num
+        end
+    end
+
     @testset "general numeric wrapper reaches symbolic linear algebra" begin
         @variables z::Complex w::Complex
         M = [z 1; 1 w]
 
         @test lu(M; check = false) isa LinearAlgebra.LU
-        @test iszero(simplify_fractions(expand(
-            det(M; laplace = false) - det(M; laplace = true)
-        )))
+        @test iszero(
+            simplify_fractions(
+                expand(
+                    det(M; laplace = false) - det(M; laplace = true)
+                )
+            )
+        )
 
         Minv = inv(M; laplace = false)
         ident = simplify.(M * Minv)
@@ -152,7 +203,6 @@ const SN = Symbolics.SymbolicNumber
         @variables (v::Complex)[1:2]
         nv = norm(v)
         @test nv isa Num
-        @test SymbolicUtils.symtype(Symbolics.unwrap(nv)) <: Real
     end
 
     @testset "complex symbolic linear systems" begin

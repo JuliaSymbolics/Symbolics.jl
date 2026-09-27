@@ -416,8 +416,6 @@ let
     @test Symbolics.is_derivative(D(Z))
     @test !Symbolics.is_derivative(Z)
 
-    # A complex-capable symbolic function remains atomic, so applying `Differential`
-    # produces one derivative term just like any other scalar symbolic function.
     @variables W(t)::Complex
     @test Symbolics.is_derivative(D(W))
     @test Symbolics.is_derivative(Symbolics.unwrap(D(W)))

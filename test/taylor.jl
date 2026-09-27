@@ -64,9 +64,8 @@ sol = x_coeffs .=> [1, -1//5, -1//25, -1//125] # e.g. https://ekamperi.github.io
 eqs = substitute(eqs, Dict(sol))
 @test all(isequal(eq.lhs, eq.rhs) for eq in eqs)
 
-# Complex equations stay atomic. Their Cartesian projections still agree with the
-# corresponding real/imaginary Taylor systems.
-atomic = evaluate(taylor(exp(im*x) ~ 0, x, 0:5))
+# system of equations
+atomic = evaluate(taylor(exp(im * x) ~ 0, x, 0:5))
 split = evaluate(taylor([cos(x) ~ 0, sin(x) ~ 0], x, 0:5))
 @test atomic isa Equation
 @test evalsol(simplify(real(atomic.lhs - atomic.rhs) - (split[1].lhs - split[1].rhs))) == 0

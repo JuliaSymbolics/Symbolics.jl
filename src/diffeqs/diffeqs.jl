@@ -424,9 +424,8 @@ function exp_trig_particular_solution(eq::SymbolicLinearODE)
         return nothing
     end
 
-    # Do the complex response formula but project it analytically onto real Cartesian
-    # components. Keeping p(r + ib) = u + iv separate avoids both atomic `real(exp(z))`
-    # nodes and floating-point Complex division for exact coefficients.
+    # do complex rrf
+    # figure out how many times p needs to be differentiated before denominator isn't 0
     k = 0
     @variables 𝓈
     p = characteristic_polynomial(eq, 𝓈)

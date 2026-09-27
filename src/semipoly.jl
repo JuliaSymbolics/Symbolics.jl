@@ -182,10 +182,6 @@ Returns a tuple of two elements:
 """
 polynomial_coeffs(expr, vars) = semipolynomial_form(expr, vars, Inf)
 
-# Coefficient extraction works on raw symbolic expressions. Wrap only at the container
-# boundary, then promote to one homogeneous wrapper type. Real-only forms therefore retain
-# `Num`, while the presence of any genuinely complex coefficient promotes the container to
-# `SymbolicNumber` without falling back to `Number` or `Any` storage.
 function _wrap_semipoly_coefficients(xs)
     isempty(xs) && return Num[]
     ys = wrap.(xs)
@@ -216,7 +212,7 @@ function semilinear_form(exprs::AbstractArray, vars)
         end
     end
 
-    sparse(I, J, _wrap_semipoly_coefficients(V), length(exprs), length(vars)), wrap.(nls)
+    return sparse(I, J, _wrap_semipoly_coefficients(V), length(exprs), length(vars)), wrap.(nls)
 end
 
 """

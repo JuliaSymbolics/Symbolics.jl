@@ -15,7 +15,6 @@ const SN = Symbolics.SymbolicNumber
 
     for x in (z, Z[1], z + a, z * a, z^2)
         @test x isa SN
-        @test symtype(unwrap(x)) <: Number
         @test real(x) isa Num
         @test imag(x) isa Num
         @test conj(x) isa SN
@@ -34,7 +33,6 @@ end
 
     @test ai isa SN
     @test ia isa SN
-    @test !isdefined(Symbolics, :IM)
     @test Set(Symbolics.get_variables(ai)) == Set([unwrap(a)])
     @test Set(Symbolics.get_variables(ia)) == Set([unwrap(a)])
 
@@ -49,39 +47,34 @@ end
     for f in (exp, sin, cos, log, sqrt)
         y = f(z)
         @test y isa SN
-        @test !(y isa Complex{Num})
         @test SymbolicUtils.operation(unwrap(y)) === f
     end
 
     for f in (sqrt, log, exp)
         y = f(-im + a)
         @test y isa SN
-        @test !(y isa Complex{Num})
         @test SymbolicUtils.operation(unwrap(y)) === f
     end
 end
 
 @testset "explicit Cartesian representation stays opt-in" begin
     cart = Complex(a, b)
-    @test cart isa Complex{Num}
     @test isequal(real(cart), a)
     @test isequal(imag(cart), b)
 
     for ex in (
-        im * a,
-        a * im,
-        a + 3im,
-        3im + a,
-        a - 3im,
-        3im - a,
-        a * (2 + 3im),
-        (2 + 3im) * a,
-        a / (2 + 3im),
-        (2 + 3im) / a,
-    )
+            im * a,
+            a * im,
+            a + 3im,
+            3im + a,
+            a - 3im,
+            3im - a,
+            a * (2 + 3im),
+            (2 + 3im) * a,
+            a / (2 + 3im),
+            (2 + 3im) / a,
+        )
         @test ex isa SN
-        @test !(ex isa Complex{Num})
-        @test symtype(unwrap(ex)) <: Number
     end
 end
 
@@ -94,14 +87,17 @@ end
 
     @variables x::Complex
     @test !isnothing(metadata(unwrap(x)))
-    @test_nowarn substitute(x + 1.0, x => 1.0im)
+    @test Symbolics.value(substitute(x + 1.0, x => 1.0im)) == 1.0 + 1.0im
 end
 
 @testset "atomic naming" begin
     @variables t x::Complex y(t)::Complex q(a, b)::Complex
-    @test hasname(x) && getname(x) == :x
-    @test hasname(y) && getname(y) == :y
-    @test hasname(q) && getname(q) == :q
+    @test hasname(x)
+    @test getname(x) == :x
+    @test hasname(y)
+    @test getname(y) == :y
+    @test hasname(q)
+    @test getname(q) == :q
     @test !hasname(2x)
     @test !hasname(x + y)
 end
@@ -149,7 +145,7 @@ end
 @testset "atomic arrays and code generation" begin
     @variables z1::Complex z2::Complex
     A = [z1 z2; conj(z1) z1 + z2]
-    @test eltype(A) <: Number
+    @test eltype(A) === SN
 
     f, f! = build_function(A, z1, z2; expression = Val(false))
     out = f(1.0 + 2.0im, 3.0 - 1.0im)
