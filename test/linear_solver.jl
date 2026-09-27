@@ -157,10 +157,6 @@ end
 
 @testset "`linear_expansion` remainder is free of `x` inside opaque calls" begin
     @variables x h w c g(..)
-    # The `x`-coefficients inside `g`'s argument cancel (`-h*x + h*x`), so the
-    # argument is affine in `x` with a zero coefficient. The remainder must
-    # still be rewritten to the `x`-free form; returning the original argument
-    # leaks `x` into `b`, which breaks consumers that treat `b` as constant.
     ex = g(-h * x + ifelse(c > 0, h * x, h * x) + w)
     a, b, islin = Symbolics.linear_expansion(ex, x)
     @test islin

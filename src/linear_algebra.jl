@@ -530,10 +530,7 @@ function (lex::LinearExpander)(t::SymbolicT; need_remainder::Bool = true)
                     _linear_expansion_predicate(lex, arg) && return (COMMON_ZERO, COMMON_ZERO, false)
                     a, b, islin = _linear_expansion_recurse(lex, arg)
                     (_iszero(a) && islin) || return (COMMON_ZERO, COMMON_ZERO, false)
-                    # An argument can have a zero `x`-coefficient while still
-                    # containing `x` syntactically (the terms cancel inside the
-                    # argument). Substitute the rewritten remainder so `b` is
-                    # free of `x`.
+                    # Keep rewritten arguments so the opaque call remainder is x-free.
                     if need_remainder && !isequal(b, arg)
                         if !dirty
                             newargs = copy(args)
