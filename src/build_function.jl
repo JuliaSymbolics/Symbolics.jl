@@ -549,7 +549,13 @@ function _make_sparse_array(arr, similarto)
         newarr = _make_array(parent(arr), typeof(parent(arr)))
         return term(setparent, nzmap(Returns(true), arr), newarr)
     else
-        newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))})
+        # For an empty `nzval` there is nothing to infer an eltype from, and
+        # `symtype(eltype(arr))` is `DataType` for symbolic eltypes, so the
+        # `Vector{symtype(eltype(arr))}` hint carries no type information. Use a
+        # concrete fallback (matching the dense path's empty output) so the result
+        # is not `SparseMatrixCSC{Any}`.
+        output_eltype = isempty(arr.nzval) ? Int64 : nothing
+        newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))}, output_eltype)
         return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), true)
     end
 end
@@ -561,12 +567,12 @@ function _make_array(rhs::LowerTriangular, similarto)
     return term(LowerTriangular, _make_array(parent(rhs), similarto))
 end
 
-function _make_array(rhss::AbstractArray, similarto)
+function _make_array(rhss::AbstractArray, similarto, output_eltype = nothing)
     arr = nzmap(x->_make_array(x, similarto), rhss)
     if _issparse(arr)
         _make_sparse_array(arr, similarto)
     else
-        MakeArray(arr, similarto)
+        MakeArray(arr, similarto, output_eltype)
     end
 end
 
