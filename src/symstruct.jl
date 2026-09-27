@@ -141,7 +141,7 @@ macro symstruct(T, opts = Expr(:block))
         end
     end)
 
-    push!(block.args, __record_ctors_expr(raw_T, raw_where))
+    literal_constructors = true
 
     @assert Meta.isexpr(opts, :block) """
     Options to `@symstruct` must be specified as a `begin...end` block. Got $opts.
@@ -170,9 +170,26 @@ macro symstruct(T, opts = Expr(:block))
             """
             field = args[1]
             push!(block.args, __field_shape_expr(T, field, where_args, val))
+        elseif opt === :literal_constructors
+            @assert isempty(args) """
+            The `literal_constructors` option must be of the form \
+            `literal_constructors() = value`. Arguments $args were found.
+            """
+            # The right-hand side of an option parses as a short-form function body, so
+            # it arrives wrapped in a block carrying line information.
+            optval = __unwrap_option_value(val)
+            @assert optval isa Bool """
+            The `literal_constructors` option must be given a literal `Bool`. Found \
+            `$optval`.
+            """
+            literal_constructors = optval
         else
             error("Unsupported option $opt.")
         end
+    end
+
+    if literal_constructors
+        push!(block.args, __record_ctors_expr(raw_T, raw_where))
     end
 
     return block
@@ -227,6 +244,18 @@ function __record_ctors_expr(raw_T, raw_where)
             end
         end
     end
+end
+
+"""
+    $TYPEDSIGNATURES
+
+The value of a `@symstruct` option, unwrapping the block its right-hand side parses into.
+"""
+function __unwrap_option_value(val)
+    Meta.isexpr(val, :block) || return val
+    body = filter(x -> !(x isa LineNumberNode), val.args)
+    length(body) == 1 || return val
+    return only(body)
 end
 
 function __field_shape_expr(T::Union{Symbol, Expr}, field::QuoteNode,

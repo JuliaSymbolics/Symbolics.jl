@@ -47,6 +47,7 @@ record_type(::RecordLiteral{T}) where {T} = T
 Return `true` if `x` is a symbolic struct literal (see [`RecordLiteral`](@ref)).
 """
 is_record_literal(x) = false
+is_record_literal(x::SymStruct) = is_record_literal(unwrap(x))
 function is_record_literal(x::SymbolicT)
     @match x begin
         BSImpl.Term(; f) => f isa RecordLiteral
@@ -58,7 +59,7 @@ end
 # field it gives back a literal - which the constructor methods `@symstruct` registers
 # would also do, but only for structs narrow enough to have been given them.
 function (::RecordLiteral{T})(args...) where {T}
-    any(a -> unwrap(a) isa SymbolicT, args) && return record_literal(T, args)
+    any(a -> unwrap(a) isa SymbolicT, args) && return record_literal_term(T, args)
     return T(args...)
 end
 
@@ -79,6 +80,20 @@ only one available for structs with more than `$(RECORD_LITERAL_MAX_FIELDS)` fie
 generating those methods would be prohibitive.
 """
 function record_literal(::Type{T}, args::Tuple) where {T}
+    term = record_literal_term(T, args)
+    # Wrapped like any other symbolic of a registered struct type, so that `T(p, q).x`
+    # reaches `getproperty` on `SymStruct` and folds, as it does for a struct variable.
+    has_symwrapper(T) || return term
+    return wrapper_type(T)(term)
+end
+
+"""
+    $TYPEDSIGNATURES
+
+The unwrapped term behind [`record_literal`](@ref), for the operation itself and anything
+else working at the level of terms rather than of wrapped symbolics.
+"""
+function record_literal_term(::Type{T}, args) where {T}
     nf = fieldcount(T)
     if length(args) != nf
         throw(ArgumentError(LazyString(

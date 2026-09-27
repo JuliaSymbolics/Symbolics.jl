@@ -40,6 +40,21 @@ struct RLWide
 end
 @symstruct RLWide
 
+# Opts out of the generated constructors and handles the symbolic case itself, which is
+# what a struct's owner can do to avoid `2^nfields - 1` methods.
+struct RLHand
+    a::Float64
+    b::Float64
+    function RLHand(args...)
+        any(x -> unwrap(x) isa Symbolics.SymbolicT, args) &&
+            return record_literal(RLHand, args)
+        return new(args...)
+    end
+end
+@symstruct RLHand begin
+    literal_constructors() = false
+end
+
 @variables q1 q2 q3
 
 @testset "construction" begin
@@ -78,7 +93,7 @@ end
     args = ntuple(i -> i, 9)
     # No constructor methods are generated, so this stays concrete.
     @test RLWide(args...) isa RLWide
-    @test is_record_literal(unwrap(record_literal(RLWide, args)))
+    @test is_record_literal(record_literal(RLWide, args))
     @test_throws ArgumentError record_literal(RLPair, (1.0,))
 end
 
@@ -98,13 +113,27 @@ end
 @testset "a single array-valued field is not read as a field list" begin
     # The field list is a `Tuple`; anything else is one field value. Without that, an
     # array-valued field of a one-field struct is mistaken for two fields.
-    lit = record_literal(RLArrField, [1.0, 2.0])
+    lit = unwrap(record_literal(RLArrField, [1.0, 2.0]))
     @test is_record_literal(lit)
     @test length(SU.arguments(lit)) == 1
     @test SU.symtype(lit) === RLArrField
 
     # A tuple is still read as the field list.
-    @test length(SU.arguments(record_literal(RLPair, (1.0, 2.0)))) == 2
+    @test length(SU.arguments(unwrap(record_literal(RLPair, (1.0, 2.0))))) == 2
+end
+
+@testset "`literal_constructors() = false` skips the generated methods" begin
+    # Registration is unaffected; only the constructor methods are skipped.
+    @test Symbolics.has_symwrapper(RLHand)
+    @test length(methods(RLHand)) == 1
+    @test length(methods(RLPair)) > 1
+
+    # The hand-written constructor covers both paths itself.
+    @test RLHand(1.0, 2.0) isa RLHand
+    lit = RLHand(q1, 2.0)
+    @test is_record_literal(unwrap(lit))
+    @test SU.symtype(unwrap(lit)) === RLHand
+    @test isequal(unwrap(SymStruct{RLHand}(unwrap(lit)).a), unwrap(q1))
 end
 
 @testset "field access folds through a literal" begin
