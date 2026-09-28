@@ -462,7 +462,10 @@ function make_array(s::ShardedForm, closed_args, arr, similarto)
     arrays = map(slices) do slice
         Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
-    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
+    return SpawnFetch{typeof(s)}(
+        first.(arrays), last.(arrays),
+        VcatReshape(size(arr))
+    )
 end
 
 struct Funcall{F, T}
@@ -472,12 +475,22 @@ end
 
 (f::Funcall)() = f.f(f.args...)
 
+struct VcatReshape{Dims}
+    dims::Dims
+end
+
+(c::VcatReshape)(xs...) = reshape(vcat(xs...), c.dims)
+
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false))),
-                       ($(toexpr.(a, (st,))...),)))
+        ex = :(
+            $Funcall(
+                $(toexpr(thunk, st)),
+                ($(toexpr.(a, (st,))...),)
+            )
+        )
         quote
             let
                 task = Base.Task($ex)
@@ -593,10 +606,14 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
         fs = map(slices) do slice
             recursive_split(leaf_f, s, out, args, first.(slice), last.(slice))
         end
-        return Func(args, [],
-                    SpawnFetch{typeof(s)}(fs, [args for f in fs],
-                                          (@inline noop(x...) = nothing)),
-                    [])
+        return Func(
+            args, [],
+            SpawnFetch{typeof(s)}(
+                fs, [args for f in fs],
+                Returns(nothing)
+            ),
+            []
+        )
     end
 end
 

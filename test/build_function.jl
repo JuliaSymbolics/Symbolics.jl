@@ -404,3 +404,27 @@ end
     @test_nowarn fjac_upper_expr(Jtmp, utmp)
     @test Jtmp[3] == utmp[2]
 end
+
+@testset "MultithreadedForm expressions can be written to a file and included" begin
+    @variables x y
+    A = [
+        x^2 + y 0 2x
+        0 0 2y
+        y^2 + x 0 0
+    ]
+    u = [1.0, 2.0]
+    expected = @invokelatest eval(build_function(A, [x, y])[1])(u)
+    oop_ex, iip_ex = build_function(A, [x, y]; parallel = Symbolics.MultithreadedForm())
+    mktempdir() do dir
+        oop_path = joinpath(dir, "f_oop.jl")
+        iip_path = joinpath(dir, "f_iip.jl")
+        write(oop_path, string(oop_ex))
+        write(iip_path, string(iip_ex))
+        f_oop = include(oop_path)
+        f_iip = include(iip_path)
+        @test @invokelatest(f_oop(u)) == expected
+        out = zeros(3, 3)
+        @invokelatest f_iip(out, u)
+        @test out == expected
+    end
+end
