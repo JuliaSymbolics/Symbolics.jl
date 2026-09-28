@@ -310,6 +310,11 @@ eval_subs(ex, subs) = eval(Symbolics.toexpr(substitute(Symbolics.unwrap(ex), sub
     @test f_sqrt(4.0, 0.7) == 0.25
     # a variable occurring only in the condition has zero derivative
     @test isequal(only(dstar_jacobian([ifelse(z > 0, x, y)], [z])), 0)
+    # distinct Add keys can fold to the same select term: coefficients must
+    # accumulate rather than overwrite (2 + 3 = 5, not 3)
+    @test isequal(Symbolics._fold_ifelse_guards(
+            unwrap(2ifelse(x > 0, y, 0) + 3y * ifelse(x > 0, 1, 0))),
+        5ifelse(x > 0, y, 0))
 end
 
 # Array symbolics
@@ -418,7 +423,9 @@ end
         dvals = Float64.(Symbolics.value.(substitute.(dj, (fsubs,); fold = Val(true))))
         all(isfinite, jvals) && all(isfinite, dvals) || continue
         evaluated += 1
-        @test isapprox(dvals, jvals; rtol = 1e-6)
+        # atol covers entries that are exact-zero analytically but leave
+        # ~1e-17 cancellation noise in either backend
+        @test isapprox(dvals, jvals; rtol = 1e-6, atol = 1e-12)
     end
     # guard against the generator producing nothing usable
     @test evaluated > 20

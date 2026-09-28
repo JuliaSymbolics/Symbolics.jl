@@ -615,7 +615,7 @@ function get_dominators(dg::DerivativeGraph{T}, root::Integer) where {T}
                 if first_parent
                     new_idom = parent
                     first_parent = false
-                elseif isassigned(doms, parent)
+                else
                     new_idom = get_common_parent(parent, new_idom)
                     isnothing(new_idom) && break
                 end
@@ -638,7 +638,7 @@ function get_dominators(dg::DerivativeGraph{T}, root::Integer) where {T}
 end
 
 function get_postdominators(dg::DerivativeGraph{T}, var::Integer) where {T}
-    pdoms = Vector{Union{Nothing, T}}(undef, length(dg))
+    pdoms = fill!(Vector{Union{Nothing, T}}(undef, length(dg)), nothing)
     for vi in values(dg.var_idx_to_postorder)
         pdoms[vi] = vi
     end
@@ -696,7 +696,7 @@ function get_postdominators(dg::DerivativeGraph{T}, var::Integer) where {T}
                 if first_child
                     new_pidom = child
                     first_child = false
-                elseif isassigned(pdoms, child)
+                else
                     new_pidom = get_common_child(child, new_pidom)
                     isnothing(new_pidom) && break
                 end
@@ -1244,7 +1244,10 @@ function _fold_ifelse_guards(ex)
             for (k, v) in dict
                 k2 = _fold_ifelse_guards(k)
                 changed |= k2 !== k
-                newdict[k2] = v
+                # distinct dict keys can fold to the same key (e.g. an Add
+                # holding both `ifelse(c,x,0)` and `x*ifelse(c,1,0)`):
+                # accumulate so the folded coefficient isn't dropped
+                newdict[k2] = haskey(newdict, k2) ? newdict[k2] + v : v
             end
             changed || return ex
             if variant == SymbolicUtils.AddMulVariant.ADD
@@ -1288,16 +1291,16 @@ end
 """
 $(SIGNATURES)
 
-Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differentiation algorithm using the [`DerivativeGraph`](@ref) data structure.
+Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differentiation algorithm using the `DerivativeGraph` data structure.
 
 (see [this paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/main-65.pdf) for more details on the algorithm)
 
-Mostly the same usage as [`jacobian`](@ref), but asymptotically faster for large Rn->Rm expressions. `Integral` terms and complex expressions are not supported.
+Mostly the same usage as [`jacobian`](@ref), but can be faster on large expressions with heavy shared subexpressions. `Integral` terms and complex expressions are not supported.
 
 # Arguments
 
-- `roots::AbstractVector`: Vector of expressions to differentate or array-type symbolic expression (e.g. function registered with `@register_array_symbolic`)
-- `vars::AbstractVector`: Vector of variables to differentate w.r.t. or single array-type variable (e.g. `@variables x[1:4]`)
+- `roots::AbstractVector`: Vector of expressions to differentiate or array-type symbolic expression (e.g. function registered with `@register_array_symbolic`)
+- `vars::AbstractVector`: Vector of variables to differentiate w.r.t. or single array-type variable (e.g. `@variables x[1:4]`)
 """
 function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
     roots isa Arr && (roots = scalarize(unwrap(roots)))
@@ -1384,12 +1387,12 @@ $(SIGNATURES)
 
 Computes the derivative of `root` w.r.t. `var` using the D* differentiation algorithm.
 
-Mostly the same usage as [`derivative`](@ref), but asymptotically faster for large Rn->Rm expressions. `Integral` terms and complex expressions are not supported.
+Mostly the same usage as [`derivative`](@ref), but can be faster on large expressions with heavy shared subexpressions. `Integral` terms and complex expressions are not supported.
 
 Wrapper for R1->R1 case of `dstar_jacobian`. See [`dstar_jacobian`](@ref) for more information.
 
 # Arguments
-- `root`: Expression to differentate
-- `var`: Variable to differentate w.r.t.
+- `root`: Expression to differentiate
+- `var`: Variable to differentiate w.r.t.
 """
 dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}) = Num(only(dstar_jacobian(unwrap.([root]), unwrap.([var]))))

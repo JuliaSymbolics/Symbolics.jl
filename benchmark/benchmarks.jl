@@ -124,7 +124,9 @@ const SUITE_AD = SUITE["AD"] = BenchmarkGroup()
 for depth in (3, 5, 7, 9, 11)
     expr = _random_expr(Xoshiro(42), _ad_atoms, depth)
     SUITE_AD["expand_derivatives/depth=$depth"] = @benchmarkable expand_derivatives($(_Dp(expr)))
-    SUITE_AD["dstar_derivative/depth=$depth"] = @benchmarkable Symbolics.dstar_derivative($expr, $p)
+    # absent when the suite is run against a base revision predating D*
+    isdefined(Symbolics, :dstar_derivative) &&
+        (SUITE_AD["dstar_derivative/depth=$depth"] = @benchmarkable Symbolics.dstar_derivative($expr, $p))
 end
 
 # ── symbolic AD: dstar_jacobian vs jacobian ───────────────────────────────────
@@ -170,7 +172,9 @@ const _DJ_WORKLOADS = [
 ]
 
 for (name, roots, vars) in _DJ_WORKLOADS
-    SUITE_DJ["$name/dstar"] = @benchmarkable Symbolics.dstar_jacobian($roots, $vars)
+    # absent when the suite is run against a base revision predating D*
+    isdefined(Symbolics, :dstar_jacobian) &&
+        (SUITE_DJ["$name/dstar"] = @benchmarkable Symbolics.dstar_jacobian($roots, $vars))
     SUITE_DJ["$name/jacobian"] = @benchmarkable jacobian($roots, $vars)
 end
 
