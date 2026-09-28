@@ -18,10 +18,20 @@ Base.promote_rule(::Type{Num}, ::Type{Interval{T}}) where {T <: NumTypes} = Num
 # SymbolicUtils' `/` (and `\`) promote_symtype falls through to
 # `promote_type(Interval, Real)`, which tries to form `Interval{Real}` and throws.
 # Unlike `*`, `/` has no `T <: S => S` shortcut in SymbolicUtils.
+# Narrow to `<:Real` so Complex symtypes fall through to SymbolicUtils' Complex
+# branches. An explicit `(Interval, Interval)` method is required because
+# `Interval <: Real`, so the two `<:Real` methods would otherwise be ambiguous.
 for op in (/, \)
     @eval begin
-        SymbolicUtils.promote_symtype(::typeof($op), ::Type{<:Interval}, ::Type{<:Number}) = Real
-        SymbolicUtils.promote_symtype(::typeof($op), ::Type{<:Number}, ::Type{<:Interval}) = Real
+        SymbolicUtils.promote_symtype(
+            ::typeof($op), ::Type{<:Interval}, ::Type{<:Interval}
+        ) = Real
+        SymbolicUtils.promote_symtype(
+            ::typeof($op), ::Type{<:Interval}, ::Type{<:Real}
+        ) = Real
+        SymbolicUtils.promote_symtype(
+            ::typeof($op), ::Type{<:Real}, ::Type{<:Interval}
+        ) = Real
     end
 end
 
