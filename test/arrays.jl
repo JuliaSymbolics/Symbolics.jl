@@ -684,6 +684,22 @@ end
     @test build_function(x in 1:3, x; expression = Val{false})(2) === true
 end
 
+@testset "Issue#1955: `collect` of empty `Arr` retains eltype" begin
+    @variables X[1:0, 1:10] Y[1:0]
+    cx = collect(X)
+    @test cx isa Matrix{Num}
+    @test eltype(cx) === Num
+    @test size(cx) == (0, 10)
+    cy = collect(Y)
+    @test cy isa Vector{Num}
+    @test eltype(cy) === Num
+    @test size(cy) == (0,)
+    @variables Z[1:2, 1:3]
+    cz = collect(Z)
+    @test cz isa Matrix{Num}
+    @test isequal(cz, Num[Z[1, 1] Z[1, 2] Z[1, 3]; Z[2, 1] Z[2, 2] Z[2, 3]])
+end
+
 @testset "Issue#1975: `dims` reductions do not mutate their argument's shape" begin
     @variables A[1:5, 1:4] W[1:3, 1:4, 1:5]
     reductions = [
