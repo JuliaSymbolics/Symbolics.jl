@@ -80,10 +80,15 @@ $(TYPEDSIGNATURES)
 
 Solve equation(s) `eqs` for a set of variables `vars`.
 
-Assumes `length(eqs) == length(vars)`
+Requires a square linear system: as many independent linear equations as
+unknowns (`length(eqs) == length(vars)` after expansion). Non-square systems
+throw an `ArgumentError` suggesting [`Symbolics.symbolic_solve`](@ref) or solving a
+square linear subsystem first.
 
 Currently only works if all equations are linear. `check` if the expr is linear
-w.r.t `vars`.
+w.r.t `vars`; when `check=true` (default), nonlinearity throws an
+`ArgumentError` naming the offending equation, and when `check=false` returns
+`nothing`.
 
 # Examples
 ```jldoctest
@@ -103,8 +108,13 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
     # simplify defaults for `false` as canonicalization should handle most of
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
-    check && @assert islinear
-    islinear || return nothing
+    if !islinear
+        check || return nothing
+        throw(ArgumentError(_symbolic_linear_solve_nonlinear_msg(eq, var)))
+    end
+    if a isa AbstractMatrix && size(a, 1) != size(a, 2)
+        throw(ArgumentError(_symbolic_linear_solve_nonsquare_msg(size(a, 1), size(a, 2))))
+    end
     # a * x + b = 0
     x = __solve(a, b, simplify)
     simplify || return x
@@ -113,6 +123,36 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
     end
     map!(SymbolicUtils.simplify, x, x)
     return x
+end
+
+function _symbolic_linear_solve_nonsquare_msg(neqs::Integer, nvars::Integer)
+    eqword = neqs == 1 ? "equation" : "equations"
+    varword = nvars == 1 ? "unknown" : "unknowns"
+    return string(
+        "symbolic_linear_solve requires as many independent linear equations as unknowns; ",
+        "got $neqs $eqword in $nvars $varword. ",
+        "For underdetermined or nonlinear systems use symbolic_solve, ",
+        "or solve a square linear subsystem first.",
+    )
+end
+
+function _symbolic_linear_solve_nonlinear_msg(eq, var)
+    vars = var isa AbstractArray ? collect(vec(var)) : [var]
+    eqs = eq isa AbstractArray ? collect(vec(eq)) : [eq]
+    for (i, e) in enumerate(eqs)
+        _, _, islin = linear_expansion([e], vars)
+        if !islin
+            return string(
+                "symbolic_linear_solve requires equations that are linear in the unknowns; ",
+                "equation $i is not linear in $vars. ",
+                "For nonlinear systems use symbolic_solve.",
+            )
+        end
+    end
+    return string(
+        "symbolic_linear_solve requires equations that are linear in the unknowns $vars. ",
+        "For nonlinear systems use symbolic_solve.",
+    )
 end
 
 function __solve(a::AbstractArray{SymbolicT}, b::AbstractArray{SymbolicT}, simplify::Bool)
