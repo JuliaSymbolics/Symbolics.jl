@@ -492,8 +492,7 @@ function toexpr(p::SpawnFetch{MultithreadedForm}, st)
             )
         )
         quote
-            let
-                task = Base.Task($ex)
+            let task = Base.Task($ex)
                 task.sticky = false
                 Base.schedule(task)
                 task

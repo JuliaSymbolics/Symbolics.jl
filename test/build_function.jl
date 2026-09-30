@@ -428,3 +428,34 @@ end
         @test out == expected
     end
 end
+
+@testset "MultithreadedForm in-place function from Threads.@spawn" begin
+    # A race between the generated tasks can crash the whole Julia process, so
+    # the calls have to run in a subprocess with real worker threads.
+    script = joinpath(mktempdir(), "mt_iip_spawn.jl")
+    write(
+        script, """
+        using Symbolics
+        @variables x y
+        N = 8
+        A = Num[x^i + y^j for i in 1:N, j in 1:N]
+        u = [1.0, 2.0]
+        _, f_serial = build_function(A, [x, y]; parallel = Symbolics.SerialForm(), expression = Val(false))
+        _, f_par = build_function(A, [x, y]; parallel = Symbolics.MultithreadedForm(2, 4), expression = Val(false))
+        ref = zeros(N, N)
+        f_serial(ref, u)
+        f_par(zeros(N, N), u)
+        outs = [zeros(N, N) for _ in 1:200]
+        ok = all(fetch, map(1:200) do i
+            Threads.@spawn begin
+                f_par(outs[i], u)
+                outs[i] == ref
+            end
+        end)
+        println(ok ? "ALL_CORRECT" : "MISMATCH")
+        exit(ok ? 0 : 1)
+        """
+    )
+    cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t4,0 $script`
+    @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
+end
