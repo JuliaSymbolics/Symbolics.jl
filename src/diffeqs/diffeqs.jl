@@ -169,10 +169,10 @@ julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [9, -6], 4exp(3t)))
 C₁*exp((3//1)*t) + C₂*exp((3//1)*t)*t + (2//1)*exp(3t)*(t^2)
 
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [6, 5], 2exp(-t)*cos(t)))
-C₁*exp((-2//1)*t) + C₂*exp((-3//1)*t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
+C₁*exp((-3//1)*t) + C₂*exp((-2//1)*t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
 
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5))
-(11//9) - (2//3)*t + C₁*exp(t) + C₂*exp((-3//1)*t)
+(11//9) - (2//3)*t + C₁*exp((-3//1)*t) + C₂*exp(t)
 ```
 """
 function symbolic_solve_ode(eq::SymbolicLinearODE)

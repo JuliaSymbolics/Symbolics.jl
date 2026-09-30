@@ -109,6 +109,16 @@ end
     @test isequal(Symbolics.value.(symbolic_solve(x^2 + 1, x)), [im, -im])
 end
 
+@testset "Documented symbolic_solve root order (#2015)" begin
+    # Docstring examples must match deterministic sorting (numeric roots before
+    # symbolic roots_of entries); stale order broke Documenter doctests after #1993.
+    solver_source = read(joinpath(dirname(pathof(Symbolics)), "solver/main.jl"), String)
+    command = "Symbolics.symbolic_solve(x^7 - 1, x)"
+    expected = first(split(first(split(split(solver_source, "julia> " * command * "\n")[2], "\n\n")), "\n```"))
+    actual = repr(MIME("text/plain"), eval(Meta.parse(command)))
+    @test actual == expected
+end
+
 @testset "Deg 1 univar" begin
     @test isequal(unwrap_const(only(symbolic_solve(x+1, x))), -1)
 
