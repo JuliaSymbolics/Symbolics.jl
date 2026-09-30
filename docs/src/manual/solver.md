@@ -7,8 +7,10 @@ means that it only uses symbolic (algebraic) methods and outputs exact solutions
 Symbolics.symbolic_solve
 ```
 
-One other symbolic solver is `symbolic_linear_solve` which is limited compared to 
-`symbolic_solve` as it only solves linear equations.
+One other symbolic solver is `symbolic_linear_solve` which is limited compared to
+`symbolic_solve` as it only solves square linear systems (as many independent
+linear equations as unknowns). Non-square or nonlinear systems should use
+`symbolic_solve`, or a square linear subsystem should be solved first.
 
 ```@docs
 Symbolics.symbolic_linear_solve
