@@ -698,6 +698,23 @@ end
     cz = collect(Z)
     @test cz isa Matrix{Num}
     @test isequal(cz, Num[Z[1, 1] Z[1, 2] Z[1, 3]; Z[2, 1] Z[2, 2] Z[2, 3]])
+    @variables cv[1:2]::Complex ce[1:0]::Complex
+    ccv = collect(cv)
+    @test ccv isa Vector{Complex{Num}}
+    @test eltype(ccv) === Complex{Num}
+    cce = collect(ce)
+    @test cce isa Vector{Complex{Num}}
+    @test eltype(cce) === Complex{Num}
+    @test size(cce) == (0,)
+    @variables s[1:2]::String se[1:0]::String
+    cs = collect(s)
+    @test cs isa AbstractVector
+    @test size(cs) == (2,)
+    @test isequal(cs, [s[1], s[2]])
+    cse = collect(se)
+    @test cse isa AbstractVector
+    @test eltype(cse) === eltype(cs)
+    @test size(cse) == (0,)
 end
 
 @testset "Issue#1975: `dims` reductions do not mutate their argument's shape" begin
