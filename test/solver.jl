@@ -250,7 +250,7 @@ end
     @test err isa AssertionError
     @test occursin("Invalid input of type", err.msg)
     @test occursin("Vector", err.msg)
-    
+
     # TODO: test this properly
     sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
 

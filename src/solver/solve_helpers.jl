@@ -106,7 +106,7 @@ function check_expr_validity(expr)
     end
     iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
     @assert valid_type "Invalid input of type $type_expr (symtype $st)"
-    valid_type && return nothing
+    return valid_type && return nothing
 end
 function check_x(x)
     iscall(unwrap(x)) && @assert !hasderiv(unwrap(x)) "Differential equations are not currently supported"
