@@ -234,6 +234,22 @@ end
 @testset "Multivar solver" begin
     @variables x y z
     @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
+
+    # Vector-valued Equation should take the system path
+    sol_vec_eq = sort_arr(symbolic_solve([0, 0] ~ [x^2 - 4, x + y], [x, y]), [x, y])
+    sol_vec = sort_arr(symbolic_solve([0 ~ x^2 - 4, 0 ~ x + y], [x, y]), [x, y])
+    @test check_equal(sol_vec_eq, sol_vec)
+    @test check_equal(sol_vec_eq, sort_arr([Dict(x => -2, y => 2), Dict(x => 2, y => -2)], [x, y]))
+
+    err = try
+        Symbolics.check_expr_validity([x, y])
+        nothing
+    catch e
+        e
+    end
+    @test err isa AssertionError
+    @test occursin("Invalid input of type", err.msg)
+    @test occursin("Vector", err.msg)
     
     # TODO: test this properly
     sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
