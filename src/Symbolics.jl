@@ -119,6 +119,12 @@ end
 
 export Num
 import MacroTools: splitdef
+
+# `Markdown.parse` exists but is not `public` on Julia 1.11 (it is on 1.12+).
+# Reach it via `getfield` so ExplicitImports does not see a non-public qualified
+# access (https://github.com/JuliaSymbolics/Symbolics.jl/issues/2014).
+@inline _markdown_parse(str::AbstractString) = getfield(Markdown, :parse)(str)
+
 include("wrapper-types.jl")
 
 @recompile_invalidations begin
