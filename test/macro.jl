@@ -51,7 +51,7 @@ let
         size=(length(x) * 2, length(x) * 2)
         eltype=eltype(x)
     end
-    @test promote_symtype(ggg, symtype(unwrap(x))) == SymMatrix{Real}
+    @test promote_symtype(ggg, symtype(unwrap(x))) == SymMatrix{Real, 2}
 end
 
 # ndims specified
@@ -115,7 +115,7 @@ ccwa = CanCallWithArray2((length=10,))
     size=(size(x, 1), length(b), c.params.length)
     eltype=Real
 end
-@test promote_symtype(ccwa, symtype(unwrap(gg)), symtype(unwrap(x))) == Array{Real}
+@test promote_symtype(ccwa, symtype(unwrap(gg)), symtype(unwrap(x))) == Array{Real, 3}
 
 struct CanCallWithArray3{T}
     params::T
@@ -461,6 +461,22 @@ end
     end
     @variables x
     @test SU.shape(unwrap(foo3(x))) == SU.Unknown(2)
+end
+
+@testset "`@register_array_symbolic` errors when ndims cannot be inferred (#1845)" begin
+    err = try
+        @macroexpand @register_array_symbolic missing_ndims_f(x::AbstractVector) begin
+            size = size(x)
+            eltype = eltype(x)
+        end
+        nothing
+    catch e
+        e
+    end
+    @test err isa Exception
+    msg = sprint(showerror, err)
+    @test occursin("ndims", msg)
+    @test occursin("UnionAll", msg) || occursin("cannot be inferred", msg)
 end
 
 struct Bar{T} end
