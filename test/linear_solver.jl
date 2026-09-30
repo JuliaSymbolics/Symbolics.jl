@@ -60,6 +60,40 @@ eqs = [
 @test isequal(Symbolics.symbolic_linear_solve([x + y ~ 0], [x]), Symbolics.symbolic_linear_solve(x + y ~ 0, [x]))
 @test isequal(Symbolics.symbolic_linear_solve(2x/z + sin(z), x), sin(z) / (-2 / z))
 
+# Non-square and nonlinear systems: informative ArgumentError (#1336)
+@testset "symbolic_linear_solve non-square / nonlinear errors" begin
+    @variables x y z
+    err = try
+        Symbolics.symbolic_linear_solve([x + y ~ 1, x - y ~ 0, x + 2y ~ 3], x)
+        error("expected ArgumentError")
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("3 equations in 1 unknown", err.msg)
+    @test occursin("symbolic_solve", err.msg)
+
+    err2 = try
+        Symbolics.symbolic_linear_solve([x + y ~ 1], [x, y])
+        error("expected ArgumentError")
+    catch e
+        e
+    end
+    @test err2 isa ArgumentError
+    @test occursin("1 equation in 2 unknowns", err2.msg)
+
+    err3 = try
+        Symbolics.symbolic_linear_solve([x + y ~ 1, sin(x) ~ 0], [x, y])
+        error("expected ArgumentError")
+    catch e
+        e
+    end
+    @test err3 isa ArgumentError
+    @test occursin("not linear", err3.msg)
+    @test occursin("equation 2", err3.msg)
+    @test Symbolics.symbolic_linear_solve([x + y ~ 1, sin(x) ~ 0], [x, y], check=false) === nothing
+end
+
 @testset "linear_expansion with array variables" begin
     @variables x[1:2] y[1:2] z(..)
     @test !Symbolics.linear_expansion(z(x) + x[1], x[1])[3]
