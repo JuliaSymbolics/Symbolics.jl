@@ -280,7 +280,7 @@ end
 
 function transendence_basis(sys, vars)
     J = Symbolics.jacobian(sys, vars)
-    x0 = Dict(v => rand(-10:10) for v in vars)
+    x0 = Dict(v => rand(-10:10) for v in Symbolics.get_variables(sys))
     J_x0 = map(Symbolics.value, substitute(J, x0))
     rk, rref = Nemo.rref(Nemo.matrix(Nemo.QQ, J_x0))
     pivots = Int[]
