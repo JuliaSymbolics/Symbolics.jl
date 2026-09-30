@@ -91,7 +91,7 @@ eqs = [
     @test err3 isa ArgumentError
     @test occursin("not linear", err3.msg)
     @test occursin("equation 2", err3.msg)
-    @test Symbolics.symbolic_linear_solve([x + y ~ 1, sin(x) ~ 0], [x, y], check=false) === nothing
+    @test Symbolics.symbolic_linear_solve([x + y ~ 1, sin(x) ~ 0], [x, y], check = false) === nothing
 end
 
 @testset "linear_expansion with array variables" begin

@@ -104,7 +104,7 @@ julia> all(Symbolics.value.(Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 
 true
 ```
 """
-function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar case
+function symbolic_linear_solve(eq, var; simplify = false, check = true) # scalar case
     # simplify defaults for `false` as canonicalization should handle most of
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
