@@ -280,7 +280,7 @@ end
 
 function _rand_nonzero_int(bound = 1 << 20)
     r = rand(1:bound)
-    ifelse(rand(Bool), r, -r)
+    return ifelse(rand(Bool), r, -r)
 end
 
 function transendence_basis(sys, vars; ntrials = 3)
@@ -302,18 +302,18 @@ function transendence_basis(sys, vars; ntrials = 3)
             best_pivots = pivots
         end
     end
-    vars[setdiff(collect(1:length(vars)), best_pivots)]
+    return vars[setdiff(collect(1:length(vars)), best_pivots)]
 end
 
-function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, warns=true)
-    sol = solve_zerodim(eqs, vars; dropmultiplicity=dropmultiplicity, warns=warns)
+function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity = true, warns = true)
+    sol = solve_zerodim(eqs, vars; dropmultiplicity = dropmultiplicity, warns = warns)
     !isnothing(sol) && return sol
     tr_basis = transendence_basis(eqs, vars)
     isempty(tr_basis) && return nothing
     vars_gen = setdiff(vars, tr_basis)
     # Empty vars_gen would send solve_zerodim into an infinite separating-form loop.
     isempty(vars_gen) && return nothing
-    sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
+    sol = solve_zerodim(eqs, vars_gen; dropmultiplicity = dropmultiplicity, warns = warns)
     sol === nothing && return nothing
     for roots in sol
         for x in tr_basis
@@ -321,7 +321,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         end
     end
 
-    sol
+    return sol
 end
 
 end # module
