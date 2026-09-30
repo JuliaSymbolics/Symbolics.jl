@@ -247,7 +247,11 @@ function SymbolicUtils.scalarize(x::Arr{T, N}, ::Val{toplevel}) where {toplevel,
 end
 
 Base.isempty(x::Arr) = isempty(unwrap(x))
-Base.collect(x::Arr) = wrap.(collect(unwrap(x)))
+function Base.collect(x::Arr{T, N}) where {T, N}
+    out = Array{T, N}(undef, size(x))
+    out .= wrap.(collect(unwrap(x)))
+    return out
+end
 isarraysymbolic(x) = false
 # this should be validated in the constructor
 isarraysymbolic(x::Arr) = true
