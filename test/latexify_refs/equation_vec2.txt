@@ -1,4 +1,4 @@
 \begin{align}
-\frac{\mathrm{d}\left( u\left( x \right) \right)}{\mathrm{d}x} &= z \\
+\frac{\mathrm{d}u\left( x \right)}{\mathrm{d}x} &= z \\
 \frac{\mathrm{d}}{\mathrm{d}x} ~ y &= x ~ y
 \end{align}
