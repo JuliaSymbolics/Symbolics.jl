@@ -274,6 +274,9 @@ function diff2term(O::SymbolicT)
         return result
     end
 
+    if !hasname(inner)
+        throw(ArgumentError("`diff2term` expects the derivative of a variable, got $O; call `expand_derivatives` first"))
+    end
     return rename(inner, diff2term_name(inner, opchain))
 end
 diff2term(O::Num) = Num(diff2term(unwrap(O)))
