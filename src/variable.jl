@@ -29,6 +29,17 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 """
 struct VariableSource <: AbstractVariableMetadata end
 
+function _default_is_array_shaped(val)
+    u = unwrap(val)
+    if u isa AbstractArray
+        return ndims(u) > 0
+    elseif u isa SymbolicUtils.BasicSymbolic
+        ush = shape(u)
+        return !(ush isa SymbolicUtils.Unknown) && !isempty(ush)
+    end
+    return false
+end
+
 function setdefaultval(x, val)
     val === nothing && return x
     sh = shape(x)
@@ -36,8 +47,14 @@ function setdefaultval(x, val)
         if !(sh.ndims == -1 || ndims(val) == sh.ndims)
             throw(ArgumentError("Variable $x must have default of matching `ndims`. Got $val with `ndims` $(ndims(val))."))
         end
-    elseif !(val === missing || symtype(x) <: FnType || size(x) == size(val))
-        throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+    elseif val !== missing && !(symtype(x) <: FnType)
+        if isempty(sh)
+            if _default_is_array_shaped(val)
+                throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+            end
+        elseif size(x) != size(val)
+            throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+        end
     end
     return setmetadata(x, VariableDefaultValue, val)
 end
