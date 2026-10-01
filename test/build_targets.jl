@@ -94,6 +94,15 @@ let
                                                         target = Symbolics.CTarget(),
                                                         fname = :grad_f,
                                                         expression = Val{false})
+    err = try
+        Symbolics.build_function(∇f, [x, y, z], target = Symbolics.CTarget(),
+                                 expression = true)
+        error("expected ArgumentError")
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("Pass expression=Val{true}", err.msg)
 end
 
 @test Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.StanTarget()) ==
