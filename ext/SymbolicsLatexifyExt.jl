@@ -35,25 +35,25 @@ function latexify_derivatives(ex)
             dsym = "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")"
             den_ls = diffdenom(den)
             if Meta.isexpr(num, :call) && length(num.args) == 2 && num.args[1] !== :*
-                return Expr(:call, :/, Expr(:latexifymerge, dsym, num), den_ls)
+                return Expr(:call, :/, Expr(:latexifymerge, dsym, _latexify_merge_child(num)), den_ls)
             else
                 return Expr(
                     :latexifymerge,
                     LaTeXString("\\frac{$dsym}{$(den_ls.s)} ~ "),
-                    num
+                    _latexify_merge_child(num)
                 )
             end
         elseif x.args[1] === :_integral
             lower, upper, var_of_int, integrand = x.args[2:end]
-            body = Expr(:latexifymerge, "\\int_{", lower)
-            body = Expr(:latexifymerge, body, Expr(:latexifymerge, "}^{", upper))
+            body = Expr(:latexifymerge, "\\int_{", _latexify_merge_child(lower))
+            body = Expr(:latexifymerge, body, Expr(:latexifymerge, "}^{", _latexify_merge_child(upper)))
             body = Expr(:latexifymerge, body, "} ~ ")
-            body = Expr(:latexifymerge, body, var_of_int)
-            body = Expr(:latexifymerge, body, Expr(:latexifymerge, " ~ ", integrand))
+            body = Expr(:latexifymerge, body, _latexify_merge_child(var_of_int))
+            body = Expr(:latexifymerge, body, Expr(:latexifymerge, " ~ ", _latexify_merge_child(integrand)))
             return body
         elseif x.args[1] == :^ && length(x.args) == 3 && _latexify_power_base_needs_parens(x.args[2])
-            # `:latexifymerge` has no operator precedence; restore master's parentheses
-            # when a differential/integral form is raised to a power.
+            # `:latexifymerge` has no precedence; parenthesise a differential/integral
+            # form used as a power base.
             return Expr(
                 :call, :^,
                 Expr(:latexifymerge, "\\left( ", x.args[2], " \\right)"),
@@ -66,6 +66,23 @@ function latexify_derivatives(ex)
             return x
         end
     end
+end
+
+# `:latexifymerge` parenthesises any child with a non-`:none` operation. Leave
+# binary `+`/`*`/`/`/`-` bare so they stay grouped; wrap other `Expr` children
+# in `:block` so calls, refs and powers stay bare. Non-`Expr` atoms are already
+# `:none` and must not be block-wrapped (Latexify treats the block arg as `op`).
+function _latexify_needs_merge_parens(ex)
+    Meta.isexpr(ex, :call) || return false
+    op = ex.args[1]
+    (op isa Symbol && Base.isoperator(op)) || return false
+    op === :^ && return false
+    return length(ex.args) >= 3
+end
+
+function _latexify_merge_child(ex)
+    _latexify_needs_merge_parens(ex) && return ex
+    return ex isa Expr ? Expr(:block, ex) : ex
 end
 
 function _latexify_power_base_needs_parens(base)
