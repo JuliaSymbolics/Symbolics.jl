@@ -28,17 +28,14 @@ function cleanup_exprs(ex)
 end
 
 function latexify_derivatives(ex)
-    rawtex(x) = strip(let r = latexify(x; env = :raw)
-            r isa LaTeXString ? r.s : string(r)
-        end, '\$')
     return postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
         if x.args[1] == :_derivative
             num, den, deg = x.args[2:end]
             dsym = "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")"
             den_ls = diffdenom(den)
-            if Meta.isexpr(num, :call) && length(num.args) == 2
-                return Expr(:call, :/, LaTeXString(dsym * rawtex(num)), den_ls)
+            if Meta.isexpr(num, :call) && length(num.args) == 2 && num.args[1] !== :*
+                return Expr(:call, :/, Expr(:latexifymerge, dsym, num), den_ls)
             else
                 return Expr(
                     :latexifymerge,
@@ -48,8 +45,19 @@ function latexify_derivatives(ex)
             end
         elseif x.args[1] === :_integral
             lower, upper, var_of_int, integrand = x.args[2:end]
-            return LaTeXString(
-                "\\int_{$(rawtex(lower))}^{$(rawtex(upper))} ~ $(rawtex(var_of_int)) ~ $(rawtex(integrand))"
+            body = Expr(:latexifymerge, "\\int_{", lower)
+            body = Expr(:latexifymerge, body, Expr(:latexifymerge, "}^{", upper))
+            body = Expr(:latexifymerge, body, "} ~ ")
+            body = Expr(:latexifymerge, body, var_of_int)
+            body = Expr(:latexifymerge, body, Expr(:latexifymerge, " ~ ", integrand))
+            return body
+        elseif x.args[1] == :^ && length(x.args) == 3 && _latexify_power_base_needs_parens(x.args[2])
+            # `:latexifymerge` has no operator precedence; restore master's parentheses
+            # when a differential/integral form is raised to a power.
+            return Expr(
+                :call, :^,
+                Expr(:latexifymerge, "\\left( ", x.args[2], " \\right)"),
+                x.args[3]
             )
         elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(sorted_arguments(x)[1])).s
@@ -58,6 +66,16 @@ function latexify_derivatives(ex)
             return x
         end
     end
+end
+
+function _latexify_power_base_needs_parens(base)
+    Meta.isexpr(base, :latexifymerge) || return false
+    a1 = base.args[1]
+    if a1 isa AbstractString || a1 isa LaTeXString
+        s = a1 isa LaTeXString ? a1.s : a1
+        return startswith(s, "\\frac") || startswith(s, "\\int")
+    end
+    return _latexify_power_base_needs_parens(a1)
 end
 
 # `latexify_derivatives` can collapse a top-level node into a bare `String` (e.g.
