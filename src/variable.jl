@@ -367,9 +367,24 @@ for T in [LinearAlgebra.UpperTriangular, LinearAlgebra.LowerTriangular]
     end
 end
 
+for T in [LinearAlgebra.Symmetric, LinearAlgebra.Hermitian]
+    @eval function _recursive_unwrap(val::$T, ::Val{eval} = Val(false)) where {eval}
+        data = _recursive_unwrap(parent(val), Val{eval}())
+        if eltype(data) <: Number
+            return $T{eltype(data), typeof(data)}(data, val.uplo)
+        else
+            return _recursive_unwrap(Matrix(val), Val{eval}())
+        end
+    end
+end
+
+function _recursive_unwrap(val::LinearAlgebra.Diagonal, ::Val{eval} = Val(false)) where {eval}
+    return LinearAlgebra.Diagonal(_recursive_unwrap(val.diag, Val{eval}()))
+end
+
 function _recursive_unwrap(val, ::Val{eval} = Val(false)) where {eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
-        if parent(val) !== val
+        if parent(val) !== val && hasfield(typeof(val), :parent)
             return Setfield.@set val.parent = _recursive_unwrap(parent(val), Val{eval}())
         end
         return _recursive_unwrap.(val, Val{eval}())
