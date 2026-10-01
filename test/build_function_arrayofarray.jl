@@ -1,4 +1,4 @@
-using Symbolics, Test, SparseArrays
+using Symbolics, Test, SparseArrays, LinearAlgebra
 @variables a b c
 
 # Auxiliary Functions
@@ -214,4 +214,29 @@ h_emptyNested_ip!(out, input) # should just not fail
     @test nnz(A[1]) == 2
     @test nnz(A[2]) == 1
     @test length(A[1]) == 4
+end
+
+@testset "_recursive_unwrap structured LinearAlgebra wrappers (#1507)" begin
+    m = Float64[1.0 2.0; 2.0 3.0]
+    d = Float64[1.0, 2.0]
+    @variables x
+
+    @test Symbolics._recursive_unwrap(Hermitian(m)) isa Hermitian{Float64, Matrix{Float64}}
+    @test Symbolics._recursive_unwrap(Hermitian(m)) == Hermitian(m)
+    @test Symbolics._recursive_unwrap(Symmetric(m)) isa Symmetric{Float64, Matrix{Float64}}
+    @test Symbolics._recursive_unwrap(Symmetric(m)) == Symmetric(m)
+    @test Symbolics._recursive_unwrap(Diagonal(d)) isa Diagonal{Float64, Vector{Float64}}
+    @test Symbolics._recursive_unwrap(Diagonal(d)) == Diagonal(d)
+
+    Hn = Hermitian(Num[x 1; 1 x])
+    Sn = Symmetric(Num[x 1; 1 x])
+    Dn = Diagonal(Num[x, 1])
+    @test Symbolics._recursive_unwrap(Hn) isa AbstractMatrix
+    @test Symbolics._recursive_unwrap(Sn) isa AbstractMatrix
+    @test Symbolics._recursive_unwrap(Dn) isa Diagonal
+    @test isequal(Symbolics._recursive_unwrap(Hn), map(Symbolics.unwrap, Matrix(Hn)))
+    @test isequal(diag(Symbolics._recursive_unwrap(Dn)), map(Symbolics.unwrap, Dn.diag))
+
+    f, _ = build_function(Hermitian(Num[x 1; 1 x]), x; expression = Val{false})
+    @test f(2.0) == Float64[2.0 1.0; 1.0 2.0]
 end
