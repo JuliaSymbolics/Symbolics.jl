@@ -120,22 +120,16 @@ symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(C
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
-function _array_symbolic_ndims_expr(defs)
+function _try_infer_array_symbolic_ndims(defs)
     if haskey(defs, :ndims)
         return defs[:ndims]
     elseif haskey(defs, :size)
         sz = defs[:size]
-        if Meta.isexpr(sz, :tuple)
+        if Meta.isexpr(sz, :tuple) && !any(a -> Meta.isexpr(a, :...), sz.args)
             return length(sz.args)
         end
     end
-    error("""
-    `@register_array_symbolic` requires `ndims` when it cannot be inferred from `size`.
-    Provide `ndims = N` in the registration block (for example `ndims = 1` for a vector result).
-    A non-tuple `size` expression such as `size = size(x)` is not enough, because \
-    `promote_symtype` receives types rather than values and would otherwise return a \
-    `UnionAll` like `Array{Real}` instead of a concrete `Array{Real,N}`.
-    """)
+    return nothing
 end
 
 function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__)
@@ -145,7 +139,8 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         ex.args[1] => ex.args[2]
     end |> Dict
 
-    ndims_expr = _array_symbolic_ndims_expr(defs)
+    ndims_expr = _try_infer_array_symbolic_ndims(defs)
+    ndims_known = !isnothing(ndims_expr)
 
     shape_expr = if haskey(defs, :size)
         quote
@@ -154,8 +149,9 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             sh = $(SymbolicUtils.ShapeVecT)(map(Base.UnitRange{Int} ∘ Base.OneTo, sz))
         end
     else
+        nd_fallback = ndims_known ? ndims_expr : -1
         quote
-            nd = $ndims_expr
+            nd = $nd_fallback
             sh = $(SymbolicUtils.Unknown)(nd)
         end
     end
@@ -173,7 +169,11 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             $assigns
             $shape_expr
             eltype = $eltype ∘ $symtype
-            type = $container_type{$eltype_expr, nd}
+            type = if nd == -1
+                $container_type{$eltype_expr}
+            else
+                $container_type{$eltype_expr, nd}
+            end
             $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type, shape = sh)
         else
             $f($(argnames...))
@@ -182,6 +182,15 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     fexpr = wrap_func_expr(caller, inner, wrap_arrays)
 
     if define_promotion
+        if !ndims_known
+            @warn """
+            `@register_array_symbolic` could not infer `ndims` for `$f`.
+            `promote_symtype` will return a `UnionAll` like `Array{Real}` instead of a concrete \
+            `Array{Real,N}`, which can break IR substitution (see JuliaSymbolics/Symbolics.jl#1845).
+            Add `ndims = N` to the registration block (for example `ndims = 1` for a vector result).
+            Tuple `size = (...)` without splats is also enough to infer `ndims`.
+            """
+        end
         is_callable_struct = f isa Expr && f.head == :(::)
         fn_arg = if is_callable_struct
             f
@@ -196,12 +205,21 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
 
         shape_args = [:($name::$(SymbolicUtils.ShapeT)) for name in argnames]
         type_args = [:($name::$Type) for name in argnames]
-        promote_symtype_body = quote
-            f = $fn_arg_name
-            container_type = $container_type
-            nd = $ndims_expr
-            etype = $eltype_expr
-            return container_type{etype, nd}
+        promote_symtype_body = if ndims_known
+            quote
+                f = $fn_arg_name
+                container_type = $container_type
+                nd = $ndims_expr
+                etype = $eltype_expr
+                return container_type{etype, nd}
+            end
+        else
+            quote
+                f = $fn_arg_name
+                container_type = $container_type
+                etype = $eltype_expr
+                return container_type{etype}
+            end
         end
         promote_shape_body = quote
             @nospecialize $(argnames...)
@@ -246,8 +264,12 @@ Example:
 end
 ```
 
-`ndims` is inferred from a tuple `size = (...)` when possible. When `size` is a
-non-tuple expression such as `size(x)`, `ndims` must be given explicitly:
+`ndims` is inferred from a non-splat tuple `size = (...)` when possible. When it
+cannot be inferred (for example `size = size(x)`), add `ndims` explicitly to keep
+`promote_symtype` concrete; otherwise a warning is emitted and the previous
+`UnionAll` fallback is kept.
+
+You can also register calls on callable structs:
 
 ```julia
 @register_array_symbolic (c::Conv)(x::AbstractMatrix) begin
