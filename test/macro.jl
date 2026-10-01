@@ -3,6 +3,7 @@ import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
 import SymbolicUtils: Term, symtype, FnType, BasicSymbolic, promote_symtype, SymReal, Const
 import SymbolicUtils as SU
 using LinearAlgebra
+using Logging
 using Test
 
 @variables t
@@ -463,20 +464,64 @@ end
     @test SU.shape(unwrap(foo3(x))) == SU.Unknown(2)
 end
 
-@testset "`@register_array_symbolic` errors when ndims cannot be inferred (#1845)" begin
-    err = try
-        @macroexpand @register_array_symbolic missing_ndims_f(x::AbstractVector) begin
-            size = size(x)
-            eltype = eltype(x)
-        end
-        nothing
-    catch e
-        e
+# Top-level registrations used by #1845 tests (warnings suppressed at load).
+_ndims_fallback_f(x::AbstractVector) = -x
+_splat_size_f(A::AbstractArray) = reshape(A, 1, size(A)...)
+_no_promo_ndims_f(x::AbstractVector) = -x
+_old_logger_1845 = global_logger(Logging.NullLogger())
+@register_array_symbolic _ndims_fallback_f(x::AbstractVector) begin
+    size = size(x)
+    eltype = eltype(x)
+end
+@register_array_symbolic _splat_size_f(A::AbstractArray) begin
+    size = (1, size(A)...)
+    eltype = eltype(A)
+end
+@register_array_symbolic _no_promo_ndims_f(x::AbstractVector) begin
+    size = size(x)
+    eltype = eltype(x)
+end false
+global_logger(_old_logger_1845)
+
+@testset "`@register_array_symbolic` warns when ndims cannot be inferred (#1845)" begin
+    @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic missing_ndims_warn_f(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
     end
-    @test err isa Exception
-    msg = sprint(showerror, err)
-    @test occursin("ndims", msg)
-    @test occursin("UnionAll", msg) || occursin("cannot be inferred", msg)
+    @variables yw[1:3]
+    @test promote_symtype(_ndims_fallback_f, symtype(unwrap(yw))) == Array{Real}
+
+    with_ndims_f(x::AbstractVector) = -x
+    @register_array_symbolic with_ndims_f(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
+        ndims = 1
+    end
+    t = unwrap(with_ndims_f(yw))
+    @test promote_symtype(with_ndims_f, symtype(unwrap(yw))) === Vector{Real}
+    @test isconcretetype(symtype(t))
+    rebuilt = SU.maketerm(typeof(t), operation(t), arguments(t), nothing)
+    @test rebuilt isa typeof(t)
+    @test symtype(rebuilt) === Vector{Real}
+end
+
+@testset "`@register_array_symbolic` does not infer ndims from splatted size (#1845)" begin
+    @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic splatf_macro(A::AbstractArray) begin
+        size = (1, size(A)...)
+        eltype = eltype(A)
+    end
+    @variables A[1:2, 1:3]
+    @test promote_symtype(_splat_size_f, symtype(unwrap(A))) == Array{Real}
+    @test ndims(_splat_size_f(A)) == 3
+end
+
+@testset "`@register_array_symbolic` skips ndims warning when define_promotion=false" begin
+    @test_logs min_level = Logging.Warn @macroexpand @register_array_symbolic no_promo_macro(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
+    end false
+    @variables yw2[1:3]
+    @test ndims(_no_promo_ndims_f(yw2)) == 1
 end
 
 struct Bar{T} end
