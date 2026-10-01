@@ -429,6 +429,9 @@ end
     end
 end
 
+# `-tN,0` keeps the main thread in the default pool on 1.12+; older Julia rejects `,0`.
+const MT_TEST_THREADS = VERSION >= v"1.12" ? "4,0" : "4"
+
 @testset "MultithreadedForm in-place function from Threads.@spawn" begin
     # A race between the generated tasks can crash the whole Julia process, so
     # the calls have to run in a subprocess with real worker threads.
@@ -456,6 +459,34 @@ end
         exit(ok ? 0 : 1)
         """
     )
-    cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t4,0 $script`
+    cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t$(MT_TEST_THREADS) $script`
     @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
+end
+
+@testset "MultithreadedForm RuntimeGeneratedFunction with three or more arguments" begin
+    # Julia 1.10/1.11 segfault when this generated code calls opaque closures, so the
+    # calls run in a subprocess.
+    script = joinpath(mktempdir(), "mt_rgf_nargs.jl")
+    write(
+        script, """
+        using Symbolics
+        @variables a b c d
+        h = [a + b + c, c + d, a * d, 0]
+        args = ([a], [b], [c], [d])
+        inputs = ([1], [2], [3], [4])
+        expected = [6, 7, 4, 0]
+        for nt in (Symbolics.MultithreadedForm(), Symbolics.MultithreadedForm(2, 4))
+            f_oop, f_iip = build_function(h, args...; parallel = nt, expression = Val(false))
+            f_oop(inputs...) == expected || exit(1)
+            out = zeros(Int, 4)
+            f_iip(out, inputs...)
+            out == expected || exit(1)
+        end
+        println("ALL_CORRECT")
+        """
+    )
+    for threads in (1, MT_TEST_THREADS)
+        cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t$(threads) $script`
+        @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
+    end
 end
