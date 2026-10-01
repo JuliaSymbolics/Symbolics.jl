@@ -460,6 +460,10 @@ end
     # log(2) - 3log(5) + x*log(2) - x*log(5)
     expr = expand((1 + x)*Symbolics.term(log, 2) - (3 + x)*Symbolics.term(log, 5))
     @test Symbolics.n_func_occ(expr, x) == 1
+
+    @test Symbolics.n_func_occ(sqrt(abs2(x) + y), x) == 1
+    @test Symbolics.n_func_occ(abs2(x) + y, x) == 1
+    @test Symbolics.n_func_occ(abs(x) + y, x) == 1
 end
 
 
