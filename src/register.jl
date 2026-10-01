@@ -120,12 +120,27 @@ symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(C
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
+# An array with the given shape, so that a registered `size` expression evaluated in
+# `promote_shape` sees each argument's `size`/`length`/`axes` rather than its shape vector.
+shape_placeholder(sh::SymbolicUtils.ShapeVecT) = CartesianIndices(Tuple(sh))
+shape_placeholder(sh) = sh
+
 function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__)
     def_assignments = MacroTools.rmlines(partial_defs).args
     defs = map(def_assignments) do ex
         @assert ex.head == :(=)
         ex.args[1] => ex.args[2]
     end |> Dict
+    # `promote_symtype` only sees argument types and cannot evaluate `size`, but a literal
+    # tuple `size` still fixes `ndims`.
+    promote_nd = get(defs, :ndims) do
+        sz = get(defs, :size, nothing)
+        if Meta.isexpr(sz, :tuple) && !any(a -> Meta.isexpr(a, :...), sz.args)
+            length(sz.args)
+        else
+            -1
+        end
+    end
 
     shape_expr = if haskey(defs, :size)
         quote
@@ -183,7 +198,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         promote_symtype_body = quote
             f = $fn_arg_name
             container_type = $container_type
-            nd = $(get(defs, :ndims, -1))
+            nd = $promote_nd
             etype = $eltype_expr
             if nd == -1
                 return container_type{etype}
@@ -193,7 +208,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         end
         promote_shape_body = quote
             @nospecialize $(argnames...)
-            size = identity
+            $([:($a = $shape_placeholder($a)) for a in argnames]...)
             $shape_expr
             return sh
         end
