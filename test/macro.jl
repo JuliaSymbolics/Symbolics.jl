@@ -426,12 +426,28 @@ end
 @testset "Unwrap defaults and other metadata" begin
     @variables a b[1:2]
     @variables x = a [foo = 1 + a]
-    @variables y = b [foo = [a, b[1]]]
+    @variables y[1:2] = b [foo = [a, b[1]]]
 
     @test getdefaultval(x) isa BasicSymbolic
     @test Symbolics.getmetadata(unwrap(x), VariableFoo, nothing) isa BasicSymbolic
     @test getdefaultval(y) isa BasicSymbolic
     @test Symbolics.getmetadata(unwrap(y), VariableFoo, nothing) isa Vector{Num}
+end
+
+@testset "Reject scalar variables with array defaults (#1073)" begin
+    @test_throws ArgumentError (@variables x = [1, 2])
+    @test_throws ArgumentError (@variables x::Real = [1, 2])
+    @variables y
+    @test_throws ArgumentError (@variables x = [y, y])
+
+    @variables x = 1.0
+    @test getdefaultval(x) == 1.0
+    @variables z = y
+    @test isequal(getdefaultval(z), unwrap(y))
+
+    @variables a[1:2] = [1, 2]
+    @test getdefaultval(a) == [1, 2]
+    @test_throws ArgumentError (@variables b[1:2] = 1.0)
 end
 
 @testset "`hash` of callable is consistent with `isequal`" begin
