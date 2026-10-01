@@ -80,8 +80,8 @@ $(TYPEDSIGNATURES)
 
 Solve equation(s) `eqs` for a set of variables `vars`.
 
-Requires a square linear system: as many independent linear equations as
-unknowns (`length(eqs) == length(vars)` after expansion). Non-square systems
+Requires a square linear system: as many equations as unknowns
+(`length(eqs) == length(vars)` after expansion). Non-square systems
 throw an `ArgumentError` suggesting [`Symbolics.symbolic_solve`](@ref) or solving a
 square linear subsystem first.
 
@@ -129,11 +129,16 @@ function _symbolic_linear_solve_nonsquare_msg(neqs::Integer, nvars::Integer)
     eqword = neqs == 1 ? "equation" : "equations"
     varword = nvars == 1 ? "unknown" : "unknowns"
     return string(
-        "symbolic_linear_solve requires as many independent linear equations as unknowns; ",
+        "symbolic_linear_solve requires as many equations as unknowns; ",
         "got $neqs $eqword in $nvars $varword. ",
         "For underdetermined or nonlinear systems use symbolic_solve, ",
         "or solve a square linear subsystem first.",
     )
+end
+
+function _format_eq_for_error(e)
+    e isa Equation && return string(e)
+    return string(e isa Num ? e : wrap(e))
 end
 
 function _symbolic_linear_solve_nonlinear_msg(eq, var)
@@ -144,13 +149,13 @@ function _symbolic_linear_solve_nonlinear_msg(eq, var)
         if !islin
             return string(
                 "symbolic_linear_solve requires equations that are linear in the unknowns; ",
-                "equation $i is not linear in $vars. ",
+                "equation $i ($(_format_eq_for_error(e))) is not linear. ",
                 "For nonlinear systems use symbolic_solve.",
             )
         end
     end
     return string(
-        "symbolic_linear_solve requires equations that are linear in the unknowns $vars. ",
+        "symbolic_linear_solve requires equations that are linear in the unknowns. ",
         "For nonlinear systems use symbolic_solve.",
     )
 end
