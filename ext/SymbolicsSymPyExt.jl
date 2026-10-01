@@ -33,8 +33,9 @@ function Symbolics.symbolics_to_sympy(expr)
         end
 
         # Array element variables have no SymPy analogue; flatten to a named symbol.
+        # Use sympy.Symbol (not sympy.symbols via Sym) so names like "M[1, 2]" stay one symbol.
         if op === getindex && symtype(args[1]) <: AbstractArray
-            return SymPy.Sym(string(Symbol(expr)))
+            return SymPy.sympy.Symbol(string(Symbol(expr)))
         end
 
         sop = symbolics_to_sympy(op)
