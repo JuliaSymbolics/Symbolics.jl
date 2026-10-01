@@ -33,17 +33,13 @@ function setdefaultval(x, val)
     val === nothing && return x
     sh = shape(x)
     if sh isa SymbolicUtils.Unknown
-        @assert sh.ndims == -1 || ndims(val) == sh.ndims """
-        Variable $x must have default of matching `ndims`. Got $val with `ndims` \
-        $(ndims(val)).
-        """
-    else
-        @assert val === missing || isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
-        Variable $x must have default of matching size. Got $val with size \
-        $(size(val)).
-        """
+        if !(sh.ndims == -1 || ndims(val) == sh.ndims)
+            throw(ArgumentError("Variable $x must have default of matching `ndims`. Got $val with `ndims` $(ndims(val))."))
+        end
+    elseif !(val === missing || symtype(x) <: FnType || size(x) == size(val))
+        throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
     end
-    setmetadata(x, VariableDefaultValue, val)
+    return setmetadata(x, VariableDefaultValue, val)
 end
 
 """
