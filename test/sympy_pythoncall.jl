@@ -29,6 +29,13 @@ result = sympy_pythoncall_simplify(expr)
 @variables a[1:2]
 expr_arr = a[1] + a[2]
 sympy_expr_arr = symbolics_to_sympy_pythoncall(expr_arr)
-@test occursin("a[1]", string(sympy_expr_arr)) && occursin("a[2]", string(sympy_expr_arr))
+@test string(sympy_expr_arr) == "a[1] + a[2]"
 back_expr_arr = sympy_pythoncall_to_symbolics(sympy_expr_arr, collect(Symbolics.get_variables(expr_arr)))
 @test isequal(Symbolics.simplify(expr_arr), Symbolics.simplify(back_expr_arr))
+
+@variables M[1:2, 1:2]
+expr_mat = M[1, 2] + 2M[2, 1]
+sympy_expr_mat = symbolics_to_sympy_pythoncall(expr_mat)
+@test string(sympy_expr_mat) == "M[1, 2] + 2*M[2, 1]"
+back_expr_mat = sympy_pythoncall_to_symbolics(sympy_expr_mat, collect(Symbolics.get_variables(expr_mat)))
+@test isequal(Symbolics.simplify(expr_mat), Symbolics.simplify(back_expr_mat))
