@@ -125,6 +125,11 @@ Keyword Arguments:
   - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
     splitting the number of expressions per thread.
 - `fname`: Used by some targets for the name of the function in the target space.
+- `iip_config`: A 2-tuple of `Bool`s `(oop, iip)` selecting whether the out-of-place
+  and in-place functions are generated. Defaults to `(true, true)`. A variant that
+  is turned off is still returned as a stub so that the 2-tuple shape is kept, and
+  calling the stub throws an `ArgumentError`. Only applies when `ex` is an array
+  (scalar `ex` returns a single function).
 
 Note that not all build targets support the full compilation interface. Check the
 individual target documentation for details.
@@ -352,6 +357,11 @@ Special Keyword Arguments:
   filling function is 0.
 - `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
   safety with `skipzeros`.
+- `iip_config`: A 2-tuple of `Bool`s `(oop, iip)` selecting whether the out-of-place
+  and in-place functions are generated. Defaults to `(true, true)`. A variant that
+  is turned off is still returned as a stub so that the 2-tuple shape is kept, and
+  calling the stub throws an `ArgumentError`. Only applies when `rhss` is an array
+  (scalar `rhss` returns a single function).
 """
 function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        conv=toexpr,
