@@ -43,6 +43,23 @@ Dy = Differential(y)
 @test_reference "latexify_refs/derivative4.txt" latexify(Dy(u))
 @test_reference "latexify_refs/derivative5.txt" latexify(Dx(Dy(Dx(y))))
 
+# issue #1979: ambient mult_symbol must not leak into derivative/integral rendering,
+# and integral upper limits must close with `}` (not `)`).
+@testset "mult_symbol does not leak into derivatives/integrals (#1979)" begin
+    @variables t ξ(t) η ϕ(η)
+    Dt = Differential(t)
+    Dη = Differential(η)
+    @test !occursin("\\cdot", latexify(Dt(ξ); env = :raw, mult_symbol = "\\cdot").s)
+    @test !occursin("\\cdot", latexify(Dt(Dt(ξ)); env = :raw, mult_symbol = "\\cdot").s)
+    @test !occursin("\\cdot", latexify(Dη(ϕ); env = :raw, mult_symbol = "\\cdot").s)
+    @test !occursin("\\cdot", latexify(Dη(η^2 + ϕ); env = :raw, mult_symbol = "\\cdot").s)
+    CI = Integral(η in Interval(0, 1))
+    Istr = latexify(CI(ϕ); env = :raw, mult_symbol = "\\cdot").s
+    @test !occursin("\\cdot", Istr)
+    @test occursin("\\int_{0}^{1}", Istr)
+    @test !occursin("^{1)}", Istr)
+end
+
 @test_reference "latexify_refs/stable_mul_ordering1.txt" latexify(x * y)
 @test_reference "latexify_refs/stable_mul_ordering2.txt" latexify(y * x)
 
