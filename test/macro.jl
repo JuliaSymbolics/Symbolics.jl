@@ -3,7 +3,6 @@ import Symbolics: getsource, getdefaultval, wrap, unwrap, getname
 import SymbolicUtils: Term, symtype, FnType, BasicSymbolic, promote_symtype, SymReal, Const
 import SymbolicUtils as SU
 using LinearAlgebra
-using Logging
 using Test
 
 @variables t
@@ -464,11 +463,10 @@ end
     @test SU.shape(unwrap(foo3(x))) == SU.Unknown(2)
 end
 
-# Top-level registrations used by #1845 tests (warnings suppressed at load).
+# Top-level registrations used by #1845 tests.
 _ndims_fallback_f(x::AbstractVector) = -x
 _splat_size_f(A::AbstractArray) = reshape(A, 1, size(A)...)
 _no_promo_ndims_f(x::AbstractVector) = -x
-_old_logger_1845 = global_logger(Logging.NullLogger())
 @register_array_symbolic _ndims_fallback_f(x::AbstractVector) begin
     size = size(x)
     eltype = eltype(x)
@@ -481,7 +479,6 @@ end
     size = size(x)
     eltype = eltype(x)
 end false
-global_logger(_old_logger_1845)
 
 @testset "`@register_array_symbolic` warns when ndims cannot be inferred (#1845)" begin
     @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic missing_ndims_warn_f(x::AbstractVector) begin
@@ -516,7 +513,7 @@ end
 end
 
 @testset "`@register_array_symbolic` skips ndims warning when define_promotion=false" begin
-    @test_logs min_level = Logging.Warn @macroexpand @register_array_symbolic no_promo_macro(x::AbstractVector) begin
+    @test_logs @macroexpand @register_array_symbolic no_promo_macro(x::AbstractVector) begin
         size = size(x)
         eltype = eltype(x)
     end false
