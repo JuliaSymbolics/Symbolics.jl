@@ -217,26 +217,43 @@ h_emptyNested_ip!(out, input) # should just not fail
 end
 
 @testset "_recursive_unwrap structured LinearAlgebra wrappers (#1507)" begin
-    m = Float64[1.0 2.0; 2.0 3.0]
-    d = Float64[1.0, 2.0]
-    @variables x
+    @variables x y
 
-    @test Symbolics._recursive_unwrap(Hermitian(m)) isa Hermitian{Float64, Matrix{Float64}}
-    @test Symbolics._recursive_unwrap(Hermitian(m)) == Hermitian(m)
-    @test Symbolics._recursive_unwrap(Symmetric(m)) isa Symmetric{Float64, Matrix{Float64}}
-    @test Symbolics._recursive_unwrap(Symmetric(m)) == Symmetric(m)
-    @test Symbolics._recursive_unwrap(Diagonal(d)) isa Diagonal{Float64, Vector{Float64}}
-    @test Symbolics._recursive_unwrap(Diagonal(d)) == Diagonal(d)
-
+    @test Symbolics._recursive_unwrap(Hermitian(Float64[1.0 2.0; 3.0 4.0])) ==
+          Float64[1.0 2.0; 2.0 4.0]
+    @test Symbolics._recursive_unwrap(Symmetric(Float64[1.0 2.0; 3.0 4.0], :L)) ==
+          Float64[1.0 3.0; 3.0 4.0]
+    @test Symbolics._recursive_unwrap(Diagonal(Float64[1.0, 2.0])) ==
+          Float64[1.0 0.0; 0.0 2.0]
     Hn = Hermitian(Num[x 1; 1 x])
-    Sn = Symmetric(Num[x 1; 1 x])
-    Dn = Diagonal(Num[x, 1])
-    @test Symbolics._recursive_unwrap(Hn) isa AbstractMatrix
-    @test Symbolics._recursive_unwrap(Sn) isa AbstractMatrix
-    @test Symbolics._recursive_unwrap(Dn) isa Diagonal
+    Dn = Diagonal(Num[x, y])
     @test isequal(Symbolics._recursive_unwrap(Hn), map(Symbolics.unwrap, Matrix(Hn)))
-    @test isequal(diag(Symbolics._recursive_unwrap(Dn)), map(Symbolics.unwrap, Dn.diag))
+    @test isequal(Symbolics._recursive_unwrap(Dn), map(Symbolics.unwrap, Matrix(Dn)))
 
-    f, _ = build_function(Hermitian(Num[x 1; 1 x]), x; expression = Val{false})
-    @test f(2.0) == Float64[2.0 1.0; 1.0 2.0]
+    cases = (
+        (Hermitian(Float64[1.0 2.0; 3.0 4.0]), (), Float64[1.0 2.0; 2.0 4.0]),
+        (Symmetric(Float64[1.0 2.0; 3.0 4.0], :L), (), Float64[1.0 3.0; 3.0 4.0]),
+        (Diagonal(Float64[1.0, 2.0]), (), Float64[1.0 0.0; 0.0 2.0]),
+        (Diagonal(Num[x, y]), (x, y), Float64[2.0 0.0; 0.0 3.0]),
+        (Hermitian(Num[x 1; 1 x]), (x,), Float64[2.0 1.0; 1.0 2.0]),
+    )
+    for (expr, args, expected) in cases
+        f, f! = build_function(expr, args...; expression = Val{false})
+        if isempty(args)
+            @test f() == expected
+            out = fill(NaN, size(expected)...)
+            f!(out)
+            @test out == expected
+        elseif length(args) == 1
+            @test f(2.0) == expected
+            out = fill(NaN, size(expected)...)
+            f!(out, 2.0)
+            @test out == expected
+        else
+            @test f(2.0, 3.0) == expected
+            out = fill(NaN, size(expected)...)
+            f!(out, 2.0, 3.0)
+            @test out == expected
+        end
+    end
 end
