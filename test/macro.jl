@@ -463,15 +463,28 @@ end
     @test SU.shape(unwrap(foo3(x))) == SU.Unknown(2)
 end
 
-# Top-level registrations used by #1845 tests.
+@testset "`@register_array_symbolic` promotion matches the constructed term" begin
+    @register_array_symbolic foo4(A::AbstractMatrix, x::AbstractVector) begin
+        size = (length(x),)
+        eltype = eltype(x)
+    end
+    @variables A[1:2, 1:2] x[1:2] y[1:2]
+    @test promote_symtype(foo4, Matrix{Real}, Vector{Real}) == Vector{Real}
+    # Rebuilding the term goes through `promote_symtype`, which must give a concrete type
+    ex = substitute(unwrap(foo4(A, x)), Dict(unwrap(x) => unwrap(y)))
+    @test isequal(arguments(ex)[2], unwrap(y))
+    @test symtype(ex) == Vector{Real}
+    @test SU.shape(ex) == SU.shape(unwrap(foo4(A, x)))
+end
+
 _ndims_fallback_f(x::AbstractVector) = -x
 _splat_size_f(A::AbstractArray) = reshape(A, 1, size(A)...)
 _no_promo_ndims_f(x::AbstractVector) = -x
-@register_array_symbolic _ndims_fallback_f(x::AbstractVector) begin
+@test_logs (:warn, r"ndims") @eval @register_array_symbolic _ndims_fallback_f(x::AbstractVector) begin
     size = size(x)
     eltype = eltype(x)
 end
-@register_array_symbolic _splat_size_f(A::AbstractArray) begin
+@test_logs (:warn, r"ndims") @eval @register_array_symbolic _splat_size_f(A::AbstractArray) begin
     size = (1, size(A)...)
     eltype = eltype(A)
 end
@@ -480,7 +493,7 @@ end
     eltype = eltype(x)
 end false
 
-@testset "`@register_array_symbolic` warns when ndims cannot be inferred (#1845)" begin
+@testset "`@register_array_symbolic` warns when ndims cannot be inferred" begin
     @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic missing_ndims_warn_f(x::AbstractVector) begin
         size = size(x)
         eltype = eltype(x)
@@ -502,7 +515,7 @@ end false
     @test symtype(rebuilt) === Vector{Real}
 end
 
-@testset "`@register_array_symbolic` does not infer ndims from splatted size (#1845)" begin
+@testset "`@register_array_symbolic` does not infer ndims from splatted size" begin
     @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic splatf_macro(A::AbstractArray) begin
         size = (1, size(A)...)
         eltype = eltype(A)

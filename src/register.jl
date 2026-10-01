@@ -120,17 +120,10 @@ symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(C
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
-function _try_infer_array_symbolic_ndims(defs)
-    if haskey(defs, :ndims)
-        return defs[:ndims]
-    elseif haskey(defs, :size)
-        sz = defs[:size]
-        if Meta.isexpr(sz, :tuple) && !any(a -> Meta.isexpr(a, :...), sz.args)
-            return length(sz.args)
-        end
-    end
-    return nothing
-end
+# An array with the given shape, so that a registered `size` expression evaluated in
+# `promote_shape` sees each argument's `size`/`length`/`axes` rather than its shape vector.
+shape_placeholder(sh::SymbolicUtils.ShapeVecT) = CartesianIndices(Tuple(sh))
+shape_placeholder(sh) = sh
 
 function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__)
     def_assignments = MacroTools.rmlines(partial_defs).args
@@ -138,9 +131,16 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         @assert ex.head == :(=)
         ex.args[1] => ex.args[2]
     end |> Dict
-
-    ndims_expr = _try_infer_array_symbolic_ndims(defs)
-    ndims_known = !isnothing(ndims_expr)
+    # `promote_symtype` only sees argument types and cannot evaluate `size`, but a literal
+    # tuple `size` still fixes `ndims`.
+    promote_nd = get(defs, :ndims) do
+        sz = get(defs, :size, nothing)
+        if Meta.isexpr(sz, :tuple) && !any(a -> Meta.isexpr(a, :...), sz.args)
+            length(sz.args)
+        else
+            -1
+        end
+    end
 
     shape_expr = if haskey(defs, :size)
         quote
@@ -149,9 +149,8 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             sh = $(SymbolicUtils.ShapeVecT)(map(Base.UnitRange{Int} ∘ Base.OneTo, sz))
         end
     else
-        nd_fallback = ndims_known ? ndims_expr : -1
         quote
-            nd = $nd_fallback
+            nd = $(get(defs, :ndims, -1))
             sh = $(SymbolicUtils.Unknown)(nd)
         end
     end
@@ -182,7 +181,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     fexpr = wrap_func_expr(caller, inner, wrap_arrays)
 
     if define_promotion
-        if !ndims_known
+        if promote_nd == -1
             @warn """
             `@register_array_symbolic` could not infer `ndims` for `$f`.
             `promote_symtype` will return a `UnionAll` like `Array{Real}` instead of a concrete \
@@ -205,25 +204,20 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
 
         shape_args = [:($name::$(SymbolicUtils.ShapeT)) for name in argnames]
         type_args = [:($name::$Type) for name in argnames]
-        promote_symtype_body = if ndims_known
-            quote
-                f = $fn_arg_name
-                container_type = $container_type
-                nd = $ndims_expr
-                etype = $eltype_expr
-                return container_type{etype, nd}
-            end
-        else
-            quote
-                f = $fn_arg_name
-                container_type = $container_type
-                etype = $eltype_expr
+        promote_symtype_body = quote
+            f = $fn_arg_name
+            container_type = $container_type
+            nd = $promote_nd
+            etype = $eltype_expr
+            if nd == -1
                 return container_type{etype}
+            else
+                return container_type{etype, nd}
             end
         end
         promote_shape_body = quote
             @nospecialize $(argnames...)
-            size = identity
+            $([:($a = $shape_placeholder($a)) for a in argnames]...)
             $shape_expr
             return sh
         end
@@ -266,8 +260,8 @@ end
 
 `ndims` is inferred from a non-splat tuple `size = (...)` when possible. When it
 cannot be inferred (for example `size = size(x)`), add `ndims` explicitly to keep
-`promote_symtype` concrete; otherwise a warning is emitted and the previous
-`UnionAll` fallback is kept.
+`promote_symtype` concrete; otherwise a warning is emitted and `promote_symtype`
+returns the `UnionAll` `container_type{eltype}`.
 
 You can also register calls on callable structs:
 
