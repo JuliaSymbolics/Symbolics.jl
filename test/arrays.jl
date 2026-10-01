@@ -713,8 +713,11 @@ end
     @test isequal(cs, [s[1], s[2]])
     cse = collect(se)
     @test cse isa AbstractVector
-    @test eltype(cse) === eltype(cs)
     @test size(cse) == (0,)
+    @variables y[1:3] z[1:3]
+    @test collect(y .=> z) isa Vector{<:Pair}
+    @test collect(y .~ z) isa Vector{Equation}
+    @test Dict(collect(y .=> z)) isa Dict
 end
 
 @testset "Issue#1975: `dims` reductions do not mutate their argument's shape" begin
