@@ -28,39 +28,28 @@ function cleanup_exprs(ex)
 end
 
 function latexify_derivatives(ex)
+    rawtex(x) = strip(let r = latexify(x; env = :raw)
+            r isa LaTeXString ? r.s : string(r)
+        end, '\$')
     return postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
         if x.args[1] == :_derivative
             num, den, deg = x.args[2:end]
-            if num isa Expr && length(num.args) == 2
-                return Expr(
-                    :call, :/,
-                    Expr(
-                        :call, :*,
-                        "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")", num
-                    ),
-                    diffdenom(den)
-                )
+            dsym = "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")"
+            den_ls = diffdenom(den)
+            if Meta.isexpr(num, :call) && length(num.args) == 2
+                return Expr(:call, :/, LaTeXString(dsym * rawtex(num)), den_ls)
             else
                 return Expr(
-                    :call, :*,
-                    Expr(
-                        :call, :/,
-                        "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")",
-                        diffdenom(den)
-                    ),
+                    :latexifymerge,
+                    LaTeXString("\\frac{$dsym}{$(den_ls.s)} ~ "),
                     num
                 )
             end
         elseif x.args[1] === :_integral
             lower, upper, var_of_int, integrand = x.args[2:end]
-            lower_s = strip(latexify(lower).s, '\$')
-            upper_s = strip(latexify(upper).s, '\$')
-            return Expr(
-                :call, :*,
-                "\\int_{$lower_s}^{$upper_s)}",
-                var_of_int,
-                integrand
+            return LaTeXString(
+                "\\int_{$(rawtex(lower))}^{$(rawtex(upper))} ~ $(rawtex(var_of_int)) ~ $(rawtex(integrand))"
             )
         elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(sorted_arguments(x)[1])).s
