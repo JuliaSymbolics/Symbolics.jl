@@ -784,6 +784,21 @@ function coperators(expr)
     expr
 end
 
+function _check_ctarget_expression(expression)
+    expression == Val{true} && return
+    if expression isa Bool
+        throw(ArgumentError(
+            "CTarget does not accept expression=$(expression) (a Bool). " *
+            "Pass expression=Val{true} to get the C source as a String, then " *
+            "compile it yourself (e.g. with Libdl/ccall)."))
+    else
+        throw(ArgumentError(
+            "CTarget with expression=$(expression) is not supported. " *
+            "CTarget emits C source code, not Julia; use expression=Val{true} " *
+            "and compile the generated C yourself (e.g. with Libdl/ccall)."))
+    end
+end
+
 
 """
 Build function target: `CTarget`
@@ -800,6 +815,9 @@ This builds an in-place C function. Only works on arrays of equations.
 `expression` must be `Val{true}` (the default); the return value is C source
 code as a `String`. `expression=Val{false}` is not supported because CTarget
 emits C, not Julia, and Symbolics cannot guarantee a C compiler or library path.
+Pass `expression=Val{true}` (not a `Bool` such as `true`). The keyword
+arguments `libpath` and `compiler` are accepted for API compatibility but are
+unused.
 """
 function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                          conv = toexpr, expression = Val{true},
@@ -809,12 +827,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
 
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
 
-    if expression != Val{true}
-        throw(ArgumentError(
-            "CTarget with expression=$(expression) is not supported. " *
-            "CTarget emits C source code, not Julia; use expression=Val{true} " *
-            "and compile the generated C yourself (e.g. with Libdl/ccall)."))
-    end
+    _check_ctarget_expression(expression)
 
     varnumbercache = buildvarnumbercache(args...)
     differential_equation = string(join([numbered_expr(eq,varnumbercache,args...,lhsname=lhsname,
@@ -851,6 +864,9 @@ This builds an in-place C function. Only works on expressions.
 `expression` must be `Val{true}` (the default); the return value is C source
 code as a `String`. `expression=Val{false}` is not supported because CTarget
 emits C, not Julia, and Symbolics cannot guarantee a C compiler or library path.
+Pass `expression=Val{true}` (not a `Bool` such as `true`). The keyword
+arguments `libpath` and `compiler` are accepted for API compatibility but are
+unused.
 """
 function _build_function(target::CTarget, ex::AbstractArray, args...;
                          columnmajor = true,
@@ -862,12 +878,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
                          libpath     = tempname(),
                          compiler    = :gcc)
 
-    if expression != Val{true}
-        throw(ArgumentError(
-            "CTarget with expression=$(expression) is not supported. " *
-            "CTarget emits C source code, not Julia; use expression=Val{true} " *
-            "and compile the generated C yourself (e.g. with Libdl/ccall)."))
-    end
+    _check_ctarget_expression(expression)
 
     if !columnmajor
         return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...;
