@@ -220,11 +220,11 @@ end
     @variables x y
 
     @test Symbolics._recursive_unwrap(Hermitian(Float64[1.0 2.0; 3.0 4.0])) ==
-          Float64[1.0 2.0; 2.0 4.0]
+        Float64[1.0 2.0; 2.0 4.0]
     @test Symbolics._recursive_unwrap(Symmetric(Float64[1.0 2.0; 3.0 4.0], :L)) ==
-          Float64[1.0 3.0; 3.0 4.0]
+        Float64[1.0 3.0; 3.0 4.0]
     @test Symbolics._recursive_unwrap(Diagonal(Float64[1.0, 2.0])) ==
-          Float64[1.0 0.0; 0.0 2.0]
+        Float64[1.0 0.0; 0.0 2.0]
     Hn = Hermitian(Num[x 1; 1 x])
     Dn = Diagonal(Num[x, y])
     @test isequal(Symbolics._recursive_unwrap(Hn), map(Symbolics.unwrap, Matrix(Hn)))
