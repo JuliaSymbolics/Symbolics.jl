@@ -303,10 +303,9 @@ end
 function Base.showerror(io::IO, err::DerivativeNotDefinedError)
     op = operation(err.expr)
     nargs = length(arguments(err.expr))
-    # `_markdown_parse` instead of `@md_str` to allow interpolating inside `literal` blocks
-    # and code fences (`Markdown.parse` is not public on Julia 1.11; see #2014).
-    err_str = _markdown_parse(
-        """
+    # `Markdown.parse` instead of `@md_str` to allow interpolating inside `literal` blocks
+    # and code fences
+    err_str = Markdown.parse("""
         Derivative of `$(err.expr)` with respect to its $(err.i)-th argument is not defined.
         Define a derivative by using `@register_derivative`:
 

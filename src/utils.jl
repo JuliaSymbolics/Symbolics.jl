@@ -258,7 +258,6 @@ function diff2term(O::SymbolicT)
     if has_gp
         # Reconstruct D^n(cur) and apply diff2term to the base variable.
         diff_cur = cur
-        # `Base.reverse` is public; `Iterators.reverse` is not on Julia 1.11 (#2014).
         for d in reverse(opchain)    # opchain is outer→inner; reverse to build inside-out
             diff_cur = d(diff_cur)
         end

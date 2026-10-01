@@ -10,8 +10,8 @@ end
 nterms(t::Num) = nterms(unwrap(t))
 nterms(t::Num, cache) = nterms(unwrap(t), cache)
 
-# `Base.require_one_based_indexing` is not `public` on Julia 1.11 (it is on 1.12+).
-# Reimplement with public `axes`/`first` so ExplicitImports stays clean (#2014).
+# Local copy of Base.require_one_based_indexing using public `axes`/`first`
+# (that Base helper is not `public` on Julia 1.11).
 function _require_one_based_indexing(As...)
     for A in As
         for ax in axes(A)

@@ -564,7 +564,6 @@ function getdefaultval(x, val=_fail)
                 if parentval === missing
                     return missing
                 end
-                # `Base.map` is public; `Iterators.map` is not on Julia 1.11 (#2014).
                 idxs = map(unwrap_const, Iterators.drop(args, 1))
                 return parentval[idxs...]
             end

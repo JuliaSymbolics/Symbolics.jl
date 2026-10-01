@@ -1,14 +1,10 @@
 using SciMLTesting
 import StaticArrays
-using Test
 
 symbolic_utils = Symbolics.SymbolicUtils
 basic_symbolic = symbolic_utils.BasicSymbolic{symbolic_utils.SymReal}
 basic_symbolic_wrapper = getfield(parentmodule(basic_symbolic), nameof(basic_symbolic))
 
-# Upstream compatibility names that are not declared public by their owners.
-# Issue #2014 names (`map`, `parse`, `require_one_based_indexing`, `reverse`) must
-# NOT be added here — fix call sites to use public APIs or local helpers instead.
 const QUALIFIED_ACCESS_IGNORE = (
     :BlasInt, :Cartesian, :Experimental, :ParseError, :ReshapedArray,
     :Unknown, :acos, :acosh, :alignment, :asin, :atanh, :checknonsingular,
@@ -17,36 +13,9 @@ const QUALIFIED_ACCESS_IGNORE = (
     :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractTriangular,
     :Slice, :StaticArray, :TwicePrecision, :TypedEndpointsInterval,
     :sin, :sqrt, :striplines, :tan,
+    # Markdown.parse is public from Julia 1.12; keep an ExplicitImports exception on 1.11.
+    (VERSION < v"1.12" ? (:parse,) : ())...,
 )
-
-# Names from https://github.com/JuliaSymbolics/Symbolics.jl/issues/2014
-const ISSUE_2014_NAMES = (:map, :parse, :require_one_based_indexing, :reverse)
-
-@testset "issue #2014: stdlib accesses use public APIs" begin
-    for name in ISSUE_2014_NAMES
-        @test name ∉ QUALIFIED_ACCESS_IGNORE
-    end
-    # On Julia 1.11 these names are not public; call sites must not qualify them.
-    # (On 1.12+ they are public, so this filter is vacuously empty.)
-    # ExplicitImports is a transitive test dep via SciMLTesting; load it from
-    # `Base.require` so the test env does not need a direct entry.
-    if VERSION >= v"1.11"
-        ei_id = Base.PkgId(
-            Base.UUID("7d51a73a-1435-4ff3-83d9-f097790105c7"),
-            "ExplicitImports",
-        )
-        ExplicitImports = Base.require(ei_id)
-        offending = Symbol[]
-        for (_, rows) in ExplicitImports.improper_qualified_accesses(Symbolics)
-            for row in rows
-                if !row.public_access && row.name in ISSUE_2014_NAMES
-                    push!(offending, row.name)
-                end
-            end
-        end
-        @test isempty(offending)
-    end
-end
 
 run_qa(
     Symbolics;

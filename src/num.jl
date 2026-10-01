@@ -468,7 +468,7 @@ function Base.Docs.getdoc(x::Num)
     for (key, val) in collect(pairs(x.metadata))
         push!(strings, string(string(key), ": ", string(val)))
     end
-    return _markdown_parse(join(strings, "\n\n  "))
+    Markdown.parse(join(strings, "\n\n  "))
 end
 
 # https://github.com/JuliaSymbolics/Symbolics.jl/issues/1206#issuecomment-2271847091
