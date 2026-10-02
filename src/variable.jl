@@ -564,7 +564,7 @@ function getdefaultval(x, val=_fail)
                 if parentval === missing
                     return missing
                 end
-                idxs = map(unwrap_const, Iterators.drop(args, 1))
+                idxs = Iterators.map(unwrap_const, Iterators.drop(args, 1))
                 return parentval[idxs...]
             end
             _ => error("$x has no default value")

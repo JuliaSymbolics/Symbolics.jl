@@ -10,18 +10,6 @@ end
 nterms(t::Num) = nterms(unwrap(t))
 nterms(t::Num, cache) = nterms(unwrap(t), cache)
 
-# Local copy of Base.require_one_based_indexing using public `axes`/`first`
-# (that Base helper is not `public` on Julia 1.11).
-function _require_one_based_indexing(As...)
-    for A in As
-        for ax in axes(A)
-            first(ax) == 1 ||
-                throw(ArgumentError("offset arrays are not supported but got an array with index other than 1"))
-        end
-    end
-    return nothing
-end
-
 # Soft pivoted
 function sym_lu(A::AbstractMatrix{Num}; check=true)
     nterms_cache = Base.IdDict{SymbolicT, Int}()
@@ -160,7 +148,7 @@ function _solve(A::AbstractMatrix{Num}, b::Union{AbstractArray{Num}, AbstractArr
 end
 
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
-    _require_one_based_indexing(A, b, x)
+    Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
@@ -179,7 +167,7 @@ function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
 end
 
 function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = b)
-    _require_one_based_indexing(A, b, x)
+    Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))

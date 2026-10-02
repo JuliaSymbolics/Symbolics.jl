@@ -13,8 +13,8 @@ const QUALIFIED_ACCESS_IGNORE = (
     :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractTriangular,
     :Slice, :StaticArray, :TwicePrecision, :TypedEndpointsInterval,
     :sin, :sqrt, :striplines, :tan,
-    # Markdown.parse is public from Julia 1.12; keep an ExplicitImports exception on 1.11.
-    (VERSION < v"1.12" ? (:parse,) : ())...,
+    # Public on Julia 1.12+; ExplicitImports exception only needed on 1.11.
+    (VERSION < v"1.12" ? (:map, :parse, :require_one_based_indexing, :reverse) : ())...,
 )
 
 run_qa(

@@ -258,12 +258,12 @@ function diff2term(O::SymbolicT)
     if has_gp
         # Reconstruct D^n(cur) and apply diff2term to the base variable.
         diff_cur = cur
-        for d in reverse(opchain)    # opchain is outer→inner; reverse to build inside-out
+        for d in Iterators.reverse(opchain)    # opchain is outer→inner; reverse to build inside-out
             diff_cur = d(diff_cur)
         end
         result = diff2term(diff_cur)
         # Re-apply access ops (collected outer→inner, so reverse to apply inner-first).
-        for op in reverse(access_ops)
+        for op in Iterators.reverse(access_ops)
             if op isa Symbol
                 T = symtype(result)
                 result = unwrap(getproperty(SymStruct{T}(result), op))
