@@ -1203,6 +1203,8 @@ $(SIGNATURES)
 Check if an expression is linear with respect to a list of variable expressions.
 """
 function islinear(ex, u)
+    ex = scalarize(ex)
+    u = scalarize(u)
     isaffine(ex, u) && iszero(Num(substitute(ex, Dict(u .=> 0))))
 end
 
