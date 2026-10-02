@@ -139,7 +139,25 @@ Now using the function `svdsolve` with symbolic array variables will be kept laz
 svdsolve(A,b)
 ```
 
-Note that at this time array derivatives cannot be defined.
+Derivatives of registered array functions are defined with [`@register_derivative`](@ref);
+the derivative expression is the Jacobian, which is a single column when differentiating with
+respect to a scalar argument. Differentiation with respect to array-valued arguments is not
+yet supported.
+
+```@example polar_derivative
+using Symbolics
+
+polar(r, θ) = [r * cos(θ), r * sin(θ)]
+@register_array_symbolic polar(r::Real, θ::Real) begin
+    size = (2,)
+    eltype = Real
+end
+@register_derivative polar(r, θ) 1 Symbolics.SConst([cos(θ), sin(θ)])
+@register_derivative polar(r, θ) 2 Symbolics.SConst([-r * sin(θ), r * cos(θ)])
+
+@variables r θ
+Symbolics.scalarize(Symbolics.derivative(polar(r, θ)[2], θ))
+```
 
 ## Registration API
 
@@ -189,6 +207,22 @@ requires using the macro.
 @register_derivative (interp::AbstractInterpolation)(x) 1 begin
     # ...
 end
+```
+
+This rule applies when the interpolation object itself is the operation of the term.
+A symbolic function declared with a callable type, such as `@variables (interp::LinearInterpolation)(..)`
+(or a ModelingToolkit callable parameter), represents an interpolation whose value is not
+known symbolically. Its derivative rules are registered on [`Symbolics.SymbolicCallable`](@ref),
+and the rule receives the symbolic function as `interp.f`:
+
+```julia
+@register_derivative (interp::Symbolics.SymbolicCallable{<:AbstractInterpolation})(x) 1 begin
+    derivative(interp.f, x, 1)
+end
+```
+
+```@docs
+Symbolics.SymbolicCallable
 ```
 
 ## Inverse function registration

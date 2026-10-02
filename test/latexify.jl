@@ -1,6 +1,7 @@
 using Symbolics
 using Test
 using Latexify
+using LaTeXStrings
 using ReferenceTests
 import SymbolicUtils as SU
 using Symbolics: VartypeT
@@ -47,7 +48,21 @@ Dy = Differential(y)
 
 @test_reference "latexify_refs/equation1.txt" latexify(x ~ y + z)
 @test_reference "latexify_refs/equation2.txt" latexify(x ~ Dx(y + z))
-@test_reference "latexify_refs/equation5.txt" latexify(AA^2 + AA + 1 + X₁)
+
+# The relative order of the two degree-1 terms AA(x) and X₁(x) in this sum is
+# decided by SymbolicUtils' hash-based tie-break, which differs across Julia
+# versions, so no single reference string passes on all of them. Compare the set
+# of additive terms instead of the exact rendered string. (was equation5.txt)
+let
+    body = strip(replace(string(latexify(AA^2 + AA + 1 + X₁)),
+                         "\\begin{equation}" => "", "\\end{equation}" => ""))
+    @test sort(strip.(split(body, " + "))) == sort([
+        "1",
+        "AA\\left( x \\right)",
+        "X_1\\left( x \\right)",
+        "\\left( AA\\left( x \\right) \\right)^{2}",
+    ])
+end
 
 @test_reference "latexify_refs/equation_vec1.txt" latexify(
     [
@@ -61,6 +76,9 @@ Dy = Differential(y)
         Dx(y) ~ y * x
     ]
 )
+
+@variables s p(s)[1:2] q(s)[1:2] A[1:2, 1:2]
+@test_reference "latexify_refs/equation_vec_array.txt" latexify([q ~ A * p])
 
 @test_reference "latexify_refs/complex1.txt" latexify(x^2 - y^2 + 2im * x * y)
 @test_reference "latexify_refs/complex2.txt" latexify(3im * x)
@@ -83,6 +101,26 @@ Dy = Differential(y)
 @variables f(..)
 @test_reference "latexify_refs/call_with_metadata.txt" latexify(f)
 
+# The `_toexpr_metadata`/`_toexpr_op` hooks live in `Symbolics`, so downstream code can
+# extend them via `import Symbolics` without `Base.get_extension`. The Latexify-coupled
+# helpers (`_toexpr_plain`, `default_latex_wrapper`) come from the loaded extension.
+struct LatexHookCtx end
+function Symbolics._toexpr_metadata(O, ::Type{LatexHookCtx}, val; latexwrapper = LatexifyExt.default_latex_wrapper)
+    inner = LatexifyExt._toexpr_plain(O; latexwrapper)
+    return Expr(:call, :_textbf, inner)
+end
+expr = SU.setmetadata(x + y, LatexHookCtx, true)
+@test occursin("\\textbf", latexify(expr).s)
+
+avgf(x) = x
+function Symbolics._toexpr_op(::typeof(avgf), args; latexwrapper = LatexifyExt.default_latex_wrapper)
+    inner = LatexifyExt._toexpr_plain(args[1]; latexwrapper)
+    inner_s = strip(latexify(inner).s, '\$')
+    return LaTeXString("\\langle " * inner_s * " \\rangle")
+end
+avg_expr = SU.term(avgf, x + y)
+@test occursin("\\langle", latexify(avg_expr).s)
+
 @test !occursin("identity", latexify(Num(π))) # issue #1254
 
 # issue #1820: hasmetadata should not be called on Vector arguments in getindex
@@ -94,4 +132,10 @@ Dy = Differential(y)
     getindex_term = SU.term(getindex, vec_expr, 1; type=SU.SymReal)
     # This should not throw a MethodError about hasmetadata on Vector
     @test_nowarn latexify(getindex_term)
+end
+
+@testset "ifelse_eager / ifelse_branching render" begin
+    @variables a b
+    @test_nowarn latexify(ifelse_eager(a > 0, a^2, 1 / a))
+    @test_nowarn latexify(ifelse_branching(a > 0, a^2, 1 / a))
 end

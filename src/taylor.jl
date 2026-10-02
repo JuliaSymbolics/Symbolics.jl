@@ -57,7 +57,7 @@ julia> @variables x y
  y
 
 julia> taylor_coeff(series(y, x, 0:5), x, 0:2:4)
-3-element Vector{Num}:
+3-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
  y[0]
  y[2]
  y[4]
@@ -122,7 +122,7 @@ julia> taylor(exp(x), x, 0:3)
 1 + x + (1//2)*(x^2) + (1//6)*(x^3)
 
 julia> taylor(exp(x), x, 0:3; rationalize=false)
-1.0 + x + 0.5(x^2) + 0.16666666666666666(x^3)
+1 + x + (1//2)*(x^2) + (1//6)*(x^3)
 
 julia> taylor(√(x), x, 1, 0:3)
 1 + (1//2)*(-1 + x) - (1//8)*((-1 + x)^2) + (1//16)*((-1 + x)^3)

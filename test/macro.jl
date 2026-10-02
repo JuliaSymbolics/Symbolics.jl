@@ -51,7 +51,7 @@ let
         size=(length(x) * 2, length(x) * 2)
         eltype=eltype(x)
     end
-    @test promote_symtype(ggg, symtype(unwrap(x))) == SymMatrix{Real}
+    @test promote_symtype(ggg, symtype(unwrap(x))) == SymMatrix{Real, 2}
 end
 
 # ndims specified
@@ -115,7 +115,7 @@ ccwa = CanCallWithArray2((length=10,))
     size=(size(x, 1), length(b), c.params.length)
     eltype=Real
 end
-@test promote_symtype(ccwa, symtype(unwrap(gg)), symtype(unwrap(x))) == Array{Real}
+@test promote_symtype(ccwa, symtype(unwrap(gg)), symtype(unwrap(x))) == Array{Real, 3}
 
 struct CanCallWithArray3{T}
     params::T
@@ -177,6 +177,14 @@ let
 
 
     @test Symbolics.getname(Symbolics.rename(y[2], :u)) === :u
+end
+
+@testset "renamed metadata" begin
+    metadata = Base.ImmutableDict{DataType, Any}(
+        Symbolics.VariableSource, (:variables, :x),
+    )
+    renamed = Symbolics.renamed_metadata(metadata, :y)
+    @test renamed[Symbolics.VariableSource] === (:variables, :y)
 end
 
 let
@@ -443,7 +451,7 @@ end
 @testset "`@register_symbolic` edge cases" begin
     @register_symbolic foo1(x::AbstractArray)
     @register_symbolic foo1(x::AbstractArray{Int})
-    @register_symbolic foo1(x::AbstractVector{Int})
+    @register_symbolic foo1(T::AbstractVector{Int})
 end
 
 @testset "`@register_array_symbolic` works without size" begin
@@ -455,3 +463,27 @@ end
     @test SU.shape(unwrap(foo3(x))) == SU.Unknown(2)
 end
 
+@testset "`@register_array_symbolic` promotion matches the constructed term" begin
+    @register_array_symbolic foo4(A::AbstractMatrix, x::AbstractVector) begin
+        size = (length(x),)
+        eltype = eltype(x)
+    end
+    @variables A[1:2, 1:2] x[1:2] y[1:2]
+    @test promote_symtype(foo4, Matrix{Real}, Vector{Real}) == Vector{Real}
+    # Rebuilding the term goes through `promote_symtype`, which must give a concrete type
+    ex = substitute(unwrap(foo4(A, x)), Dict(unwrap(x) => unwrap(y)))
+    @test isequal(arguments(ex)[2], unwrap(y))
+    @test symtype(ex) == Vector{Real}
+    @test SU.shape(ex) == SU.shape(unwrap(foo4(A, x)))
+end
+
+struct Bar{T} end
+struct Baz{T} end
+
+@register_symbolic Bar(x::Int)::Bar{Int}
+@register_symbolic Baz(x::String)::Baz{String}
+
+@testset "Registration of struct constructors works correctly" begin
+    @test SU.promote_symtype(Bar, Int) === Bar{Int}
+    @test SU.promote_symtype(Baz, String) === Baz{String}
+end

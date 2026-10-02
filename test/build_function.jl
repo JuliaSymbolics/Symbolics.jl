@@ -404,3 +404,58 @@ end
     @test_nowarn fjac_upper_expr(Jtmp, utmp)
     @test Jtmp[3] == utmp[2]
 end
+
+@testset "MultithreadedForm expressions can be written to a file and included" begin
+    @variables x y
+    A = [
+        x^2 + y 0 2x
+        0 0 2y
+        y^2 + x 0 0
+    ]
+    u = [1.0, 2.0]
+    expected = @invokelatest eval(build_function(A, [x, y])[1])(u)
+    oop_ex, iip_ex = build_function(A, [x, y]; parallel = Symbolics.MultithreadedForm())
+    mktempdir() do dir
+        oop_path = joinpath(dir, "f_oop.jl")
+        iip_path = joinpath(dir, "f_iip.jl")
+        write(oop_path, string(oop_ex))
+        write(iip_path, string(iip_ex))
+        f_oop = include(oop_path)
+        f_iip = include(iip_path)
+        @test @invokelatest(f_oop(u)) == expected
+        out = zeros(3, 3)
+        @invokelatest f_iip(out, u)
+        @test out == expected
+    end
+end
+
+@testset "MultithreadedForm in-place function from Threads.@spawn" begin
+    # A race between the generated tasks can crash the whole Julia process, so
+    # the calls have to run in a subprocess with real worker threads.
+    script = joinpath(mktempdir(), "mt_iip_spawn.jl")
+    write(
+        script, """
+        using Symbolics
+        @variables x y
+        N = 8
+        A = Num[x^i + y^j for i in 1:N, j in 1:N]
+        u = [1.0, 2.0]
+        _, f_serial = build_function(A, [x, y]; parallel = Symbolics.SerialForm(), expression = Val(false))
+        _, f_par = build_function(A, [x, y]; parallel = Symbolics.MultithreadedForm(2, 4), expression = Val(false))
+        ref = zeros(N, N)
+        f_serial(ref, u)
+        f_par(zeros(N, N), u)
+        outs = [zeros(N, N) for _ in 1:200]
+        ok = all(fetch, map(1:200) do i
+            Threads.@spawn begin
+                f_par(outs[i], u)
+                outs[i] == ref
+            end
+        end)
+        println(ok ? "ALL_CORRECT" : "MISMATCH")
+        exit(ok ? 0 : 1)
+        """
+    )
+    cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t4,0 $script`
+    @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
+end
