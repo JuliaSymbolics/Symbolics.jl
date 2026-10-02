@@ -254,6 +254,9 @@ include("plot_recipes.jl")
 
 include("latexify_recipes.jl")
 
+export partial_fraction
+include("integration_utils.jl")
+
 include("semipoly.jl")
 
 
