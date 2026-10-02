@@ -122,7 +122,15 @@ getdef(v) = Symbolics.getdefaultval(v)
                        b[3] * A[1, 3])))
 
     D = Differential(t)
-    # @test isequal(collect(D.(x) .~ x), map(i -> D(x[i]) ~ x[i], eachindex(x)))
+    @test isequal(D.(x) .~ x, map(i -> D(x[i]) ~ x[i], eachindex(x)))
+    @variables x855[1:2]
+    eqs855 = x855 .~ x855
+    @test eqs855 isa AbstractVector{<:Equation}
+    @test isequal(eqs855, [x855[1] ~ x855[1], x855[2] ~ x855[2]])
+    @variables A855[1:2, 1:2] B855[1:2, 1:2]
+    eqs855m = A855 .~ B855
+    @test eqs855m isa AbstractMatrix{<:Equation}
+    @test isequal(eqs855m, [A855[i, j] ~ B855[i, j] for i in 1:2, j in 1:2])
     @test_throws ArgumentError A ~ t
     @test isequal(D(x[1]), D(x)[1])
     a = Symbolics.unwrap(D(x)[1])
