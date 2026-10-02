@@ -173,43 +173,16 @@ function attract_exponential(lhs, var)
     lhs = unwrap(lhs)
     contains_var(arg) = n_occurrences(arg, var) > 0
 
-    # @acrule matches summands in an unspecified order; canonicalize by base
-    # so the rewritten slog form is stable across Julia versions.
-    _expon_base_lt(b, d) = isless(string(b), string(d))
-
     r_addexpon = Vector{Any}()
 
     #! format: off
-    push!(r_addexpon, @acrule (~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => begin
-            b, f_, d, g_ = ~b, ~f, ~d, ~g
-            if !_expon_base_lt(b, d)
-                b, f_, d, g_ = d, g_, b, f_
-            end
-            f_ * term(slog, b) - g_ * term(slog, d) + term(slog, -1)
-        end)
-    push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => begin
-            a, b, f_, d, g_ = ~a, ~b, ~f, ~d, ~g
-            if _expon_base_lt(b, d)
-                f_ * term(slog, b) - g_ * term(slog, d) + term(slog, -a)
-            else
-                g_ * term(slog, d) - f_ * term(slog, b) + term(slog, -1 // a)
-            end
-        end)
-    push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~c)*(~d)^(~g::(contains_var)) => begin
-            a, b, f_, c, d, g_ = ~a, ~b, ~f, ~c, ~d, ~g
-            if _expon_base_lt(b, d)
-                f_ * term(slog, b) - g_ * term(slog, d) + term(slog, -(a) // (c))
-            else
-                g_ * term(slog, d) - f_ * term(slog, b) + term(slog, -(c) // (a))
-            end
-        end)
+    push!(r_addexpon, @acrule (~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -1))
+    push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -~a))
+    push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~c)*(~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -(~a)//(~c)))
     #! format: on
 
-    lhs = expand(
-        simplify(
-            lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addexpon))
-        )
-    )
+    lhs = expand(simplify(
+        lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addexpon))))
 
     return expand(lhs)
 end

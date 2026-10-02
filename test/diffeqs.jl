@@ -67,13 +67,10 @@ C = Symbolics.variables(:C, 1:5)
 @test isequal(find_particular_solution(SymbolicLinearODE(x, t, [1, 0], t^2)), t^2 - 2)
 
 @testset "Documented symbolic_solve_ode constant labels" begin
-    # Characteristic-root order after #1993 assigns C₁ to exp(-3t) and C₂ to
-    # exp(-2t) / exp(t). Compare structurally: MIME text of integer Rationals
-    # differs between SymbolicUtils 4.48 (root Manifest) and 4.49 (docs Manifest).
     @test isequal(
         symbolic_solve_ode(SymbolicLinearODE(x, t, [6, 5], 2exp(-t) * cos(t))),
         C[1] * exp(-3t) + C[2] * exp(-2t) + (1 // 5) * cos(t) * exp(-t) +
-        (3 // 5) * exp(-t) * sin(t),
+            (3 // 5) * exp(-t) * sin(t),
     )
     @test isequal(
         symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5)),
