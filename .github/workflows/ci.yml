@@ -29,6 +29,8 @@ jobs:
         include:
           - group: QA
             version: '1.10'
+          - group: Core
+            version: '1.10'
     steps:
       - uses: actions/checkout@v7
         with:

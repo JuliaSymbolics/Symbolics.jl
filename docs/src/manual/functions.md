@@ -129,6 +129,7 @@ svdsolve(A, b) = svd(A)\b
 @register_array_symbolic svdsolve(A::AbstractMatrix, b::AbstractVector) begin
     size = size(b)
     eltype = promote_type(eltype(A), eltype(b))
+    ndims = 1
 end
 ```
 
