@@ -48,6 +48,7 @@ makedocs(
                 "manual/parsing.md",
                 "manual/io.md",
                 "manual/types.md",
+                "manual/complex.md",
                 "manual/metadata.md",
             ],
 

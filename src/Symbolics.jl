@@ -125,7 +125,7 @@ include("wrapper-types.jl")
     include("num.jl")
 end
 function (s::SymbolicUtils.Substituter)(x::Num)
-    Num(s(unwrap(x)))
+    return wrap(s(unwrap(x)))
 end
 
 
@@ -623,7 +623,6 @@ function __init__()
         end
     end
     SymbolicUtils.hashcons(RootsOf, true)
-    SymbolicUtils.hashcons(IM, true)
     SymbolicUtils.hashcons(COMMON_ONE, true)
     SymbolicUtils.hashcons(COMMON_ZERO, true)
     SymbolicUtils.hashcons(IIP_OUTSYM, true)
@@ -639,7 +638,7 @@ include("discontinuities.jl")
 
 include("despecialize.jl")
 
-@public Arr, NAMESPACE_SEPARATOR, VariableDefaultValue, VariableSource
+@public Arr, NAMESPACE_SEPARATOR, SymbolicNumber, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, option_to_metadata_type
 @public variable, wrap, linear_expansion, LinearExpander
