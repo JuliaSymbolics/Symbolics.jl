@@ -105,6 +105,10 @@ if GROUP == "All" || GROUP == "HypergeometricFunctionsExt"
     @safetestset "HypergeometricFunctions extension Test" begin include("extensions/hypergeometric.jl") end
 end
 
+if GROUP == "All" || GROUP == "Core" || GROUP == "IntervalArithmeticExt"
+    @safetestset "IntervalArithmetic extension Test" begin include("extensions/intervalarithmetic.jl") end
+end
+
 if GROUP == "All" || GROUP == "Core" || GROUP == "SymbolicIndexingInterface"
     @safetestset "SymbolicIndexingInterface Trait Test" begin
       include("symbolic_indexing_interface_trait.jl")
