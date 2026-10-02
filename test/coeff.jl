@@ -63,3 +63,16 @@ e = x*y^2 + 2x + y^3*x^3
     @variables x a b c d
     @test isequal(coeff(c + (a + b*x)*d, x), b * d)
 end
+
+# issue #910 - unexpanded products where sym appears in multiple factors
+@test_throws DomainError coeff((3x^2 + 2) * (2x^2 + 1), x^2)
+@test isequal(coeff(expand((3x^2 + 2) * (2x^2 + 1)), x^2), 7)
+@test_throws DomainError coeff((3x^2 + 2) * y * (2x^2 + y), x^2)
+@test isequal(coeff(expand((3x^2 + 2) * y * (2x^2 + y)), x^2), 4y + 3(y^2))
+# single-factor products remain fine
+@test isequal(unwrap_const(coeff(2 * (3x^2 + 2), x^2)), 6)
+@test isequal(coeff((3x^2 + 2) * (2x^2 + 1), x^0), 2)
+
+# issue #910 - negative powers as sym
+@test_throws DomainError coeff(3 / x, x^-1)
+@test_throws DomainError coeff(3 / x^2, x^(-2))
