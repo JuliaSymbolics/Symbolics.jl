@@ -158,7 +158,7 @@ julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [5/t], 7t))
 ```jldoctest
 julia> using Symbolics
 
-julia> import Nemo
+julia> import Nemo, Groebner
 
 julia> @variables x, t
 2-element Vector{Num}:
@@ -166,13 +166,13 @@ julia> @variables x, t
  t
 
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [9, -6], 4exp(3t)))
-C₁*exp((3//1)*t) + C₂*exp((3//1)*t)*t + (2//1)*exp(3t)*(t^2)
+C₁*exp(3t) + C₂*exp(3t)*t + 2exp(3t)*(t^2)
 
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [6, 5], 2exp(-t)*cos(t)))
-C₁*exp((-3//1)*t) + C₂*exp((-2//1)*t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
+C₁*exp(-3t) + C₂*exp(-2t) + (1//5)*cos(t)*exp(-t) + (3//5)*exp(-t)*sin(t)
 
 julia> symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5))
-(11//9) - (2//3)*t + C₁*exp((-3//1)*t) + C₂*exp(t)
+(11//9) - (2//3)*t + C₁*exp(-3t) + C₂*exp(t)
 ```
 """
 function symbolic_solve_ode(eq::SymbolicLinearODE)
@@ -211,7 +211,7 @@ Symbolically solve an ODE
 ```jldoctest
 julia> using Symbolics
 
-julia> import Nemo
+julia> import Nemo, Groebner
 
 julia> @variables x, t
 2-element Vector{Num}:
@@ -222,7 +222,7 @@ julia> Dt = Symbolics.Differential(t)
 Differential(t, 1)
 
 julia> Symbolics.symbolic_solve_ode(SymbolicLinearODE(x, t, [9, -6], 4exp(3t)))
-C₁*exp((3//1)*t) + C₂*exp((3//1)*t)*t + (2//1)*exp(3t)*(t^2)
+C₁*exp(3t) + C₂*exp(3t)*t + 2exp(3t)*(t^2)
 
 julia> Symbolics.symbolic_solve_ode(x ~ Dt(x)*t - ((Dt(x))^3), x, t)
 C₁*t - (C₁^3)
@@ -599,7 +599,7 @@ julia> eq = SymbolicLinearODE(x, t, [-3, 2], 0)  # d²x/dt² + 2dx/dt - 3x = 0
 (Dt^2)x + (2)(Dt^1)x + (-3)(Dt^0)x ~ 0
 
 julia> solve_symbolic_IVP(eq, [1, -1])  # x(0) = 1, x'(0) = -1
-(1//2)*exp(t) + (1//2)*exp((-3//1)*t)
+(1//2)*exp(t) + (1//2)*exp(-3t)
 ```
 """
 function solve_symbolic_IVP(eq::SymbolicLinearODE, initial_conditions::Vector{<:Number})

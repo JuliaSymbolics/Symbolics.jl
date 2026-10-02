@@ -306,10 +306,10 @@ julia> Symbolics.operation(myop) === (*)
 true
 
 julia> Symbolics.derivative_idx(myop, 1)  # wrt. sin(x)
-sin(x)
+y^2
 
 julia> Symbolics.derivative_idx(myop, 2)  # wrt. y^2
-y^2
+sin(x)
 ```
 """
 @inline derivative_idx(::Any, ::Any) = COMMON_ZERO

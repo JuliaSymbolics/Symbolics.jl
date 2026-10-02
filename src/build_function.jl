@@ -480,7 +480,9 @@ function make_array(s::ShardedForm, closed_args, arr, similarto)
     if arr isa AbstractSparseArray
         return term(SparseMatrixCSC, arr.m, arr.n, copy(arr.colptr), copy(arr.rowval), make_array(s, closed_args, arr.nzval, Vector))
     end
-    per_task = ceil(Int, length(arr) / s.ncalls)
+    # Empty arrays (e.g. sparse jacobians with no nonzeros) have nothing to shard.
+    isempty(arr) && return _make_array(arr, similarto)
+    per_task = max(1, ceil(Int, length(arr) / s.ncalls))
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
         Func(closed_args, [], _make_array(slice, similarto)), closed_args
