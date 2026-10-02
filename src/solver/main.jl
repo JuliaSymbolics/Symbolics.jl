@@ -169,7 +169,7 @@ x
 
 julia> Symbolics.symbolic_solve(log(x+1)+log(x-1), x)
 1-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
- (1//2)*√(4 + 4exp(0))
+ (1//2)*√(8.0)
 ```
 ```jldoctest
 julia> using Symbolics

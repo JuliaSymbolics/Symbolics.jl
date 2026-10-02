@@ -823,3 +823,15 @@ end
     end
 end
 
+@testset "Parameterized algebraic inverses remain differentiable" begin
+    @variables x y
+    # Hand-derived: d/dy (y^2) = 2y, d/dy (y^3) = 3y^2.
+    sol_sqrt = only(symbolic_solve(sqrt(x) ~ y, x; warns = false))
+    @test isequal(sol_sqrt, y^2)
+    @test isequal(Symbolics.derivative(sol_sqrt, y), 2y)
+
+    sol_cbrt = only(symbolic_solve(cbrt(x) ~ y, x; warns = false))
+    @test isequal(sol_cbrt, y^3)
+    @test isequal(Symbolics.derivative(sol_cbrt, y), 3(y^2))
+end
+

@@ -135,13 +135,14 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                 new_var = gensym()
                 new_var = (@variables $new_var)[1]
                 period = fundamental_period(oper)
+                # Unevaluated trig inverse so convert_consts can canonicalize π forms.
                 rhs = map(
                     sol -> Symbolics.term(invop, sol; type = Real) +
                            *(period, new_var),
                     rhs)
                 @info string(new_var) * " ϵ" * " Ζ"
             else
-                rhs = map(sol -> Symbolics.term(invop, sol; type = Real), rhs)
+                rhs = map(sol -> invop(sol), rhs)
             end
         end
 
