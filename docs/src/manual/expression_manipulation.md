@@ -32,7 +32,6 @@ Other additional manipulation functions are given below.
 
 ```@docs
 SymbolicUtils.substitute
-SymbolicUtils.expand
 Symbolics.get_variables
 Symbolics.tosymbol
 Symbolics.diff2term

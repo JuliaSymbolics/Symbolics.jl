@@ -173,10 +173,6 @@ julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(true))
 """
 substitute
 
-@doc (let d = Docs.meta(SymbolicUtils)[Docs.Binding(SymbolicUtils, :expand)].docs
-         (haskey(d, Union{}) ? d[Union{}] : first(values(d))).text[1]
-     end) expand
-
 export Equation
 include("equations.jl")
 
