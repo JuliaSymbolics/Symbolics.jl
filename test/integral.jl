@@ -17,6 +17,15 @@ end
 @test isequal(I1(y), I2(y))
 @test hash(I1(y)) == hash(I2(y))
 
+let I1 = Integral(x in ClosedInterval(0.0, x)),
+        I2 = Integral(x in ClosedInterval(0.0f0, x)),
+        I3 = Integral(x in ClosedInterval(0.0, 1.0))
+    @test isequal(I1, I2)
+    @test hash(I1) == hash(I2)
+    @test isequal(I1(y), I2(y))
+    @test !isequal(I1, I3)
+end
+
 @variables v(..) u(..) x y a b
 
 # test constant integrand

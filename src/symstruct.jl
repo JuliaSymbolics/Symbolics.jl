@@ -58,7 +58,7 @@ function Base.isequal(a::SymStruct{T}, b::SymStruct{T}) where {T}
 end
 Base.isequal(a::SymStruct{T}, b::SymbolicT) where {T} = isequal(unwrap(a), b)
 Base.isequal(a::SymbolicT, b::SymStruct{T}) where {T} = isequal(a, unwrap(b))
-Base.hash(a::SymStruct{T}, h::UInt64) where {T} = hash(unwrap(a), h)
+Base.hash(a::SymStruct{T}, h::UInt) where {T} = hash(unwrap(a), h)
 
 function field_shape end
 

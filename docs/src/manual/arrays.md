@@ -213,6 +213,8 @@ Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
 
 ```@docs
 Symbolics.Arr
-SymbolicUtils.scalarize
-SymbolicUtils.shape
 ```
+
+The [`Symbolics.scalarize`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.scalarize)
+and [`Symbolics.shape`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.shape)
+functions are provided by SymbolicUtils and reexported by Symbolics.

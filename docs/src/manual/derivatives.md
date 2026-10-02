@@ -35,6 +35,9 @@ Symbolics.gradient
 Symbolics.hessian
 Symbolics.sparsehessian
 Symbolics.sparsehessian_vals
+Symbolics.get_differential_vars
+Symbolics.substitute_in_deriv
+Symbolics.substitute_in_deriv_and_depvar
 ```
 
 ## Adding Analytical Derivatives

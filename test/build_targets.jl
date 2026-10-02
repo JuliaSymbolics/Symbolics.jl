@@ -50,6 +50,8 @@ let
 end
 
 # MATLABTarget structural test (was target_functions/1.m)
+@test Base.ispublic(Symbolics, :MATLABTarget)
+
 let
     mfunc = Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.MATLABTarget())
     @test occursin("diffeqf = @(internal_var___t,internal_var___u)", mfunc)
@@ -80,6 +82,28 @@ end
       Symbolics.build_function(expr,vcat(x,y),[a],t,target = Symbolics.CTarget(),
                                      lhsname=:internal_var___du,
                                      rhsnames=[:internal_var___u,:internal_var___p,:t])
+
+# CTarget emits C source, not Julia; expression=Val{false} must error
+@test_throws ArgumentError Symbolics.build_function(expr, [x, y], [a], t,
+                                                    target = Symbolics.CTarget(),
+                                                    expression = Val{false})
+let
+    @variables x y z
+    ∇f = Symbolics.gradient(x^2 + y^2 + z^2 + x*y + y*z + z*x, [x, y, z])
+    @test_throws ArgumentError Symbolics.build_function(∇f, [x, y, z],
+                                                        target = Symbolics.CTarget(),
+                                                        fname = :grad_f,
+                                                        expression = Val{false})
+    err = try
+        Symbolics.build_function(∇f, [x, y, z], target = Symbolics.CTarget(),
+                                 expression = true)
+        error("expected ArgumentError")
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("Pass expression=Val{true}", err.msg)
+end
 
 @test Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.StanTarget()) ==
       Symbolics.build_function(expr,vcat(x,y),[a],t,target = Symbolics.StanTarget())

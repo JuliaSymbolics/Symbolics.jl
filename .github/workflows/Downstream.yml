@@ -21,7 +21,7 @@ jobs:
           - {user: SciML, repo: ModelingToolkit.jl, group: InterfaceII}
           - {user: SciML, repo: ModelingToolkit.jl, group: Initialization}
           - {user: SciML, repo: ModelingToolkit.jl, group: SymbolicIndexingInterface}
-          - {user: SciML, repo: ModelingToolkit.jl, group: RegressionI}
+          - {user: SciML, repo: ModelingToolkit.jl, group: RegressionI, target: ModelingToolkitBase}
           - {user: SciML, repo: Catalyst.jl, group: Modeling}
           - {user: SciML, repo: Catalyst.jl, group: Simulation}
           - {user: SciML, repo: Catalyst.jl, group: Hybrid}
@@ -59,7 +59,8 @@ jobs:
               Pkg.develop(PackageSpec(path="."))  # resolver may fail with main deps
             end
             Pkg.update()
-            Pkg.test()  # resolver may fail with test time deps
+            target = "${{ matrix.package.target }}"
+            isempty(target) ? Pkg.test() : Pkg.test(target)  # resolver may fail with test time deps
           catch err
             err isa Pkg.Resolve.ResolverError || rethrow()
             # If we can't resolve that means this is incompatible by SemVer and this is fine

@@ -28,7 +28,7 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
     ret_type = isnothing(ret_type) ? Real : ret_type
     N = length(args′)
     symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
-    fexpr = :(Symbolics.@wrapped function $f($(args′...))
+    inner = :(function $f($(args′...))
         args = ($(argnames...),)
         if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
             args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
@@ -36,7 +36,8 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
         else
             $f($(argnames...))
         end
-    end $wrap_arrays)
+    end)
+    fexpr = wrap_func_expr(__module__, inner, wrap_arrays)
 
     if define_promotion
         type_args = [:($name::$Type) for name in argnames]
@@ -119,12 +120,27 @@ symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(C
 symbolic_eltype(::AbstractArray{Num}) = Real
 symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 
-function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true)
+# An array with the given shape, so that a registered `size` expression evaluated in
+# `promote_shape` sees each argument's `size`/`length`/`axes` rather than its shape vector.
+shape_placeholder(sh::SymbolicUtils.ShapeVecT) = CartesianIndices(Tuple(sh))
+shape_placeholder(sh) = sh
+
+function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__)
     def_assignments = MacroTools.rmlines(partial_defs).args
     defs = map(def_assignments) do ex
         @assert ex.head == :(=)
         ex.args[1] => ex.args[2]
     end |> Dict
+    # `promote_symtype` only sees argument types and cannot evaluate `size`, but a literal
+    # tuple `size` still fixes `ndims`.
+    promote_nd = get(defs, :ndims) do
+        sz = get(defs, :size, nothing)
+        if Meta.isexpr(sz, :tuple) && !any(a -> Meta.isexpr(a, :...), sz.args)
+            length(sz.args)
+        else
+            -1
+        end
+    end
 
     shape_expr = if haskey(defs, :size)
         quote
@@ -145,27 +161,35 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     N = length(args′)
     symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
     assigns = macroexpand(@__MODULE__, :(Base.Cartesian.@nexprs $N i -> ($argnames[i] = args[i])))
-    fexpr = quote
-        @wrapped function $f($(args′...))
-            args = ($(argnames...),)
-            if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
-                args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
-                $assigns
-                $shape_expr
-                eltype = $eltype ∘ $symtype
-                type = if nd == -1
-                    $container_type{$eltype_expr}
-                else
-                    $container_type{$eltype_expr, nd}
-                end
-                $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type, shape = sh)
+    inner = :(function $f($(args′...))
+        args = ($(argnames...),)
+        if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
+            args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
+            $assigns
+            $shape_expr
+            eltype = $eltype ∘ $symtype
+            type = if nd == -1
+                $container_type{$eltype_expr}
             else
-                $f($(argnames...))
+                $container_type{$eltype_expr, nd}
             end
-        end $wrap_arrays
-    end |> esc
+            $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type, shape = sh)
+        else
+            $f($(argnames...))
+        end
+    end)
+    fexpr = wrap_func_expr(caller, inner, wrap_arrays)
 
     if define_promotion
+        if promote_nd == -1
+            @warn """
+            `@register_array_symbolic` could not infer `ndims` for `$f`.
+            `promote_symtype` will return a `UnionAll` like `Array{Real}` instead of a concrete \
+            `Array{Real,N}`, which can break IR substitution (see JuliaSymbolics/Symbolics.jl#1845).
+            Add `ndims = N` to the registration block (for example `ndims = 1` for a vector result).
+            Tuple `size = (...)` without splats is also enough to infer `ndims`.
+            """
+        end
         is_callable_struct = f isa Expr && f.head == :(::)
         fn_arg = if is_callable_struct
             f
@@ -183,7 +207,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         promote_symtype_body = quote
             f = $fn_arg_name
             container_type = $container_type
-            nd = $(get(defs, :ndims, -1))
+            nd = $promote_nd
             etype = $eltype_expr
             if nd == -1
                 return container_type{etype}
@@ -193,7 +217,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         end
         promote_shape_body = quote
             @nospecialize $(argnames...)
-            size = identity
+            $([:($a = $shape_placeholder($a)) for a in argnames]...)
             $shape_expr
             return sh
         end
@@ -214,7 +238,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
                     $promote_shape_body
                 end
             end
-        end |> esc
+        end
         fexpr = :($fexpr; $promote_expr)
     end
 
@@ -234,12 +258,18 @@ Example:
 end
 ```
 
+`ndims` is inferred from a non-splat tuple `size = (...)` when possible. When it
+cannot be inferred (for example `size = size(x)`), add `ndims` explicitly to keep
+`promote_symtype` concrete; otherwise a warning is emitted and `promote_symtype`
+returns the `UnionAll` `container_type{eltype}`.
+
 You can also register calls on callable structs:
 
 ```julia
 @register_array_symbolic (c::Conv)(x::AbstractMatrix) begin
     size=size(x) .- size(c.kernel) .+ 1
     eltype=promote_type(eltype(x), eltype(c))
+    ndims=2
 end
 ```
 
@@ -255,5 +285,5 @@ overwriting.
 """
 macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
-    register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays)
+    esc(register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays, __module__))
 end

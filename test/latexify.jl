@@ -43,6 +43,40 @@ Dy = Differential(y)
 @test_reference "latexify_refs/derivative4.txt" latexify(Dy(u))
 @test_reference "latexify_refs/derivative5.txt" latexify(Dx(Dy(Dx(y))))
 
+# issue #1979: exact strings (hand-written from the issue's requested forms).
+@testset "latexify derivatives/integrals (#1979)" begin
+    @variables t x(t)
+    D = Differential(t)
+    # Issue examples with mult_symbol override: no leak into the differential form.
+    @test latexify(D(x); env = :raw, mult_symbol = "\\cdot").s ==
+        "\\frac{\\mathrm{d}x\\left( t \\right)}{\\mathrm{d}t}"
+    @test latexify(D(D(x)); env = :raw, mult_symbol = "\\cdot").s ==
+        "\\frac{\\mathrm{d}^{2}x\\left( t \\right)}{\\mathrm{d}t^{2}}"
+
+    @variables x y a[1:3]
+    Dx = Differential(x)
+    I = Integral(x in Interval(0, 1))
+
+    # Compound integrand: default mult_symbol stays "~"; product stays grouped.
+    @test latexify(I(x * y); env = :raw).s ==
+        "\\int_{0}^{1} ~ x ~ \\left( x ~ y \\right)"
+    # Sum integrand stays parenthesised (not flattened to ∫x + y).
+    @test latexify(I(x + y); env = :raw).s ==
+        "\\int_{0}^{1} ~ x ~ \\left( x + y \\right)"
+    # Indexed variable keeps recipe index=:subscript; no redundant merge parens.
+    @test latexify(I(a[1]); env = :raw).s ==
+        "\\int_{0}^{1} ~ x ~ a_{1}"
+    # Float coefficient keeps FancyNumberFormatter(5) rounding.
+    @test latexify(I(0.123456789 * x); env = :raw).s ==
+        "\\int_{0}^{1} ~ x ~ \\left( 0.12346 ~ x \\right)"
+    # Power of an operator-form derivative keeps the derivative parenthesised as base.
+    @test latexify((Dx(x + y))^2; env = :raw).s ==
+        "\\left( \\frac{\\mathrm{d}}{\\mathrm{d}x} ~ \\left( x + y \\right) \\right)^{2}"
+    # Integral upper limit closes with `}` (not `)`), and mult_symbol does not leak.
+    @test latexify(I(y); env = :raw, mult_symbol = "\\cdot").s ==
+        "\\int_{0}^{1} ~ x ~ y"
+end
+
 @test_reference "latexify_refs/stable_mul_ordering1.txt" latexify(x * y)
 @test_reference "latexify_refs/stable_mul_ordering2.txt" latexify(y * x)
 
@@ -76,6 +110,9 @@ end
         Dx(y) ~ y * x
     ]
 )
+
+@variables s p(s)[1:2] q(s)[1:2] A[1:2, 1:2]
+@test_reference "latexify_refs/equation_vec_array.txt" latexify([q ~ A * p])
 
 @test_reference "latexify_refs/complex1.txt" latexify(x^2 - y^2 + 2im * x * y)
 @test_reference "latexify_refs/complex2.txt" latexify(3im * x)

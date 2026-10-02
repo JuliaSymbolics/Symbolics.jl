@@ -126,6 +126,31 @@ end
 # Fallback
 @register_derivative (f::Any)(args...) I nothing
 
+"""
+    SymbolicCallable{T}
+
+Stand-in for a symbolic function `f` whose `symtype` is `FnType{A, R, T}`, i.e. a symbolic
+representing a callable of type `T`, such as `@variables (f::T)(..)`. Derivative rules of
+`f(args...)` are looked up on `SymbolicCallable{T}` and can be registered for a supertype
+of `T`:
+
+```julia
+@register_derivative (f::SymbolicCallable{<:MyCallableStruct})(x) 1 my_derivative(f.f, x)
+```
+
+The field `f` is the symbolic function. The rule should keep it in the returned expression,
+so that the derivative is evaluated with whatever value `f` takes.
+"""
+struct SymbolicCallable{T}
+    f::SymbolicT
+end
+
+function derivative_rule(f::SymbolicT, ::Val{N}, args::ROArgsT{VartypeT}, ::Val{I}) where {N, I}
+    T = fntype_callable_type(symtype(f))
+    T === Nothing && return nothing
+    return derivative_rule(SymbolicCallable{T}(f), Val{N}(), args, Val{I}())
+end
+
 # Pre-defined derivatives
 import DiffRules
 for (modu, fun, arity) ∈ DiffRules.diffrules(; filter_modules=(:Base, :SpecialFunctions, :NaNMath))
@@ -277,14 +302,14 @@ chain rule is not applied:
 julia> myop = Symbolics.value(sin(x) * y^2)
 sin(x)*(y^2)
 
-julia> typeof(Symbolics.operation(myop))  # Op is multiplication function
-typeof(*)
+julia> Symbolics.operation(myop) === (*)
+true
 
 julia> Symbolics.derivative_idx(myop, 1)  # wrt. sin(x)
-y^2
+sin(x)
 
 julia> Symbolics.derivative_idx(myop, 2)  # wrt. y^2
-sin(x)
+y^2
 ```
 """
 @inline derivative_idx(::Any, ::Any) = COMMON_ZERO
@@ -294,4 +319,3 @@ function derivative_idx(O::SymbolicT, idx::Int)
     args = arguments(O)
     return @derivative_rule f(args...) idx
 end
-

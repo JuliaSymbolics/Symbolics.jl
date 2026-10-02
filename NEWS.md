@@ -1,3 +1,14 @@
+## 7.37.0
+
+### Behavior changes
+
+- `is_derivative` now unwraps wrapper types before inspecting the expression, so
+  `is_derivative(D(x))` is `true` where it previously returned `false` (`D(x)` is a `Num`,
+  and the old catch-all method answered `false` for anything that was not a raw expression
+  tree). This applies to any registered wrapper, including `Arr`. Code that relied on the
+  old answer to distinguish a wrapped value from an unwrapped one should test
+  `Symbolics.iswrapped` instead.
+
 ## 7.0.0
 
 ### Breaking changes

@@ -143,6 +143,8 @@ canonequal(a, b) = isequal(simplify(unwrap_const(unwrap(a))), simplify(unwrap_co
     (Differential(z) * Differential(y) * Differential(x))(t),
     Differential(z)(Differential(y)(Differential(x)(t)))
 )
+@test isequal((Differential(x) * identity)(t), Differential(x)(t))
+@test_throws MethodError Differential(x) * 2
 
 @test canonequal(
                  Symbolics.derivative(sin(cos(x)), x),
@@ -397,6 +399,28 @@ let
     @test Symbolics.is_derivative(Symbolics.unwrap(D(X + 2a*Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(D(X) + D(Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(my_f(X, D(Y))))
+
+    # Wrapper types give the same answer as the expression they wrap (#1942).
+    @test !Symbolics.is_derivative(D)
+    @test !Symbolics.is_derivative(t)
+    @test !Symbolics.is_derivative(X)
+    @test !Symbolics.is_derivative(1)
+    @test Symbolics.is_derivative(D(X))
+    @test !Symbolics.is_derivative(D(X) + 3)
+    @test Symbolics.is_derivative(D(X + 2a * Y))
+    @test !Symbolics.is_derivative(D(X) + D(Y))
+    @test !Symbolics.is_derivative(my_f(X, D(Y)))
+    @test !Symbolics.is_derivative(expand_derivatives(D(X^2)))
+
+    @variables Z(t)[1:3]
+    @test Symbolics.is_derivative(D(Z))
+    @test !Symbolics.is_derivative(Z)
+
+    # `Differential` distributes over the parts of a `Complex{Num}`, so the result is a
+    # `complex` term rather than a single derivative term.
+    @variables W(t)::Complex
+    @test !Symbolics.is_derivative(D(W))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(D(W)))
 end
 
 # Zeroth derivative (#1163)
@@ -688,6 +712,71 @@ end
     @test isequal(Symbolics.derivative(sqrt(ex), x[1]), y[1] / 2sqrt(ex))
 end
 
+# Derivatives of lazy array reductions w.r.t. the elements of the reduced arrays
+# used to silently return zero; they now error instead (issue #1990).
+@testset "Derivatives of lazy reductions w.r.t. array elements" begin
+    @variables x[1:3] y a[1:3]
+    obj = sum(abs2, x .- a) + (y - 1)^2
+
+    # differentiating element vars through lazy reductions nested in scalar
+    # expressions is unsupported and must error rather than return wrong zeros
+    @test_throws ErrorException Symbolics.gradient(obj, [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.gradient(
+        sum((x .- a) .^ 2) + (y - 1)^2, [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.derivative(sqrt(sum(abs2, x .- a)), x[1])
+    @test_throws ErrorException Symbolics.jacobian([obj], [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.hessian(obj, [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.hessian_sparsity(obj, [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.hessian_sparsity(
+        sum(abs2, x .- a), [x[1], x[2], x[3]])
+
+    # scalarizing first makes the same derivatives computable
+    @test isequal(Symbolics.gradient(Symbolics.scalarize(obj), [x[1], x[2], x[3], y]),
+                  Num[-2a[1] + 2x[1], -2a[2] + 2x[2], -2a[3] + 2x[3], 2(-1 + y)])
+
+    # differentiating a lazy reduction directly still works (it is expanded
+    # internally), as do bare-array arguments and literal elements
+    @test isequal(Symbolics.derivative(sum(abs2, x .- a), x[1]), -2a[1] + 2x[1])
+    @test isequal(Symbolics.derivative(x[1] * sum(x), x[2]), x[1])
+    @test isequal(Symbolics.jacobian([sum(x)], [x[1], x[2], x[3]]), Num[1 1 1])
+    @test isequal(Symbolics.jacobian([sum(abs2, x .- a)], [x[1], x[2], x[3]]),
+                  Num[-2a[1] + 2x[1] -2a[2] + 2x[2] -2a[3] + 2x[3]])
+    @test isequal(Symbolics.hessian(sum(abs2, x .- a), [x[1], x[2], x[3]]),
+                  Num[2 0 0; 0 2 0; 0 0 2])
+
+    # elements that genuinely do not occur still differentiate to zero
+    @test isequal(Symbolics.derivative(sum(a), x[1]), 0)
+    @test isequal(Symbolics.derivative(sum(y .* a), x[1]), 0)
+    @test isequal(Symbolics.derivative(sum(x), a[1]), 0)
+
+    # sparsity detection sees elements inside lazy array expressions
+    @test Symbolics.jacobian_sparsity([obj], [x[1], x[2], x[3], y]) ==
+        sparse([1, 1, 1, 1], [1, 2, 3, 4], true)
+    @test Symbolics.jacobian_sparsity([sum(x)], [x[1], x[2], x[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+    # a literal `arr[k]` occurrence must not mark the other elements
+    @test nnz(Symbolics.jacobian_sparsity([x[2]^2], [x[1]])) == 0
+    @test Symbolics.jacobian_sparsity([x[2]^2], [x[1], x[2]]) == sparse([1], [2], true)
+    # the same holds when the indexee is a symbolic call like `u(t)`
+    @variables t u(t)[1:3] k::Int
+    @test Symbolics.jacobian_sparsity([u[1] + u[2], u[3]], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 2], [1, 2, 3], true)
+    # a non-literal index or a whole-array occurrence still marks all elements
+    @test Symbolics.jacobian_sparsity([u[k]], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+    @test Symbolics.jacobian_sparsity([sum(u)], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+    @test Symbolics.exprs_occur_in(
+        Symbolics.unwrap.([x[1], x[2], x[3], y]), Symbolics.unwrap(obj)) ==
+        Bool[1, 1, 1, 1]
+    @test Symbolics.exprs_occur_in(Symbolics.unwrap.([x[1], y]), Symbolics.unwrap(x[2]^2)) ==
+        Bool[0, 0]
+
+    @test isequal(Symbolics.sparsejacobian([obj], [x[1], x[2], x[3], y]),
+                  sparse([1, 1, 1, 1], [1, 2, 3, 4],
+                         Num[-2a[1] + 2x[1], -2a[2] + 2x[2], -2a[3] + 2x[3], 2(-1 + y)]))
+end
+
 struct Op <: SymbolicUtils.Operator end
 
 @testset "Derivative of non-`Differential` operators" begin
@@ -725,4 +814,67 @@ end
     end
     @test SymbolicUtils.isarraymaker(arr_no_deriv)
     @test !Symbolics.hasderiv(arr_no_deriv)
+end
+
+@testset "Derivatives of mod and rem" begin
+    @variables x y
+    for (f, q) in ((mod, floor), (rem, trunc))
+        dx = build_function(Symbolics.derivative(f(x, y), x), x, y; expression = Val(false))
+        dy = build_function(Symbolics.derivative(f(x, y), y), x, y; expression = Val(false))
+        @test dx(5.5, 2.0) == 1.0
+        @test dy(5.5, 2.0) == -q(5.5 / 2.0)
+        @test dy(-5.5, 2.0) == -q(-5.5 / 2.0)
+        @test isnan(dx(4.0, 2.0))
+        @test isnan(dy(4.0, 2.0))
+    end
+    @test !(Symbolics.derivative(mod(x, 1.0), x) isa Symbolics.Differential)
+    df = build_function(Symbolics.derivative(mod(x, 1.0), x), x; expression = Val(false))
+    @test df(0.5) == 1
+    @test isequal(Symbolics.derivative(mod(x, 1.0), y), 0)
+end
+
+struct ScaledSquare
+    a::Float64
+end
+(s::ScaledSquare)(x) = s.a * x^2
+dscaledsquare(s::ScaledSquare, x) = 2 * s.a * x
+@register_symbolic dscaledsquare(s::ScaledSquare, x)
+@register_derivative (s::Symbolics.SymbolicCallable{<:ScaledSquare})(x) 1 dscaledsquare(s.f, x)
+
+struct ScaledProduct
+    a::Float64
+end
+(s::ScaledProduct)(x, y) = s.a * x * y
+dscaledproduct1(s::ScaledProduct, x, y) = s.a * y
+@register_symbolic dscaledproduct1(s::ScaledProduct, x, y)
+@register_derivative (s::Symbolics.SymbolicCallable{<:ScaledProduct})(x, y) 1 dscaledproduct1(s.f, x, y)
+
+struct NoRuleCallable end
+
+@testset "Derivative rules of symbolic callables" begin
+    @variables x y t z(t) (f::ScaledSquare)(..) (g::ScaledProduct)(..) (h::NoRuleCallable)(..) k(..) (a::Any)(..)
+    Dx = Differential(x)
+    Dt = Differential(t)
+    fs, gs = unwrap(f), unwrap(g)
+
+    @test isequal(expand_derivatives(Dx(f(x))), dscaledsquare(fs, x))
+    @test isequal(expand_derivatives(Dx(f(x^2))), 2x * dscaledsquare(fs, x^2))
+    @test isequal(expand_derivatives(Dt(f(z))), dscaledsquare(fs, z) * Dt(z))
+    @test isequal(Symbolics.derivative(sin(f(x)), x), cos(f(x)) * dscaledsquare(fs, x))
+    @test isequal(@derivative_rule(fs(unwrap(x)), 1), unwrap(dscaledsquare(fs, x)))
+
+    fn = build_function(Symbolics.derivative(f(x), x), fs, x; expression = Val{false})
+    @test fn(ScaledSquare(3.0), 2.0) == 12.0
+
+    # the partial derivative w.r.t. `y` has no rule, so it is needed only when `y`
+    # depends on the differentiation variable
+    @test isequal(expand_derivatives(Dx(g(x, y))), dscaledproduct1(gs, x, y))
+    @test isequal(expand_derivatives(Dx(g(x, x))), Dx(g(x, x)))
+
+    # symbolic functions without a callable type or without a rule are left unexpanded
+    @test isequal(expand_derivatives(Dx(h(x))), Dx(h(x)))
+    @test isequal(expand_derivatives(Dx(k(x))), Dx(k(x)))
+    @test isequal(expand_derivatives(Dx(a(x))), Dx(a(x)))
+    @test isequal(expand_derivatives(Dx(h(f(x)))), Differential(f(x))(h(f(x))) * dscaledsquare(fs, x))
+    @test isequal(expand_derivatives(Dt(z)), Dt(z))
 end

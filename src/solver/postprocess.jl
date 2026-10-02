@@ -39,7 +39,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     if (oper === sqrt || oper === cbrt || oper === ssqrt ||
         oper === scbrt)
         arg = arguments(x)[1]
-        if isequal(arg, 0) || isequal(arg, 1)
+        if SymbolicUtils._iszero(arg) || SymbolicUtils._isone(arg)
             return arg
         end
     end

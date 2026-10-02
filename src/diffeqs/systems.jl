@@ -20,19 +20,23 @@ vector of symbolic solutions
 # Examples
 !!! note uses method `symbolic_solve`, so packages `Nemo` and `Groebner` are often required
 ```jldoctest
+julia> using Symbolics
+
+julia> import Nemo, Groebner
+
 julia> @variables t
 1-element Vector{Num}:
  t
 
-julia> solve_linear_ode_system([1 0; 0 -1], [1, -1], t) # requires Nemo
+julia> solve_linear_ode_system([1 0; 0 -1], [1, -1], t)
 2-element Vector{Num}:
    exp(t)
  -exp(-t)
 
-julia> solve_linear_ode_system([-3 4; -2 3], [7, 2], t) # requires Groebner
+julia> solve_linear_ode_system([-3 4; -2 3], [7, 2], t)
 2-element Vector{Num}:
- (10//1)*exp(-t) - (3//1)*exp(t)
-  (5//1)*exp(-t) - (3//1)*exp(t)
+ -(3//1)*exp(t) + (10//1)*exp(-t)
+  -(3//1)*exp(t) + (5//1)*exp(-t)
 ```
 """
 function solve_linear_ode_system(A::Matrix{<:Number}, x0::Vector{<:Number}, t::Num)
@@ -87,8 +91,8 @@ end
 Replacement for `LinearAlgebra.eigen` function that uses symbolic functions to avoid floating-point inaccuracies
 """
 function symbolic_eigen(A::Matrix{<:Number})
-    @variables λ # eigenvalue
-    v = variables(:v, 1:size(A, 1)) # vector of subscripted variables to represent eigenvector
+    λ = variable(:ℰ) # eigenvalue
+    v = variables(:𝓋, 1:size(A, 1)) # vector of subscripted variables to represent eigenvector
     
     # find eigenvalues first
     p = det(λ*I - A) ~ 0 # polynomial to solve
@@ -113,4 +117,3 @@ function symbolic_eigen(A::Matrix{<:Number})
 
     return Eigen(values, S)
 end
-
