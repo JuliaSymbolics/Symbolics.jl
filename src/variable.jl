@@ -32,38 +32,66 @@ struct VariableSource <: AbstractVariableMetadata end
 """
     $TYPEDEF
 
-Symbolic metadata key for storing the domain or assumptions of a symbolic variable. Set
-through the `domain` option of [`@variables`](@ref):
+Symbolic metadata key for storing the domain of a symbolic variable, that is, the set of
+values it is assumed to take. Set through the `domain` option of [`@variables`](@ref):
 
 ```julia
-@variables x [domain = (10, Inf)]
-@variables y [domain = v -> v > 0]
+@variables x [domain = DomainSets.HalfLine()]   # x >= 0
+@variables y [domain = (10, Inf)]               # shorthand for `Interval(10, Inf)`
+@variables n [domain = DomainSets.Integers()]
 ```
 
-The value is stored as given and is not interpreted by Symbolics itself; consumers such as
-simplification rules decide what to make of it. Two conventions are in use: a `(lo, hi)`
-tuple describing an interval, and a predicate called on a candidate value. Note that
-Symbolics also has a separate, unrelated domain concept for `x ∈ Interval(...)` pairings
-(see `Symbolics.VarDomainPairing`).
+The value is a DomainSets `Domain`, which is the representation
+[discussed for assumptions](https://github.com/JuliaSymbolics/Symbolics.jl/issues/98) and the
+one already used by the `x ∈ Interval(...)` pairings of `Symbolics.VarDomainPairing`,
+so the two describe domains the same way. A `(lo, hi)` tuple is accepted and converted to an
+`Interval`, matching the conversion that `∈` already performs.
+
+Nothing in Symbolics consumes this key yet; it exists so that downstream packages and
+user-written rewrite rules can read a variable's assumptions, with `in` as the single
+predicate they need.
 """
 struct VariableDomain <: AbstractVariableMetadata end
 
+"""
+    normalize_metadata_value(key_type, value)
+
+Canonicalise the value given for a metadata key in `@variables`.
+
+The default returns `value` unchanged. A key that accepts more than one spelling of the same
+thing adds a method here, so that everything stored under it has one representation and
+consumers have one shape to handle.
+"""
+normalize_metadata_value(::Type, value) = value
+
+function _default_is_array_shaped(val)
+    u = unwrap(val)
+    if u isa AbstractArray
+        return ndims(u) > 0
+    elseif u isa SymbolicUtils.BasicSymbolic
+        ush = shape(u)
+        return !(ush isa SymbolicUtils.Unknown) && !isempty(ush)
+    end
+    return false
+end
 
 function setdefaultval(x, val)
     val === nothing && return x
     sh = shape(x)
     if sh isa SymbolicUtils.Unknown
-        @assert sh.ndims == -1 || ndims(val) == sh.ndims """
-        Variable $x must have default of matching `ndims`. Got $val with `ndims` \
-        $(ndims(val)).
-        """
-    else
-        @assert val === missing || isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
-        Variable $x must have default of matching size. Got $val with size \
-        $(size(val)).
-        """
+        if !(sh.ndims == -1 || ndims(val) == sh.ndims)
+            throw(ArgumentError("Variable $x must have default of matching `ndims`. Got $val with `ndims` $(ndims(val))."))
+        end
+    elseif val !== missing && !(symtype(x) <: FnType)
+        if isempty(sh)
+            if _default_is_array_shaped(val)
+                throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+            end
+        elseif size(x) != size(val)
+            throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+        end
     end
-    setmetadata(x, VariableDefaultValue, val)
+    return setmetadata(x, VariableDefaultValue, val)
 end
 
 """
@@ -259,6 +287,7 @@ function _add_metadata(parse_result, var::Expr, default, macroname::Symbol, meta
         Meta.isexpr(ex, :(=)) || error("Metadata must of the form of `key = value`")
         key, value = ex.args
         key_type = option_to_metadata_type(Val{key}())::DataType
+        value = Expr(:call, normalize_metadata_value, key_type, value)
         var = Expr(:call, setmetadata, var, key_type, value)
     end
     return var
@@ -390,9 +419,15 @@ for T in [LinearAlgebra.UpperTriangular, LinearAlgebra.LowerTriangular]
     end
 end
 
+for T in [LinearAlgebra.Symmetric, LinearAlgebra.Hermitian, LinearAlgebra.Diagonal]
+    @eval function _recursive_unwrap(val::$T, ::Val{eval} = Val(false)) where {eval}
+        return _recursive_unwrap(collect(val), Val{eval}())
+    end
+end
+
 function _recursive_unwrap(val, ::Val{eval} = Val(false)) where {eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
-        if parent(val) !== val
+        if parent(val) !== val && hasfield(typeof(val), :parent)
             return Setfield.@set val.parent = _recursive_unwrap(parent(val), Val{eval}())
         end
         return _recursive_unwrap.(val, Val{eval}())

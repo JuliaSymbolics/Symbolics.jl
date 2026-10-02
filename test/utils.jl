@@ -1,5 +1,5 @@
 using Symbolics
-import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap,
+import Symbolics: symbolic_to_float, var_from_nested_derivative, unwrap, value,
                   isblock, flatten_expr!, get_variables, get_differential_vars,
                   is_singleton, diff2term, tosymbol, lower_varname,
                   degree, coeff
@@ -223,6 +223,28 @@ end
         xtt = diff2term(D(xt))
         xtt_true = diff2term(unwrap(D(D(x[1]))))
         @test isequal(xtt, xtt_true)
+    end
+
+    @testset "diff2term rejects derivatives of non-variables" begin
+        @variables t x(t) y(t)
+        D = Differential(t)
+        err1 = try
+            diff2term(value(D(x * exp(-1 / y))))
+            nothing
+        catch e
+            e
+        end
+        @test err1 isa ArgumentError
+        @test occursin("expand_derivatives", sprint(showerror, err1))
+
+        err2 = try
+            diff2term(value(D(-x - y + 1)))
+            nothing
+        catch e
+            e
+        end
+        @test err2 isa ArgumentError
+        @test occursin("expand_derivatives", sprint(showerror, err2))
     end
 end
 

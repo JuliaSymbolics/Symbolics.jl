@@ -97,3 +97,32 @@ function supremum(d::AbstractInterval)
     )
     return IntervalSets.supremum(d)
 end
+
+"""
+    to_domain(d)
+
+Canonicalise the value of the `domain` option of [`@variables`](@ref) into a DomainSets
+`Domain`, the representation `VarDomainPairing` already uses.
+
+A `Domain` is kept as it is, and a `(lo, hi)` tuple becomes an `Interval`, the same
+conversion `∈` performs for `x ∈ (lo, hi)`. Anything else is rejected: a domain that no
+existing `Domain` describes is written as a `Domain` subtype with a `Base.in` method, which
+keeps it composable with `UnionDomain` and the rest.
+"""
+to_domain(d::Domain) = d
+to_domain(d::NTuple{2, Real}) = Interval(d...)
+function to_domain(d)
+    throw(
+        ArgumentError(
+            """
+            `domain` expects a DomainSets `Domain`, or a `(lo, hi)` tuple standing for an \
+            `Interval`; got `$(repr(d))` of type `$(typeof(d))`. Common domains are \
+            `DomainSets.HalfLine()` for nonnegative values, `DomainSets.Integers()`, and \
+            `DomainSets.RealNumbers()`. For a condition none of them express, define \
+            `struct MyDomain <: DomainSets.Domain{T} end` with a `Base.in` method.
+            """
+        )
+    )
+end
+
+normalize_metadata_value(::Type{VariableDomain}, value) = to_domain(value)
