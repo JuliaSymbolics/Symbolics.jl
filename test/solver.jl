@@ -690,10 +690,7 @@ using LambertW
     root = Symbolics.ssubs(root, Dict(var=>0))
     @test correctAns([root],[asin(1.0/3.0)-3.0])
 
-    # Remains broken post-#1842: composed-attract path uses `attract_trig`
-    # which has its own simplification chain outside the `isolate` fix from
-    # spec 002-fix-transcendental-solve. Left as @test_broken pending a
-    # follow-up scoped to the attract path.
+    # Still broken: composed sin+cos goes through attract_trig, not isolate.
     @test_broken correctAns(symbolic_solve(sin(x+2//5)+cos(x+2//5)~1//2 , x, warns=false), [acos(0.5/sqrt(2.0))+pi/4.0-(2.0/5.0)])
 
     #product
@@ -707,8 +704,6 @@ end
     @test x isa Complex && isnan(x)
 end
 
-# Enforces the no-float-literal contract from
-# specs/002-fix-transcendental-solve/contracts/solver-contract.md §G-EXACT-1.
 function has_no_float_literals(expr)
     expr = Symbolics.unwrap(expr)
     expr isa AbstractFloat && return false

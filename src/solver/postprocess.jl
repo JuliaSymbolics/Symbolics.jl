@@ -32,10 +32,7 @@ function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
 
     oper = operation(x)
     new_args = map(_postprocess_root, arguments(x))
-    # `maketerm` eagerly folds known-function calls on constant operands, which
-    # collapses exact forms like `π/3` into `1.0471...`. Rebuild with
-    # `Symbolics.term` when any arg is an irrational math constant to keep the
-    # exact form intact (see spec 002-fix-transcendental-solve §research §1 row 4).
+    # Avoid maketerm folding π/e constants into Float64 (e.g. π/3 → 1.047…).
     has_math_const_arg = any(new_args) do a
         v = value(Symbolics.unwrap(a))
         v === Base.MathConstants.pi || v === Base.MathConstants.e

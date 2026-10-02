@@ -231,7 +231,6 @@ for fn in [tand, cotd]
 end
 
 for fn in [tan, cot, NaNMath.tan]
-    # Wrap `Base.MathConstants.pi` as a symbolic term so it survives downstream
-    # arithmetic without promoting to `Float64` (see spec 002).
+    # Keep π symbolic so Int*π does not promote to Float64.
     @eval fundamental_period(::typeof($fn)) = Symbolics.term(*, 1, Base.MathConstants.pi)
 end
