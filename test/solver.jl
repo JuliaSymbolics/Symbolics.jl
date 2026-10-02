@@ -324,10 +324,20 @@ end
     backward = [Symbolics.substitute(eqs, s) for s in sol]
     @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
 
-    # TODO: broken
-    # @variables H1 H2
-    # eqs = [-288421779135875//1125899906842624*H1^2 + 1963378034549373//562949953421312*H1 - 4, -288421779135875//844424930131968*H1*H2 + 1963378034549373//562949953421312*H2 - 4]
-    # symbolic_solve(eqs, [H1, H2])
+    @variables H1 H2
+    eqs = [-288421779135875//1125899906842624*H1^2 + 1963378034549373//562949953421312*H1 - 4,
+           -288421779135875//844424930131968*H1*H2 + 1963378034549373//562949953421312*H2 - 4]
+    sol = symbolic_solve(eqs, [H1, H2])
+    @test length(sol) == 2
+    backward = [Symbolics.substitute(eqs, s) for s in sol]
+    @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
+    disc = sqrt(big(2555917089509096769845824549129))
+    h1_a = (big(1963378034549373) + disc) / big(288421779135875)
+    h1_b = (big(1963378034549373) - disc) / big(288421779135875)
+    h2_of(h1) = 4 / (1963378034549373//562949953421312 - 288421779135875//844424930131968 * h1)
+    arr_known_roots = sort_arr([Dict(H1 => h1_a, H2 => h2_of(h1_a)),
+                                Dict(H1 => h1_b, H2 => h2_of(h1_b))], [H1, H2])
+    @test check_approx(sort_arr(sol, [H1, H2]), arr_known_roots)
 
     @test isnothing(symbolic_solve([x*y - 1, sin(x)], [x, y]))
 
