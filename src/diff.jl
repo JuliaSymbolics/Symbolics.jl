@@ -217,7 +217,7 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
     @match expr begin
         BSImpl.ArrayOp(; output_idx) && if isempty(output_idx) end => begin
             # Scalar reductions must expose element dependencies before the chain rule.
-            return occursin_info(x, SymbolicUtils.scalarize(expr), fail)
+            return occursin_info(x, SymbolicUtils.scalarize(expr)::SymbolicT, fail)
         end
         _ => nothing
     end
