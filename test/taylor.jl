@@ -45,6 +45,9 @@ end
 @test evalsol(expand(taylor(cosh(x), x, 0:7) - sum(1/factorial(2*n) * x^(2*n) for n in 0:3))) == 0
 @test evalsol(expand(taylor(tanh(x), x, 0:7) - (x - x^3/3 + 2/15*x^5 - 17/315*x^7))) == 0
 
+f = (-1 + sqrt(1 + 4 * x^2) + 2 * x) / (2 * x)
+@test evalsol(expand(taylor(f, x, 0, 0:5) - (1 + x - x^3 + 2 * x^5))) == 0
+
 # around x ≠ 0
 @test evalsol(substitute(taylor(√(x), x, 1, 0:6), x => x + 1) - taylor(√(1+x), x, 0:6)) == 0
 
