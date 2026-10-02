@@ -14,6 +14,9 @@ using Symbolics
 
 # Variables with custom metadata (once registered)
 @variables z [description="Temperature in Kelvin"]
+
+# Per-variable LaTeX rendering (see also the Latexification section in I/O)
+@variables w0 [latexwrapper = s -> raw"\omega_{0}"]
 ```
 
 ## Extending Metadata
