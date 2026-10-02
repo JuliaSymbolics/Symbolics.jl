@@ -299,17 +299,17 @@ Note that the function does not recurse into the operation's arguments, i.e., th
 chain rule is not applied:
 
 ```jldoctest label1
-julia> myop = Symbolics.value(sin(x) * y^2)
-sin(x)*(y^2)
+julia> myop = Symbolics.value(sin(x)^y)
+sin(x)^y
 
-julia> Symbolics.operation(myop) === (*)
+julia> Symbolics.operation(myop) === (^)
 true
 
-julia> Symbolics.derivative_idx(myop, 1)  # wrt. sin(x)
-y^2
+julia> Symbolics.derivative_idx(myop, 1)  # wrt. base sin(x)
+(sin(x)^(-1 + y))*y
 
-julia> Symbolics.derivative_idx(myop, 2)  # wrt. y^2
-sin(x)
+julia> Symbolics.derivative_idx(myop, 2)  # wrt. exponent y
+(sin(x)^y)*log(sin(x))
 ```
 """
 @inline derivative_idx(::Any, ::Any) = COMMON_ZERO

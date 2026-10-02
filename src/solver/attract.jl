@@ -174,7 +174,7 @@ function attract_exponential(lhs, var)
     contains_var(arg) = n_occurrences(arg, var) > 0
 
     # @acrule matches summands in an unspecified order; canonicalize by base
-    # so the rewritten slog form is stable across Julia versions (#2015 docs).
+    # so the rewritten slog form is stable across Julia versions.
     _expon_base_lt(b, d) = isless(string(b), string(d))
 
     r_addexpon = Vector{Any}()
@@ -192,7 +192,7 @@ function attract_exponential(lhs, var)
             if _expon_base_lt(b, d)
                 f_ * term(slog, b) - g_ * term(slog, d) + term(slog, -a)
             else
-                g_ * term(slog, d) - f_ * term(slog, b) + term(slog, -1 / a)
+                g_ * term(slog, d) - f_ * term(slog, b) + term(slog, -1 // a)
             end
         end)
     push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~c)*(~d)^(~g::(contains_var)) => begin

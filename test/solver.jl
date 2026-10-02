@@ -109,7 +109,7 @@ end
     @test isequal(Symbolics.value.(symbolic_solve(x^2 + 1, x)), [im, -im])
 end
 
-@testset "Documented symbolic_solve root order (#2015)" begin
+@testset "Documented symbolic_solve root order" begin
     # Docstring examples must match deterministic sorting (numeric roots before
     # symbolic roots_of entries); stale order broke Documenter doctests after #1993.
     solver_source = read(joinpath(dirname(pathof(Symbolics)), "solver/main.jl"), String)
@@ -119,9 +119,12 @@ end
     @test actual == expected
 end
 
-@testset "Deterministic attract_exponential form (#2015)" begin
+@testset "Deterministic attract_exponential form" begin
     # @acrule summand order used to flip the slog rewrite across Julia versions.
-    expected = slog(-1) + slog(2) - 3slog(5) + slog(2) * x - slog(5) * x
+    # Use unevaluated slog terms: slog(::Real) evaluates eagerly to Float/Complex.
+    expected = Symbolics.term(slog, -1) + Symbolics.term(slog, 2) -
+               3 * Symbolics.term(slog, 5) + Symbolics.term(slog, 2) * x -
+               Symbolics.term(slog, 5) * x
     @test isequal(Symbolics.attract_exponential(2^(x + 1) + 5^(x + 3), x), expected)
     @test isequal(Symbolics.attract_exponential(5^(x + 3) + 2^(x + 1), x), expected)
 end
