@@ -477,6 +477,63 @@ end
     @test SU.shape(ex) == SU.shape(unwrap(foo4(A, x)))
 end
 
+_ndims_fallback_f(x::AbstractVector) = -x
+_splat_size_f(A::AbstractArray) = reshape(A, 1, size(A)...)
+_no_promo_ndims_f(x::AbstractVector) = -x
+@test_logs (:warn, r"ndims") @eval @register_array_symbolic _ndims_fallback_f(x::AbstractVector) begin
+    size = size(x)
+    eltype = eltype(x)
+end
+@test_logs (:warn, r"ndims") @eval @register_array_symbolic _splat_size_f(A::AbstractArray) begin
+    size = (1, size(A)...)
+    eltype = eltype(A)
+end
+@register_array_symbolic _no_promo_ndims_f(x::AbstractVector) begin
+    size = size(x)
+    eltype = eltype(x)
+end false
+
+@testset "`@register_array_symbolic` warns when ndims cannot be inferred" begin
+    @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic missing_ndims_warn_f(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
+    end
+    @variables yw[1:3]
+    @test promote_symtype(_ndims_fallback_f, symtype(unwrap(yw))) == Array{Real}
+
+    with_ndims_f(x::AbstractVector) = -x
+    @register_array_symbolic with_ndims_f(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
+        ndims = 1
+    end
+    t = unwrap(with_ndims_f(yw))
+    @test promote_symtype(with_ndims_f, symtype(unwrap(yw))) === Vector{Real}
+    @test isconcretetype(symtype(t))
+    rebuilt = SU.maketerm(typeof(t), operation(t), arguments(t), nothing)
+    @test rebuilt isa typeof(t)
+    @test symtype(rebuilt) === Vector{Real}
+end
+
+@testset "`@register_array_symbolic` does not infer ndims from splatted size" begin
+    @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic splatf_macro(A::AbstractArray) begin
+        size = (1, size(A)...)
+        eltype = eltype(A)
+    end
+    @variables A[1:2, 1:3]
+    @test promote_symtype(_splat_size_f, symtype(unwrap(A))) == Array{Real}
+    @test ndims(_splat_size_f(A)) == 3
+end
+
+@testset "`@register_array_symbolic` skips ndims warning when define_promotion=false" begin
+    @test_logs @macroexpand @register_array_symbolic no_promo_macro(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
+    end false
+    @variables yw2[1:3]
+    @test ndims(_no_promo_ndims_f(yw2)) == 1
+end
+
 struct Bar{T} end
 struct Baz{T} end
 

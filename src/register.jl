@@ -181,6 +181,15 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
     fexpr = wrap_func_expr(caller, inner, wrap_arrays)
 
     if define_promotion
+        if promote_nd == -1
+            @warn """
+            `@register_array_symbolic` could not infer `ndims` for `$f`.
+            `promote_symtype` will return a `UnionAll` like `Array{Real}` instead of a concrete \
+            `Array{Real,N}`, which can break IR substitution (see JuliaSymbolics/Symbolics.jl#1845).
+            Add `ndims = N` to the registration block (for example `ndims = 1` for a vector result).
+            Tuple `size = (...)` without splats is also enough to infer `ndims`.
+            """
+        end
         is_callable_struct = f isa Expr && f.head == :(::)
         fn_arg = if is_callable_struct
             f
@@ -249,12 +258,18 @@ Example:
 end
 ```
 
+`ndims` is inferred from a non-splat tuple `size = (...)` when possible. When it
+cannot be inferred (for example `size = size(x)`), add `ndims` explicitly to keep
+`promote_symtype` concrete; otherwise a warning is emitted and `promote_symtype`
+returns the `UnionAll` `container_type{eltype}`.
+
 You can also register calls on callable structs:
 
 ```julia
 @register_array_symbolic (c::Conv)(x::AbstractMatrix) begin
     size=size(x) .- size(c.kernel) .+ 1
     eltype=promote_type(eltype(x), eltype(c))
+    ndims=2
 end
 ```
 
