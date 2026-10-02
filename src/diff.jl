@@ -130,6 +130,11 @@ function Base.:^(D::Differential, n::Integer)
     iszero(n) && return identity
     return Differential(D.x, D.order * n)
 end
+function Base.:^(D::Differential, n::Rational)
+    iszero(n) && return identity
+    return Differential(D.x, D.order * Rational{Int}(n))
+end
+Base.:^(D::Differential, n::Real) = D^rationalize(Int, n)
 
 function Base.show(io::IO, D::Differential)
     warn_load_latexify()

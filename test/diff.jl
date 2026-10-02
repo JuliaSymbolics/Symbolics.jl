@@ -431,6 +431,17 @@ let
     test_equal(Dt(t + 2t^2), t + 2t^2)
 end
 
+# Fractional differential operator (#906)
+let
+    @variables x
+    D = Differential(x)
+    @test isequal(D^(1 // 2), Differential(x, 1 // 2))
+    @test isequal(D^0.5, Differential(x, 1 // 2))
+    Dhalf = D^(1 // 2)
+    @test isequal(Dhalf(Dhalf(x^2)), Differential(x, 1 // 1)(x^2))
+    @test_throws ArgumentError expand_derivatives(Dhalf(x))
+end
+
 # Check `Function` inputs for derivative (#1085)
 let
     @variables x
