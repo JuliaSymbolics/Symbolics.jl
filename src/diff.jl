@@ -369,6 +369,22 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
     return SymbolicUtils.add_worker(VartypeT, summed_args)
 end
 
+function symbolic_callable_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::SymbolicUtils.ROArgsT{VartypeT}; kw...)
+    partials = Union{Nothing, SymbolicT}[derivative_idx(arg, i) for i in eachindex(inner_args)]
+    for (t, a) in zip(partials, inner_args)
+        t === nothing && occursin_info(D.x, a) && return nothing
+    end
+    summed_args = SymbolicUtils.ArgsT{VartypeT}()
+    sizehint!(summed_args, length(inner_args))
+    for (t, a) in zip(partials, inner_args)
+        t === nothing && continue
+        t2 = executediff(D, a; kw...)::SymbolicT
+        _iszero(t2) && continue
+        push!(summed_args, _isone(t2) ? t : t * t2)
+    end
+    return SymbolicUtils.add_worker(VartypeT, summed_args)
+end
+
 """
     executediff(D, arg; simplify=false, occurrences=nothing)
 
@@ -440,8 +456,14 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
             if f isa BasicSymbolic{VartypeT}
                 # the only case where `f` is a symbolic is if this is a called symbolic
                 # function or a dependent variable. In either case, we know it contains
-                # `D.x` because of `occursin_info` and will just return `D(arg)`
+                # `D.x` because of `occursin_info`. A symbolic function of a known
+                # callable type uses the rules registered for `SymbolicCallable`, and
+                # falls back to `chain_diff` if a partial derivative it needs has none.
                 inner_args = arguments(arg)
+                if fntype_callable_type(symtype(f)) !== Nothing
+                    der = symbolic_callable_diff(D, arg, inner_args; simplify, throw_no_derivative)
+                    der === nothing || return der
+                end
                 return chain_diff(D, arg, inner_args; simplify, throw_no_derivative)
             elseif f === getindex
                 arr = arguments(arg)[1]

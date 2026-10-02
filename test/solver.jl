@@ -234,7 +234,23 @@ end
 @testset "Multivar solver" begin
     @variables x y z
     @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
-    
+
+    # Vector-valued Equation should take the system path
+    sol_vec_eq = sort_arr(symbolic_solve([0, 0] ~ [x^2 - 4, x + y], [x, y]), [x, y])
+    sol_vec = sort_arr(symbolic_solve([0 ~ x^2 - 4, 0 ~ x + y], [x, y]), [x, y])
+    @test check_equal(sol_vec_eq, sol_vec)
+    @test check_equal(sol_vec_eq, sort_arr([Dict(x => -2, y => 2), Dict(x => 2, y => -2)], [x, y]))
+
+    err = try
+        Symbolics.check_expr_validity([x, y])
+        nothing
+    catch e
+        e
+    end
+    @test err isa AssertionError
+    @test occursin("Invalid input of type", err.msg)
+    @test occursin("Vector", err.msg)
+
     # TODO: test this properly
     sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
 
@@ -352,6 +368,30 @@ end
 
     sol = value.(symbolic_solve([x + y - z, y - z], [x]))
     @test isequal(sol, [0])
+
+    @variables s::Real
+    @variables u_g::Real u_a::Real u_a2::Real
+    @variables i_c1::Real i_r1::Real i_probe::Real
+    @variables r0::Real r1::Real rinterface::Real c1::Real
+    solve_vars = [u_a, u_a2, i_c1, i_r1, i_probe]
+    eqs = [
+        u_g - u_a - r0 * (i_c1 + i_r1 + i_probe),
+        u_a - u_a2 - r1 * i_r1,
+        u_a2 - rinterface * (i_c1 + i_r1),
+        i_c1 - s * c1 * (u_a - u_a2),
+    ]
+    sol = symbolic_solve(eqs, solve_vars)
+    @test sol isa AbstractVector
+    @test length(sol) == 1
+    @test count(v -> isequal(sol[1][v], v), solve_vars) == 1
+    @test all(eq -> isequal(simplify(expand(substitute(eq, sol[1]))), 0), eqs)
+
+    @variables b
+    sol = symbolic_solve([a * x - b], [x, y])
+    @test sol isa AbstractVector
+    @test length(sol) == 1
+    @test count(v -> isequal(sol[1][v], v), [x, y]) == 1
+    @test isequal(simplify(expand(substitute(a * x - b, sol[1]))), 0)
 end
 
 @testset "Factorisation" begin
@@ -444,6 +484,10 @@ end
     # log(2) - 3log(5) + x*log(2) - x*log(5)
     expr = expand((1 + x)*Symbolics.term(log, 2) - (3 + x)*Symbolics.term(log, 5))
     @test Symbolics.n_func_occ(expr, x) == 1
+
+    @test Symbolics.n_func_occ(sqrt(abs2(x) + y), x) == 1
+    @test Symbolics.n_func_occ(abs2(x) + y, x) == 1
+    @test Symbolics.n_func_occ(abs(x) + y, x) == 1
 end
 
 
