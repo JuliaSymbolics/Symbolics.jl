@@ -593,36 +593,13 @@ function variables(name, indices...; T=Real)
 end
 
 """
-    complete_fntype(T)
-
-Fill missing type parameters of a (possibly partially parameterized) `FnType`
-with the same defaults used by `@variables f(..)`: argument types `Tuple`,
-return type `Real`, and function type `Nothing`. Fully parameterized `FnType`s
-and non-`FnType` types are returned unchanged.
-"""
-function complete_fntype(::Type{T}) where {T}
-    T <: FnType || return T
-    !(T isa UnionAll) && return T
-    U = T
-    while U isa UnionAll
-        U = U.body
-    end
-    defaults = (Tuple, Real, Nothing)
-    params = ntuple(Val(3)) do i
-        p = U.parameters[i]
-        p isa TypeVar ? defaults[i] : p
-    end
-    return FnType{params...}
-end
-
-"""
     variable(name::Symbol, idx::Integer...; T=Real)
 
 Create a variable with the given name along with subscripted indices with the
-`symtype=T`. When `T` is `FnType` or a partially parameterized `FnType` (for
-example `FnType{Tuple, Real}`), missing parameters are completed to
-`FnType{Tuple, Real, Nothing}` — the same defaults as `@variables f(..)` — and
-a symbolic function is created.
+`symtype=T`. When `T` is a fully parameterized `FnType` such as
+`FnType{Tuple, Real, Nothing}`, it creates a symbolic function. Incomplete
+forms (`FnType`, `FnType{Tuple, Real}`, ...) throw an `ArgumentError` asking
+for the fully parameterized type.
 
 ```jldoctest
 julia> Symbolics.variable(:x, 4, 2, 0)
@@ -630,16 +607,15 @@ x₄ˏ₂ˏ₀
 
 julia> Symbolics.variable(:x, 4, 2, 0, T=Symbolics.FnType{Tuple{Real}, Real, Nothing})
 x₄ˏ₂ˏ₀⋆
-
-julia> Symbolics.variable(:f, T=Symbolics.FnType)
-f⋆
 ```
 
 Also see `variables`.
 """
 function variable(name, idx...; T=Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
-    T = complete_fntype(T)
+    if T isa UnionAll && T <: FnType
+        throw(ArgumentError("Symbolics.variable(:f; T = FnType) needs a fully parameterized FnType, e.g. FnType{Tuple, Real, Nothing} (what @variables f(..) uses)"))
+    end
     v = Sym{VartypeT}(name_ij; type = T)
     wrap(setmetadata(v, VariableSource, (:variables, name_ij)))
 end

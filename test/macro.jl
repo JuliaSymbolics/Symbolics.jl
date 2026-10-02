@@ -255,17 +255,22 @@ yyy = yy(t)
 @test isequal(yyy, y(t))
 
 @variables x
-for T in (FnType, FnType{Tuple, Real}, FnType{Tuple, Real, Nothing})
-    f = Symbolics.variable(:f, T = T)
-    @test f isa Symbolics.CallAndWrap{Num}
-    @test symtype(unwrap(f)) === FnType{Tuple, Real, Nothing}
-    @test 2f(x) isa Num
-    @test 2f(x, x) isa Num
+incomplete_fntype_err = try
+    Symbolics.variable(:f, T = FnType)
+    error("expected ArgumentError")
+catch err
+    err
 end
-f_partial = Symbolics.variable(:f, T = FnType{Tuple{Real}, Real})
-@test symtype(unwrap(f_partial)) === FnType{Tuple{Real}, Real, Nothing}
-@test 2f_partial(x) isa Num
-@test_throws ErrorException 2f_partial(x, x)
+@test incomplete_fntype_err isa ArgumentError
+@test occursin("fully parameterized FnType", incomplete_fntype_err.msg)
+@test occursin("FnType{Tuple, Real, Nothing}", incomplete_fntype_err.msg)
+@test_throws ArgumentError Symbolics.variable(:f, T = FnType{Tuple, Real})
+@test_throws ArgumentError Symbolics.variable(:f, T = FnType{Tuple{Real}, Real})
+f = Symbolics.variable(:f, T = FnType{Tuple, Real, Nothing})
+@test f isa Symbolics.CallAndWrap{Num}
+@test symtype(unwrap(f)) === FnType{Tuple, Real, Nothing}
+@test 2f(x) isa Num
+@test 2f(x, x) isa Num
 
 spam(x) = 2x
 @register_symbolic spam(x::AbstractArray)
