@@ -696,6 +696,7 @@ factors(x) = arguments(x, *)
 
 Evaluate the equation `eq` or inequality `ineq`. `subs` is a dictionary of variable to numerical value substitutions. 
 If both sides of the equation or inequality are numeric, then the result is a boolean. 
+An array-valued inequality is `true` if it holds for every element.
 
 # Examples
 ```julia-repl
@@ -722,6 +723,9 @@ function evaluate(eq::Equation, subs)
 end
 
 function evaluate(ineq::Inequality, subs)
+    if is_array_operand(ineq.lhs) || is_array_operand(ineq.rhs)
+        return all(i -> evaluate(i, subs), scalarize(ineq))
+    end
     lhs = substitute(ineq.lhs, subs)
     rhs = substitute(ineq.rhs, subs)
     if (ineq.relational_op == geq)
