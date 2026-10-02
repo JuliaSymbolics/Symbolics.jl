@@ -571,7 +571,9 @@ function _make_sparse_array(arr, similarto)
         newarr = _make_array(parent(arr), typeof(parent(arr)))
         return term(setparent, nzmap(Returns(true), arr), newarr)
     else
-        newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))})
+        # Empty `nzval` has no eltype to infer; `Int` matches literal constants.
+        output_eltype = isempty(arr.nzval) ? Int : nothing
+        newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))}, output_eltype)
         return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), true)
     end
 end
@@ -583,12 +585,12 @@ function _make_array(rhs::LowerTriangular, similarto)
     return term(LowerTriangular, _make_array(parent(rhs), similarto))
 end
 
-function _make_array(rhss::AbstractArray, similarto)
+function _make_array(rhss::AbstractArray, similarto, output_eltype = nothing)
     arr = nzmap(x->_make_array(x, similarto), rhss)
     if _issparse(arr)
         _make_sparse_array(arr, similarto)
     else
-        MakeArray(arr, similarto)
+        MakeArray(arr, similarto, output_eltype)
     end
 end
 

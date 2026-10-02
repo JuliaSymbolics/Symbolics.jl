@@ -285,6 +285,24 @@ let #issue#587
     @test nnz(J) == nnz(sj)
 end
 
+let # Symbolics.jl#2006
+    @variables a b
+    # empty sparse output: every entry is structurally zero
+    H_empty = Symbolics.sparsehessian(a + b, [a, b])
+    @test isempty(H_empty.nzval)
+    f_empty = eval(build_function(H_empty, [a, b])[1])
+    out_empty = @invokelatest f_empty([1.0, 2.0])
+    # must support arithmetic against a numeric matrix
+    @test out_empty ≈ zeros(2, 2)
+    # eltype must be concrete, not `Any`
+    @test eltype(out_empty) <: Number
+    # same concrete eltype as the non-empty sparse output for the same inputs
+    H_const = Symbolics.sparsehessian(a^2 + b, [a, b])
+    f_const = eval(build_function(H_const, [a, b])[1])
+    out_const = @invokelatest f_const([1.0, 2.0])
+    @test eltype(out_empty) == eltype(out_const)
+end
+
 # test header wrapping of scalar build function
 let
     @variables x p t
