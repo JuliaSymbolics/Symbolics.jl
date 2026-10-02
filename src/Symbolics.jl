@@ -173,27 +173,7 @@ julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(true))
 """
 substitute
 
-"""
-    expand(expr)
-
-Expand expressions by distributing multiplication over addition, e.g.,
-`a*(b+c)` becomes `ab+ac`.
-
-# Examples
-
-```jldoctest
-julia> using Symbolics
-
-julia> @variables x y
-2-element Vector{Num}:
- x
- y
-
-julia> expand((x + y)^2)
-x^2 + 2x*y + y^2
-```
-"""
-expand
+@doc only(only(values(Docs.meta(SymbolicUtils)[Docs.Binding(SymbolicUtils, :expand)].docs)).text) expand
 
 export Equation
 include("equations.jl")
