@@ -440,6 +440,12 @@ let
     Dhalf = D^(1 // 2)
     @test isequal(Dhalf(Dhalf(x^2)), Differential(x, 1 // 1)(x^2))
     @test_throws ArgumentError expand_derivatives(Dhalf(x))
+    @test_throws ArgumentError D^1.0e-20
+    @test_throws ArgumentError D^(-1.0e-20)
+    @test_throws ArgumentError D^1.0e20
+    @test_throws ArgumentError D^Inf
+    @test_throws ArgumentError D^(-Inf)
+    @test_throws ArgumentError D^NaN
 end
 
 # Check `Function` inputs for derivative (#1085)

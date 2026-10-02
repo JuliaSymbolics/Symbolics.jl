@@ -132,9 +132,17 @@ function Base.:^(D::Differential, n::Integer)
 end
 function Base.:^(D::Differential, n::Rational)
     iszero(n) && return identity
+    isfinite(n) || throw(ArgumentError("Differential order exponent must be finite"))
     return Differential(D.x, D.order * Rational{Int}(n))
 end
-Base.:^(D::Differential, n::Real) = D^rationalize(Int, n)
+function Base.:^(D::Differential, n::Real)
+    isfinite(n) || throw(ArgumentError("Differential order exponent must be finite"))
+    rn = rationalize(Int, n)
+    if !iszero(n) && (iszero(rn) || !isfinite(rn))
+        throw(ArgumentError("Differential order exponent $n is not representable as Rational{Int}"))
+    end
+    return D^rn
+end
 
 function Base.show(io::IO, D::Differential)
     warn_load_latexify()
