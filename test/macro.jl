@@ -426,12 +426,69 @@ end
 @testset "Unwrap defaults and other metadata" begin
     @variables a b[1:2]
     @variables x = a [foo = 1 + a]
-    @variables y = b [foo = [a, b[1]]]
+    @variables y[1:2] = b [foo = [a, b[1]]]
 
     @test getdefaultval(x) isa BasicSymbolic
     @test Symbolics.getmetadata(unwrap(x), VariableFoo, nothing) isa BasicSymbolic
     @test getdefaultval(y) isa BasicSymbolic
     @test Symbolics.getmetadata(unwrap(y), VariableFoo, nothing) isa Vector{Num}
+end
+
+@testset "Reject scalar variables with array defaults (#1073)" begin
+    @test_throws ArgumentError (@variables x = [1, 2])
+    @test_throws ArgumentError (@variables x::Real = [1, 2])
+    @variables y
+    @test_throws ArgumentError (@variables x = [y, y])
+    @variables b[1:2]
+    @test_throws ArgumentError (@variables x = b)
+
+    @variables x = 1.0
+    @test getdefaultval(x) == 1.0
+    @variables z = y
+    @test isequal(getdefaultval(z), unwrap(y))
+
+    @variables a[1:2] = [1, 2]
+    @test getdefaultval(a) == [1, 2]
+    @test_throws ArgumentError (@variables c[1:2] = 1.0)
+end
+
+struct _DefaultValProbe
+    x::Int
+end
+
+# Mimics ModelingToolkitStandardLibrary Parameter{T} (no size method).
+struct _ParameterProbe{T}
+    value::T
+end
+
+@testset "Scalar variables accept non-array defaults (#1073)" begin
+    @variables p = "str"
+    @test getdefaultval(p) == "str"
+    @variables p2::String = "str"
+    @test getdefaultval(p2) == "str"
+    @variables s = :sym
+    @test getdefaultval(s) === :sym
+    @variables t = (1, 2)
+    @test getdefaultval(t) == (1, 2)
+    @variables t2::Tuple{Int, Int} = (1, 2)
+    @test getdefaultval(t2) == (1, 2)
+    @variables f::Function = sin
+    @test getdefaultval(f) === sin
+    @variables f2 = sin
+    @test getdefaultval(f2) === sin
+    @variables Tdef = Vector
+    @test getdefaultval(Tdef) === Vector
+    @variables d::Dict{Int, Int} = Dict(1 => 2)
+    @test getdefaultval(d) == Dict(1 => 2)
+    @variables c::_DefaultValProbe = _DefaultValProbe(1)
+    @test getdefaultval(c) == _DefaultValProbe(1)
+
+    # ModelingToolkitStandardLibrary patterns (sources.jl interpolation_type / Parameter)
+    interp_type = Vector{Float64}
+    @variables interpolation_type = interp_type
+    @test getdefaultval(interpolation_type) === interp_type
+    @variables p::_ParameterProbe{Float64} = _ParameterProbe(1.0)
+    @test getdefaultval(p) == _ParameterProbe(1.0)
 end
 
 @testset "`hash` of callable is consistent with `isequal`" begin
@@ -475,6 +532,63 @@ end
     @test isequal(arguments(ex)[2], unwrap(y))
     @test symtype(ex) == Vector{Real}
     @test SU.shape(ex) == SU.shape(unwrap(foo4(A, x)))
+end
+
+_ndims_fallback_f(x::AbstractVector) = -x
+_splat_size_f(A::AbstractArray) = reshape(A, 1, size(A)...)
+_no_promo_ndims_f(x::AbstractVector) = -x
+@test_logs (:warn, r"ndims") @eval @register_array_symbolic _ndims_fallback_f(x::AbstractVector) begin
+    size = size(x)
+    eltype = eltype(x)
+end
+@test_logs (:warn, r"ndims") @eval @register_array_symbolic _splat_size_f(A::AbstractArray) begin
+    size = (1, size(A)...)
+    eltype = eltype(A)
+end
+@register_array_symbolic _no_promo_ndims_f(x::AbstractVector) begin
+    size = size(x)
+    eltype = eltype(x)
+end false
+
+@testset "`@register_array_symbolic` warns when ndims cannot be inferred" begin
+    @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic missing_ndims_warn_f(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
+    end
+    @variables yw[1:3]
+    @test promote_symtype(_ndims_fallback_f, symtype(unwrap(yw))) == Array{Real}
+
+    with_ndims_f(x::AbstractVector) = -x
+    @register_array_symbolic with_ndims_f(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
+        ndims = 1
+    end
+    t = unwrap(with_ndims_f(yw))
+    @test promote_symtype(with_ndims_f, symtype(unwrap(yw))) === Vector{Real}
+    @test isconcretetype(symtype(t))
+    rebuilt = SU.maketerm(typeof(t), operation(t), arguments(t), nothing)
+    @test rebuilt isa typeof(t)
+    @test symtype(rebuilt) === Vector{Real}
+end
+
+@testset "`@register_array_symbolic` does not infer ndims from splatted size" begin
+    @test_logs (:warn, r"ndims") @macroexpand @register_array_symbolic splatf_macro(A::AbstractArray) begin
+        size = (1, size(A)...)
+        eltype = eltype(A)
+    end
+    @variables A[1:2, 1:3]
+    @test promote_symtype(_splat_size_f, symtype(unwrap(A))) == Array{Real}
+    @test ndims(_splat_size_f(A)) == 3
+end
+
+@testset "`@register_array_symbolic` skips ndims warning when define_promotion=false" begin
+    @test_logs @macroexpand @register_array_symbolic no_promo_macro(x::AbstractVector) begin
+        size = size(x)
+        eltype = eltype(x)
+    end false
+    @variables yw2[1:3]
+    @test ndims(_no_promo_ndims_f(yw2)) == 1
 end
 
 struct Bar{T} end
