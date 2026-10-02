@@ -816,6 +816,23 @@ end
     @test !Symbolics.hasderiv(arr_no_deriv)
 end
 
+@testset "Derivatives of mod and rem" begin
+    @variables x y
+    for (f, q) in ((mod, floor), (rem, trunc))
+        dx = build_function(Symbolics.derivative(f(x, y), x), x, y; expression = Val(false))
+        dy = build_function(Symbolics.derivative(f(x, y), y), x, y; expression = Val(false))
+        @test dx(5.5, 2.0) == 1.0
+        @test dy(5.5, 2.0) == -q(5.5 / 2.0)
+        @test dy(-5.5, 2.0) == -q(-5.5 / 2.0)
+        @test isnan(dx(4.0, 2.0))
+        @test isnan(dy(4.0, 2.0))
+    end
+    @test !(Symbolics.derivative(mod(x, 1.0), x) isa Symbolics.Differential)
+    df = build_function(Symbolics.derivative(mod(x, 1.0), x), x; expression = Val(false))
+    @test df(0.5) == 1
+    @test isequal(Symbolics.derivative(mod(x, 1.0), y), 0)
+end
+
 struct ScaledSquare
     a::Float64
 end
