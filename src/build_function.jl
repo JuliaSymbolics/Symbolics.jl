@@ -269,7 +269,20 @@ function _build_and_inject_function(mod::Module, ex)
     elseif ex.head == :(->)
         return _build_and_inject_function(mod, Expr(:function, ex.args...))
     end
-    RuntimeGeneratedFunction(mod, mod, ex)
+    return RuntimeGeneratedFunction(mod, mod, _shards_to_rgfs(mod, ex))
+end
+
+# Inside a RuntimeGeneratedFunction the inline `MultithreadedForm` shard closures would
+# become opaque closures, and on Julia 1.10/1.11 calling an opaque closure with three or
+# more arguments through `Funcall` segfaults. Compile each shard to its own RGF instead.
+function _shards_to_rgfs(mod::Module, ex)
+    ex isa Expr || return ex
+    args = Any[_shards_to_rgfs(mod, a) for a in ex.args]
+    if ex.head === :call && length(args) == 3 && args[1] === Funcall &&
+            Meta.isexpr(args[2], :function)
+        args[2] = drop_expr(RuntimeGeneratedFunction(mod, mod, args[2]; opaque_closures = false))
+    end
+    return Expr(ex.head, args...)
 end
 
 toexpr(n::Num, st) = toexpr(value(n), st)
