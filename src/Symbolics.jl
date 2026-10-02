@@ -238,6 +238,7 @@ export series, taylor, taylor_coeff
 
 export SymStruct, @symstruct
 include("symstruct.jl")
+include("symzero.jl")
 
 import Libdl
 include("build_function.jl")
@@ -648,6 +649,7 @@ include("despecialize.jl")
 @public CodegenFunctionOptions, codegen_function
 @public diff2term, map_subscripts
 @public fixpoint_sub
+@public symbolic_zero, is_zeroable, SymbolicZero
 @public SymbolicCallable
 
 @setup_workload begin
