@@ -1203,9 +1203,74 @@ $(SIGNATURES)
 Check if an expression is linear with respect to a list of variable expressions.
 """
 function islinear(ex, u)
-    ex = scalarize(ex)
-    u = scalarize(u)
-    isaffine(ex, u) && iszero(Num(substitute(ex, Dict(u .=> 0))))
+    vars = Num[]
+    atoms = Num[]
+    subrules = Dict{Any, Any}()
+    indexed_vars = Dict{Any, Vector{Tuple{Num, Num}}}()
+    for var in (u isa Arr ? (u,) : u)
+        if var isa AbstractArray ||
+                (var isa BasicSymbolic && !isempty(shape(value(var))))
+            var_shape = shape(value(var))
+            scalar_vars = vec(scalarize(var))
+            scalar_atoms = [variable(gensym(:islinear)) for _ in scalar_vars]
+            subrules[value(var)] = reshape(value.(scalar_atoms), map(length, var_shape)...)
+            append!(vars, scalar_vars)
+            append!(atoms, scalar_atoms)
+        else
+            push!(vars, var)
+            atom = variable(gensym(:islinear))
+            push!(atoms, atom)
+            subrules[value(var)] = value(atom)
+            expr = value(var)
+            if iscall(expr) && operation(expr) === getindex
+                args = arguments(expr)
+                parent = first(args)
+                if !isempty(shape(parent))
+                    push!(get!(indexed_vars, parent, Tuple{Num, Num}[]), (var, atom))
+                end
+            end
+        end
+    end
+
+    for (var, atom) in zip(vars, atoms)
+        subrules[value(var)] = value(atom)
+    end
+    for (parent, indexed) in indexed_vars
+        parent_shape = shape(parent)
+        if prod(map(length, parent_shape)) == length(indexed)
+            scalar_parent = vec(scalarize(parent))
+            replacement = value.(scalar_parent)
+            assigned = falses(length(replacement))
+            valid = true
+            for (var, atom) in indexed
+                index = findfirst(x -> isequal(value(x), value(var)), scalar_parent)
+                if index === nothing || assigned[index]
+                    valid = false
+                    break
+                end
+                replacement[index] = value(atom)
+                assigned[index] = true
+            end
+            if valid && all(assigned)
+                subrules[parent] = reshape(replacement, map(length, parent_shape)...)
+            end
+        end
+    end
+    ex = substitute(ex, subrules)
+
+    scalarize_reductions = Prewalk(
+        x -> begin
+            if x isa BasicSymbolic && SU.isarrayop(x) && isempty(shape(x)) &&
+                    any(var -> hasnode(var, x), atoms)
+                scalarize(x)
+            else
+                x
+            end
+        end; maketerm = basic_mkterm
+    )
+    ex = ex isa Union{Num, BasicSymbolic} ? scalarize_reductions(unwrap(ex)) : ex
+
+    return isaffine(ex, atoms) && iszero(Num(substitute(ex, Dict(value.(atoms) .=> 0))))
 end
 
 """
