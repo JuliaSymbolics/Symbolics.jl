@@ -173,7 +173,7 @@ julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(true))
 """
 substitute
 
-@doc only(only(values(Docs.meta(SymbolicUtils)[Docs.Binding(SymbolicUtils, :expand)].docs)).text) expand
+@doc (@doc SymbolicUtils.expand) expand
 
 export Equation
 include("equations.jl")
