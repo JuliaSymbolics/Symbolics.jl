@@ -439,6 +439,10 @@ end
 Extract the coefficient of `p` with respect to `sym`.
 Note that `p` might need to be expanded and/or simplified with `expand` and/or `simplify`.
 
+Throws a `DomainError` if `sym` appears in more than one factor of an unexpanded
+product (expand first), if `sym` is a negative power / division, or if `sym`
+appears in the denominator of a fraction.
+
 # Examples
 
 ```jldoctest
@@ -457,7 +461,7 @@ julia> Symbolics.coeff(2*x*y + y, x*y)
 2
 ```
 """
-function coeff(p, sym=nothing)
+function coeff(p, sym = nothing)
     # if `sym` is a product, iteratively compute the coefficient w.r.t. each term in `sym`
     if iscall(value(sym)) && operation(value(sym)) === (*)
         for t in arguments(value(sym))
@@ -466,28 +470,36 @@ function coeff(p, sym=nothing)
         end
         return p
     end
-            
+
     p, sym = value(p), value(sym)
 
     if _isone(sym)
         sym = nothing
     end
 
+    # x^-n becomes 1/x^n (or (1/x)^n); negative powers as `sym` are not supported
+    if sym !== nothing && (isdiv(sym) || SymbolicUtils.query(isdiv, sym))
+        throw(DomainError(sym, "coeff with negative powers is not yet implemented."))
+    end
+
     if issym(p) || SymbolicUtils.isconst(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif isadd(p)
-        if sym===nothing
+        if sym === nothing
             p.coeff
         else
             sum(coeff(k, sym) * v for (k, v) in p.dict)
         end
     elseif ismul(p)
         args = arguments(p)
-        coeffs = map(a->coeff(a, sym), args)
-        if all(_iszero, coeffs)
+        coeffs = map(a -> coeff(a, sym), args)
+        nonzero = findall(!_iszero, coeffs)
+        if isempty(nonzero)
             return 0
+        elseif sym !== nothing && length(nonzero) > 1
+            throw(DomainError(p, "coeff cannot extract coefficient from unexpanded product where $sym appears in multiple factors; call expand first."))
         else
-            @views prod(Iterators.flatten((coeffs[findall(!_iszero, coeffs)], args[findall(_iszero, coeffs)])))
+            @views prod(Iterators.flatten((coeffs[nonzero], args[findall(_iszero, coeffs)])))
         end
     elseif isdiv(p)
         numerator, denominator = arguments(p)
