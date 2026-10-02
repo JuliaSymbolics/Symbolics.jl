@@ -119,6 +119,13 @@ end
     @test actual == expected
 end
 
+@testset "Deterministic attract_exponential form (#2015)" begin
+    # @acrule summand order used to flip the slog rewrite across Julia versions.
+    expected = slog(-1) + slog(2) - 3slog(5) + slog(2) * x - slog(5) * x
+    @test isequal(Symbolics.attract_exponential(2^(x + 1) + 5^(x + 3), x), expected)
+    @test isequal(Symbolics.attract_exponential(5^(x + 3) + 2^(x + 1), x), expected)
+end
+
 @testset "Deg 1 univar" begin
     @test isequal(unwrap_const(only(symbolic_solve(x+1, x))), -1)
 
