@@ -835,3 +835,16 @@ end
     @test isequal(Symbolics.derivative(sol_cbrt, y), 3(y^2))
 end
 
+@testset "cospi inverse expands and differentiates" begin
+    @variables x y
+    # Principal root is acos(y)/π; d/dy at y=0 is -1/π (period term independent of y).
+    sol = only(symbolic_solve(cospi(x) ~ y, x; warns = false))
+    contains_acosbypi = SymbolicUtils.query(Symbolics.unwrap(sol)) do n
+        SymbolicUtils.iscall(n) && isequal(operation(n), Symbolics.acosbypi)
+    end
+    @test !contains_acosbypi
+    deriv = Symbolics.derivative(sol, y)
+    @test isapprox(Symbolics.symbolic_to_float(Symbolics.substitute(deriv, Dict(y => 0))),
+                    -1 / pi; rtol = 1e-14)
+end
+
