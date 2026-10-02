@@ -1,4 +1,4 @@
-## 7.42.0
+## 7.43.0
 
 ### Behavior changes
 
