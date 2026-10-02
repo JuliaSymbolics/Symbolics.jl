@@ -6,7 +6,7 @@ using LaTeXStrings
 using TermInterface
 using SymbolicUtils
 using Symbolics: value, hide_lhs, wrap
-using MacroTools: postwalk
+using MacroTools: postwalk, prewalk
 using SymbolicUtils: BSImpl, FnType, unwrap, symtype, BasicSymbolic
 using Moshi.Match: @match
 
@@ -27,10 +27,40 @@ function cleanup_exprs(ex)
     return postwalk(x -> iscall(x) && length(arguments(x)) == 0 ? operation(x) : x, ex)
 end
 
+_strip_dollars(s) = strip(string(s), '\$')
+
+function _render_latexstring_call(ex::Expr)
+    name = _strip_dollars(ex.args[1])
+    length(ex.args) == 1 && return name
+    args = [_strip_dollars(latexify(a)) for a in ex.args[2:end]]
+    return name * "\\left( " * join(args, ", ") * " \\right)"
+end
+
 function latexify_derivatives(ex)
+    # Latexify does not parenthesize `^` when the base is a call whose head is a
+    # LaTeXString (`_getoperation` only recognizes Symbol heads). Fence those first.
+    ex = prewalk(ex) do x
+        if Meta.isexpr(x, :call) && x.args[1] == :^ && length(x.args) >= 3
+            base = x.args[2]
+            if Meta.isexpr(base, :call) && base.args[1] isa LaTeXString
+                return Expr(:call, :^, Expr(:call, :_latexfenced, base), x.args[3])
+            end
+        end
+        return x
+    end
     return postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
-        if x.args[1] == :_derivative
+        if x.args[1] === :_latexfenced
+            inner = x.args[2]
+            inner_s = if Meta.isexpr(inner, :call) && inner.args[1] isa LaTeXString
+                _render_latexstring_call(inner)
+            else
+                _strip_dollars(inner)
+            end
+            return LaTeXString("\\left( $inner_s \\right)")
+        elseif x.args[1] isa LaTeXString
+            return LaTeXString(_render_latexstring_call(x))
+        elseif x.args[1] == :_derivative
             num, den, deg = x.args[2:end]
             if num isa Expr && length(num.args) == 2
                 return Expr(
@@ -250,10 +280,16 @@ function _toexpr_plain(O; latexwrapper = default_latex_wrapper)
         sym = replace(sym, Symbolics.NAMESPACE_SEPARATOR => ".")
 
         # override if the sym has its own latex wrapper
-        symwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) :
-            latexwrapper
+        has_custom_wrapper = hasmetadata(O, SymLatexWrapper)
+        symwrapper = has_custom_wrapper ? getmetadata(O, SymLatexWrapper) : latexwrapper
         sym = symwrapper(sym)
-        return Symbol(sym)
+        # Custom wrappers supply raw LaTeX; emit LaTeXString so snakecase=true does not
+        # escape `_`/`^`. Keep Symbol for the default wrapper so unannotated names match.
+        if has_custom_wrapper || latexwrapper !== default_latex_wrapper
+            return LaTeXString(sym)
+        else
+            return Symbol(sym)
+        end
     end
     !iscall(O) && return O
 
