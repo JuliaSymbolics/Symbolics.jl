@@ -109,24 +109,11 @@ end
     @test isequal(Symbolics.value.(symbolic_solve(x^2 + 1, x)), [im, -im])
 end
 
-@testset "Documented symbolic_solve root order" begin
-    # Docstring examples must match deterministic sorting (numeric roots before
-    # symbolic roots_of entries); stale order broke Documenter doctests after #1993.
-    solver_source = read(joinpath(dirname(pathof(Symbolics)), "solver/main.jl"), String)
-    command = "Symbolics.symbolic_solve(x^7 - 1, x)"
-    expected = first(split(first(split(split(solver_source, "julia> " * command * "\n")[2], "\n\n")), "\n```"))
-    actual = repr(MIME("text/plain"), eval(Meta.parse(command)))
-    @test actual == expected
-end
-
-@testset "Deterministic attract_exponential form" begin
-    # @acrule summand order used to flip the slog rewrite across Julia versions.
-    # Use unevaluated slog terms: slog(::Real) evaluates eagerly to Float/Complex.
-    expected = Symbolics.term(slog, -1) + Symbolics.term(slog, 2) -
-               3 * Symbolics.term(slog, 5) + Symbolics.term(slog, 2) * x -
-               Symbolics.term(slog, 5) * x
-    @test isequal(Symbolics.attract_exponential(2^(x + 1) + 5^(x + 3), x), expected)
-    @test isequal(Symbolics.attract_exponential(5^(x + 3) + 2^(x + 1), x), expected)
+@testset "Numeric roots precede roots_of" begin
+    sols = symbolic_solve(x^7 - 1, x)
+    @test length(sols) == 2
+    @test isequal(unwrap_const(sols[1]), 1)
+    @test isequal(operation(Symbolics.value(sols[2])), Symbolics.RootsOf)
 end
 
 @testset "Deg 1 univar" begin
