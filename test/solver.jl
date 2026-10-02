@@ -235,6 +235,24 @@ end
     @variables x y z
     @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
 
+    eqs = [x^2 + y^2 - 1, y - z - x^2]
+    sol = symbolic_solve(eqs, [x, y])
+    zval = complex(-1 // 4)
+    sol_at_z = [
+        (
+            eval(Symbolics.toexpr(substitute(s[x], Dict(z => zval)))),
+            eval(Symbolics.toexpr(substitute(s[y], Dict(z => zval)))),
+        ) for s in sol
+    ]
+    @test all(
+        isapprox(u^2 + v^2 - 1, 0; atol = 1.0e-12) &&
+            isapprox(v - zval - u^2, 0; atol = 1.0e-12) for (u, v) in sol_at_z
+    )
+    @test any(
+        isapprox(u, sqrt(3) / 2; atol = 1.0e-12) && isapprox(v, 1 / 2; atol = 1.0e-12)
+            for (u, v) in sol_at_z
+    )
+
     # Vector-valued Equation should take the system path
     sol_vec_eq = sort_arr(symbolic_solve([0, 0] ~ [x^2 - 4, x + y], [x, y]), [x, y])
     sol_vec = sort_arr(symbolic_solve([0 ~ x^2 - 4, 0 ~ x + y], [x, y]), [x, y])
