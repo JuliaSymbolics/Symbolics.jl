@@ -225,9 +225,14 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             check_x(var)
         end
     end
-    if !(expr isa Vector)
+    if expr isa Equation
+        expr = expr.lhs - expr.rhs
+    end
+    if isarraysymbolic(expr)
+        expr = vec(scalarize(expr))
+    end
+    if !(expr isa AbstractVector)
         expr_univar = true
-        expr = expr isa Equation ? expr.lhs - expr.rhs : expr
         check_expr_validity(expr)
         isequal(expr, 0) && return []
     else

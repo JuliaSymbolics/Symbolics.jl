@@ -29,21 +29,34 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 """
 struct VariableSource <: AbstractVariableMetadata end
 
+function _default_is_array_shaped(val)
+    u = unwrap(val)
+    if u isa AbstractArray
+        return ndims(u) > 0
+    elseif u isa SymbolicUtils.BasicSymbolic
+        ush = shape(u)
+        return !(ush isa SymbolicUtils.Unknown) && !isempty(ush)
+    end
+    return false
+end
+
 function setdefaultval(x, val)
     val === nothing && return x
     sh = shape(x)
     if sh isa SymbolicUtils.Unknown
-        @assert sh.ndims == -1 || ndims(val) == sh.ndims """
-        Variable $x must have default of matching `ndims`. Got $val with `ndims` \
-        $(ndims(val)).
-        """
-    else
-        @assert val === missing || isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
-        Variable $x must have default of matching size. Got $val with size \
-        $(size(val)).
-        """
+        if !(sh.ndims == -1 || ndims(val) == sh.ndims)
+            throw(ArgumentError("Variable $x must have default of matching `ndims`. Got $val with `ndims` $(ndims(val))."))
+        end
+    elseif val !== missing && !(symtype(x) <: FnType)
+        if isempty(sh)
+            if _default_is_array_shaped(val)
+                throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+            end
+        elseif size(x) != size(val)
+            throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+        end
     end
-    setmetadata(x, VariableDefaultValue, val)
+    return setmetadata(x, VariableDefaultValue, val)
 end
 
 """
@@ -367,9 +380,15 @@ for T in [LinearAlgebra.UpperTriangular, LinearAlgebra.LowerTriangular]
     end
 end
 
+for T in [LinearAlgebra.Symmetric, LinearAlgebra.Hermitian, LinearAlgebra.Diagonal]
+    @eval function _recursive_unwrap(val::$T, ::Val{eval} = Val(false)) where {eval}
+        return _recursive_unwrap(collect(val), Val{eval}())
+    end
+end
+
 function _recursive_unwrap(val, ::Val{eval} = Val(false)) where {eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
-        if parent(val) !== val
+        if parent(val) !== val && hasfield(typeof(val), :parent)
             return Setfield.@set val.parent = _recursive_unwrap(parent(val), Val{eval}())
         end
         return _recursive_unwrap.(val, Val{eval}())

@@ -285,6 +285,24 @@ let #issue#587
     @test nnz(J) == nnz(sj)
 end
 
+let # Symbolics.jl#2006
+    @variables a b
+    # empty sparse output: every entry is structurally zero
+    H_empty = Symbolics.sparsehessian(a + b, [a, b])
+    @test isempty(H_empty.nzval)
+    f_empty = eval(build_function(H_empty, [a, b])[1])
+    out_empty = @invokelatest f_empty([1.0, 2.0])
+    # must support arithmetic against a numeric matrix
+    @test out_empty ≈ zeros(2, 2)
+    # eltype must be concrete, not `Any`
+    @test eltype(out_empty) <: Number
+    # same concrete eltype as the non-empty sparse output for the same inputs
+    H_const = Symbolics.sparsehessian(a^2 + b, [a, b])
+    f_const = eval(build_function(H_const, [a, b])[1])
+    out_const = @invokelatest f_const([1.0, 2.0])
+    @test eltype(out_empty) == eltype(out_const)
+end
+
 # test header wrapping of scalar build function
 let
     @variables x p t
@@ -403,4 +421,90 @@ end
     utmp = rand(2)
     @test_nowarn fjac_upper_expr(Jtmp, utmp)
     @test Jtmp[3] == utmp[2]
+end
+
+@testset "MultithreadedForm expressions can be written to a file and included" begin
+    @variables x y
+    A = [
+        x^2 + y 0 2x
+        0 0 2y
+        y^2 + x 0 0
+    ]
+    u = [1.0, 2.0]
+    expected = @invokelatest eval(build_function(A, [x, y])[1])(u)
+    oop_ex, iip_ex = build_function(A, [x, y]; parallel = Symbolics.MultithreadedForm())
+    mktempdir() do dir
+        oop_path = joinpath(dir, "f_oop.jl")
+        iip_path = joinpath(dir, "f_iip.jl")
+        write(oop_path, string(oop_ex))
+        write(iip_path, string(iip_ex))
+        f_oop = include(oop_path)
+        f_iip = include(iip_path)
+        @test @invokelatest(f_oop(u)) == expected
+        out = zeros(3, 3)
+        @invokelatest f_iip(out, u)
+        @test out == expected
+    end
+end
+
+# `-tN,0` keeps the main thread in the default pool on 1.12+; older Julia rejects `,0`.
+const MT_TEST_THREADS = VERSION >= v"1.12" ? "4,0" : "4"
+
+@testset "MultithreadedForm in-place function from Threads.@spawn" begin
+    # A race between the generated tasks can crash the whole Julia process, so
+    # the calls have to run in a subprocess with real worker threads.
+    script = joinpath(mktempdir(), "mt_iip_spawn.jl")
+    write(
+        script, """
+        using Symbolics
+        @variables x y
+        N = 8
+        A = Num[x^i + y^j for i in 1:N, j in 1:N]
+        u = [1.0, 2.0]
+        _, f_serial = build_function(A, [x, y]; parallel = Symbolics.SerialForm(), expression = Val(false))
+        _, f_par = build_function(A, [x, y]; parallel = Symbolics.MultithreadedForm(2, 4), expression = Val(false))
+        ref = zeros(N, N)
+        f_serial(ref, u)
+        f_par(zeros(N, N), u)
+        outs = [zeros(N, N) for _ in 1:200]
+        ok = all(fetch, map(1:200) do i
+            Threads.@spawn begin
+                f_par(outs[i], u)
+                outs[i] == ref
+            end
+        end)
+        println(ok ? "ALL_CORRECT" : "MISMATCH")
+        exit(ok ? 0 : 1)
+        """
+    )
+    cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t$(MT_TEST_THREADS) $script`
+    @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
+end
+
+@testset "MultithreadedForm RuntimeGeneratedFunction with three or more arguments" begin
+    # Julia 1.10/1.11 segfault when this generated code calls opaque closures, so the
+    # calls run in a subprocess.
+    script = joinpath(mktempdir(), "mt_rgf_nargs.jl")
+    write(
+        script, """
+        using Symbolics
+        @variables a b c d
+        h = [a + b + c, c + d, a * d, 0]
+        args = ([a], [b], [c], [d])
+        inputs = ([1], [2], [3], [4])
+        expected = [6, 7, 4, 0]
+        for nt in (Symbolics.MultithreadedForm(), Symbolics.MultithreadedForm(2, 4))
+            f_oop, f_iip = build_function(h, args...; parallel = nt, expression = Val(false))
+            f_oop(inputs...) == expected || exit(1)
+            out = zeros(Int, 4)
+            f_iip(out, inputs...)
+            out == expected || exit(1)
+        end
+        println("ALL_CORRECT")
+        """
+    )
+    for threads in (1, MT_TEST_THREADS)
+        cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t$(threads) $script`
+        @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
+    end
 end

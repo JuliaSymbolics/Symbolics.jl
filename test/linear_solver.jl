@@ -177,6 +177,16 @@ end
     @test islin
 end
 
+@testset "`linear_expansion` remainder is free of `x` inside opaque calls" begin
+    @variables x h w c g(..)
+    ex = g(-h * x + ifelse(c > 0, h * x, h * x) + w)
+    a, b, islin = Symbolics.linear_expansion(ex, x)
+    @test islin
+    @test iszero(a)
+    @test isequal(b, g(w))
+    @test !SU.query(isequal(unwrap(x)), unwrap(b))
+end
+
 matmulwrapper(a, b) = a * b
 @register_array_symbolic matmulwrapper(a::AbstractMatrix{Real}, b::AbstractVector{Real}) begin
     size = size(b)

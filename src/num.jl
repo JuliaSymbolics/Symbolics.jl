@@ -51,7 +51,7 @@ Num(x::DomainSets.Point{<:Number}) = Num(x.x)::Num
 SymbolicUtils.@number_methods(Num,
     Num(f(unwrap(a))),
     Num(f(unwrap(a), unwrap(b))),
-    [conj, real, transpose, +, -, *, ^, //, /, \])
+    [conj, real, transpose, +, -, *, ^, //, /, \, isfinite])
 
 Base.:+(x::Num) = x
 function Base.:+(x1::Num, xs::Real...)
@@ -358,6 +358,12 @@ Base.nameof(n::Num) = nameof(value(n))
 
 Base.iszero(x::Num) = SymbolicUtils._iszero(unwrap(x))
 Base.isone(x::Num) = SymbolicUtils._isone(unwrap(x))
+Base.isinf(x::Num) =
+    SymbolicUtils.isconst(unwrap(x)) && isinf(unwrap_const(unwrap(x)))
+Base.isnan(x::Num) =
+    SymbolicUtils.isconst(unwrap(x)) && isnan(unwrap_const(unwrap(x)))
+Base.isfinite(x::Num) =
+    !SymbolicUtils.isconst(unwrap(x)) || isfinite(unwrap_const(unwrap(x)))
 
 const COMMON_ZERO_NUM = Num(COMMON_ZERO)
 const COMMON_ONE_NUM = Num(COMMON_ONE)
