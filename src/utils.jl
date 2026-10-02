@@ -477,8 +477,7 @@ function coeff(p, sym = nothing)
         sym = nothing
     end
 
-    # x^-n becomes 1/x^n (or (1/x)^n); negative powers as `sym` are not supported
-    if sym !== nothing && (isdiv(sym) || SymbolicUtils.query(isdiv, sym))
+    if sym !== nothing && (isdiv(sym) || (ispow(sym) && isdiv(arguments(sym)[1])))
         throw(DomainError(sym, "coeff with negative powers is not yet implemented."))
     end
 

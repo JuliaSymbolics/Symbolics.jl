@@ -76,3 +76,11 @@ end
 # issue #910 - negative powers as sym
 @test_throws DomainError coeff(3 / x, x^-1)
 @test_throws DomainError coeff(3 / x^2, x^(-2))
+
+# terms that contain division only in descendants remain supported
+@testset "coeff of terms containing nested division" begin
+    @variables x y a b
+    for sym in [sin(1 / x), sin(x / y), x^(b / y)]
+        @test isequal(coeff(a * sym, sym), a)
+    end
+end
