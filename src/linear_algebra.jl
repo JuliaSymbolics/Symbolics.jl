@@ -130,7 +130,7 @@ function _symbolic_linear_solve_nonsquare_msg(neqs::Integer, nvars::Integer)
     varword = nvars == 1 ? "unknown" : "unknowns"
     return string(
         "symbolic_linear_solve requires as many equations as unknowns; ",
-        "got $neqs $eqword in $nvars $varword. ",
+        lazy"got $neqs $eqword in $nvars $varword. ",
         "For underdetermined or nonlinear systems use symbolic_solve, ",
         "or solve a square linear subsystem first.",
     )
@@ -149,7 +149,7 @@ function _symbolic_linear_solve_nonlinear_msg(eq, var)
         if !islin
             return string(
                 "symbolic_linear_solve requires equations that are linear in the unknowns; ",
-                "equation $i ($(_format_eq_for_error(e))) is not linear. ",
+                lazy"equation $i ($(_format_eq_for_error(e))) is not linear. ",
                 "For nonlinear systems use symbolic_solve.",
             )
         end
