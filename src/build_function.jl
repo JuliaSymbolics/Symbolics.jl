@@ -125,6 +125,11 @@ Keyword Arguments:
   - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
     splitting the number of expressions per thread.
 - `fname`: Used by some targets for the name of the function in the target space.
+- `iip_config`: A 2-tuple of `Bool`s `(oop, iip)` selecting whether the out-of-place
+  and in-place functions are generated. Defaults to `(true, true)`. A variant that
+  is turned off is still returned as a stub so that the 2-tuple shape is kept, and
+  calling the stub throws an `ArgumentError`. Only applies when `ex` is an array
+  (scalar `ex` returns a single function).
 
 Note that not all build targets support the full compilation interface. Check the
 individual target documentation for details.
@@ -352,6 +357,11 @@ Special Keyword Arguments:
   filling function is 0.
 - `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
   safety with `skipzeros`.
+- `iip_config`: A 2-tuple of `Bool`s `(oop, iip)` selecting whether the out-of-place
+  and in-place functions are generated. Defaults to `(true, true)`. A variant that
+  is turned off is still returned as a stub so that the 2-tuple shape is kept, and
+  calling the stub throws an `ArgumentError`. Only applies when `rhss` is an array
+  (scalar `rhss` returns a single function).
 """
 function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        conv=toexpr,
@@ -462,7 +472,10 @@ function make_array(s::ShardedForm, closed_args, arr, similarto)
     arrays = map(slices) do slice
         Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
-    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
+    return SpawnFetch{typeof(s)}(
+        first.(arrays), last.(arrays),
+        VcatReshape(size(arr))
+    )
 end
 
 struct Funcall{F, T}
@@ -472,15 +485,24 @@ end
 
 (f::Funcall)() = f.f(f.args...)
 
+struct VcatReshape{Dims}
+    dims::Dims
+end
+
+(c::VcatReshape)(xs...) = reshape(vcat(xs...), c.dims)
+
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false))),
-                       ($(toexpr.(a, (st,))...),)))
+        ex = :(
+            $Funcall(
+                $(toexpr(thunk, st)),
+                ($(toexpr.(a, (st,))...),)
+            )
+        )
         quote
-            let
-                task = Base.Task($ex)
+            let task = Base.Task($ex)
                 task.sticky = false
                 Base.schedule(task)
                 task
@@ -593,10 +615,14 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
         fs = map(slices) do slice
             recursive_split(leaf_f, s, out, args, first.(slice), last.(slice))
         end
-        return Func(args, [],
-                    SpawnFetch{typeof(s)}(fs, [args for f in fs],
-                                          (@inline noop(x...) = nothing)),
-                    [])
+        return Func(
+            args, [],
+            SpawnFetch{typeof(s)}(
+                fs, [args for f in fs],
+                Returns(nothing)
+            ),
+            []
+        )
     end
 end
 
