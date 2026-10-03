@@ -720,6 +720,11 @@ end
     @test collect(y .=> z) isa Vector{<:Pair}
     @test collect(y .~ z) isa Vector{Equation}
     @test Dict(collect(y .=> z)) isa Dict
+    z0 = Arr(fill(3.0))
+    zc = collect(z0)
+    @test zc isa Arr{Num, 0}
+    @test size(zc) == ()
+    @test isequal(zc[], 3.0)
 end
 
 @testset "Issue#1975: `dims` reductions do not mutate their argument's shape" begin

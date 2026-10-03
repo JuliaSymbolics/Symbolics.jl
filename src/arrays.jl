@@ -252,6 +252,7 @@ function Base.collect(x::Arr{T, N}) where {T, N}
     is_wrapper_type(T) || return wrap.(xs)
     return map!(T, Array{T, N}(undef, size(xs)), xs)
 end
+Base.collect(x::Arr{T, 0}) where {T} = wrap.(collect(unwrap(x)))
 isarraysymbolic(x) = false
 # this should be validated in the constructor
 isarraysymbolic(x::Arr) = true
