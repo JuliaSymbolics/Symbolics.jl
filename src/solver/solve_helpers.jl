@@ -189,3 +189,68 @@ function contains_var(var, vars)
     end
     return false
 end
+
+# True when eqs are jointly affine-linear in vars (coefficients free of vars).
+function is_affine_linear_system(eqs, vars)
+    length(eqs) == length(vars) || return false
+    A, bvec, islinear = linear_expansion(eqs, vars)
+    islinear || return false
+    x_set = Set(unwrap(v) for v in vars)
+    for e in Iterators.flatten((A, bvec))
+        for v in get_variables(e)
+            v in x_set && return false
+        end
+    end
+    return true
+end
+
+# Strip outer integer powers and nonzero constant factors so that f^n and c*f^n
+# share the zero set of f when multiplicities are discarded.
+function drop_outer_multiplicities(expression)
+    expression = unwrap(expression)
+    changed = true
+    while changed && iscall(expression)
+        changed = false
+        op = operation(expression)
+        args = arguments(expression)
+        if isequal(op, ^) && SymbolicUtils.isconst(args[2])
+            a2 = unwrap_const(args[2])
+            if a2 isa Integer && a2 > 0
+                expression = unwrap(args[1])
+                changed = true
+                continue
+            end
+        elseif isequal(op, *)
+            new_factors = Any[]
+            local_changed = false
+            for a in args
+                a = unwrap(a)
+                if iscall(a) && isequal(operation(a), ^)
+                    aa = arguments(a)
+                    if SymbolicUtils.isconst(aa[2])
+                        exp = unwrap_const(aa[2])
+                        if exp isa Integer && exp > 0
+                            push!(new_factors, aa[1])
+                            local_changed = true
+                            continue
+                        end
+                    end
+                    push!(new_factors, a)
+                elseif SymbolicUtils.isconst(a) || a isa Number
+                    if isequal(a, 0) || (a isa Number && iszero(a))
+                        return wrap(0)
+                    end
+                    local_changed = true
+                else
+                    push!(new_factors, a)
+                end
+            end
+            isempty(new_factors) && return wrap(1)
+            expression = length(new_factors) == 1 ? unwrap(new_factors[1]) :
+                         unwrap(*(wrap.(new_factors)...))
+            changed = local_changed
+            continue
+        end
+    end
+    return wrap(expression)
+end

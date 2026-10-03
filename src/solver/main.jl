@@ -274,7 +274,25 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+        if dropmultiplicity
+            expr = map(drop_outer_multiplicities, expr)
+        end
+
+        # Square affine-linear systems are cheaper via Gaussian elimination than Groebner.
+        sols = nothing
+        if is_affine_linear_system(expr, x)
+            lin_sol = try
+                symbolic_linear_solve(expr .~ 0, x; check = false)
+            catch
+                nothing
+            end
+            if !isnothing(lin_sol)
+                sols = [Dict{Num, Any}(var => lin_sol[i] for (i, var) in enumerate(x))]
+            end
+        end
+        if isnothing(sols)
+            sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+        end
         isequal(sols, nothing) && return nothing
         sols = convert(Vector{Any}, sols)
         for i in eachindex(sols)
