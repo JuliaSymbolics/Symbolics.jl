@@ -63,3 +63,43 @@ e = x*y^2 + 2x + y^3*x^3
     @variables x a b c d
     @test isequal(coeff(c + (a + b*x)*d, x), b * d)
 end
+
+# issue #910 - unexpanded products where sym appears in multiple factors
+@test_throws DomainError coeff((3x^2 + 2) * (2x^2 + 1), x^2)
+@test isequal(coeff(expand((3x^2 + 2) * (2x^2 + 1)), x^2), 7)
+@test_throws DomainError coeff((3x^2 + 2) * y * (2x^2 + y), x^2)
+@test isequal(coeff(expand((3x^2 + 2) * y * (2x^2 + y)), x^2), 4y + 3(y^2))
+# single-factor products remain fine
+@test isequal(unwrap_const(coeff(2 * (3x^2 + 2), x^2)), 6)
+@test isequal(coeff((3x^2 + 2) * (2x^2 + 1), x^0), 2)
+
+# issue #910 - negative powers as sym
+@test_throws DomainError coeff(3 / x, x^-1)
+@test_throws DomainError coeff(3 / x^2, x^(-2))
+
+@testset "coeff of terms containing nested division" begin
+    @variables x y z a b
+    for sym in [
+            sin(1 / x), sin(x / y), x^(b / y), (x / y)^(1 // 2),
+            (x / y)^b, (1 / x)^b, (x / y)^sqrt(2), (1 / x)^2, (x / y)^2,
+        ]
+        @test isequal(coeff(a * sym, sym), a)
+        @test isequal(coeff(a * sym + b, sym), a)
+        @test isequal(coeff(a * sym / z, sym), a / z)
+    end
+end
+
+@testset "coeff of absent reciprocal powers" begin
+    @variables x y a b
+    @test isequal(coeff(a * x^-2 + b / x, x^-2), a)
+    @test isequal(coeff(a * (x / y)^2 + b / y, (x / y)^2), a)
+    for (p, sym) in [
+            (b / x, (1 / x)^2), (1 / (x * y), (1 / x)^2),
+            (b / x^3, (1 / x)^2), (b / y, (x / y)^2),
+            (b / y, (x / y)^3), (b / y, ((x + 1) / y)^2),
+        ]
+        @test isequal(unwrap_const(coeff(p, sym)), 0)
+    end
+    @test_throws DomainError coeff(3 / (x^2 * y), x^-2)
+    @test_throws DomainError coeff((x + 1) / x^3, x^-2)
+end
