@@ -1,3 +1,14 @@
+## 7.42.0
+
+### New features
+
+- `split_complex_equation(lhs, rhs)` equates two sides like `lhs ~ rhs`, but when
+  the equation splits into real-part and imaginary-part equations it returns a
+  `SplitComplexEquation`: a read-only two-element `AbstractVector{Equation}`
+  that also records the original unsplit equation. Consumers can tell it apart
+  from a user-written pair of real equations with `isa SplitComplexEquation`.
+  `lhs ~ rhs` itself still returns a `Vector{Equation}` for a complex split.
+
 ## 7.37.0
 
 ### Behavior changes
