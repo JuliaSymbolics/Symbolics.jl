@@ -94,8 +94,9 @@ function get_roots_deg4(expression, x)
         end
     end
     if SymbolicUtils._iszero(m)
-        @info "Assuming $(roots_m[1] != 0)"
-        m = roots_m[1]
+        nonzero_root = findfirst(root -> !SymbolicUtils._iszero(root), roots_m)
+        m = roots_m[something(nonzero_root, 1)]
+        @info "Assuming $(m != 0)"
     end
 
     arr = get_yroots(m, p, q)

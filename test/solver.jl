@@ -365,6 +365,21 @@ end
 
 @testset "Multivar parametric" begin
     @variables x y a
+    @test length(
+        Symbolics.get_roots_deg4(
+            SymbolicUtils.unwrap(x^4 - 5x^2 + 4), SymbolicUtils.unwrap(x)
+        )
+    ) == 4
+    quartic_roots = symbolic_solve(x^4 + a * x^2 + 1, x)
+    a_value = complex(5.0)
+    numeric_roots = [
+        eval(Symbolics.toexpr(substitute(root, Dict(a => a_value)))) for root in quartic_roots
+    ]
+    residuals = [root^4 + a_value * root^2 + 1 for root in numeric_roots]
+    tolerance = 1000 * eps(one(real(first(numeric_roots))))
+    @test length(quartic_roots) == 4
+    @test all(isapprox(residual, 0.0; atol = tolerance) for residual in residuals)
+
     @test isequal(value(only(symbolic_solve([x + a, a - 1], x))), -1)
     @test isequal(symbolic_solve([x - a, y + a], [x, y]), [Dict(y => -a, x => a)])
     @test isequal(symbolic_solve([x*y - a, x*y + x], [x, y]), [Dict(y => Const{SymReal}(-1), x => -a)])
