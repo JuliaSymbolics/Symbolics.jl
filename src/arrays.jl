@@ -238,6 +238,13 @@ function LinearAlgebra.norm(v::AbstractVector{<:Num}, p::Real = 2)
     return wrap(Symbolics.term(norm, map(unwrap, v), p; type = Real))
 end
 
+# Shadow StaticArrays' branching `norm(::StaticArray)` so static vectors of
+# `Num` build the same lazy term as plain vectors. (`StaticVector{N, T}`
+# takes the length first, so the element type is the second parameter.)
+function LinearAlgebra.norm(v::StaticArraysCore.StaticVector{<:Any, <:Num}, p::Real = 2)
+    return wrap(Symbolics.term(norm, map(unwrap, v), p; type = Real))
+end
+
 function SymbolicUtils.scalarize(x::Arr{T, N}, ::Val{toplevel}) where {toplevel, T, N}
     scal = SymbolicUtils.scalarize(unwrap(x), Val{toplevel}())::(AbstractArray{_T, N} where {_T})
     if is_wrapper_type(T)

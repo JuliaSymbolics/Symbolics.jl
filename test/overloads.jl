@@ -3,6 +3,7 @@ using Symbolics
 using LinearAlgebra
 using SparseArrays: sparse, sparsevec
 using StaticArraysCore: SArray
+using StaticArrays: SVector
 import SpecialFunctions
 using Test
 using SymbolicUtils: BasicSymbolic, evaluate
@@ -320,6 +321,14 @@ x = Num.(randn(10))
 @test isequal(scalarize(norm(x, Inf)), max(abs(x[1]), abs(x[2])))
 @test isequal(scalarize(norm(x, 1)), abs(x[1]) + abs(x[2]))
 @test isequal(scalarize(norm(x, 1.2)), (abs(x[1])^1.2 + abs(x[2])^1.2)^(1/1.2))
+
+@variables svx svy svz
+sv = SVector(svx, svy, svz)
+@test norm(sv) isa Num
+@test isequal(norm(sv), norm(collect(sv)))
+@test isequal(scalarize(norm(sv)), scalarize(norm(collect(sv))))
+@test isequal(scalarize(norm(sv, 1)), abs(svx) + abs(svy) + abs(svz))
+@test value(evaluate(substitute(norm(sv), Dict(svx => 3.0, svy => 4.0, svz => 0.0)))) ≈ 5.0
 
 @variables x y
 @test isequal(expand((x+y)^2), x^2 + y^2 + 2x*y)
