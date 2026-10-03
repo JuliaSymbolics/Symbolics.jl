@@ -307,10 +307,10 @@ function _classify_linear_monomial(k::SymbolicT, x_to_j::Dict{SymbolicT, Int}, p
                     found_j = bj
                     found_base = base
                 elseif _linear_expansion_occursin_xs(base, x_to_j, parents)
-                    return :nonlinear
+                    return :fallback
                 end
             end
-            found_j == 0 && return :fallback
+            found_j == 0 && return :constant
             newdict = copy(dict)
             delete!(newdict, found_base)
             a = SymbolicUtils.Mul{VartypeT}(coeff, newdict; type, shape)
@@ -328,6 +328,12 @@ function _linear_expansion_fast_row!(
         i::Int, t::SymbolicT, x_to_j::Dict{SymbolicT, Int},
         parents::Set{SymbolicT}
     )
+    j = get(x_to_j, t, 0)
+    if j > 0
+        A[i, j] = COMMON_ONE
+        bvec[i] = COMMON_ZERO
+        return true
+    end
     return @match t begin
         BSImpl.AddMul(; coeff, dict, variant, type, shape) &&
             if variant === SymbolicUtils.AddMulVariant.ADD

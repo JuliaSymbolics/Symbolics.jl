@@ -114,6 +114,60 @@ end
     @test !Symbolics.linear_expansion(Symbolics.scalarize(z(x) .+ x), Symbolics.scalarize(x))[3]
 end
 
+@testset "linear_expansion array overload preserves LinearExpander semantics" begin
+    @variables x y c q[1:3]
+
+    A, b, islin = Symbolics.linear_expansion([x + y], [x + y])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([1], 1, 1)))
+    @test isequal(Num.(b), Num.([0]))
+    @test isequal(Num.(Symbolics.symbolic_linear_solve([0 ~ x + y], [x + y])), Num.([0]))
+
+    A, b, islin = Symbolics.linear_expansion([y * (x + 1)], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([y], 1, 1)))
+    @test isequal(Num.(b), Num.([y]))
+    @test isequal(Num.(Symbolics.symbolic_linear_solve([y * (x + 1) ~ 0], [x])), Num.([-1]))
+
+    A, b, islin = Symbolics.linear_expansion([y * ifelse(c > 0, 2x + 1, 3x + 2)], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([y * ifelse(c > 0, 2, 3)], 1, 1)))
+    @test isequal(Num.(b), Num.([y * ifelse(c > 0, 1, 2)]))
+
+    A, b, islin = Symbolics.linear_expansion([q[1] * q[2]], [q[1]])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([q[2]], 1, 1)))
+    @test isequal(Num.(b), Num.([0]))
+    @test isequal(Num.(Symbolics.symbolic_linear_solve([q[1] * q[2] ~ 1], [q[1]])), Num.([1 / q[2]]))
+
+    A, b, islin = Symbolics.linear_expansion([y * (3 * (x + y) - 3x)], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([0], 1, 1)))
+    @test isequal(Num.(b), Num.([3y^2]))
+
+    A, b, islin = Symbolics.linear_expansion([y * (3 * (x + y) - 3x) * (x + 3)], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([3y^2], 1, 1)))
+    @test isequal(Num.(b), Num.([9y^2]))
+
+    A, b, islin = Symbolics.linear_expansion([(2x + 1) / y], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([2 / y], 1, 1)))
+    @test isequal(Num.(b), Num.([1 / y]))
+
+    A, b, islin = Symbolics.linear_expansion([sin(y) + 2x], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([2], 1, 1)))
+    @test isequal(Num.(b), Num.([sin(y)]))
+
+    A, b, islin = Symbolics.linear_expansion([2x + 3y + 4], [x, y])
+    @test islin
+    @test isequal(Num.(A), Num.([2 3]))
+    @test isequal(Num.(b), Num.([4]))
+
+    @test !Symbolics.linear_expansion([x * y], [x, y])[3]
+end
+
 @testset "linear_expansion of ifelse" begin
     @variables p
     a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p + 1, 3p + 2), p)
