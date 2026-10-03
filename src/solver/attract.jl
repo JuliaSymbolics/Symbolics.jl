@@ -166,7 +166,7 @@ julia> x = (@variables x)[1]
 x
 
 julia> Symbolics.attract_exponential(2^(x+1) + 5^(x+3), x)
-slog(-1) - slog(2) + 3slog(5) + slog(5)*x - slog(2)*x
+slog(-1) + slog(2) - 3slog(5) + slog(2)*x - slog(5)*x
 ```
 """
 function attract_exponential(lhs, var)
