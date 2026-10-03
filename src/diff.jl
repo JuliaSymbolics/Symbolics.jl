@@ -27,24 +27,22 @@ Differential(x, 3)
 ```
 """
 struct Differential <: Operator
-    """The variable to differentiate with respect to. Must be a symbolic variable, a called symbolic function or dependent variable (`x(t)`), a scalar-indexed element of these (`x[i]`), or an operator application (e.g. `D(t)(u)`); constructing over any other expression throws an `ArgumentError`."""
+    """The variable to differentiate with respect to. Must be a symbolic variable, a called symbolic function or dependent variable (`x(t)`), a scalar-indexed element or symbolic struct field of these (`x[i]`, `rec.x`), or an operator application (e.g. `D(t)(u)`); constructing over any other expression throws an `ArgumentError`."""
     x::BasicSymbolic{VartypeT}
     """The derivative order. Can be rational for fractional derivatives."""
     order::Union{Int, Rational{Int}}
     function Differential(x::BasicSymbolic{VartypeT}, order = 1; unsafe::Bool = false)
         @assert order > 0 "Derivative order must be positive"
-        if !unsafe
-            @match x begin
-                BSImpl.Const() => throw(ArgumentError("Cannot take derivative with respect to constant."))
-                _ => _is_differential_target(x) ||
-                    throw(ArgumentError("Cannot take derivative with respect to a non-variable expression `$x`."))
-            end
+        @match x begin
+            BSImpl.Const() => throw(ArgumentError("Cannot take derivative with respect to constant."))
+            _ => unsafe || _is_differential_target(x) ||
+                throw(ArgumentError("Cannot take derivative with respect to a non-variable expression `$x`."))
         end
         return new(x, order)
     end
     Differential(x::Union{Num, Arr}, order = 1) = Differential(unwrap(x), order)
     Differential(::CallAndWrap, order = 1) = throw(ArgumentError("Cannot take derivative with respect to a symbolic function."))
-    Differential(::Union{AbstractFloat, Integer}) = error("D(::Number) is not a valid derivative. Derivatives must be taken w.r.t. symbolic variables.")
+    Differential(::Number, order = 1) = throw(ArgumentError("Cannot take derivative with respect to constant."))
 end
 function (D::Differential)(x::BasicSymbolic{VartypeT})
     return @match x begin
@@ -70,7 +68,7 @@ function _is_differential_target(x::BasicSymbolic{VartypeT})
         BSImpl.Sym() => true
         BSImpl.Term(; f, args) => if f isa BasicSymbolic{VartypeT} || f isa Operator
             true
-        elseif f === getindex
+        elseif f === getindex || f isa SymbolicGetproperty
             _is_differential_target(args[1])
         else
             false

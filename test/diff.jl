@@ -19,9 +19,13 @@ Dx = Differential(x)
 test_equal(a, b) = @test isequal(unwrap_const(simplify(unwrap(a))), unwrap_const(simplify(unwrap(b))))
 
 @testset "ZeroOperator handling" begin
-    @test_throws ErrorException Differential(0.1)(x)
-    @test_throws ErrorException Differential(1)(x)
-    @test_throws ErrorException Differential(2)(2x)
+    @test_throws ArgumentError Differential(0.1)(x)
+    @test_throws ArgumentError Differential(1)(x)
+    @test_throws ArgumentError Differential(2)(2x)
+    for target in (0, 1, 0.1, 1 // 2, im, pi, Num(0))
+        @test_throws ArgumentError Differential(target)
+        @test_throws ArgumentError Differential(target, 2)
+    end
 end
 
 @testset "Differential target must be a variable" begin
@@ -60,6 +64,44 @@ end
     @test isequal(Symbolics.substitute_in_deriv(d, Dict(x => y)), renamed)
     @test isequal(Symbolics.substitute_in_deriv_and_depvar(d, Dict(x => y)), Symbolics.derivative(g(2y), y))
     @test isequal(expand_derivatives(Symbolics.substitute_in_deriv_and_depvar(d, Dict(x => y))), Symbolics.derivative(g(2y), y))
+end
+
+@testset "Constant targets in derivative substitution" begin
+    @variables a
+    ex = Differential(a)(a^2)
+    for point in (0, 1, 2)
+        @test_throws ArgumentError Differential(unwrap(Num(point)); unsafe = true)
+    end
+    for sub in (Symbolics.substitute_in_deriv, Symbolics.substitute_in_deriv_and_depvar)
+        for point in (0, 1, 2)
+            @test_throws ArgumentError sub(ex, Dict(a => point))
+            @test isequal(sub(expand_derivatives(ex), Dict(a => point)), 2point)
+        end
+    end
+end
+
+struct DifferentialRecord
+    x::Real
+    y::Real
+    values::Vector{Real}
+end
+@symstruct DifferentialRecord
+
+struct NestedDifferentialRecord
+    inner::DifferentialRecord
+end
+@symstruct NestedDifferentialRecord
+
+@testset "Symbolic field differentiation" begin
+    @variables rec::DifferentialRecord nested::NestedDifferentialRecord
+    for target in (rec.x, rec.values[1], nested.inner.x)
+        @test Differential(target) isa Differential
+        @test Symbolics.derivative(target, target) == 1
+        @test isequal(Symbolics.derivative(target^2, target), 2target)
+        @test Symbolics.derivative(rec.y, target) == 0
+        @test isequal(Symbolics.gradient(target^2, [target]), [2target])
+        @test_throws ArgumentError Differential(2target)
+    end
 end
 
 #@test @macroexpand(@derivatives D'~t D2''~t) == @macroexpand(@derivatives (D'~t), (D2''~t))
