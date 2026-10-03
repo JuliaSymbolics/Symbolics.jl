@@ -203,22 +203,3 @@ function contains_var(var, vars)
     end
     return false
 end
-
-# Variable-containing denominators anywhere inside `expr`. Clearing them turns a
-# rational system into a polynomial one, and their zeros are spurious roots the
-# solver filters out afterwards.
-function fraction_denominators(expr)
-    dens = []
-    stack = Any[unwrap(expr)]
-    while !isempty(stack)
-        node = pop!(stack)
-        !iscall(node) && continue
-        args = arguments(node)
-        if operation(node) === (/)
-            den = wrap(args[2])
-            isempty(get_variables(den)) || push!(dens, den)
-        end
-        append!(stack, args)
-    end
-    return dens
-end

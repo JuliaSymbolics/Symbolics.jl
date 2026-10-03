@@ -361,32 +361,22 @@ end
     @test isnothing(symbolic_solve([x^2, x*y, y^2], [x,y], warns=false))
 
     # https://github.com/JuliaSymbolics/Symbolics.jl/issues/1370
-    @variables Vpack R1 RisoP RisoN R2 R3 Vadc_off Vadc_on
-    A = 1 / (1 / RisoN + 1 / (R2 + R3))
-    B = 1 / (1 / RisoP + 1 / R1)
-    Vadc_ratio = R3 / (R2 + R3)
-    eq1 = Vadc_off ~ Vpack * (A / (RisoP + A)) * Vadc_ratio
-    eq2 = Vadc_on ~ Vpack * (A / (A + B)) * Vadc_ratio
-
-    sol_tuple = symbolic_solve([eq1, eq2], (RisoP, RisoN))
-    sol_vec = symbolic_solve([eq1, eq2], [RisoP, RisoN])
-    @test sol_vec isa AbstractVector && length(sol_vec) == 1
-    @test isequal(sol_tuple, sol_vec)
-    @test !isequal(sol_vec[1][RisoP], 0)
-    @test !isequal(sol_vec[1][RisoN], 0)
-
-    paramvals = Dict(
-        Vpack => big(21), R1 => big(97), R2 => big(33),
-        R3 => big(17), Vadc_off => big(2), Vadc_on => big(5)
+    # variables passed as a tuple dispatch to the same solver as a vector
+    eqs = [x * y + 2x^2, y^2 - 1]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, (x, y)), [x, y])
+    arr_known_roots = sort_arr(
+        [
+            Dict(x => -1 // 2, y => 1), Dict(x => 0, y => -1),
+            Dict(x => 0, y => 1), Dict(x => 1 // 2, y => -1),
+        ],
+        [x, y]
     )
-    numsol = Dict(k => substitute(v, paramvals) for (k, v) in sol_vec[1])
-    for eq in (eq1, eq2)
-        residual = substitute(eq.lhs - eq.rhs, merge(paramvals, numsol))
-        @test iszero(Symbolics.symbolic_to_float(residual))
-    end
-
-    # roots at the zeros of cleared denominators are spurious
-    @test isempty(symbolic_solve([x / (x - 1) - y / (x - 1), x - 1], [x, y]))
+    @test check_equal(arr_calcd_roots, arr_known_roots)
+    @test isequal(symbolic_solve(eqs, (x, y)), symbolic_solve(eqs, [x, y]))
+    @test isequal(
+        symbolic_solve([x^2 - 1, x + 1], (x,)),
+        symbolic_solve([x^2 - 1, x + 1], [x])
+    )
 end
 
 @testset "Multivar parametric" begin

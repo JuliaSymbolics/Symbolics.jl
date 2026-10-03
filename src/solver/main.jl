@@ -213,7 +213,6 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         x_univar = true
         check_x(x)
     else
-        x = vec(collect(Num, x))
         for var in x
             check_x(var)
         end
@@ -266,12 +265,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 
 
     if !x_univar
-        denominators = []
-        expr = map(expr) do e
-            append!(denominators, fraction_denominators(e))
-            numerator(simplify_fractions(e))
-        end
-
+        x = vec(collect(Num, x))
         for e in expr
             for var in x
                 if !check_poly_inunivar(e, var)
@@ -281,18 +275,8 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
+        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
         isequal(sols, nothing) && return nothing
-
-        unique!(denominators)
-        for den in denominators
-            warns && @info "Assuming $den != 0"
-        end
-        # Clearing denominators can introduce spurious roots at their zeros.
-        filter!(sols) do sol
-            all(den -> !isequal(substitute(den, sol), 0), denominators)
-        end
-
         sols = convert(Vector{Any}, sols)
         for i in eachindex(sols)
             for var in x
