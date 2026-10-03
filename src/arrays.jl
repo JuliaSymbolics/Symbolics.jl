@@ -250,7 +250,7 @@ Base.isempty(x::Arr) = isempty(unwrap(x))
 function Base.collect(x::Arr{T, N}) where {T, N}
     xs = collect(unwrap(x))
     is_wrapper_type(T) || return wrap.(xs)
-    return map!(wrap, Array{T, N}(undef, size(xs)), xs)
+    return map!(T, Array{T, N}(undef, size(xs)), xs)
 end
 isarraysymbolic(x) = false
 # this should be validated in the constructor
