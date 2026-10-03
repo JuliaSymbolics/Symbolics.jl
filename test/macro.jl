@@ -254,6 +254,24 @@ yyy = yy(t)
 @variables y(::Real)
 @test isequal(yyy, y(t))
 
+@variables x
+incomplete_fntype_err = try
+    Symbolics.variable(:f, T = FnType)
+    error("expected ArgumentError")
+catch err
+    err
+end
+@test incomplete_fntype_err isa ArgumentError
+@test occursin("fully parameterized FnType", incomplete_fntype_err.msg)
+@test occursin("FnType{Tuple, Real, Nothing}", incomplete_fntype_err.msg)
+@test_throws ArgumentError Symbolics.variable(:f, T = FnType{Tuple, Real})
+@test_throws ArgumentError Symbolics.variable(:f, T = FnType{Tuple{Real}, Real})
+f = Symbolics.variable(:f, T = FnType{Tuple, Real, Nothing})
+@test f isa Symbolics.CallAndWrap{Num}
+@test symtype(unwrap(f)) === FnType{Tuple, Real, Nothing}
+@test 2f(x) isa Num
+@test 2f(x, x) isa Num
+
 spam(x) = 2x
 @register_symbolic spam(x::AbstractArray)
 
