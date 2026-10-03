@@ -6,7 +6,7 @@ using ReferenceTests
 import SymbolicUtils as SU
 using Symbolics: VartypeT
 
-using DomainSets: Interval
+using DomainSets: Interval, ClosedInterval
 
 const LatexifyExt = Base.get_extension(Symbolics, :SymbolicsLatexifyExt)
 const _toexpr = LatexifyExt._toexpr
@@ -23,9 +23,9 @@ Dy = Differential(y)
 
 @test_reference "latexify_refs/inverse.txt" latexify(x^-1)
 
-@test_reference "latexify_refs/integral1.txt" latexify(Integral(dx in Interval(0, 1))(x))
-@test_reference "latexify_refs/integral2.txt" latexify(Integral(dx in Interval(-Inf, Inf))(u^2))
-@test_reference "latexify_refs/integral3.txt" latexify(Integral(dx in Interval(-z, u))(x^2))
+@test_reference "latexify_refs/integral1.txt" latexify(Integral(y in Interval(0, 1))(x))
+@test_reference "latexify_refs/integral2.txt" latexify(Integral(y in Interval(-Inf, Inf))(u^2))
+@test_reference "latexify_refs/integral3.txt" latexify(Integral(y in Interval(-z, u))(x^2))
 
 @test_reference "latexify_refs/frac1.txt" latexify((z + x * y^-1) / sin(z))
 @test_reference "latexify_refs/frac2.txt"  latexify((3x - 7y * z^23) * (z - z^2) / x)
@@ -57,24 +57,35 @@ Dy = Differential(y)
     Dx = Differential(x)
     I = Integral(x in Interval(0, 1))
 
-    # Compound integrand: default mult_symbol stays "~"; product stays grouped.
+    # Compound integrand: differential after integrand; product stays grouped.
     @test latexify(I(x * y); env = :raw).s ==
-        "\\int_{0}^{1} ~ x ~ \\left( x ~ y \\right)"
+        "\\int_{0}^{1} ~ \\left( x ~ y \\right) ~ \\mathrm{d}x"
     # Sum integrand stays parenthesised (not flattened to ∫x + y).
     @test latexify(I(x + y); env = :raw).s ==
-        "\\int_{0}^{1} ~ x ~ \\left( x + y \\right)"
+        "\\int_{0}^{1} ~ \\left( x + y \\right) ~ \\mathrm{d}x"
     # Indexed variable keeps recipe index=:subscript; no redundant merge parens.
     @test latexify(I(a[1]); env = :raw).s ==
-        "\\int_{0}^{1} ~ x ~ a_{1}"
+        "\\int_{0}^{1} ~ a_{1} ~ \\mathrm{d}x"
     # Float coefficient keeps FancyNumberFormatter(5) rounding.
     @test latexify(I(0.123456789 * x); env = :raw).s ==
-        "\\int_{0}^{1} ~ x ~ \\left( 0.12346 ~ x \\right)"
+        "\\int_{0}^{1} ~ \\left( 0.12346 ~ x \\right) ~ \\mathrm{d}x"
     # Power of an operator-form derivative keeps the derivative parenthesised as base.
     @test latexify((Dx(x + y))^2; env = :raw).s ==
         "\\left( \\frac{\\mathrm{d}}{\\mathrm{d}x} ~ \\left( x + y \\right) \\right)^{2}"
     # Integral upper limit closes with `}` (not `)`), and mult_symbol does not leak.
     @test latexify(I(y); env = :raw, mult_symbol = "\\cdot").s ==
-        "\\int_{0}^{1} ~ x ~ y"
+        "\\int_{0}^{1} ~ y ~ \\mathrm{d}x"
+end
+
+# issue #1694: bare Integral recipe and differential form.
+@testset "latexify bare Integral (#1694)" begin
+    @variables x a b y
+    I1 = Integral(x in ClosedInterval(a, b))
+    @test latexify(I1; env = :raw).s == "\\int_{a}^{b} ~ \\mathrm{d}x"
+    @test latexify(I1(x^2 + 2 * x + 1); env = :raw).s ==
+        "\\int_{a}^{b} ~ \\left( 1 + 2 ~ x + x^{2} \\right) ~ \\mathrm{d}x"
+    @test latexify(y ~ I1(x^2 + 2 * x + 1); env = :raw).s ==
+        "y = \\int_{a}^{b} ~ \\left( 1 + 2 \\cdot x + x^{2} \\right) ~ \\mathrm{d}x"
 end
 
 @test_reference "latexify_refs/stable_mul_ordering1.txt" latexify(x * y)
