@@ -6,7 +6,7 @@ using LaTeXStrings
 using TermInterface
 using SymbolicUtils
 using Symbolics: value, hide_lhs, wrap
-using MacroTools: postwalk
+using MacroTools: postwalk, prewalk
 using SymbolicUtils: BSImpl, FnType, unwrap, symtype, BasicSymbolic
 using Moshi.Match: @match
 
@@ -27,8 +27,38 @@ function cleanup_exprs(ex)
     return postwalk(x -> iscall(x) && length(arguments(x)) == 0 ? operation(x) : x, ex)
 end
 
+# Keep custom-wrapper call arguments as Expr nodes so the outer Latexify
+# traversal applies recipe/caller options (index, fmt, mult_symbol, snakecase).
+# Always `:block`-wrap Expr args: `:latexifymerge` wraps any non-`:none` child
+# in an extra `\left(...\right)`, and we already supply the call parentheses.
+function _latexstring_call_to_merge(ex::Expr)
+    name = ex.args[1]
+    length(ex.args) == 1 && return name
+    body = Expr(:latexifymerge, name, "\\left( ")
+    for (i, a) in enumerate(ex.args[2:end])
+        i > 1 && (body = Expr(:latexifymerge, body, ", "))
+        child = a isa Expr ? Expr(:block, a) : a
+        body = Expr(:latexifymerge, body, child)
+    end
+    return Expr(:latexifymerge, body, " \\right)")
+end
+
 function latexify_derivatives(ex)
-    return postwalk(ex) do x
+    # Latexify does not parenthesize `^` when the base is a LaTeXString-headed
+    # call (`_getoperation` only recognizes Symbol heads). Mark those first.
+    ex = prewalk(ex) do x
+        if Meta.isexpr(x, :call) && x.args[1] == :^ && length(x.args) >= 3
+            base = x.args[2]
+            if Meta.isexpr(base, :call) && base.args[1] isa LaTeXString && length(base.args) > 1
+                return Expr(:call, :^, Expr(:call, :_latexfenced, base), x.args[3])
+            end
+        end
+        return x
+    end
+    # Pass 1: derivatives/integrals while unary custom calls are still `:call`
+    # nodes, so `D(f(x))` keeps `f(x)` in the fraction numerator (needed when
+    # the derivative is later multiplied by another factor).
+    ex = postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
         if x.args[1] == :_derivative
             num, den, deg = x.args[2:end]
@@ -62,6 +92,21 @@ function latexify_derivatives(ex)
         elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(sorted_arguments(x)[1])).s
             return "\\textbf{" * strip(ls, '\$') * "}"
+        else
+            return x
+        end
+    end
+    # Pass 2: convert custom-wrapper calls to `:latexifymerge` and apply fences.
+    return postwalk(ex) do x
+        Meta.isexpr(x, :call) || return x
+        if x.args[1] === :_latexfenced
+            inner = x.args[2]
+            if Meta.isexpr(inner, :call) && inner.args[1] isa LaTeXString
+                inner = _latexstring_call_to_merge(inner)
+            end
+            return Expr(:latexifymerge, "\\left( ", inner, " \\right)")
+        elseif x.args[1] isa LaTeXString
+            return _latexstring_call_to_merge(x)
         else
             return x
         end
@@ -274,10 +319,16 @@ function _toexpr_plain(O; latexwrapper = default_latex_wrapper)
         sym = replace(sym, Symbolics.NAMESPACE_SEPARATOR => ".")
 
         # override if the sym has its own latex wrapper
-        symwrapper = hasmetadata(O, SymLatexWrapper) ? getmetadata(O, SymLatexWrapper) :
-            latexwrapper
+        has_custom_wrapper = hasmetadata(O, SymLatexWrapper)
+        symwrapper = has_custom_wrapper ? getmetadata(O, SymLatexWrapper) : latexwrapper
         sym = symwrapper(sym)
-        return Symbol(sym)
+        # Custom wrappers supply raw LaTeX; emit LaTeXString so snakecase=true does not
+        # escape `_`/`^`. Keep Symbol for the default wrapper so unannotated names match.
+        if has_custom_wrapper || latexwrapper !== default_latex_wrapper
+            return LaTeXString(sym)
+        else
+            return Symbol(sym)
+        end
     end
     !iscall(O) && return O
 
