@@ -48,9 +48,11 @@ function latexify_derivatives(ex)
             body = Expr(:latexifymerge, "\\int_{", _latexify_merge_child(lower))
             body = Expr(:latexifymerge, body, Expr(:latexifymerge, "}^{", _latexify_merge_child(upper)))
             body = Expr(:latexifymerge, body, "} ~ ")
-            body = Expr(:latexifymerge, body, _latexify_merge_child(var_of_int))
-            body = Expr(:latexifymerge, body, Expr(:latexifymerge, " ~ ", _latexify_merge_child(integrand)))
-            return body
+            if integrand !== nothing
+                body = Expr(:latexifymerge, body, _latexify_merge_child(integrand))
+                body = Expr(:latexifymerge, body, " ~ ")
+            end
+            return Expr(:latexifymerge, body, _integral_diff_merge(var_of_int))
         elseif x.args[1] == :^ && length(x.args) == 3 && _latexify_power_base_needs_parens(x.args[2])
             # `:latexifymerge` has no precedence; parenthesise a differential/integral
             # form used as a power base.
@@ -119,6 +121,17 @@ end
     safescripts --> true
 
     return recipe(value(n))
+end
+
+@latexrecipe function f(I::Integral)
+    env --> :equation
+    mult_symbol --> "~"
+    fmt --> FancyNumberFormatter(5)
+    index --> :subscript
+    snakecase --> true
+    safescripts --> true
+
+    return _as_latexstring(latexify_derivatives(cleanup_exprs(_integral_expr(I, nothing))))
 end
 
 @latexrecipe function f(z::Complex{Num})
@@ -311,16 +324,7 @@ function _toexpr_plain(O; latexwrapper = default_latex_wrapper)
         return :(_derivative($(_toexpr(num)), $den, $deg))
 
     elseif op isa Integral
-        lower = op.domain.domain.left
-        upper = op.domain.domain.right
-        vars = op.domain.variables
-        integrand = args[1]
-        var = if vars isa Tuple
-            Expr(:call, :(*), _toexpr(vars...))
-        else
-            _toexpr(vars)
-        end
-        return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), vars, _toexpr(integrand))
+        return _integral_expr(op, args[1])
     elseif symtype(op) <: FnType
         isempty(args) && return nameof(op)
         return Expr(:call, _toexpr(op; latexwrapper), _toexpr(args)...)
@@ -376,6 +380,34 @@ function diffdenom(e)
     else
         LaTeXString("\\mathrm{d}$e")
     end
+end
+
+function _integral_var_expr(vars)
+    if vars isa Tuple
+        return Expr(:tuple, map(_toexpr, vars)...)
+    else
+        return _toexpr(vars)
+    end
+end
+
+function _integral_diff_merge(var_of_int)
+    if Meta.isexpr(var_of_int, :tuple)
+        body = Expr(:latexifymerge, "\\mathrm{d}", _latexify_merge_child(var_of_int.args[1]))
+        for v in var_of_int.args[2:end]
+            body = Expr(:latexifymerge, body, Expr(:latexifymerge, "\\mathrm{d}", _latexify_merge_child(v)))
+        end
+        return body
+    else
+        return Expr(:latexifymerge, "\\mathrm{d}", _latexify_merge_child(var_of_int))
+    end
+end
+
+function _integral_expr(I::Integral, integrand)
+    lower = I.domain.domain.left
+    upper = I.domain.domain.right
+    var = _integral_var_expr(I.domain.variables)
+    integ = integrand === nothing ? nothing : _toexpr(integrand)
+    return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), var, integ)
 end
 
 end
