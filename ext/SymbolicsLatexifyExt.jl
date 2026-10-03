@@ -52,7 +52,7 @@ function latexify_derivatives(ex)
                 body = Expr(:latexifymerge, body, _latexify_merge_child(integrand))
                 body = Expr(:latexifymerge, body, " ~ ")
             end
-            return Expr(:latexifymerge, body, var_of_int)
+            return Expr(:latexifymerge, body, _integral_diff_merge(var_of_int))
         elseif x.args[1] == :^ && length(x.args) == 3 && _latexify_power_base_needs_parens(x.args[2])
             # `:latexifymerge` has no precedence; parenthesise a differential/integral
             # form used as a power base.
@@ -382,20 +382,32 @@ function diffdenom(e)
     end
 end
 
-function _integral_diff_var(vars)
+function _integral_var_expr(vars)
     if vars isa Tuple
-        return LaTeXString(prod(diffdenom(v).s for v in vars))
+        return Expr(:tuple, map(_toexpr, vars)...)
     else
-        return diffdenom(vars)
+        return _toexpr(vars)
+    end
+end
+
+function _integral_diff_merge(var_of_int)
+    if Meta.isexpr(var_of_int, :tuple)
+        body = Expr(:latexifymerge, "\\mathrm{d}", _latexify_merge_child(var_of_int.args[1]))
+        for v in var_of_int.args[2:end]
+            body = Expr(:latexifymerge, body, Expr(:latexifymerge, "\\mathrm{d}", _latexify_merge_child(v)))
+        end
+        return body
+    else
+        return Expr(:latexifymerge, "\\mathrm{d}", _latexify_merge_child(var_of_int))
     end
 end
 
 function _integral_expr(I::Integral, integrand)
     lower = I.domain.domain.left
     upper = I.domain.domain.right
-    dvar = _integral_diff_var(I.domain.variables)
+    var = _integral_var_expr(I.domain.variables)
     integ = integrand === nothing ? nothing : _toexpr(integrand)
-    return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), dvar, integ)
+    return Expr(:call, :_integral, _toexpr(lower), _toexpr(upper), var, integ)
 end
 
 end

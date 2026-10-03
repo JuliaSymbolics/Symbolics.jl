@@ -88,6 +88,24 @@ end
         "y = \\int_{a}^{b} ~ \\left( 1 + 2 \\cdot x + x^{2} \\right) ~ \\mathrm{d}x"
 end
 
+# issue #1694: integration variable keeps recipe formatting (indexed, mathtt, latexwrapper).
+@testset "latexify Integral variable formatting (#1694)" begin
+    @variables y x_long a[1:3]
+    @variables wrapped [latexwrapper = s -> "\\mathbf{" * s * "}"]
+    @test latexify(Integral(x_long in ClosedInterval(0, 1))(y); env = :raw).s ==
+        "\\int_{0}^{1} ~ y ~ \\mathrm{d}\\mathtt{x\\_long}"
+    @test latexify(Integral(x_long in ClosedInterval(0, 1)); env = :raw).s ==
+        "\\int_{0}^{1} ~ \\mathrm{d}\\mathtt{x\\_long}"
+    @test latexify(Integral(a[1] in ClosedInterval(0, 1))(y); env = :raw).s ==
+        "\\int_{0}^{1} ~ y ~ \\mathrm{d}a_{1}"
+    @test latexify(Integral(a[1] in ClosedInterval(0, 1)); env = :raw).s ==
+        "\\int_{0}^{1} ~ \\mathrm{d}a_{1}"
+    @test latexify(Integral(wrapped in ClosedInterval(0, 1))(y); env = :raw).s ==
+        "\\int_{0}^{1} ~ y ~ \\mathrm{d}\\mathbf{wrapped}"
+    @test latexify(Integral(wrapped in ClosedInterval(0, 1)); env = :raw).s ==
+        "\\int_{0}^{1} ~ \\mathrm{d}\\mathbf{wrapped}"
+end
+
 @test_reference "latexify_refs/stable_mul_ordering1.txt" latexify(x * y)
 @test_reference "latexify_refs/stable_mul_ordering2.txt" latexify(y * x)
 
