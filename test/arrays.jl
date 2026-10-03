@@ -698,6 +698,8 @@ end
     cz = collect(Z)
     @test cz isa Matrix{Num}
     @test isequal(cz, Num[Z[1, 1] Z[1, 2] Z[1, 3]; Z[2, 1] Z[2, 2] Z[2, 3]])
+    @test isequal(@inferred(collect(Z)), Num[Z[1, 1] Z[1, 2] Z[1, 3]; Z[2, 1] Z[2, 2] Z[2, 3]])
+    @test (@inferred(collect(X)) isa Matrix{Num})
     @variables cv[1:2]::Complex ce[1:0]::Complex
     ccv = collect(cv)
     @test ccv isa Vector{Complex{Num}}
