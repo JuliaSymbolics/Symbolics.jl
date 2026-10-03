@@ -45,8 +45,7 @@ end
 
 function latexify_derivatives(ex)
     # Latexify does not parenthesize `^` when the base is a LaTeXString-headed
-    # call (`_getoperation` only recognizes Symbol heads). Mark those first;
-    # conversion to `:latexifymerge` happens in the postwalk below.
+    # call (`_getoperation` only recognizes Symbol heads). Mark those first.
     ex = prewalk(ex) do x
         if Meta.isexpr(x, :call) && x.args[1] == :^ && length(x.args) >= 3
             base = x.args[2]
@@ -56,18 +55,12 @@ function latexify_derivatives(ex)
         end
         return x
     end
-    return postwalk(ex) do x
+    # Pass 1: derivatives/integrals while unary custom calls are still `:call`
+    # nodes, so `D(f(x))` keeps `f(x)` in the fraction numerator (needed when
+    # the derivative is later multiplied by another factor).
+    ex = postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
-        if x.args[1] === :_latexfenced
-            # Child may already be a `:latexifymerge` from the LaTeXString-call branch.
-            inner = x.args[2]
-            if Meta.isexpr(inner, :call) && inner.args[1] isa LaTeXString
-                inner = _latexstring_call_to_merge(inner)
-            end
-            return Expr(:latexifymerge, "\\left( ", inner, " \\right)")
-        elseif x.args[1] isa LaTeXString
-            return _latexstring_call_to_merge(x)
-        elseif x.args[1] == :_derivative
+        if x.args[1] == :_derivative
             num, den, deg = x.args[2:end]
             dsym = "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")"
             den_ls = diffdenom(den)
@@ -99,6 +92,21 @@ function latexify_derivatives(ex)
         elseif x.args[1] === :_textbf
             ls = latexify(latexify_derivatives(sorted_arguments(x)[1])).s
             return "\\textbf{" * strip(ls, '\$') * "}"
+        else
+            return x
+        end
+    end
+    # Pass 2: convert custom-wrapper calls to `:latexifymerge` and apply fences.
+    return postwalk(ex) do x
+        Meta.isexpr(x, :call) || return x
+        if x.args[1] === :_latexfenced
+            inner = x.args[2]
+            if Meta.isexpr(inner, :call) && inner.args[1] isa LaTeXString
+                inner = _latexstring_call_to_merge(inner)
+            end
+            return Expr(:latexifymerge, "\\left( ", inner, " \\right)")
+        elseif x.args[1] isa LaTeXString
+            return _latexstring_call_to_merge(x)
         else
             return x
         end
