@@ -73,7 +73,10 @@ julia> A ~ B
 A ~ B
 
 julia> A .~ 3x
-(broadcast(~, A, 3x))[1:3,1:3]
+3×3 Matrix{Equation}:
+ A[1, 1] ~ 3x  A[1, 2] ~ 3x  A[1, 3] ~ 3x
+ A[2, 1] ~ 3x  A[2, 2] ~ 3x  A[2, 3] ~ 3x
+ A[3, 1] ~ 3x  A[3, 2] ~ 3x  A[3, 3] ~ 3x
 ```
 """
 function Base.:~(lhs, rhs)
