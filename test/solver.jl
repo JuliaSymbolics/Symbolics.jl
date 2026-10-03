@@ -97,6 +97,15 @@ end
     found_roots = symbolic_solve(1/x^2 ~ 1/y^2 - 2/x^3 * (x-y), x)
     known_roots = Symbolics.unwrap.([y, -2y])
     @test isequal(found_roots, known_roots)
+
+    found_roots = symbolic_solve(x + y - 1 / (x * y), x)
+    found_roots_at_y2 = eval.(Symbolics.toexpr.(Symbolics.substitute.(found_roots, Ref(Dict(y => 2)))))
+    @test sort_roots(found_roots_at_y2) ≈ sort_roots([-1 - sqrt(3 / 2), -1 + sqrt(3 / 2)])
+
+    @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x ~ 1 / x, x)))) ≈ [-1, 1]
+    @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x + 2 - 1 / (3x), x)))) ≈
+        sort_roots([-1 - 2sqrt(3) / 3, -1 + 2sqrt(3) / 3])
+    @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve((x^2 - 1) / (x - 1) ~ 0, x)))) ≈ [-1]
 end
 
 @testset "Deterministic root order" begin
