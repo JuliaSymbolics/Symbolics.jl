@@ -22,7 +22,7 @@ Y, = @variables y[ns]
 @test isequal(series([1,2,3], 4), 1^0 + 2*4^1 + 3*4^2)
 
 # https://en.wikipedia.org/wiki/Taylor_series#List_of_Maclaurin_series_of_some_common_functions
-@variables x
+@variables x a
 @test evalsol(expand(taylor(exp(x), x, 0:9) - sum(x^n/factorial(n) for n in 0:9))) == 0
 @test evalsol(expand(taylor(log(1-x), x, 0:9) - sum(-x^n/n for n in 1:9))) == 0
 @test evalsol(expand(taylor(log(1+x), x, 0:9) - sum((-1)^(n+1)*x^n/n for n in 1:9))) == 0
@@ -47,6 +47,21 @@ end
 
 f = (-1 + sqrt(1 + 4 * x^2) + 2 * x) / (2 * x)
 @test evalsol(expand(taylor(f, x, 0, 0:5) - (1 + x - x^3 + 2 * x^5))) == 0
+@test evalsol(expand(taylor(a + sin(x)/x, x, 0:2) - (1 + a - x^2/6))) == 0
+@test evalsol(expand(taylor(sin(x)/x + a*x, x, 0:2) - (1 + a*x - x^2/6))) == 0
+
+d = sinh(x) - (exp(x) - exp(-x))/2
+@test_throws ErrorException taylor(1/d, x, 0:1)
+@test_throws ErrorException taylor(1/x, x, 0:2)
+@test_throws ErrorException taylor(sqrt(x), x, 0:2)
+pole_error = try
+    taylor(1/(x - 2), x, 2, 0:1)
+    nothing
+catch err
+    err
+end
+@test pole_error isa ErrorException
+@test occursin("pole at x = 2", sprint(showerror, pole_error))
 
 # around x ≠ 0
 @test evalsol(substitute(taylor(√(x), x, 1, 0:6), x => x + 1) - taylor(√(1+x), x, 0:6)) == 0
@@ -76,7 +91,6 @@ eq = taylor(eq, x, 0, 1; rationalize=false, fold=Val(false))
 @test contains(string(eq), "π") # should not turn 2*π into 6.28...
 
 # integral with symbolic limits
-@variables a
 I = Integral(x in (0, 2a))
 @test isequal(taylor_coeff(I(ϵ^2*x+1), ϵ, 1), I(0))
 
