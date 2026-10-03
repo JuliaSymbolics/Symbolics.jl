@@ -35,10 +35,16 @@ end
 """
     get_variables(e, varlist = nothing; kw...)
 
-Return a vector of variables appearing in e, optionally restricting to variables in varlist.
-Takes the same keyword arguments as `SymbolicUtils.search_variables`.
+Return an `AbstractSet` of variables appearing in `e` (an
+`OrderedCollections.OrderedSet`, as returned by
+`SymbolicUtils.search_variables`), optionally restricting to variables in
+`varlist`. Takes the same keyword arguments as
+`SymbolicUtils.search_variables`.
 
 Note that the returned variables are not wrapped in the Num type.
+
+Since the result is a set, it has no user-controlled order. Collect it into a
+vector (e.g. with `sort!` or an explicit variable list) when an order matters.
 
 Examples
 ≡≡≡≡≡≡≡≡
@@ -46,13 +52,10 @@ Examples
 ```julia
 julia> @variables t x y z(t);
 
-julia> Symbolics.get_variables(x + y + sin(z))
-3-element Vector{SymbolicUtils.BasicSymbolic}:
- x
- y
- z(t)
+julia> issetequal(Symbolics.get_variables(x + y + sin(z)), Symbolics.unwrap.((x, y, z)))
+true
 
-julia> Symbolics.get_variables(x - y)
+julia> sort!(collect(Symbolics.get_variables(x - y)), by = string)
 2-element Vector{SymbolicUtils.BasicSymbolic}:
  x
  y
