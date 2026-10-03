@@ -1,7 +1,7 @@
 using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 using Symbolics: value
-using SymbolicUtils.Code: DestructuredArgs, Func, NameState, Let, cse
+using SymbolicUtils.Code: Assignment, DestructuredArgs, Func, LiteralExpr, NameState, Let, cse
 @variables a b c1 c2 c3 d e g
 oop, iip = Symbolics.build_function([sqrt(a), sin(b)], [a, b], nanmath = true)
 oop = eval(oop)
@@ -506,5 +506,106 @@ end
     for threads in (1, MT_TEST_THREADS)
         cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t$(threads) $script`
         @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
+    end
+end
+
+@testset "Shard postprocessing scope" begin
+    @variables x y z
+    for parallel in (Symbolics.SerialForm(), Symbolics.ShardedForm(1, 2), Symbolics.MultithreadedForm(1, 2)),
+            expression in (Val{true}, Val{false}), cse in (false, true),
+            sequential in (false, true), sparse_output in (false, true)
+        ex, expected = sparse_output ?
+            (sparse([z + 1 0; z + 2 z]), sparse([7.0 0; 8.0 6.0])) :
+            ([z + 1, z + 2, x, y], [7.0, 8.0, 2.0, 3.0])
+        wrap = if sequential
+            b -> Let([Assignment(z, x * y), Assignment(:result, b)], :result, false)
+        else
+            b -> Let([Assignment(z, x * y)], b, false)
+        end
+        @testset "$parallel $expression cse=$cse sequential=$sequential sparse=$sparse_output" begin
+            fs = build_function(ex, [x, y]; parallel, expression, cse, postprocess_fbody = wrap)
+            f, g = expression == Val{true} ? eval.(fs) : fs
+            @test Base.invokelatest(f, [2.0, 3.0]) == expected
+            out = copy(expected)
+            fill!(out, 0)
+            Base.invokelatest(g, out, [2.0, 3.0])
+            @test out == expected
+        end
+    end
+end
+
+@testset "Whole-result shard postprocessing" begin
+    @variables x z
+    for parallel in (Symbolics.SerialForm(), Symbolics.ShardedForm(1, 2), Symbolics.MultithreadedForm(1, 2)),
+            expression in (Val{true}, Val{false})
+        fs = build_function(
+            [x, 2x, 3x, 4x], x;
+            parallel, expression, iip_config = (true, false),
+            postprocess_fbody = b -> LiteralExpr(:(reverse($b)))
+        )
+        f = expression == Val{true} ? eval(first(fs)) : first(fs)
+        @test Base.invokelatest(f, 1) == [4, 3, 2, 1]
+
+        @testset "ordinary closure $parallel $expression" begin
+            wrap = b -> Let([Assignment(z, 3)], LiteralExpr(:($(Func([], [], b))())), false)
+            fs = build_function([x, 2x, 3x, 4x], x; parallel, expression, postprocess_fbody = wrap)
+            f, g = expression == Val{true} ? eval.(fs) : fs
+            @test Base.invokelatest(f, 2) == [2, 4, 6, 8]
+            out = zeros(Int, 4)
+            Base.invokelatest(g, out, 2)
+            @test out == [2, 4, 6, 8]
+        end
+
+        @testset "indexed mutation $parallel $expression" begin
+            counter = Ref(0)
+            wrap = b -> Let(
+                [
+                    Assignment(LiteralExpr(:($counter[])), LiteralExpr(:($counter[] + 1))),
+                ], b, false
+            )
+            fs = build_function([x, 2x, 3x, 4x], x; parallel, expression, postprocess_fbody = wrap)
+            f, g = expression == Val{true} ? eval.(fs) : fs
+            @test Base.invokelatest(f, 2) == [2, 4, 6, 8]
+            @test counter[] == 1
+            out = zeros(Int, 4)
+            Base.invokelatest(g, out, 2)
+            @test out == [2, 4, 6, 8]
+            @test counter[] == 2
+        end
+    end
+end
+
+@testset "Shard bindings and input destructuring" begin
+    @variables x y z
+    for parallel in (Symbolics.SerialForm(), Symbolics.ShardedForm(1, 2), Symbolics.MultithreadedForm(1, 2))
+        @testset "input mutation $parallel" begin
+            wrap = b -> Let([Assignment(x, 3x)], b, false)
+            f, g = build_function(
+                [x, y, 2x, 2y], [x, y];
+                parallel, expression = Val{false}, postprocess_fbody = wrap
+            )
+            @test f([2, 3]) == [6, 3, 12, 6]
+            out = zeros(Int, 4)
+            g(out, [2, 3])
+            @test out == [6, 3, 12, 6]
+        end
+        for expression in (Val{false}, Val(false), false), wrap in (
+                    b -> Let([Assignment(z, x * y)], b, true),
+                    b -> Let([Assignment(z, 1)], Let([Assignment(z, x * y)], b, true), true),
+                    b -> Let([Assignment(DestructuredArgs([z], :values), LiteralExpr(:([6])))], b, false),
+                    b -> Let([DestructuredArgs([z], LiteralExpr(:([6])))], b, false),
+                    b -> Let([Assignment(LiteralExpr(:((z,))), LiteralExpr(:((6,))))], b, false),
+                    b -> Let([Assignment(DestructuredArgs((z,), :values), LiteralExpr(:([6])))], b, false),
+                    b -> Let([Assignment(LiteralExpr(:((_, z))), LiteralExpr(:((1, 6))))], b, false),
+                )
+            f, g = build_function(
+                [z + 1, z + 2, x, y], [x, y];
+                parallel, expression, postprocess_fbody = wrap
+            )
+            @test f([2, 3]) == [7, 8, 2, 3]
+            out = zeros(Int, 4)
+            g(out, [2, 3])
+            @test out == [7, 8, 2, 3]
+        end
     end
 end
