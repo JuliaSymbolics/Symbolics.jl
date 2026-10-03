@@ -236,21 +236,24 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         error("Unreachable")
     end
     # TODO: maybe don't drop first lol
-    methods = map(Iterators.drop(Iterators.product(types...), 1)) do Ts
-        method_args = map(names, Ts) do n, T
-            :($n::$T)
+    methods = Expr[]
+    for Ts in Iterators.drop(Iterators.product(types...), 1)
+        method_args = Expr[]
+        for (n, T) in zip(names, Ts)
+            push!(method_args, :($n::$T))
         end
 
         any_wrapper = false
-        impl_args = map(enumerate(names)) do (i, name)
+        impl_args = Any[]
+        for (i, name) in enumerate(names)
             if is_wrapper_type(Ts[i])
                 any_wrapper = true
-                :($unwrap($name))
+                push!(impl_args, :($unwrap($name)))
             elseif Ts[i] <: AbstractArray && is_wrapped_array_eltype(Ts[i])
                 any_wrapper = true
-                :($_recursive_unwrap($name))
+                push!(impl_args, :($_recursive_unwrap($name)))
             else
-                name
+                push!(impl_args, name)
             end
         end
         implcall = :($impl_name($self, $(impl_args...)))
@@ -269,13 +272,21 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         push!(body.args, implcall)
 
         if isempty(kwargs)
-            :(function $fname($(method_args...))
-                  $body
-              end)
+            push!(
+                methods, :(
+                    function $fname($(method_args...))
+                        $body
+                    end
+                )
+            )
         else
-            :(function $fname($(method_args...); $(kwargs...))
-                  $body
-              end)
+            push!(
+                methods, :(
+                    function $fname($(method_args...); $(kwargs...))
+                        $body
+                    end
+                )
+            )
         end
     end
 
