@@ -247,7 +247,7 @@ function drop_outer_multiplicities(expression)
             end
             isempty(new_factors) && return wrap(1)
             expression = length(new_factors) == 1 ? unwrap(new_factors[1]) :
-                         unwrap(*(wrap.(new_factors)...))
+                unwrap(*(wrap.(new_factors)...))
             changed = local_changed
             continue
         end

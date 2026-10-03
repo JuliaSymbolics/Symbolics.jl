@@ -247,8 +247,8 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 
     if x_univar
         sols = check_poly_inunivar(expr, x) ?
-               solve_univar(expr, x, dropmultiplicity = dropmultiplicity) :
-               ia_solve(expr, x, warns = warns)
+            solve_univar(expr, x, dropmultiplicity = dropmultiplicity) :
+            ia_solve(expr, x, warns = warns)
         isequal(sols, nothing) && return nothing
         sols = map(postprocess_root, sols)
         sort!(sols, lt = lt_roots)
@@ -257,7 +257,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         all_vars = get_variables(expr)
         diff_vars = setdiff(wrap.(all_vars), x)
         if length(diff_vars) == 1
-            return solve_interms_ofvar(expr, diff_vars[1], dropmultiplicity=dropmultiplicity, warns=warns)
+            return solve_interms_ofvar(expr, diff_vars[1], dropmultiplicity = dropmultiplicity, warns = warns)
         end
 
         expr = [expr]
@@ -291,7 +291,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
         if isnothing(sols)
-            sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+            sols = solve_multivar(expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
         end
         isequal(sols, nothing) && return nothing
         sols = convert(Vector{Any}, sols)
@@ -367,7 +367,7 @@ implemented in the function `get_roots` and its children.
 # Examples
 
 """
-function solve_univar(expression, x; dropmultiplicity=true, strict=true)
+function solve_univar(expression, x; dropmultiplicity = true, strict = true)
     args = []
     mult_n = 1
     expression = unwrap(expression)
@@ -383,8 +383,8 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
         end
     end
 
-    subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions=true)
-    if !strict && !check_polynomial(filtered_expr, strict=false)
+    subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions = true)
+    if !strict && !check_polynomial(filtered_expr, strict = false)
         return [RootsOf(wrap(expression), wrap(x))]
     end
     coeffs, constant = polynomial_coeffs(filtered_expr, [x])
@@ -409,7 +409,7 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
             end
         end
     elseif !is_unfactored
-        for i in eachindex(factors_subbed) 
+        for i in eachindex(factors_subbed)
             if !any(isequal(x, var) for var in get_variables(factors[i]))
                 continue
             end
@@ -420,7 +420,7 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
 
     for i in reverse(eachindex(arr_roots))
         for j in eachindex(assumptions)
-            if isequal(substitute(assumptions[j], Dict(x=>arr_roots[i])), 0)
+            if isequal(substitute(assumptions[j], Dict(x => arr_roots[i])), 0)
                 deleteat!(arr_roots, i)
             end
         end
