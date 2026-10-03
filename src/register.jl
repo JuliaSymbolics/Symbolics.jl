@@ -20,8 +20,13 @@ overwriting.
 @register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
 See `@register_array_symbolic` to register functions which return arrays.
+
+An optional final list of argument-type tuples selects the symbolic overloads to
+generate. Each tuple must match the positional argument count and include a
+symbolic type. Omitting the list, or using an empty list, generates the default
+combinations.
 """
-macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
+macro register_symbolic(expr, define_promotion = true, wrap_arrays = true, args_list = [])
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
@@ -37,7 +42,7 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
             $f($(argnames...))
         end
     end)
-    fexpr = wrap_func_expr(__module__, inner, wrap_arrays)
+    fexpr = wrap_func_expr(__module__, inner, wrap_arrays, args_list)
 
     if define_promotion
         type_args = [:($name::$Type) for name in argnames]
@@ -125,7 +130,7 @@ symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 shape_placeholder(sh::SymbolicUtils.ShapeVecT) = CartesianIndices(Tuple(sh))
 shape_placeholder(sh) = sh
 
-function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__)
+function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__, args_list = [])
     def_assignments = MacroTools.rmlines(partial_defs).args
     defs = map(def_assignments) do ex
         @assert ex.head == :(=)
@@ -178,7 +183,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             $f($(argnames...))
         end
     end)
-    fexpr = wrap_func_expr(caller, inner, wrap_arrays)
+    fexpr = wrap_func_expr(caller, inner, wrap_arrays, args_list)
 
     if define_promotion
         if promote_nd == -1
@@ -282,8 +287,13 @@ is defined for the register function. Note that when defining multiple register
 overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
 overwriting.
+
+An optional final list of argument-type tuples selects the symbolic overloads to
+generate. Each tuple must match the positional argument count and include a
+symbolic type. Omitting the list, or using an empty list, generates the default
+combinations.
 """
-macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
+macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true, args_list = [])
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
-    esc(register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays, __module__))
+    esc(register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays, __module__, args_list))
 end
