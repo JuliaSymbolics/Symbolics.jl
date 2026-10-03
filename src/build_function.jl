@@ -409,9 +409,14 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
         similarto = force_SA ? SArray : i === nothing ? Array : dargs[i].name
     end
 
+    capture_bindings = parallel isa ShardedForm{false} ||
+        (parallel isa MultithreadedForm && expression == Val{false})
+    process_body = capture_bindings ?
+        body -> _capture_shard_bindings(postprocess_fbody(body), Any[]) : postprocess_fbody
+
     oop, iip = iip_config
     if oop
-        oop_expr = Func(dargs, [], postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
+        oop_expr = Func(dargs, [], process_body(make_array(parallel, dargs, rhss, similarto)))
         if wrap_code[1] !== nothing
             oop_expr = wrap_code[1](oop_expr)
         end
@@ -422,13 +427,13 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     if iip
         out = Sym{VartypeT}(DEFAULT_OUTSYM; type = Any, shape = SymbolicUtils.Unknown(-1))
-        iip_expr = Func(vcat(out, dargs), [], postprocess_fbody(set_array(parallel,
-                                    dargs,
-                                    out,
-                                    outputidxs,
-                                    rhss,
-                                    checkbounds,
-                                    skipzeros)))
+        iip_expr = Func(
+            vcat(out, dargs), [], process_body(
+                set_array(
+                    parallel, dargs, out, outputidxs, rhss, checkbounds, skipzeros
+                )
+            )
+        )
         if wrap_code[2] !== nothing
             iip_expr = wrap_code[2](iip_expr)
         end
@@ -445,9 +450,6 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
         iip_expr = apply_optimization_rules(iip_expr, states, optimize)
         oop_expr = apply_optimization_rules(oop_expr, states, optimize)
     end
-
-    oop_expr = hoist_let_bindings_for_shards(oop_expr)
-    iip_expr = hoist_let_bindings_for_shards(iip_expr)
 
     oop_expr = conv(oop_expr, states)
     iip_expr = conv(iip_expr, states)
@@ -494,85 +496,77 @@ function make_array(s::ShardedForm, closed_args, arr, similarto)
     )
 end
 
-function _let_bound_names(pairs)
-    names = Any[]
-    for p in pairs
-        if p isa Assignment
-            push!(names, p.lhs)
-        elseif p isa DestructuredArgs
-            append!(names, p.elems)
+function _shard_binding_names(lhs)
+    if lhs isa DestructuredArgs
+        names = lhs.create_bindings ? (lhs.name, lhs.elems...) : (lhs.name,)
+        return mapreduce(_shard_binding_names, vcat, names; init = Any[])
+    elseif lhs isa LiteralExpr
+        return _shard_binding_names(lhs.ex)
+    elseif lhs isa Expr
+        return lhs.head === :tuple ? mapreduce(_shard_binding_names, vcat, lhs.args; init = Any[]) : Any[]
+    elseif lhs isa Symbol
+        return all(==('_'), String(lhs)) ? Any[] : Any[lhs]
+    elseif issym(unwrap(lhs)) || iscall(unwrap(lhs))
+        return Any[lhs]
+    end
+    return Any[]
+end
+
+function _capture_shard_bindings(ex::Let, bindings)
+    local_bindings = copy(bindings)
+    pairs = map(ex.pairs) do pair
+        if pair isa Assignment
+            rhs = _capture_shard_bindings(pair.rhs, local_bindings)
+            union!(local_bindings, _shard_binding_names(pair.lhs))
+            Assignment(pair.lhs, rhs)
+        else
+            if pair.create_bindings
+                union!(local_bindings, mapreduce(_shard_binding_names, vcat, pair.elems; init = Any[]))
+            end
+            pair
         end
     end
-    return names
+    return Let(pairs, _capture_shard_bindings(ex.body, local_bindings), ex.let_block)
 end
 
-function _args_with_bindings(args, bindings)
-    isempty(bindings) && return args
-    out = Any[args...]
-    for b in bindings
-        any(a -> a === b, out) || push!(out, b)
+function _capture_shard_bindings(ex::Func, bindings)
+    return Func(ex.args, ex.kwargs, _capture_shard_bindings(ex.body, bindings), ex.pre)
+end
+
+function _capture_shard_bindings(ex::SpawnFetch{Typ}, bindings) where {Typ}
+    isempty(bindings) && return ex
+    args = isnothing(ex.args) ? [Any[] for _ in ex.exprs] : ex.args
+    calls = map(ex.exprs, args) do f, call_args
+        f isa Func || return (f, call_args)
+        available = copy(f.args)
+        for arg in f.args
+            if arg isa DestructuredArgs && !arg.create_bindings
+                append!(available, arg.elems)
+            end
+        end
+        extra = filter(b -> !any(a -> isequal(unwrap(a), unwrap(b)), available), bindings)
+        body = _capture_shard_bindings(f.body, bindings)
+        Func([f.args; extra], f.kwargs, body, f.pre), [call_args; extra]
     end
-    return out
+    return SpawnFetch{Typ}(first.(calls), last.(calls), ex.combine)
 end
 
-_may_contain_shards(::Union{Let, Func, SpawnFetch, LiteralExpr}) = true
-_may_contain_shards(ex::AbstractArray) = any(_may_contain_shards, ex)
-function _may_contain_shards(ex)
-    iscall(ex) || return false
-    return any(_may_contain_shards, arguments(ex))
+function _capture_shard_bindings(ex::LiteralExpr, bindings)
+    return LiteralExpr(_capture_shard_bindings(ex.ex, bindings))
 end
 
-hoist_let_bindings_for_shards(ex) = _hoist_let_bindings(ex, Any[])
-
-function _hoist_let_bindings(ex::Let, bindings)
-    local_bindings = _args_with_bindings(bindings, _let_bound_names(ex.pairs))
-    new_pairs = map(p -> _hoist_let_bindings(p, bindings), ex.pairs)
-    new_body = _hoist_let_bindings(ex.body, local_bindings)
-    return Let(new_pairs, new_body, ex.let_block)
+function _capture_shard_bindings(ex::Expr, bindings)
+    return Expr(ex.head, map(a -> _capture_shard_bindings(a, bindings), ex.args)...)
 end
 
-function _hoist_let_bindings(ex::Assignment, bindings)
-    return Assignment(ex.lhs, _hoist_let_bindings(ex.rhs, bindings))
-end
-
-function _hoist_let_bindings(ex::Func, bindings)
-    new_args = _args_with_bindings(ex.args, bindings)
-    new_body = _hoist_let_bindings(ex.body, bindings)
-    return Func(new_args, ex.kwargs, new_body, ex.pre)
-end
-
-function _hoist_let_bindings(ex::SpawnFetch{Typ}, bindings) where {Typ}
-    new_exprs = map(e -> _hoist_let_bindings(e, bindings), ex.exprs)
-    if isempty(bindings)
-        new_args = ex.args
-    elseif ex.args === nothing
-        new_args = [Any[bindings...] for _ in ex.exprs]
-    else
-        new_args = [_args_with_bindings(a, bindings) for a in ex.args]
-    end
-    return SpawnFetch{Typ}(new_exprs, new_args, ex.combine)
-end
-
-function _hoist_let_bindings(ex::LiteralExpr, bindings)
-    return LiteralExpr(_hoist_let_bindings_in_expr(ex.ex, bindings))
-end
-
-function _hoist_let_bindings_in_expr(ex::Expr, bindings)
-    return Expr(ex.head, Any[_hoist_let_bindings_in_expr(a, bindings) for a in ex.args]...)
-end
-_hoist_let_bindings_in_expr(ex, bindings) = _hoist_let_bindings(ex, bindings)
-
-function _hoist_let_bindings(ex::AbstractArray, bindings)
-    return map(x -> _hoist_let_bindings(x, bindings), ex)
-end
-
-function _hoist_let_bindings(ex, bindings)
-    if _may_contain_shards(ex) && iscall(ex)
-        return maketerm(
-            typeof(ex), operation(ex),
-            map(a -> _hoist_let_bindings(a, bindings), arguments(ex)),
-            metadata(ex)
-        )
+function _capture_shard_bindings(ex, bindings)
+    unwrapped = unwrap_const(unwrap(ex))
+    unwrapped === ex || return _capture_shard_bindings(unwrapped, bindings)
+    if iscall(ex)
+        args = arguments(ex)
+        new_args = map(a -> _capture_shard_bindings(a, bindings), args)
+        all(a === b for (a, b) in zip(args, new_args)) && return ex
+        return maketerm(typeof(ex), operation(ex), new_args, metadata(ex))
     end
     return ex
 end
