@@ -7,7 +7,7 @@ Symbolics.jl provides a metadata system for attaching additional information to 
 Metadata can be attached to variables when they are created with the `@variables` macro. Common metadata includes default values and other annotations:
 
 ```julia
-using Symbolics
+using Symbolics, Latexify
 
 # Variable with default value
 @variables x=1.0 y=2.0
