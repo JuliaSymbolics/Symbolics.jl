@@ -201,3 +201,20 @@ end
     @variables plain_x
     @test occursin("\\mathtt{plain\\_x}", string(latexify(plain_x)))
 end
+
+# Custom-function arguments must keep outer recipe/caller Latexify options (#956 review)
+@testset "latexwrapper argument formatting" begin
+    @variables x y a[1:2] a_b
+    @variables f(..) [latexwrapper = string]
+    # Exact strings from master (pre-#2051 freeze) for these inputs
+    @test String(latexify(f(a[1]); env = :raw, index = :subscript)) ==
+        raw"f\left( a_{1} \right)"
+    @test String(latexify(f(1.23456789); env = :raw, fmt = "%.2f")) ==
+        raw"f\left( 1.23 \right)"
+    @test String(latexify(f(x * y); env = :raw, mult_symbol = raw"\times")) ==
+        raw"f\left( x \times y \right)"
+    @test String(latexify(f(a_b); env = :raw)) ==
+        raw"f\left( \mathtt{a\_b} \right)"
+    @test String(latexify(f(1.23456789e-9); env = :raw)) ==
+        raw"f\left( 1.2346 \cdot 10^{-9} \right)"
+end
