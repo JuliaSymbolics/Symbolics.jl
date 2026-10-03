@@ -358,7 +358,6 @@ end
         @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
     end
 
-    # With dropmultiplicity, outer powers are stripped so the radical ideal is solved.
     sol_rad = symbolic_solve([x^2, x * y, y^2], [x, y], warns = false)
     @test length(sol_rad) == 1
     @test iszero(value(sol_rad[1][x])) && iszero(value(sol_rad[1][y]))
@@ -531,6 +530,40 @@ end
     for scale in (0.1, 1.0e-20)
         eqs = [scale * (x + y - 2)^2, (x - y)^2]
         @test_throws AssertionError symbolic_solve(eqs, [x, y])
+    end
+end
+
+@testset "Affine solutions at vanishing intermediate pivots" begin
+    @variables x y a c
+    for (eqs, point, expected) in (
+            ([a * x + y - 3, x + 2y - 4], Dict(a => 0), [-2, 3]),
+            (
+                [a * c * x + (a + c) * y - 1, (a - c) * x + a * c * y],
+                Dict(a => 0, c => 2), [0, 1 // 2],
+            ),
+            (
+                [a^5 * x + c^3 * y - a * c, (a^2 + c^2) * x - y + 1],
+                Dict(a => 0, c => 2), [-1 // 4, 0],
+            ),
+        )
+        sol = only(symbolic_solve(eqs, [x, y]))
+        specialized = Dict(v => substitute(sol[v], point) for v in [x, y])
+        @test value.([specialized[x], specialized[y]]) == expected
+        @test all(iszero(value(substitute(substitute(eq, point), specialized))) for eq in eqs)
+    end
+    k = typemax(Int)
+    coefficient = big(k) * (k - 1)
+    reduced = value(Symbolics.canonical_affine_coefficient((1 - coefficient * a) / (-1 + coefficient * a)))
+    @test reduced == -1
+    @test reduced isa Union{Integer, Rational}
+    eqs = [k * a * x + y - 1, x + (k - 1) * y]
+    sol = only(symbolic_solve(eqs, [x, y]))
+    for av in (0, 1)
+        determinant = big(k) * (k - 1) * av - 1
+        expected = [big(k - 1) // determinant, -big(1) // determinant]
+        specialized = Dict(v => substitute(sol[v], Dict(a => av)) for v in [x, y])
+        @test value.([specialized[x], specialized[y]]) == expected
+        @test all(iszero(value(substitute(substitute(eq, Dict(a => av)), specialized))) for eq in eqs)
     end
 end
 

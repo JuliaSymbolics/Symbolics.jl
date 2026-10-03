@@ -223,7 +223,21 @@ function is_exact_polynomial(expr)
     return false
 end
 
-canonical_affine_coefficient(expr) = simplify_fractions(expand(expr))
+function rational_affine_coefficient(expr)
+    expr = value(expr)
+    expr isa Integer && return big(expr) // big(1)
+    iscall(expr) || return expr
+    op = operation(expr)
+    args = arguments(expr)
+    if op === (^)
+        return rational_affine_coefficient(args[1])^value(args[2])
+    end
+    return op(map(rational_affine_coefficient, args)...)
+end
+
+function canonical_affine_coefficient(expr)
+    return wrap(simplify_fractions(rational_affine_coefficient(expand(expr))))
+end
 
 function exact_affine_solve(eqs, vars)
     length(eqs) == length(vars) || return nothing
@@ -237,6 +251,7 @@ function exact_affine_solve(eqs, vars)
     A = canonical_affine_coefficient.(wrap.(bigify.(A)))
     bvec = -wrap.(bigify.(bvec))
     n = length(vars)
+    previous_pivot = one(Num)
     for k in 1:n
         pivot = findfirst(i -> !_iszero(A[i, k]), k:n)
         isnothing(pivot) && return nothing
@@ -246,16 +261,28 @@ function exact_affine_solve(eqs, vars)
             bvec[k], bvec[pivot] = bvec[pivot], bvec[k]
         end
         for i in (k + 1):n
-            _iszero(A[i, k]) && continue
-            factor = canonical_affine_coefficient(A[i, k] / A[k, k])
             for j in (k + 1):n
-                A[i, j] = canonical_affine_coefficient(A[i, j] - factor * A[k, j])
+                A[i, j] = canonical_affine_coefficient(
+                    (A[k, k] * A[i, j] - A[i, k] * A[k, j]) / previous_pivot
+                )
             end
-            bvec[i] = canonical_affine_coefficient(bvec[i] - factor * bvec[k])
+            bvec[i] = canonical_affine_coefficient(
+                (A[k, k] * bvec[i] - A[i, k] * bvec[k]) / previous_pivot
+            )
             A[i, k] = 0
         end
+        previous_pivot = A[k, k]
     end
-    return symsub!(UpperTriangular(A), bvec)
+    determinant = A[n, n]
+    for i in (n - 1):-1:1
+        numerator = bvec[i] * determinant
+        for j in (i + 1):n
+            numerator -= A[i, j] * bvec[j]
+        end
+        bvec[i] = canonical_affine_coefficient(numerator / A[i, i])
+    end
+    bvec = canonical_affine_coefficient.(bvec ./ determinant)
+    return bvec
 end
 
 # Strip outer integer powers and nonzero constant factors so that f^n and c*f^n
