@@ -48,9 +48,13 @@ function clean_f(filtered_expr, var, subs)
         if !all(isequal(var, x) for x in get_variables(denominator_f)) ||
                 any(isequal(var, x) for x in get_variables(numerator_f))
             filtered_expr = numerator_f
+            denominator_subs, denominator_f = _filter_poly(denominator_f, var)
+            merge!(subs, denominator_subs)
             push!(assumptions, substitute(denominator_f, subs, fold = Val(false)))
         end
     end
+    numerator_subs, filtered_expr = _filter_poly(filtered_expr, var)
+    merge!(subs, numerator_subs)
     return filtered_expr, assumptions
 end
 

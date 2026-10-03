@@ -297,10 +297,6 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
         end
 
         if !isempty(auxiliary_vars)
-            for i in eachindex(solve_expr)
-                subs, filtered = _filter_poly(solve_expr[i], solve_vars)
-                solve_expr[i] = ssubs(filtered, subs)
-            end
             solve_expr = wrap.(groebner_basis(solve_expr))
             any(e -> isempty(get_variables(e)) && !isequal(e, 0), solve_expr) && return []
         end

@@ -110,6 +110,22 @@ end
     end
 end
 
+@testset "Rational equations with floating coefficients" begin
+    for (eq, expected) in (
+            (1 / (0.5x) ~ 1, 2),
+            (0.5 / x ~ 1, 1 // 2),
+            (1 / (0.5x + 1) ~ 1, 0),
+            ((x + 0.5) / x ~ 2, 1 // 2),
+        )
+        expr = eq.lhs - eq.rhs
+        for input in (eq, Symbolics.wrap(expr), expr)
+            roots = symbolic_solve(input, x)
+            @test isequal(value.(roots), [expected])
+            @test isequal(value(substitute(expr, Dict(x => only(roots)); fold = Val(true))), 0)
+        end
+    end
+end
+
 @testset "Deterministic root order" begin
     # Root order must not depend on hash/dictionary iteration order, which varies
     # across Julia versions. Numeric roots sort ascending, complex conjugate pairs
@@ -259,11 +275,8 @@ end
         expr = (x - y) / (x^2 - 2)
         for input in (expr ~ 0, expr, unwrap(expr))
             sols = symbolic_solve(input, [x, y])
-            @test sols === nothing || (
-                !isempty(sols) && all(
-                    sol -> isequal(value(simplify_fractions(substitute(expr, sol))), 0), sols
-                )
-            )
+            @test isequal(sols, [Dict(x => y, y => y)])
+            @test isequal(value(simplify_fractions(substitute(expr, only(sols)))), 0)
         end
     end
 
