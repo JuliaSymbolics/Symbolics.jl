@@ -440,18 +440,20 @@ end
     @test timed_sq.time - timed_sq.compile_time < 10
     @test length(timed_sq.value) == 1
     for subA in (
-        Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6),
-        Dict(A[i] => big(7 - i) // 5 - 2 // 11 for i in 1:6),
-        Dict(A[i] => big(1) // (i + 2) for i in 1:6),
-    )
+            Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6),
+            Dict(A[i] => big(7 - i) // 5 - 2 // 11 for i in 1:6),
+            Dict(A[i] => big(1) // (i + 2) for i in 1:6),
+        )
         check_zero_residuals(linear_polys, timed_sq.value[1]; subs = subA)
     end
 
     timed_lin = @timed symbolic_solve(linear_polys, vars)
     @test timed_lin.time - timed_lin.compile_time < 10
     @test length(timed_lin.value) == 1
-    check_zero_residuals(linear_polys, timed_lin.value[1];
-        subs = Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6))
+    check_zero_residuals(
+        linear_polys, timed_lin.value[1];
+        subs = Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6)
+    )
 
     # Hand-derived exact system: 2x + y = 5, x - y = 1 => (x, y) = (2, 1)
     @variables x y
@@ -464,12 +466,72 @@ end
         check_zero_residuals(exact_lin, sol)
     end
 
-    # Inexact coefficients must not take the linear fast path (sym_lu is not
-    # numerically stable). Reproduce master's AssertionError from Groebner.
     float_eqs = [1.0e-20 * x + y - 1, x + y - 2]
     @test_throws AssertionError symbolic_solve(float_eqs, [x, y])
     float_sq = [float_eqs[1]^2, float_eqs[2]^2]
     @test_throws AssertionError symbolic_solve(float_sq, [x, y])
+end
+
+@testset "Exact affine elimination" begin
+    @variables x y a
+    for k in (10_000_000_000, typemax(Int) - 1)
+        eqs = [k * x + y - (k + 1), x + k * y - (k + 1)]
+        for polys in (eqs, eqs .^ 2)
+            sol = only(symbolic_solve(polys, [x, y]))
+            @test isequal(value(sol[x]), 1)
+            @test isequal(value(sol[y]), 1)
+            @test all(iszero(value(substitute(eq, sol))) for eq in eqs)
+        end
+    end
+    for k in (10_000_000_000 // 3, (typemax(Int) - 1) // 3)
+        eqs = [k * x + y - k, x + k * y - 1]
+        sol = only(symbolic_solve(eqs, [x, y]))
+        @test isequal(value(sol[x]), 1)
+        @test iszero(value(sol[y]))
+        @test all(iszero(value(substitute(eq, sol))) for eq in eqs)
+    end
+    k = 10_000_000_000
+    eqs = [k * a * x + y - (k + 1), a * x + k * y - (k + 1)]
+    sol = only(symbolic_solve(eqs, [x, y]))
+    @test iszero(value(simplify(sol[x] - 1 / a)))
+    @test isequal(value(sol[y]), 1)
+    for parameter in (big(2) // 3, big(-3) // 7)
+        @test all(iszero(value(substitute(substitute(eq, sol), Dict(a => parameter)))) for eq in eqs)
+    end
+
+    dependent = [
+        (a + 1) * x + (a^2 - 1) * y - (a + 1),
+        (a + 2) * x + (a + 2) * (a - 1) * y - (a + 2),
+    ]
+    @test isnothing(Symbolics.exact_affine_solve(dependent, [x, y]))
+    @test isnothing(
+        Symbolics.exact_affine_solve(
+            [x + (a + 1) * (a + 2) * y - 1, x + (a^2 + 3a + 2) * y - 1], [x, y]
+        )
+    )
+    @test isnothing(Symbolics.exact_affine_solve([dependent[1], dependent[2] - (a + 2)], [x, y]))
+    sol = only(symbolic_solve(dependent, [x, y]))
+    @test count(v -> isequal(sol[v], v), [x, y]) == 1
+    @test iszero(value(expand(simplify_fractions(sol[x] + (a - 1) * sol[y] - 1))))
+
+    @variables z
+    eqs = [
+        (a + 1) * x + (a^2 - 1) * y + z - (2a^2 + a + 2),
+        (a + 2) * x + (a + 2) * (a - 1) * y + 2z - (2a^2 + 3a + 4),
+        y - 2,
+    ]
+    sol = only(symbolic_solve(eqs, [x, y, z]))
+    for (v, expected) in zip([x, y, z], [1, 2, 3])
+        @test iszero(value(simplify_fractions(sol[v] - expected)))
+    end
+    for parameter in (big(2) // 3, big(-3) // 7)
+        @test all(iszero(value(substitute(substitute(eq, sol), Dict(a => parameter)))) for eq in eqs)
+    end
+
+    for scale in (0.1, 1.0e-20)
+        eqs = [scale * (x + y - 2)^2, (x - y)^2]
+        @test_throws AssertionError symbolic_solve(eqs, [x, y])
+    end
 end
 
 @testset "Factorisation" begin

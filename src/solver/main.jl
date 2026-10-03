@@ -274,21 +274,12 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        if dropmultiplicity
-            expr = map(drop_outer_multiplicities, expr)
-        end
-
-        # Square affine-linear systems with exact coefficients are cheaper via
-        # Gaussian elimination than Groebner. Inexact (float) coefficients stay
-        # on the Groebner path, which rejects them with the same assertion as before.
         sols = nothing
-        if is_affine_linear_system(expr, x) && !has_inexact_numeric_coefficients(expr)
-            lin_sol = try
-                symbolic_linear_solve(expr .~ 0, x; check = false)
-            catch e
-                e isa SingularException || rethrow()
-                nothing
+        if all(is_exact_polynomial, expr)
+            if dropmultiplicity
+                expr = map(drop_outer_multiplicities, expr)
             end
+            lin_sol = exact_affine_solve(expr, x)
             if !isnothing(lin_sol)
                 sols = [Dict{Num, Any}(var => lin_sol[i] for (i, var) in enumerate(x))]
             end

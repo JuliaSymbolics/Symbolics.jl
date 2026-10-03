@@ -204,41 +204,58 @@ function contains_var(var, vars)
     return false
 end
 
-# True when eqs are jointly affine-linear in vars (coefficients free of vars).
-function is_affine_linear_system(eqs, vars)
-    length(eqs) == length(vars) || return false
-    A, bvec, islinear = linear_expansion(eqs, vars)
-    islinear || return false
-    x_set = Set(unwrap(v) for v in vars)
-    for e in Iterators.flatten((A, bvec))
-        for v in get_variables(e)
-            v in x_set && return false
-        end
-    end
-    return true
-end
-
-# Groebner path rejects AbstractFloat coefficients; keep the linear fast path aligned.
-function has_inexact_numeric_coefficients(expr)
+function is_exact_polynomial(expr)
     expr = unwrap(expr)
-    if expr isa Number || SymbolicUtils.isconst(expr)
-        c = expr isa Number ? expr : unwrap_const(expr)
-        if c isa AbstractFloat
-            return true
-        elseif c isa Complex
-            return real(c) isa AbstractFloat || imag(c) isa AbstractFloat
-        end
-        return false
+    if SymbolicUtils.isconst(expr) || expr isa Number
+        c = value(expr)
+        return c isa Integer || (c isa Rational && !iszero(denominator(c)))
     end
+    is_singleton(expr) && return true
     iscall(expr) || return false
-    for a in arguments(expr)
-        has_inexact_numeric_coefficients(a) && return true
+    op = operation(expr)
+    args = arguments(expr)
+    if op === (+) || op === (*)
+        return all(is_exact_polynomial, args)
+    elseif op === (^)
+        exponent = value(args[2])
+        return exponent isa Integer && exponent >= 0 && is_exact_polynomial(args[1])
     end
     return false
 end
 
-function has_inexact_numeric_coefficients(exprs::AbstractVector)
-    any(has_inexact_numeric_coefficients, exprs)
+canonical_affine_coefficient(expr) = simplify_fractions(expand(expr))
+
+function exact_affine_solve(eqs, vars)
+    length(eqs) == length(vars) || return nothing
+    isempty(vars) && return nothing
+    A, bvec, islinear = linear_expansion(wrap.(bigify.(eqs)), vars)
+    islinear || return nothing
+    x_set = Set(unwrap(v) for v in vars)
+    for e in Iterators.flatten((A, bvec))
+        any(v -> v in x_set, get_variables(e)) && return nothing
+    end
+    A = canonical_affine_coefficient.(wrap.(bigify.(A)))
+    bvec = -wrap.(bigify.(bvec))
+    n = length(vars)
+    for k in 1:n
+        pivot = findfirst(i -> !_iszero(A[i, k]), k:n)
+        isnothing(pivot) && return nothing
+        pivot += k - 1
+        if pivot != k
+            A[k, :], A[pivot, :] = A[pivot, :], A[k, :]
+            bvec[k], bvec[pivot] = bvec[pivot], bvec[k]
+        end
+        for i in (k + 1):n
+            _iszero(A[i, k]) && continue
+            factor = canonical_affine_coefficient(A[i, k] / A[k, k])
+            for j in (k + 1):n
+                A[i, j] = canonical_affine_coefficient(A[i, j] - factor * A[k, j])
+            end
+            bvec[i] = canonical_affine_coefficient(bvec[i] - factor * bvec[k])
+            A[i, k] = 0
+        end
+    end
+    return symsub!(UpperTriangular(A), bvec)
 end
 
 # Strip outer integer powers and nonzero constant factors so that f^n and c*f^n
