@@ -58,3 +58,15 @@ ex = det(B) * q
 Symbolics.islinear(ex, [q])
 @test (@allocated Symbolics.islinear(ex, [q])) < 1_000_000
 @test Symbolics.islinear(p[1] * q, [q])
+
+function full_indexed_islinear_time(n)
+    @variables scaling_x[1:n]
+    vars = collect(Symbolics.scalarize(scaling_x))
+    ex = vars[1] + vars[end]
+    Symbolics.islinear(ex, vars)
+    return minimum(@elapsed(Symbolics.islinear(ex, vars)) for _ in 1:3)
+end
+
+small_n_time = full_indexed_islinear_time(128)
+large_n_time = full_indexed_islinear_time(512)
+@test large_n_time < 10 * small_n_time

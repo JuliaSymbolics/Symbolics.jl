@@ -1241,9 +1241,13 @@ function islinear(ex, u)
             scalar_parent = vec(scalarize(parent))
             replacement = value.(scalar_parent)
             assigned = falses(length(replacement))
+            scalar_indices = Dict{Any, Int}()
+            for (i, x) in enumerate(scalar_parent)
+                get!(scalar_indices, value(x), i)
+            end
             valid = true
             for (var, atom) in indexed
-                index = findfirst(x -> isequal(value(x), value(var)), scalar_parent)
+                index = get(scalar_indices, value(var), nothing)
                 if index === nothing || assigned[index]
                     valid = false
                     break
