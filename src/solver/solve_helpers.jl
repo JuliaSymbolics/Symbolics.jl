@@ -218,6 +218,29 @@ function is_affine_linear_system(eqs, vars)
     return true
 end
 
+# Groebner path rejects AbstractFloat coefficients; keep the linear fast path aligned.
+function has_inexact_numeric_coefficients(expr)
+    expr = unwrap(expr)
+    if expr isa Number || SymbolicUtils.isconst(expr)
+        c = expr isa Number ? expr : unwrap_const(expr)
+        if c isa AbstractFloat
+            return true
+        elseif c isa Complex
+            return real(c) isa AbstractFloat || imag(c) isa AbstractFloat
+        end
+        return false
+    end
+    iscall(expr) || return false
+    for a in arguments(expr)
+        has_inexact_numeric_coefficients(a) && return true
+    end
+    return false
+end
+
+function has_inexact_numeric_coefficients(exprs::AbstractVector)
+    any(has_inexact_numeric_coefficients, exprs)
+end
+
 # Strip outer integer powers and nonzero constant factors so that f^n and c*f^n
 # share the zero set of f when multiplicities are discarded.
 function drop_outer_multiplicities(expression)
