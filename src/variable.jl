@@ -615,7 +615,10 @@ end
     variable(name::Symbol, idx::Integer...; T=Real)
 
 Create a variable with the given name along with subscripted indices with the
-`symtype=T`. When `T=FnType`, it creates a symbolic function.
+`symtype=T`. When `T` is a fully parameterized `FnType` such as
+`FnType{Tuple, Real, Nothing}`, it creates a symbolic function. Incomplete
+forms (`FnType`, `FnType{Tuple, Real}`, ...) throw an `ArgumentError` asking
+for the fully parameterized type.
 
 ```jldoctest
 julia> Symbolics.variable(:x, 4, 2, 0)
@@ -627,10 +630,13 @@ x₄ˏ₂ˏ₀⋆
 
 Also see `variables`.
 """
-function variable(name, idx...; T=Real)
+function variable(name, idx...; T = Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
+    if T isa UnionAll && T <: FnType
+        throw(ArgumentError("Symbolics.variable(:f; T = FnType) needs a fully parameterized FnType, e.g. FnType{Tuple, Real, Nothing} (what @variables f(..) uses)"))
+    end
     v = Sym{VartypeT}(name_ij; type = T)
-    wrap(setmetadata(v, VariableSource, (:variables, name_ij)))
+    return wrap(setmetadata(v, VariableSource, (:variables, name_ij)))
 end
 
 ##### Renaming #####
