@@ -256,31 +256,177 @@ function linear_expansion(t, x::Num)
     Num(a), Num(b), islin
 end
 
+function linear_expansion(t::SymbolicT, x::Arr)
+    return linear_expansion(_linear_expansion_scalarize_expr(t), scalarize(x))
+end
+
+function linear_expansion(t::Equation, x::Arr)
+    return linear_expansion(scalarize(t), scalarize(x))
+end
+
 @inline function linear_expansion(t, x::SymbolicT)
+    if symtype(x) <: AbstractArray
+        return linear_expansion(_linear_expansion_scalarize_expr(t), scalarize(x))
+    end
     return LinearExpander(x)(unwrap(t))
+end
+
+function _linear_expansion_scalarize_expr(t)
+    if t isa Equation
+        return scalarize(t)
+    elseif t isa AbstractArray
+        return t
+    else
+        return scalarize(unwrap(t))
+    end
+end
+
+function _linear_expansion_occursin_xs(t::SymbolicT, x_to_j::Dict{SymbolicT, Int}, parents::Set{SymbolicT})
+    haskey(x_to_j, t) && return true
+    t in parents && return true
+    iscall(t) || return false
+    return any(arguments(t)) do arg
+        arg isa SymbolicT && _linear_expansion_occursin_xs(arg, x_to_j, parents)
+    end
+end
+
+function _classify_linear_monomial(k::SymbolicT, x_to_j::Dict{SymbolicT, Int}, parents::Set{SymbolicT})
+    j = get(x_to_j, k, 0)
+    j > 0 && return (j, COMMON_ONE)
+
+    return @match k begin
+        BSImpl.AddMul(; coeff, dict, variant, type, shape) &&
+            if variant === SymbolicUtils.AddMulVariant.MUL
+        end => begin
+            found_j = 0
+            found_base = k
+            for (base, exp) in dict
+                bj = get(x_to_j, base, 0)
+                if bj > 0
+                    (found_j == 0 && _isone(exp)) || return :nonlinear
+                    found_j = bj
+                    found_base = base
+                elseif _linear_expansion_occursin_xs(base, x_to_j, parents)
+                    return :nonlinear
+                end
+            end
+            found_j == 0 && return :fallback
+            newdict = copy(dict)
+            delete!(newdict, found_base)
+            a = SymbolicUtils.Mul{VartypeT}(coeff, newdict; type, shape)
+            return (found_j, a)
+        end
+        _ => begin
+            _linear_expansion_occursin_xs(k, x_to_j, parents) && return :fallback
+            return :constant
+        end
+    end
+end
+
+function _linear_expansion_fast_row!(
+        A::AbstractMatrix{SymbolicT}, bvec::Vector{SymbolicT},
+        i::Int, t::SymbolicT, x_to_j::Dict{SymbolicT, Int},
+        parents::Set{SymbolicT}
+    )
+    return @match t begin
+        BSImpl.AddMul(; coeff, dict, variant, type, shape) &&
+            if variant === SymbolicUtils.AddMulVariant.ADD
+        end => begin
+            b_dict = dict
+            b_dirty = false
+            for (k, v) in dict
+                class = _classify_linear_monomial(k, x_to_j, parents)
+                if class === :constant
+                    continue
+                elseif class === :nonlinear
+                    return false
+                elseif class === :fallback
+                    return :fallback
+                else
+                    j, a = class
+                    if !b_dirty
+                        b_dict = copy(dict)
+                        b_dirty = true
+                    end
+                    delete!(b_dict, k)
+                    contrib = a * v
+                    prev = A[i, j]
+                    A[i, j] = _iszero(prev) ? contrib : (prev + contrib)
+                end
+            end
+            if !b_dirty
+                bvec[i] = t
+            else
+                bvec[i] = SymbolicUtils.Add{VartypeT}(coeff, b_dict; type, shape)
+            end
+            return true
+        end
+        _ => begin
+            class = _classify_linear_monomial(t, x_to_j, parents)
+            if class === :constant
+                bvec[i] = t
+                return true
+            elseif class === :nonlinear
+                return false
+            elseif class === :fallback
+                return :fallback
+            else
+                j, a = class
+                A[i, j] = a
+                bvec[i] = COMMON_ZERO
+                return true
+            end
+        end
+    end
+end
+
+function _linear_expansion_slow_row!(
+        A::AbstractMatrix{SymbolicT}, bvec::Vector{SymbolicT},
+        i::Int, t::SymbolicT, xs::Vector{SymbolicT}
+    )
+    bi = t
+    for (j, x) in enumerate(xs)
+        a, bi, islin = LinearExpander(x)(bi)
+        islin || return false
+        A[i, j] = a
+    end
+    bvec[i] = bi
+    return true
 end
 
 function linear_expansion(ts::AbstractArray{T}, xs::AbstractArray{S}) where {T <: Union{Num, SymbolicT, Equation}, S <: Union{SymbolicT, Num}}
     ts = vec(ts)
     xs = vec(xs)
-    A = Matrix{SymbolicT}(undef, length(ts), length(xs))
-    bvec = Vector{SymbolicT}(undef, length(ts))
-    map!(bvec, ts) do t
-        if t isa Equation
-            return t.rhs - t.lhs
-        elseif t isa Num
-            return unwrap(t)
-        else
-            return t
+    n = length(ts)
+    m = length(xs)
+    A = fill(COMMON_ZERO, n, m)
+    bvec = Vector{SymbolicT}(undef, n)
+    x_unwrapped = Vector{SymbolicT}(undef, m)
+    x_to_j = Dict{SymbolicT, Int}()
+    sizehint!(x_to_j, m)
+    parents = Set{SymbolicT}()
+    for (j, x) in enumerate(xs)
+        ux = unwrap(x)::SymbolicT
+        x_unwrapped[j] = ux
+        x_to_j[ux] = j
+        @match ux begin
+            BSImpl.Term(; f, args) && if f === getindex
+            end => push!(parents, args[1])
+            _ => nothing
         end
     end
-    for (j, x) in enumerate(xs)
-        lex = LinearExpander(unwrap(x))
-        for (i, t) in enumerate(bvec)
-            a, resid, islin = lex(t)
-            islin || return A, bvec, false
-            A[i, j] = a
-            bvec[i] = resid
+    for (i, t) in enumerate(ts)
+        resid = if t isa Equation
+            unwrap(t.rhs - t.lhs)::SymbolicT
+        else
+            unwrap(t)::SymbolicT
+        end
+        status = _linear_expansion_fast_row!(A, bvec, i, resid, x_to_j, parents)
+        if status === :fallback
+            fill!(view(A, i, :), COMMON_ZERO)
+            _linear_expansion_slow_row!(A, bvec, i, resid, x_unwrapped) || return A, bvec, false
+        elseif status === false
+            return A, bvec, false
         end
     end
     return A, bvec, true
