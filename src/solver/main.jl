@@ -265,7 +265,19 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 
 
     if !x_univar
-        for e in expr
+        solve_expr = similar(expr)
+        assumptions = []
+        for i in eachindex(expr)
+            if isempty(get_variables(expr[i]))
+                solve_expr[i] = expr[i]
+                continue
+            end
+            subs, solve_expr[i], expr_assumptions = filter_poly(expr[i], x; assumptions = true)
+            solve_expr[i] = ssubs(solve_expr[i], subs)
+            append!(assumptions, expr_assumptions)
+        end
+
+        for e in solve_expr
             for var in x
                 if !check_poly_inunivar(e, var)
                     warns && @warn("This system can not be currently solved by `symbolic_solve`.")
@@ -274,9 +286,14 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+        sols = solve_multivar(solve_expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
         isequal(sols, nothing) && return nothing
         sols = convert(Vector{Any}, sols)
+        for i in reverse(eachindex(sols))
+            if any(assumption -> isequal(substitute(assumption, sols[i]; fold = Val(true)), 0), assumptions)
+                deleteat!(sols, i)
+            end
+        end
         for i in eachindex(sols)
             for var in x
                 sols[i][var] = postprocess_root(sols[i][var])

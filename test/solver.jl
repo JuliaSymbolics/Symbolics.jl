@@ -105,7 +105,9 @@ end
     @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x ~ 1 / x, x)))) ≈ [-1, 1]
     @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x + 2 - 1 / (3x), x)))) ≈
         sort_roots([-1 - 2sqrt(3) / 3, -1 + 2sqrt(3) / 3])
-    @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve((x^2 - 1) / (x - 1) ~ 0, x)))) ≈ [-1]
+    @testset "Cancelled rational factor" begin
+        @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve((x^2 - 1) / (x - 1) ~ 0, x)))) ≈ [-1]
+    end
 end
 
 @testset "Deterministic root order" begin
@@ -243,6 +245,12 @@ end
 @testset "Multivar solver" begin
     @variables x y z
     @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
+
+    solutions = sort_arr(symbolic_solve([x + 1 / y ~ 2, x * y ~ 1], [x, y]), [x, y])
+    @test check_equal(solutions, sort_arr([Dict(x => 1, y => 1)], [x, y]))
+
+    solutions = sort_arr(symbolic_solve([x / y ~ 2, x + y ~ 3], [x, y]), [x, y])
+    @test check_equal(solutions, sort_arr([Dict(x => 2, y => 1)], [x, y]))
 
     # Vector-valued Equation should take the system path
     sol_vec_eq = sort_arr(symbolic_solve([0, 0] ~ [x^2 - 4, x + y], [x, y]), [x, y])
