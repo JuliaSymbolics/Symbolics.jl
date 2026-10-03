@@ -429,23 +429,47 @@ end
         @test isequal(s, p)
     end
 
-    lin = Symbolics.symbolic_linear_solve(linear_polys .~ 0, vars)
-    expected = Dict(var => postprocess_root(lin[i]) for (i, var) in enumerate(vars))
+    function check_zero_residuals(eqs, sol; subs = Dict())
+        for eq in eqs
+            resid = value(substitute(substitute(eq, sol), subs))
+            @test iszero(resid)
+        end
+    end
 
     timed_sq = @timed symbolic_solve(squared_polys, vars)
     @test timed_sq.time - timed_sq.compile_time < 10
     @test length(timed_sq.value) == 1
-    @test all(v -> isequal(timed_sq.value[1][v], expected[v]), vars)
-    subA = Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6)
-    for eq in linear_polys
-        resid = value(substitute(substitute(eq, timed_sq.value[1]), subA))
-        @test iszero(resid)
+    for subA in (
+        Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6),
+        Dict(A[i] => big(7 - i) // 5 - 2 // 11 for i in 1:6),
+        Dict(A[i] => big(1) // (i + 2) for i in 1:6),
+    )
+        check_zero_residuals(linear_polys, timed_sq.value[1]; subs = subA)
     end
 
     timed_lin = @timed symbolic_solve(linear_polys, vars)
     @test timed_lin.time - timed_lin.compile_time < 10
     @test length(timed_lin.value) == 1
-    @test all(v -> isequal(timed_lin.value[1][v], expected[v]), vars)
+    check_zero_residuals(linear_polys, timed_lin.value[1];
+        subs = Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6))
+
+    # Hand-derived exact system: 2x + y = 5, x - y = 1 => (x, y) = (2, 1)
+    @variables x y
+    exact_lin = [2x + y - 5, x - y - 1]
+    exact_sq = [exact_lin[1]^2, (1 // 3) * (exact_lin[2]^2)]
+    for eqs in (exact_lin, exact_sq)
+        sol = only(symbolic_solve(eqs, [x, y]))
+        @test isequal(value(sol[x]), 2)
+        @test isequal(value(sol[y]), 1)
+        check_zero_residuals(exact_lin, sol)
+    end
+
+    # Inexact coefficients must not take the linear fast path (sym_lu is not
+    # numerically stable). Reproduce master's AssertionError from Groebner.
+    float_eqs = [1.0e-20 * x + y - 1, x + y - 2]
+    @test_throws AssertionError symbolic_solve(float_eqs, [x, y])
+    float_sq = [float_eqs[1]^2, float_eqs[2]^2]
+    @test_throws AssertionError symbolic_solve(float_sq, [x, y])
 end
 
 @testset "Factorisation" begin
