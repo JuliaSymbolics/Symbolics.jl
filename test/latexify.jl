@@ -202,11 +202,10 @@ end
     @test occursin("\\mathtt{plain\\_x}", string(latexify(plain_x)))
 end
 
-# Custom-function arguments must keep outer recipe/caller Latexify options (#956 review)
+# Custom-function arguments must keep outer recipe/caller Latexify options
 @testset "latexwrapper argument formatting" begin
     @variables x y a[1:2] a_b
     @variables f(..) [latexwrapper = string]
-    # Exact strings from master (pre-#2051 freeze) for these inputs
     @test String(latexify(f(a[1]); env = :raw, index = :subscript)) ==
         raw"f\left( a_{1} \right)"
     @test String(latexify(f(1.23456789); env = :raw, fmt = "%.2f")) ==
@@ -217,4 +216,17 @@ end
         raw"f\left( \mathtt{a\_b} \right)"
     @test String(latexify(f(1.23456789e-9); env = :raw)) ==
         raw"f\left( 1.2346 \cdot 10^{-9} \right)"
+end
+
+# A derivative of a custom call multiplied by another factor must keep operand
+# scope in the numerator, not as an unfenced differential operator times both.
+@testset "latexwrapper derivative factor scope" begin
+    @variables x
+    @variables f(..) [latexwrapper = string]
+    @variables g(..) [latexwrapper = string]
+    D = Differential(x)
+    @test String(latexify(D(f(x)) * g(x); env = :raw)) ==
+        raw"\frac{\mathrm{d}f\left( x \right)}{\mathrm{d}x} ~ g\left( x \right)"
+    @test String(latexify(f(x) * D(g(x)); env = :raw)) ==
+        raw"\frac{\mathrm{d}g\left( x \right)}{\mathrm{d}x} ~ f\left( x \right)"
 end
