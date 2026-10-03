@@ -35,30 +35,31 @@ end
 """
     get_variables(e, varlist = nothing; kw...)
 
-Return an `AbstractSet` of variables appearing in `e` (an
-`OrderedCollections.OrderedSet`, as returned by
-`SymbolicUtils.search_variables`), optionally restricting to variables in
-`varlist`. Takes the same keyword arguments as
-`SymbolicUtils.search_variables`.
+Return an `AbstractSet` of variables appearing in `e`, as returned by
+`SymbolicUtils.search_variables` (an `OrderedCollections.OrderedSet` for
+scalar expressions), optionally restricting to variables in `varlist`. Takes
+the same keyword arguments as `SymbolicUtils.search_variables`.
 
 Note that the returned variables are not wrapped in the Num type.
 
 Since the result is a set, it has no user-controlled order. Collect it into a
-vector (e.g. with `sort!` or an explicit variable list) when an order matters.
+vector (e.g. with `sort` or an explicit variable list) when an order matters.
 
 Examples
 ≡≡≡≡≡≡≡≡
 
-```julia
+```jldoctest
+julia> using Symbolics
+
 julia> @variables t x y z(t);
 
 julia> issetequal(Symbolics.get_variables(x + y + sin(z)), Symbolics.unwrap.((x, y, z)))
 true
 
-julia> sort!(collect(Symbolics.get_variables(x - y)), by = string)
-2-element Vector{SymbolicUtils.BasicSymbolic}:
- x
- y
+julia> sort(string.(collect(Symbolics.get_variables(x - y))))
+2-element Vector{String}:
+ "x"
+ "y"
 ```
 """
 function get_variables(e; kw...)

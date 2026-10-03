@@ -190,9 +190,23 @@ Returns a tuple of a sparse matrix `A`, and a residual vector `c` such that,
 
 The columns of `A` follow the iteration order of `vars`, so when `vars` is a
 set (e.g. the result of `get_variables`), collect it into a vector once and
-reuse that same vector:
-`vars = collect(get_variables(exprs)); A, c = semilinear_form(exprs, vars)`,
-giving `A * vars + c`.
+reuse that same vector. Wrap the collected variables in `Num`, since
+`get_variables` returns unwrapped variables:
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables x y;
+
+julia> exprs = [2x + 3y, x - y];
+
+julia> vars = Num.(collect(Symbolics.get_variables(exprs)));
+
+julia> A, c = Symbolics.semilinear_form(exprs, vars);
+
+julia> all(isequal.(A * vars + c, exprs))
+true
+```
 """
 function semilinear_form(exprs::AbstractArray, vars)
     ds, nls = semipolynomial_form(exprs, vars, 1; consts = false)
@@ -231,7 +245,23 @@ The result is arranged such that, `A * vars + B * v2 + c` is the same as `exprs`
 
 The columns of `A` (and the entries of `v2`) follow the iteration order of
 `vars`, so when `vars` is a set (e.g. the result of `get_variables`), collect
-it into a vector once and reuse that same vector.
+it into a vector once and reuse that same vector. Wrap the collected variables
+in `Num`, since `get_variables` returns unwrapped variables:
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables x y;
+
+julia> exprs = [x^2 + x * y, 2y^2 + x + 1];
+
+julia> vars = Num.(collect(Symbolics.get_variables(exprs)));
+
+julia> A, B, v2, c = Symbolics.semiquadratic_form(exprs, vars);
+
+julia> all(isequal.(A * vars + B * v2 + c, exprs))
+true
+```
 """
 function semiquadratic_form(exprs, vars)
     ds, nls = semipolynomial_form(exprs, vars, 2; consts = false)
