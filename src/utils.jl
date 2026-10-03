@@ -439,9 +439,12 @@ end
 Extract the coefficient of `p` with respect to `sym`.
 Note that `p` might need to be expanded and/or simplified with `expand` and/or `simplify`.
 
-Throws a `DomainError` if `sym` appears in more than one factor of an unexpanded
-product (expand first), if `sym` is a negative power / division, or if `sym`
-appears in the denominator of a fraction.
+For a nonconstant `sym`, throws a `DomainError` if more than one factor of an
+unexpanded product has a nonzero coefficient with respect to `sym` (expand first),
+if `sym` itself is a quotient, or if `sym` appears in the denominator of a fraction.
+An integer power of a quotient also raises a `DomainError` when its denominator
+occurs in `p`'s denominator and its coefficient in the numerator is zero. Functions and
+powers with quotients in their arguments can be used as intact symbolic terms.
 
 # Examples
 
@@ -477,8 +480,8 @@ function coeff(p, sym = nothing)
         sym = nothing
     end
 
-    if sym !== nothing && (isdiv(sym) || (ispow(sym) && isdiv(arguments(sym)[1])))
-        throw(DomainError(sym, "coeff with negative powers is not yet implemented."))
+    if isdiv(sym)
+        throw(DomainError(sym, "coeff with a quotient as the symbolic term is not yet implemented."))
     end
 
     if issym(p) || SymbolicUtils.isconst(p) || isterm(p)
@@ -503,7 +506,16 @@ function coeff(p, sym = nothing)
     elseif isdiv(p)
         numerator, denominator = arguments(p)
         if !SymbolicUtils.query(isequal(sym), denominator)
-            coeff(numerator, sym) / denominator
+            c = coeff(numerator, sym)
+            if _iszero(c) && ispow(sym)
+                base, exponent = arguments(sym)
+                exponent = unwrap_const(exponent)
+                if isdiv(base) && exponent isa Real && isinteger(exponent) && exponent > 0 &&
+                        SymbolicUtils.query(isequal(arguments(base)[2]), denominator)
+                    throw(DomainError(sym, "coeff with negative powers is not yet implemented."))
+                end
+            end
+            c / denominator
         else
             throw(DomainError(p, "coeff on fractions is not yet implemented."))
         end

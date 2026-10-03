@@ -77,10 +77,14 @@ end
 @test_throws DomainError coeff(3 / x, x^-1)
 @test_throws DomainError coeff(3 / x^2, x^(-2))
 
-# terms that contain division only in descendants remain supported
 @testset "coeff of terms containing nested division" begin
     @variables x y a b
-    for sym in [sin(1 / x), sin(x / y), x^(b / y)]
+    for sym in [
+            sin(1 / x), sin(x / y), x^(b / y), (x / y)^(1 // 2),
+            (x / y)^b, (1 / x)^b, (x / y)^sqrt(2), (1 / x)^2, (x / y)^2,
+        ]
         @test isequal(coeff(a * sym, sym), a)
+        @test isequal(coeff(a * sym + b, sym), a)
+        @test isequal(coeff(a * sym / z, sym), a / z)
     end
 end
