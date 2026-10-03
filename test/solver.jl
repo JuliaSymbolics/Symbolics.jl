@@ -358,7 +358,11 @@ end
         @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
     end
 
-    @test isnothing(symbolic_solve([x^2, x*y, y^2], [x,y], warns=false))
+    # With dropmultiplicity, outer powers are stripped so the radical ideal is solved.
+    sol_rad = symbolic_solve([x^2, x * y, y^2], [x, y], warns = false)
+    @test length(sol_rad) == 1
+    @test iszero(value(sol_rad[1][x])) && iszero(value(sol_rad[1][y]))
+    @test isnothing(symbolic_solve([x^2, x * y, y^2], [x, y], dropmultiplicity = false, warns = false))
 end
 
 @testset "Multivar parametric" begin
@@ -408,6 +412,40 @@ end
     @test length(sol) == 1
     @test count(v -> isequal(sol[1][v], v), [x, y]) == 1
     @test isequal(simplify(expand(substitute(a * x - b, sol[1]))), 0)
+end
+
+@testset "Linear multivar with multiplicities (#1284)" begin
+    A = [Symbolics.variable(Symbol(:A, i)) for i in 1:6]
+    b = [Symbolics.variable(Symbol(:b, i)) for i in 1:4]
+    vars = b[2:4]
+    linear_polys = [
+        -(1 // 2) + A[1] * b[2] + (A[2] + A[4]) * b[3] + (A[3] + A[5] + A[6]) * b[4],
+        -(1 // 6) + A[1] * A[4] * b[3] + (A[1] * A[5] + (A[2] + A[4]) * A[6]) * b[4],
+        -(1 // 3) + (A[1]^2) * b[2] + ((A[2] + A[4])^2) * b[3] + ((A[3] + A[5] + A[6])^2) * b[4],
+    ]
+    squared_polys = [linear_polys[1]^2, linear_polys[2]^2, (1 // 4) * (linear_polys[3]^2)]
+
+    for (s, p) in zip(Symbolics.drop_outer_multiplicities.(squared_polys), linear_polys)
+        @test isequal(s, p)
+    end
+
+    lin = Symbolics.symbolic_linear_solve(linear_polys .~ 0, vars)
+    expected = Dict(var => postprocess_root(lin[i]) for (i, var) in enumerate(vars))
+
+    timed_sq = @timed symbolic_solve(squared_polys, vars)
+    @test timed_sq.time - timed_sq.compile_time < 10
+    @test length(timed_sq.value) == 1
+    @test all(v -> isequal(timed_sq.value[1][v], expected[v]), vars)
+    subA = Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6)
+    for eq in linear_polys
+        resid = value(substitute(substitute(eq, timed_sq.value[1]), subA))
+        @test iszero(resid)
+    end
+
+    timed_lin = @timed symbolic_solve(linear_polys, vars)
+    @test timed_lin.time - timed_lin.compile_time < 10
+    @test length(timed_lin.value) == 1
+    @test all(v -> isequal(timed_lin.value[1][v], expected[v]), vars)
 end
 
 @testset "Factorisation" begin
