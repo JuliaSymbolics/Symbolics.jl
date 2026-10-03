@@ -86,6 +86,34 @@ eqs = [
     @test !Symbolics.linear_expansion(x + z([x, y]), y)[3]
 end
 
+@testset "linear_expansion of matrix-vector products (issue #1231)" begin
+    @variables x[1:3] b[1:3] A[1:3, 1:3] s
+
+    Amat, bvec, islin = Symbolics.linear_expansion(A * x + b, x)
+    @test islin
+    @test isequal(Amat, Symbolics.scalarize(A))
+    @test isequal(bvec, Symbolics.scalarize(b))
+
+    Amat, bvec, islin = Symbolics.linear_expansion(A * x + b ~ zeros(Num, 3), x)
+    @test islin
+    @test isequal(Amat, .-Symbolics.scalarize(A))
+    @test isequal(bvec, .-Symbolics.scalarize(b))
+
+    Amat, bvec, islin = Symbolics.linear_expansion(unwrap(A * x + b), unwrap(x))
+    @test islin
+    @test isequal(Amat, Symbolics.scalarize(A))
+    @test isequal(bvec, Symbolics.scalarize(b))
+
+    Amat, bvec, islin = Symbolics.linear_expansion(s .* x .+ b, x)
+    @test islin
+    @test isequal(Amat, Diagonal(fill(unwrap(s), 3)))
+    @test isequal(bvec, Symbolics.scalarize(b))
+
+    # Opaque dependence on the whole array still counts as nonlinear.
+    @variables z(..)
+    @test !Symbolics.linear_expansion(Symbolics.scalarize(z(x) .+ x), Symbolics.scalarize(x))[3]
+end
+
 @testset "linear_expansion of ifelse" begin
     @variables p
     a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p + 1, 3p + 2), p)
