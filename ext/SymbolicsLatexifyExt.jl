@@ -27,22 +27,30 @@ function cleanup_exprs(ex)
     return postwalk(x -> iscall(x) && length(arguments(x)) == 0 ? operation(x) : x, ex)
 end
 
-_strip_dollars(s) = strip(string(s), '\$')
-
-function _render_latexstring_call(ex::Expr)
-    name = _strip_dollars(ex.args[1])
+# Keep custom-wrapper call arguments as Expr nodes so the outer Latexify
+# traversal applies recipe/caller options (index, fmt, mult_symbol, snakecase).
+# Always `:block`-wrap Expr args: `:latexifymerge` wraps any non-`:none` child
+# in an extra `\left(...\right)`, and we already supply the call parentheses.
+function _latexstring_call_to_merge(ex::Expr)
+    name = ex.args[1]
     length(ex.args) == 1 && return name
-    args = [_strip_dollars(latexify(a)) for a in ex.args[2:end]]
-    return name * "\\left( " * join(args, ", ") * " \\right)"
+    body = Expr(:latexifymerge, name, "\\left( ")
+    for (i, a) in enumerate(ex.args[2:end])
+        i > 1 && (body = Expr(:latexifymerge, body, ", "))
+        child = a isa Expr ? Expr(:block, a) : a
+        body = Expr(:latexifymerge, body, child)
+    end
+    return Expr(:latexifymerge, body, " \\right)")
 end
 
 function latexify_derivatives(ex)
-    # Latexify does not parenthesize `^` when the base is a call whose head is a
-    # LaTeXString (`_getoperation` only recognizes Symbol heads). Fence those first.
+    # Latexify does not parenthesize `^` when the base is a LaTeXString-headed
+    # call (`_getoperation` only recognizes Symbol heads). Mark those first;
+    # conversion to `:latexifymerge` happens in the postwalk below.
     ex = prewalk(ex) do x
         if Meta.isexpr(x, :call) && x.args[1] == :^ && length(x.args) >= 3
             base = x.args[2]
-            if Meta.isexpr(base, :call) && base.args[1] isa LaTeXString
+            if Meta.isexpr(base, :call) && base.args[1] isa LaTeXString && length(base.args) > 1
                 return Expr(:call, :^, Expr(:call, :_latexfenced, base), x.args[3])
             end
         end
@@ -51,15 +59,14 @@ function latexify_derivatives(ex)
     return postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
         if x.args[1] === :_latexfenced
+            # Child may already be a `:latexifymerge` from the LaTeXString-call branch.
             inner = x.args[2]
-            inner_s = if Meta.isexpr(inner, :call) && inner.args[1] isa LaTeXString
-                _render_latexstring_call(inner)
-            else
-                _strip_dollars(inner)
+            if Meta.isexpr(inner, :call) && inner.args[1] isa LaTeXString
+                inner = _latexstring_call_to_merge(inner)
             end
-            return LaTeXString("\\left( $inner_s \\right)")
+            return Expr(:latexifymerge, "\\left( ", inner, " \\right)")
         elseif x.args[1] isa LaTeXString
-            return LaTeXString(_render_latexstring_call(x))
+            return _latexstring_call_to_merge(x)
         elseif x.args[1] == :_derivative
             num, den, deg = x.args[2:end]
             dsym = "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")"
