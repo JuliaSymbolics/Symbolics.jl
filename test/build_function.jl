@@ -1,7 +1,7 @@
 using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 using Symbolics: value
-using SymbolicUtils.Code: DestructuredArgs, Func, NameState, Let, cse
+using SymbolicUtils.Code: Assignment, DestructuredArgs, Func, NameState, Let, cse
 @variables a b c1 c2 c3 d e g
 oop, iip = Symbolics.build_function([sqrt(a), sin(b)], [a, b], nanmath = true)
 oop = eval(oop)
@@ -506,5 +506,22 @@ end
     for threads in (1, MT_TEST_THREADS)
         cmd = `$(Base.julia_cmd()) --project=$(Base.active_project()) -t$(threads) $script`
         @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
+    end
+end
+
+@testset "ShardedForm preserves postprocess_fbody Let bindings" begin
+    @variables x y z
+    ex = [z + 1, z + 2, x, y]
+    wrap = b -> Let([Assignment(z, x * y)], b, false)
+    expected = [7.0, 8.0, 2.0, 3.0]
+    u = [2.0, 3.0]
+
+    for parallel in (Symbolics.ShardedForm(1, 2), Symbolics.MultithreadedForm(1, 2))
+        f_oop, f_iip = build_function(ex, [x, y]; parallel = parallel,
+                                      postprocess_fbody = wrap, expression = Val{false})
+        @test f_oop(u) == expected
+        out = zeros(4)
+        f_iip(out, u)
+        @test out == expected
     end
 end
