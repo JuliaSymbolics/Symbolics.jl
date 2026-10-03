@@ -41,6 +41,80 @@ function series(y::Num, x::Number, ns::AbstractArray)
     return series(y, x, 0, ns)
 end
 
+function _fraction_parts(ex)
+    iscall(ex) || return (ex, 1)
+    op = operation(ex)
+    args = arguments(ex)
+    if op === (/)
+        n1, d1 = _fraction_parts(args[1])
+        n2, d2 = _fraction_parts(args[2])
+        return n1 * d2, d1 * n2
+    elseif op === (*)
+        parts = _fraction_parts.(args)
+        return prod(first, parts), prod(last, parts)
+    elseif op === (+)
+        parts = _fraction_parts.(args)
+        numerator = sum(parts[i][1] * prod(parts[j][2] for j in eachindex(parts) if j != i) for i in eachindex(parts))
+        return numerator, prod(last, parts)
+    elseif op === (^)
+        exponent = value(args[2])
+        if exponent isa Integer
+            numerator, denominator = _fraction_parts(args[1])
+            return exponent >= 0 ? (numerator^exponent, denominator^exponent) :
+                (denominator^(-exponent), numerator^(-exponent))
+        end
+    end
+    return ex, 1
+end
+
+_contains_nonfinite_constant(x::Number) = !isfinite(x)
+_contains_nonfinite_constant(x::Num) = _contains_nonfinite_constant(unwrap(x))
+function _contains_nonfinite_constant(x::BasicSymbolic{VartypeT})
+    if iscall(x)
+        return any(_contains_nonfinite_constant, arguments(x))
+    elseif SymbolicUtils.isconst(x)
+        return _contains_nonfinite_constant(unwrap_const(x))
+    end
+    return false
+end
+_contains_nonfinite_constant(x) = false
+
+function _series_coeff(f, x, n; rationalize, kwargs...)
+    numerator, denominator = value.(_fraction_parts(unwrap(f)))
+    isequal(denominator, 1) && error("Cannot compute a finite Taylor coefficient because the expression is not a quotient with a vanishing denominator")
+    isequal(value(simplify(denominator)), 0) && error("Cannot compute a Taylor coefficient with a zero denominator")
+
+    denominator_coeffs = Any[]
+    order = 0
+    max_order = n + 20
+    while order <= max_order
+        coefficient = taylor_coeff(denominator, x, order; rationalize, kwargs...)
+        push!(denominator_coeffs, coefficient)
+        if !isequal(value(coefficient), 0)
+            break
+        end
+        order += 1
+    end
+    order > max_order && error("Could not find a nonzero denominator Taylor coefficient through order $max_order at x = 0")
+
+    for j in 1:(n + order)
+        push!(denominator_coeffs, taylor_coeff(denominator, x, order + j; rationalize, kwargs...))
+    end
+
+    quotient_coeffs = Any[]
+    for i in 0:(n + order)
+        coefficient = taylor_coeff(numerator, x, i; rationalize, kwargs...)
+        for j in 0:(i - 1)
+            coefficient -= quotient_coeffs[j + 1] * denominator_coeffs[order + i - j + 1]
+        end
+        if i < order && !isequal(value(coefficient), 0)
+            error("Cannot compute the Taylor coefficient of an expression with a pole at $x = 0")
+        end
+        push!(quotient_coeffs, coefficient / denominator_coeffs[order + 1])
+    end
+    return value(quotient_coeffs[n + order + 1])
+end
+
 """
     taylor_coeff(f, x[, n]; rationalize=true, kwargs...)
 
@@ -88,6 +162,9 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
     c = (D^n)(f) # TODO: optimize the implementation for multiple n with a loop that avoids re-differentiating the same expressions
     c = expand_derivatives(c)
     c = value(substitute_in_deriv(c, x => 0; fold = Val(true), kwargs...))
+    if _contains_nonfinite_constant(c)
+        c = n! * _series_coeff(f, x, n; rationalize, kwargs...)
+    end
     if !(c isa BasicSymbolic{VartypeT}) && isinteger(c)
         c = Integer(c)
         c //= n!
@@ -147,7 +224,14 @@ function taylor(f, x, x0, n; rationalize=true, kwargs...)
     f = substitute_in_deriv(f, x => x′ + x0; kwargs...)
 
     # 2) expand f around x′ = 0
-    s = taylor(f, x′, n; rationalize, kwargs...)
+    s = try
+        taylor(f, x′, n; rationalize, kwargs...)
+    catch err
+        if err isa ErrorException && occursin("pole at $x′ = 0", err.msg)
+            throw(ErrorException(replace(err.msg, "pole at $x′ = 0" => "pole at $x = $x0")))
+        end
+        rethrow()
+    end
 
     # 3) substitute back x = x′ + x0
     return substitute_in_deriv(s, x′ => x - x0; kwargs...)
