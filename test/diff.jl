@@ -431,21 +431,42 @@ let
     test_equal(Dt(t + 2t^2), t + 2t^2)
 end
 
-# Fractional differential operator (#906)
-let
+@testset "Exact differential powers" begin
     @variables x
     D = Differential(x)
-    @test isequal(D^(1 // 2), Differential(x, 1 // 2))
-    @test isequal(D^0.5, Differential(x, 1 // 2))
+    for n in (1 // 2, 0.5, Float16(0.5), Float32(0.5), big"0.5")
+        @test isequal(D^n, Differential(x, 1 // 2))
+    end
+    for n in (0, big(0), 0 // 1, 0.0, -0.0, big"0.0")
+        @test D^n === identity
+    end
+    for (n, expected) in (
+            (Float16(1024), 1024), (Float32(2^24), 2^24),
+            (Float64(2^53), 2^53), (Float64(2^53 + 1), 2^53),
+            (big(2)^53 + 1, 2^53 + 1), (big"1024.0", 1024),
+            (big(typemax(Int)), typemax(Int)),
+        )
+        @test isequal(D^n, Differential(x, expected))
+    end
+    @test isequal(D^(1 / 3), Differential(x, 6004799503160661 // 18014398509481984))
+    @test isequal(D^(1 // 3), Differential(x, 1 // 3))
+    @test isequal(D^0.1, Differential(x, 3602879701896397 // 36028797018963968))
     Dhalf = D^(1 // 2)
     @test isequal(Dhalf(Dhalf(x^2)), Differential(x, 1 // 1)(x^2))
     @test_throws ArgumentError expand_derivatives(Dhalf(x))
-    @test_throws ArgumentError D^1.0e-20
-    @test_throws ArgumentError D^(-1.0e-20)
-    @test_throws ArgumentError D^1.0e20
-    @test_throws ArgumentError D^Inf
-    @test_throws ArgumentError D^(-Inf)
-    @test_throws ArgumentError D^NaN
+    H = Differential(x, 1 // 1024)
+    @test isequal(H^Float16(1024), D)
+    @test isequal(expand_derivatives((H^Float16(1024))(x^2)), 2x)
+    for n in (1.0e-20, 1.0e20, Inf, -Inf, NaN, big"0.1", big(2)^100)
+        @test_throws ArgumentError D^n
+    end
+    for n in (-1, -big(1), -1 // 2, -0.5, -1.0e-20)
+        @test_throws ArgumentError D^n
+    end
+    @test_throws ArgumentError Differential(x, 3)^typemax(Int)
+    @test_throws ArgumentError Differential(x, typemax(Int))^2.0
+    @test_throws ArgumentError D^(1 // 0)
+    @test_throws ArgumentError D^(big(1) // (big(2)^100))
 end
 
 # Check `Function` inputs for derivative (#1085)

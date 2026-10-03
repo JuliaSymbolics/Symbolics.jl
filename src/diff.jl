@@ -126,21 +126,24 @@ is_derivative(x) = iswrapped(x) && is_derivative(unwrap(x))
 
 Base.:*(D1::ComposedFunction, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2::Union{Operator, Function}) = D1 ∘ D2
-function Base.:^(D::Differential, n::Integer)
-    iszero(n) && return identity
-    return Differential(D.x, D.order * n)
-end
+Base.:^(D::Differential, n::Integer) = D^(n // one(n))
 function Base.:^(D::Differential, n::Rational)
+    isfinite(n) && n >= 0 || throw(ArgumentError("Differential order exponent must be finite and nonnegative"))
     iszero(n) && return identity
-    isfinite(n) || throw(ArgumentError("Differential order exponent must be finite"))
-    return Differential(D.x, D.order * Rational{Int}(n))
+    order = try
+        Rational{Int}(Rational{BigInt}(D.order) * n)
+    catch err
+        if err isa InexactError || err isa OverflowError
+            throw(ArgumentError("Differential order for exponent $n is not representable as Rational{Int}"))
+        end
+        rethrow()
+    end
+    return Differential(D.x, isinteger(order) ? numerator(order) : order)
 end
 function Base.:^(D::Differential, n::Real)
-    isfinite(n) || throw(ArgumentError("Differential order exponent must be finite"))
-    rn = rationalize(Int, n)
-    if !iszero(n) && (iszero(rn) || !isfinite(rn))
-        throw(ArgumentError("Differential order exponent $n is not representable as Rational{Int}"))
-    end
+    isfinite(n) && n >= 0 || throw(ArgumentError("Differential order exponent must be finite and nonnegative"))
+    rn = Rational{BigInt}(n)
+    rn == n || throw(ArgumentError("Differential order exponent $n cannot be represented exactly as a rational"))
     return D^rn
 end
 
