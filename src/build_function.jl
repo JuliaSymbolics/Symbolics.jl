@@ -411,7 +411,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     oop, iip = iip_config
     if oop
-        oop_expr = Func(dargs, [], make_array(parallel, dargs, rhss, similarto, postprocess_fbody))
+        oop_expr = Func(dargs, [], postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
         if wrap_code[1] !== nothing
             oop_expr = wrap_code[1](oop_expr)
         end
@@ -422,18 +422,13 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     if iip
         out = Sym{VartypeT}(DEFAULT_OUTSYM; type = Any, shape = SymbolicUtils.Unknown(-1))
-        iip_expr = Func(
-            vcat(out, dargs), [], set_array(
-                parallel,
-                dargs,
-                out,
-                outputidxs,
-                rhss,
-                checkbounds,
-                skipzeros,
-                postprocess_fbody
-            )
-        )
+        iip_expr = Func(vcat(out, dargs), [], postprocess_fbody(set_array(parallel,
+                                    dargs,
+                                    out,
+                                    outputidxs,
+                                    rhss,
+                                    checkbounds,
+                                    skipzeros)))
         if wrap_code[2] !== nothing
             iip_expr = wrap_code[2](iip_expr)
         end
@@ -450,6 +445,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
         iip_expr = apply_optimization_rules(iip_expr, states, optimize)
         oop_expr = apply_optimization_rules(oop_expr, states, optimize)
     end
+
+    oop_expr = hoist_let_bindings_for_shards(oop_expr)
+    iip_expr = hoist_let_bindings_for_shards(iip_expr)
 
     oop_expr = conv(oop_expr, states)
     iip_expr = conv(iip_expr, states)
@@ -472,31 +470,111 @@ _nnz(x::AbstractArray) = length(x)
 _nnz(x::AbstractSparseArray) = nnz(x)
 _nnz(x::Union{Base.ReshapedArray, LinearAlgebra.Transpose}) = _nnz(parent(x))
 
-function make_array(s, dargs, arr, similarto, postprocess_fbody = identity)
+function make_array(s, dargs, arr, similarto)
     s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
-    return postprocess_fbody(_make_array(arr, similarto))
+    _make_array(arr, similarto)
 end
 
-function make_array(s::SerialForm, dargs, arr, similarto, postprocess_fbody = identity)
-    return postprocess_fbody(_make_array(arr, similarto))
+function make_array(s::SerialForm, dargs, arr, similarto)
+    _make_array(arr, similarto)
 end
 
-function make_array(s::ShardedForm, closed_args, arr, similarto, postprocess_fbody = identity)
+function make_array(s::ShardedForm, closed_args, arr, similarto)
     if arr isa AbstractSparseArray
-        return term(
-            SparseMatrixCSC, arr.m, arr.n, copy(arr.colptr), copy(arr.rowval),
-            make_array(s, closed_args, arr.nzval, Vector, postprocess_fbody)
-        )
+        return term(SparseMatrixCSC, arr.m, arr.n, copy(arr.colptr), copy(arr.rowval), make_array(s, closed_args, arr.nzval, Vector))
     end
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
-        Func(closed_args, [], postprocess_fbody(_make_array(slice, similarto))), closed_args
+        Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
     return SpawnFetch{typeof(s)}(
         first.(arrays), last.(arrays),
         VcatReshape(size(arr))
     )
+end
+
+function _let_bound_names(pairs)
+    names = Any[]
+    for p in pairs
+        if p isa Assignment
+            push!(names, p.lhs)
+        elseif p isa DestructuredArgs
+            append!(names, p.elems)
+        end
+    end
+    return names
+end
+
+function _args_with_bindings(args, bindings)
+    isempty(bindings) && return args
+    out = Any[args...]
+    for b in bindings
+        any(a -> a === b, out) || push!(out, b)
+    end
+    return out
+end
+
+_may_contain_shards(::Union{Let, Func, SpawnFetch, LiteralExpr}) = true
+_may_contain_shards(ex::AbstractArray) = any(_may_contain_shards, ex)
+function _may_contain_shards(ex)
+    iscall(ex) || return false
+    return any(_may_contain_shards, arguments(ex))
+end
+
+hoist_let_bindings_for_shards(ex) = _hoist_let_bindings(ex, Any[])
+
+function _hoist_let_bindings(ex::Let, bindings)
+    local_bindings = _args_with_bindings(bindings, _let_bound_names(ex.pairs))
+    new_pairs = map(p -> _hoist_let_bindings(p, bindings), ex.pairs)
+    new_body = _hoist_let_bindings(ex.body, local_bindings)
+    return Let(new_pairs, new_body, ex.let_block)
+end
+
+function _hoist_let_bindings(ex::Assignment, bindings)
+    return Assignment(ex.lhs, _hoist_let_bindings(ex.rhs, bindings))
+end
+
+function _hoist_let_bindings(ex::Func, bindings)
+    new_args = _args_with_bindings(ex.args, bindings)
+    new_body = _hoist_let_bindings(ex.body, bindings)
+    return Func(new_args, ex.kwargs, new_body, ex.pre)
+end
+
+function _hoist_let_bindings(ex::SpawnFetch{Typ}, bindings) where {Typ}
+    new_exprs = map(e -> _hoist_let_bindings(e, bindings), ex.exprs)
+    if isempty(bindings)
+        new_args = ex.args
+    elseif ex.args === nothing
+        new_args = [Any[bindings...] for _ in ex.exprs]
+    else
+        new_args = [_args_with_bindings(a, bindings) for a in ex.args]
+    end
+    return SpawnFetch{Typ}(new_exprs, new_args, ex.combine)
+end
+
+function _hoist_let_bindings(ex::LiteralExpr, bindings)
+    return LiteralExpr(_hoist_let_bindings_in_expr(ex.ex, bindings))
+end
+
+function _hoist_let_bindings_in_expr(ex::Expr, bindings)
+    return Expr(ex.head, Any[_hoist_let_bindings_in_expr(a, bindings) for a in ex.args]...)
+end
+_hoist_let_bindings_in_expr(ex, bindings) = _hoist_let_bindings(ex, bindings)
+
+function _hoist_let_bindings(ex::AbstractArray, bindings)
+    return map(x -> _hoist_let_bindings(x, bindings), ex)
+end
+
+function _hoist_let_bindings(ex, bindings)
+    if _may_contain_shards(ex) && iscall(ex)
+        return maketerm(
+            typeof(ex), operation(ex),
+            map(a -> _hoist_let_bindings(a, bindings), arguments(ex)),
+            metadata(ex)
+        )
+    end
+    return ex
 end
 
 struct Funcall{F, T}
@@ -619,19 +697,13 @@ _make_array(x, similarto) = x
 
 ## In-place version
 
-function set_array(
-        p, closed_vars, out, outputidxs, rhss, checkbounds, skipzeros,
-        postprocess_fbody = identity
-    )
+function set_array(p, closed_vars, args...)
     p !== nothing && Base.@warn("Parallel form of $(typeof(p)) not implemented")
-    return postprocess_fbody(_set_array(out, outputidxs, rhss, checkbounds, skipzeros))
+    _set_array(args...)
 end
 
-function set_array(
-        s::SerialForm, closed_vars, out, outputidxs, rhss, checkbounds, skipzeros,
-        postprocess_fbody = identity
-    )
-    return postprocess_fbody(_set_array(out, outputidxs, rhss, checkbounds, skipzeros))
+function set_array(s::SerialForm, closed_vars, args...)
+    _set_array(args...)
 end
 
 function recursive_split(leaf_f, s, out, args, outputidxs, xs)
@@ -655,21 +727,15 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
     end
 end
 
-function set_array(
-        s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros,
-        postprocess_fbody = identity
-    )
+function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
-        return set_array(
-            s,
-            closed_args,
-            LiteralExpr(:($out.nzval)),
-            nothing,
-            rhss.nzval,
-            checkbounds,
-            skipzeros,
-            postprocess_fbody
-        )
+        return set_array(s,
+                         closed_args,
+                         LiteralExpr(:($out.nzval)),
+                         nothing,
+                         rhss.nzval,
+                         checkbounds,
+                         skipzeros)
     end
 
     outvar = !(out isa Sym) ? gensym("out") : out
@@ -679,11 +745,9 @@ function set_array(
     end
     all_args = [outvar, closed_args...]
     ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
-        Func(
-            all_args, [],
-            postprocess_fbody(_set_array(outvar, idxs, xs, checkbounds, skipzeros)),
-            []
-        )
+        Func(all_args, [],
+             _set_array(outvar, idxs, xs, checkbounds, skipzeros),
+             [])
     end.body
 
     return out isa Sym ? ex : LiteralExpr(quote

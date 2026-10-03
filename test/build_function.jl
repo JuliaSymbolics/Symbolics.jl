@@ -1,7 +1,7 @@
 using Symbolics, SparseArrays, LinearAlgebra, Test
 using ReferenceTests
 using Symbolics: value
-using SymbolicUtils.Code: Assignment, DestructuredArgs, Func, NameState, Let, cse
+using SymbolicUtils.Code: Assignment, DestructuredArgs, Func, LiteralExpr, NameState, Let, cse
 @variables a b c1 c2 c3 d e g
 oop, iip = Symbolics.build_function([sqrt(a), sin(b)], [a, b], nanmath = true)
 oop = eval(oop)
@@ -513,6 +513,7 @@ end
     @variables x y z
     ex = [z + 1, z + 2, x, y]
     wrap = b -> Let([Assignment(z, x * y)], b, false)
+    # x=2, y=3 => z=x*y=6 => [7, 8, 2, 3]
     expected = [7.0, 8.0, 2.0, 3.0]
     u = [2.0, 3.0]
 
@@ -525,5 +526,16 @@ end
         out = zeros(4)
         f_iip(out, u)
         @test out == expected
+    end
+end
+
+@testset "whole-result postprocessing" begin
+    @variables x
+    # At x=1 the array is [1,2,3,4]; reversing the complete result yields [4,3,2,1].
+    for parallel in (Symbolics.ShardedForm(1, 2), Symbolics.MultithreadedForm(1, 2))
+        f, _ = build_function([x, 2x, 3x, 4x], x;
+            parallel, expression = Val{false}, iip_config = (true, false),
+            postprocess_fbody = b -> LiteralExpr(:(reverse($b))))
+        @test f(1) == [4, 3, 2, 1]
     end
 end
