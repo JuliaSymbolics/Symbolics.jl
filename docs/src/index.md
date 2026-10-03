@@ -1,5 +1,9 @@
 # Symbolics.jl
 
+```@docs
+Symbolics.Symbolics
+```
+
 Symbolics.jl is a fast and modern Computer Algebra System (CAS) for a fast and modern
 programming language (Julia). The goal is to have a high-performance and parallelized
 symbolic algebra system that is directly extendable in the same language as that of the
@@ -75,10 +79,10 @@ to be listed here, feel free to open a pull request!
 - [DataDrivenDiffEq.jl](https://github.com/SciML/DataDrivenDiffEq.jl): Automatic identification of equations from data
     - Automated construction of ODEs and DAEs from data
     - Representations of Koopman operators and Dynamic Mode Decomposition (DMD)
-- [SymbolicRegression.jl](https://github.com/MilesCranmer/SymbolicRegression.jl): Distributed High-Performance symbolic regression
+- [SymbolicRegression.jl](https://github.com/astroautomata/SymbolicRegression.jl): Distributed High-Performance symbolic regression
     - Parallelized generic algorithms for finding equations from data
     - Pareto frontier-based scoring
-- [ReversePropagation.jl](https://github.com/dpsanders/ReversePropagation.jl): Source-to-source reverse mode automatic differentiation
+- [ReversePropagation.jl](https://github.com/JuliaIntervals/ReversePropagation.jl): Source-to-source reverse mode automatic differentiation
     - Automated tracing of code and construction of backpropagation equations
     - Composes with symbolic transformation and simplification functionality
 

@@ -1,0 +1,26 @@
+name: Benchmark
+on:
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - 'docs/**'
+permissions:
+  pull-requests: write    # needed to post comments
+
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: |
+          if [ "`git rev-parse --abbrev-ref HEAD`" != master ]; then git fetch origin master:master; fi
+      - uses: MilesCranmer/AirspeedVelocity.jl@action-v1
+        with:
+          julia-version: '1'
+          rev: '${{ github.event.pull_request.base.sha }},${{ github.sha }}'
+          bench-on: '${{ github.sha }}'
+          job-summary: '${{ github.event.pull_request.head.repo.fork }}'

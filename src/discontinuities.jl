@@ -64,16 +64,28 @@ macro register_discontinuity(f, root, left, right)
     args = f.args[2:end]
     fn = esc(f.args[1])
     rootname = gensym(:root)
+    symbolic_check_expr = Expr(:||)
+    for arg in args
+        push!(symbolic_check_expr.args, :($unwrap($arg) isa $SymbolicT))
+    end
     rootfn = :(function $rootname($(args...))
         $root
     end)
     leftname = gensym(:left)
     leftfn = :(function $leftname($(args...))
-        $left
+        result = $left
+        if $symbolic_check_expr
+            result = $SConst(result)
+        end
+        return result
     end)
     rightname = gensym(:right)
     rightfn = :(function $rightname($(args...))
-        $right
+        result = $right
+        if $symbolic_check_expr
+            result = $SConst(result)
+        end
+        return result
     end)
     return quote
         $rootfn
@@ -104,3 +116,170 @@ end
 @register_discontinuity <=(x, y) y - x false true
 @register_discontinuity >(x, y) y - x true false
 @register_discontinuity >=(x, y) x - y false true
+
+"""
+    majorization_function(f)
+
+Given a function `f`, return a majorization function `m` for `f`. The function `m` should
+have the signature `m(k, args...)` where `args...` are the same arguments as `f`. `k` is a
+`Real` value which acts as an approximation factor. For higher `k`, the function `m` should
+more closely approximate `f` over the domain. A majorization function is such that
+`m(k, args...) >= f(args...)` for all `args...` in the domain.
+"""
+function majorization_function end
+
+"""
+    minorization_function(f)
+
+Given a function `f`, return a minorization function `m` for `f`. The function `m` should
+have the signature `m(k, args...)` where `args...` are the same arguments as `f`. `k` is a
+`Real` value which acts as an approximation factor. For higher `k`, the function `m` should
+more closely approximate `f` over the domain. A minorization function is such that
+`m(k, args...) <= f(args...)` for all `args...` in the domain.
+"""
+function minorization_function end
+
+"""
+    approximation_function(f)
+
+Given a function `f`, return an approximation function `appr` for `f`. The function `appr` should
+have the signature `appr(k, args...)` where `args..` are the same arguments as `f`. `k` is a
+`Real` value acting as an approximation factor. For higher `k`, the function `appr` should more
+closely approximate `f` over the domain. The function `appr` offers no guarantees other than
+infinite differentiability over the domain. At any point in the domain, it may evaluate to a
+value greater or less than the value returned by `f` for the same point.
+"""
+function approximation_function end
+
+function _approx_max(m, a, b)
+    if a isa Union{Num, SymbolicT} || b isa Union{Num, SymbolicT}
+        return STerm(
+            _approx_max, SArgsT((m, a, b));
+            type = SU.promote_symtype(_approx_max, SU.symtype(m), SU.symtype(a), SU.symtype(b)),
+            shape = SU.ShapeVecT()
+        )
+    end
+    return (a + b + _approx_abs(m, a - b)) / 2
+end
+
+function SU.promote_symtype(::typeof(_approx_max), M::SU.TypeT, A::SU.TypeT, B::SU.TypeT)
+    return SU.promote_symtype(*, SU.promote_symtype(+, A, B), M)
+end
+
+function SU.promote_shape(::typeof(_approx_max), @nospecialize(shapes::Vararg{SU.ShapeT, 3}))
+    return SU.ShapeVecT()
+end
+
+function _approx_min(m, a, b)
+    -_approx_max(m, -a, -b)
+end
+
+function SU.promote_symtype(::typeof(_approx_min), args::SU.TypeT...)
+    return SU.promote_symtype(_approx_max, args...)
+end
+
+function SU.promote_shape(::typeof(_approx_min), @nospecialize(shapes::Vararg{SU.ShapeT, 3}))
+    return SU.ShapeVecT()
+end
+
+function _approx_abs(m, a)
+    return sqrt(a^2 + 1/(8m + 1))
+end
+
+function SU.promote_symtype(::typeof(_approx_abs), M::SU.TypeT, A::SU.TypeT)
+    return SU.promote_symtype(*, M, A)
+end
+
+function SU.promote_shape(::typeof(_approx_abs), @nospecialize(shapes::Vararg{SU.ShapeT, 2}))
+    return SU.ShapeVecT()
+end
+
+function _approx_ge(m, a, b)
+    (tanh(m * ((a - b) + eps(float(typeof(m))))) + 1) / 2
+end
+
+function SU.promote_symtype(::typeof(_approx_ge), args::SU.TypeT...)
+    return SU.promote_symtype(_approx_max, args...)
+end
+
+function SU.promote_shape(::typeof(_approx_ge), @nospecialize(shapes::Vararg{SU.ShapeT, 3}))
+    return SU.ShapeVecT()
+end
+
+_approx_le(m, a, b) = _approx_ge(m, b, a)
+
+function SU.promote_symtype(::typeof(_approx_le), args::SU.TypeT...)
+    return SU.promote_symtype(_approx_max, args...)
+end
+
+function SU.promote_shape(::typeof(_approx_le), @nospecialize(shapes::Vararg{SU.ShapeT, 3}))
+    return SU.ShapeVecT()
+end
+
+function _sigmoid(x)
+    if x > 0
+        return one(x) / (one(x) + exp(-x))
+    else
+        tmp = exp(x)
+        return tmp / (1 + tmp)
+    end
+end
+
+function SU.promote_symtype(::typeof(_sigmoid), T::SU.TypeT)
+    return T
+end
+
+function SU.promote_shape(::typeof(_sigmoid), @nospecialize(sh::SU.ShapeT))
+    return SU.ShapeVecT()
+end
+
+for T in [SymbolicT, Num]
+    @eval function _sigmoid(x::$T)
+        return STerm(_sigmoid, SArgsT((unwrap(x),)); type = SU.symtype(unwrap(x)), shape = SU.ShapeVecT())
+    end
+end
+
+function _sigder(x)
+    tmp = _sigmoid(x)
+    return tmp * (1 - tmp)
+end
+
+function SU.promote_symtype(::typeof(_sigder), T::SU.TypeT)
+    return T
+end
+
+function SU.promote_shape(::typeof(_sigder), @nospecialize(sh::SU.ShapeT))
+    return SU.ShapeVecT()
+end
+
+function _approx_eq(m, a, b)
+    # `2m` to try and make `_approx_eq` similarly steep for the same `m` as other
+    # approximators.
+    4_sigder(2m * (a - b))
+end
+
+function SU.promote_symtype(::typeof(_approx_eq), M::SU.TypeT, A::SU.TypeT, B::SU.TypeT)
+    return SU.promote_symtype(*, SU.promote_symtype(+, A, B), M)
+end
+
+function SU.promote_shape(::typeof(_approx_eq), @nospecialize(sh::Vararg{SU.ShapeT, 3}))
+    return SU.ShapeVecT()
+end
+
+approximation_function(::typeof(max)) = _approx_max
+majorization_function(::typeof(max)) = _approx_max
+approximation_function(::typeof(min)) = _approx_min
+minorization_function(::typeof(min)) = _approx_min
+approximation_function(::typeof(NaNMath.max)) = _approx_max
+majorization_function(::typeof(NaNMath.max)) = _approx_max
+approximation_function(::typeof(NaNMath.min)) = _approx_min
+minorization_function(::typeof(NaNMath.min)) = _approx_min
+approximation_function(::typeof(abs)) = _approx_abs
+majorization_function(::typeof(abs)) = _approx_abs
+
+approximation_function(::typeof(>=)) = _approx_ge
+approximation_function(::typeof(>)) = _approx_ge
+approximation_function(::typeof(<=)) = _approx_le
+approximation_function(::typeof(<)) = _approx_le
+
+approximation_function(::typeof(==)) = _approx_eq

@@ -1,5 +1,6 @@
 using Symbolics
 using Symbolics: value, unwrap
+import SymbolicUtils as SU
 using LinearAlgebra
 using Test
 
@@ -104,4 +105,75 @@ end
 
     @test !Symbolics.linear_expansion(ifelse(p < 1, p^2, 2p), p)[3]
     @test !Symbolics.linear_expansion(ifelse(p < 1, 2p, p^2), p)[3]
+
+    @testset "Strict mode" begin
+        lex = Symbolics.LinearExpander(p; strict = true)
+        @test !lex(ifelse(p < 1, 1, 2))[3]
+    end
+end
+
+@testset "`linear_expansion` of `LinearAlgebra.dot`" begin
+    @variables a b c d
+    arr1 = Symbolics.SConst([a, b])
+    arr2 = Symbolics.SConst([c, d])
+    ex = dot(Symbolics.SConst([arr1, arr2]), [[1, 2], [3, 4]])
+    @test isequal(
+        Symbolics.scalarize(Symbolics.linear_expansion(ex, a)), 
+        (Symbolics.SConst(1), 2b + dot(arr2, [3, 4]), true)
+    )
+    @test isequal(
+        Symbolics.scalarize(Symbolics.linear_expansion(ex, b)), 
+        (Symbolics.SConst(2), a + dot(arr2, [3, 4]), true)
+    )
+    @test isequal(
+        Symbolics.scalarize(Symbolics.linear_expansion(ex, c)), 
+        (Symbolics.SConst(3), 4d + dot(arr1, [1, 2]), true)
+    )
+    @test isequal(
+        Symbolics.scalarize(Symbolics.linear_expansion(ex, d)),
+        (Symbolics.SConst(4), 3c + dot(arr1, [1, 2]), true)
+    )
+end
+
+@testset "`linear_expansion` of multiplication when multiplicand is singular" begin
+    @variables x y
+
+    ex = y * (3 * (x + y) - 3x)
+    @test SU.query(isequal(x), unwrap(ex))
+    @test isequal(expand(ex), 3y^2)
+    a, b, islin = Symbolics.linear_expansion(ex, x)
+    @test isequal(a, 0)
+    @test isequal(b, 3y^2)
+    @test islin
+
+    # Also test case when expression itself is not singular, but a term is
+    ex = y * (3 * (x + y) - 3x) * (x + 3)
+    @test isequal(expand(ex), 3y^2 * x + 9y^2)
+    a, b, islin = Symbolics.linear_expansion(ex, x)
+    @test isequal(a, 3y^2)
+    @test isequal(b, 9y^2)
+    @test islin
+end
+
+@testset "`linear_expansion` remainder is free of `x` inside opaque calls" begin
+    @variables x h w c g(..)
+    ex = g(-h * x + ifelse(c > 0, h * x, h * x) + w)
+    a, b, islin = Symbolics.linear_expansion(ex, x)
+    @test islin
+    @test iszero(a)
+    @test isequal(b, g(w))
+    @test !SU.query(isequal(unwrap(x)), unwrap(b))
+end
+
+matmulwrapper(a, b) = a * b
+@register_array_symbolic matmulwrapper(a::AbstractMatrix{Real}, b::AbstractVector{Real}) begin
+    size = size(b)
+    eltype = eltype(a)
+    ndims = 1
+end
+
+@testset "`linear_expansion` with `@register_array_symbolic`" begin
+    @variables x[1:3] p[1:3, 1:3]
+    ex = matmulwrapper(p, x)
+    @test !Symbolics.linear_expansion(ex[1], x[1])[3]
 end

@@ -15,4 +15,5 @@ Symbolics expressions for use in its solvers.
 
 ```@docs
 Symbolics.sympy_limit
+Symbolics.sympy_pythoncall_limit
 ```

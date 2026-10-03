@@ -122,6 +122,9 @@ for pred in [:isequal, :(==)]
     end
 end
 
+Base.floor(d::Dual{T, Num}) where {T} = floor(value(d))
+Base.ceil(d::Dual{T, Num}) where {T} = ceil(value(d))
+
 ###################################
 # General Mathematical Operations #
 ###################################
@@ -271,5 +274,11 @@ end
         $AMBIGUOUS_TYPES
     )
 end
+
+# promotion #
+#-----------#
+
+# needed to avoid ambiguities
+Base.promote_rule(::Type{Dual{T, V, N}}, ::Type{Num}) where {T, V, N} = Dual{T, promote_type(V, Num), N}
 
 end

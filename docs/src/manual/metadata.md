@@ -38,7 +38,8 @@ Symbolics.option_to_metadata_type(::Val{:my_custom}) = MyCustomMetadata
 ```@docs
 Symbolics.VariableDefaultValue
 Symbolics.VariableSource
-Symbolics.CallWithMetadata
-Symbolics.Unknown
 Symbolics.option_to_metadata_type
 ```
+
+`Symbolics.Unknown` is reexported from
+[SymbolicUtils](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.Unknown).

@@ -1,4 +1,5 @@
-using SymbolicUtils: FnType, Sym, metadata
+using SymbolicUtils: FnType, Sym
+using TermInterface: metadata
 using Setfield
 
 const IndexMap = Dict{Char,Char}(
@@ -28,23 +29,54 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 """
 struct VariableSource <: AbstractVariableMetadata end
 
+function _default_is_array_shaped(val)
+    u = unwrap(val)
+    if u isa AbstractArray
+        return ndims(u) > 0
+    elseif u isa SymbolicUtils.BasicSymbolic
+        ush = shape(u)
+        return !(ush isa SymbolicUtils.Unknown) && !isempty(ush)
+    end
+    return false
+end
+
 function setdefaultval(x, val)
     val === nothing && return x
     sh = shape(x)
     if sh isa SymbolicUtils.Unknown
-        @assert sh.ndims == -1 || ndims(val) == sh.ndims """
-        Variable $x must have default of matching `ndims`. Got $val with `ndims` \
-        $(ndims(val)).
-        """
-    else
-        @assert val === missing || isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
-        Variable $x must have default of matching size. Got $val with size \
-        $(size(val)).
-        """
+        if !(sh.ndims == -1 || ndims(val) == sh.ndims)
+            throw(ArgumentError("Variable $x must have default of matching `ndims`. Got $val with `ndims` $(ndims(val))."))
+        end
+    elseif val !== missing && !(symtype(x) <: FnType)
+        if isempty(sh)
+            if _default_is_array_shaped(val)
+                throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+            end
+        elseif size(x) != size(val)
+            throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+        end
     end
-    setmetadata(x, VariableDefaultValue, val)
+    return setmetadata(x, VariableDefaultValue, val)
 end
 
+"""
+    map_subscripts(indices)
+
+Convert the decimal characters in an index to the Unicode subscript
+characters used in symbolic variable names.
+
+# Arguments
+
+- `indices`: an integer or other value whose string representation consists of
+  characters in `-0123456789`.
+
+# Examples
+
+```julia
+julia> Symbolics.map_subscripts(-12)
+"₋₁₂"
+```
+"""
 function map_subscripts(indices)
     str = string(indices)
     join(IndexMap[c] for c in str)
@@ -62,8 +94,23 @@ is the default type of created variables. `x` is the tuple of expressions passed
 macro. `transform` is an optional function that takes constructed variables and performs
 custom postprocessing to them, returning the created variables. This function returns the
 `Expr` for constructing the parsed variables.
+
+See also: [`_parse_vars`](@ref).
 """
 function parse_vars(macroname, type, x, transform = identity)
+    esc(_parse_vars(macroname, type, x, transform))
+end
+
+"""
+    $TYPEDSIGNATURES
+
+The worker function for [`parse_vars`](@ref). This returns the expanded code, exactly as it
+should be run. In other words, this does not require sanitization and the result should be
+passed through `esc` before returning from the macro. `parse_vars` does this automatically.
+This function also guarantees that the last expression in the returned `Expr(:block)` is an
+`Expr(:vect)` of the identifiers for the created variables.
+"""
+function _parse_vars(macroname, type, x, transform = identity)
     ex = Expr(:block)
     var_names = Expr(:vect)
     # if parsing things in the form of
@@ -93,11 +140,10 @@ function parse_vars(macroname, type, x, transform = identity)
                 options = default.args[2].args
                 default = default.args[1]
             end
-            default = esc(default)
         end
         parse_result = SymbolicUtils.parse_variable(var_expr; default_type = type)
         handle_nonconcrete_symtype!(parse_result)
-        sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
+        sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT; do_esc = false)
         sym = handle_maybe_dependent_variable!(parse_result, sym, type)
 
         if options === nothing && cursor < length(x) && isoption(x[cursor + 1])
@@ -109,9 +155,9 @@ function parse_vars(macroname, type, x, transform = identity)
         sym = Expr(:call, transform, Expr(:call, wrap, sym))
 
         if parse_result[:isruntime]
-            varname = Symbol(parse_result[:name])
+            varname = gensym(Symbol(parse_result[:name]))
         else
-            varname = esc(parse_result[:name])
+            varname = parse_result[:name]
         end
         push!(var_names.args, varname)
         push!(ex.args, Expr(:(=), varname, sym))
@@ -175,11 +221,9 @@ function handle_maybe_dependent_variable!(parse_result, sym, type)
     parse_result[:args] = [SymbolicUtils.parse_variable(:(..); default_type = type)]
     parse_result[:type].args[2] = Tuple
     # Re-create the `Sym`
-    sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT)
+    sym = SymbolicUtils.sym_from_parse_result(parse_result, VartypeT; do_esc = false)
     # Change the type
     parse_result[:type] = parse_result[:type].args[3]
-    # Call the `Sym` with the arguments to create a dependent variable.
-    map!(esc, argnames, argnames)
     sym = Expr(:call, sym)
     append!(sym.args, argnames)
     return sym
@@ -199,9 +243,7 @@ function _add_metadata(parse_result, var::Expr, default, macroname::Symbol, meta
         var = Expr(:call, setdefaultval, var, default)
     end
     varname = parse_result[:name]
-    if parse_result[:isruntime]
-        varname = esc(varname)
-    else
+    if !parse_result[:isruntime]
         varname = Meta.quot(varname)
     end
     var = Expr(:call, setmetadata, var, VariableSource, Expr(:tuple, Meta.quot(macroname), varname))
@@ -210,7 +252,7 @@ function _add_metadata(parse_result, var::Expr, default, macroname::Symbol, meta
         Meta.isexpr(ex, :(=)) || error("Metadata must of the form of `key = value`")
         key, value = ex.args
         key_type = option_to_metadata_type(Val{key}())::DataType
-        var = Expr(:call, setmetadata, var, key_type, esc(value))
+        var = Expr(:call, setmetadata, var, key_type, value)
     end
     return var
 end
@@ -281,6 +323,11 @@ A symbol or expression that represents an array can be turned into an array of
 symbols or expressions using the `scalarize` function.
 
 ```jldoctest
+julia> @variables t z(t)[1:3]
+2-element Vector{Any}:
+ t
+  (z(t))[1:3]
+
 julia> Symbolics.scalarize(z)
 3-element Vector{Num}:
  (z(t))[1]
@@ -299,15 +346,8 @@ syntax also applies here.
 julia> a, b, c = :runtime_symbol_value, :value_b, :value_c
 (:runtime_symbol_value, :value_b, :value_c)
 
-julia> vars = @variables t \$a \$b(t) \$c(t)[1:3]
-4-element Vector{Any}:
-      t
- runtime_symbol_value
-   value_b(t)
-       (value_c(t))[1:3]
-
-julia> (t, a, b, c)
-(t, :runtime_symbol_value, :value_b, :value_c)
+julia> length(@variables t \$a \$b(t) \$c(t)[1:3])
+4
 ```
 """
 macro variables(xs...)
@@ -319,6 +359,7 @@ const _fail = Dict()
 getsource(x, val=_fail) = getmetadata(unwrap(x), VariableSource, val)
 
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Num}) = ScalarSymbolic()
+SymbolicIndexingInterface.symbolic_type(::Type{Complex{Symbolics.Num}}) = ScalarSymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr{T, N}}) where {T, N} = ArraySymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr{T}}) where {T} = ArraySymbolic()
 SymbolicIndexingInterface.symbolic_type(::Type{Symbolics.Arr}) = ArraySymbolic()
@@ -330,79 +371,185 @@ end
 
 function SymbolicIndexingInterface.symbolic_evaluate(ex::Union{Num, Arr, BasicSymbolic, Equation, Inequality}, d::Dict; kwargs...)
     val = fixpoint_sub(ex, d; fold = Val(true), kwargs...)
-    return _recursive_unwrap(val; eval = Val(true))
+    return _recursive_unwrap(val, Val(true))
 end
 
 for T in [LinearAlgebra.UpperTriangular, LinearAlgebra.LowerTriangular]
-    @eval function _recursive_unwrap(val::$T; eval::Val{_eval} = Val(false)) where {_eval}
-        $T(_recursive_unwrap(collect(val); eval = Val{_eval}()))
+    @eval function _recursive_unwrap(val::$T, ::Val{eval} = Val(false)) where {eval}
+        $T(_recursive_unwrap(collect(val), Val{eval}()))
     end
 end
 
-function _recursive_unwrap(val; eval::Val{_eval} = Val(false)) where {_eval}
+for T in [LinearAlgebra.Symmetric, LinearAlgebra.Hermitian, LinearAlgebra.Diagonal]
+    @eval function _recursive_unwrap(val::$T, ::Val{eval} = Val(false)) where {eval}
+        return _recursive_unwrap(collect(val), Val{eval}())
+    end
+end
+
+function _recursive_unwrap(val, ::Val{eval} = Val(false)) where {eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
-        if parent(val) !== val
-            return Setfield.@set val.parent = _recursive_unwrap(parent(val); eval = Val{_eval}())
+        if parent(val) !== val && hasfield(typeof(val), :parent)
+            return Setfield.@set val.parent = _recursive_unwrap(parent(val), Val{eval}())
         end
-        return _recursive_unwrap.(val; eval = Val{_eval}())
+        return _recursive_unwrap.(val, Val{eval}())
     else
-        return _eval ? value(val) : unwrap(val)
+        return eval ? value(val) : unwrap(val)
     end
 end
 
-function _recursive_unwrap(val::AbstractSparseArray; eval::Val{_eval} = Val(false)) where {_eval}
+function _recursive_unwrap(val::StaticArraysCore.SizedVector, ::Val{eval} = Val(false)) where {eval}
+    return _recursive_unwrap.(val, Val{eval}())
+end
+
+function _recursive_unwrap(val::AbstractSparseArray, ::Val{eval} = Val(false)) where {eval}
     if val isa AbstractSparseVector
         (Is, Vs) = findnz(val)
-        Vs = _recursive_unwrap.(Vs; eval = Val{_eval}())
+        Vs = _recursive_unwrap.(Vs, Val{eval}())
         return SparseVector(length(val), Is, Vs)
     else
         (Is, Js, Vs) = findnz(val)
-        Vs = _recursive_unwrap.(Vs; eval = Val{_eval}())
+        Vs = _recursive_unwrap.(Vs, Val{eval}())
         return sparse(Is, Js, Vs, size(val)...) 
     end
 end
 
-struct FPSubFilterer{O} end
+struct FPSubFilterer{O, F}
+    fallback_filterer::F
+end
 
-function (::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
+function FPSubFilterer{O}(; fallback_filterer = SymbolicUtils.default_substitute_filter) where {O}
+    FPSubFilterer{O, typeof(fallback_filterer)}(fallback_filterer)
+end
+
+function (filt::FPSubFilterer{O})(ex::BasicSymbolic{T}) where {T, O}
     @match ex begin
         BSImpl.Term(; f) && if f isa Operator end => !(f isa O)
-        _ => SymbolicUtils.default_substitute_filter(ex)
+        _ => filt.fallback_filterer(ex)
     end
 end
 
 """
-    fixpoint_sub(expr, dict; operator = Nothing, maxiters = 1000)
+    FixpointSubstituter{Fold, #= ... =# } <: SymbolicUtils.Substituter{Fold}
 
-Given a symbolic expression, equation or inequality `expr` perform the substitutions in
-`dict` recursively until the expression does not change. Substitutions that depend on one
-another will thus be recursively expanded. For example,
-`fixpoint_sub(x, Dict(x => y, y => 3))` will return `3`. The `operator` keyword can be
-specified to prevent substitution of expressions inside operators of the given type. The
-`maxiters` keyword is used to limit the number of times the substitution can occur to avoid
-infinite loops in cases where the substitutions in `dict` are circular
-(e.g. `[x => y, y => x]`).
+A substituter which repeatedly substitutes an expression until a fixpoint is reached,
+or a maximum number of substitutions in case of circular rules. For example, the rules
+`[x => y, y => x]` will lead to hitting the maximum iterations. This follows
+the same caching rules as
+[`SymbolicUtils.Substituter`](https://symbolicutils.juliasymbolics.org/api/).
+
+See also: [`fixpoint_sub`](@ref).
 """
-function fixpoint_sub(x, dict; operator = Nothing, maxiters = 1000, kw...)
-    y = substitute(x, dict; filterer=FPSubFilterer{operator}(), kw...)
-    iters = maxiters
-    while !isequal(x, y) && iters > 0
-        y = x
-        x = substitute(y, dict; filterer=FPSubFilterer{operator}(), kw...)
+struct FixpointSubstituter{Fold, S <: SU.Substituter{Fold}} <: SU.Substituter{Fold}
+    wrapped::S
+    maxiters::Int
+    warn_maxiters::Bool
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Construct a `FixpointSubstituter` from the given substituter `subber`. Optionally specify
+the maximum number of iterations to substitute. Set `warn_maxiters = false` to suppress
+the warning emitted when substitution hits the iteration limit.
+"""
+function FixpointSubstituter(subber::S; maxiters::Integer = 1000, warn_maxiters::Bool = true) where {Fold, S <: SU.Substituter{Fold}}
+    return FixpointSubstituter{Fold, S}(subber, maxiters, warn_maxiters)
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Construct a `FixpointSubstituter`, specifying whether it constant-folds via `Fold`.
+`Op` prevents substitution of expressions inside operators of the given type. Set
+`warn_maxiters = false` to suppress the warning emitted when substitution hits the
+iteration limit.
+"""
+function FixpointSubstituter{Fold}(
+    rules, filterer = SU.default_substitute_filter, op::Type{Op} = Nothing; maxiters = 1000,
+    warn_maxiters::Bool = true) where {Fold, Op}
+    fpfilterer = FPSubFilterer{Op}(; fallback_filterer = filterer)
+    return FixpointSubstituter(SU.Substituter{Fold}(rules, fpfilterer); maxiters, warn_maxiters)
+end
+
+SymbolicUtils.clear_cache!(s::FixpointSubstituter) = SU.clear_cache!(s.wrapped)
+function SymbolicUtils.get_substitution_dict(s::FixpointSubstituter)
+    return SU.get_substitution_dict(s.wrapped)
+end
+
+function (sub::FixpointSubstituter)(ex::SymbolicT)
+    iters = sub.maxiters
+    new_ex = sub.wrapped(ex)
+    while !isequal(ex, new_ex) && iters > 0
+        ex = new_ex
+        new_ex = sub.wrapped(new_ex)
         iters -= 1
     end
 
-    if !isequal(x, y)
-        @warn "Did not converge after `maxiters = $maxiters` substitutions. Either there is a cycle in the rules or `maxiters` needs to be higher."
+    if !isequal(ex, new_ex) && iters == 0 && sub.warn_maxiters
+        @warn lazy"""
+        Did not converge after `maxiters = $(sub.maxiters)` substitutions. Either there \
+        is a cycle in the rules or `maxiters` needs to be higher.
+        """
     end
 
-    return x
+    return new_ex
 end
-function fixpoint_sub(x::SparseMatrixCSC, dict; operator = Nothing, maxiters = 1000, kw...)
-    I, J, V = findnz(x)
-    V = fixpoint_sub(V, dict; operator, maxiters, kw...)
-    m, n = size(x)
-    return sparse(I, J, V, m, n)
+
+"""
+    fixpoint_sub(
+        expr, dict, ::Type{OP} = Nothing;
+        maxiters = 1000,
+        warn_maxiters = true,
+        filterer = SymbolicUtils.default_substitute_filter,
+        fold = Val(false),
+    )
+
+Recursively apply the substitutions in `dict` until `expr` no longer changes.
+Substitutions that depend on one another are fully expanded. Circular substitutions stop
+after `maxiters` applications.
+
+# Arguments
+
+- `expr`: symbolic expression, equation, inequality, or array to transform.
+- `dict`: substitution rules accepted by `SymbolicUtils.Substituter`.
+- `OP`: operator type whose contents should not be substituted. The default `Nothing`
+  does not exclude an operator type.
+
+# Keywords
+
+- `maxiters::Integer = 1000`: maximum number of repeated substitutions.
+- `warn_maxiters::Bool = true`: emit a warning when the iteration limit is reached.
+- `filterer = SymbolicUtils.default_substitute_filter`: predicate controlling which
+  expression nodes may be substituted.
+- `fold::Val = Val(false)`: whether to constant-fold while substituting.
+
+# Returns
+
+The transformed value after reaching a fixpoint or the iteration limit.
+
+# Examples
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables x y;
+
+julia> Symbolics.fixpoint_sub(x, Dict(x => y, y => 3))
+3
+```
+
+See also: [`FixpointSubstituter`](@ref).
+"""
+function fixpoint_sub(x, dict, ::Type{OP} = Nothing; maxiters = 1000, warn_maxiters::Bool = true, filterer = SymbolicUtils.default_substitute_filter, fold::Val{FOLD} = Val{false}(), kw...) where {OP, FOLD}
+    if get(kw, :operator, nothing) !== nothing
+        Base.depwarn("""
+        The `operator` keyword to `fixpoint_sub` is deprecated. Please pass it as the \
+        third positional argument instead.
+        """, :fixpoint_sub_op_kwarg)
+        return fixpoint_sub(x, dict, kw[:operator]; maxiters, warn_maxiters, filterer, fold)
+    end
+    subber = FixpointSubstituter{FOLD}(dict, filterer, OP; maxiters, warn_maxiters)
+    return subber(x)
 end
 
 function is_array_of_symbolics(x)
@@ -474,7 +621,7 @@ Create a variable with the given name along with subscripted indices with the
 julia> Symbolics.variable(:x, 4, 2, 0)
 x₄ˏ₂ˏ₀
 
-julia> Symbolics.variable(:x, 4, 2, 0, T=Symbolics.FnType)
+julia> Symbolics.variable(:x, 4, 2, 0, T=Symbolics.FnType{Tuple{Real}, Real, Nothing})
 x₄ˏ₂ˏ₀⋆
 ```
 
@@ -507,7 +654,7 @@ function renamed_metadata(metadata::Union{Nothing, SymbolicUtils.MetadataT}, nam
                 v = v::NTuple{2, Symbol}
                 v = (v[1], name)
             end
-            newmeta = Base.ImmutableDict(newmeta, k, v)
+            newmeta = Base.ImmutableDict{DataType, Any}(newmeta, k, v)
         end
         return newmeta
     end
@@ -578,6 +725,7 @@ is_wrapper_type(::Type{T}) where {T <: CallAndWrap} = true
 wraps_type(::Type{T}) where {W, T <: CallAndWrap{W}} = FnType{A, R} where {A, R <: wraps_type(W)}
 iswrapped(::CallAndWrap) = true
 SymbolicUtils.unwrap(x::CallAndWrap) = x.f
+SymbolicUtils.infer_vartype(::Type{CallAndWrap{T}}) where {T} = VartypeT
 SymbolicUtils.symtype(x::CallAndWrap) = symtype(x.f)
 SymbolicIndexingInterface.getname(x::CallAndWrap) = getname(x.f)
 SymbolicIndexingInterface.hasname(x::CallAndWrap) = hasname(x.f)

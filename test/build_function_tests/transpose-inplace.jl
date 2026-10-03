@@ -1,6 +1,5 @@
 :(function (ˍ₋out, x)
-      begin
-          _out = ˍ₋out
+      let _out = ˍ₋out
           var"%_out" = for _2 = 1:1:4
                   for _1 = 1:1:4
                       begin

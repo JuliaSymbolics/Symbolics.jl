@@ -1,9 +1,42 @@
-using SymbolicUtils
-using StaticArraysCore
+import StaticArraysCore
+import SparseArrays
+using StaticArraysCore: SArray
 import Base: eltype, length, ndims, size, axes, eachindex
 
 ### Wrapper type for dispatch
 
+"""
+    Arr{T, N}(expr)
+
+Array wrapper used by Symbolics to dispatch array-valued symbolic expressions as
+`AbstractArray{T, N}`.
+
+# Fields
+
+- `value::BasicSymbolic`: the unwrapped symbolic expression represented by the
+  array.
+
+# Arguments
+
+- `expr`: an array-valued symbolic expression whose symbolic type is compatible
+  with `Array{T, N}`.
+
+The one-argument constructor `Arr(expr)` infers `T` and `N` from `expr`. In
+ordinary user code, array variables are created with [`@variables`](@ref), and
+`Arr` is primarily useful when defining dispatch for array-valued symbolic
+operations.
+
+# Examples
+
+```julia
+julia> using Symbolics
+
+julia> @variables A[1:2, 1:3]
+
+julia> A isa Symbolics.Arr{<:Any, 2}
+true
+```
+"""
 struct Arr{T,N} <: AbstractArray{T, N}
     value::BasicSymbolic{VartypeT}
 
@@ -42,9 +75,10 @@ SymbolicUtils.symtype(x::Arr) = symtype(unwrap(x))
 SymbolicUtils.setmetadata(x::Arr{T, N}, t, v) where {T, N} = Arr{T, N}(SymbolicUtils.setmetadata(unwrap(x), t, v))
 SymbolicUtils.getmetadata(x::Arr, t) = SymbolicUtils.getmetadata(unwrap(x), t)
 SymbolicUtils.hasmetadata(x::Arr, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
+SymbolicUtils.infer_vartype(::Type{Arr{T, N}}) where {T, N} = VartypeT
 
-function (s::SymbolicUtils.Substituter)(x::Arr)
-    Arr(s(unwrap(x)))
+function (s::SymbolicUtils.Substituter)(x::Arr{T, N}) where {T, N}
+    Arr{T, N}(s(unwrap(x)))
 end
 
 maybewrap(T) = has_symwrapper(T) ? wrapper_type(T) : T
@@ -102,14 +136,78 @@ for (T1, T2) in [
     (BasicSymbolic{TreeReal}, Arr{<:Any, 2}),
 ]
     @eval function Base.:(\)(A::$T1, b::$T2)
-        unwrap(A) \ unwrap(b)
+        return wrap(unwrap(A) \ unwrap(b))
     end
 end
 
+const _HermitianOrSymmetric = Union{
+    LinearAlgebra.Hermitian{T, S}, LinearAlgebra.Symmetric{T, S},
+} where {T, S}
+# SparseArrays dispatches `\` on this non-public abstract storage type, so exact
+# intersections with its methods cannot be expressed through `SparseMatrixCSC`.
+for T in (
+            LinearAlgebra.Bidiagonal,
+            LinearAlgebra.Diagonal,
+            LinearAlgebra.SymTridiagonal,
+            _HermitianOrSymmetric,
+            Union{LinearAlgebra.LowerTriangular, LinearAlgebra.UpperTriangular},
+            Union{LinearAlgebra.UnitLowerTriangular, LinearAlgebra.UnitUpperTriangular},
+            Union{
+                LinearAlgebra.Adjoint{<:Any, <:LinearAlgebra.Bidiagonal},
+                LinearAlgebra.Transpose{<:Any, <:LinearAlgebra.Bidiagonal},
+            },
+            SparseArrays.AbstractSparseMatrixCSC,
+            LinearAlgebra.Adjoint{<:Any, <:SparseArrays.AbstractSparseMatrixCSC},
+            LinearAlgebra.Transpose{<:Any, <:SparseArrays.AbstractSparseMatrixCSC},
+        ), N in (1, 2)
+    @eval Base.:(\)(A::$T, b::Arr{<:Any, $N}) = wrap(unwrap(A) \ unwrap(b))
+end
+if isdefined(LinearAlgebra, :UpperHessenberg)
+    for N in (1, 2)
+        @eval function Base.:(\)(
+                A::Union{
+                    LinearAlgebra.UpperHessenberg,
+                    LinearAlgebra.Adjoint{T, S} where {
+                        T, S <: (LinearAlgebra.UpperHessenberg{T, S2} where {S2 <: AbstractMatrix{T}}),
+                    },
+                    LinearAlgebra.Transpose{T, S} where {
+                        T, S <: (LinearAlgebra.UpperHessenberg{T, S2} where {S2 <: AbstractMatrix{T}}),
+                    },
+                }, b::Arr{<:Any, $N}
+            )
+            return wrap(unwrap(A) \ unwrap(b))
+        end
+    end
+end
+function Base.:(\)(
+        A::LinearAlgebra.Diagonal{T, StaticArraysCore.SVector{N, T}}, b::Arr{<:Any, 1}
+    ) where {T, N}
+    return wrap(unwrap(A) \ unwrap(b))
+end
+function Base.:(\)(
+        A::LinearAlgebra.Diagonal{Num, StaticArraysCore.SVector{N, Num}},
+        b::Arr{Num, 1}
+    ) where {N}
+    return wrap(unwrap(A) \ unwrap(b))
+end
+
+Base.ifelse(x::Num, y::Arr{T, N}, z) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+function Base.ifelse(x::Num, y::Arr, z::Arr)
+    size(y) == size(z) || error("Both branches of `ifelse` must have the same shape.")
+    return Arr(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+end
+Base.ifelse(x::Num, y::Arr{T, N}, z::Num) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+Base.ifelse(x::Num, y::Num, z::Arr{T, N}) where {T, N} = Arr{T, N}(ifelse(unwrap(x), unwrap(y), unwrap(z)))
+
+Base.exp(A::Arr{T, 2}) where {T} = Arr{T, 2}(exp(unwrap(A)))
+Base.:^(A::Arr{<:Any, 2}, x::Num) = wrap(unwrap(A)^unwrap(x))
+# `Arr` has no `similar`; Base generics that `copy` an intermediate (e.g. `/`) need this.
+Base.copy(x::Arr) = wrap(copy(unwrap(x)))
 Base.inv(A::Arr{T, 2}) where {T} = Arr{T, 2}(inv(unwrap(A)))
 LinearAlgebra.det(A::Arr{T, 2}) where {T} = T(det(unwrap(A)))
-LinearAlgebra.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
-LinearAlgebra.adjoint(A::Arr{T, 1}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
+Base.adjoint(A::Arr{T, 2}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
+Base.adjoint(A::Arr{T, 1}) where {T} = Arr{T, 2}(adjoint(unwrap(A)))
 function LinearAlgebra.norm(A::Arr{T}) where {T}
     if is_wrapper_type(T)
         T(norm(unwrap(A)))
@@ -132,7 +230,21 @@ function LinearAlgebra.norm(A::Arr{T}, p::Real) where {T}
     end
 end
 
-SymbolicUtils.scalarize(x::Arr) = SymbolicUtils.scalarize(unwrap(x))
+# A scalarized vector is an ordinary `AbstractVector{<:Num}`, not an `Arr`, so it
+# missed the methods above and fell into the generic implementation, which expands
+# to `sqrt(sum(abs2, v))`. That is a different expression: the `norm` atom is gone,
+# which matters to anything analysing the result rather than evaluating it.
+function LinearAlgebra.norm(v::AbstractVector{<:Num}, p::Real = 2)
+    return wrap(Symbolics.term(norm, map(unwrap, v), p; type = Real))
+end
+
+function SymbolicUtils.scalarize(x::Arr{T, N}, ::Val{toplevel}) where {toplevel, T, N}
+    scal = SymbolicUtils.scalarize(unwrap(x), Val{toplevel}())::(AbstractArray{_T, N} where {_T})
+    if is_wrapper_type(T)
+        scal = map(T, scal)
+    end
+    return scal
+end
 
 Base.isempty(x::Arr) = isempty(unwrap(x))
 Base.collect(x::Arr) = wrap.(collect(unwrap(x)))

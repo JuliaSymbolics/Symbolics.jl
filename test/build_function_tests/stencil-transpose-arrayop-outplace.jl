@@ -1,6 +1,5 @@
 :(function (x,)
-      begin
-          _out = (zeros)(Float64, (map)(length, (1:6, 1:6)))
+      let _out = (zeros)(Float64, (map)(length, (1:6, 1:6)))
           var"%_out" = begin
                   _out_1 = (view)(_out, 2:5, 2:5)
                   var"%_out_1" = for var"%jj′" = (zip)(Base.OneTo(4), (Symbolics.reset_to_one)(Base.OneTo(4)))

@@ -77,3 +77,5 @@ eq = taylor(eq, x, 0, 1; rationalize=false, fold=Val(false))
 I = Integral(x in (0, 2a))
 @test isequal(taylor_coeff(I(ϵ^2*x+1), ϵ, 1), I(0))
 
+# inside derivatives
+@test isequal(taylor(Differential(x)(sin(x)), x, 0:7), taylor(cos(x), x, 0:6)) # D(sin(x)) = cos(x)
