@@ -246,6 +246,27 @@ end
     @variables x y z
     @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
 
+    @testset "Single rational equation inputs" begin
+        for eq in (x / y ~ 2, x + 1 / y ~ 2)
+            expr = eq.lhs - eq.rhs
+            for input in (eq, Symbolics.wrap(expr), expr)
+                sol = only(symbolic_solve(input, [x, y]))
+                @test issetequal(keys(sol), [x, y])
+                @test isequal(value(simplify_fractions(substitute(expr, sol))), 0)
+            end
+        end
+
+        expr = (x - y) / (x^2 - 2)
+        for input in (expr ~ 0, expr, unwrap(expr))
+            sols = symbolic_solve(input, [x, y])
+            @test sols === nothing || (
+                !isempty(sols) && all(
+                    sol -> isequal(value(simplify_fractions(substitute(expr, sol))), 0), sols
+                )
+            )
+        end
+    end
+
     @testset "Rational systems exclude poles" begin
         for n in (2, 3)
             @test isequal(symbolic_solve([(x - y) / (x^2 - n) ~ 0, y^2 ~ n], [x, y]), [])
@@ -256,6 +277,8 @@ end
                 ([x / y ~ 2, x + y ~ 3], Dict(x => 2, y => 1)),
                 ([1 / x + 1 / y ~ 1, x - y ~ 0], Dict(x => 2, y => 2)),
                 ([(x^2 - y) / (x - 1) ~ 0, x + y ~ 2], Dict(x => -2, y => 4)),
+                ([x / (0.5y) ~ 1, y ~ 2], Dict(x => 1, y => 2)),
+                ([0.5x / y ~ 1, y ~ 2], Dict(x => 4, y => 2)),
             )
             solutions = symbolic_solve(eqs, [x, y])
             @test check_equal(sort_arr(solutions, [x, y]), [expected])
