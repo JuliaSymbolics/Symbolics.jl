@@ -203,3 +203,135 @@ function contains_var(var, vars)
     end
     return false
 end
+
+function is_exact_polynomial(expr)
+    expr = unwrap(expr)
+    if SymbolicUtils.isconst(expr) || expr isa Number
+        c = value(expr)
+        return c isa Integer || (c isa Rational && !iszero(denominator(c)))
+    end
+    is_singleton(expr) && return true
+    iscall(expr) || return false
+    op = operation(expr)
+    args = arguments(expr)
+    if op === (+) || op === (*)
+        return all(is_exact_polynomial, args)
+    elseif op === (^)
+        exponent = value(args[2])
+        return exponent isa Integer && exponent >= 0 && is_exact_polynomial(args[1])
+    end
+    return false
+end
+
+function rational_affine_coefficient(expr)
+    expr = value(expr)
+    expr isa Integer && return big(expr) // big(1)
+    iscall(expr) || return expr
+    op = operation(expr)
+    args = arguments(expr)
+    if op === (^)
+        return rational_affine_coefficient(args[1])^value(args[2])
+    end
+    return op(map(rational_affine_coefficient, args)...)
+end
+
+function canonical_affine_coefficient(expr)
+    return wrap(simplify_fractions(rational_affine_coefficient(expand(expr))))
+end
+
+function exact_affine_solve(eqs, vars)
+    length(eqs) == length(vars) || return nothing
+    isempty(vars) && return nothing
+    A, bvec, islinear = linear_expansion(wrap.(bigify.(eqs)), vars)
+    islinear || return nothing
+    x_set = Set(unwrap(v) for v in vars)
+    for e in Iterators.flatten((A, bvec))
+        any(v -> v in x_set, get_variables(e)) && return nothing
+    end
+    A = canonical_affine_coefficient.(wrap.(bigify.(A)))
+    bvec = -wrap.(bigify.(bvec))
+    n = length(vars)
+    previous_pivot = one(Num)
+    for k in 1:n
+        pivot = findfirst(i -> !_iszero(A[i, k]), k:n)
+        isnothing(pivot) && return nothing
+        pivot += k - 1
+        if pivot != k
+            A[k, :], A[pivot, :] = A[pivot, :], A[k, :]
+            bvec[k], bvec[pivot] = bvec[pivot], bvec[k]
+        end
+        for i in (k + 1):n
+            for j in (k + 1):n
+                A[i, j] = canonical_affine_coefficient(
+                    (A[k, k] * A[i, j] - A[i, k] * A[k, j]) / previous_pivot
+                )
+            end
+            bvec[i] = canonical_affine_coefficient(
+                (A[k, k] * bvec[i] - A[i, k] * bvec[k]) / previous_pivot
+            )
+            A[i, k] = 0
+        end
+        previous_pivot = A[k, k]
+    end
+    determinant = A[n, n]
+    for i in (n - 1):-1:1
+        numerator = bvec[i] * determinant
+        for j in (i + 1):n
+            numerator -= A[i, j] * bvec[j]
+        end
+        bvec[i] = canonical_affine_coefficient(numerator / A[i, i])
+    end
+    bvec = canonical_affine_coefficient.(bvec ./ determinant)
+    return bvec
+end
+
+# Strip outer integer powers and nonzero constant factors so that f^n and c*f^n
+# share the zero set of f when multiplicities are discarded.
+function drop_outer_multiplicities(expression)
+    expression = unwrap(expression)
+    changed = true
+    while changed && iscall(expression)
+        changed = false
+        op = operation(expression)
+        args = arguments(expression)
+        if isequal(op, ^) && SymbolicUtils.isconst(args[2])
+            a2 = unwrap_const(args[2])
+            if a2 isa Integer && a2 > 0
+                expression = unwrap(args[1])
+                changed = true
+                continue
+            end
+        elseif isequal(op, *)
+            new_factors = Any[]
+            local_changed = false
+            for a in args
+                a = unwrap(a)
+                if iscall(a) && isequal(operation(a), ^)
+                    aa = arguments(a)
+                    if SymbolicUtils.isconst(aa[2])
+                        exp = unwrap_const(aa[2])
+                        if exp isa Integer && exp > 0
+                            push!(new_factors, aa[1])
+                            local_changed = true
+                            continue
+                        end
+                    end
+                    push!(new_factors, a)
+                elseif SymbolicUtils.isconst(a) || a isa Number
+                    if isequal(a, 0) || (a isa Number && iszero(a))
+                        return wrap(0)
+                    end
+                    local_changed = true
+                else
+                    push!(new_factors, a)
+                end
+            end
+            isempty(new_factors) && return wrap(1)
+            expression = length(new_factors) == 1 ? unwrap(new_factors[1]) :
+                unwrap(*(wrap.(new_factors)...))
+            changed = local_changed
+            continue
+        end
+    end
+    return wrap(expression)
+end
