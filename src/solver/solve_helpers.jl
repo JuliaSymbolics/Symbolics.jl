@@ -41,6 +41,25 @@ end
 SymbolicUtils.promote_symtype(::typeof(ssqrt), ::Type{T}) where {T} = T
 SymbolicUtils.promote_shape(::typeof(ssqrt), @nospecialize(sh::SymbolicUtils.ShapeT)) = sh
 
+function SymbolicUtils.simplify(n::BasicSymbolic{VartypeT}; kw...)
+    root_powers = Postwalk(
+        Chain(
+            (
+                (@rule ssqrt(~x)^2 => ~x),
+                (@rule scbrt(~x)^3 => ~x),
+            )
+        )
+    )
+    initial = root_powers(n)
+    result = invoke(SymbolicUtils.simplify, Tuple{Any}, initial; kw...)
+    rewritten = root_powers(result)
+    if !isequal(initial, n) || !isequal(rewritten, result)
+        result = rewritten
+        result = invoke(SymbolicUtils.simplify, Tuple{Any}, result; kw...)
+    end
+    return root_powers(result)
+end
+
 @register_derivative ssqrt(x) I begin
     substitute(@derivative_rule(sqrt(x), I), sqrt => ssqrt)
 end
@@ -129,6 +148,7 @@ function bigify(n)
 
     if n isa SymbolicUtils.BasicSymbolic
         !iscall(n) && return n
+        operation(n) === getindex && return n
         args = copy(parent(arguments(n)))
         for i in eachindex(args)
             args[i] = Const{VartypeT}(bigify(args[i]))
