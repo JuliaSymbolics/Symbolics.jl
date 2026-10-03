@@ -24,6 +24,29 @@ test_equal(a, b) = @test isequal(unwrap_const(simplify(unwrap(a))), unwrap_const
     @test_throws ErrorException Differential(2)(2x)
 end
 
+@testset "Differential target must be a variable" begin
+    @variables a b t2 z2(t2) aa[1:3] (g2)(..)
+    @test_throws ArgumentError Differential(2a)
+    @test_throws ArgumentError Differential(a + b)
+    @test_throws ArgumentError Differential(a / b)
+    @test_throws ArgumentError Differential(a^2)
+    @test_throws ArgumentError Differential(sin(a))
+    @test_throws ArgumentError Differential(aa[1:2])
+    @test_throws ArgumentError Symbolics.derivative(a, 2a)
+    @test_throws ArgumentError Symbolics.derivative(a^2, 2a)
+    @test_throws ArgumentError Symbolics.derivative(2a, 2a)
+    @test_throws ArgumentError expand_derivatives(Differential(2a)(a))
+    @test_throws ArgumentError Symbolics.derivative(a, Num(0))
+    @test Differential(a) isa Differential
+    @test Differential(z2) isa Differential
+    @test Differential(g2(a)) isa Differential
+    @test Differential(aa[1]) isa Differential
+    @test Differential(Differential(t2)(z2)) isa Differential
+    @test Symbolics.derivative(2a, a) == 2
+    @test Symbolics.derivative(z2, z2) == 1
+    @test Symbolics.derivative(aa[1], aa[1]) == 1
+end
+
 #@test @macroexpand(@derivatives D'~t D2''~t) == @macroexpand(@derivatives (D'~t), (D2''~t))
 
 @test isequal(unwrap_const(expand_derivatives(D(t))), 1)
