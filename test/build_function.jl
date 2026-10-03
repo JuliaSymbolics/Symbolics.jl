@@ -589,18 +589,18 @@ end
             g(out, [2, 3])
             @test out == [6, 3, 12, 6]
         end
-        for wrap in (
-                b -> Let([Assignment(z, x * y)], b, true),
-                b -> Let([Assignment(z, 1)], Let([Assignment(z, x * y)], b, true), true),
-                b -> Let([Assignment(DestructuredArgs([z], :values), LiteralExpr(:([6])))], b, false),
-                b -> Let([DestructuredArgs([z], LiteralExpr(:([6])))], b, false),
-                b -> Let([Assignment(LiteralExpr(:((z,))), LiteralExpr(:((6,))))], b, false),
-                b -> Let([Assignment(DestructuredArgs((z,), :values), LiteralExpr(:([6])))], b, false),
-                b -> Let([Assignment(LiteralExpr(:((_, z))), LiteralExpr(:((1, 6))))], b, false),
-            )
+        for expression in (Val{false}, Val(false), false), wrap in (
+                    b -> Let([Assignment(z, x * y)], b, true),
+                    b -> Let([Assignment(z, 1)], Let([Assignment(z, x * y)], b, true), true),
+                    b -> Let([Assignment(DestructuredArgs([z], :values), LiteralExpr(:([6])))], b, false),
+                    b -> Let([DestructuredArgs([z], LiteralExpr(:([6])))], b, false),
+                    b -> Let([Assignment(LiteralExpr(:((z,))), LiteralExpr(:((6,))))], b, false),
+                    b -> Let([Assignment(DestructuredArgs((z,), :values), LiteralExpr(:([6])))], b, false),
+                    b -> Let([Assignment(LiteralExpr(:((_, z))), LiteralExpr(:((1, 6))))], b, false),
+                )
             f, g = build_function(
                 [z + 1, z + 2, x, y], [x, y];
-                parallel, expression = Val{false}, postprocess_fbody = wrap
+                parallel, expression, postprocess_fbody = wrap
             )
             @test f([2, 3]) == [7, 8, 2, 3]
             out = zeros(Int, 4)

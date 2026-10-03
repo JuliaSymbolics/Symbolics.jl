@@ -410,7 +410,7 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
 
     capture_bindings = parallel isa ShardedForm{false} ||
-        (parallel isa MultithreadedForm && expression == Val{false})
+        (parallel isa MultithreadedForm && expression != Val{true})
     process_body = capture_bindings ?
         body -> _capture_shard_bindings(postprocess_fbody(body), Any[]) : postprocess_fbody
 
