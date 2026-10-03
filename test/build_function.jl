@@ -517,8 +517,10 @@ end
     u = [2.0, 3.0]
 
     for parallel in (Symbolics.ShardedForm(1, 2), Symbolics.MultithreadedForm(1, 2))
-        f_oop, f_iip = build_function(ex, [x, y]; parallel = parallel,
-                                      postprocess_fbody = wrap, expression = Val{false})
+        f_oop, f_iip = build_function(
+            ex, [x, y]; parallel = parallel,
+            postprocess_fbody = wrap, expression = Val{false}
+        )
         @test f_oop(u) == expected
         out = zeros(4)
         f_iip(out, u)

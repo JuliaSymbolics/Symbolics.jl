@@ -422,14 +422,18 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     if iip
         out = Sym{VartypeT}(DEFAULT_OUTSYM; type = Any, shape = SymbolicUtils.Unknown(-1))
-        iip_expr = Func(vcat(out, dargs), [], set_array(parallel,
-                                    dargs,
-                                    out,
-                                    outputidxs,
-                                    rhss,
-                                    checkbounds,
-                                    skipzeros,
-                                    postprocess_fbody))
+        iip_expr = Func(
+            vcat(out, dargs), [], set_array(
+                parallel,
+                dargs,
+                out,
+                outputidxs,
+                rhss,
+                checkbounds,
+                skipzeros,
+                postprocess_fbody
+            )
+        )
         if wrap_code[2] !== nothing
             iip_expr = wrap_code[2](iip_expr)
         end
@@ -470,17 +474,19 @@ _nnz(x::Union{Base.ReshapedArray, LinearAlgebra.Transpose}) = _nnz(parent(x))
 
 function make_array(s, dargs, arr, similarto, postprocess_fbody = identity)
     s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
-    postprocess_fbody(_make_array(arr, similarto))
+    return postprocess_fbody(_make_array(arr, similarto))
 end
 
 function make_array(s::SerialForm, dargs, arr, similarto, postprocess_fbody = identity)
-    postprocess_fbody(_make_array(arr, similarto))
+    return postprocess_fbody(_make_array(arr, similarto))
 end
 
 function make_array(s::ShardedForm, closed_args, arr, similarto, postprocess_fbody = identity)
     if arr isa AbstractSparseArray
-        return term(SparseMatrixCSC, arr.m, arr.n, copy(arr.colptr), copy(arr.rowval),
-                    make_array(s, closed_args, arr.nzval, Vector, postprocess_fbody))
+        return term(
+            SparseMatrixCSC, arr.m, arr.n, copy(arr.colptr), copy(arr.rowval),
+            make_array(s, closed_args, arr.nzval, Vector, postprocess_fbody)
+        )
     end
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
@@ -613,15 +619,19 @@ _make_array(x, similarto) = x
 
 ## In-place version
 
-function set_array(p, closed_vars, out, outputidxs, rhss, checkbounds, skipzeros,
-                   postprocess_fbody = identity)
+function set_array(
+        p, closed_vars, out, outputidxs, rhss, checkbounds, skipzeros,
+        postprocess_fbody = identity
+    )
     p !== nothing && Base.@warn("Parallel form of $(typeof(p)) not implemented")
-    postprocess_fbody(_set_array(out, outputidxs, rhss, checkbounds, skipzeros))
+    return postprocess_fbody(_set_array(out, outputidxs, rhss, checkbounds, skipzeros))
 end
 
-function set_array(s::SerialForm, closed_vars, out, outputidxs, rhss, checkbounds, skipzeros,
-                   postprocess_fbody = identity)
-    postprocess_fbody(_set_array(out, outputidxs, rhss, checkbounds, skipzeros))
+function set_array(
+        s::SerialForm, closed_vars, out, outputidxs, rhss, checkbounds, skipzeros,
+        postprocess_fbody = identity
+    )
+    return postprocess_fbody(_set_array(out, outputidxs, rhss, checkbounds, skipzeros))
 end
 
 function recursive_split(leaf_f, s, out, args, outputidxs, xs)
@@ -645,17 +655,21 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
     end
 end
 
-function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros,
-                   postprocess_fbody = identity)
+function set_array(
+        s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros,
+        postprocess_fbody = identity
+    )
     if rhss isa AbstractSparseArray
-        return set_array(s,
-                         closed_args,
-                         LiteralExpr(:($out.nzval)),
-                         nothing,
-                         rhss.nzval,
-                         checkbounds,
-                         skipzeros,
-                         postprocess_fbody)
+        return set_array(
+            s,
+            closed_args,
+            LiteralExpr(:($out.nzval)),
+            nothing,
+            rhss.nzval,
+            checkbounds,
+            skipzeros,
+            postprocess_fbody
+        )
     end
 
     outvar = !(out isa Sym) ? gensym("out") : out
@@ -665,9 +679,11 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     end
     all_args = [outvar, closed_args...]
     ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
-        Func(all_args, [],
-             postprocess_fbody(_set_array(outvar, idxs, xs, checkbounds, skipzeros)),
-             [])
+        Func(
+            all_args, [],
+            postprocess_fbody(_set_array(outvar, idxs, xs, checkbounds, skipzeros)),
+            []
+        )
     end.body
 
     return out isa Sym ? ex : LiteralExpr(quote
