@@ -32,9 +32,12 @@ end
     @test_throws ArgumentError Differential(a^2)
     @test_throws ArgumentError Differential(sin(a))
     @test_throws ArgumentError Differential(aa[1:2])
+    @test_throws ArgumentError Differential((2aa)[1])
     @test_throws ArgumentError Symbolics.derivative(a, 2a)
     @test_throws ArgumentError Symbolics.derivative(a^2, 2a)
     @test_throws ArgumentError Symbolics.derivative(2a, 2a)
+    @test_throws ArgumentError Symbolics.derivative(aa[1], (2aa)[1])
+    @test_throws ArgumentError Symbolics.derivative(aa[1], Symbolics.scalarize((2aa)[1]))
     @test_throws ArgumentError expand_derivatives(Differential(2a)(a))
     @test_throws ArgumentError Symbolics.derivative(a, Num(0))
     @test Differential(a) isa Differential
@@ -45,6 +48,18 @@ end
     @test Symbolics.derivative(2a, a) == 2
     @test Symbolics.derivative(z2, z2) == 1
     @test Symbolics.derivative(aa[1], aa[1]) == 1
+end
+
+@testset "Generated chain-rule derivatives survive substitution" begin
+    @variables x y (g)(..)
+    d = Symbolics.derivative(g(2x), x)
+    @test isequal(Symbolics.substitute_in_deriv(d, Dict(y => x)), d)
+    @test isequal(Symbolics.substitute_in_deriv_and_depvar(d, Dict(y => x)), d)
+    # `substitute_in_deriv` does not descend into called symbolic functions
+    renamed = 2 * Symbolics.Differential(unwrap(2y); unsafe = true)(unwrap(g(2x)))
+    @test isequal(Symbolics.substitute_in_deriv(d, Dict(x => y)), renamed)
+    @test isequal(Symbolics.substitute_in_deriv_and_depvar(d, Dict(x => y)), Symbolics.derivative(g(2y), y))
+    @test isequal(expand_derivatives(Symbolics.substitute_in_deriv_and_depvar(d, Dict(x => y))), Symbolics.derivative(g(2y), y))
 end
 
 #@test @macroexpand(@derivatives D'~t D2''~t) == @macroexpand(@derivatives (D'~t), (D2''~t))

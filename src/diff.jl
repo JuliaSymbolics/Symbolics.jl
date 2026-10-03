@@ -27,7 +27,7 @@ Differential(x, 3)
 ```
 """
 struct Differential <: Operator
-    """The variable or expression to differentiate with respect to."""
+    """The variable to differentiate with respect to. Must be a symbolic variable, a called symbolic function or dependent variable (`x(t)`), a scalar-indexed element of these (`x[i]`), or an operator application (e.g. `D(t)(u)`); constructing over any other expression throws an `ArgumentError`."""
     x::BasicSymbolic{VartypeT}
     """The derivative order. Can be rational for fractional derivatives."""
     order::Union{Int, Rational{Int}}
@@ -35,13 +35,9 @@ struct Differential <: Operator
         @assert order > 0 "Derivative order must be positive"
         if !unsafe
             @match x begin
-                BSImpl.Const(;) => throw(ArgumentError("Cannot take derivative with respect to constant."))
-                BSImpl.Sym(;) => nothing
-                # Called symbolic functions/dependent variables (`x(t)`), scalar
-                # indexing (`x[i]`), and operator applications (e.g. `D(t)(u)`)
-                # act as variables.
-                BSImpl.Term(; f) && if f isa BasicSymbolic{VartypeT} || f === getindex || f isa Operator end => nothing
-                _ => throw(ArgumentError("Cannot take derivative with respect to a non-variable expression `$x`."))
+                BSImpl.Const() => throw(ArgumentError("Cannot take derivative with respect to constant."))
+                _ => _is_differential_target(x) ||
+                    throw(ArgumentError("Cannot take derivative with respect to a non-variable expression `$x`."))
             end
         end
         return new(x, order)
@@ -51,7 +47,7 @@ struct Differential <: Operator
     Differential(::Union{AbstractFloat, Integer}) = error("D(::Number) is not a valid derivative. Derivatives must be taken w.r.t. symbolic variables.")
 end
 function (D::Differential)(x::BasicSymbolic{VartypeT})
-    @match x begin
+    return @match x begin
         BSImpl.Term(; f, args) && if f isa Differential && isequal(f.x, D.x) end => begin
             return Differential(D.x, D.order + f.order; unsafe = true)(args[1])
         end
@@ -66,8 +62,23 @@ end
 SymbolicUtils.isbinop(f::Differential) = false
 
 function (s::SymbolicUtils.Substituter)(x::Differential)
-    Differential(s(x.x), x.order)
+    return Differential(s(x.x), x.order; unsafe = true)
 end
+
+function _is_differential_target(x::BasicSymbolic{VartypeT})
+    return @match x begin
+        BSImpl.Sym() => true
+        BSImpl.Term(; f, args) => if f isa BasicSymbolic{VartypeT} || f isa Operator
+            true
+        elseif f === getindex
+            _is_differential_target(args[1])
+        else
+            false
+        end
+        _ => false
+    end
+end
+_is_differential_target(x) = false
 
 function SymbolicUtils.operator_to_term(::Differential, ex::BasicSymbolic{VartypeT})
     return diff2term(ex)
