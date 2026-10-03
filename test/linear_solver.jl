@@ -199,6 +199,42 @@ end
     end
 end
 
+@testset "linear_expansion scalar and array unknown compatibility" begin
+    @variables x q[1:3] b[1:3]
+    zero_result = (unwrap(Num(0)), unwrap(Num(0)), false)
+    for t in (
+            unwrap(q[1] + 2), unwrap(q[1] * q[2]), unwrap(sum(q)),
+            unwrap(dot(b, q)) + 1, Num(x) + q[1],
+        )
+        result = Symbolics.linear_expansion(t, unwrap(q))
+        @test isequal(result, zero_result)
+        @test typeof(result) === typeof(zero_result)
+    end
+    for (t, expected) in (
+            (unwrap(q + b), (unwrap(Num(1)), unwrap(b), true)),
+            (unwrap(b), (unwrap(Num(0)), unwrap(b), true)),
+            (unwrap(q), (unwrap(Num(1)), unwrap(Num(0)), true)),
+        )
+        result = Symbolics.linear_expansion(t, unwrap(q))
+        @test isequal(result, expected)
+        @test typeof(result) === typeof(expected)
+    end
+end
+
+@testset "linear_expansion zero remainder types" begin
+    @variables x y p
+    for (t, expected) in (
+            (0.5x, 0.0), ((1 // 2) * x, 0 // 1),
+            (x + 0.5y, 0.0), (x + (1 // 2) * y, 0 // 1),
+            (0.5x + y, 0), (x + p * y + 0.5y, 0),
+        )
+        _, b, islin = Symbolics.linear_expansion([t], [x, y])
+        @test islin
+        @test isequal(b, [unwrap(Num(expected))])
+        @test typeof(unwrap_const(b[1])) === typeof(expected)
+    end
+end
+
 @testset "linear_expansion of ifelse" begin
     @variables p
     a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p + 1, 3p + 2), p)

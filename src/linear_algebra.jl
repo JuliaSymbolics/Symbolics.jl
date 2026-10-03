@@ -250,6 +250,14 @@ end
 When `islinear`, return `a` and `b` such that `a * x + b == t`. Instead of calling
 `linear_expansion` multiple times with the same `x`, prefer using
 [`Symbolics.LinearExpander`](@ref).
+
+For arrays of unknowns, array expressions and equations are scalarized to return a
+coefficient matrix and a remainder vector. An unwrapped symbolic array used as a
+single unknown retains the scalar coefficient form when `LinearExpander` succeeds.
+If that form is not linear, array-shaped expressions can instead be expanded with
+respect to its scalar entries. If neither form is linear, the single-unknown result
+is returned.
+Scalar expressions against an unwrapped array unknown retain the single-unknown result.
 """
 function linear_expansion(t, x::Num)
     a, b, islin = linear_expansion(t, unwrap(x))
@@ -265,10 +273,16 @@ function linear_expansion(t::Equation, x::Arr)
 end
 
 @inline function linear_expansion(t, x::SymbolicT)
-    if symtype(x) <: AbstractArray
-        return linear_expansion(_linear_expansion_scalarize_expr(t), scalarize(x))
+    result = LinearExpander(x)(unwrap(t))
+    (result[3] || !(symtype(x) <: AbstractArray)) && return result
+    isarray = if t isa Equation
+        symtype(t.lhs) <: AbstractArray || symtype(t.rhs) <: AbstractArray
+    else
+        symtype(unwrap(t)) <: AbstractArray
     end
-    return LinearExpander(x)(unwrap(t))
+    isarray || return result
+    expanded = linear_expansion(_linear_expansion_scalarize_expr(t), scalarize(x))
+    return expanded[3] ? expanded : result
 end
 
 function _linear_expansion_scalarize_expr(t)
@@ -326,7 +340,7 @@ end
 function _linear_expansion_fast_row!(
         A::AbstractMatrix{SymbolicT}, bvec::Vector{SymbolicT},
         i::Int, t::SymbolicT, x_to_j::Dict{SymbolicT, Int},
-        parents::Set{SymbolicT}
+        parents::Set{SymbolicT}, xs::AbstractArray
     )
     j = get(x_to_j, t, 0)
     if j > 0
@@ -340,6 +354,8 @@ function _linear_expansion_fast_row!(
         end => begin
             b_dict = dict
             b_dirty = false
+            last_j = 0
+            last_dict = empty(dict)
             for (k, v) in dict
                 class = _classify_linear_monomial(k, x_to_j, parents)
                 if class === :constant
@@ -348,6 +364,11 @@ function _linear_expansion_fast_row!(
                     return :fallback
                 else
                     j, a = class
+                    if j > last_j
+                        last_j = j
+                        empty!(last_dict)
+                    end
+                    j == last_j && (last_dict[k] = v)
                     if !b_dirty
                         b_dict = copy(dict)
                         b_dirty = true
@@ -362,6 +383,12 @@ function _linear_expansion_fast_row!(
                 bvec[i] = t
             else
                 bvec[i] = SymbolicUtils.Add{VartypeT}(coeff, b_dict; type, shape)
+                if _iszero(bvec[i])
+                    # The last extraction determines the zero remainder's numeric type.
+                    last_t = SymbolicUtils.Add{VartypeT}(coeff, last_dict; type, shape)
+                    _, bvec[i], islin = LinearExpander(unwrap(xs[last_j]))(last_t)
+                    islin || return :fallback
+                end
             end
             return true
         end
@@ -375,7 +402,7 @@ function _linear_expansion_fast_row!(
             else
                 j, a = class
                 A[i, j] = a
-                bvec[i] = COMMON_ZERO
+                bvec[i] = COMMON_ZERO * a
                 return true
             end
         end
@@ -408,7 +435,7 @@ function linear_expansion(ts::AbstractArray{T}, xs::AbstractArray{S}) where {T <
     bvec = Vector{SymbolicT}(undef, length(ts))
     for (i, t) in enumerate(ts)
         resid = t isa Equation ? unwrap(t.rhs - t.lhs) : unwrap(t)
-        status = _linear_expansion_fast_row!(A, bvec, i, resid, x_to_j, parents)
+        status = _linear_expansion_fast_row!(A, bvec, i, resid, x_to_j, parents, xs)
         status === :fallback && return _linear_expansion_slow(ts, xs)
     end
     return A, bvec, true
