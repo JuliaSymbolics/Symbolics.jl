@@ -235,6 +235,24 @@ end
     @variables x y z
     @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
 
+    eqs = [x^2 + y^2 - 1, y - z - x^2]
+    sol = symbolic_solve(eqs, [x, y])
+    zval = complex(-1 // 4)
+    sol_at_z = [
+        (
+            eval(Symbolics.toexpr(substitute(s[x], Dict(z => zval)))),
+            eval(Symbolics.toexpr(substitute(s[y], Dict(z => zval)))),
+        ) for s in sol
+    ]
+    @test all(
+        isapprox(u^2 + v^2 - 1, 0; atol = 1.0e-12) &&
+            isapprox(v - zval - u^2, 0; atol = 1.0e-12) for (u, v) in sol_at_z
+    )
+    @test any(
+        isapprox(u, sqrt(3) / 2; atol = 1.0e-12) && isapprox(v, 1 / 2; atol = 1.0e-12)
+            for (u, v) in sol_at_z
+    )
+
     # Vector-valued Equation should take the system path
     sol_vec_eq = sort_arr(symbolic_solve([0, 0] ~ [x^2 - 4, x + y], [x, y]), [x, y])
     sol_vec = sort_arr(symbolic_solve([0 ~ x^2 - 4, 0 ~ x + y], [x, y]), [x, y])
@@ -363,6 +381,21 @@ end
 
 @testset "Multivar parametric" begin
     @variables x y a
+    @test length(
+        Symbolics.get_roots_deg4(
+            SymbolicUtils.unwrap(x^4 - 5x^2 + 4), SymbolicUtils.unwrap(x)
+        )
+    ) == 4
+    quartic_roots = symbolic_solve(x^4 + a * x^2 + 1, x)
+    a_value = complex(5.0)
+    numeric_roots = [
+        eval(Symbolics.toexpr(substitute(root, Dict(a => a_value)))) for root in quartic_roots
+    ]
+    residuals = [root^4 + a_value * root^2 + 1 for root in numeric_roots]
+    tolerance = 1000 * eps(one(real(first(numeric_roots))))
+    @test length(quartic_roots) == 4
+    @test all(isapprox(residual, 0.0; atol = tolerance) for residual in residuals)
+
     @test isequal(value(only(symbolic_solve([x + a, a - 1], x))), -1)
     @test isequal(symbolic_solve([x - a, y + a], [x, y]), [Dict(y => -a, x => a)])
     @test isequal(symbolic_solve([x*y - a, x*y + x], [x, y]), [Dict(y => Const{SymReal}(-1), x => -a)])
