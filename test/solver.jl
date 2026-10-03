@@ -246,11 +246,35 @@ end
     @variables x y z
     @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
 
-    solutions = sort_arr(symbolic_solve([x + 1 / y ~ 2, x * y ~ 1], [x, y]), [x, y])
-    @test check_equal(solutions, sort_arr([Dict(x => 1, y => 1)], [x, y]))
+    @testset "Rational systems exclude poles" begin
+        for n in (2, 3)
+            @test isequal(symbolic_solve([(x - y) / (x^2 - n) ~ 0, y^2 ~ n], [x, y]), [])
+        end
 
-    solutions = sort_arr(symbolic_solve([x / y ~ 2, x + y ~ 3], [x, y]), [x, y])
-    @test check_equal(solutions, sort_arr([Dict(x => 2, y => 1)], [x, y]))
+        for (eqs, expected) in (
+                ([x + 1 / y ~ 2, x * y ~ 1], Dict(x => 1, y => 1)),
+                ([x / y ~ 2, x + y ~ 3], Dict(x => 2, y => 1)),
+                ([1 / x + 1 / y ~ 1, x - y ~ 0], Dict(x => 2, y => 2)),
+                ([(x^2 - y) / (x - 1) ~ 0, x + y ~ 2], Dict(x => -2, y => 4)),
+            )
+            solutions = symbolic_solve(eqs, [x, y])
+            @test check_equal(sort_arr(solutions, [x, y]), [expected])
+            @test all(
+                eq -> isequal(value(substitute(eq.lhs - eq.rhs, only(solutions); fold = Val(true))), 0),
+                eqs
+            )
+        end
+
+        for eqs in ([x / y ~ 2], [x / y ~ 2, y / x ~ 1 // 2])
+            sol = only(symbolic_solve(eqs, [x, y]))
+            @test issetequal(keys(sol), [x, y])
+            @test all(root -> issubset(Symbolics.get_variables(root), Set(unwrap.([x, y]))), values(sol))
+            @test all(
+                eq -> isequal(value(simplify_fractions(substitute(eq.lhs - eq.rhs, sol))), 0),
+                eqs
+            )
+        end
+    end
 
     # Vector-valued Equation should take the system path
     sol_vec_eq = sort_arr(symbolic_solve([0, 0] ~ [x^2 - 4, x + y], [x, y]), [x, y])
