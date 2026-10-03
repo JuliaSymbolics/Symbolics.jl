@@ -93,6 +93,16 @@ end
     @test_throws AssertionError symbolic_solve(x, x^2)
 end
 
+@testset "Safe roots simplify in symbolic solves" begin
+    @variables A[1:2, 1:2] λ
+    char_poly = det([A[1, 1] - λ A[1, 2]; A[2, 1] A[2, 2] - λ])
+    roots = symbolic_solve(char_poly, λ)
+
+    @test isequal(value(simplify(prod(λ .- roots) - char_poly; expand = true)), 0)
+    @test isequal(simplify(ssqrt(x)^2), x)
+    @test isequal(simplify(scbrt(x)^3), x)
+end
+
 @testset "Nice univar cases" begin
     found_roots = symbolic_solve(1/x^2 ~ 1/y^2 - 2/x^3 * (x-y), x)
     known_roots = Symbolics.unwrap.([y, -2y])
