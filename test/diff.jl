@@ -815,3 +815,66 @@ end
     @test SymbolicUtils.isarraymaker(arr_no_deriv)
     @test !Symbolics.hasderiv(arr_no_deriv)
 end
+
+@testset "Derivatives of mod and rem" begin
+    @variables x y
+    for (f, q) in ((mod, floor), (rem, trunc))
+        dx = build_function(Symbolics.derivative(f(x, y), x), x, y; expression = Val(false))
+        dy = build_function(Symbolics.derivative(f(x, y), y), x, y; expression = Val(false))
+        @test dx(5.5, 2.0) == 1.0
+        @test dy(5.5, 2.0) == -q(5.5 / 2.0)
+        @test dy(-5.5, 2.0) == -q(-5.5 / 2.0)
+        @test isnan(dx(4.0, 2.0))
+        @test isnan(dy(4.0, 2.0))
+    end
+    @test !(Symbolics.derivative(mod(x, 1.0), x) isa Symbolics.Differential)
+    df = build_function(Symbolics.derivative(mod(x, 1.0), x), x; expression = Val(false))
+    @test df(0.5) == 1
+    @test isequal(Symbolics.derivative(mod(x, 1.0), y), 0)
+end
+
+struct ScaledSquare
+    a::Float64
+end
+(s::ScaledSquare)(x) = s.a * x^2
+dscaledsquare(s::ScaledSquare, x) = 2 * s.a * x
+@register_symbolic dscaledsquare(s::ScaledSquare, x)
+@register_derivative (s::Symbolics.SymbolicCallable{<:ScaledSquare})(x) 1 dscaledsquare(s.f, x)
+
+struct ScaledProduct
+    a::Float64
+end
+(s::ScaledProduct)(x, y) = s.a * x * y
+dscaledproduct1(s::ScaledProduct, x, y) = s.a * y
+@register_symbolic dscaledproduct1(s::ScaledProduct, x, y)
+@register_derivative (s::Symbolics.SymbolicCallable{<:ScaledProduct})(x, y) 1 dscaledproduct1(s.f, x, y)
+
+struct NoRuleCallable end
+
+@testset "Derivative rules of symbolic callables" begin
+    @variables x y t z(t) (f::ScaledSquare)(..) (g::ScaledProduct)(..) (h::NoRuleCallable)(..) k(..) (a::Any)(..)
+    Dx = Differential(x)
+    Dt = Differential(t)
+    fs, gs = unwrap(f), unwrap(g)
+
+    @test isequal(expand_derivatives(Dx(f(x))), dscaledsquare(fs, x))
+    @test isequal(expand_derivatives(Dx(f(x^2))), 2x * dscaledsquare(fs, x^2))
+    @test isequal(expand_derivatives(Dt(f(z))), dscaledsquare(fs, z) * Dt(z))
+    @test isequal(Symbolics.derivative(sin(f(x)), x), cos(f(x)) * dscaledsquare(fs, x))
+    @test isequal(@derivative_rule(fs(unwrap(x)), 1), unwrap(dscaledsquare(fs, x)))
+
+    fn = build_function(Symbolics.derivative(f(x), x), fs, x; expression = Val{false})
+    @test fn(ScaledSquare(3.0), 2.0) == 12.0
+
+    # the partial derivative w.r.t. `y` has no rule, so it is needed only when `y`
+    # depends on the differentiation variable
+    @test isequal(expand_derivatives(Dx(g(x, y))), dscaledproduct1(gs, x, y))
+    @test isequal(expand_derivatives(Dx(g(x, x))), Dx(g(x, x)))
+
+    # symbolic functions without a callable type or without a rule are left unexpanded
+    @test isequal(expand_derivatives(Dx(h(x))), Dx(h(x)))
+    @test isequal(expand_derivatives(Dx(k(x))), Dx(k(x)))
+    @test isequal(expand_derivatives(Dx(a(x))), Dx(a(x)))
+    @test isequal(expand_derivatives(Dx(h(f(x)))), Differential(f(x))(h(f(x))) * dscaledsquare(fs, x))
+    @test isequal(expand_derivatives(Dt(z)), Dt(z))
+end

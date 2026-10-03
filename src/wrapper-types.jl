@@ -121,6 +121,16 @@ function wraps_type end
 has_symwrapper(::Type) = false
 is_wrapper_type(::Type) = false
 
+fntype_callable_type(::Type{FnType{A, R, T}}) where {A, R, T} = T
+fntype_callable_type(::Any) = Nothing
+
+# A symbolic function whose `symtype` is `FnType{A, R, T}` stands for a value of type `T`.
+function symtype_represents(S, T)
+    S <: T && return true
+    C = fntype_callable_type(S)
+    return C !== Nothing && C <: T
+end
+
 function wrap_func_expr(mod, expr, wrap_arrays = true)
     @assert expr.head == :function || (expr.head == :(=) &&
                                        expr.args[1] isa Expr &&
@@ -251,7 +261,7 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         body = Expr(:block)
         for (i, T) in enumerate(Ts)
             if T === BasicSymbolic{VartypeT}
-                push!(body.args, :(@assert $symtype($(names[i])) <: $(types[i][1])))
+                push!(body.args, :(@assert $symtype_represents($symtype($(names[i])), $(types[i][1]))))
             elseif T <: (AbstractArray{S} where {S <: SymbolicT}) && eltype(types[i][1]) !== Any
                 push!(body.args, :(@assert $symtype($(names[i])[1]) <: $(eltype(types[i][1]))))
             end
@@ -307,7 +317,8 @@ the result is re-wrapped with [`Symbolics.wrap`](@ref) whenever at least one arg
 wrapped — so passing `Num`s in gets a `Num` back out, while passing raw `BasicSymbolic`s in
 returns a raw expression. Symbolic arguments additionally get an `@assert` that their
 `symtype` matches the declared annotation, which turns a type mismatch into an error at the
-call rather than a wrong answer downstream.
+call rather than a wrong answer downstream. A symbolic function whose `symtype` is
+`FnType{A, R, T}` matches an annotation `T`, since it stands for a callable of type `T`.
 
 Keyword arguments are forwarded as declared and are not expanded over; only positional
 arguments participate in the product.
