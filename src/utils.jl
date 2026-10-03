@@ -441,10 +441,11 @@ Note that `p` might need to be expanded and/or simplified with `expand` and/or `
 
 For a nonconstant `sym`, throws a `DomainError` if more than one factor of an
 unexpanded product has a nonzero coefficient with respect to `sym` (expand first),
-if `sym` itself is a quotient, or if `sym` appears in the denominator of a fraction.
-An integer power of a quotient also raises a `DomainError` when its denominator
-occurs in `p`'s denominator and its coefficient in the numerator is zero. Functions and
-powers with quotients in their arguments can be used as intact symbolic terms.
+if `sym` itself is a quotient, or if `sym` is a literal subexpression of the denominator.
+For `sym = (n/d)^k` with a positive integer `k`, a fraction with zero coefficient in
+its numerator raises a `DomainError` when its denominator has degree `k` in `d`,
+or when `d` occurs in both its numerator and denominator. Functions and powers
+with quotients in their arguments can be used as intact symbolic terms.
 
 # Examples
 
@@ -464,7 +465,7 @@ julia> Symbolics.coeff(2*x*y + y, x*y)
 2
 ```
 """
-function coeff(p, sym = nothing)
+function coeff(p, sym=nothing)
     # if `sym` is a product, iteratively compute the coefficient w.r.t. each term in `sym`
     if iscall(value(sym)) && operation(value(sym)) === (*)
         for t in arguments(value(sym))
@@ -473,7 +474,7 @@ function coeff(p, sym = nothing)
         end
         return p
     end
-
+            
     p, sym = value(p), value(sym)
 
     if _isone(sym)
@@ -487,7 +488,7 @@ function coeff(p, sym = nothing)
     if issym(p) || SymbolicUtils.isconst(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif isadd(p)
-        if sym === nothing
+        if sym===nothing
             p.coeff
         else
             sum(coeff(k, sym) * v for (k, v) in p.dict)
@@ -510,9 +511,12 @@ function coeff(p, sym = nothing)
             if _iszero(c) && ispow(sym)
                 base, exponent = arguments(sym)
                 exponent = unwrap_const(exponent)
-                if isdiv(base) && exponent isa Real && isinteger(exponent) && exponent > 0 &&
-                        SymbolicUtils.query(isequal(arguments(base)[2]), denominator)
-                    throw(DomainError(sym, "coeff with negative powers is not yet implemented."))
+                if isdiv(base) && exponent isa Real && isinteger(exponent) && exponent > 0
+                    d = arguments(base)[2]
+                    if isequal(degree(denominator, d), exponent) ||
+                            all(p -> SymbolicUtils.query(isequal(d), p), (numerator, denominator))
+                        throw(DomainError(sym, "coeff with negative powers is not yet implemented."))
+                    end
                 end
             end
             c / denominator

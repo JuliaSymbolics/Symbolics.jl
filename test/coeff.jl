@@ -78,7 +78,7 @@ end
 @test_throws DomainError coeff(3 / x^2, x^(-2))
 
 @testset "coeff of terms containing nested division" begin
-    @variables x y a b
+    @variables x y z a b
     for sym in [
             sin(1 / x), sin(x / y), x^(b / y), (x / y)^(1 // 2),
             (x / y)^b, (1 / x)^b, (x / y)^sqrt(2), (1 / x)^2, (x / y)^2,
@@ -87,4 +87,19 @@ end
         @test isequal(coeff(a * sym + b, sym), a)
         @test isequal(coeff(a * sym / z, sym), a / z)
     end
+end
+
+@testset "coeff of absent reciprocal powers" begin
+    @variables x y a b
+    @test isequal(coeff(a * x^-2 + b / x, x^-2), a)
+    @test isequal(coeff(a * (x / y)^2 + b / y, (x / y)^2), a)
+    for (p, sym) in [
+            (b / x, (1 / x)^2), (1 / (x * y), (1 / x)^2),
+            (b / x^3, (1 / x)^2), (b / y, (x / y)^2),
+            (b / y, (x / y)^3), (b / y, ((x + 1) / y)^2),
+        ]
+        @test isequal(unwrap_const(coeff(p, sym)), 0)
+    end
+    @test_throws DomainError coeff(3 / (x^2 * y), x^-2)
+    @test_throws DomainError coeff((x + 1) / x^3, x^-2)
 end
