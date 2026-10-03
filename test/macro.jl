@@ -4,6 +4,7 @@ import SymbolicUtils: Term, symtype, FnType, BasicSymbolic, promote_symtype, Sym
 import SymbolicUtils as SU
 using LinearAlgebra
 using Test
+import DomainSets
 
 @variables t
 Symbolics.@register_symbolic fff(t)
@@ -618,4 +619,52 @@ struct Baz{T} end
 @testset "Registration of struct constructors works correctly" begin
     @test SU.promote_symtype(Bar, Int) === Bar{Int}
     @test SU.promote_symtype(Baz, String) === Baz{String}
+end
+
+@testset "`domain` metadata" begin
+    # A `Domain` is stored as it is.
+    @variables x [domain = DomainSets.HalfLine()]
+    @test Symbolics.getmetadata(unwrap(x), Symbolics.VariableDomain) === DomainSets.HalfLine()
+
+    @variables n [domain = DomainSets.Integers()]
+    @test Symbolics.getmetadata(unwrap(n), Symbolics.VariableDomain) === DomainSets.Integers()
+
+    # A `(lo, hi)` tuple is converted to an `Interval`, as `∈` converts it, so what is
+    # stored is always a `Domain` and consumers have one shape to handle.
+    @variables y [domain = (10, Inf)]
+    dy = Symbolics.getmetadata(unwrap(y), Symbolics.VariableDomain)
+    @test dy isa DomainSets.Domain
+    @test dy == DomainSets.Interval(10, Inf)
+    @test 42 in dy
+    @test !(0 in dy)
+
+    # Array variables carry the key on the array symbol, not on its elements.
+    @variables z[1:3] [domain = (0, 1)]
+    @test Symbolics.getmetadata(unwrap(z), Symbolics.VariableDomain) == DomainSets.Interval(0, 1)
+    @test !Symbolics.hasmetadata(unwrap(z[1]), Symbolics.VariableDomain)
+
+    # The key is opt-in.
+    @variables w
+    @test !Symbolics.hasmetadata(unwrap(w), Symbolics.VariableDomain)
+    @test Symbolics.getmetadata(unwrap(w), Symbolics.VariableDomain, nothing) === nothing
+
+    # Anything that is not a domain is refused rather than stored untyped: a predicate
+    # belongs in a `Domain` subtype with a `Base.in` method.
+    @test_throws ArgumentError @variables bad [domain = v -> v > 0]
+    @test_throws ArgumentError @variables bad [domain = "positive"]
+    @test_throws ArgumentError @variables bad [domain = (1, 2, 3)]
+
+    struct EvenIntegers <: DomainSets.Domain{Int} end
+    Base.in(v, ::EvenIntegers) = v isa Integer && iseven(v)
+    @variables e [domain = EvenIntegers()]
+    de = Symbolics.getmetadata(unwrap(e), Symbolics.VariableDomain)
+    @test de isa DomainSets.Domain
+    @test 4 in de
+    @test !(5 in de)
+
+    @test Symbolics.option_to_metadata_type(Val(:domain)) === Symbolics.VariableDomain
+    @test Symbolics.to_domain(DomainSets.HalfLine()) === DomainSets.HalfLine()
+    @test Symbolics.to_domain((0, 1)) == DomainSets.Interval(0, 1)
+    # The generic hook leaves other keys alone.
+    @test Symbolics.normalize_metadata_value(VariableFoo, 42) === 42
 end

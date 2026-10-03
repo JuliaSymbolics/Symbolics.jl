@@ -639,7 +639,7 @@ include("discontinuities.jl")
 
 include("despecialize.jl")
 
-@public Arr, NAMESPACE_SEPARATOR, VariableDefaultValue, VariableSource
+@public Arr, NAMESPACE_SEPARATOR, VariableDefaultValue, VariableSource, VariableDomain
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
 @public get_variables, get_variables!, get_differential_vars, option_to_metadata_type
 @public variable, wrap, linear_expansion, LinearExpander
