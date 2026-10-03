@@ -303,7 +303,7 @@ function _classify_linear_monomial(k::SymbolicT, x_to_j::Dict{SymbolicT, Int}, p
             for (base, exp) in dict
                 bj = get(x_to_j, base, 0)
                 if bj > 0
-                    (found_j == 0 && _isone(exp)) || return :nonlinear
+                    (found_j == 0 && _isone(exp)) || return :fallback
                     found_j = bj
                     found_base = base
                 elseif _linear_expansion_occursin_xs(base, x_to_j, parents)
@@ -344,8 +344,6 @@ function _linear_expansion_fast_row!(
                 class = _classify_linear_monomial(k, x_to_j, parents)
                 if class === :constant
                     continue
-                elseif class === :nonlinear
-                    return false
                 elseif class === :fallback
                     return :fallback
                 else
@@ -372,8 +370,6 @@ function _linear_expansion_fast_row!(
             if class === :constant
                 bvec[i] = t
                 return true
-            elseif class === :nonlinear
-                return false
             elseif class === :fallback
                 return :fallback
             else
@@ -386,53 +382,59 @@ function _linear_expansion_fast_row!(
     end
 end
 
-function _linear_expansion_slow_row!(
-        A::AbstractMatrix{SymbolicT}, bvec::Vector{SymbolicT},
-        i::Int, t::SymbolicT, xs::Vector{SymbolicT}
-    )
-    bi = t
-    for (j, x) in enumerate(xs)
-        a, bi, islin = LinearExpander(x)(bi)
-        islin || return false
-        A[i, j] = a
-    end
-    bvec[i] = bi
-    return true
-end
-
 function linear_expansion(ts::AbstractArray{T}, xs::AbstractArray{S}) where {T <: Union{Num, SymbolicT, Equation}, S <: Union{SymbolicT, Num}}
     ts = vec(ts)
     xs = vec(xs)
-    n = length(ts)
-    m = length(xs)
-    A = fill(COMMON_ZERO, n, m)
-    bvec = Vector{SymbolicT}(undef, n)
-    x_unwrapped = Vector{SymbolicT}(undef, m)
     x_to_j = Dict{SymbolicT, Int}()
-    sizehint!(x_to_j, m)
+    sizehint!(x_to_j, length(xs))
     parents = Set{SymbolicT}()
     for (j, x) in enumerate(xs)
         ux = unwrap(x)::SymbolicT
-        x_unwrapped[j] = ux
+        haskey(x_to_j, ux) && return _linear_expansion_slow(ts, xs)
+        if !issym(ux)
+            plain_index = @match ux begin
+                BSImpl.Term(; f, args) && if f === getindex
+                end => begin
+                    issym(args[1]) && all(SymbolicUtils.isconst, args[2:end])
+                end
+                _ => false
+            end
+            plain_index || return _linear_expansion_slow(ts, xs)
+            push!(parents, arguments(ux)[1])
+        end
         x_to_j[ux] = j
-        @match ux begin
-            BSImpl.Term(; f, args) && if f === getindex
-            end => push!(parents, args[1])
-            _ => nothing
+    end
+    A = fill(COMMON_ZERO, length(ts), length(xs))
+    bvec = Vector{SymbolicT}(undef, length(ts))
+    for (i, t) in enumerate(ts)
+        resid = t isa Equation ? unwrap(t.rhs - t.lhs) : unwrap(t)
+        status = _linear_expansion_fast_row!(A, bvec, i, resid, x_to_j, parents)
+        status === :fallback && return _linear_expansion_slow(ts, xs)
+    end
+    return A, bvec, true
+end
+
+function _linear_expansion_slow(ts::AbstractArray{T}, xs::AbstractArray{S}) where {T <: Union{Num, SymbolicT, Equation}, S <: Union{SymbolicT, Num}}
+    ts = vec(ts)
+    xs = vec(xs)
+    A = Matrix{SymbolicT}(undef, length(ts), length(xs))
+    bvec = Vector{SymbolicT}(undef, length(ts))
+    map!(bvec, ts) do t
+        if t isa Equation
+            return t.rhs - t.lhs
+        elseif t isa Num
+            return unwrap(t)
+        else
+            return t
         end
     end
-    for (i, t) in enumerate(ts)
-        resid = if t isa Equation
-            unwrap(t.rhs - t.lhs)::SymbolicT
-        else
-            unwrap(t)::SymbolicT
-        end
-        status = _linear_expansion_fast_row!(A, bvec, i, resid, x_to_j, parents)
-        if status === :fallback
-            fill!(view(A, i, :), COMMON_ZERO)
-            _linear_expansion_slow_row!(A, bvec, i, resid, x_unwrapped) || return A, bvec, false
-        elseif status === false
-            return A, bvec, false
+    for (j, x) in enumerate(xs)
+        lex = LinearExpander(unwrap(x))
+        for (i, t) in enumerate(bvec)
+            a, resid, islin = lex(t)
+            islin || return A, bvec, false
+            A[i, j] = a
+            bvec[i] = resid
         end
     end
     return A, bvec, true

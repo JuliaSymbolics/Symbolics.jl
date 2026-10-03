@@ -165,7 +165,38 @@ end
     @test isequal(Num.(A), Num.([2 3]))
     @test isequal(Num.(b), Num.([4]))
 
-    @test !Symbolics.linear_expansion([x * y], [x, y])[3]
+    A, b, islin = Symbolics.linear_expansion([x * y], [x, y])
+    @test islin
+    @test isequal(Num.(A), Num.([y 0]))
+    @test isequal(Num.(b), Num.([0]))
+end
+
+@testset "linear_expansion conservative fast path" begin
+    @variables x y q[1:2]
+    for z0 in (3 * (x + y) - 3x - 3y, 2 * (x + 1) - 2x - 2)
+        A, b, islin = Symbolics.linear_expansion([x + x * y * z0, y], [x, y])
+        @test islin
+        @test isequal(expand.(Num.(A)), Num.([1 0; 0 1]))
+        @test isequal(expand.(Num.(b)), Num.([0, 0]))
+        sol = Symbolics.symbolic_linear_solve([x + x * y * z0 ~ 1, y ~ 2], [x, y])
+        @test isequal(simplify.(sol; expand = true), Num.([1, 2]))
+    end
+    for (t, xs, expected_A, expected_b) in (
+            (x, [x, x], [1 0], [0]),
+            (x + y, [x, x + y], [1 0], [y]),
+            (y * (x + y), [x, x + y], [y 0], [y^2]),
+            (x * y, [x, y], [y 0], [0]),
+            (x * y, [y, x], [x 0], [0]),
+            (q[1] * q[2], [q[1], q[2]], [q[2] 0], [0]),
+        )
+        A, b, islin = Symbolics.linear_expansion([t], xs)
+        @test islin
+        @test isequal(Num.(A), Num.(expected_A))
+        @test isequal(Num.(b), Num.(expected_b))
+    end
+    for t in (x^2, sin(x), y^x)
+        @test !Symbolics.linear_expansion([t], [x, y])[3]
+    end
 end
 
 @testset "linear_expansion of ifelse" begin
