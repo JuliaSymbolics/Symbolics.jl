@@ -131,6 +131,10 @@ getdef(v) = Symbolics.getdefaultval(v)
     eqs855m = A855 .~ B855
     @test eqs855m isa AbstractMatrix{<:Equation}
     @test isequal(eqs855m, [A855[i, j] ~ B855[i, j] for i in 1:2, j in 1:2])
+    @variables b_bool[1:2]::Bool i_sym::Int
+    r_not = (~).(b_bool)
+    @test r_not isa Arr
+    @test unwrap(r_not[i_sym]) isa SymbolicUtils.BasicSymbolic
     @test_throws ArgumentError A ~ t
     @test isequal(D(x[1]), D(x)[1])
     a = Symbolics.unwrap(D(x)[1])

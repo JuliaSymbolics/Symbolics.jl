@@ -70,7 +70,7 @@ end
 
 function Base.copy(bc::Broadcast.Broadcasted{SymWrapBroadcast})
     result = wrap(copy(unwrap_broadcast(bc)))
-    if bc.f === ~
+    if bc.f === (~) && length(bc.args) == 2
         return scalarize(result)
     end
     return result
