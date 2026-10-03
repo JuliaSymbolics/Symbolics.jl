@@ -186,9 +186,9 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
             if has_symwrapper(T)
-                Ts = (T, SymbolicT, wrapper_type(T))
+                Ts = Any[T, SymbolicT, wrapper_type(T)]
             else
-                Ts = (T, SymbolicT)
+                Ts = Any[T, SymbolicT]
             end
             if T <: AbstractArray && wrap_arrays
                 eT = eltype(T)
@@ -201,21 +201,21 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
                     (elT) -> AbstractArray{S} where {S <: elT}
                 end
                 if has_symwrapper(eT)
-                    Ts = (Ts..., _arr_type_fn(SymbolicT), _arr_type_fn(wrapper_type(eT)))
+                    push!(Ts, _arr_type_fn(SymbolicT), _arr_type_fn(wrapper_type(eT)))
                 else
-                    Ts = (Ts..., _arr_type_fn(SymbolicT))
+                    push!(Ts, _arr_type_fn(SymbolicT))
                 end
             end
             Ts
         elseif arg isa Expr && arg.head == :(...)
             Ts = type_options(arg.args[1])
-            map(x->Vararg{x},Ts)
+            Any[Vararg{x} for x in Ts]
         else
-            (Any,)
+            Any[Any]
         end
     end
 
-    types = map(type_options, args)
+    types = Any[type_options(a) for a in args]
 
     impl = :(function $impl_name($self, $(names...))
         $body
@@ -235,9 +235,15 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         end
         error("Unreachable")
     end
-    # TODO: maybe don't drop first lol
     methods = Expr[]
-    for Ts in Iterators.drop(Iterators.product(types...), 1)
+    indices = CartesianIndices(Tuple(length.(types)))
+    first_index = first(indices)
+    for index in indices
+        index == first_index && continue
+        Ts = Any[]
+        for i in eachindex(types)
+            push!(Ts, types[i][index[i]])
+        end
         method_args = Expr[]
         for (n, T) in zip(names, Ts)
             push!(method_args, :($n::$T))
