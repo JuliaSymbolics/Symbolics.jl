@@ -29,3 +29,6 @@ Manifest.toml
 
 # CondaPkg environment files
 .CondaPkg/
+
+# Personal contribution notes
+SYMBOLICS_CONTRIBUTION_NOTES.mdPRs/
