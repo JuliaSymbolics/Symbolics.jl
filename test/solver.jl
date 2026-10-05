@@ -685,6 +685,9 @@ using LambertW
     end
 
     #quadratics
+    @test value.(symbolic_solve(x * a^b + x, x)) == [0]
+    @test value.(symbolic_solve(x * exp(a) + x, x)) == [0]
+
     @test correctAns(symbolic_solve(x^2~4,x), [-2, 2])
     @test correctAns(symbolic_solve(x^2~2,x),[-sqrt(2.0),sqrt(2.0)])
     @test correctAns(symbolic_solve(x^2~32,x),[-sqrt(32.0),sqrt(32.0)])
