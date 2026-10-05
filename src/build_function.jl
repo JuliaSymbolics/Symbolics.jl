@@ -125,6 +125,11 @@ Keyword Arguments:
   - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
     splitting the number of expressions per thread.
 - `fname`: Used by some targets for the name of the function in the target space.
+- `iip_config`: A 2-tuple of `Bool`s `(oop, iip)` selecting whether the out-of-place
+  and in-place functions are generated. Defaults to `(true, true)`. A variant that
+  is turned off is still returned as a stub so that the 2-tuple shape is kept, and
+  calling the stub throws an `ArgumentError`. Only applies when `ex` is an array
+  (scalar `ex` returns a single function).
 
 Note that not all build targets support the full compilation interface. Check the
 individual target documentation for details.
@@ -264,7 +269,20 @@ function _build_and_inject_function(mod::Module, ex)
     elseif ex.head == :(->)
         return _build_and_inject_function(mod, Expr(:function, ex.args...))
     end
-    RuntimeGeneratedFunction(mod, mod, ex)
+    return RuntimeGeneratedFunction(mod, mod, _shards_to_rgfs(mod, ex))
+end
+
+# Inside a RuntimeGeneratedFunction the inline `MultithreadedForm` shard closures would
+# become opaque closures, and on Julia 1.10/1.11 calling an opaque closure with three or
+# more arguments through `Funcall` segfaults. Compile each shard to its own RGF instead.
+function _shards_to_rgfs(mod::Module, ex)
+    ex isa Expr || return ex
+    args = Any[_shards_to_rgfs(mod, a) for a in ex.args]
+    if ex.head === :call && length(args) == 3 && args[1] === Funcall &&
+            Meta.isexpr(args[2], :function)
+        args[2] = drop_expr(RuntimeGeneratedFunction(mod, mod, args[2]; opaque_closures = false))
+    end
+    return Expr(ex.head, args...)
 end
 
 toexpr(n::Num, st) = toexpr(value(n), st)
@@ -352,6 +370,11 @@ Special Keyword Arguments:
   filling function is 0.
 - `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
   safety with `skipzeros`.
+- `iip_config`: A 2-tuple of `Bool`s `(oop, iip)` selecting whether the out-of-place
+  and in-place functions are generated. Defaults to `(true, true)`. A variant that
+  is turned off is still returned as a stub so that the 2-tuple shape is kept, and
+  calling the stub throws an `ArgumentError`. Only applies when `rhss` is an array
+  (scalar `rhss` returns a single function).
 """
 function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        conv=toexpr,
@@ -462,7 +485,10 @@ function make_array(s::ShardedForm, closed_args, arr, similarto)
     arrays = map(slices) do slice
         Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
-    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
+    return SpawnFetch{typeof(s)}(
+        first.(arrays), last.(arrays),
+        VcatReshape(size(arr))
+    )
 end
 
 struct Funcall{F, T}
@@ -472,15 +498,24 @@ end
 
 (f::Funcall)() = f.f(f.args...)
 
+struct VcatReshape{Dims}
+    dims::Dims
+end
+
+(c::VcatReshape)(xs...) = reshape(vcat(xs...), c.dims)
+
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false))),
-                       ($(toexpr.(a, (st,))...),)))
+        ex = :(
+            $Funcall(
+                $(toexpr(thunk, st)),
+                ($(toexpr.(a, (st,))...),)
+            )
+        )
         quote
-            let
-                task = Base.Task($ex)
+            let task = Base.Task($ex)
                 task.sticky = false
                 Base.schedule(task)
                 task
@@ -549,8 +584,10 @@ function _make_sparse_array(arr, similarto)
         newarr = _make_array(parent(arr), typeof(parent(arr)))
         return term(setparent, nzmap(Returns(true), arr), newarr)
     else
-        newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))})
-        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), false)
+        # Empty `nzval` has no eltype to infer; `Int` matches literal constants.
+        output_eltype = isempty(arr.nzval) ? Int : nothing
+        newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))}, output_eltype)
+        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), true)
     end
 end
 
@@ -561,12 +598,12 @@ function _make_array(rhs::LowerTriangular, similarto)
     return term(LowerTriangular, _make_array(parent(rhs), similarto))
 end
 
-function _make_array(rhss::AbstractArray, similarto)
+function _make_array(rhss::AbstractArray, similarto, output_eltype = nothing)
     arr = nzmap(x->_make_array(x, similarto), rhss)
     if _issparse(arr)
         _make_sparse_array(arr, similarto)
     else
-        MakeArray(arr, similarto)
+        MakeArray(arr, similarto, output_eltype)
     end
 end
 
@@ -593,10 +630,14 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
         fs = map(slices) do slice
             recursive_split(leaf_f, s, out, args, first.(slice), last.(slice))
         end
-        return Func(args, [],
-                    SpawnFetch{typeof(s)}(fs, [args for f in fs],
-                                          (@inline noop(x...) = nothing)),
-                    [])
+        return Func(
+            args, [],
+            SpawnFetch{typeof(s)}(
+                fs, [args for f in fs],
+                Returns(nothing)
+            ),
+            []
+        )
     end
 end
 
@@ -784,6 +825,21 @@ function coperators(expr)
     expr
 end
 
+function _check_ctarget_expression(expression)
+    expression == Val{true} && return
+    if expression isa Bool
+        throw(ArgumentError(
+            "CTarget does not accept expression=$(expression) (a Bool). " *
+            "Pass expression=Val{true} to get the C source as a String, then " *
+            "compile it yourself (e.g. with Libdl/ccall)."))
+    else
+        throw(ArgumentError(
+            "CTarget with expression=$(expression) is not supported. " *
+            "CTarget emits C source code, not Julia; use expression=Val{true} " *
+            "and compile the generated C yourself (e.g. with Libdl/ccall)."))
+    end
+end
+
 
 """
 Build function target: `CTarget`
@@ -796,14 +852,13 @@ _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                 libpath=tempname(), compiler=:gcc)
 ```
 
-This builds an in-place C function. Only works on arrays of equations. If
-`expression == Val{false}`, then this builds a function in C, compiles it,
-and returns a lambda to that compiled function. These special keyword arguments
-control the compilation:
-
-- libpath: the path to store the binary. Defaults to a temporary path.
-- compiler: which C compiler to use. Defaults to `:gcc`, which is currently the
-  only available option.
+This builds an in-place C function. Only works on arrays of equations.
+`expression` must be `Val{true}` (the default); the return value is C source
+code as a `String`. `expression=Val{false}` is not supported because CTarget
+emits C, not Julia, and Symbolics cannot guarantee a C compiler or library path.
+Pass `expression=Val{true}` (not a `Bool` such as `true`). The keyword
+arguments `libpath` and `compiler` are accepted for API compatibility but are
+unused.
 """
 function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                          conv = toexpr, expression = Val{true},
@@ -812,6 +867,8 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                          libpath=tempname(),compiler=:gcc)
 
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
+
+    _check_ctarget_expression(expression)
 
     varnumbercache = buildvarnumbercache(args...)
     differential_equation = string(join([numbered_expr(eq,varnumbercache,args...,lhsname=lhsname,
@@ -825,23 +882,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
     }
     """
 
-    if expression == Val{true}
-        return ex
-    else
-        @assert compiler == :gcc
-        ex = build_function(eqs,args...;target=Symbolics.CTarget())
-        open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
-            print(f, ex)
-        end
-        drop_expr(@RuntimeGeneratedFunction(@__MODULE__,
-                                            :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64)
-                                              -> ccall(("diffeqf", $libpath),
-                                                       Cvoid, (Ptr{Float64},
-                                                               Ptr{Float64},
-                                                               Ptr{Float64},
-                                                               Float64), du, u,
-                                                               p, t)), false))
-    end
+    return ex
 end
 
 
@@ -860,14 +901,13 @@ _build_function(target::CTarget, ex::AbstractArray, args...;
                 compiler    = :gcc)
 ```
 
-This builds an in-place C function. Only works on expressions. If
-`expression == Val{false}`, then this builds a function in C, compiles it,
-and returns a lambda to that compiled function. These special keyword arguments
-control the compilation:
-
-- libpath: the path to store the binary. Defaults to a temporary path.
-- compiler: which C compiler to use. Defaults to :gcc, which is currently the
-  only available option.
+This builds an in-place C function. Only works on expressions.
+`expression` must be `Val{true}` (the default); the return value is C source
+code as a `String`. `expression=Val{false}` is not supported because CTarget
+emits C, not Julia, and Symbolics cannot guarantee a C compiler or library path.
+Pass `expression=Val{true}` (not a `Bool` such as `true`). The keyword
+arguments `libpath` and `compiler` are accepted for API compatibility but are
+unused.
 """
 function _build_function(target::CTarget, ex::AbstractArray, args...;
                          columnmajor = true,
@@ -879,10 +919,13 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
                          libpath     = tempname(),
                          compiler    = :gcc)
 
+    _check_ctarget_expression(expression)
+
     if !columnmajor
         return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...;
                                columnmajor = true,
                                conv        = conv,
+                               expression  = expression,
                                fname       = fname,
                                lhsname     = lhsname,
                                rhsnames    = rhsnames,
@@ -911,23 +954,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
     void $fname($(argstrs...)) {$([string("\n  ", eqn) for eqn ∈ equations]...)\n}
     """
 
-    if expression == Val{true}
-        return ccode
-    else
-        @assert compiler == :gcc
-        open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
-            print(f, ccode)
-        end
-        drop_expr(@RuntimeGeneratedFunction(@__MODULE__,
-                                            :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64)
-                                              -> ccall(("diffeqf", $libpath),
-                                                       Cvoid, (Ptr{Float64},
-                                                               Ptr{Float64},
-                                                               Ptr{Float64},
-                                                               Float64), du, u,
-                                                       p, t)), false))
-    end
-
+    return ccode
 end
 _build_function(target::CTarget, ex::Num, args...; kwargs...) = _build_function(target, [ex], args...; kwargs...)
 

@@ -5,7 +5,7 @@ using Base: Slice
 using SymbolicUtils: Sym, term, operation, search_variables
 import SymbolicUtils.Code: toexpr
 import LinearAlgebra
-import LinearAlgebra: dot, Adjoint, cross, Diagonal, diagm, eigmax, eigmin
+import LinearAlgebra: dot, Adjoint, cross, Diagonal, diagm, eigmax, eigmin, opnorm
 using StaticArraysCore: SArray
 using SparseArrays: sparse
 import ..limit2
@@ -547,6 +547,18 @@ end
     # numeric behavior is untouched
     @test eigmax([2.0 0 0; 0 3 0; 0 0 5]) == 5.0
     @test eigmin([2.0 0 0; 0 3 0; 0 0 5]) == 2.0
+end
+
+@testset "opnorm builds a symbolic term" begin
+    @variables x[1:3, 1:3]
+    A = [3.0 1 0; 0 2 1; 1 0 4]
+    for X in (x, collect(x))
+        o = unwrap(opnorm(X))
+        @test operation(o) === opnorm
+        @test symtype(o) <: Real
+        @test value(substitute(o, Dict(x => A); fold = Val(true))) ≈ opnorm(A)
+    end
+    @test opnorm(A) ≈ maximum(LinearAlgebra.svdvals(A))
 end
 
 @testset "`transpose(::Arr) * Arr`" begin

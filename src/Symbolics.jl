@@ -240,6 +240,7 @@ export SymStruct, @symstruct
 @public record_literal, is_record_literal, RecordLiteral
 include("symstruct.jl")
 include("recordliteral.jl")
+include("symzero.jl")
 
 import Libdl
 include("build_function.jl")
@@ -650,6 +651,8 @@ include("despecialize.jl")
 @public CodegenFunctionOptions, codegen_function
 @public diff2term, map_subscripts
 @public fixpoint_sub
+@public symbolic_zero, is_zeroable, SymbolicZero
+@public SymbolicCallable
 
 @setup_workload begin
     fold1 = Val{false}()
