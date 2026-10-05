@@ -19,9 +19,89 @@ Dx = Differential(x)
 test_equal(a, b) = @test isequal(unwrap_const(simplify(unwrap(a))), unwrap_const(simplify(unwrap(b))))
 
 @testset "ZeroOperator handling" begin
-    @test_throws ErrorException Differential(0.1)(x)
-    @test_throws ErrorException Differential(1)(x)
-    @test_throws ErrorException Differential(2)(2x)
+    @test_throws ArgumentError Differential(0.1)(x)
+    @test_throws ArgumentError Differential(1)(x)
+    @test_throws ArgumentError Differential(2)(2x)
+    for target in (0, 1, 0.1, 1 // 2, im, pi, Num(0))
+        @test_throws ArgumentError Differential(target)
+        @test_throws ArgumentError Differential(target, 2)
+    end
+end
+
+@testset "Differential target must be a variable" begin
+    @variables a b t2 z2(t2) aa[1:3] (g2)(..)
+    @test_throws ArgumentError Differential(2a)
+    @test_throws ArgumentError Differential(a + b)
+    @test_throws ArgumentError Differential(a / b)
+    @test_throws ArgumentError Differential(a^2)
+    @test_throws ArgumentError Differential(sin(a))
+    @test_throws ArgumentError Differential(aa[1:2])
+    @test_throws ArgumentError Differential((2aa)[1])
+    @test_throws ArgumentError Symbolics.derivative(a, 2a)
+    @test_throws ArgumentError Symbolics.derivative(a^2, 2a)
+    @test_throws ArgumentError Symbolics.derivative(2a, 2a)
+    @test_throws ArgumentError Symbolics.derivative(aa[1], (2aa)[1])
+    @test_throws ArgumentError Symbolics.derivative(aa[1], Symbolics.scalarize((2aa)[1]))
+    @test_throws ArgumentError expand_derivatives(Differential(2a)(a))
+    @test_throws ArgumentError Symbolics.derivative(a, Num(0))
+    @test Differential(a) isa Differential
+    @test Differential(z2) isa Differential
+    @test Differential(g2(a)) isa Differential
+    @test Differential(aa[1]) isa Differential
+    @test Differential(Differential(t2)(z2)) isa Differential
+    @test Symbolics.derivative(2a, a) == 2
+    @test Symbolics.derivative(z2, z2) == 1
+    @test Symbolics.derivative(aa[1], aa[1]) == 1
+end
+
+@testset "Generated chain-rule derivatives survive substitution" begin
+    @variables x y (g)(..)
+    d = Symbolics.derivative(g(2x), x)
+    @test isequal(Symbolics.substitute_in_deriv(d, Dict(y => x)), d)
+    @test isequal(Symbolics.substitute_in_deriv_and_depvar(d, Dict(y => x)), d)
+    # `substitute_in_deriv` does not descend into called symbolic functions
+    renamed = 2 * Symbolics.Differential(unwrap(2y); unsafe = true)(unwrap(g(2x)))
+    @test isequal(Symbolics.substitute_in_deriv(d, Dict(x => y)), renamed)
+    @test isequal(Symbolics.substitute_in_deriv_and_depvar(d, Dict(x => y)), Symbolics.derivative(g(2y), y))
+    @test isequal(expand_derivatives(Symbolics.substitute_in_deriv_and_depvar(d, Dict(x => y))), Symbolics.derivative(g(2y), y))
+end
+
+@testset "Constant targets in derivative substitution" begin
+    @variables a
+    ex = Differential(a)(a^2)
+    for point in (0, 1, 2)
+        @test_throws ArgumentError Differential(unwrap(Num(point)); unsafe = true)
+    end
+    for sub in (Symbolics.substitute_in_deriv, Symbolics.substitute_in_deriv_and_depvar)
+        for point in (0, 1, 2)
+            @test_throws ArgumentError sub(ex, Dict(a => point))
+            @test isequal(sub(expand_derivatives(ex), Dict(a => point)), 2point)
+        end
+    end
+end
+
+struct DifferentialRecord
+    x::Real
+    y::Real
+    values::Vector{Real}
+end
+@symstruct DifferentialRecord
+
+struct NestedDifferentialRecord
+    inner::DifferentialRecord
+end
+@symstruct NestedDifferentialRecord
+
+@testset "Symbolic field differentiation" begin
+    @variables rec::DifferentialRecord nested::NestedDifferentialRecord
+    for target in (rec.x, rec.values[1], nested.inner.x)
+        @test Differential(target) isa Differential
+        @test Symbolics.derivative(target, target) == 1
+        @test isequal(Symbolics.derivative(target^2, target), 2target)
+        @test Symbolics.derivative(rec.y, target) == 0
+        @test isequal(Symbolics.gradient(target^2, [target]), [2target])
+        @test_throws ArgumentError Differential(2target)
+    end
 end
 
 #@test @macroexpand(@derivatives D'~t D2''~t) == @macroexpand(@derivatives (D'~t), (D2''~t))
