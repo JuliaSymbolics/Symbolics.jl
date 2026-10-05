@@ -102,11 +102,36 @@ function record_literal_term(::Type{T}, args) where {T}
     end
     cargs = ArgsT{VartypeT}()
     sizehint!(cargs, nf)
-    for a in args
-        push!(cargs, BSImpl.Const{VartypeT}(unwrap(a)))
+    for (i, a) in enumerate(args)
+        ua = unwrap(a)
+        check_record_field_symtype(T, i, symtype(ua))
+        push!(cargs, BSImpl.Const{VartypeT}(ua))
     end
     return BSImpl.Term{VartypeT}(
         RecordLiteral{T}(), cargs; type = T, shape = SU.ShapeVecT())
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Check that a value of symtype `aT` can stand for field `i` of `T`, and throw otherwise.
+
+The two types must be related in one direction or the other, rather than `aT` being a
+subtype of the field. A symbolic variable is usually declared more loosely than the field
+it fills - `@variables q` has symtype `Real`, which no `Float64` field would admit under a
+plain subtype test - while a value of an unrelated type is wrong in either direction.
+
+Without this the mismatch surfaces much later and somewhere else: a record-typed symbolic
+in a `Float64` field builds without complaint, and only fails on field access, as an
+assertion inside `getproperty` that names neither the field nor the type.
+"""
+function check_record_field_symtype(::Type{T}, i::Int, aT) where {T}
+    fT = fieldtype(T, i)
+    aT <: fT || fT <: aT || throw(ArgumentError(LazyString(
+        "Cannot build a symbolic literal of `", T, "`: field `", fieldname(T, i),
+        "` has type `", fT, "`, which is unrelated to the symtype `", aT,
+        "` of the argument given for it.")))
+    return nothing
 end
 
 record_literal(::Type{T}, args...) where {T} = record_literal(T, args)

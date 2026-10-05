@@ -136,6 +136,29 @@ end
     @test isequal(unwrap(SymStruct{RLHand}(unwrap(lit)).a), unwrap(q1))
 end
 
+@testset "field symtypes are checked against the field types" begin
+    # A symbolic is usually declared more loosely than the field it fills, so this has to
+    # be accepted: `@variables` gives symtype `Real` for a `Float64` field.
+    @test is_record_literal(RLPair(q1, q2))
+    @test is_record_literal(RLPair(1.0, q2))
+
+    # An unrelated symtype is a mistake in either direction. Caught here rather than on
+    # field access, where it used to surface as an assertion inside `getproperty`.
+    @variables rec::RLPair str::String
+    @test_throws ArgumentError RLPair(rec, q1)
+    @test_throws ArgumentError RLPair(str, q1)
+    @test_throws ArgumentError record_literal(RLPair, (rec, q1))
+
+    # The message names the field, its type, and the symtype received.
+    err = try
+        RLPair(rec, q1)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("field `x`", err)
+    @test occursin("RLPair", err)
+end
+
 @testset "field access folds through a literal" begin
     lit = RLPair(q1, q2)
     @test isequal(unwrap(SymStruct{RLPair}(unwrap(lit)).x), unwrap(q1))
