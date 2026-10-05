@@ -50,7 +50,10 @@ let
 end
 
 # MATLABTarget structural test (was target_functions/1.m)
-@test Base.ispublic(Symbolics, :MATLABTarget)
+# ispublic exists from Julia 1.11.
+if VERSION >= v"1.11"
+    @test Base.ispublic(Symbolics, :MATLABTarget)
+end
 
 let
     mfunc = Symbolics.build_function(expr,[x,y],[a],t,target = Symbolics.MATLABTarget())
