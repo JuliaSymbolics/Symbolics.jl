@@ -173,3 +173,60 @@ end
     @test_nowarn latexify(ifelse_eager(a > 0, a^2, 1 / a))
     @test_nowarn latexify(ifelse_branching(a > 0, a^2, 1 / a))
 end
+
+# issue #956: latexwrapper `_`/`^` must not be escaped when latexifying a Num
+@testset "latexwrapper raw LaTeX (#956)" begin
+    @variables x t
+    @variables w0 [latexwrapper = s -> raw"\omega_{0}"]
+    @variables vx(x, t) [latexwrapper = s -> "v_{x}"]
+    ex = vx + w0^2
+    eq = vx ~ w0
+
+    for s in (string(latexify(ex)), repr(MIME"text/latex"(), ex))
+        @test occursin(raw"v_{x}\left( x, t \right) + \omega_{0}^{2}", s)
+        @test !occursin(raw"\_{", s)
+    end
+    @test occursin(raw"\omega_{0}", string(latexify(w0)))
+    @test !occursin(raw"\_{", string(latexify(w0)))
+    @test occursin(raw"v_{x}\left( x, t \right)", string(latexify(vx)))
+    @test !occursin(raw"\_{", string(latexify(vx)))
+    for s in (string(latexify(eq)), repr(MIME"text/latex"(), eq))
+        @test occursin(raw"v_{x}", s)
+        @test occursin(raw"\omega_{0}", s)
+        @test !occursin(raw"\_{", s)
+    end
+    # Powers of function variables must stay parenthesized
+    @test occursin(raw"\left( v_{x}\left( x, t \right) \right)^{2}", string(latexify(vx^2)))
+    # Unannotated multi-character names still go through the default Symbol path
+    @variables plain_x
+    @test occursin("\\mathtt{plain\\_x}", string(latexify(plain_x)))
+end
+
+# Custom-function arguments must keep outer recipe/caller Latexify options
+@testset "latexwrapper argument formatting" begin
+    @variables x y a[1:2] a_b
+    @variables f(..) [latexwrapper = string]
+    @test String(latexify(f(a[1]); env = :raw, index = :subscript)) ==
+        raw"f\left( a_{1} \right)"
+    @test String(latexify(f(1.23456789); env = :raw, fmt = "%.2f")) ==
+        raw"f\left( 1.23 \right)"
+    @test String(latexify(f(x * y); env = :raw, mult_symbol = raw"\times")) ==
+        raw"f\left( x \times y \right)"
+    @test String(latexify(f(a_b); env = :raw)) ==
+        raw"f\left( \mathtt{a\_b} \right)"
+    @test String(latexify(f(1.23456789e-9); env = :raw)) ==
+        raw"f\left( 1.2346 \cdot 10^{-9} \right)"
+end
+
+# A derivative of a custom call multiplied by another factor must keep operand
+# scope in the numerator, not as an unfenced differential operator times both.
+@testset "latexwrapper derivative factor scope" begin
+    @variables x
+    @variables f(..) [latexwrapper = string]
+    @variables g(..) [latexwrapper = string]
+    D = Differential(x)
+    @test String(latexify(D(f(x)) * g(x); env = :raw)) ==
+        raw"\frac{\mathrm{d}f\left( x \right)}{\mathrm{d}x} ~ g\left( x \right)"
+    @test String(latexify(f(x) * D(g(x)); env = :raw)) ==
+        raw"\frac{\mathrm{d}g\left( x \right)}{\mathrm{d}x} ~ f\left( x \right)"
+end
