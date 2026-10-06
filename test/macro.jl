@@ -254,6 +254,24 @@ yyy = yy(t)
 @variables y(::Real)
 @test isequal(yyy, y(t))
 
+@variables x
+incomplete_fntype_err = try
+    Symbolics.variable(:f, T = FnType)
+    error("expected ArgumentError")
+catch err
+    err
+end
+@test incomplete_fntype_err isa ArgumentError
+@test occursin("fully parameterized FnType", incomplete_fntype_err.msg)
+@test occursin("FnType{Tuple, Real, Nothing}", incomplete_fntype_err.msg)
+@test_throws ArgumentError Symbolics.variable(:f, T = FnType{Tuple, Real})
+@test_throws ArgumentError Symbolics.variable(:f, T = FnType{Tuple{Real}, Real})
+f = Symbolics.variable(:f, T = FnType{Tuple, Real, Nothing})
+@test f isa Symbolics.CallAndWrap{Num}
+@test symtype(unwrap(f)) === FnType{Tuple, Real, Nothing}
+@test 2f(x) isa Num
+@test 2f(x, x) isa Num
+
 spam(x) = 2x
 @register_symbolic spam(x::AbstractArray)
 
@@ -426,12 +444,69 @@ end
 @testset "Unwrap defaults and other metadata" begin
     @variables a b[1:2]
     @variables x = a [foo = 1 + a]
-    @variables y = b [foo = [a, b[1]]]
+    @variables y[1:2] = b [foo = [a, b[1]]]
 
     @test getdefaultval(x) isa BasicSymbolic
     @test Symbolics.getmetadata(unwrap(x), VariableFoo, nothing) isa BasicSymbolic
     @test getdefaultval(y) isa BasicSymbolic
     @test Symbolics.getmetadata(unwrap(y), VariableFoo, nothing) isa Vector{Num}
+end
+
+@testset "Reject scalar variables with array defaults (#1073)" begin
+    @test_throws ArgumentError (@variables x = [1, 2])
+    @test_throws ArgumentError (@variables x::Real = [1, 2])
+    @variables y
+    @test_throws ArgumentError (@variables x = [y, y])
+    @variables b[1:2]
+    @test_throws ArgumentError (@variables x = b)
+
+    @variables x = 1.0
+    @test getdefaultval(x) == 1.0
+    @variables z = y
+    @test isequal(getdefaultval(z), unwrap(y))
+
+    @variables a[1:2] = [1, 2]
+    @test getdefaultval(a) == [1, 2]
+    @test_throws ArgumentError (@variables c[1:2] = 1.0)
+end
+
+struct _DefaultValProbe
+    x::Int
+end
+
+# Mimics ModelingToolkitStandardLibrary Parameter{T} (no size method).
+struct _ParameterProbe{T}
+    value::T
+end
+
+@testset "Scalar variables accept non-array defaults (#1073)" begin
+    @variables p = "str"
+    @test getdefaultval(p) == "str"
+    @variables p2::String = "str"
+    @test getdefaultval(p2) == "str"
+    @variables s = :sym
+    @test getdefaultval(s) === :sym
+    @variables t = (1, 2)
+    @test getdefaultval(t) == (1, 2)
+    @variables t2::Tuple{Int, Int} = (1, 2)
+    @test getdefaultval(t2) == (1, 2)
+    @variables f::Function = sin
+    @test getdefaultval(f) === sin
+    @variables f2 = sin
+    @test getdefaultval(f2) === sin
+    @variables Tdef = Vector
+    @test getdefaultval(Tdef) === Vector
+    @variables d::Dict{Int, Int} = Dict(1 => 2)
+    @test getdefaultval(d) == Dict(1 => 2)
+    @variables c::_DefaultValProbe = _DefaultValProbe(1)
+    @test getdefaultval(c) == _DefaultValProbe(1)
+
+    # ModelingToolkitStandardLibrary patterns (sources.jl interpolation_type / Parameter)
+    interp_type = Vector{Float64}
+    @variables interpolation_type = interp_type
+    @test getdefaultval(interpolation_type) === interp_type
+    @variables p::_ParameterProbe{Float64} = _ParameterProbe(1.0)
+    @test getdefaultval(p) == _ParameterProbe(1.0)
 end
 
 @testset "`hash` of callable is consistent with `isequal`" begin

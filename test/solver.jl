@@ -324,10 +324,26 @@ end
     backward = [Symbolics.substitute(eqs, s) for s in sol]
     @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
 
-    # TODO: broken
-    # @variables H1 H2
-    # eqs = [-288421779135875//1125899906842624*H1^2 + 1963378034549373//562949953421312*H1 - 4, -288421779135875//844424930131968*H1*H2 + 1963378034549373//562949953421312*H2 - 4]
-    # symbolic_solve(eqs, [H1, H2])
+    @variables H1 H2
+    eqs = [
+        -288421779135875 // 1125899906842624 * H1^2 + 1963378034549373 // 562949953421312 * H1 - 4,
+        -288421779135875 // 844424930131968 * H1 * H2 + 1963378034549373 // 562949953421312 * H2 - 4,
+    ]
+    sol = symbolic_solve(eqs, [H1, H2])
+    @test length(sol) == 2
+    backward = [Symbolics.substitute(eqs, s) for s in sol]
+    @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol = 1.0e-6)), backward)
+    disc = sqrt(big(2555917089509096769845824549129))
+    h1_a = (big(1963378034549373) + disc) / big(288421779135875)
+    h1_b = (big(1963378034549373) - disc) / big(288421779135875)
+    h2_of(h1) = 4 / (1963378034549373 // 562949953421312 - 288421779135875 // 844424930131968 * h1)
+    arr_known_roots = sort_arr(
+        [
+            Dict(H1 => h1_a, H2 => h2_of(h1_a)),
+            Dict(H1 => h1_b, H2 => h2_of(h1_b)),
+        ], [H1, H2],
+    )
+    @test check_approx(sort_arr(sol, [H1, H2]), arr_known_roots)
 
     @test isnothing(symbolic_solve([x*y - 1, sin(x)], [x, y]))
 
@@ -701,4 +717,40 @@ end
     @test x isa Real && isnan(x)
     x = fn(NaN + NaN * im)
     @test x isa Complex && isnan(x)
+end
+
+@testset "exact_div keeps `//` for numbers and accepts symbolics" begin
+    @variables a
+    # Numbers keep exact rational division; `/` there would return a float and
+    # the closed-form root formulas rely on the exactness.
+    @test Symbolics.exact_div(3, 8) === 3 // 8
+    @test Symbolics.exact_div(3 // 4, 2) === 3 // 8
+    @test Symbolics.exact_div(big(3), 8) == 3 // 8
+    @test Symbolics.exact_div(1.5, 2) === 0.75
+
+    # `//` has no method for a symbolic operand, which is the bug this replaces.
+    @test_throws MethodError value(a) // 8
+    @test isequal(Symbolics.exact_div(1, value(a)), 1 / value(a))
+    @test isequal(Symbolics.exact_div(value(a), 2), value(a) / 2)
+end
+
+@testset "parametric cubics and quartics have closed-form roots" begin
+    @variables x a A1 A4
+
+    # Both used to throw `MethodError: no method matching //(::BigInt,
+    # ::BasicSymbolic)` from the closed-form formulas in `univar.jl`.
+    @test length(Symbolics.get_roots_deg3(value(a * x^3 + 2x + 1), value(x))) == 3
+    @test length(Symbolics.get_roots_deg4(value(a^2 * x^4 + 1), value(x))) == 4
+
+    for ex in [x^4 + a, a * x^4 + 1, x^4 + a * x + 1, A1^2 * x^4 + A4^2]
+        roots = symbolic_solve(ex, x)
+        @test roots !== nothing
+        @test length(roots) == 4
+    end
+
+    # Numeric quartics are unaffected. `correctAns` above is local to its own
+    # testset, so the comparison is spelled out here.
+    numeric = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x^4 - 3x^2 + 2, x))))
+    expected = sort_roots([-sqrt(2.0), -1.0, 1.0, sqrt(2.0)])
+    @test all(isapprox.(numeric, expected; atol = 1.0e-6))
 end
