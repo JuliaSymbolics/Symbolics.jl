@@ -227,6 +227,9 @@ symbolic, and indexing into it does not currently fold.
 ```@docs
 @symstruct
 SymStruct
+record_literal
+is_record_literal
+RecordLiteral
 Symbolics.symbolic_zero
 Symbolics.is_zeroable
 Symbolics.SymbolicZero
