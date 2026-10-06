@@ -627,6 +627,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
 
                 for (i, iarg) in enumerate(inner_args)
+                    occursin_info(D.x, iarg) || continue #skip if inner arg doesn't need this var
                     t2 = executediff(D, iarg; simplify, throw_no_derivative)::SymbolicT
                     _iszero_derivative(t2) && continue
                     t = derivative_idx(arg, i)::Union{Nothing, SymbolicT}

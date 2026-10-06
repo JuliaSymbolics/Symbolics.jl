@@ -447,6 +447,51 @@ end
     @test SU.symtype(drec) === Record2{Int}
 end
 
+struct ZeroPlan
+    a::Float64
+end
+zeroplan_pos(p, t) = 0.0
+zeroplan_vel(p, t) = 0.0
+@register_symbolic zeroplan_pos(p::SU.FnType{Tuple, Real}, t::Real)
+@register_symbolic zeroplan_vel(p::SU.FnType{Tuple, Real}, t::Real)
+Symbolics.@register_derivative zeroplan_pos(p, t) 2 zeroplan_vel(p, t)
+
+norec_fn(r, t) = 0.0
+@register_symbolic norec_fn(r::Record2{Int}, t::Real)
+
+@testset "a constant argument with no zero contributes nothing" begin
+    @variables t q norec::Record2{Int}
+    zplan = only(@variables (zplan::ZeroPlan)(..))
+    D = Differential(t)
+
+    # A subterm without the differentiation variable contributes nothing to the chain
+    # rule, so it must not be asked for a derivative - its type may well have no zero.
+    # A callable parameter is one such: its symtype is an `FnType`, and the registered
+    # rule supplies the whole derivative.
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(zeroplan_pos(zplan, t)))),
+        SU.unwrap(zeroplan_vel(zplan, t))
+    )
+
+    # A record with a `String` field is another: unzeroable in its own right, yet
+    # perfectly good as a constant argument.
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(norec_fn(norec, t)))),
+        SU.unwrap(D(SU.unwrap(norec_fn(norec, t))))
+    )
+
+    # The same holds wherever such a call is nested, since each of these differentiates
+    # the numeric call rather than the argument.
+    for ex in (norec_fn(norec, t) + q, norec_fn(norec, t) * q,
+               norec_fn(norec, t) / q, norec_fn(norec, t)^2)
+        @test SU.unwrap(expand_derivatives(D(ex))) isa SU.BasicSymbolic
+    end
+
+    # Asking for the derivative of the unzeroable value itself is still an error: there
+    # the zero would be the answer, not a factor that drops out.
+    @test_throws ArgumentError expand_derivatives(D(SU.unwrap(norec)))
+end
+
 using SymbolicIndexingInterface: SymbolicIndexingInterface as SII
 
 @testset "field accesses are named through their record" begin
