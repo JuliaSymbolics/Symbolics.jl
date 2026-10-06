@@ -317,19 +317,15 @@ end
 # symbolic functions like `x(t)` that are also in `vars` — get a var node that
 # still expands through its call arguments (matching `jacobian`, where
 # `d(x(t))/dt` stays `xˍt` even when `x(t)` is a differentiated variable);
-# `Differential` vars similarly keep their edges; everything else is a regular
-# node
+# other calls in `vars` (`Differential`, `Integral`, `getindex`, ...) go
+# through the regular dispatch, which registers them as vars while still
+# wiring their normal edges (the dual role `jacobian` applies, e.g.
+# `d(sin(x))/dx == cos(x)` even when `sin(x)` is a differentiated variable)
 function _populate_dispatch(dg::DerivativeGraph{T}, term::SymbolicT, root_idx::Integer) where {T}
     if term in dg.varset
-        if iscall(term)
-            op = operation(term)
-            if op isa BasicSymbolic{VartypeT}
-                return populate_dergraph_depvar!(dg, term, root_idx)
-            elseif op isa Differential
-                return populate_dergraph!(dg, term, root_idx)
-            end
-        end
-        return populate_dergraph_var!(dg, term, root_idx)
+        iscall(term) || return populate_dergraph_var!(dg, term, root_idx)
+        operation(term) isa BasicSymbolic{VartypeT} &&
+            return populate_dergraph_depvar!(dg, term, root_idx)
     end
     return populate_dergraph!(dg, term, root_idx)
 end
@@ -361,6 +357,9 @@ function populate_dergraph!(dg::DerivativeGraph{T}, expr::SymbolicT, root_idx::I
 
     if operation(expr) isa Differential
         return _populate_differential!(dg, expr, root_idx)
+    end
+    if operation(expr) isa Integral || operation(expr) isa SymbolicUtils.Operator
+        return _populate_operator_leaf!(dg, expr, root_idx)
     end
 
     return _populate_node!(dg, expr, root_idx; isleaf)
@@ -434,6 +433,47 @@ function _populate_differential!(dg::DerivativeGraph{T}, expr::SymbolicT, root_i
     return post_idx
 end
 
+# `Operator` applications (`Integral`, user-defined `Operator`s): the
+# derivative of such a term is not a local per-argument partial — e.g. the
+# Leibniz rule for `Integral` differentiates bounds and wraps the integrand's
+# derivative in a new `Integral` — so the node gets a shortcut edge straight
+# to each var leaf it depends on, carrying the whole `executediff` partial
+# for that variable (`occursin_info` and `executediff` are the same oracles
+# `derivative` uses: they know about endpoint recursion and bound-variable
+# shadowing). The edge's var mask is just that one variable — the value is
+# the *total* derivative w.r.t. that atom, so paths must terminate at the
+# var node; letting them continue through a depvar's children would
+# double-count the mediated term already included in `executediff`'s result.
+# `executediff` differentiates generic `Operator`s to zero, which simply
+# produces no edges — the same leaf behavior as before.
+function _populate_operator_leaf!(dg::DerivativeGraph{T}, expr::SymbolicT,
+                                  root_idx::Integer) where {T}
+    is_var = expr in dg.varset
+    push!(dg.symbols, expr)
+    post_idx::T = length(dg.symbols)
+    dg.definitions[expr] = post_idx
+    dg.child_edges[post_idx] = Edge{T}[]
+    dg.parent_edges[post_idx] = Edge{T}[]
+    is_var && _register_var!(dg, expr, post_idx)
+
+    for (var_idx, var) in enumerate(dg.vars)
+        occursin_info(var, expr) || continue
+        var_post = _populate_dispatch(dg, var, root_idx)
+        isnothing(var_post) && continue
+        partial = executediff(Differential(var), expr)
+        _iszero(partial) && continue
+        vars = falses(length(dg.vars))
+        vars[var_idx] = 1
+        roots = falses(length(dg.roots))
+        roots[root_idx] = 1
+        edge = Edge{T}(partial, post_idx, var_post, vars, roots)
+        push!(dg.child_edges[post_idx], edge)
+        push!(dg.parent_edges[var_post], edge)
+    end
+
+    return post_idx
+end
+
 function _populate_node!(dg::DerivativeGraph{T}, expr::SymbolicT,
                          root_idx::Integer; isleaf::Bool = false) where {T}
     args = parent(arguments(expr))
@@ -454,10 +494,6 @@ function _populate_node!(dg::DerivativeGraph{T}, expr::SymbolicT,
     # condition is excluded from the graph entirely so non-differentiable
     # subterms (comparisons) are never traversed.
     cond_idx = op === ifelse || op === ifelse_eager || op === ifelse_branching ? 1 : 0
-    # operator applications (`Integral`, user-defined `Operator`s) act as fresh
-    # variables — `executediff` differentiates them to zero, so they are leaves
-    # here (`Differential` is handled separately in `populate_dergraph!`)
-    isleaf |= op isa SymbolicUtils.Operator
     for arg_idx in reverse(eachindex(args))
         arg = args[arg_idx]
         if isleaf || arg_idx == cond_idx
@@ -1303,7 +1339,7 @@ Computes the Jacobian of `roots` w.r.t. `vars` using the D* automatic differenti
 
 (see [this paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/main-65.pdf) for more details on the algorithm)
 
-Mostly the same usage as [`jacobian`](@ref), but can be faster on large expressions with heavy shared subexpressions. `Integral` terms and complex expressions are not supported.
+Mostly the same usage as [`jacobian`](@ref), but can be faster on large expressions with heavy shared subexpressions. Complex expressions are not supported. `Integral` terms are supported through [`expand_derivatives`](@ref) semantics (Leibniz rule for bounds and integrand).
 
 # Arguments
 
@@ -1395,7 +1431,7 @@ $(SIGNATURES)
 
 Computes the derivative of `root` w.r.t. `var` using the D* differentiation algorithm.
 
-Mostly the same usage as [`derivative`](@ref), but can be faster on large expressions with heavy shared subexpressions. `Integral` terms and complex expressions are not supported.
+Mostly the same usage as [`derivative`](@ref), but can be faster on large expressions with heavy shared subexpressions. Complex expressions are not supported. `Integral` terms are supported through [`expand_derivatives`](@ref) semantics (Leibniz rule for bounds and integrand).
 
 Wrapper for R1->R1 case of `dstar_jacobian`. See [`dstar_jacobian`](@ref) for more information.
 

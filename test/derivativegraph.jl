@@ -261,6 +261,46 @@ end
                   [1 expand_derivatives(D(x)(D(y)(u(x, y))))])
 end
 
+# `Integral` terms: the derivative is not a local per-argument partial (the
+# Leibniz rule differentiates bounds and wraps the integrand's derivative in a
+# new `Integral`), so the node gets shortcut edges to each var leaf carrying
+# the whole `executediff` partial — the same oracle `derivative` uses
+@testset "integrals" begin
+    using Symbolics: Integral
+    using DomainSets: ClosedInterval
+    @variables t x a b y z u(..) v(..)
+    I = Integral(x in ClosedInterval(a, b))
+    # bound variables differentiate via the fundamental theorem; the
+    # integration variable is bound and differentiates to zero; unrelated
+    # variables stay zero
+    @test isequal(dstar_derivative(I(x^2), a), Symbolics.derivative(I(x^2), a))
+    @test isequal(dstar_derivative(I(x^2), b), Symbolics.derivative(I(x^2), b))
+    @test isequal(dstar_derivative(I(x^2), x), Symbolics.derivative(I(x^2), x))
+    @test isequal(dstar_derivative(I(x^2), z), Symbolics.derivative(I(x^2), z))
+    # free variables inside the integrand differentiate inside the integral
+    @test isequal(dstar_derivative(I(x^2 + y), y), Symbolics.derivative(I(x^2 + y), y))
+    @test isequal(dstar_derivative(I(x^2 + y), a), Symbolics.derivative(I(x^2 + y), a))
+    # composition through the integral node
+    @test isequal(dstar_derivative(sin(I(x^2)), a), Symbolics.derivative(sin(I(x^2)), a))
+    @test isequal(dstar_derivative(sin(I(x^2 + y)), y), Symbolics.derivative(sin(I(x^2 + y)), y))
+    # symbolic bound expressions
+    I2 = Integral(x in ClosedInterval(1, v(z)))
+    @test isequal(dstar_derivative(I2(x^2), z), Symbolics.derivative(I2(x^2), z))
+    # depvar inside the integrand: the atom column and the mediated column
+    # both match `derivative` — the mediated term comes solely from the
+    # `n -> t` shortcut edge's `executediff` total, never re-added by a chain
+    @test isequal(dstar_derivative(I(u(t)^2), u(t)), Symbolics.derivative(I(u(t)^2), u(t)))
+    @test isequal(dstar_derivative(I(u(t)^2), t), Symbolics.derivative(I(u(t)^2), t))
+    # an integral in `vars` keeps the leaf column while still differentiating
+    # for other variables
+    @test isequal(dstar_jacobian([I(x^2)], Symbolics.unwrap.([I(x^2), a])),
+                  [1 Symbolics.derivative(I(x^2), a)])
+    # shared integral terms across roots — `jacobian`'s `search_variables`
+    # pre-filter misses bound dependence, so compare against `derivative`
+    expected = [Symbolics.derivative(e, v) for e in [I(x^2) * x, I(x^2)^2], v in [a, y]]
+    @test isequal(dstar_jacobian([I(x^2) * x, I(x^2)^2], [a, y]), expected)
+end
+
 # `ifelse`: conditions are treated as piecewise-constant (matching
 # `expand_derivatives`) and excluded from the derivative graph; branch partials
 # become `ifelse(c, 1, 0)`/`ifelse(c, 0, 1)` edge values. `simplify` does not
