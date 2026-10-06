@@ -1172,6 +1172,14 @@ end
 
 function evaluate_path(dg::DerivativeGraph{T}, edge::Edge{T}, root::Integer, var::Integer, cache::Vector{Dict{Edge{T},SymbolicT}}) where {T}
     edge.bott_vertex == dg.var_idx_to_postorder[var] && return edge.edge_value # reached var
+    # `cache[var]` is keyed by edge only, not (root, edge): an edge reachable
+    # from several roots computes its downward path-sum once and shares it.
+    # That is sound because factoring only ever partitions an edge's
+    # root/var *coverage* — split copies keep the original `edge_value` and
+    # endpoints, and collapsed subgraph edges carry exactly the sum of the
+    # path products they replace — so for a given `var`, every root in
+    # `reachable_roots(edge)` sees the same path-product sum below it, even if
+    # the edge objects differ per root.
     haskey(cache[var], edge) && return cache[var][edge]
 
     terms = SymbolicT[]
