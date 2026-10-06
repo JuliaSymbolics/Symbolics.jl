@@ -1345,8 +1345,10 @@ Mostly the same usage as [`jacobian`](@ref), but can be faster on large expressi
 
 - `roots::AbstractVector`: Vector of expressions to differentiate or array-type symbolic expression (e.g. function registered with `@register_array_symbolic`)
 - `vars::AbstractVector`: Vector of variables to differentiate w.r.t. or single array-type variable (e.g. `@variables x[1:4]`)
+- `simplify::Bool=false`: Whether to simplify the resulting expressions using
+    [`SymbolicUtils.simplify`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.simplify).
 """
-function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
+function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT}; simplify::Bool = false)
     roots isa Arr && (roots = scalarize(unwrap(roots)))
     roots isa AbstractVector{Num} && (roots = unwrap.(roots))
 
@@ -1399,28 +1401,14 @@ function dstar_jacobian(roots::AbstractVector, vars::AbstractVector{SymbolicT})
             result[root, var] = has_ifelse ? _fold_ifelse_guards(r) : r
         end
     end
+    simplify && (result = SymbolicUtils.simplify.(result))
 
     return result[root_map, var_map]
 end
 
-function dstar_jacobian(roots, vars)
-    # input validation copied from `jacobian`
-    roots = vec(scalarize(roots))
-    if roots isa Vector{Num}
-        roots = unwrap.(roots)::Vector{SymbolicT}
-    elseif roots isa Vector{SymbolicT}
-    else
-        roots = roots::Vector{eltype(roots)}
-    end
-    # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
-    vars = vec(scalarize(vars))
-    if vars isa Vector{Num}
-        vars = unwrap.(vars)::Vector{SymbolicT}
-    elseif vars isa Vector{SymbolicT}
-    else
-        error("This should not happen! `vars` must be convertible to Vector{SymbolicT}. \nReceived vars = $vars")
-    end
-    _res = dstar_jacobian(roots, vars)
+function dstar_jacobian(roots, vars; simplify::Bool = false)
+    roots, vars = _normalize_jacobian_args(roots, vars)
+    _res = dstar_jacobian(roots, vars; simplify)
     res = similar(_res, Num)
     map!(Num, res, _res)
     return res
@@ -1438,5 +1426,8 @@ Wrapper for R1->R1 case of `dstar_jacobian`. See [`dstar_jacobian`](@ref) for mo
 # Arguments
 - `root`: Expression to differentiate
 - `var`: Variable to differentiate w.r.t.
+- `simplify::Bool=false`: Whether to simplify the resulting expression using
+    [`SymbolicUtils.simplify`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.simplify).
 """
-dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}) = Num(only(dstar_jacobian(unwrap.([root]), unwrap.([var]))))
+dstar_derivative(root::Union{Num,SymbolicT}, var::Union{Num,SymbolicT}; simplify::Bool = false) =
+    Num(only(dstar_jacobian(unwrap.([root]), unwrap.([var]); simplify)))
