@@ -219,8 +219,6 @@ end
 @latexrecipe function f(eqs::Vector{Equation})
     index --> :subscript
     env --> :align
-    # Equations with a hidden lhs (e.g. MTK `connect` equations) render as
-    # `0 = rhs`, so mixed systems stay in a single aligned environment.
     lhs = map(eq -> hide_lhs(value(eq.lhs)) ? 0 : align_side(eq.lhs), eqs)
     return lhs, align_side.(getfield.(eqs, :rhs))
 end
