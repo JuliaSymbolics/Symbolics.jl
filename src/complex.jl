@@ -20,7 +20,8 @@ function SymbolicUtils.unwrap(a::Complex{<:Num})
         return arguments(re)[1]
     end
     sT = promote_type(symtype(re), symtype(img))
-    return Term{VartypeT}(complex, SymbolicUtils.ArgsT{vartype(re)}((re, img)); type = Complex{sT}, shape = SymbolicUtils.ShapeVecT())
+    type = sT <: Real ? Complex{sT} : sT
+    return Term{VartypeT}(complex, SymbolicUtils.ArgsT{vartype(re)}((re, img)); type, shape = SymbolicUtils.ShapeVecT())
 end
 
 SymbolicUtils.infer_vartype(::Type{Complex{Num}}) = VartypeT
