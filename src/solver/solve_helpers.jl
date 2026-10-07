@@ -68,6 +68,33 @@ SymbolicUtils.promote_shape(::typeof(scbrt), @nospecialize(sh::SymbolicUtils.Sha
     substitute(@derivative_rule(cbrt(x), I), cbrt => scbrt)
 end
 
+"""
+    cardano_cbrt(Q, R, k)
+
+The cube roots `S` (`k = 1`) and `T` (`k = 2`) in Cardano's formula for the depressed
+cubic, with `S^3 = R + √(Q^3 + R^2)`, `T^3 = R - √(Q^3 + R^2)` and `S * T = -Q`.
+
+The principal cube root is taken of the radicand with the larger modulus and the other
+root is `-Q` divided by it, so the pair stays consistent for complex `Q` and `R`.
+Returns a symbolic term unless `Q` and `R` are both numbers.
+"""
+function cardano_cbrt(Q, R, k)
+    Q, R = unwrap(Q), unwrap(R)
+    if !(Q isa Number && R isa Number)
+        return term(cardano_cbrt, Q, R, k)
+    end
+    sqrtD = ssqrt(Q^3 + R^2)
+    U, V = R + sqrtD, R - sqrtD
+    swap = abs(V) > abs(U)
+    larger = scbrt(swap ? V : U)
+    smaller = iszero(larger) ? zero(larger) : -Q / larger
+    S, T = swap ? (smaller, larger) : (larger, smaller)
+    return k == 1 ? S : T
+end
+
+SymbolicUtils.promote_symtype(::typeof(cardano_cbrt), ::Type{A}, ::Type{B}, ::Type) where {A, B} = promote_type(A, B)
+SymbolicUtils.promote_shape(::typeof(cardano_cbrt), @nospecialize(shapes::SymbolicUtils.ShapeT...)) = shapes[1]
+
 function slog(n)
     n = unwrap(n)
 

@@ -173,6 +173,35 @@ end
     @test all(arr_solve_roots .≈ arr_known_roots)
 end
 
+@testset "Deg 3 univar, complex parameter values" begin
+    @variables x a
+    evalroots(roots, A) = [eval(Symbolics.toexpr(substitute(r, Dict(a => A)))) for r in roots]
+
+    # x^3 + 3x + 1: Q = 1, R = -1/2, so S = ∛((√5 - 1) / 2) and T = -Q / S.
+    S = cbrt((sqrt(5) - 1) / 2)
+    T = -1 / S
+    known = [S + T, -(S + T) / 2 - im * sqrt(3) / 2 * (S - T), -(S + T) / 2 + im * sqrt(3) / 2 * (S - T)]
+    roots = Symbolics.get_roots_deg3(value(x^3 + a * x + 1), value(x))
+    for A in (3, 3.0 + 0.0im)
+        @test all(isapprox.(sort(evalroots(roots, A); by = imag), sort(known; by = imag); atol = 1.0e-12))
+    end
+
+    # Vieta: the roots of x^3 + A*x + 1 sum to 0, their pairwise products sum
+    # to A and their product is -1; those of A*x^3 + x + 1 give 0, 1/A and -1/A.
+    for (ex, e1, e2, e3) in (
+            (x^3 + a * x + 1, A -> 0, A -> A, A -> -1),
+            (a * x^3 + x + 1, A -> 0, A -> 1 / A, A -> -1 / A),
+        )
+        roots = symbolic_solve(ex, x)
+        for A in (3.0 + 0.0im, 1 + 2im, 2im, -1 - 0.5im)
+            r1, r2, r3 = evalroots(roots, A)
+            @test isapprox(r1 + r2 + r3, e1(A); atol = 1.0e-12)
+            @test isapprox(r1 * r2 + r1 * r3 + r2 * r3, e2(A); atol = 1.0e-12)
+            @test isapprox(r1 * r2 * r3, e3(A); atol = 1.0e-12)
+        end
+    end
+end
+
 @testset "Deg 4 univar" begin
     expr = x^4 + 1
     arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
