@@ -137,6 +137,19 @@ end
     @test !occursin(raw"u\left( t \right)_{1}", s)
 end
 
+@testset "indexed derivative operand scope (#1526)" begin
+    @variables t y(t) u(t)[1:3]
+    D = Differential(t)
+    @test String(latexify(D(u[1]) * y; env = :raw)) ==
+        raw"\frac{\mathrm{d}u_{1}\left( t \right)}{\mathrm{d}t} ~ y\left( t \right)"
+    @test String(latexify(D(D(u[1])) * y; env = :raw)) ==
+        raw"\frac{\mathrm{d}^{2}u_{1}\left( t \right)}{\mathrm{d}t^{2}} ~ y\left( t \right)"
+    @test String(latexify(D(u[1]) * y; env = :raw, index = :bracket)) ==
+        raw"\frac{\mathrm{d}u\left[1\right]\left( t \right)}{\mathrm{d}t} ~ y\left( t \right)"
+    @test String(latexify(D(D(u[1])) * y; env = :raw, index = :bracket)) ==
+        raw"\frac{\mathrm{d}^{2}u\left[1\right]\left( t \right)}{\mathrm{d}t^{2}} ~ y\left( t \right)"
+end
+
 @test_reference "latexify_refs/indices5.txt" latexify(a'a)
 
 @variables f(..)
