@@ -223,20 +223,57 @@ function is_exact_polynomial(expr)
     return false
 end
 
-function rational_affine_coefficient(expr)
+function affine_polynomial(expr, parameters, unit)
     expr = value(expr)
-    expr isa Integer && return big(expr) // big(1)
-    iscall(expr) || return expr
+    if expr isa Union{Integer, Rational}
+        return Rational{BigInt}(expr) * unit
+    end
+    haskey(parameters, expr) && return parameters[expr] * unit
+    iscall(expr) || return nothing
     op = operation(expr)
     args = arguments(expr)
     if op === (^)
-        return rational_affine_coefficient(args[1])^value(args[2])
+        base = affine_polynomial(args[1], parameters, unit)
+        exponent = value(args[2])
+        isnothing(base) && return nothing
+        exponent isa Integer && exponent >= 0 || return nothing
+        return base^exponent
     end
-    return op(map(rational_affine_coefficient, args)...)
+    op === (+) || op === (*) || return nothing
+    polys = map(arg -> affine_polynomial(arg, parameters, unit), args)
+    any(isnothing, polys) && return nothing
+    return op(polys...)
 end
 
-function canonical_affine_coefficient(expr)
-    return wrap(simplify_fractions(rational_affine_coefficient(expand(expr))))
+function exact_affine_quotient(numerator, denominator)
+    iszero(denominator) && return nothing
+    quotient, remainder = divrem(numerator, denominator; ztol = 0)
+    return iszero(remainder) ? quotient : nothing
+end
+
+function affine_polynomial_expression(poly, parameters, polyvars)
+    result = Num(big(0) // big(1))
+    for term in MP.terms(poly)
+        summand = Num(MP.coefficient(term))
+        for (parameter, polyvar) in zip(parameters, polyvars)
+            exponent = MP.degree(term, polyvar)
+            iszero(exponent) || (summand *= wrap(parameter)^exponent)
+        end
+        result += summand
+    end
+    return result
+end
+
+function reduced_affine_fraction(numerator, denominator, parameters, polyvars)
+    scale = foldl(lcm, (Base.denominator(c) for p in (numerator, denominator) for c in MP.coefficients(p)); init = big(1))
+    intnum = MP.map_coefficients(c -> BigInt(c * scale), numerator)
+    intden = MP.map_coefficients(c -> BigInt(c * scale), denominator)
+    factor = gcd(intnum, intden)
+    divisor = MP.map_coefficients(c -> Rational{BigInt}(c), factor)
+    num = exact_affine_quotient(MP.map_coefficients(c -> Rational{BigInt}(c), intnum), divisor)
+    den = exact_affine_quotient(MP.map_coefficients(c -> Rational{BigInt}(c), intden), divisor)
+    (isnothing(num) || isnothing(den)) && return nothing
+    return affine_polynomial_expression(num, parameters, polyvars) / affine_polynomial_expression(den, parameters, polyvars)
 end
 
 function exact_affine_solve(eqs, vars)
@@ -244,16 +281,20 @@ function exact_affine_solve(eqs, vars)
     isempty(vars) && return nothing
     A, bvec, islinear = linear_expansion(wrap.(bigify.(eqs)), vars)
     islinear || return nothing
-    x_set = Set(unwrap(v) for v in vars)
-    for e in Iterators.flatten((A, bvec))
-        any(v -> v in x_set, get_variables(e)) && return nothing
-    end
-    A = canonical_affine_coefficient.(wrap.(bigify.(A)))
-    bvec = -wrap.(bigify.(bvec))
+    parameters = unique!(collect(Iterators.flatten(get_variables.(vcat(vec(A), bvec)))))
+    x_set = Set(unwrap.(vars))
+    any(v -> v in x_set, parameters) && return nothing
+    DP.@polyvar polyvars[1:max(1, length(parameters))]
+    unit = MP.polynomial((big(1) // big(1)) * one(first(polyvars)))
+    mapping = Dict(zip(parameters, polyvars))
+    A = map(e -> affine_polynomial(e, mapping, unit), A)
+    bvec = map(e -> affine_polynomial(-e, mapping, unit), bvec)
+    any(isnothing, A) && return nothing
+    any(isnothing, bvec) && return nothing
     n = length(vars)
-    previous_pivot = one(Num)
+    previous_pivot = unit
     for k in 1:n
-        pivot = findfirst(i -> !_iszero(A[i, k]), k:n)
+        pivot = findfirst(i -> !iszero(A[i, k]), k:n)
         isnothing(pivot) && return nothing
         pivot += k - 1
         if pivot != k
@@ -262,14 +303,14 @@ function exact_affine_solve(eqs, vars)
         end
         for i in (k + 1):n
             for j in (k + 1):n
-                A[i, j] = canonical_affine_coefficient(
-                    (A[k, k] * A[i, j] - A[i, k] * A[k, j]) / previous_pivot
-                )
+                entry = exact_affine_quotient(A[k, k] * A[i, j] - A[i, k] * A[k, j], previous_pivot)
+                isnothing(entry) && return nothing
+                A[i, j] = entry
             end
-            bvec[i] = canonical_affine_coefficient(
-                (A[k, k] * bvec[i] - A[i, k] * bvec[k]) / previous_pivot
-            )
-            A[i, k] = 0
+            entry = exact_affine_quotient(A[k, k] * bvec[i] - A[i, k] * bvec[k], previous_pivot)
+            isnothing(entry) && return nothing
+            bvec[i] = entry
+            A[i, k] = zero(unit)
         end
         previous_pivot = A[k, k]
     end
@@ -279,10 +320,13 @@ function exact_affine_solve(eqs, vars)
         for j in (i + 1):n
             numerator -= A[i, j] * bvec[j]
         end
-        bvec[i] = canonical_affine_coefficient(numerator / A[i, i])
+        entry = exact_affine_quotient(numerator, A[i, i])
+        isnothing(entry) && return nothing
+        bvec[i] = entry
     end
-    bvec = canonical_affine_coefficient.(bvec ./ determinant)
-    return bvec
+    roots = map(b -> reduced_affine_fraction(b, determinant, parameters, polyvars), bvec)
+    any(isnothing, roots) && return nothing
+    return roots
 end
 
 # Strip outer integer powers and nonzero constant factors so that f^n and c*f^n

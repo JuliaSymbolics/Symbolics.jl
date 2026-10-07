@@ -3,6 +3,7 @@ import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root
 using SymbolicUtils
 using SymbolicUtils: Const
 using Test
+using Random, LinearAlgebra
 
 # @testset "ia_solve without Nemo" begin
 #     @test Base.get_extension(Symbolics, :SymbolicsNemoExt) === nothing
@@ -553,7 +554,7 @@ end
     end
     k = typemax(Int)
     coefficient = big(k) * (k - 1)
-    reduced = value(Symbolics.canonical_affine_coefficient((1 - coefficient * a) / (-1 + coefficient * a)))
+    reduced = value(only(symbolic_solve([(1 - coefficient * a) * x + 1 - coefficient * a, y], [x, y]))[x])
     @test reduced == -1
     @test reduced isa Union{Integer, Rational}
     eqs = [k * a * x + y - 1, x + (k - 1) * y]
@@ -564,6 +565,60 @@ end
         specialized = Dict(v => substitute(sol[v], Dict(a => av)) for v in [x, y])
         @test value.([specialized[x], specialized[y]]) == expected
         @test all(iszero(value(substitute(substitute(eq, Dict(a => av)), specialized))) for eq in eqs)
+    end
+end
+
+@testset "Parametric polynomial division regression" begin
+    @variables x y a c
+    eqs = [
+        -4a^2 - 5a^3 * c - 3a * c^3 + (2 + 4c^3) * x + (-a * c - a^2 * c - 4a * c^2 + 3a^3 * c) * y,
+        1 - 3a * c^3 + (-5a * c - 5c^2 - 4a^2 * c - 3c^3 + 4a^3 * c - 5a^2 * c^2) * y + (3a^3 + 4c^3 + 3a^2 * c^2) * x,
+    ]
+    @test !isnothing(Symbolics.exact_affine_solve(eqs, [x, y]))
+    sol = only(symbolic_solve(eqs, [x, y]))
+    for (av, cv) in ((3 // 7, -5 // 2), (-11 // 3, 2 // 9), (1 // 2, 1 // 3), (7, -1 // 5), (2, 3))
+        aa, cc = big(av), big(cv)
+        M = Rational{BigInt}[
+            2 + 4cc^3 -aa * cc - aa^2 * cc - 4aa * cc^2 + 3aa^3 * cc;
+            3aa^3 + 4cc^3 + 3aa^2 * cc^2 -5aa * cc - 5cc^2 - 4aa^2 * cc - 3cc^3 + 4aa^3 * cc - 5aa^2 * cc^2
+        ]
+        rhs = Rational{BigInt}[4aa^2 + 5aa^3 * cc + 3aa * cc^3, 3aa * cc^3 - 1]
+        @test !iszero(det(M))
+        got = [value(substitute(sol[v], Dict(a => aa, c => cc))) for v in (x, y)]
+        @test got == M \ rhs
+        @test all(iszero, M * got - rhs)
+        @test all(iszero(value(substitute(substitute(e, sol), Dict(a => aa, c => cc)))) for e in eqs)
+    end
+end
+
+@testset "Random exact parametric affine systems" begin
+    @variables x y z a c
+    rng = MersenneTwister(20261004)
+    powers = [(i, j) for i in 0:3 for j in 0:3 if 0 < i + j <= 3]
+    for n in (2, 3), trial in 1:12
+        vars = [x, y, z][1:n]
+        coefficients = rand(rng, -9:9, n, n, length(powers))
+        constants = rand(rng, -9:9, n, length(powers) + 1)
+        matrix = [sum(coefficients[i, j, k] * a^u * c^v for (k, (u, v)) in enumerate(powers)) + (i == j) for i in 1:n, j in 1:n]
+        rhs = [constants[i, end] + sum(constants[i, k] * a^u * c^v for (k, (u, v)) in enumerate(powers)) for i in 1:n]
+        eqs = matrix * vars - rhs
+        @test !isnothing(Symbolics.exact_affine_solve(eqs, vars))
+        input = trial % 3 == 0 ? (2 // 3) .* eqs .^ 2 : eqs
+        sol = only(symbolic_solve(input, vars))
+        checked = 0
+        for av in -2:2, cv in -2:2
+            monomials = [big(av)^u * big(cv)^v for (u, v) in powers]
+            M = Rational{BigInt}[sum(coefficients[i, j, k] * monomials[k] for k in eachindex(powers)) + (i == j) for i in 1:n, j in 1:n]
+            iszero(det(M)) && continue
+            r = Rational{BigInt}[constants[i, end] + sum(constants[i, k] * monomials[k] for k in eachindex(powers)) for i in 1:n]
+            point = Dict(a => av, c => cv)
+            actual = [value(substitute(sol[v], point)) for v in vars]
+            @test actual == M \ r
+            @test all(iszero, M * actual - r)
+            @test all(iszero(value(substitute(substitute(e, sol), point))) for e in eqs)
+            checked += 1
+        end
+        @test checked > 0
     end
 end
 
