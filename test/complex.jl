@@ -75,6 +75,46 @@ end
     @test substitute(x * im, Dict(x => im)) isa Complex{Num}
 end
 
+@testset "substitute real values into Complex{Num} is exact" begin
+    @variables p q w::Complex x y
+    cval(c) = unwrap_const(unwrap(c))
+    pq = p + q * im
+
+    zero_v = cval(substitute(pq, Dict(p => -0.0, q => -0.0)))
+    @test isequal(real(zero_v), -0.0)
+    @test isequal(imag(zero_v), -0.0)
+
+    bool_v = cval(substitute(pq, Dict(p => false, q => true)))
+    @test bool_v isa Complex{Bool}
+    @test bool_v == complex(false, true)
+
+    r, i = setprecision(512) do
+        BigFloat(1) + BigFloat(2)^(-400), BigFloat(2) + BigFloat(2)^(-400)
+    end
+    big_v = cval(substitute(pq, Dict(p => r, q => i)))
+    @test isequal(big_v, complex(r, i))
+    @test precision(real(big_v)) == 512
+    @test precision(imag(big_v)) == 512
+
+    w1 = substitute(w, Dict(w => 3.0im))
+    @test w1 isa Complex{Num}
+    @test isequal(cval(w1), 3.0im)
+    w2 = substitute(w, Dict(w => x))
+    @test w2 isa Complex{Num}
+    @test isequal(unwrap(real(w2)), unwrap(x))
+    @test isequal(cval(imag(w2)), 0)
+
+    v = substitute([x, y], Dict(x => 1.0im))
+    @test v isa Vector{Complex{Num}}
+    @test isequal(cval(v[1]), 1.0im)
+    @test isequal(unwrap(real(v[2])), unwrap(y))
+    @test substitute([x, y], Dict(x => 1.0)) isa Vector{Num}
+    @test substitute(Num[], Dict(x => 1.0im)) isa Vector{Num}
+    m = substitute([x y; y x], Dict(x => 2.0im))
+    @test m isa Matrix{Complex{Num}}
+    @test isequal(cval(m[2, 2]), 2.0im)
+end
+
 @testset "unwrap preserves complex constants" begin
     v = complex(-0.0, 2.0)
     @test isequal(unwrap_const(unwrap(Complex{Num}(Num(real(v)), Num(imag(v))))), v)

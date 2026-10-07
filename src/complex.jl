@@ -74,8 +74,17 @@ end
 
 function (s::SymbolicUtils.Substituter)(x::Complex{Num})
     val = get(SymbolicUtils.get_substitution_dict(s), x, nothing)
-    val === nothing || return val
-    are, aim = _complex_reim(unwrap(s(real(x))))
-    re2, im2 = _complex_reim(unwrap(s(imag(x))))
+    val === nothing || return Complex{Num}(wrap(val))
+    re, img = s(real(x)), s(imag(x))
+    re isa Num && img isa Num && return Complex{Num}(re, img)
+    are, aim = _complex_reim(unwrap(re))
+    re2, im2 = _complex_reim(unwrap(img))
     return Complex{Num}(wrap(are - im2), wrap(aim + re2))
+end
+
+function (s::SymbolicUtils.Substituter)(ex::Array{Num})
+    res = [s(x) for x in ex]
+    all(x -> x isa Num, res) && return convert(Array{Num}, res)
+    all(x -> x isa Union{Num, Complex{Num}}, res) && return convert(Array{Complex{Num}}, res)
+    return res
 end
