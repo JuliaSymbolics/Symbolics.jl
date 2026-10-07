@@ -211,21 +211,20 @@ end
 
 @latexrecipe function f(eqs::Vector{Equation})
     index --> :subscript
-    has_connections = any(x -> hide_lhs(value(x.lhs)), eqs)
-    if has_connections
-        env --> :equation
-        return map(first ∘ first ∘ Latexify.apply_recipe, eqs)
-    else
-        env --> :align
-        return align_side.(getfield.(eqs, :lhs)), align_side.(getfield.(eqs, :rhs))
-    end
+    env --> :align
+    # Equations with a hidden lhs (e.g. MTK `connect` equations) render as
+    # `0 = rhs`, so mixed systems stay in a single aligned environment.
+    lhs = map(eq -> hide_lhs(value(eq.lhs)) ? 0 : align_side(eq.lhs), eqs)
+    return lhs, align_side.(getfield.(eqs, :rhs))
 end
 
 @latexrecipe function f(eq::Equation)
     env --> :equation
     index --> :subscript
 
-    if hide_lhs(value(eq.lhs)) || !(value(eq.lhs) isa Union{Number, AbstractArray, BasicSymbolic})
+    if hide_lhs(value(eq.lhs))
+        return Expr(:(=), 0, recipe(eq.rhs))
+    elseif !(value(eq.lhs) isa Union{Number, AbstractArray, BasicSymbolic})
         return value(eq.rhs)
     else
         return Expr(:(=), recipe(eq.lhs), recipe(eq.rhs))
