@@ -131,19 +131,23 @@ function symtype_represents(S, T)
     return C !== Nothing && C <: T
 end
 
-function parse_args_list(args_list)
-    if isa(args_list, Expr) && args_list.head == :vect
-        args_list = args_list.args
+function registration_signatures(block)
+    Meta.isexpr(block, :block) || throw(ArgumentError("registration options must be a block"))
+    signatures = []
+    for option in MacroTools.rmlines(block).args
+        Meta.isexpr(option, :(=), 2) && option.args[1] === :signatures ||
+            throw(ArgumentError("expected signatures = [...] in registration options"))
+        signatures = option.args[2]
+    end
+    return signatures
+end
 
-        args_list = map(args_list) do exp
-            if exp isa Expr && exp.head == :tuple
-                exp.args
-            else
-                (exp,)
-            end
+function parse_args_list(args_list)
+    if args_list isa AbstractVector
+        return map(args_list) do signature
+            signature isa Tuple ? signature : (signature,)
         end
     end
-
     return args_list
 end
 
@@ -252,10 +256,10 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
         error("Unreachable")
     end
     # TODO: maybe don't drop first lol
-    args_list = parse_args_list(args_list)
     if args_list isa Union{Expr, Symbol}
         args_list = Base.eval(mod, args_list)
     end
+    args_list = parse_args_list(args_list)
     if isempty(args_list)
         it = Iterators.drop(Iterators.product(types...), 1)
     else
@@ -386,11 +390,14 @@ applicable(foo, wrap(Foo{Int}()), wrap(2)) # true
 See also: [`@symbolic_wrap`](@ref), [`Symbolics.wrap`](@ref),
 [`SymbolicUtils.unwrap`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap).
 
-An optional final list of argument-type tuples selects the symbolic overloads to
-generate. Each tuple must match the positional argument count and include a
-symbolic type. Omitting the list, or using an empty list, generates the default
-combinations.
+A final options block can set `signatures = [(Num, Real), ...]` to select the
+symbolic overloads to generate. Each tuple must match the positional argument
+count and include a symbolic type. Omitting `signatures`, or using an empty
+list, generates the default combinations.
 """
-macro wrapped(expr, wrap_arrays = true, args_list = [])
-    esc(wrap_func_expr(__module__, expr, wrap_arrays, args_list))
+macro wrapped(expr, wrap_arrays = true, block = :(begin end))
+    if Meta.isexpr(wrap_arrays, :block)
+        block, wrap_arrays = wrap_arrays, true
+    end
+    esc(wrap_func_expr(__module__, expr, wrap_arrays, registration_signatures(block)))
 end

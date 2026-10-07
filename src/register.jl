@@ -21,12 +21,18 @@ overwriting.
 ```
 See `@register_array_symbolic` to register functions which return arrays.
 
-An optional final list of argument-type tuples selects the symbolic overloads to
-generate. Each tuple must match the positional argument count and include a
-symbolic type. Omitting the list, or using an empty list, generates the default
-combinations.
+A final options block can set `signatures = [(Num, Real), ...]` to select the
+symbolic overloads to generate. Each tuple must match the positional argument
+count and include a symbolic type. Omitting `signatures`, or using an empty
+list, generates the default combinations.
 """
-macro register_symbolic(expr, define_promotion = true, wrap_arrays = true, args_list = [])
+macro register_symbolic(expr, define_promotion = true, wrap_arrays = true, block = :(begin end))
+    if Meta.isexpr(define_promotion, :block)
+        block, define_promotion = define_promotion, true
+    elseif Meta.isexpr(wrap_arrays, :block)
+        block, wrap_arrays = wrap_arrays, true
+    end
+    args_list = registration_signatures(block)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
@@ -130,12 +136,13 @@ symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
 shape_placeholder(sh::SymbolicUtils.ShapeVecT) = CartesianIndices(Tuple(sh))
 shape_placeholder(sh) = sh
 
-function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__, args_list = [])
+function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__)
     def_assignments = MacroTools.rmlines(partial_defs).args
     defs = map(def_assignments) do ex
         @assert ex.head == :(=)
         ex.args[1] => ex.args[2]
     end |> Dict
+    args_list = get(defs, :signatures, [])
     # `promote_symtype` only sees argument types and cannot evaluate `size`, but a literal
     # tuple `size` still fixes `ndims`.
     promote_nd = get(defs, :ndims) do
@@ -288,12 +295,12 @@ overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
 overwriting.
 
-An optional final list of argument-type tuples selects the symbolic overloads to
-generate. Each tuple must match the positional argument count and include a
-symbolic type. Omitting the list, or using an empty list, generates the default
-combinations.
+Set `signatures = [(Num, Real), ...]` in the existing array options block to
+select the symbolic overloads to generate. Each tuple must match the positional
+argument count and include a symbolic type. Omitting `signatures`, or using an
+empty list, generates the default combinations.
 """
-macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true, args_list = [])
+macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
-    esc(register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays, __module__, args_list))
+    esc(register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays, __module__))
 end
