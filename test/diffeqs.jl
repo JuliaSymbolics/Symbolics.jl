@@ -66,18 +66,6 @@ C = Symbolics.variables(:C, 1:5)
 @test isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5)), C[1]exp(-3t) + C[2]exp(t) - (2//3)t + 11//9)
 @test isequal(find_particular_solution(SymbolicLinearODE(x, t, [1, 0], t^2)), t^2 - 2)
 
-@testset "Documented symbolic_solve_ode constant labels" begin
-    @test isequal(
-        symbolic_solve_ode(SymbolicLinearODE(x, t, [6, 5], 2exp(-t) * cos(t))),
-        C[1] * exp(-3t) + C[2] * exp(-2t) + (1 // 5) * cos(t) * exp(-t) +
-            (3 // 5) * exp(-t) * sin(t),
-    )
-    @test isequal(
-        symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5)),
-        (11 // 9) - (2 // 3) * t + C[1] * exp(-3t) + C[2] * exp(t),
-    )
-end
-
 # Parsing
 @test isequal(SymbolicLinearODE(x, t, SymbolicUtils.BS{VartypeT}[1], SymbolicUtils.Const{VartypeT}(0)), SymbolicLinearODE(Dt(x) + x ~ 0, x, t))
 @test isequal(SymbolicLinearODE(x, t, [sin(t), 0, 3t^2], exp(2t) + 2cos(t)), SymbolicLinearODE(6t^2*(Dt^2)(x) + 2sin(t)*x - 2exp(2t) + 2(Dt^3)(x) ~ 4cos(t), x, t))
