@@ -125,10 +125,17 @@ end
 @test_reference "latexify_refs/indices1.txt" latexify(h[10, 10])
 @test_reference "latexify_refs/indices2.txt" latexify(h[10, 10], index = :bracket)
 
-# test for https://github.com/JuliaSymbolics/Symbolics.jl/issues/1167
-# note these tests need updating if/when https://github.com/korsbo/Latexify.jl/issues/331 is fixed
+# Indexed dependent arrays (issues #1167 / #1526): subscript before call args, no escaped `\_`
 @test_reference "latexify_refs/indices3.txt" latexify(hh[10, 10])
 @test_reference "latexify_refs/indices4.txt" latexify(gg[10, 10])
+
+@testset "indexed dependent array latexify (#1526)" begin
+    @variables t u(t)[1:3]
+    s = string(latexify(u[1]))
+    @test occursin(raw"u_{1}\left( t \right)", s)
+    @test !occursin(raw"\_", s)
+    @test !occursin(raw"u\left( t \right)_{1}", s)
+end
 
 @test_reference "latexify_refs/indices5.txt" latexify(a'a)
 
