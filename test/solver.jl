@@ -97,6 +97,33 @@ end
     found_roots = symbolic_solve(1/x^2 ~ 1/y^2 - 2/x^3 * (x-y), x)
     known_roots = Symbolics.unwrap.([y, -2y])
     @test isequal(found_roots, known_roots)
+
+    found_roots = symbolic_solve(x + y - 1 / (x * y), x)
+    found_roots_at_y2 = eval.(Symbolics.toexpr.(Symbolics.substitute.(found_roots, Ref(Dict(y => 2)))))
+    @test sort_roots(found_roots_at_y2) ≈ sort_roots([-1 - sqrt(3 / 2), -1 + sqrt(3 / 2)])
+
+    @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x ~ 1 / x, x)))) ≈ [-1, 1]
+    @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x + 2 - 1 / (3x), x)))) ≈
+        sort_roots([-1 - 2sqrt(3) / 3, -1 + 2sqrt(3) / 3])
+    @testset "Cancelled rational factor" begin
+        @test sort_roots(eval.(Symbolics.toexpr.(symbolic_solve((x^2 - 1) / (x - 1) ~ 0, x)))) ≈ [-1]
+    end
+end
+
+@testset "Rational equations with floating coefficients" begin
+    for (eq, expected) in (
+            (1 / (0.5x) ~ 1, 2),
+            (0.5 / x ~ 1, 1 // 2),
+            (1 / (0.5x + 1) ~ 1, 0),
+            ((x + 0.5) / x ~ 2, 1 // 2),
+        )
+        expr = eq.lhs - eq.rhs
+        for input in (eq, Symbolics.wrap(expr), expr)
+            roots = symbolic_solve(input, x)
+            @test isequal(value.(roots), [expected])
+            @test isequal(value(substitute(expr, Dict(x => only(roots)); fold = Val(true))), 0)
+        end
+    end
 end
 
 @testset "Deterministic root order" begin
@@ -234,6 +261,56 @@ end
 @testset "Multivar solver" begin
     @variables x y z
     @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
+
+    @testset "Single rational equation inputs" begin
+        for eq in (x / y ~ 2, x + 1 / y ~ 2)
+            expr = eq.lhs - eq.rhs
+            for input in (eq, Symbolics.wrap(expr), expr)
+                sol = only(symbolic_solve(input, [x, y]))
+                @test issetequal(keys(sol), [x, y])
+                @test isequal(value(simplify_fractions(substitute(expr, sol))), 0)
+            end
+        end
+
+        expr = (x - y) / (x^2 - 2)
+        for input in (expr ~ 0, expr, unwrap(expr))
+            sols = symbolic_solve(input, [x, y])
+            @test isequal(sols, [Dict(x => y, y => y)])
+            @test isequal(value(simplify_fractions(substitute(expr, only(sols)))), 0)
+        end
+    end
+
+    @testset "Rational systems exclude poles" begin
+        for n in (2, 3)
+            @test isequal(symbolic_solve([(x - y) / (x^2 - n) ~ 0, y^2 ~ n], [x, y]), [])
+        end
+
+        for (eqs, expected) in (
+                ([x + 1 / y ~ 2, x * y ~ 1], Dict(x => 1, y => 1)),
+                ([x / y ~ 2, x + y ~ 3], Dict(x => 2, y => 1)),
+                ([1 / x + 1 / y ~ 1, x - y ~ 0], Dict(x => 2, y => 2)),
+                ([(x^2 - y) / (x - 1) ~ 0, x + y ~ 2], Dict(x => -2, y => 4)),
+                ([x / (0.5y) ~ 1, y ~ 2], Dict(x => 1, y => 2)),
+                ([0.5x / y ~ 1, y ~ 2], Dict(x => 4, y => 2)),
+            )
+            solutions = symbolic_solve(eqs, [x, y])
+            @test check_equal(sort_arr(solutions, [x, y]), [expected])
+            @test all(
+                eq -> isequal(value(substitute(eq.lhs - eq.rhs, only(solutions); fold = Val(true))), 0),
+                eqs
+            )
+        end
+
+        for eqs in ([x / y ~ 2], [x / y ~ 2, y / x ~ 1 // 2])
+            sol = only(symbolic_solve(eqs, [x, y]))
+            @test issetequal(keys(sol), [x, y])
+            @test all(root -> issubset(Symbolics.get_variables(root), Set(unwrap.([x, y]))), values(sol))
+            @test all(
+                eq -> isequal(value(simplify_fractions(substitute(eq.lhs - eq.rhs, sol))), 0),
+                eqs
+            )
+        end
+    end
 
     # Vector-valued Equation should take the system path
     sol_vec_eq = sort_arr(symbolic_solve([0, 0] ~ [x^2 - 4, x + y], [x, y]), [x, y])
