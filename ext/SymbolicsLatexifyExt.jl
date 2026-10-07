@@ -81,6 +81,17 @@ function latexify_derivatives(ex)
             body = Expr(:latexifymerge, body, _latexify_merge_child(var_of_int))
             body = Expr(:latexifymerge, body, Expr(:latexifymerge, " ~ ", _latexify_merge_child(integrand)))
             return body
+        elseif x.args[1] === :_indexed_call
+            # Avoid Latexify snakecase+subscript bug on :(name[idx](args...)).
+            head = x.args[2]
+            length(x.args) == 2 && return head
+            body = Expr(:latexifymerge, _latexify_merge_child(head), "\\left( ")
+            for (i, a) in enumerate(x.args[3:end])
+                i > 1 && (body = Expr(:latexifymerge, body, ", "))
+                child = a isa Expr ? Expr(:block, a) : a
+                body = Expr(:latexifymerge, body, child)
+            end
+            return Expr(:latexifymerge, body, " \\right)")
         elseif x.args[1] == :^ && length(x.args) == 3 && _latexify_power_base_needs_parens(x.args[2])
             # `:latexifymerge` has no precedence; parenthesise a differential/integral
             # form used as a power base.
@@ -404,11 +415,12 @@ function getindex_to_symbol(t)
     latexwrapper = (O isa SymbolicUtils.BasicSymbolic && hasmetadata(O, SymLatexWrapper)) ? getmetadata(O, SymLatexWrapper) :
         default_latex_wrapper
 
-    # this is to ensure X(t)[1] becomes X_1(t) in Latex
+    # X(t)[1] -> _indexed_call(X[1], t); bare :(X[1](t)) escapes the subscript `_`.
     if iscall(O) && SymbolicUtils.issym(operation(O))
         oop = operation(O)
         oargs = sorted_arguments(O)
-        return :($(_toexpr(oop; latexwrapper))[$(idxs...)]($(_toexpr(oargs)...)))
+        head = :($(_toexpr(oop; latexwrapper))[$(idxs...)])
+        return Expr(:call, :_indexed_call, head, _toexpr(oargs)...)
     else
         return :($(_toexpr(O; latexwrapper))[$(idxs...)])
     end
