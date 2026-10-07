@@ -230,3 +230,30 @@ end
     @test String(latexify(f(x) * D(g(x)); env = :raw)) ==
         raw"\frac{\mathrm{d}g\left( x \right)}{\mathrm{d}x} ~ f\left( x \right)"
 end
+
+# issue #1311: equations with a hidden lhs (e.g. MTK `connect` equations, where
+# the lhs is a `Const`-wrapped non-symbolic object) must render as `0 = rhs`,
+# so mixed systems stay in a single aligned environment.
+struct DummyConnection1311
+    systems::Any
+end
+Symbolics.hide_lhs(::DummyConnection1311) = true
+
+@testset "hidden-lhs equations render as 0 = rhs (#1311)" begin
+    @variables x y
+    conn_eq = Symbolics.Equation(DummyConnection1311(nothing), x + y)
+
+    s = string(latexify(conn_eq))
+    @test occursin("\\begin{equation}", s)
+    @test occursin("0 = x + y", s)
+
+    s = string(latexify([conn_eq]))
+    @test occursin("\\begin{align}", s)
+    @test occursin("0 &= x + y", s)
+
+    s = string(latexify([conn_eq, x ~ y]))
+    @test occursin("\\begin{align}", s)
+    @test occursin("0 &= x + y", s)
+    @test occursin("x &= y", s)
+    @test !occursin("\\begin{array}", s)
+end
