@@ -95,6 +95,21 @@ end
 SymbolicUtils.promote_symtype(::typeof(cardano_cbrt), ::Type{A}, ::Type{B}, ::Type) where {A, B} = promote_type(A, B)
 SymbolicUtils.promote_shape(::typeof(cardano_cbrt), @nospecialize(shapes::SymbolicUtils.ShapeT...)) = shapes[1]
 
+# With s = √(Q^3 + R^2), S^3 = R + s and T^3 = R - s on either branch, so implicit
+# differentiation gives ∂S/∂R = S / 3s, ∂S/∂Q = Q^2 / (2s S^2) and the same with
+# the sign flipped for T; 3 - 2k is that sign.
+@register_derivative cardano_cbrt(Q, R, k) I begin
+    C = cardano_cbrt(Q, R, k)
+    s = term(ssqrt, Q^3 + R^2)
+    if I == 1
+        (3 - 2k) * Q^2 / (2 * s * C^2)
+    elseif I == 2
+        (3 - 2k) * C / (3 * s)
+    else
+        SConst(0)
+    end
+end
+
 function slog(n)
     n = unwrap(n)
 
@@ -121,6 +136,7 @@ const RootsOf = (SymbolicUtils.@syms roots_of(poly,var))[1]
 
 Base.show(io::IO, f::typeof(ssqrt)) = print(io, "√")
 Base.show(io::IO, r::typeof(scbrt)) = print(io, "∛")
+Base.show(io::IO, ::typeof(cardano_cbrt)) = print(io, "cardano_cbrt")
 Base.show(io::IO, r::typeof(slog)) = print(io, "slog")
 
 function check_expr_validity(expr)

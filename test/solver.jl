@@ -200,6 +200,15 @@ end
             @test isapprox(r1 * r2 * r3, e3(A); atol = 1.0e-12)
         end
     end
+
+    # d(root)/da against a central finite difference of the evaluated roots.
+    roots = symbolic_solve(x^3 + a * x + 1, x)
+    droots = [expand_derivatives(Differential(a)(r)) for r in roots]
+    h = 1.0e-6
+    for A in (3.0, 1.0 + 2.0im)
+        fd = (evalroots(roots, A + h) .- evalroots(roots, A - h)) ./ (2h)
+        @test all(isapprox.(evalroots(droots, A), fd; rtol = 1.0e-6))
+    end
 end
 
 @testset "Deg 4 univar" begin
