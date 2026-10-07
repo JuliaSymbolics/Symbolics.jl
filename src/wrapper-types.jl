@@ -134,7 +134,8 @@ end
 function registration_signatures(block)
     Meta.isexpr(block, :block) || throw(ArgumentError("registration options must be a block"))
     signatures = []
-    for option in MacroTools.rmlines(block).args
+    for option in block.args
+        MacroTools.isline(option) && continue
         Meta.isexpr(option, :(=), 2) && option.args[1] === :signatures ||
             throw(ArgumentError("expected signatures = [...] in registration options"))
         signatures = option.args[2]

@@ -102,6 +102,8 @@ end
     @test_throws ArgumentError Symbolics.registration_signatures(:([Num]))
     @test_throws ArgumentError Symbolics.registration_signatures(:(begin unknown = [] end))
     @test_throws ArgumentError Symbolics.registration_signatures(:(begin signatures end))
+    legacy = Expr(:block, Expr(:line, 1, :none), :(signatures = [Num]))
+    @test Symbolics.registration_signatures(legacy) == :([Num])
     body = :(validate_signature(x::Real, y::Real) = x + y)
     @test_throws ArgumentError Symbolics.wrap_func_expr(@__MODULE__, body, true, :([(Num, Num), (Num,)]))
     @test_throws ArgumentError Symbolics.wrap_func_expr(@__MODULE__, body, true, :([(Real, Real)]))
