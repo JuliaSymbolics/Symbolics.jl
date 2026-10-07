@@ -343,8 +343,17 @@ let
     @test isequal(Symbolics.jacobian(f, vu), Diagonal(Jdiag))
     H2I = Num[2 0 0 0; 0 2 0 0; 0 0 2 0; 0 0 0 2]
     @test isequal(Symbolics.hessian(g, vu), H2I)
-    @test isequal(Symbolics.sparsehessian(g, vu),
-                  sparse([1, 2, 3, 4], [1, 2, 3, 4], Num[2, 2, 2, 2], 4, 4))
+    @test isequal(
+        Symbolics.sparsehessian(g, vu),
+        sparse([1, 2, 3, 4], [1, 2, 3, 4], Num[2, 2, 2, 2], 4, 4)
+    )
+    @syms h(x::Real)::Real
+    @test isequal(map(h, vu), map(h, Num[u[1, 1], u[2, 1], u[1, 2], u[2, 2]]))
+    @test isempty(
+        filter(Test.detect_ambiguities(Symbolics)) do (m1, m2)
+            occursin("ReshapedArray", string(m1.sig)) || occursin("ReshapedArray", string(m2.sig))
+        end
+    )
 end
 
 # substituting iv of differentials
