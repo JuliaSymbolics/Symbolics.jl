@@ -898,7 +898,7 @@ function _augment_with_call_args!(vs)
 end
 
 function jacobian(ops, vars; simplify=false, kwargs...)
-    ops = vec(scalarize(ops))
+    ops = vec(scalarize(collect(ops)))
     if ops isa Vector{Num}
         ops = unwrap.(ops)::Vector{SymbolicT}
     elseif ops isa Vector{SymbolicT}
@@ -906,7 +906,7 @@ function jacobian(ops, vars; simplify=false, kwargs...)
         ops = ops::Vector{eltype(ops)}
     end
     # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
-    vars = vec(scalarize(vars))
+    vars = vec(scalarize(collect(vars)))
     if vars isa Vector{Num}
         vars = unwrap.(vars)::Vector{SymbolicT}
     elseif vars isa Vector{SymbolicT}
@@ -926,6 +926,9 @@ function faster_maybe_scalarize!(arg::Vector)
     return arg
 end
 
+# Collect first: Julia 1.13+ `map` on ReshapedArray of Arr builds symbolic map
+# terms instead of scalarizing elementwise.
+faster_maybe_scalarize!(arg::AbstractArray) = scalarize(collect(arg))
 faster_maybe_scalarize!(arg) = scalarize(arg)
 
 """
@@ -1002,6 +1005,10 @@ julia> Symbolics.jacobian_sparsity(exprs, vars)
 ```
 """
 function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
+    # Collect first: Julia 1.13+ `map` on ReshapedArray of Arr builds symbolic
+    # map terms instead of unwrapping elementwise.
+    exprs = collect(exprs)
+    vars = collect(vars)
     if any(iswrapped, exprs)
         du = map(value, exprs)
     else
