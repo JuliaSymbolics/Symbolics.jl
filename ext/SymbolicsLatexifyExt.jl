@@ -151,6 +151,13 @@ _as_latexstring(x::AbstractString) = LaTeXString(x)
 recipe(n) = _as_latexstring(latexify_derivatives(cleanup_exprs(_toexpr(n))))
 
 function align_side(n)
+    # Const-wrapped custom objects (e.g. MTK `Connection`) must keep their own
+    # Latexify recipes. Returning the BasicSymbolic Const would route through
+    # the BasicSymbolic recipe and drop that dispatch.
+    v = value(n)
+    if !(v isa Union{Number, AbstractArray, BasicSymbolic})
+        return v
+    end
     wrapped = wrap(n)
     return wrapped isa Symbolics.Arr ? recipe(n) : wrapped
 end
@@ -223,7 +230,7 @@ end
     index --> :subscript
 
     if hide_lhs(value(eq.lhs))
-        return Expr(:(=), 0, recipe(eq.rhs))
+        return Expr(:(=), 0, align_side(eq.rhs))
     elseif !(value(eq.lhs) isa Union{Number, AbstractArray, BasicSymbolic})
         return value(eq.rhs)
     else

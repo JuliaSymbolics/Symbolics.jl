@@ -232,28 +232,59 @@ end
 end
 
 # issue #1311: equations with a hidden lhs (e.g. MTK `connect` equations, where
-# the lhs is a `Const`-wrapped non-symbolic object) must render as `0 = rhs`,
-# so mixed systems stay in a single aligned environment.
+# both sides are `Const`-wrapped custom objects with their own Latexify recipes)
+# must render as `0 = rhs` / `0 &= rhs` in an aligned environment. Ordinary and
+# array equations must keep their previous display.
 struct DummyConnection1311
-    systems::Any
+    systems::Vector{Symbol}
 end
 Symbolics.hide_lhs(::DummyConnection1311) = true
+@latexrecipe function f(c::DummyConnection1311)
+    index --> :subscript
+    return Expr(:call, :connect, c.systems...)
+end
 
 @testset "hidden-lhs equations render as 0 = rhs (#1311)" begin
     @variables x y
-    conn_eq = Symbolics.Equation(DummyConnection1311(nothing), x + y)
+    # Symbolic RHS (still Const-wrapped lhs via Equation convert)
+    plain_conn = Symbolics.Equation(DummyConnection1311(Symbol[]), x + y)
+    # Both sides custom - mirrors MTK Connection / connect(...) representation
+    conn_eq = Symbolics.Equation(
+        DummyConnection1311(Symbol[]),
+        DummyConnection1311([:a_1, :b_2]),
+    )
+    connect_tex = raw"\mathrm{connect}\left( a_{1}, b_{2} \right)"
 
-    s = string(latexify(conn_eq))
+    s = string(latexify(plain_conn))
     @test occursin("\\begin{equation}", s)
     @test occursin("0 = x + y", s)
 
-    s = string(latexify([conn_eq]))
+    s = string(latexify(conn_eq))
+    @test occursin("\\begin{equation}", s)
+    @test occursin("0 = " * connect_tex, s)
+
+    s = string(latexify([plain_conn]))
     @test occursin("\\begin{align}", s)
     @test occursin("0 &= x + y", s)
 
+    @testset for eqs in ([conn_eq], [conn_eq, x ~ y], [x ~ y, conn_eq])
+        s = string(latexify(eqs))
+        @test occursin("\\begin{align}", s)
+        @test occursin("0 &= " * connect_tex, s)
+        @test !occursin("\\begin{array}", s)
+    end
+
     s = string(latexify([conn_eq, x ~ y]))
-    @test occursin("\\begin{align}", s)
-    @test occursin("0 &= x + y", s)
     @test occursin("x &= y", s)
-    @test !occursin("\\begin{array}", s)
+
+    # Ordinary vector still uses align (no hidden lhs)
+    s = string(latexify([x ~ y, y ~ x]))
+    @test occursin("\\begin{align}", s)
+    @test occursin("x &= y", s)
+    @test occursin("y &= x", s)
+
+    # Array equations keep the Arr path through align_side
+    @variables u[1:2] v[1:2]
+    s = string(latexify([u ~ v]))
+    @test occursin("\\begin{align}", s)
 end
