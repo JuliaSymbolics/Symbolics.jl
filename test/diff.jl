@@ -325,6 +325,22 @@ let
     @test isequal(sj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
 end
 
+# sparsejacobian / jacobian_sparsity / jacobian with vec(Arr) (ReshapedArray)
+let
+    N = 2
+    @variables u[1:N, 1:N]
+    f = vec(collect(u) .^ 2 .+ collect(u))
+    vu = vec(u)
+    @test vu isa Base.ReshapedArray
+    @test nnz(Symbolics.jacobian_sparsity(f, vu)) == N^2
+    J = Symbolics.sparsejacobian(f, vu)
+    @test nnz(J) == N^2
+    @test isequal(J, Symbolics.sparsejacobian(f, collect(vu)))
+    Jd = Symbolics.jacobian(f, vu)
+    @test count(!iszero, Jd) == N^2
+    @test isequal(Jd, Symbolics.jacobian(f, collect(vu)))
+end
+
 # substituting iv of differentials
 @variables t t2 x(t)
 D = Differential(t)
