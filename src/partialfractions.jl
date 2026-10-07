@@ -26,18 +26,22 @@ When leading coefficient of the denominator is not 1, it will be factored out an
 # Examples
 
 ```jldoctest
+julia> using Symbolics
+
+julia> import Groebner
+
 julia> @variables x
 1-element Vector{Num}:
  x
 
 julia> partial_frac_decomposition((3x-1) / (x^2 + x - 6), x)
-(1//1) / (-(2//1) + x) + (2//1) / ((3//1) + x)
+(1//1) / (-2 + x) + (2//1) / (3 + x)
 
 julia> partial_frac_decomposition((4x^3 + 16x + 7)/(x^2 + 4)^2, x)
 ((4//1)*x) / ((4//1) + x^2) + (7//1) / (((4//1) + x^2)^2)
 
 julia> partial_frac_decomposition((4x^2 - 22x + 7)/((2x+3)*(x-2)^2), x)
-2 / ((3//2) + x) + -3 / ((-(2//1) + x)^2)
+2 / ((3//2) + x) + -3 / ((-2 + x)^2)
 ```
 
 !!! note that irreducible quadratic and repeated linear factors require the `Groebner` package to solve a system of equations

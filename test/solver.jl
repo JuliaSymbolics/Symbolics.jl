@@ -109,6 +109,13 @@ end
     @test isequal(Symbolics.value.(symbolic_solve(x^2 + 1, x)), [im, -im])
 end
 
+@testset "Numeric roots precede roots_of" begin
+    sols = symbolic_solve(x^7 - 1, x)
+    @test length(sols) == 2
+    @test isequal(unwrap_const(sols[1]), 1)
+    @test isequal(operation(Symbolics.value(sols[2])), Symbolics.RootsOf)
+end
+
 @testset "Deg 1 univar" begin
     @test isequal(unwrap_const(only(symbolic_solve(x+1, x))), -1)
 
