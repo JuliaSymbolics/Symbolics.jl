@@ -1,5 +1,5 @@
 using Symbolics, Test
-using SymbolicUtils: metadata, unwrap_const
+using SymbolicUtils: metadata, unwrap_const, Const
 using Symbolics: unwrap
 using SymbolicIndexingInterface: getname, hasname
 
@@ -73,6 +73,33 @@ end
 
     @test substitute(x, Dict(x => 1.0 + 2.0im)) isa Complex{Num}
     @test substitute(x * im, Dict(x => im)) isa Complex{Num}
+end
+
+@testset "unwrap preserves complex constants" begin
+    v = complex(-0.0, 2.0)
+    @test isequal(unwrap_const(unwrap(Complex{Num}(Num(real(v)), Num(imag(v))))), v)
+
+    r, i = setprecision(512) do
+        BigFloat(1) + BigFloat(2)^(-400), BigFloat(2) + BigFloat(2)^(-400)
+    end
+    expected = complex(r, i)
+    big_v = unwrap_const(unwrap(Complex{Num}(Num(r), Num(i))))
+    @test isequal(big_v, expected)
+    @test precision(real(big_v)) == 512
+    @test precision(imag(big_v)) == 512
+
+    @test isequal(unwrap_const(unwrap(Complex{Num}(Num(1), Num(2)))), 1 + 2im)
+    @test typeof(unwrap_const(unwrap(Complex{Num}(Num(false), Num(true))))) === Complex{Bool}
+
+    mixed = unwrap_const(
+        unwrap(
+            Complex{Num}(
+                Num(0.4),
+                Num(Const{Symbolics.VartypeT}(0.34 + 1.7im))
+            )
+        )
+    )
+    @test mixed ≈ -1.3 + 0.34im
 end
 
 @testset "getname" begin

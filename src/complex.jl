@@ -13,8 +13,11 @@ end
 function SymbolicUtils.unwrap(a::Complex{<:Num})
     re, img = unwrap(real(a)), unwrap(imag(a))
     if SymbolicUtils.isconst(re) && SymbolicUtils.isconst(img)
-        # `re`/`img` may wrap complex constants, for which `complex` would throw
-        return Const{VartypeT}(unwrap_const(re) + im * unwrap_const(img))
+        re_c, img_c = unwrap_const(re), unwrap_const(img)
+        if re_c isa Real && img_c isa Real
+            return Const{VartypeT}(complex(re_c, img_c))
+        end
+        return Const{VartypeT}(re_c + im * img_c)
     end
     if iscall(re) && operation(re) === real && iscall(img) && operation(img) === imag && isequal(arguments(re)[1], arguments(img)[1])
         return arguments(re)[1]
