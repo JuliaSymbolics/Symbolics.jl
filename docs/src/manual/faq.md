@@ -116,3 +116,31 @@ b = only(@variables($a))
 ```
 
 In this example, `@variables($a)` created a variable named `c`, and set this variable to `b`.
+
+## [Why does `A \ b` give `NaN` or make `simplify` extremely slow?](@id faq_symbolic_backslash)
+
+For arrays of symbolic scalars (`Matrix{Num}`), `A \ b` uses an LU factorization
+with soft pivoting (`sym_lu`): each pivot is chosen by fewest expression terms, not
+by numeric magnitude. A pivot that is symbolically nonzero can still be numerically
+zero after substitution, which produces nested `0/0`-style fractions and `NaN`.
+Back-substitution also nests divisions, so the first unknown (`sol[1]`) is usually
+the deepest expression and the slowest (or impossible) to `simplify`. Related
+`DivideError`s during simplification of `1/0`-like forms are tracked separately
+(see [issue 878](https://github.com/JuliaSymbolics/Symbolics.jl/issues/878)).
+
+If you need a closed-form solution that stays valid for every nonsingular numeric
+specialization of `A`, prefer the division-free Laplace paths, which divide by
+`det(A)` only once:
+
+```julia
+using Symbolics, LinearAlgebra
+A = Symbolics.@variables(A[1:4, 1:4])[1] |> Symbolics.scalarize
+b = Symbolics.@variables(b[1:4])[1] |> Symbolics.scalarize
+sol = -(inv(A) * b)
+# or Cramer:
+# d = det(A)
+# sol = [-det(hcat(A[:, 1:(i-1)], b, A[:, (i+1):end])) / d for i in 1:4]
+```
+
+On small dense systems these build in a few seconds and evaluate correctly even when
+`A[1,1] == 0`, where `A \ b` can return `NaN`/`Inf`.
