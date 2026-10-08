@@ -20,8 +20,19 @@ overwriting.
 @register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
 See `@register_array_symbolic` to register functions which return arrays.
+
+A final options block can set `signatures = [(Num, Real), ...]` to select the
+symbolic overloads to generate. Each tuple must match the positional argument
+count and include a symbolic type. Omitting `signatures`, or using an empty
+list, generates the default combinations.
 """
-macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
+macro register_symbolic(expr, define_promotion = true, wrap_arrays = true, block = :(begin end))
+    if Meta.isexpr(define_promotion, :block)
+        block, define_promotion = define_promotion, true
+    elseif Meta.isexpr(wrap_arrays, :block)
+        block, wrap_arrays = wrap_arrays, true
+    end
+    args_list = registration_signatures(block)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
 
     args′ = map((a, T) -> :($a::$T), argnames, Ts)
@@ -37,7 +48,7 @@ macro register_symbolic(expr, define_promotion = true, wrap_arrays = true)
             $f($(argnames...))
         end
     end)
-    fexpr = wrap_func_expr(__module__, inner, wrap_arrays)
+    fexpr = wrap_func_expr(__module__, inner, wrap_arrays, args_list)
 
     if define_promotion
         type_args = [:($name::$Type) for name in argnames]
@@ -131,6 +142,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
         @assert ex.head == :(=)
         ex.args[1] => ex.args[2]
     end |> Dict
+    args_list = get(defs, :signatures, [])
     # `promote_symtype` only sees argument types and cannot evaluate `size`, but a literal
     # tuple `size` still fixes `ndims`.
     promote_nd = get(defs, :ndims) do
@@ -178,7 +190,7 @@ function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs 
             $f($(argnames...))
         end
     end)
-    fexpr = wrap_func_expr(caller, inner, wrap_arrays)
+    fexpr = wrap_func_expr(caller, inner, wrap_arrays, args_list)
 
     if define_promotion
         if promote_nd == -1
@@ -282,6 +294,11 @@ is defined for the register function. Note that when defining multiple register
 overloads for one function, all the rest of the registers must set
 `define_promotion` to `false` except for the first one, to avoid method
 overwriting.
+
+Set `signatures = [(Num, Real), ...]` in the existing array options block to
+select the symbolic overloads to generate. Each tuple must match the positional
+argument count and include a symbolic type. Omitting `signatures`, or using an
+empty list, generates the default combinations.
 """
 macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
     f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
