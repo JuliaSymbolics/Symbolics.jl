@@ -43,23 +43,30 @@ let
     @test Symbolics.isaffine(sin(Dx), [x])
 end
 
-# issue #1105 with a dependent variable: `D(u^2) = 2u*D(u)` is genuinely
-# nonlinear in `u`, and querying `t` keeps the conservative handling since
-# e.g. `d/dt D(u) = D(D(u))` is nonzero.
+# expected patterns: Hessian of `expand_derivatives(ex)` with `D(u)`, `D(v)`, ... as independent coordinates
 let
-    @variables t u(t) v(t)
+    @variables t x u(t) v(t) a(t)
     D = Differential(t)
-    @test !Symbolics.isaffine(D(u^2), [u])
-    # second derivative of `u * D(u^2)` w.r.t. `u` is nonzero
-    @test Matrix(Symbolics.hessian_sparsity(u * D(u^2), [u])) == [true;;]
-    @test !Symbolics.isaffine(u * D(u^2), [u])
-    @test !Symbolics.islinear(u * D(u^2), [u])
-    # second derivative of `t * D(u)` w.r.t. `t` is `2D(D(u)) + t*D(D(D(u)))`
-    @test Matrix(Symbolics.hessian_sparsity(t * D(u), [t])) == [true;;]
-    @test !Symbolics.isaffine(t * D(u), [t])
-    @test !Symbolics.islinear(t * D(u), [t])
-    @test Symbolics.isaffine(D(u), [u])
-    @test Symbolics.isaffine(D(u) + u, [u])
-    @test Symbolics.islinear(u * D(u), [u])
-    @test Matrix(Symbolics.hessian_sparsity(D(u * v), [u, v])) == [false true; true false]
+    covers(S, H) = size(S) == size(H) && all(Matrix(S) .>= H)
+    cases = [
+        (x * D(t * x), [x], [true;;]),
+        (D(t * x)^2, [x], [true;;]),
+        (u * D(t * u), [u], [true;;]),
+        (u * D(v * u), [u], [true;;]),
+        (u * D(u * v), [u], [true;;]),
+        (u * D(a * u), [u], [true;;]),
+        (D(v * u)^2, [u], [true;;]),
+        (u * D(D(u) * u), [u], [true;;]),
+        (sin(D(t * u)), [u], [true;;]),
+        (v * D(v * u), [u, v], [false true; true true]),
+        (u * D(u^2), [u], [true;;]),
+        (t * D(u), [t], [true;;]),
+    ]
+    for (ex, vars, H) in cases
+        @test covers(Symbolics.hessian_sparsity(ex, vars), H)
+        @test !Symbolics.isaffine(ex, vars)
+        @test !Symbolics.islinear(ex, vars)
+    end
+    @test Symbolics.isaffine(x * D(2x + 3) + D(D(x))^2, [x])
+    @test Symbolics.isaffine(x * D(x / 2 - x + t), [x])
 end

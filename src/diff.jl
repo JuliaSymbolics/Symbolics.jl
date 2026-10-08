@@ -1185,7 +1185,7 @@ const linearity_rules_affine = (
       (@rule +(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
       (@rule *(~~xs) => reduce(*, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
 
-      (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), unwrap_const(~x)) : _scalar),
+      (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
       (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? unwrap_const(~x) : unwrap_const(~x) * unwrap_const(~x)),
       (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? unwrap_const(~x) : _scalar, isidx(~y) ? unwrap_const(~y) : _scalar)),
 
@@ -1210,33 +1210,36 @@ const linearity_rules_affine = (
 const linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 const affine_linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules_affine); maketerm=basic_mkterm))
 
-# `D(arg)` is constant in the query variables when `arg` is at most linear in them, else `D` keeps `arg`'s dependence.
-function _differential_terms(x)
-    tc = unwrap_const(x)
-    tc isa TermCombination || return _scalar
-    all(d -> sum(values(d); init=0) <= 1, tc.terms) ? _scalar : tc
-end
-const _differential_linearity_1 = (@rule (~f)(~x) => (~f) isa Differential ? _differential_terms(~x) : (isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar))
-const _affine_differential_linearity_1 = (@rule (~f)(~x) => (~f) isa Differential ? _differential_terms(~x) : (isidx(~x) ? combine_terms_1(linearity_1(~f), unwrap_const(~x)) : _scalar))
-const differential_linearity_rules = (linearity_rules[1:2]..., _differential_linearity_1, linearity_rules[4:end]...)
-const affine_differential_linearity_rules = (linearity_rules_affine[1:2]..., _affine_differential_linearity_1, linearity_rules_affine[4:end]...)
-const differential_linearity_propagator = Fixpoint(Postwalk(Chain(differential_linearity_rules); maketerm=basic_mkterm))
-const affine_differential_linearity_propagator = Fixpoint(Postwalk(Chain(affine_differential_linearity_rules); maketerm=basic_mkterm))
+_is_query(e, u) = any(isequal(e), u)
 
-function _resolve_linearity_propagator(propagator, expr, u)
-    _has_queried_differential_iv(expr, u) && return propagator
-    propagator === affine_linearity_propagator && return affine_differential_linearity_propagator
-    propagator === linearity_propagator && return differential_linearity_propagator
-    return propagator
+# `D(arg)` is provably free of the query variables `u` only when no `u` depends on `D.x` and
+# `arg` is affine in `u` with numeric coefficients; anything else keeps the conservative rules.
+function _is_constant_differential(e, u)
+    is_derivative(e) || return false
+    iv = operation(e).x
+    all(q -> !hasnode(n -> isequal(n, iv) || is_derivative(n), q), u) || return false
+    return _is_affine_numeric(only(arguments(e)), u)
 end
 
-function _has_queried_differential_iv(expr, u)
-    expr isa Union{Num, BasicSymbolic} || return false
-    hasnode(expr) do x
-        iscall(x) || return false
-        op = operation(x)
-        op isa Differential && any(v -> isequal(op.x, v), u)
+function _is_query_free(e, u)
+    _is_query(e, u) && return false
+    iscall(e) || return true
+    is_derivative(e) && return _is_constant_differential(e, u)
+    return all(a -> _is_query_free(a, u), arguments(e))
+end
+
+function _is_affine_numeric(e, u)
+    (_is_query(e, u) || _is_query_free(e, u)) && return true
+    iscall(e) || return false
+    op = operation(e)
+    args = arguments(e)
+    op === (+) && return all(a -> _is_affine_numeric(a, u), args)
+    if op === (*)
+        nonnumeric = filter(a -> !(unwrap_const(a) isa Number), args)
+        return length(nonnumeric) == 1 && _is_affine_numeric(only(nonnumeric), u)
     end
+    op === (/) && return unwrap_const(args[2]) isa Number && _is_affine_numeric(args[1], u)
+    return false
 end
 
 """
@@ -1274,9 +1277,9 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
         ui isa SymbolicT && is_scalar_indexed(ui) && occursin_info(ui, expr)
     end
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
-    f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
-    propagator = _resolve_linearity_propagator(linearity_propagator, expr, u)
-    lp = unwrap_const(propagator(f))
+    substitute_leaves(x) = haskey(dict, x) ? dict[x] : _is_constant_differential(x, u) ? _scalar : x
+    f = Rewriters.Prewalk(substitute_leaves; maketerm = basic_mkterm)(expr)
+    lp = unwrap_const(linearity_propagator(f))
     S = _sparse(lp, length(u))
     S = full ? S : tril(S)
 end
