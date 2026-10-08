@@ -439,6 +439,14 @@ end
 Extract the coefficient of `p` with respect to `sym`.
 Note that `p` might need to be expanded and/or simplified with `expand` and/or `simplify`.
 
+For a nonconstant `sym`, throws a `DomainError` if more than one factor of an
+unexpanded product has a nonzero coefficient with respect to `sym` (expand first),
+if `sym` itself is a quotient, or if `sym` is a literal subexpression of the denominator.
+For `sym = (n/d)^k` with a positive integer `k`, a fraction with zero coefficient in
+its numerator raises a `DomainError` when its denominator has degree `k` in `d`,
+or when `d` occurs in both its numerator and denominator. Functions and powers
+with quotients in their arguments can be used as intact symbolic terms.
+
 # Examples
 
 ```jldoctest
@@ -473,6 +481,10 @@ function coeff(p, sym=nothing)
         sym = nothing
     end
 
+    if isdiv(sym)
+        throw(DomainError(sym, "coeff with a quotient as the symbolic term is not yet implemented."))
+    end
+
     if issym(p) || SymbolicUtils.isconst(p) || isterm(p)
         sym === nothing ? 0 : Int(isequal(p, sym))
     elseif isadd(p)
@@ -483,16 +495,31 @@ function coeff(p, sym=nothing)
         end
     elseif ismul(p)
         args = arguments(p)
-        coeffs = map(a->coeff(a, sym), args)
-        if all(_iszero, coeffs)
+        coeffs = map(a -> coeff(a, sym), args)
+        nonzero = findall(!_iszero, coeffs)
+        if isempty(nonzero)
             return 0
+        elseif sym !== nothing && length(nonzero) > 1
+            throw(DomainError(p, "coeff cannot extract coefficient from unexpanded product where $sym appears in multiple factors; call expand first."))
         else
-            @views prod(Iterators.flatten((coeffs[findall(!_iszero, coeffs)], args[findall(_iszero, coeffs)])))
+            @views prod(Iterators.flatten((coeffs[nonzero], args[findall(_iszero, coeffs)])))
         end
     elseif isdiv(p)
         numerator, denominator = arguments(p)
         if !SymbolicUtils.query(isequal(sym), denominator)
-            coeff(numerator, sym) / denominator
+            c = coeff(numerator, sym)
+            if _iszero(c) && ispow(sym)
+                base, exponent = arguments(sym)
+                exponent = unwrap_const(exponent)
+                if isdiv(base) && exponent isa Real && isinteger(exponent) && exponent > 0
+                    d = arguments(base)[2]
+                    if isequal(degree(denominator, d), exponent) ||
+                            all(p -> SymbolicUtils.query(isequal(d), p), (numerator, denominator))
+                        throw(DomainError(sym, "coeff with negative powers is not yet implemented."))
+                    end
+                end
+            end
+            c / denominator
         else
             throw(DomainError(p, "coeff on fractions is not yet implemented."))
         end
