@@ -136,10 +136,10 @@ specialization of `A`, prefer the Laplace (cofactor) paths, which divide only by
 using Symbolics, LinearAlgebra
 A = Symbolics.@variables(A[1:4, 1:4])[1] |> Symbolics.scalarize
 b = Symbolics.@variables(b[1:4])[1] |> Symbolics.scalarize
-sol = -(inv(A) * b)
+sol = inv(A) * b   # solves A * x = b
 # or Cramer:
 # d = det(A)
-# sol = [-det(hcat(A[:, 1:(i-1)], b, A[:, (i+1):end])) / d for i in 1:4]
+# sol = [det(hcat(A[:, 1:(i-1)], b, A[:, (i+1):end])) / d for i in 1:4]
 ```
 
 Laplace expansion is factorial in the matrix size, so this route is practical only

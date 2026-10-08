@@ -152,12 +152,12 @@ M \ [1, 2]
 @variables M[1:2, 1:2] v[1:2]
 Ms = Symbolics.scalarize(M)
 vs = Symbolics.scalarize(v)
-sol_inv = -(inv(Ms) * vs)
+sol_inv = inv(Ms) * vs
 subs_zero_pivot = Dict(
     Ms[1, 1] => 0.0, Ms[1, 2] => 1.0, Ms[2, 1] => 1.0, Ms[2, 2] => 1.0,
     vs[1] => 1.0, vs[2] => 2.0
 )
-ref_zero_pivot = -([0.0 1.0; 1.0 1.0] \ [1.0, 2.0])
+ref_zero_pivot = [0.0 1.0; 1.0 1.0] \ [1.0, 2.0]
 got_inv = [Float64(Symbolics.value(substitute(sol_inv[i], subs_zero_pivot))) for i in 1:2]
 @test got_inv ≈ ref_zero_pivot
 
