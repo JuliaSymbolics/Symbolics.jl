@@ -1165,10 +1165,7 @@ const linearity_rules = (
       (@rule +(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
       (@rule *(~~xs) => reduce(*, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
 
-      # A `Differential` application is opaque here: differentiating `D(x)` w.r.t.
-      # any variable gives zero (cf. `expand_derivatives` and `linear_expansion`),
-      # so it carries no dependence on the query variables.
-      (@rule (~f)(~x) => (~f) isa Differential ? _scalar : (isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar)),
+      (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
       (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)),
       (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)),
 
@@ -1188,10 +1185,7 @@ const linearity_rules_affine = (
       (@rule +(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
       (@rule *(~~xs) => reduce(*, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
 
-      # A `Differential` application is opaque here: differentiating `D(x)` w.r.t.
-      # any variable gives zero (cf. `expand_derivatives` and `linear_expansion`),
-      # so it carries no dependence on the query variables.
-      (@rule (~f)(~x) => (~f) isa Differential ? _scalar : (isidx(~x) ? combine_terms_1(linearity_1(~f), unwrap_const(~x)) : _scalar)),
+      (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), unwrap_const(~x)) : _scalar),
       (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? unwrap_const(~x) : unwrap_const(~x) * unwrap_const(~x)),
       (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? unwrap_const(~x) : _scalar, isidx(~y) ? unwrap_const(~y) : _scalar)),
 
@@ -1215,6 +1209,35 @@ const linearity_rules_affine = (
 )
 const linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 const affine_linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules_affine); maketerm=basic_mkterm))
+
+# `D(arg)` is constant in the query variables when `arg` is at most linear in them, else `D` keeps `arg`'s dependence.
+function _differential_terms(x)
+    tc = unwrap_const(x)
+    tc isa TermCombination || return _scalar
+    all(d -> sum(values(d); init=0) <= 1, tc.terms) ? _scalar : tc
+end
+const _differential_linearity_1 = (@rule (~f)(~x) => (~f) isa Differential ? _differential_terms(~x) : (isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar))
+const _affine_differential_linearity_1 = (@rule (~f)(~x) => (~f) isa Differential ? _differential_terms(~x) : (isidx(~x) ? combine_terms_1(linearity_1(~f), unwrap_const(~x)) : _scalar))
+const differential_linearity_rules = (linearity_rules[1:2]..., _differential_linearity_1, linearity_rules[4:end]...)
+const affine_differential_linearity_rules = (linearity_rules_affine[1:2]..., _affine_differential_linearity_1, linearity_rules_affine[4:end]...)
+const differential_linearity_propagator = Fixpoint(Postwalk(Chain(differential_linearity_rules); maketerm=basic_mkterm))
+const affine_differential_linearity_propagator = Fixpoint(Postwalk(Chain(affine_differential_linearity_rules); maketerm=basic_mkterm))
+
+function _resolve_linearity_propagator(propagator, expr, u)
+    _has_queried_differential_iv(expr, u) && return propagator
+    propagator === affine_linearity_propagator && return affine_differential_linearity_propagator
+    propagator === linearity_propagator && return differential_linearity_propagator
+    return propagator
+end
+
+function _has_queried_differential_iv(expr, u)
+    expr isa Union{Num, BasicSymbolic} || return false
+    hasnode(expr) do x
+        iscall(x) || return false
+        op = operation(x)
+        op isa Differential && any(v -> isequal(op.x, v), u)
+    end
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -1252,7 +1275,8 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
     end
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
     f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
-    lp = unwrap_const(linearity_propagator(f))
+    propagator = _resolve_linearity_propagator(linearity_propagator, expr, u)
+    lp = unwrap_const(propagator(f))
     S = _sparse(lp, length(u))
     S = full ? S : tril(S)
 end
