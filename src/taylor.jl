@@ -99,8 +99,7 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
                 else
                     c /= k!
                 end
-                if rationalize && unwrap(c) isa Number
-                    c = unwrap(c)
+                if rationalize && isa Number
                     c = Base.rationalize(c)
                 end
                 if !(c isa BasicSymbolic{VartypeT})
