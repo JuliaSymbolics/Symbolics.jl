@@ -129,8 +129,8 @@ the deepest expression and the slowest (or impossible) to `simplify`. Related
 (see [issue 878](https://github.com/JuliaSymbolics/Symbolics.jl/issues/878)).
 
 If you need a closed-form solution that stays valid for every nonsingular numeric
-specialization of `A`, prefer the division-free Laplace paths, which divide by
-`det(A)` only once:
+specialization of `A`, prefer the Laplace (cofactor) paths, which divide only by
+`det(A)` (once, at the end) instead of nesting a division at every elimination step:
 
 ```julia
 using Symbolics, LinearAlgebra
@@ -142,5 +142,9 @@ sol = -(inv(A) * b)
 # sol = [-det(hcat(A[:, 1:(i-1)], b, A[:, (i+1):end])) / d for i in 1:4]
 ```
 
-On small dense systems these build in a few seconds and evaluate correctly even when
-`A[1,1] == 0`, where `A \ b` can return `NaN`/`Inf`.
+Laplace expansion is factorial in the matrix size, so this route is practical only
+for small dense systems. Timed on current Symbolics (Julia 1.12), a second call to
+`inv(A)` for a fully symbolic `n×n` matrix is on the order of milliseconds through
+`5×5`, about a second at `7×7`, about ten seconds at `8×8`, and about a minute and
+a half at `9×9`; larger sizes grow quickly. Within the small-`n` range the expressions
+evaluate correctly even when `A[1,1] == 0`, where `A \ b` can return `NaN`/`Inf`.

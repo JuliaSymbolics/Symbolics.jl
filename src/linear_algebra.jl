@@ -21,7 +21,9 @@ expressions smaller, but a pivot that is symbolically nonzero can still evaluate
 zero for some substitutions, which produces `0/0`-style nested fractions and `NaN`
 after substitution. Prefer `inv(A) * b` or Cramer's rule (`det`) when you need a
 closed form that stays valid for every nonsingular numeric specialization; those
-paths use Laplace expansion and divide by `det(A)` only once.
+paths use Laplace expansion and divide only by `det(A)`. Laplace cost grows
+factorially with `n`, so it is practical for small systems (roughly up through
+about `7×7`–`8×8` before build times reach tens of seconds).
 """
 function sym_lu(A::AbstractMatrix{Num}; check = true)
     nterms_cache = Base.IdDict{SymbolicT, Int}()
