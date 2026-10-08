@@ -1165,7 +1165,10 @@ const linearity_rules = (
       (@rule +(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
       (@rule *(~~xs) => reduce(*, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
 
-      (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
+      # A `Differential` application is opaque here: differentiating `D(x)` w.r.t.
+      # any variable gives zero (cf. `expand_derivatives` and `linear_expansion`),
+      # so it carries no dependence on the query variables.
+      (@rule (~f)(~x) => (~f) isa Differential ? _scalar : (isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar)),
       (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? ~x : (~x) * (~x)),
       (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? ~x : _scalar, isidx(~y) ? ~y : _scalar)),
 
@@ -1185,7 +1188,10 @@ const linearity_rules_affine = (
       (@rule +(~~xs) => reduce(+, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
       (@rule *(~~xs) => reduce(*, filter(isidx, map(unwrap_const, ~~xs)), init=_scalar)),
 
-      (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
+      # A `Differential` application is opaque here: differentiating `D(x)` w.r.t.
+      # any variable gives zero (cf. `expand_derivatives` and `linear_expansion`),
+      # so it carries no dependence on the query variables.
+      (@rule (~f)(~x) => (~f) isa Differential ? _scalar : (isidx(~x) ? combine_terms_1(linearity_1(~f), unwrap_const(~x)) : _scalar)),
       (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? unwrap_const(~x) : unwrap_const(~x) * unwrap_const(~x)),
       (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? unwrap_const(~x) : _scalar, isidx(~y) ? unwrap_const(~y) : _scalar)),
 
