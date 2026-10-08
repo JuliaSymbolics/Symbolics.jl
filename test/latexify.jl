@@ -230,3 +230,40 @@ end
     @test String(latexify(f(x) * D(g(x)); env = :raw)) ==
         raw"\frac{\mathrm{d}g\left( x \right)}{\mathrm{d}x} ~ f\left( x \right)"
 end
+
+struct DummyConnection1311
+    systems::Vector{Symbol}
+end
+Symbolics.hide_lhs(::DummyConnection1311) = true
+@latexrecipe function f(c::DummyConnection1311)
+    index --> :subscript
+    return Expr(:call, :connect, c.systems...)
+end
+
+@testset "hidden-lhs equations render as 0 = rhs (#1311)" begin
+    @variables x y
+    plain_conn = Symbolics.Equation(DummyConnection1311(Symbol[]), x + y)
+    conn_eq = Symbolics.Equation(
+        DummyConnection1311(Symbol[]),
+        DummyConnection1311([:a_1, :b_2]),
+    )
+
+    @test String(latexify(plain_conn)) ==
+        "\\begin{equation}\n0 = x + y\n\\end{equation}\n"
+    @test String(latexify(conn_eq)) ==
+        "\\begin{equation}\n0 = \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{equation}\n"
+    @test String(latexify([plain_conn])) ==
+        "\\begin{align}\n0 &= x + y\n\\end{align}\n"
+    @test String(latexify([conn_eq])) ==
+        "\\begin{align}\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{align}\n"
+    @test String(latexify([conn_eq, x ~ y])) ==
+        "\\begin{align}\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right) \\\\\nx &= y\n\\end{align}\n"
+    @test String(latexify([x ~ y, conn_eq])) ==
+        "\\begin{align}\nx &= y \\\\\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{align}\n"
+    @test String(latexify([x ~ y, y ~ x])) ==
+        "\\begin{align}\nx &= y \\\\\ny &= x\n\\end{align}\n"
+
+    @variables u[1:2] v[1:2]
+    @test String(latexify([u ~ v])) ==
+        "\\begin{align}\nu &= v\n\\end{align}\n"
+end

@@ -151,6 +151,13 @@ _as_latexstring(x::AbstractString) = LaTeXString(x)
 recipe(n) = _as_latexstring(latexify_derivatives(cleanup_exprs(_toexpr(n))))
 
 function align_side(n)
+    # Const-wrapped custom objects (e.g. MTK `Connection`) must keep their own
+    # Latexify recipes. Returning the BasicSymbolic Const would route through
+    # the BasicSymbolic recipe and drop that dispatch.
+    v = value(n)
+    if !(v isa Union{Number, AbstractArray, BasicSymbolic})
+        return v
+    end
     wrapped = wrap(n)
     return wrapped isa Symbolics.Arr ? recipe(n) : wrapped
 end
@@ -211,21 +218,18 @@ end
 
 @latexrecipe function f(eqs::Vector{Equation})
     index --> :subscript
-    has_connections = any(x -> hide_lhs(value(x.lhs)), eqs)
-    if has_connections
-        env --> :equation
-        return map(first ∘ first ∘ Latexify.apply_recipe, eqs)
-    else
-        env --> :align
-        return align_side.(getfield.(eqs, :lhs)), align_side.(getfield.(eqs, :rhs))
-    end
+    env --> :align
+    lhs = map(eq -> hide_lhs(value(eq.lhs)) ? 0 : align_side(eq.lhs), eqs)
+    return lhs, align_side.(getfield.(eqs, :rhs))
 end
 
 @latexrecipe function f(eq::Equation)
     env --> :equation
     index --> :subscript
 
-    if hide_lhs(value(eq.lhs)) || !(value(eq.lhs) isa Union{Number, AbstractArray, BasicSymbolic})
+    if hide_lhs(value(eq.lhs))
+        return Expr(:(=), 0, align_side(eq.rhs))
+    elseif !(value(eq.lhs) isa Union{Number, AbstractArray, BasicSymbolic})
         return value(eq.rhs)
     else
         return Expr(:(=), recipe(eq.lhs), recipe(eq.rhs))
