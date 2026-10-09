@@ -252,6 +252,11 @@ for Tf in (BasicSymbolic, Any)
         end
     end
 end
+
+for Tf in (BasicSymbolic, Any)
+    @eval Base.map(f::$Tf, R::Base.ReshapedArray{T, N, <:Arr}) where {T, N} = map(f, collect(R))
+end
+
 for Tf in (BasicSymbolic, Any), Tr in (BasicSymbolic, Any)
     @eval begin
         function Base.mapreduce(f::$Tf, op::$Tr, x::Arr; kw...)

@@ -1002,6 +1002,8 @@ julia> Symbolics.jacobian_sparsity(exprs, vars)
 ```
 """
 function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
+    exprs = collect(exprs)
+    vars = collect(vars)
     if any(iswrapped, exprs)
         du = map(value, exprs)
     else
