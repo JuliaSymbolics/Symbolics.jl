@@ -1,3 +1,12 @@
+## Unreleased
+
+### Behavior changes
+
+- `substitute` returns a `Complex{Num}` when substituting a complex value into a `Num`
+  expression, e.g. `substitute(x + 1, Dict(x => 1.0 + 2.0im))`, where it returned a `Num`
+  wrapping a complex value. Substituting into an array of `Num` returns an array of
+  `Complex{Num}` when any element becomes complex.
+
 ## 7.37.0
 
 ### Behavior changes
