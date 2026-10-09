@@ -43,6 +43,26 @@ function _latexstring_call_to_merge(ex::Expr)
     return Expr(:latexifymerge, body, " \\right)")
 end
 
+function _indexed_call_to_merge(ex::Expr)
+    head = ex.args[2]
+    length(ex.args) == 2 && return head
+    body = Expr(:latexifymerge, _latexify_merge_child(head), "\\left( ")
+    for (i, a) in enumerate(ex.args[3:end])
+        i > 1 && (body = Expr(:latexifymerge, body, ", "))
+        child = a isa Expr ? Expr(:block, a) : a
+        body = Expr(:latexifymerge, body, child)
+    end
+    return Expr(:latexifymerge, body, " \\right)")
+end
+
+function _latexify_is_unary_call_operand(num)
+    Meta.isexpr(num, :call) || return false
+    op = num.args[1]
+    op === :* && return false
+    op === :_indexed_call && return true
+    return length(num.args) == 2
+end
+
 function latexify_derivatives(ex)
     # Latexify does not parenthesize `^` when the base is a LaTeXString-headed
     # call (`_getoperation` only recognizes Symbol heads). Mark those first.
@@ -64,7 +84,7 @@ function latexify_derivatives(ex)
             num, den, deg = x.args[2:end]
             dsym = "\\mathrm{d}$(deg == 1 ? "" : "^{$deg}")"
             den_ls = diffdenom(den)
-            if Meta.isexpr(num, :call) && length(num.args) == 2 && num.args[1] !== :*
+            if _latexify_is_unary_call_operand(num)
                 return Expr(:call, :/, Expr(:latexifymerge, dsym, _latexify_merge_child(num)), den_ls)
             else
                 return Expr(
@@ -96,7 +116,7 @@ function latexify_derivatives(ex)
             return x
         end
     end
-    # Pass 2: convert custom-wrapper calls to `:latexifymerge` and apply fences.
+    # Pass 2: convert custom-wrapper / indexed calls to `:latexifymerge` and apply fences.
     return postwalk(ex) do x
         Meta.isexpr(x, :call) || return x
         if x.args[1] === :_latexfenced
@@ -105,6 +125,8 @@ function latexify_derivatives(ex)
                 inner = _latexstring_call_to_merge(inner)
             end
             return Expr(:latexifymerge, "\\left( ", inner, " \\right)")
+        elseif x.args[1] === :_indexed_call
+            return _indexed_call_to_merge(x)
         elseif x.args[1] isa LaTeXString
             return _latexstring_call_to_merge(x)
         else
@@ -408,11 +430,11 @@ function getindex_to_symbol(t)
     latexwrapper = (O isa SymbolicUtils.BasicSymbolic && hasmetadata(O, SymLatexWrapper)) ? getmetadata(O, SymLatexWrapper) :
         default_latex_wrapper
 
-    # this is to ensure X(t)[1] becomes X_1(t) in Latex
     if iscall(O) && SymbolicUtils.issym(operation(O))
         oop = operation(O)
         oargs = sorted_arguments(O)
-        return :($(_toexpr(oop; latexwrapper))[$(idxs...)]($(_toexpr(oargs)...)))
+        head = :($(_toexpr(oop; latexwrapper))[$(idxs...)])
+        return Expr(:call, :_indexed_call, head, _toexpr(oargs)...)
     else
         return :($(_toexpr(O; latexwrapper))[$(idxs...)])
     end
