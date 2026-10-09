@@ -423,6 +423,24 @@ end
     @test Jtmp[3] == utmp[2]
 end
 
+@testset "in-place `build_function` with `transpose`/`adjoint` (#2081)" begin
+    @variables a b c d
+    vals = [2.0, 3.0, 5.0, 1.0]
+    for (M, expected) in [
+            (transpose([a b; c d]), [2.0 5.0; 3.0 1.0]),
+            ([a b; c d]', [2.0 5.0; 3.0 1.0]),
+            (transpose([1.0 2.0; 3.0 4.0] .* a), [2.0 6.0; 4.0 8.0]),
+            (adjoint([1.0 2.0; 3.0 4.0] .* a), [2.0 6.0; 4.0 8.0]),
+            (reshape(transpose([a b; c d]), 4), [2.0, 3.0, 5.0, 1.0]),
+        ]
+        f_oop, f_iip = build_function(M, [a, b, c, d]; expression = Val{false})
+        @test f_oop(vals) == expected
+        out = fill(NaN, size(expected))
+        f_iip(out, vals)
+        @test out == expected
+    end
+end
+
 @testset "MultithreadedForm expressions can be written to a file and included" begin
     @variables x y
     A = [

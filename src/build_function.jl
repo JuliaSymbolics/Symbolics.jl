@@ -676,7 +676,12 @@ end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
     if parent(rhss) !== rhss
-        return _set_array(out, outputidxs, parent(rhss), checkbounds, skipzeros)
+        # Sparse parents are written through `out.nzval`. Any other wrapper (e.g.
+        # `Transpose`) may index differently from its parent, so densify it.
+        if _issparse(rhss)
+            return _set_array(out, outputidxs, parent(rhss), checkbounds, skipzeros)
+        end
+        rhss = collect(rhss)
     end
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
