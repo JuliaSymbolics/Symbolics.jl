@@ -3,7 +3,7 @@ for (T1, T2) in Iterators.product([Number, BasicSymbolic{VartypeT}, Num], [Integ
         continue
     end
     @eval function Base.binomial(a::$T1, b::$T2)
-        binomial(unwrap(a), unwrap(b))
+        return Num(binomial(unwrap(a), unwrap(b)))
     end
 end
 
