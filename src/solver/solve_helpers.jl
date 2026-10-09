@@ -203,3 +203,179 @@ function contains_var(var, vars)
     end
     return false
 end
+
+function is_exact_polynomial(expr)
+    expr = unwrap(expr)
+    if SymbolicUtils.isconst(expr) || expr isa Number
+        c = value(expr)
+        return c isa Integer || (c isa Rational && !iszero(denominator(c)))
+    end
+    is_singleton(expr) && return true
+    iscall(expr) || return false
+    op = operation(expr)
+    args = arguments(expr)
+    if op === (+) || op === (*)
+        return all(is_exact_polynomial, args)
+    elseif op === (^)
+        exponent = value(args[2])
+        return exponent isa Integer && exponent >= 0 && is_exact_polynomial(args[1])
+    end
+    return false
+end
+
+function affine_polynomial(expr, parameters, unit)
+    expr = value(expr)
+    if expr isa Union{Integer, Rational}
+        return Rational{BigInt}(expr) * unit
+    end
+    haskey(parameters, expr) && return parameters[expr] * unit
+    iscall(expr) || return nothing
+    op = operation(expr)
+    args = arguments(expr)
+    if op === (^)
+        base = affine_polynomial(args[1], parameters, unit)
+        exponent = value(args[2])
+        isnothing(base) && return nothing
+        exponent isa Integer && exponent >= 0 || return nothing
+        return base^exponent
+    end
+    op === (+) || op === (*) || return nothing
+    polys = map(arg -> affine_polynomial(arg, parameters, unit), args)
+    any(isnothing, polys) && return nothing
+    return op(polys...)
+end
+
+function exact_affine_quotient(numerator, denominator)
+    iszero(denominator) && return nothing
+    quotient, remainder = divrem(numerator, denominator; ztol = 0)
+    return iszero(remainder) ? quotient : nothing
+end
+
+function affine_polynomial_expression(poly, parameters, polyvars)
+    result = Num(big(0) // big(1))
+    for term in MP.terms(poly)
+        summand = Num(MP.coefficient(term))
+        for (parameter, polyvar) in zip(parameters, polyvars)
+            exponent = MP.degree(term, polyvar)
+            iszero(exponent) || (summand *= wrap(parameter)^exponent)
+        end
+        result += summand
+    end
+    return result
+end
+
+function reduced_affine_fraction(numerator, denominator, parameters, polyvars)
+    scale = foldl(lcm, (Base.denominator(c) for p in (numerator, denominator) for c in MP.coefficients(p)); init = big(1))
+    intnum = MP.map_coefficients(c -> BigInt(c * scale), numerator)
+    intden = MP.map_coefficients(c -> BigInt(c * scale), denominator)
+    factor = gcd(intnum, intden)
+    divisor = MP.map_coefficients(c -> Rational{BigInt}(c), factor)
+    num = exact_affine_quotient(MP.map_coefficients(c -> Rational{BigInt}(c), intnum), divisor)
+    den = exact_affine_quotient(MP.map_coefficients(c -> Rational{BigInt}(c), intden), divisor)
+    (isnothing(num) || isnothing(den)) && return nothing
+    return affine_polynomial_expression(num, parameters, polyvars) / affine_polynomial_expression(den, parameters, polyvars)
+end
+
+function exact_affine_solve(eqs, vars)
+    length(eqs) == length(vars) || return nothing
+    isempty(vars) && return nothing
+    A, bvec, islinear = linear_expansion(wrap.(bigify.(eqs)), vars)
+    islinear || return nothing
+    parameters = unique!(collect(Iterators.flatten(get_variables.(vcat(vec(A), bvec)))))
+    x_set = Set(unwrap.(vars))
+    any(v -> v in x_set, parameters) && return nothing
+    DP.@polyvar polyvars[1:max(1, length(parameters))]
+    unit = MP.polynomial((big(1) // big(1)) * one(first(polyvars)))
+    mapping = Dict(zip(parameters, polyvars))
+    A = map(e -> affine_polynomial(e, mapping, unit), A)
+    bvec = map(e -> affine_polynomial(-e, mapping, unit), bvec)
+    any(isnothing, A) && return nothing
+    any(isnothing, bvec) && return nothing
+    n = length(vars)
+    previous_pivot = unit
+    for k in 1:n
+        pivot = findfirst(i -> !iszero(A[i, k]), k:n)
+        isnothing(pivot) && return nothing
+        pivot += k - 1
+        if pivot != k
+            A[k, :], A[pivot, :] = A[pivot, :], A[k, :]
+            bvec[k], bvec[pivot] = bvec[pivot], bvec[k]
+        end
+        for i in (k + 1):n
+            for j in (k + 1):n
+                entry = exact_affine_quotient(A[k, k] * A[i, j] - A[i, k] * A[k, j], previous_pivot)
+                isnothing(entry) && return nothing
+                A[i, j] = entry
+            end
+            entry = exact_affine_quotient(A[k, k] * bvec[i] - A[i, k] * bvec[k], previous_pivot)
+            isnothing(entry) && return nothing
+            bvec[i] = entry
+            A[i, k] = zero(unit)
+        end
+        previous_pivot = A[k, k]
+    end
+    determinant = A[n, n]
+    for i in (n - 1):-1:1
+        numerator = bvec[i] * determinant
+        for j in (i + 1):n
+            numerator -= A[i, j] * bvec[j]
+        end
+        entry = exact_affine_quotient(numerator, A[i, i])
+        isnothing(entry) && return nothing
+        bvec[i] = entry
+    end
+    roots = map(b -> reduced_affine_fraction(b, determinant, parameters, polyvars), bvec)
+    any(isnothing, roots) && return nothing
+    return roots
+end
+
+# Strip outer integer powers and nonzero constant factors so that f^n and c*f^n
+# share the zero set of f when multiplicities are discarded.
+function drop_outer_multiplicities(expression)
+    expression = unwrap(expression)
+    changed = true
+    while changed && iscall(expression)
+        changed = false
+        op = operation(expression)
+        args = arguments(expression)
+        if isequal(op, ^) && SymbolicUtils.isconst(args[2])
+            a2 = unwrap_const(args[2])
+            if a2 isa Integer && a2 > 0
+                expression = unwrap(args[1])
+                changed = true
+                continue
+            end
+        elseif isequal(op, *)
+            new_factors = Any[]
+            local_changed = false
+            for a in args
+                a = unwrap(a)
+                if iscall(a) && isequal(operation(a), ^)
+                    aa = arguments(a)
+                    if SymbolicUtils.isconst(aa[2])
+                        exp = unwrap_const(aa[2])
+                        if exp isa Integer && exp > 0
+                            push!(new_factors, aa[1])
+                            local_changed = true
+                            continue
+                        end
+                    end
+                    push!(new_factors, a)
+                elseif SymbolicUtils.isconst(a) || a isa Number
+                    if isequal(a, 0) || (a isa Number && iszero(a))
+                        return wrap(0)
+                    end
+                    local_changed = true
+                else
+                    push!(new_factors, a)
+                end
+            end
+            isempty(new_factors) && return wrap(1)
+            expression = length(new_factors) == 1 ? unwrap(new_factors[1]) :
+                unwrap(*(wrap.(new_factors)...))
+            changed = local_changed
+            continue
+        end
+    end
+    return wrap(expression)
+end

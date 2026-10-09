@@ -3,6 +3,7 @@ import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root
 using SymbolicUtils
 using SymbolicUtils: Const
 using Test
+using Random, LinearAlgebra
 
 # @testset "ia_solve without Nemo" begin
 #     @test Base.get_extension(Symbolics, :SymbolicsNemoExt) === nothing
@@ -358,7 +359,10 @@ end
         @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
     end
 
-    @test isnothing(symbolic_solve([x^2, x*y, y^2], [x,y], warns=false))
+    sol_rad = symbolic_solve([x^2, x * y, y^2], [x, y], warns = false)
+    @test length(sol_rad) == 1
+    @test iszero(value(sol_rad[1][x])) && iszero(value(sol_rad[1][y]))
+    @test isnothing(symbolic_solve([x^2, x * y, y^2], [x, y], dropmultiplicity = false, warns = false))
 end
 
 @testset "Multivar parametric" begin
@@ -408,6 +412,214 @@ end
     @test length(sol) == 1
     @test count(v -> isequal(sol[1][v], v), [x, y]) == 1
     @test isequal(simplify(expand(substitute(a * x - b, sol[1]))), 0)
+end
+
+@testset "Linear multivar with multiplicities (#1284)" begin
+    A = [Symbolics.variable(Symbol(:A, i)) for i in 1:6]
+    b = [Symbolics.variable(Symbol(:b, i)) for i in 1:4]
+    vars = b[2:4]
+    linear_polys = [
+        -(1 // 2) + A[1] * b[2] + (A[2] + A[4]) * b[3] + (A[3] + A[5] + A[6]) * b[4],
+        -(1 // 6) + A[1] * A[4] * b[3] + (A[1] * A[5] + (A[2] + A[4]) * A[6]) * b[4],
+        -(1 // 3) + (A[1]^2) * b[2] + ((A[2] + A[4])^2) * b[3] + ((A[3] + A[5] + A[6])^2) * b[4],
+    ]
+    squared_polys = [linear_polys[1]^2, linear_polys[2]^2, (1 // 4) * (linear_polys[3]^2)]
+
+    for (s, p) in zip(Symbolics.drop_outer_multiplicities.(squared_polys), linear_polys)
+        @test isequal(s, p)
+    end
+
+    function check_zero_residuals(eqs, sol; subs = Dict())
+        for eq in eqs
+            resid = value(substitute(substitute(eq, sol), subs))
+            @test iszero(resid)
+        end
+    end
+
+    timed_sq = @timed symbolic_solve(squared_polys, vars)
+    @test timed_sq.time - timed_sq.compile_time < 10
+    @test length(timed_sq.value) == 1
+    for subA in (
+            Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6),
+            Dict(A[i] => big(7 - i) // 5 - 2 // 11 for i in 1:6),
+            Dict(A[i] => big(1) // (i + 2) for i in 1:6),
+        )
+        check_zero_residuals(linear_polys, timed_sq.value[1]; subs = subA)
+    end
+
+    timed_lin = @timed symbolic_solve(linear_polys, vars)
+    @test timed_lin.time - timed_lin.compile_time < 10
+    @test length(timed_lin.value) == 1
+    check_zero_residuals(
+        linear_polys, timed_lin.value[1];
+        subs = Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6)
+    )
+
+    # Hand-derived exact system: 2x + y = 5, x - y = 1 => (x, y) = (2, 1)
+    @variables x y
+    exact_lin = [2x + y - 5, x - y - 1]
+    exact_sq = [exact_lin[1]^2, (1 // 3) * (exact_lin[2]^2)]
+    for eqs in (exact_lin, exact_sq)
+        sol = only(symbolic_solve(eqs, [x, y]))
+        @test isequal(value(sol[x]), 2)
+        @test isequal(value(sol[y]), 1)
+        check_zero_residuals(exact_lin, sol)
+    end
+
+    float_eqs = [1.0e-20 * x + y - 1, x + y - 2]
+    @test_throws AssertionError symbolic_solve(float_eqs, [x, y])
+    float_sq = [float_eqs[1]^2, float_eqs[2]^2]
+    @test_throws AssertionError symbolic_solve(float_sq, [x, y])
+end
+
+@testset "Exact affine elimination" begin
+    @variables x y a
+    for k in (10_000_000_000, typemax(Int) - 1)
+        eqs = [k * x + y - (k + 1), x + k * y - (k + 1)]
+        for polys in (eqs, eqs .^ 2)
+            sol = only(symbolic_solve(polys, [x, y]))
+            @test isequal(value(sol[x]), 1)
+            @test isequal(value(sol[y]), 1)
+            @test all(iszero(value(substitute(eq, sol))) for eq in eqs)
+        end
+    end
+    for k in (10_000_000_000 // 3, (typemax(Int) - 1) // 3)
+        eqs = [k * x + y - k, x + k * y - 1]
+        sol = only(symbolic_solve(eqs, [x, y]))
+        @test isequal(value(sol[x]), 1)
+        @test iszero(value(sol[y]))
+        @test all(iszero(value(substitute(eq, sol))) for eq in eqs)
+    end
+    k = 10_000_000_000
+    eqs = [k * a * x + y - (k + 1), a * x + k * y - (k + 1)]
+    sol = only(symbolic_solve(eqs, [x, y]))
+    @test iszero(value(simplify(sol[x] - 1 / a)))
+    @test isequal(value(sol[y]), 1)
+    for parameter in (big(2) // 3, big(-3) // 7)
+        @test all(iszero(value(substitute(substitute(eq, sol), Dict(a => parameter)))) for eq in eqs)
+    end
+
+    dependent = [
+        (a + 1) * x + (a^2 - 1) * y - (a + 1),
+        (a + 2) * x + (a + 2) * (a - 1) * y - (a + 2),
+    ]
+    @test isnothing(Symbolics.exact_affine_solve(dependent, [x, y]))
+    @test isnothing(
+        Symbolics.exact_affine_solve(
+            [x + (a + 1) * (a + 2) * y - 1, x + (a^2 + 3a + 2) * y - 1], [x, y]
+        )
+    )
+    @test isnothing(Symbolics.exact_affine_solve([dependent[1], dependent[2] - (a + 2)], [x, y]))
+    sol = only(symbolic_solve(dependent, [x, y]))
+    @test count(v -> isequal(sol[v], v), [x, y]) == 1
+    @test iszero(value(expand(simplify_fractions(sol[x] + (a - 1) * sol[y] - 1))))
+
+    @variables z
+    eqs = [
+        (a + 1) * x + (a^2 - 1) * y + z - (2a^2 + a + 2),
+        (a + 2) * x + (a + 2) * (a - 1) * y + 2z - (2a^2 + 3a + 4),
+        y - 2,
+    ]
+    sol = only(symbolic_solve(eqs, [x, y, z]))
+    for (v, expected) in zip([x, y, z], [1, 2, 3])
+        @test iszero(value(simplify_fractions(sol[v] - expected)))
+    end
+    for parameter in (big(2) // 3, big(-3) // 7)
+        @test all(iszero(value(substitute(substitute(eq, sol), Dict(a => parameter)))) for eq in eqs)
+    end
+
+    for scale in (0.1, 1.0e-20)
+        eqs = [scale * (x + y - 2)^2, (x - y)^2]
+        @test_throws AssertionError symbolic_solve(eqs, [x, y])
+    end
+end
+
+@testset "Affine solutions at vanishing intermediate pivots" begin
+    @variables x y a c
+    for (eqs, point, expected) in (
+            ([a * x + y - 3, x + 2y - 4], Dict(a => 0), [-2, 3]),
+            (
+                [a * c * x + (a + c) * y - 1, (a - c) * x + a * c * y],
+                Dict(a => 0, c => 2), [0, 1 // 2],
+            ),
+            (
+                [a^5 * x + c^3 * y - a * c, (a^2 + c^2) * x - y + 1],
+                Dict(a => 0, c => 2), [-1 // 4, 0],
+            ),
+        )
+        sol = only(symbolic_solve(eqs, [x, y]))
+        specialized = Dict(v => substitute(sol[v], point) for v in [x, y])
+        @test value.([specialized[x], specialized[y]]) == expected
+        @test all(iszero(value(substitute(substitute(eq, point), specialized))) for eq in eqs)
+    end
+    k = typemax(Int)
+    coefficient = big(k) * (k - 1)
+    reduced = value(only(symbolic_solve([(1 - coefficient * a) * x + 1 - coefficient * a, y], [x, y]))[x])
+    @test reduced == -1
+    @test reduced isa Union{Integer, Rational}
+    eqs = [k * a * x + y - 1, x + (k - 1) * y]
+    sol = only(symbolic_solve(eqs, [x, y]))
+    for av in (0, 1)
+        determinant = big(k) * (k - 1) * av - 1
+        expected = [big(k - 1) // determinant, -big(1) // determinant]
+        specialized = Dict(v => substitute(sol[v], Dict(a => av)) for v in [x, y])
+        @test value.([specialized[x], specialized[y]]) == expected
+        @test all(iszero(value(substitute(substitute(eq, Dict(a => av)), specialized))) for eq in eqs)
+    end
+end
+
+@testset "Parametric polynomial division regression" begin
+    @variables x y a c
+    eqs = [
+        -4a^2 - 5a^3 * c - 3a * c^3 + (2 + 4c^3) * x + (-a * c - a^2 * c - 4a * c^2 + 3a^3 * c) * y,
+        1 - 3a * c^3 + (-5a * c - 5c^2 - 4a^2 * c - 3c^3 + 4a^3 * c - 5a^2 * c^2) * y + (3a^3 + 4c^3 + 3a^2 * c^2) * x,
+    ]
+    @test !isnothing(Symbolics.exact_affine_solve(eqs, [x, y]))
+    sol = only(symbolic_solve(eqs, [x, y]))
+    for (av, cv) in ((3 // 7, -5 // 2), (-11 // 3, 2 // 9), (1 // 2, 1 // 3), (7, -1 // 5), (2, 3))
+        aa, cc = big(av), big(cv)
+        M = Rational{BigInt}[
+            2 + 4cc^3 -aa * cc - aa^2 * cc - 4aa * cc^2 + 3aa^3 * cc;
+            3aa^3 + 4cc^3 + 3aa^2 * cc^2 -5aa * cc - 5cc^2 - 4aa^2 * cc - 3cc^3 + 4aa^3 * cc - 5aa^2 * cc^2
+        ]
+        rhs = Rational{BigInt}[4aa^2 + 5aa^3 * cc + 3aa * cc^3, 3aa * cc^3 - 1]
+        @test !iszero(det(M))
+        got = [value(substitute(sol[v], Dict(a => aa, c => cc))) for v in (x, y)]
+        @test got == M \ rhs
+        @test all(iszero, M * got - rhs)
+        @test all(iszero(value(substitute(substitute(e, sol), Dict(a => aa, c => cc)))) for e in eqs)
+    end
+end
+
+@testset "Random exact parametric affine systems" begin
+    @variables x y z a c
+    rng = MersenneTwister(20261004)
+    powers = [(i, j) for i in 0:3 for j in 0:3 if 0 < i + j <= 3]
+    for n in (2, 3), trial in 1:12
+        vars = [x, y, z][1:n]
+        coefficients = rand(rng, -9:9, n, n, length(powers))
+        constants = rand(rng, -9:9, n, length(powers) + 1)
+        matrix = [sum(coefficients[i, j, k] * a^u * c^v for (k, (u, v)) in enumerate(powers)) + (i == j) for i in 1:n, j in 1:n]
+        rhs = [constants[i, end] + sum(constants[i, k] * a^u * c^v for (k, (u, v)) in enumerate(powers)) for i in 1:n]
+        eqs = matrix * vars - rhs
+        @test !isnothing(Symbolics.exact_affine_solve(eqs, vars))
+        input = trial % 3 == 0 ? (2 // 3) .* eqs .^ 2 : eqs
+        sol = only(symbolic_solve(input, vars))
+        checked = 0
+        for av in -2:2, cv in -2:2
+            monomials = [big(av)^u * big(cv)^v for (u, v) in powers]
+            M = Rational{BigInt}[sum(coefficients[i, j, k] * monomials[k] for k in eachindex(powers)) + (i == j) for i in 1:n, j in 1:n]
+            iszero(det(M)) && continue
+            r = Rational{BigInt}[constants[i, end] + sum(constants[i, k] * monomials[k] for k in eachindex(powers)) for i in 1:n]
+            point = Dict(a => av, c => cv)
+            actual = [value(substitute(sol[v], point)) for v in vars]
+            @test actual == M \ r
+            @test all(iszero, M * actual - r)
+            @test all(iszero(value(substitute(substitute(e, sol), point))) for e in eqs)
+            checked += 1
+        end
+        @test checked > 0
+    end
 end
 
 @testset "Factorisation" begin

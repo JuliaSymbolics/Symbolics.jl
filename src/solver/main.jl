@@ -274,7 +274,19 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+        sols = nothing
+        if all(is_exact_polynomial, expr)
+            if dropmultiplicity
+                expr = map(drop_outer_multiplicities, expr)
+            end
+            lin_sol = exact_affine_solve(expr, x)
+            if !isnothing(lin_sol)
+                sols = [Dict{Num, Any}(var => lin_sol[i] for (i, var) in enumerate(x))]
+            end
+        end
+        if isnothing(sols)
+            sols = solve_multivar(expr, x, dropmultiplicity = dropmultiplicity, warns = warns)
+        end
         isequal(sols, nothing) && return nothing
         sols = convert(Vector{Any}, sols)
         for i in eachindex(sols)
