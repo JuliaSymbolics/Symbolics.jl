@@ -1212,6 +1212,38 @@ const linearity_rules_affine = (
 const linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 const affine_linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules_affine); maketerm=basic_mkterm))
 
+_is_query(e, u) = any(isequal(e), u)
+
+# `D(arg)` is provably free of the query variables `u` only when no `u` depends on `D.x` and
+# `arg` is affine in `u` with numeric coefficients; anything else keeps the conservative rules.
+function _is_constant_differential(e, u)
+    is_derivative(e) || return false
+    iv = operation(e).x
+    all(q -> !hasnode(n -> isequal(n, iv) || is_derivative(n), q), u) || return false
+    return _is_affine_numeric(only(arguments(e)), u)
+end
+
+function _is_query_free(e, u)
+    _is_query(e, u) && return false
+    iscall(e) || return true
+    is_derivative(e) && return _is_constant_differential(e, u)
+    return all(a -> _is_query_free(a, u), arguments(e))
+end
+
+function _is_affine_numeric(e, u)
+    (_is_query(e, u) || _is_query_free(e, u)) && return true
+    iscall(e) || return false
+    op = operation(e)
+    args = arguments(e)
+    op === (+) && return all(a -> _is_affine_numeric(a, u), args)
+    if op === (*)
+        nonnumeric = filter(a -> !(unwrap_const(a) isa Number), args)
+        return length(nonnumeric) == 1 && _is_affine_numeric(only(nonnumeric), u)
+    end
+    op === (/) && return unwrap_const(args[2]) isa Number && _is_affine_numeric(args[1], u)
+    return false
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -1247,7 +1279,8 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
         ui isa SymbolicT && is_scalar_indexed(ui) && occursin_info(ui, expr)
     end
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
-    f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
+    substitute_leaves(x) = haskey(dict, x) ? dict[x] : _is_constant_differential(x, u) ? _scalar : x
+    f = Rewriters.Prewalk(substitute_leaves; maketerm = basic_mkterm)(expr)
     lp = unwrap_const(linearity_propagator(f))
     S = _sparse(lp, length(u))
     S = full ? S : tril(S)
