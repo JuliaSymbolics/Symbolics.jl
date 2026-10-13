@@ -79,3 +79,14 @@ I = Integral(x in (0, 2a))
 
 # inside derivatives
 @test isequal(taylor(Differential(x)(sin(x)), x, 0:7), taylor(cos(x), x, 0:6)) # D(sin(x)) = cos(x)
+
+# array path returns the same values and types as per-order calls
+for f in (exp(x), sin(x) + x^2, 1/(1-x), series(y, x, 0:5))
+    for n in (0:5, 0:2:4, [3, 0, 3])
+        @test isequal(taylor_coeff(f, x, n), taylor_coeff.(Ref(f), Ref(x), n))
+        @test typeof(taylor_coeff(f, x, n)) == typeof(taylor_coeff.(Ref(f), Ref(x), n))
+    end
+end
+
+# taylor of a zero residual is a plain zero, so `== 0` is a Bool
+@test (taylor(exp(x) - taylor(exp(x), x, 0:6), x, 0:4) == 0) === true
