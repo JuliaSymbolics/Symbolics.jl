@@ -103,6 +103,11 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
                     c = Base.rationalize(c)
                 end
                 if !(c isa BasicSymbolic{VartypeT})
+                    # collapse integer-valued rationals (e.g. 1//1 -> 1) so the
+                    # wrapped constant matches the scalar path's simplified form
+                    if c isa Rational && isone(denominator(c))
+                        c = numerator(c)
+                    end
                     c = SConst(c)
                 end
                 for i in indices[k]
