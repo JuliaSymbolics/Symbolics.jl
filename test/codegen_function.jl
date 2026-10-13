@@ -361,3 +361,23 @@ end
     without = Symbolics.codegen_function(ir, [sqrt(a)], [[a]]; nanmath = true, sort_addmul = true)
     @test string(with_bogus) == string(without)
 end
+
+@testset "`scalarize_single_element_regions`" begin
+    @test Symbolics.CodegenFunctionOptions().scalarize_single_element_regions
+    # Longer than `SymbolicUtils.Code.FILL_ARR_LIMIT`, so the output is not scalarized as a whole.
+    @variables p[1:20] q[1:20]
+    regions = [[1:19], [20:20]]
+    values = [unwrap(p[1:19] .+ q[1:19]), unwrap(p[20:20] .- q[1:1])]
+    maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(regions, values)
+    pv, qv = collect(1.0:20), collect(10.0:10:200)
+    expected = [pv[1:19] .+ qv[1:19]; pv[20] - qv[1]]
+
+    _, iip = Symbolics.codegen_function(ir, maker, [p, q])
+    @test occursin("batched_setindex!", string(iip))
+    _, iip = Symbolics.codegen_function(ir, maker, [p, q]; scalarize_single_element_regions = false)
+    @test !occursin("batched_setindex!", string(iip))
+    f! = eval(iip)
+    out = zeros(20)
+    Base.invokelatest(f!, out, pv, qv)
+    @test out ≈ expected
+end
