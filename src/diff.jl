@@ -897,22 +897,27 @@ function _augment_with_call_args!(vs)
     return vs
 end
 
-function jacobian(ops, vars; simplify=false, kwargs...)
+# shared input normalization for `jacobian`-family entry points: scalarize and
+# unwrap to `Vector{SymbolicT}` (suboptimal for `Arr`, but prevents wrong
+# results — an `Arr` from a symbolic function would fail on unknown size)
+function _normalize_jacobian_args(ops, vars)
     ops = vec(scalarize(ops))
     if ops isa Vector{Num}
         ops = unwrap.(ops)::Vector{SymbolicT}
-    elseif ops isa Vector{SymbolicT}
-    else
+    elseif !(ops isa Vector{SymbolicT})
         ops = ops::Vector{eltype(ops)}
     end
-    # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
     vars = vec(scalarize(vars))
     if vars isa Vector{Num}
         vars = unwrap.(vars)::Vector{SymbolicT}
-    elseif vars isa Vector{SymbolicT}
-    else
+    elseif !(vars isa Vector{SymbolicT})
         error("This should not happen! `vars` must be convertible to Vector{SymbolicT}. \nReceived vars = $vars")
     end
+    return ops, vars
+end
+
+function jacobian(ops, vars; simplify=false, kwargs...)
+    ops, vars = _normalize_jacobian_args(ops, vars)
     _res = jacobian(ops, vars; simplify=simplify, scalarize=Val(false), kwargs...)
     res = similar(_res, Num)
     map!(Num, res, _res)

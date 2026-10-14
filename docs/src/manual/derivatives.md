@@ -31,6 +31,8 @@ Symbolics.derivative
 Symbolics.jacobian
 Symbolics.sparsejacobian
 Symbolics.sparsejacobian_vals
+Symbolics.dstar_jacobian
+Symbolics.dstar_derivative
 Symbolics.gradient
 Symbolics.hessian
 Symbolics.sparsehessian
