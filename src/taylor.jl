@@ -72,52 +72,26 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
             return Equation[l ~ r for (l, r) in zip(lhs_coeffs, rhs_coeffs)]
         end
 
+        isempty(n) && return similar(n, SymbolicT)
+
         # Differentiate once per order up to max(n), instead of
         # recomputing (D^k)(f) from scratch for each k.
-        coeffs = similar(n, SymbolicT)
-        isempty(n) && return coeffs
-
         D = Differential(x)
         max_order = maximum(n)
-        IndexT = eltype(eachindex(n))
-        indices = Dict{Int, Vector{IndexT}}()
-        for i in eachindex(n)
-            push!(get!(Vector{IndexT}, indices, n[i]), i)
-        end
+        needed = Set{Int}(n)
+        coeffs_by_order = Dict{Int, Any}()
 
         # expr holds the k-th derivative of f, updated incrementally below
         expr = expand_derivatives(f)
         for k in 0:max_order
-            if haskey(indices, k)
+            if k in needed
                 c = value(substitute_in_deriv(expr, x => 0; fold = Val(true), kwargs...))
-                k! = factorial(k)
-                if !(c isa BasicSymbolic{VartypeT}) && isinteger(c)
-                    c = Integer(c)
-                    c //= k!
-                elseif c isa Rational
-                    c //= k!
-                else
-                    c /= k!
-                end
-                if rationalize && c isa Number
-                    c = Base.rationalize(c)
-                end
-                if !(c isa BasicSymbolic{VartypeT})
-                    # collapse integer-valued rationals (e.g. 1//1 -> 1) so the
-                    # wrapped constant matches the scalar path's simplified form
-                    if c isa Rational && isone(denominator(c))
-                        c = numerator(c)
-                    end
-                    c = SConst(c)
-                end
-                for i in indices[k]
-                    coeffs[i] = c
-                end
+                coeffs_by_order[k] = _finalize_taylor_coeff(c, k; rationalize)
             end
             k < max_order && (expr = expand_derivatives(D(expr)))
         end
 
-        return coeffs
+        return map(k -> coeffs_by_order[k], n)
     elseif f isa Equation
         if ismissing(n)
             # assume user wants maximum order in the equation
@@ -135,10 +109,14 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
 
     # TODO: error if x is not a "pure variable"
     D = Differential(x)
-    n! = factorial(n)
     c = (D^n)(f)
     c = expand_derivatives(c)
     c = value(substitute_in_deriv(c, x => 0; fold = Val(true), kwargs...))
+    return _finalize_taylor_coeff(c, n; rationalize)
+end
+
+function _finalize_taylor_coeff(c, n; rationalize)
+    n! = factorial(n)
     if !(c isa BasicSymbolic{VartypeT}) && isinteger(c)
         c = Integer(c)
         c //= n!
