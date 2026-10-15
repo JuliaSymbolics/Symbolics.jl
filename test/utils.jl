@@ -392,6 +392,12 @@ end
     @test Symbolics.evaluate(gtr, Dict(x => 2, y => 1))
     @test Symbolics.evaluate(ltr, Dict(x => 1, y => 2))
     @test !Symbolics.evaluate(ltr, Dict(x => 2, y => 1))
+
+    for val in (1, 2//3, 0.5)
+        subs = Dict(x => val, y => val)
+        @test Symbolics.evaluate(gtr, subs)
+        @test Symbolics.evaluate(ltr, subs)
+    end
 end
 
 @testset "Issue #1683: Scalarization of `Num` retains type" begin
