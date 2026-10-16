@@ -3,6 +3,19 @@ $(TYPEDEF)
 
 Represents a differential operator.
 
+`Differential(x)` differentiates with respect to `x`, which must be a symbolic variable or a
+coordinate of one:
+
+  - a symbolic variable `x`, or a called symbolic function or dependent variable `x(t)`;
+  - a scalar element `x[i]` or a symbolic struct field `rec.x` of a valid target;
+  - the adjoint or transpose of a valid array target, and its scalar elements such as `M'[1, 2]`;
+  - the real or imaginary part `real(z)`, `imag(z)` of a complex variable;
+  - an operator application such as `Differential(t)(u)`.
+
+Any other target throws an `ArgumentError`. This includes constants, arithmetic expressions
+such as `2x`, `x + y` or `(2M)[1, 2]`, slices such as `x[1:2]`, and a complex variable `z`
+itself.
+
 # Fields
 $(FIELDS)
 
@@ -27,7 +40,7 @@ Differential(x, 3)
 ```
 """
 struct Differential <: Operator
-    """The variable to differentiate with respect to. Must be a symbolic variable, a called symbolic function or dependent variable (`x(t)`), a scalar-indexed element or symbolic struct field of these (`x[i]`, `rec.x`), or an operator application (e.g. `D(t)(u)`); constructing over any other expression throws an `ArgumentError`."""
+    """The variable to differentiate with respect to. See above for the accepted targets."""
     x::BasicSymbolic{VartypeT}
     """The derivative order. Can be rational for fractional derivatives."""
     order::Union{Int, Rational{Int}}
@@ -41,6 +54,7 @@ struct Differential <: Operator
         return new(x, order)
     end
     Differential(x::Union{Num, Arr}, order = 1) = Differential(unwrap(x), order)
+    Differential(x::Complex{Num}, order = 1) = throw(ArgumentError("Cannot take derivative with respect to the complex value `$x`; differentiate with respect to its real or imaginary part instead."))
     Differential(::CallAndWrap, order = 1) = throw(ArgumentError("Cannot take derivative with respect to a symbolic function."))
     Differential(::Number, order = 1) = throw(ArgumentError("Cannot take derivative with respect to constant."))
 end
@@ -68,7 +82,8 @@ function _is_differential_target(x::BasicSymbolic{VartypeT})
         BSImpl.Sym() => true
         BSImpl.Term(; f, args) => if f isa BasicSymbolic{VartypeT} || f isa Operator
             true
-        elseif f === getindex || f isa SymbolicGetproperty
+        elseif f === getindex || f isa SymbolicGetproperty || f === adjoint ||
+                f === transpose || f === real || f === imag
             _is_differential_target(args[1])
         else
             false
@@ -567,7 +582,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                         push!(summed_args, reproject_symstruct(arg, root, der))
                         continue
                     elseif der === nothing
-                        push!(summed_args, Differential(a)(arg) * executediff(D, a))
+                        push!(summed_args, Differential(a; unsafe = true)(arg) * executediff(D, a))
                     else
                         push!(summed_args, reproject_symstruct(arg, root, der) * executediff(D, a))
                     end

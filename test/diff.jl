@@ -54,6 +54,29 @@ end
     @test Symbolics.derivative(aa[1], aa[1]) == 1
 end
 
+@testset "Differential accepts coordinate projections" begin
+    @variables a M2[1:2, 1:2] zc::Complex
+    for P in (M2', transpose(M2))
+        target = P[1, 2]
+        @test Differential(P) isa Differential
+        @test Differential(target) isa Differential
+        @test Symbolics.derivative(target, target) == 1
+        @test isequal(Symbolics.derivative(target^2 + a, target), 2target)
+        @test isequal(Symbolics.gradient(target^2 + P[2, 1], [target, P[2, 1]]), Num[2target, 1])
+        @test isequal(expand_derivatives(Differential(target)(target^3)), 3target^2)
+        @test_throws ArgumentError Differential((2P)[1, 2])
+    end
+    @test_throws ArgumentError Differential((M2 + M2')[1, 2])
+    for target in (real(zc), imag(zc))
+        @test Differential(target) isa Differential
+        @test isequal(Symbolics.derivative(target^2, target), 2target)
+    end
+    for target in (zc, a + im * a)
+        @test_throws ArgumentError Differential(target)
+        @test_throws "complex value" Differential(target)
+    end
+end
+
 @testset "Generated chain-rule derivatives survive substitution" begin
     @variables x y (g)(..)
     d = Symbolics.derivative(g(2x), x)
@@ -101,6 +124,17 @@ end
         @test Symbolics.derivative(rec.y, target) == 0
         @test isequal(Symbolics.gradient(target^2, [target]), [2target])
         @test_throws ArgumentError Differential(2target)
+    end
+end
+
+@testset "Chain rule through symbolic struct constructor arguments" begin
+    @variables t2 s2 crec(..)::DifferentialRecord
+    for inner in (2t2, t2 + s2)
+        field = crec(inner).x
+        D_inner = Differential(unwrap(inner); unsafe = true)
+        dinner = Symbolics.derivative(inner, t2)
+        @test isequal(Symbolics.derivative(field, t2), dinner * D_inner(unwrap(field)))
+        @test isequal(Symbolics.derivative(field^2, t2), 2field * dinner * D_inner(unwrap(field)))
     end
 end
 
