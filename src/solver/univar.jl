@@ -1,5 +1,3 @@
-exact_div(a, b) = a isa Number && b isa Number ? a // b : a / b
-
 function get_roots_deg1(expression, x, subs, coeffs)
     @assert isequal(sdegree(coeffs, x), 1) "Expected a polynomial of degree 1 in $x, got $expression"
 
