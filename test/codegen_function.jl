@@ -428,3 +428,41 @@ end
         @test out == [pv[2:20] .- 2 .* qv[1:19]; pv[1] + qv[20]]
     end
 end
+
+@testset "`fuse_unalias` and `fuse_output_array`" begin
+    @test Symbolics.CodegenFunctionOptions().fuse_unalias
+    @test Symbolics.CodegenFunctionOptions().fuse_output_array === nothing
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]]))
+        empty!(PROBED_REWRITES)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args)
+        @test PROBED_REWRITES[:fuse_unalias] === true
+        @test !haskey(PROBED_REWRITES, :fuse_output_array)
+        empty!(PROBED_REWRITES)
+        Symbolics.codegen_function(
+            IRStructure{SymReal}(), expr, args; fuse_unalias = false, fuse_output_array = a
+        )
+        @test PROBED_REWRITES[:fuse_unalias] === false
+        @test isequal(PROBED_REWRITES[:fuse_output_array], unwrap(a))
+    end
+
+    # SymbolicUtils updates in place from the release that adds `Code.FUSE_UNALIAS_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_UNALIAS_KEY)
+        @variables p[1:20] q[1:20] dt
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(
+            [[1:10], [11:20]],
+            [unwrap(p[1:10] .+ dt .* q[1:10]), unwrap(p[11:20] .- dt .* q[11:20])]
+        )
+        _, iip = Symbolics.codegen_function(
+            ir, maker, [p, q, dt];
+            fuse_broadcasts = true, fuse_unalias = false, fuse_output_array = p
+        )
+        @test occursin("fused_materialize_noalias!", string(iip))
+        @test !occursin("unalias(", replace(string(iip), "noalias" => ""))
+        f! = eval(iip)
+        pv, qv = collect(1.0:20), collect(10.0:10:200)
+        expected = [pv[1:10] .+ 0.5 .* qv[1:10]; pv[11:20] .- 0.5 .* qv[11:20]]
+        Base.invokelatest(f!, pv, pv, qv, 0.5)
+        @test pv == expected
+    end
+end

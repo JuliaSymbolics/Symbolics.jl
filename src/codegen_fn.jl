@@ -76,6 +76,13 @@ Fields:
   fused broadcast, slices of arguments are read through views, and `ArrayMaker` regions are
   written in place, so a GPU array takes one kernel per region rather than one per
   operation. Each fused expression is compiled separately, so this is off by default.
+- `fuse_unalias`: when `false`, fused `ArrayMaker` regions do not copy inputs that might
+  share memory with the output. Set it only when no region reads memory that a region
+  writes, except elements read at the same index they are written, as in an in-place
+  update `u[r] .= u[r] .+ dt .* f`.
+- `fuse_output_array`: the symbolic array whose memory the output buffer is, or `nothing`.
+  A fused region reading exactly the slice of it that the region writes reads it through
+  the destination itself, which broadcast does not copy.
 """
 struct CodegenFunctionOptions
     nanmath::Bool
@@ -89,6 +96,8 @@ struct CodegenFunctionOptions
     skipzeros::Bool
     scalarize_single_element_regions::Bool
     fuse_broadcasts::Bool
+    fuse_unalias::Bool
+    fuse_output_array::Any
 end
 
 function CodegenFunctionOptions(;
@@ -96,11 +105,13 @@ function CodegenFunctionOptions(;
         checkbounds = false, iip_config::NTuple{2, Bool} = (true, true),
         sort_addmul = false, optimize = nothing, similarto = nothing,
         outputidxs = nothing, skipzeros = false, scalarize_single_element_regions = true,
-        fuse_broadcasts = false, kwargs...
+        fuse_broadcasts = false, fuse_unalias = true, fuse_output_array = nothing,
+        kwargs...
     )
     return CodegenFunctionOptions(
         nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
-        similarto, outputidxs, skipzeros, scalarize_single_element_regions, fuse_broadcasts
+        similarto, outputidxs, skipzeros, scalarize_single_element_regions, fuse_broadcasts,
+        fuse_unalias, fuse_output_array
     )
 end
 
@@ -129,7 +140,7 @@ function codegen_function(
         ir::IRStructure{VartypeT}, expr, args::Vector, opts::CodegenFunctionOptions
     )
     (; nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
-        scalarize_single_element_regions, fuse_broadcasts) = opts
+        scalarize_single_element_regions, fuse_broadcasts, fuse_unalias, fuse_output_array) = opts
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
     if nanmath
@@ -138,6 +149,8 @@ function codegen_function(
     rewrites[:sort_addmul] = sort_addmul
     rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
     rewrites[:fuse_broadcasts] = fuse_broadcasts
+    rewrites[:fuse_unalias] = fuse_unalias
+    fuse_output_array === nothing || (rewrites[:fuse_output_array] = unwrap(fuse_output_array))
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
 
@@ -191,7 +204,8 @@ function codegen_function(
         opts::CodegenFunctionOptions
     )
     (; similarto, nanmath, wrap_code, iip_config, outputidxs, skipzeros, checkbounds,
-        optimize, sort_addmul, scalarize_single_element_regions, fuse_broadcasts) = opts
+        optimize, sort_addmul, scalarize_single_element_regions, fuse_broadcasts, fuse_unalias,
+        fuse_output_array) = opts
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
     if nanmath
@@ -200,6 +214,8 @@ function codegen_function(
     rewrites[:sort_addmul] = sort_addmul
     rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
     rewrites[:fuse_broadcasts] = fuse_broadcasts
+    rewrites[:fuse_unalias] = fuse_unalias
+    fuse_output_array === nothing || (rewrites[:fuse_output_array] = unwrap(fuse_output_array))
 
     expr = _recursive_unwrap(expr)
 
