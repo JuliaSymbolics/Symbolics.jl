@@ -9,9 +9,6 @@ ParameterizedFunctions = "65888b18-ceab-5e60-b2b9-181511a3b968"
 Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
-[sources]
-Symbolics = {path = "/home/crackauc/sandbox/goals/ci-green/adopt/sym-downstream/Symbolics"}
-
 [compat]
 ADTypes = "1"
 DifferentiationInterface = "0.7"
