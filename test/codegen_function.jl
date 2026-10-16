@@ -402,3 +402,29 @@ end
         @test out ≈ [collect(1.0:19) .+ collect(10.0:10:190); 20.0 - 10.0]
     end
 end
+
+@testset "`fuse_broadcasts`" begin
+    @test !Symbolics.CodegenFunctionOptions().fuse_broadcasts
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; fuse_broadcasts = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:fuse_broadcasts] === something(setting, false)
+    end
+
+    # SymbolicUtils fuses from the release that adds `Code.FUSE_BROADCASTS_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_BROADCASTS_KEY)
+        @variables p[1:20] q[1:20]
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(
+            [[1:19], [20:20]], [unwrap(p[2:20] .- 2 .* q[1:19]), unwrap(p[1:1] .+ q[20:20])]
+        )
+        _, iip = Symbolics.codegen_function(ir, maker, [p, q]; fuse_broadcasts = true)
+        @test occursin("fused_materialize!", string(iip))
+        f! = eval(iip)
+        out = zeros(20)
+        pv, qv = collect(1.0:20), collect(10.0:10:200)
+        Base.invokelatest(f!, out, pv, qv)
+        @test out == [pv[2:20] .- 2 .* qv[1:19]; pv[1] + qv[20]]
+    end
+end
