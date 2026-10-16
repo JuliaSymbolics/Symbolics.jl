@@ -737,7 +737,7 @@ function has_no_float_literals(expr)
     return true
 end
 
-function check_exact_periodic_solve(f, v, x; atol = 1e-10)
+function check_exact_periodic_solve(f, v, x; atol = 1.0e-10)
     sols = symbolic_solve(f(x) ~ v, x, warns = false)
     @test sols !== nothing
     sols === nothing && return
@@ -755,32 +755,39 @@ function check_exact_periodic_solve(f, v, x; atol = 1e-10)
             @test isapprox(residual1, 0; atol = atol)
         end
     end
+    return
 end
 
 @testset "Exact transcendental solve (#1842)" begin
     @testset "canonical sin values" begin
         @variables x
-        for v in (0, 1//2, -1//2, 1, -1,
-                  Symbolics.ssqrt(2) / 2, -Symbolics.ssqrt(2) / 2,
-                  Symbolics.ssqrt(3) / 2, -Symbolics.ssqrt(3) / 2)
+        for v in (
+                0, 1 // 2, -1 // 2, 1, -1,
+                Symbolics.ssqrt(2) / 2, -Symbolics.ssqrt(2) / 2,
+                Symbolics.ssqrt(3) / 2, -Symbolics.ssqrt(3) / 2,
+            )
             check_exact_periodic_solve(sin, v, x)
         end
     end
 
     @testset "canonical cos values" begin
         @variables x
-        for v in (0, 1//2, -1//2, 1, -1,
-                  Symbolics.ssqrt(2) / 2, -Symbolics.ssqrt(2) / 2,
-                  Symbolics.ssqrt(3) / 2, -Symbolics.ssqrt(3) / 2)
+        for v in (
+                0, 1 // 2, -1 // 2, 1, -1,
+                Symbolics.ssqrt(2) / 2, -Symbolics.ssqrt(2) / 2,
+                Symbolics.ssqrt(3) / 2, -Symbolics.ssqrt(3) / 2,
+            )
             check_exact_periodic_solve(cos, v, x)
         end
     end
 
     @testset "canonical tan values" begin
         @variables x
-        for v in (0, 1, -1,
-                  1 / Symbolics.ssqrt(3), -1 / Symbolics.ssqrt(3),
-                  Symbolics.ssqrt(3), -Symbolics.ssqrt(3))
+        for v in (
+                0, 1, -1,
+                1 / Symbolics.ssqrt(3), -1 / Symbolics.ssqrt(3),
+                Symbolics.ssqrt(3), -Symbolics.ssqrt(3),
+            )
             check_exact_periodic_solve(tan, v, x)
         end
     end
@@ -789,7 +796,7 @@ end
         @variables x
         xu = Symbolics.unwrap(x)
         # For f ∈ {sin, cos}, period must be 2π (no float coefficient).
-        for (f, v) in ((sin, 1//2), (cos, 1//2))
+        for (f, v) in ((sin, 1 // 2), (cos, 1 // 2))
             sols = symbolic_solve(f(x) ~ v, x, warns = false)
             @test sols !== nothing && length(sols) >= 1
             for sol in sols
@@ -799,7 +806,7 @@ end
                 # Round-trip at n = 5 (well away from principal) — stresses the period.
                 sol5 = Symbolics.substitute(sol, Dict(first(params) => 5))
                 residual = Symbolics.symbolic_to_float(f(sol5) - v)
-                @test isapprox(residual, 0; atol = 1e-8)
+                @test isapprox(residual, 0; atol = 1.0e-8)
             end
         end
         # For tan, period must be π (not 2π).
@@ -811,13 +818,13 @@ end
             @test length(params) == 1
             sol5 = Symbolics.substitute(sol, Dict(first(params) => 5))
             residual = Symbolics.symbolic_to_float(tan(sol5) - 1)
-            @test isapprox(residual, 0; atol = 1e-8)
+            @test isapprox(residual, 0; atol = 1.0e-8)
         end
     end
 
     @testset "non-canonical preservation" begin
         @variables x
-        for (f, v) in ((cos, 1//3), (sin, 1//7), (tan, 2//5))
+        for (f, v) in ((cos, 1 // 3), (sin, 1 // 7), (tan, 2 // 5))
             check_exact_periodic_solve(f, v, x)
         end
     end
@@ -844,8 +851,10 @@ end
     end
     @test !contains_acosbypi
     deriv = Symbolics.derivative(sol, y)
-    @test isapprox(Symbolics.symbolic_to_float(Symbolics.substitute(deriv, Dict(y => 0))),
-                    -1 / pi; rtol = 1e-14)
+    @test isapprox(
+        Symbolics.symbolic_to_float(Symbolics.substitute(deriv, Dict(y => 0))),
+        -1 / pi; rtol = 1.0e-14
+    )
 end
 
 @testset "exact_div keeps `//` for numbers and accepts symbolics" begin

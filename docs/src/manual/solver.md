@@ -93,10 +93,10 @@ Symbolics.sympy_pythoncall_algebraic_solve
 
 ### Exact results for transcendental equations
 
-Solutions to transcendental equations at canonical right-hand sides are returned
-in exact symbolic form — the principal value uses `π` (and surds where
-appropriate) rather than a floating-point approximation, and the period
-multiplying the integer parameter is likewise exact:
+When `symbolic_solve` inverts `sin`, `cos` or `tan` and the principal value is a
+multiple of `π/6` or `π/4`, the root is returned in exact form: both the
+principal value and the period multiplying the integer parameter are written in
+terms of `π` rather than as floating-point numbers:
 
 ```julia
 julia> using Symbolics
@@ -104,16 +104,19 @@ julia> using Symbolics
 julia> @variables x;
 
 julia> Symbolics.symbolic_solve(cos(x) ~ 1//2, x)
+[ Info: var"##N" ϵ Ζ
 1-element Vector{…}:
- π / 3 + (2π)*var"##N"
+ π / 3 + var"##N"*(2*π)
 ```
 
 The fresh symbolic variable introduced by the solver (shown as `var"##N"`
-above) ranges over the integers, and an `@info` message announcing this is
-emitted each time a periodic family is returned. When the right-hand side is
-not one of the canonical values (e.g. `cos(x) ~ 1//3`), the solver preserves
-the inverse operator symbolically — `acos(1//3)` is left unevaluated — so that
-no floating-point error is introduced by the solve step itself.
+above) ranges over the integers, and the `@info` message announces it each time
+a periodic family is returned. The exact angle is found by comparing the
+evaluated inverse with the table of canonical angles up to floating-point
+tolerance, so a right-hand side within that tolerance of a canonical value
+(e.g. `0.5 + 1e-9`) also returns the canonical angle. Other right-hand sides
+keep the inverse unevaluated: `cos(x) ~ 1//3` returns
+`acos(1//3) + var"##N"*(2*π)`.
 
 ### Expressions we can not solve (but aim to)
 ```
