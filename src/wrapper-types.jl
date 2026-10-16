@@ -131,7 +131,28 @@ function symtype_represents(S, T)
     return C !== Nothing && C <: T
 end
 
-function wrap_func_expr(mod, expr, wrap_arrays = true)
+function registration_signatures(block)
+    Meta.isexpr(block, :block) || throw(ArgumentError("registration options must be a block"))
+    signatures = []
+    for option in block.args
+        MacroTools.isline(option) && continue
+        Meta.isexpr(option, :(=), 2) && option.args[1] === :signatures ||
+            throw(ArgumentError("expected signatures = [...] in registration options"))
+        signatures = option.args[2]
+    end
+    return signatures
+end
+
+function parse_args_list(args_list)
+    if args_list isa AbstractVector
+        return map(args_list) do signature
+            signature isa Tuple ? signature : (signature,)
+        end
+    end
+    return args_list
+end
+
+function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
     @assert expr.head == :function || (expr.head == :(=) &&
                                        expr.args[1] isa Expr &&
                                        expr.args[1].head == :call)
@@ -235,15 +256,36 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         end
         error("Unreachable")
     end
-    methods = Expr[]
-    indices = CartesianIndices(Tuple(length.(types)))
-    first_index = first(indices)
-    for index in indices
-        index == first_index && continue
-        Ts = Any[]
-        for i in eachindex(types)
-            push!(Ts, types[i][index[i]])
+    if args_list isa Union{Expr, Symbol}
+        args_list = Base.eval(mod, args_list)
+    end
+    args_list = parse_args_list(args_list)
+    signatures = Vector{Any}[]
+    if isempty(args_list)
+        indices = CartesianIndices(Tuple(length.(types)))
+        first_index = first(indices)
+        for index in indices
+            index == first_index && continue
+            push!(signatures, Any[types[i][index[i]] for i in eachindex(types)])
         end
+    else
+        for signature in args_list
+            length(signature) == length(args) || throw(ArgumentError(
+                "each argument signature must match the number of positional arguments"))
+            Ts = Any[T isa Type ? T : Base.eval(mod, T) for T in signature]
+            all(T -> T isa Type, Ts) || throw(ArgumentError(
+                "argument signatures must contain types"))
+            all(i -> any(U -> Ts[i] <: U, types[i]), eachindex(Ts)) ||
+                throw(ArgumentError("argument signatures must use supported argument types"))
+            any(T -> T <: SymbolicT || is_wrapper_type(T) ||
+                (T <: AbstractArray && (T <: AbstractArray{<:SymbolicT} ||
+                    is_wrapped_array_eltype(T))), Ts) || throw(ArgumentError(
+                "each argument signature must include a symbolic argument"))
+            push!(signatures, Ts)
+        end
+    end
+    methods = Expr[]
+    for Ts in signatures
         method_args = Expr[]
         for (n, T) in zip(names, Ts)
             push!(method_args, :($n::$T))
@@ -362,7 +404,15 @@ applicable(foo, wrap(Foo{Int}()), wrap(2)) # true
 
 See also: [`@symbolic_wrap`](@ref), [`Symbolics.wrap`](@ref),
 [`SymbolicUtils.unwrap`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap).
+
+A final options block can set `signatures = [(Num, Real), ...]` to select the
+symbolic overloads to generate. Each tuple must match the positional argument
+count and include a symbolic type. Omitting `signatures`, or using an empty
+list, generates the default combinations.
 """
-macro wrapped(expr, wrap_arrays = true)
-    esc(wrap_func_expr(__module__, expr, wrap_arrays))
+macro wrapped(expr, wrap_arrays = true, block = :(begin end))
+    if Meta.isexpr(wrap_arrays, :block)
+        block, wrap_arrays = wrap_arrays, true
+    end
+    esc(wrap_func_expr(__module__, expr, wrap_arrays, registration_signatures(block)))
 end
