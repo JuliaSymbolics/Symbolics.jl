@@ -65,6 +65,11 @@ eqs.real_eq` and `eqs[2] == eqs.imag_eq`: iteration, indexing, `length`,
 `vcat` and `reduce(vcat, ...)` work, but `push!` and `setindex!` do not. Call
 `collect(eqs)` where a `Vector{Equation}` is required.
 
+A variable declared without `::Complex` is real, so `conj`, `real`, `imag` and
+`abs` of it simplify before the split: with `@variables ψ(..)`, the `original`
+of `im * conj(ψ(t))` is the same as that of `im * ψ(t)`. Declare `ψ(..)::Complex`
+when the equation is not holomorphic in it.
+
 # Fields
 $(FIELDS)
 """
@@ -96,7 +101,9 @@ Equate `lhs` and `rhs` like `lhs ~ rhs`, but return a
 equation splits into real-part and imaginary-part equations.
 
 When only the real parts or only the imaginary parts contain symbols, the
-result is a single [`Equation`](@ref), exactly as for `~`. Throws an error when
+result is a single [`Equation`](@ref), exactly as for `~`. The purely numeric
+part is dropped without being checked, so for a real `x`,
+`split_complex_equation(x, 1 + 2im)` returns `x ~ 1`. Throws an error when
 neither side contains symbols.
 
 # Examples
