@@ -173,3 +173,97 @@ end
     @test_nowarn latexify(ifelse_eager(a > 0, a^2, 1 / a))
     @test_nowarn latexify(ifelse_branching(a > 0, a^2, 1 / a))
 end
+
+# issue #956: latexwrapper `_`/`^` must not be escaped when latexifying a Num
+@testset "latexwrapper raw LaTeX (#956)" begin
+    @variables x t
+    @variables w0 [latexwrapper = s -> raw"\omega_{0}"]
+    @variables vx(x, t) [latexwrapper = s -> "v_{x}"]
+    ex = vx + w0^2
+    eq = vx ~ w0
+
+    for s in (string(latexify(ex)), repr(MIME"text/latex"(), ex))
+        @test occursin(raw"v_{x}\left( x, t \right) + \omega_{0}^{2}", s)
+        @test !occursin(raw"\_{", s)
+    end
+    @test occursin(raw"\omega_{0}", string(latexify(w0)))
+    @test !occursin(raw"\_{", string(latexify(w0)))
+    @test occursin(raw"v_{x}\left( x, t \right)", string(latexify(vx)))
+    @test !occursin(raw"\_{", string(latexify(vx)))
+    for s in (string(latexify(eq)), repr(MIME"text/latex"(), eq))
+        @test occursin(raw"v_{x}", s)
+        @test occursin(raw"\omega_{0}", s)
+        @test !occursin(raw"\_{", s)
+    end
+    # Powers of function variables must stay parenthesized
+    @test occursin(raw"\left( v_{x}\left( x, t \right) \right)^{2}", string(latexify(vx^2)))
+    # Unannotated multi-character names still go through the default Symbol path
+    @variables plain_x
+    @test occursin("\\mathtt{plain\\_x}", string(latexify(plain_x)))
+end
+
+# Custom-function arguments must keep outer recipe/caller Latexify options
+@testset "latexwrapper argument formatting" begin
+    @variables x y a[1:2] a_b
+    @variables f(..) [latexwrapper = string]
+    @test String(latexify(f(a[1]); env = :raw, index = :subscript)) ==
+        raw"f\left( a_{1} \right)"
+    @test String(latexify(f(1.23456789); env = :raw, fmt = "%.2f")) ==
+        raw"f\left( 1.23 \right)"
+    @test String(latexify(f(x * y); env = :raw, mult_symbol = raw"\times")) ==
+        raw"f\left( x \times y \right)"
+    @test String(latexify(f(a_b); env = :raw)) ==
+        raw"f\left( \mathtt{a\_b} \right)"
+    @test String(latexify(f(1.23456789e-9); env = :raw)) ==
+        raw"f\left( 1.2346 \cdot 10^{-9} \right)"
+end
+
+# A derivative of a custom call multiplied by another factor must keep operand
+# scope in the numerator, not as an unfenced differential operator times both.
+@testset "latexwrapper derivative factor scope" begin
+    @variables x
+    @variables f(..) [latexwrapper = string]
+    @variables g(..) [latexwrapper = string]
+    D = Differential(x)
+    @test String(latexify(D(f(x)) * g(x); env = :raw)) ==
+        raw"\frac{\mathrm{d}f\left( x \right)}{\mathrm{d}x} ~ g\left( x \right)"
+    @test String(latexify(f(x) * D(g(x)); env = :raw)) ==
+        raw"\frac{\mathrm{d}g\left( x \right)}{\mathrm{d}x} ~ f\left( x \right)"
+end
+
+struct DummyConnection1311
+    systems::Vector{Symbol}
+end
+Symbolics.hide_lhs(::DummyConnection1311) = true
+@latexrecipe function f(c::DummyConnection1311)
+    index --> :subscript
+    return Expr(:call, :connect, c.systems...)
+end
+
+@testset "hidden-lhs equations render as 0 = rhs (#1311)" begin
+    @variables x y
+    plain_conn = Symbolics.Equation(DummyConnection1311(Symbol[]), x + y)
+    conn_eq = Symbolics.Equation(
+        DummyConnection1311(Symbol[]),
+        DummyConnection1311([:a_1, :b_2]),
+    )
+
+    @test String(latexify(plain_conn)) ==
+        "\\begin{equation}\n0 = x + y\n\\end{equation}\n"
+    @test String(latexify(conn_eq)) ==
+        "\\begin{equation}\n0 = \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{equation}\n"
+    @test String(latexify([plain_conn])) ==
+        "\\begin{align}\n0 &= x + y\n\\end{align}\n"
+    @test String(latexify([conn_eq])) ==
+        "\\begin{align}\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{align}\n"
+    @test String(latexify([conn_eq, x ~ y])) ==
+        "\\begin{align}\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right) \\\\\nx &= y\n\\end{align}\n"
+    @test String(latexify([x ~ y, conn_eq])) ==
+        "\\begin{align}\nx &= y \\\\\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{align}\n"
+    @test String(latexify([x ~ y, y ~ x])) ==
+        "\\begin{align}\nx &= y \\\\\ny &= x\n\\end{align}\n"
+
+    @variables u[1:2] v[1:2]
+    @test String(latexify([u ~ v])) ==
+        "\\begin{align}\nu &= v\n\\end{align}\n"
+end
