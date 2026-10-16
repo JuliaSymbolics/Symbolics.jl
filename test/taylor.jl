@@ -49,9 +49,12 @@ f = (-1 + sqrt(1 + 4 * x^2) + 2 * x) / (2 * x)
 @test evalsol(expand(taylor(f, x, 0, 0:5) - (1 + x - x^3 + 2 * x^5))) == 0
 @test evalsol(expand(taylor(a + sin(x)/x, x, 0:2) - (1 + a - x^2/6))) == 0
 @test evalsol(expand(taylor(sin(x)/x + a*x, x, 0:2) - (1 + a*x - x^2/6))) == 0
+@test evalsol(expand(taylor(sin(x) / x, x, 0:10) - sum((-1)^k * x^(2k) / factorial(2k + 1) for k in 0:5))) == 0
+@test evalsol(expand(taylor((1 - cos(x)) / x^2, x, 0:4) - (1 // 2 - x^2 / 24 + x^4 / 720))) == 0
 
 d = sinh(x) - (exp(x) - exp(-x))/2
 @test_throws ErrorException taylor(1/d, x, 0:1)
+@test_throws ErrorException taylor_coeff(1 / d, x, 1)
 @test_throws ErrorException taylor(1/x, x, 0:2)
 @test_throws ErrorException taylor(sqrt(x), x, 0:2)
 pole_error = try

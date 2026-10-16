@@ -79,40 +79,39 @@ function _contains_nonfinite_constant(x::BasicSymbolic{VartypeT})
 end
 _contains_nonfinite_constant(x) = false
 
+_iszero_coeff(c) = c isa Number ? iszero(c) : isequal(c, 0)
+
 function _series_coeff(f, x, n; rationalize, kwargs...)
     numerator, denominator = value.(_fraction_parts(unwrap(f)))
     isequal(denominator, 1) && error("Cannot compute a finite Taylor coefficient because the expression is not a quotient with a vanishing denominator")
     isequal(value(simplify(denominator)), 0) && error("Cannot compute a Taylor coefficient with a zero denominator")
 
-    denominator_coeffs = Any[]
-    order = 0
+    # Search the vanishing order on raw derivatives: `taylor_coeff` would evaluate
+    # `factorial(order)`, which overflows within the search bound (at 13 on 32-bit).
+    D = Differential(x)
     max_order = n + 20
-    while order <= max_order
-        coefficient = taylor_coeff(denominator, x, order; rationalize, kwargs...)
-        push!(denominator_coeffs, coefficient)
-        if !isequal(value(coefficient), 0)
-            break
-        end
+    order = 0
+    derivative = expand_derivatives(denominator)
+    while _iszero_coeff(value(substitute_in_deriv(derivative, x => 0; fold = Val(true), kwargs...)))
+        order == max_order && error("Could not find a nonzero denominator Taylor coefficient through order $max_order at $x = 0")
+        derivative = expand_derivatives(D(derivative))
         order += 1
     end
-    order > max_order && error("Could not find a nonzero denominator Taylor coefficient through order $max_order at x = 0")
 
-    for j in 1:(n + order)
-        push!(denominator_coeffs, taylor_coeff(denominator, x, order + j; rationalize, kwargs...))
-    end
+    numerator_coeffs = taylor_coeff(numerator, x, 0:(n + order); rationalize, kwargs...)
+    denominator_coeffs = taylor_coeff(denominator, x, order:(n + order); rationalize, kwargs...)
+    all(_iszero_coeff ∘ value, numerator_coeffs[1:order]) ||
+        error("Cannot compute the Taylor coefficient of an expression with a pole at $x = 0")
 
     quotient_coeffs = Any[]
-    for i in 0:(n + order)
-        coefficient = taylor_coeff(numerator, x, i; rationalize, kwargs...)
-        for j in 0:(i - 1)
-            coefficient -= quotient_coeffs[j + 1] * denominator_coeffs[order + i - j + 1]
+    for p in 0:n
+        coefficient = numerator_coeffs[order + p + 1]
+        for j in 0:(p - 1)
+            coefficient -= quotient_coeffs[j + 1] * denominator_coeffs[p - j + 1]
         end
-        if i < order && !isequal(value(coefficient), 0)
-            error("Cannot compute the Taylor coefficient of an expression with a pole at $x = 0")
-        end
-        push!(quotient_coeffs, coefficient / denominator_coeffs[order + 1])
+        push!(quotient_coeffs, coefficient / denominator_coeffs[1])
     end
-    return value(quotient_coeffs[n + order + 1])
+    return value(quotient_coeffs[n + 1])
 end
 
 """
