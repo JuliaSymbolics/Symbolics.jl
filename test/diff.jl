@@ -325,6 +325,37 @@ let
     @test isequal(sj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
 end
 
+let
+    N = 2
+    @variables u[1:N, 1:N]
+    uc = collect(u)
+    f = vec(uc .^ 2 .+ uc)
+    vu = vec(u)
+    g = sum(uc .^ 2)
+    @test vu isa Base.ReshapedArray
+    @test isequal(Symbolics.scalarize(vu), Num[u[1, 1], u[2, 1], u[1, 2], u[2, 2]])
+    spI = sparse([1, 2, 3, 4], [1, 2, 3, 4], true, 4, 4)
+    @test Symbolics.jacobian_sparsity(f, vu) == spI
+    @test Symbolics.jacobian_sparsity(f, u) == spI
+    Jdiag = Num[1 + 2u[1, 1], 1 + 2u[2, 1], 1 + 2u[1, 2], 1 + 2u[2, 2]]
+    J = Symbolics.sparsejacobian(f, vu)
+    @test isequal(J, sparse([1, 2, 3, 4], [1, 2, 3, 4], Jdiag, 4, 4))
+    @test isequal(Symbolics.jacobian(f, vu), Diagonal(Jdiag))
+    H2I = Num[2 0 0 0; 0 2 0 0; 0 0 2 0; 0 0 0 2]
+    @test isequal(Symbolics.hessian(g, vu), H2I)
+    @test isequal(
+        Symbolics.sparsehessian(g, vu),
+        sparse([1, 2, 3, 4], [1, 2, 3, 4], Num[2, 2, 2, 2], 4, 4)
+    )
+    @syms h(x::Real)::Real
+    @test isequal(map(h, vu), map(h, Num[u[1, 1], u[2, 1], u[1, 2], u[2, 2]]))
+    @test isempty(
+        filter(Test.detect_ambiguities(Symbolics)) do (m1, m2)
+            occursin("ReshapedArray", string(m1.sig)) || occursin("ReshapedArray", string(m2.sig))
+        end
+    )
+end
+
 # substituting iv of differentials
 @variables t t2 x(t)
 D = Differential(t)
