@@ -90,3 +90,11 @@ end
 
 # taylor of a zero residual is a plain zero, so `== 0` is a Bool
 @test (taylor(exp(x) - taylor(exp(x), x, 0:6), x, 0:4) == 0) === true
+
+# orders given as any iterable of integers, not only arrays
+for ns in ((0, 1, 2), (n for n in 0:2), Iterators.take(0:5, 3))
+    @test isequal(taylor(exp(x), x, ns), taylor(exp(x), x, 0:2))
+    @test isequal(string(taylor(exp(x), x, ns)), "1 + x + (1//2)*(x^2)")
+end
+@test isequal(taylor(exp(x), x, 1, (0, 1)), taylor(exp(x), x, 1, 0:1))
+@test isequal(taylor(exp(x), x, [0 1; 2 3]), taylor(exp(x), x, 0:3))
