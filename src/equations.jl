@@ -54,6 +54,10 @@ $(TYPEDSIGNATURES)
 Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
 `Num` and a `Number`.
 
+Broadcasting `~` over symbolic arrays (`A .~ B`) returns an `Array{Equation}` of the
+elementwise scalar equations. It is a concrete array, so it cannot be indexed with a
+symbolic index; write `A[i] ~ B[i]` for the equation at a symbolic index `i`.
+
 # Examples
 
 ```jldoctest
