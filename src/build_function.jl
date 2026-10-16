@@ -411,14 +411,15 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     capture_bindings = parallel isa ShardedForm{false} ||
         (parallel isa MultithreadedForm && expression != Val{true})
-    process_body = capture_bindings ?
-        body -> _capture_shard_bindings(postprocess_fbody(body), Any[]) : postprocess_fbody
 
     oop, iip = iip_config
     if oop
-        oop_expr = Func(dargs, [], process_body(make_array(parallel, dargs, rhss, similarto)))
+        oop_expr = Func(dargs, [], postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
         if wrap_code[1] !== nothing
             oop_expr = wrap_code[1](oop_expr)
+        end
+        if capture_bindings
+            oop_expr = _capture_shard_bindings(oop_expr, Any[])
         end
     else
         oop_expr = get_unimplemented_expr(dargs)
@@ -427,15 +428,18 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
 
     if iip
         out = Sym{VartypeT}(DEFAULT_OUTSYM; type = Any, shape = SymbolicUtils.Unknown(-1))
-        iip_expr = Func(
-            vcat(out, dargs), [], process_body(
-                set_array(
-                    parallel, dargs, out, outputidxs, rhss, checkbounds, skipzeros
-                )
-            )
-        )
+        iip_expr = Func(vcat(out, dargs), [], postprocess_fbody(set_array(parallel,
+                                    dargs,
+                                    out,
+                                    outputidxs,
+                                    rhss,
+                                    checkbounds,
+                                    skipzeros)))
         if wrap_code[2] !== nothing
             iip_expr = wrap_code[2](iip_expr)
+        end
+        if capture_bindings
+            iip_expr = _capture_shard_bindings(iip_expr, Any[])
         end
     else
         iip_expr = get_unimplemented_expr([DEFAULT_OUTSYM; dargs])
@@ -496,20 +500,38 @@ function make_array(s::ShardedForm, closed_args, arr, similarto)
     )
 end
 
-function _shard_binding_names(lhs)
-    if lhs isa DestructuredArgs
-        names = lhs.create_bindings ? (lhs.name, lhs.elems...) : (lhs.name,)
-        return mapreduce(_shard_binding_names, vcat, names; init = Any[])
-    elseif lhs isa LiteralExpr
-        return _shard_binding_names(lhs.ex)
-    elseif lhs isa Expr
-        return lhs.head === :tuple ? mapreduce(_shard_binding_names, vcat, lhs.args; init = Any[]) : Any[]
-    elseif lhs isa Symbol
-        return all(==('_'), String(lhs)) ? Any[] : Any[lhs]
-    elseif issym(unwrap(lhs)) || iscall(unwrap(lhs))
-        return Any[lhs]
+# Elements of a `DestructuredArgs` with `create_bindings = false` are rendered as
+# `source[i]`, so a shard that references an element needs whatever `source` references.
+struct _ShardAlias
+    elems::Vector{Any}
+    source::Any
+end
+
+function _shard_destructured_bindings!(bindings, d::DestructuredArgs)
+    if d.create_bindings
+        foreach(e -> _shard_binding_names!(bindings, e), d.elems)
+    else
+        push!(bindings, _ShardAlias(collect(Any, d.elems), d.name))
     end
-    return Any[]
+    return bindings
+end
+
+function _shard_binding_names!(bindings, lhs)
+    if lhs isa DestructuredArgs
+        _shard_binding_names!(bindings, lhs.name)
+        _shard_destructured_bindings!(bindings, lhs)
+    elseif lhs isa LiteralExpr
+        _shard_binding_names!(bindings, lhs.ex)
+    elseif lhs isa Expr
+        if lhs.head === :tuple
+            foreach(a -> _shard_binding_names!(bindings, a), lhs.args)
+        end
+    elseif lhs isa Symbol
+        all(==('_'), String(lhs)) || push!(bindings, lhs)
+    elseif issym(unwrap(lhs)) || iscall(unwrap(lhs))
+        push!(bindings, lhs)
+    end
+    return bindings
 end
 
 function _capture_shard_bindings(ex::Let, bindings)
@@ -517,12 +539,10 @@ function _capture_shard_bindings(ex::Let, bindings)
     pairs = map(ex.pairs) do pair
         if pair isa Assignment
             rhs = _capture_shard_bindings(pair.rhs, local_bindings)
-            union!(local_bindings, _shard_binding_names(pair.lhs))
+            _shard_binding_names!(local_bindings, pair.lhs)
             Assignment(pair.lhs, rhs)
         else
-            if pair.create_bindings
-                union!(local_bindings, mapreduce(_shard_binding_names, vcat, pair.elems; init = Any[]))
-            end
+            _shard_destructured_bindings!(local_bindings, pair)
             pair
         end
     end
@@ -533,22 +553,107 @@ function _capture_shard_bindings(ex::Func, bindings)
     return Func(ex.args, ex.kwargs, _capture_shard_bindings(ex.body, bindings), ex.pre)
 end
 
-function _capture_shard_bindings(ex::SpawnFetch{Typ}, bindings) where {Typ}
+function _capture_shard_bindings(ex::SpawnFetch{P}, bindings) where {P}
     isempty(bindings) && return ex
+    names = Any[]
+    index = Dict{Any, Int}()
+    aliases = Dict{Any, Vector{Any}}()
+    for b in bindings
+        if b isa _ShardAlias
+            for e in b.elems
+                push!(get!(Vector{Any}, aliases, _shard_ref_key(e)), b.source)
+            end
+        elseif !haskey(index, _shard_ref_key(b))
+            push!(names, b)
+            index[_shard_ref_key(b)] = length(names)
+        end
+    end
     args = isnothing(ex.args) ? [Any[] for _ in ex.exprs] : ex.args
     calls = map(ex.exprs, args) do f, call_args
         f isa Func || return (f, call_args)
+        body = _capture_shard_bindings(f.body, bindings)
+        # Scan after recursing so the binding arguments of nested shard calls count as references.
+        scan = _ShardRefScan(index, aliases)
+        _shard_refs!(scan, (body, f.kwargs, f.pre))
         available = copy(f.args)
         for arg in f.args
             if arg isa DestructuredArgs && !arg.create_bindings
                 append!(available, arg.elems)
             end
         end
-        extra = filter(b -> !any(a -> isequal(unwrap(a), unwrap(b)), available), bindings)
-        body = _capture_shard_bindings(f.body, bindings)
+        extra = Any[]
+        for i in sort!([index[k] for k in scan.refs])
+            b = names[i]
+            any(a -> isequal(unwrap(a), unwrap(b)), available) || push!(extra, b)
+        end
         Func([f.args; extra], f.kwargs, body, f.pre), [call_args; extra]
     end
-    return SpawnFetch{Typ}(first.(calls), last.(calls), ex.combine)
+    return SpawnFetch{P}(first.(calls), last.(calls), ex.combine)
+end
+
+# Bindings and references are matched by the identifier they generate: a `Sym` and a
+# plain `Symbol` with the same name refer to the same local.
+function _shard_ref_key(x)
+    x = unwrap(x)
+    return issym(x) ? nameof(x) : x
+end
+
+struct _ShardRefScan
+    index::Dict{Any, Int}
+    aliases::Dict{Any, Vector{Any}}
+    refs::Set{Any}
+    seen::Base.IdSet{Any}
+    expanded::Set{Any}
+end
+
+_ShardRefScan(index, aliases) = _ShardRefScan(index, aliases, Set{Any}(), Base.IdSet{Any}(), Set{Any}())
+
+function _shard_ref!(scan::_ShardRefScan, key)
+    haskey(scan.index, key) && push!(scan.refs, key)
+    sources = get(scan.aliases, key, nothing)
+    if sources !== nothing && !(key in scan.expanded)
+        push!(scan.expanded, key)
+        foreach(s -> _shard_refs!(scan, s), sources)
+    end
+    return scan
+end
+
+const _ShardCodegenNode = Union{
+    Assignment, AtIndex, DestructuredArgs, Func, Let, LiteralExpr, MakeArray, SetArray,
+    SpawnFetch, Code.MakeSparseArray, Code.MakeTuple, Code.ForLoop,
+}
+
+function _shard_refs!(scan::_ShardRefScan, ex)
+    ex = unwrap(ex)
+    if ex isa Symbol
+        _shard_ref!(scan, ex)
+    elseif ex isa BasicSymbolic
+        ex in scan.seen && return scan
+        push!(scan.seen, ex)
+        if issym(ex)
+            _shard_ref!(scan, nameof(ex))
+        elseif iscall(ex)
+            _shard_ref!(scan, ex)
+            _shard_refs!(scan, operation(ex))
+            foreach(a -> _shard_refs!(scan, a), arguments(ex))
+        elseif unwrap_const(ex) !== ex
+            _shard_refs!(scan, unwrap_const(ex))
+        else
+            union!(scan.refs, keys(scan.index))
+        end
+    elseif ex isa Expr
+        foreach(a -> _shard_refs!(scan, a), ex.args)
+    elseif ex isa AbstractSparseArray
+        _shard_refs!(scan, SparseArrays.nonzeros(ex))
+    elseif ex isa Union{AbstractArray, Tuple}
+        ex isa AbstractArray && isbitstype(eltype(ex)) && return scan
+        foreach(x -> _shard_refs!(scan, x), ex)
+    elseif ex isa _ShardCodegenNode
+        for i in 1:nfields(ex)
+            isdefined(ex, i) && _shard_refs!(scan, getfield(ex, i))
+        end
+    end
+    return scan
 end
 
 function _capture_shard_bindings(ex::LiteralExpr, bindings)
@@ -561,7 +666,10 @@ end
 
 function _capture_shard_bindings(ex, bindings)
     unwrapped = unwrap_const(unwrap(ex))
-    unwrapped === ex || return _capture_shard_bindings(unwrapped, bindings)
+    if unwrapped !== ex
+        captured = _capture_shard_bindings(unwrapped, bindings)
+        return captured === unwrapped ? ex : captured
+    end
     if iscall(ex)
         args = arguments(ex)
         new_args = map(a -> _capture_shard_bindings(a, bindings), args)

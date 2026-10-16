@@ -597,6 +597,16 @@ end
                     b -> Let([Assignment(LiteralExpr(:((z,))), LiteralExpr(:((6,))))], b, false),
                     b -> Let([Assignment(DestructuredArgs((z,), :values), LiteralExpr(:([6])))], b, false),
                     b -> Let([Assignment(LiteralExpr(:((_, z))), LiteralExpr(:((1, 6))))], b, false),
+                    b -> Let(
+                        [Assignment(DestructuredArgs([z], :values; create_bindings = false), LiteralExpr(:([6])))],
+                        b, false
+                    ),
+                    b -> Let(
+                        [
+                            Assignment(:vals, LiteralExpr(:([6]))),
+                            DestructuredArgs([z], :vals; create_bindings = false),
+                        ], b, false
+                    ),
                 )
             f, g = build_function(
                 [z + 1, z + 2, x, y], [x, y];
@@ -607,5 +617,69 @@ end
             g(out, [2, 3])
             @test out == [7, 8, 2, 3]
         end
+        @testset "call-term bindings $parallel" begin
+            @variables t u(t) arr[1:2]
+            for lhs in (Symbolics.unwrap(u), Symbolics.unwrap(arr[1]))
+                f, g = build_function(
+                    [lhs + 1, lhs + 2, x, y], [x, y]; parallel, expression = Val{false},
+                    postprocess_fbody = b -> Let([Assignment(lhs, x * y)], b, false)
+                )
+                @test f([2, 3]) == [7, 8, 2, 3]
+                out = zeros(Int, 4)
+                g(out, [2, 3])
+                @test out == [7, 8, 2, 3]
+            end
+        end
+    end
+end
+
+@testset "wrap_code Let bindings in shards" begin
+    @variables x y z
+    wrap = f -> Func(f.args, f.kwargs, Let([Assignment(z, x * y)], f.body, false), f.pre)
+    for parallel in (Symbolics.SerialForm(), Symbolics.ShardedForm(1, 2), Symbolics.MultithreadedForm(1, 2)),
+            expression in (Val{true}, Val{false})
+        fs = build_function([z + 1, z + 2, x, y], [x, y]; parallel, expression, wrap_code = (wrap, wrap))
+        f, g = expression == Val{true} ? eval.(fs) : fs
+        @test Base.invokelatest(f, [2.0, 3.0]) == [7.0, 8.0, 2.0, 3.0]
+        out = zeros(4)
+        Base.invokelatest(g, out, [2.0, 3.0])
+        @test out == [7.0, 8.0, 2.0, 3.0]
+    end
+end
+
+@testset "Shards receive only the bindings they reference" begin
+    @variables x y z w
+    function shard_call_bindings(ex, names)
+        found = Vector{Symbol}[]
+        walk(e) = nothing
+        function walk(e::Expr)
+            if e.head === :call && first(e.args) isa Symbolics.RuntimeGeneratedFunctions.RuntimeGeneratedFunction
+                push!(found, filter(in(names), e.args[2:end]))
+            end
+            foreach(walk, e.args)
+        end
+        walk(ex)
+        return found
+    end
+    for (wrap, expected) in (
+            (b -> Let([Assignment(z, x * y), Assignment(w, x + y)], b, false)) => [[:z], []],
+            (
+                b -> Let(
+                    [Assignment(:vals, LiteralExpr(:([6]))), DestructuredArgs([z], :vals; create_bindings = false)],
+                    b, false
+                )
+            ) => [[:vals], []],
+        )
+        oop, iip = build_function(
+            [z + 1, z + 2, x, y], [x, y];
+            parallel = Symbolics.ShardedForm(1, 2), postprocess_fbody = wrap
+        )
+        @test shard_call_bindings(oop, (:z, :w, :vals)) == expected
+        @test shard_call_bindings(iip, (:z, :w, :vals)) == expected
+        f, g = eval.((oop, iip))
+        @test Base.invokelatest(f, [2.0, 3.0]) == [7.0, 8.0, 2.0, 3.0]
+        out = zeros(4)
+        Base.invokelatest(g, out, [2.0, 3.0])
+        @test out == [7.0, 8.0, 2.0, 3.0]
     end
 end
