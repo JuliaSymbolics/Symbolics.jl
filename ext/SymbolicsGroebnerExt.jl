@@ -278,26 +278,42 @@ function solve_zerodim(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, wa
     return solutions
 end
 
-function transendence_basis(sys, vars)
-    J = Symbolics.jacobian(sys, vars)
-    x0 = Dict(v => rand(-10:10) for v in vars)
-    J_x0 = map(Symbolics.value, substitute(J, x0))
-    rk, rref = Nemo.rref(Nemo.matrix(Nemo.QQ, J_x0))
-    pivots = Int[]
-    for i in 1:length(sys)
-        col = findfirst(!iszero, rref[i, :])
-        !isnothing(col) && push!(pivots, col)
-    end
-    vars[setdiff(collect(1:length(vars)), pivots)]
+function _rand_nonzero_int(bound = 1 << 20)
+    r = rand(1:bound)
+    return ifelse(rand(Bool), r, -r)
 end
 
-function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity=true, warns=true)
-    sol = solve_zerodim(eqs, vars; dropmultiplicity=dropmultiplicity, warns=warns)
+function transendence_basis(sys, vars; ntrials = 3)
+    J = Symbolics.jacobian(sys, vars)
+    symbols = Symbolics.get_variables(sys)
+    best_pivots = Int[]
+    best_rank = -1
+    for _ in 1:ntrials
+        x0 = Dict(v => _rand_nonzero_int() for v in symbols)
+        J_x0 = map(Symbolics.value, substitute(J, x0))
+        rk, rref = Nemo.rref(Nemo.matrix(Nemo.QQ, J_x0))
+        pivots = Int[]
+        for i in 1:length(sys)
+            col = findfirst(!iszero, rref[i, :])
+            !isnothing(col) && push!(pivots, col)
+        end
+        if length(pivots) > best_rank
+            best_rank = length(pivots)
+            best_pivots = pivots
+        end
+    end
+    return vars[setdiff(collect(1:length(vars)), best_pivots)]
+end
+
+function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplicity = true, warns = true)
+    sol = solve_zerodim(eqs, vars; dropmultiplicity = dropmultiplicity, warns = warns)
     !isnothing(sol) && return sol
     tr_basis = transendence_basis(eqs, vars)
     isempty(tr_basis) && return nothing
     vars_gen = setdiff(vars, tr_basis)
-    sol = solve_zerodim(eqs, vars_gen; dropmultiplicity=dropmultiplicity, warns=warns)
+    # Empty vars_gen would send solve_zerodim into an infinite separating-form loop.
+    isempty(vars_gen) && return nothing
+    sol = solve_zerodim(eqs, vars_gen; dropmultiplicity = dropmultiplicity, warns = warns)
     sol === nothing && return nothing
     for roots in sol
         for x in tr_basis
@@ -305,7 +321,7 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
         end
     end
 
-    sol
+    return sol
 end
 
 end # module
