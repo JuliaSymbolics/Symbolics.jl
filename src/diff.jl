@@ -185,6 +185,13 @@ occursin_info(x::BasicSymbolic{VartypeT}, expr, fail::Bool = true) = false
     end
 end
 
+# `idx` is a literal scalar index like the `Const`-wrapped `2` in `arr[2]`,
+# as opposed to a symbolic index or a range.
+@inline _is_scalar_literal(idx::Integer) = true
+@inline _is_scalar_literal(idx::BasicSymbolic{VartypeT}) =
+    SymbolicUtils.isconst(idx) && unwrap_const(idx) isa Integer
+@inline _is_scalar_literal(idx) = false
+
 function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT}, fail::Bool = true)
     shexpr = shape(expr)
     isix = is_scalar_indexed(x)
@@ -193,7 +200,13 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
     if SymbolicUtils.is_array_shape(shexpr)
         fail && error("Differentiation with array expressions is not yet supported")
         if isix
-            return isequal(expr, arguments(x)[1]) || SymbolicUtils.query(isequal(x), expr)
+            arr = arguments(x)[1]
+            (isequal(expr, arr) || SymbolicUtils.query(isequal(x), expr)) && return true
+            # `x` occurs only via `arr` inside a composite lazy array expression;
+            # the derivative would need scalarization, which we do not do implicitly.
+            SymbolicUtils.query(isequal(arr), expr) &&
+                error("Differentiation of `$x` inside lazy array expressions is not supported; scalarize the expression with `Symbolics.scalarize` first")
+            return false
         end
         return SymbolicUtils.query(isequal(x), expr)
     end
@@ -356,6 +369,93 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
     return SymbolicUtils.add_worker(VartypeT, summed_args)
 end
 
+function symbolic_callable_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::SymbolicUtils.ROArgsT{VartypeT}; kw...)
+    partials = Union{Nothing, SymbolicT}[derivative_idx(arg, i) for i in eachindex(inner_args)]
+    for (t, a) in zip(partials, inner_args)
+        t === nothing && occursin_info(D.x, a) && return nothing
+    end
+    summed_args = SymbolicUtils.ArgsT{VartypeT}()
+    sizehint!(summed_args, length(inner_args))
+    for (t, a) in zip(partials, inner_args)
+        t === nothing && continue
+        t2 = executediff(D, a; kw...)::SymbolicT
+        _iszero(t2) && continue
+        push!(summed_args, _isone(t2) ? t : t * t2)
+    end
+    return SymbolicUtils.add_worker(VartypeT, summed_args)
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Peel a chain of field accesses and indices (`s.q.z[2]`) down to the symbolic it projects
+from. Returns `x` unchanged if it is not such a projection.
+"""
+function symstruct_projection_root(x)
+    while iscall(x)
+        f = operation(x)
+        f isa SymbolicGetproperty || f === getindex || break
+        x = arguments(x)[1]
+    end
+    return x
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Re-apply the chain of field accesses and indices that takes `root` to `x` onto `value`,
+so that `reproject_symstruct(s.q.a, s, der)` is `der.q.a`.
+"""
+function reproject_symstruct(x, root, value)
+    isequal(x, root) && return value
+    f = operation(x)
+    args = arguments(x)
+    base = reproject_symstruct(args[1], root, value)
+    f isa SymbolicGetproperty && return unwrap(f(base))
+    return base[SymbolicUtils.StableIndex(x)]
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+Whether `x` projects a field out of a symbolic struct, possibly through indices.
+"""
+function is_symstruct_projection(x)
+    while iscall(x)
+        f = operation(x)
+        f isa SymbolicGetproperty && return true
+        f === getindex || return false
+        x = arguments(x)[1]
+    end
+    return false
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Return the zero that differentiating `arg` should produce, when `arg` does not depend on the
+differentiation variable. This is `COMMON_ZERO` for the overwhelmingly common case of a
+numeric expression, and otherwise a zero carrying the symtype of `arg` - see
+[`symbolic_zero`](@ref). Throws if `arg` has a symtype with no zero, such as a symbolic
+struct with a `String` field.
+"""
+function differential_zero(arg::BasicSymbolic{VartypeT})
+    T = symtype(arg)
+    T <: Number && return COMMON_ZERO
+    return symbolic_zero(T, shape(arg))
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Whether the derivative `x` is zero, in either representation [`differential_zero`](@ref)
+produces. A derivative of non-numeric symtype is a lazy [`SymbolicZero`](@ref) rather than
+a constant, which `_iszero` does not recognise - it only sees through constants. A term
+whose derivative is zero contributes nothing, whatever its symtype, so the two are treated
+alike here.
+"""
+_iszero_derivative(x) = _iszero(x) || is_symbolic_zero(x)
+
 """
     executediff(D, arg; simplify=false, occurrences=nothing)
 
@@ -416,20 +516,46 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
         _ => nothing
     end
-    occursin_info(D.x, arg) || return COMMON_ZERO
+    occursin_info(D.x, arg) || return differential_zero(arg)
 
     # We can safely assume `arg` is scalar, else `occursin_info` would have errored.
     @match arg begin
         # Const case will never be reached because of `occursin_info`
         # if the sym were equal to `D.x` we wouldn't be here
-        BSImpl.Sym(;) => return COMMON_ZERO
+        BSImpl.Sym(;) => return differential_zero(arg)
         BSImpl.Term(; f, args) => begin
             if f isa BasicSymbolic{VartypeT}
                 # the only case where `f` is a symbolic is if this is a called symbolic
                 # function or a dependent variable. In either case, we know it contains
-                # `D.x` because of `occursin_info` and will just return `D(arg)`
+                # `D.x` because of `occursin_info`. A symbolic function of a known
+                # callable type uses the rules registered for `SymbolicCallable`, and
+                # falls back to `chain_diff` if a partial derivative it needs has none.
                 inner_args = arguments(arg)
+                if fntype_callable_type(symtype(f)) !== Nothing
+                    der = symbolic_callable_diff(D, arg, inner_args; simplify, throw_no_derivative)
+                    der === nothing || return der
+                end
                 return chain_diff(D, arg, inner_args; simplify, throw_no_derivative)
+            elseif is_symstruct_projection(arg)
+                # distribute derivatives over the arguments of the record, and re-apply the projection chain to each derivative
+                root = symstruct_projection_root(arg)
+                iscall(root) || return D(arg)
+                inner_args = arguments(root)
+                summed_args = SArgsT()
+                sizehint!(summed_args, length(inner_args))
+                for (i, a) in enumerate(inner_args)
+                    der = derivative_idx(root, i)::Union{Nothing, SymbolicT}
+                    if isequal(a, D.x)
+                        der === nothing && return D(arg)
+                        push!(summed_args, reproject_symstruct(arg, root, der))
+                        continue
+                    elseif der === nothing
+                        push!(summed_args, Differential(a)(arg) * executediff(D, a))
+                    else
+                        push!(summed_args, reproject_symstruct(arg, root, der) * executediff(D, a))
+                    end
+                end
+                return SymbolicUtils.add_worker(VartypeT, summed_args)
             elseif f === getindex
                 arr = arguments(arg)[1]
                 inner_args = arguments(arguments(arg)[1])
@@ -495,14 +621,15 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 prod_args = (exp, (base ^ Const{VartypeT}(exp - 1))::BasicSymbolic{VartypeT}, executediff(D, base; simplify, throw_no_derivative))
                 return SymbolicUtils.mul_worker(VartypeT, prod_args)
             elseif f isa SymbolicUtils.Operator # operator applications return a new variable
-                return COMMON_ZERO
+                return differential_zero(arg)
             else
                 inner_args = arguments(arg)
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
 
                 for (i, iarg) in enumerate(inner_args)
+                    occursin_info(D.x, iarg) || continue #skip if inner arg doesn't need this var
                     t2 = executediff(D, iarg; simplify, throw_no_derivative)::SymbolicT
-                    _iszero(t2) && continue
+                    _iszero_derivative(t2) && continue
                     t = derivative_idx(arg, i)::Union{Nothing, SymbolicT}
                     if t === nothing
                         throw_no_derivative && throw(DerivativeNotDefinedError(arg, i))
@@ -522,7 +649,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     summed_args = SymbolicUtils.ArgsT{VartypeT}()
                     for iarg in inner_args
                         t2 = executediff(D, iarg; simplify, throw_no_derivative)
-                        _iszero(t2) && continue
+                        _iszero_derivative(t2) && continue
                         push!(summed_args, t2)
                     end
                     return SymbolicUtils.add_worker(VartypeT, summed_args)
@@ -536,7 +663,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
 
                     for (i, iarg) in enumerate(inner_args)
                             t2 = executediff(D, iarg; simplify, throw_no_derivative)
-                            _iszero(t2) && continue
+                            _iszero_derivative(t2) && continue
                         try
                             inner_args[i] = t2
                             push!(summed_args, SymbolicUtils.mul_worker(VartypeT, inner_args))
@@ -747,8 +874,11 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
     op_varsets = map(op -> _augment_with_call_args!(SymbolicUtils.search_variables(op)), ops)
     result = fill(COMMON_ZERO, length(ops), length(vars))
     for i in eachindex(ops), j in eachindex(vars)
-        (vars[j] in op_varsets[i]) || continue
-        result[i, j] = executediff(Differential(vars[j]), ops[i]; simplify, kwargs...)
+        v = vars[j]
+        # `arr[k]` also occurs when the lazy array `arr` is in the variable set.
+        (v in op_varsets[i] ||
+            (is_scalar_indexed(v) && (arguments(v)[1] in op_varsets[i]))) || continue
+        result[i, j] = executediff(Differential(v), ops[i]; simplify, kwargs...)
     end
     return result
 end
@@ -872,6 +1002,8 @@ julia> Symbolics.jacobian_sparsity(exprs, vars)
 ```
 """
 function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
+    exprs = collect(exprs)
+    vars = collect(vars)
     if any(iswrapped, exprs)
         du = map(value, exprs)
     else
@@ -884,6 +1016,14 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     end
     dict = Dict(zip(u, 1:length(u)))
 
+    # `arrdict[arr]` maps a lazy array to the columns of its element vars
+    # `arr[k]`, since occurrences of `arr`/`arr[i]` mark all of them.
+    arrdict = Dict{SymbolicT, Vector{Int}}()
+    for (j, v) in enumerate(u)
+        v isa SymbolicT && is_scalar_indexed(v) || continue
+        push!(get!(Vector{Int}, arrdict, arguments(v)[1]), j)
+    end
+
     i = Ref(1)
     I = Int[]
     J = Int[]
@@ -894,14 +1034,39 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     # This rewriter notes down which u's appear in a
     # given du (whose index is stored in the `i` Ref)
 
-    function r(x)
+    function r(x, is_indexee::Bool = false)
         if iscall(x)
-            for y in arguments(x)
-                r(y)
+            args = arguments(x)
+            # A literal `arr[k]` is an element access, not a whole-array
+            # occurrence; `arr` itself is an indexee and only contributes the
+            # variables inside it, not a dependency on every element.
+            literal_idx = operation(x) === getindex && length(args) > 1 &&
+                all(_is_scalar_literal, Iterators.drop(args, 1))
+            for (k, y) in enumerate(args)
+                r(y, literal_idx && k == 1)
             end
         end
         j = get(dict, x, -1)
         if j != -1
+            push!(I, i[])
+            push!(J, j)
+        end
+        x isa SymbolicT || return
+        if is_scalar_indexed(x)
+            arr = arguments(x)[1]
+            j = get(dict, arr, -1)
+            if j != -1
+                push!(I, i[])
+                push!(J, j)
+            end
+            # a literal `arr[k]` marks only itself (via `dict`); a non-literal
+            # index refers to elements of `arr` generically
+            all(_is_scalar_literal, Iterators.drop(arguments(x), 1)) && return
+            x = arr
+            is_indexee = false
+        end
+        is_indexee && return
+        for j in get(arrdict, x, ())
             push!(I, i[])
             push!(J, j)
         end
@@ -1075,6 +1240,12 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
     @assert !(expr isa AbstractArray)
     expr = value(expr)
     u = map(value, vars)
+    # element vars inside lazy array expressions are invisible to the linearity
+    # analysis; `occursin_info` throws for those rather than returning a
+    # silently wrong pattern
+    for ui in u
+        ui isa SymbolicT && is_scalar_indexed(ui) && occursin_info(ui, expr)
+    end
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
     f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
     lp = unwrap_const(linearity_propagator(f))
