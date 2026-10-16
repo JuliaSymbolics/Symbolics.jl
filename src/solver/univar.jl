@@ -92,7 +92,13 @@ function get_roots_deg4(expression, x)
         end
     end
     if SymbolicUtils._iszero(m)
-        @info "Assuming $(roots_m[1] != 0)"
+        assumption = (roots_m[1] != 0)
+        assumptions = get(task_local_storage(), :symbolic_solve_assumptions, nothing)
+        if assumptions !== nothing
+            push!(assumptions, assumption)
+        else
+            @info "Assuming $assumption"
+        end
         m = roots_m[1]
     end
 
