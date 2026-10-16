@@ -473,15 +473,25 @@ end
     end
     for (n, expected) in (
             (Float16(1024), 1024), (Float32(2^24), 2^24),
-            (Float64(2^53), 2^53), (Float64(2^53 + 1), 2^53),
-            (big(2)^53 + 1, 2^53 + 1), (big"1024.0", 1024),
-            (big(typemax(Int)), typemax(Int)),
+            (big"1024.0", 1024), (big(typemax(Int)), typemax(Int)),
         )
         @test isequal(D^n, Differential(x, expected))
     end
-    @test isequal(D^(1 / 3), Differential(x, 6004799503160661 // 18014398509481984))
+    # Orders are stored as `Int`/`Rational{Int}`, so these exact binary64 orders only fit on 64-bit.
+    if Int === Int64
+        for (n, expected) in (
+                (2.0^53, 2^53), (Float64(2^53 + 1), 2^53), (big(2)^53 + 1, 2^53 + 1),
+                (1 / 3, 6004799503160661 // 18014398509481984),
+                (0.1, 3602879701896397 // 36028797018963968),
+            )
+            @test isequal(D^n, Differential(x, expected))
+        end
+    else
+        for n in (2.0^53, big(2)^53 + 1, 1 / 3, 0.1)
+            @test_throws ArgumentError D^n
+        end
+    end
     @test isequal(D^(1 // 3), Differential(x, 1 // 3))
-    @test isequal(D^0.1, Differential(x, 3602879701896397 // 36028797018963968))
     Dhalf = D^(1 // 2)
     @test isequal(Dhalf(Dhalf(x^2)), Differential(x, 1 // 1)(x^2))
     @test_throws ArgumentError expand_derivatives(Dhalf(x))
