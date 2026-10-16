@@ -223,6 +223,17 @@ function is_exact_polynomial(expr)
     return false
 end
 
+# Unlike `bigify`, leaves array-element terms such as `z[1]` intact: rebuilding
+# `getindex` with a `BigInt` index is rejected by SymbolicUtils.
+function bigify_polynomial(expr)
+    expr = unwrap(expr)
+    (SymbolicUtils.isconst(expr) || expr isa Number) && return bigify(expr)
+    (!iscall(expr) || is_singleton(expr)) && return expr
+    args = arguments(expr)
+    operation(expr) === (^) && return bigify_polynomial(args[1])^value(args[2])
+    return operation(expr)(map(bigify_polynomial, args)...)
+end
+
 function affine_polynomial(expr, parameters, unit)
     expr = value(expr)
     if expr isa Union{Integer, Rational}
@@ -273,13 +284,17 @@ function reduced_affine_fraction(numerator, denominator, parameters, polyvars)
     num = exact_affine_quotient(MP.map_coefficients(c -> Rational{BigInt}(c), intnum), divisor)
     den = exact_affine_quotient(MP.map_coefficients(c -> Rational{BigInt}(c), intden), divisor)
     (isnothing(num) || isnothing(den)) && return nothing
+    if MP.leading_coefficient(den) < 0
+        num, den = -num, -den
+    end
     return affine_polynomial_expression(num, parameters, polyvars) / affine_polynomial_expression(den, parameters, polyvars)
 end
 
 function exact_affine_solve(eqs, vars)
     length(eqs) == length(vars) || return nothing
     isempty(vars) && return nothing
-    A, bvec, islinear = linear_expansion(wrap.(bigify.(eqs)), vars)
+    all(is_exact_polynomial, eqs) || return nothing
+    A, bvec, islinear = linear_expansion(Num.(bigify_polynomial.(eqs)), vars)
     islinear || return nothing
     parameters = unique!(collect(Iterators.flatten(get_variables.(vcat(vec(A), bvec)))))
     x_set = Set(unwrap.(vars))

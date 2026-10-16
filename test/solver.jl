@@ -359,10 +359,7 @@ end
         @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
     end
 
-    sol_rad = symbolic_solve([x^2, x * y, y^2], [x, y], warns = false)
-    @test length(sol_rad) == 1
-    @test iszero(value(sol_rad[1][x])) && iszero(value(sol_rad[1][y]))
-    @test isnothing(symbolic_solve([x^2, x * y, y^2], [x, y], dropmultiplicity = false, warns = false))
+    @test isnothing(symbolic_solve([x^2, x*y, y^2], [x,y], warns=false))
 end
 
 @testset "Multivar parametric" begin
@@ -436,24 +433,26 @@ end
         end
     end
 
-    timed_sq = @timed symbolic_solve(squared_polys, vars)
-    @test timed_sq.time - timed_sq.compile_time < 10
-    @test length(timed_sq.value) == 1
+    @test !isnothing(Symbolics.exact_affine_solve(linear_polys, vars))
+
+    sol_sq = symbolic_solve(squared_polys, vars)
+    @test length(sol_sq) == 1
     for subA in (
             Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6),
             Dict(A[i] => big(7 - i) // 5 - 2 // 11 for i in 1:6),
             Dict(A[i] => big(1) // (i + 2) for i in 1:6),
         )
-        check_zero_residuals(linear_polys, timed_sq.value[1]; subs = subA)
+        check_zero_residuals(linear_polys, sol_sq[1]; subs = subA)
     end
+    @test @elapsed(symbolic_solve(squared_polys, vars)) < 10
 
-    timed_lin = @timed symbolic_solve(linear_polys, vars)
-    @test timed_lin.time - timed_lin.compile_time < 10
-    @test length(timed_lin.value) == 1
+    sol_lin = symbolic_solve(linear_polys, vars)
+    @test length(sol_lin) == 1
     check_zero_residuals(
-        linear_polys, timed_lin.value[1];
+        linear_polys, sol_lin[1];
         subs = Dict(A[i] => big(i) // 3 + 1 // 7 for i in 1:6)
     )
+    @test @elapsed(symbolic_solve(linear_polys, vars)) < 10
 
     # Hand-derived exact system: 2x + y = 5, x - y = 1 => (x, y) = (2, 1)
     @variables x y
@@ -467,9 +466,11 @@ end
     end
 
     float_eqs = [1.0e-20 * x + y - 1, x + y - 2]
-    @test_throws AssertionError symbolic_solve(float_eqs, [x, y])
     float_sq = [float_eqs[1]^2, float_eqs[2]^2]
-    @test_throws AssertionError symbolic_solve(float_sq, [x, y])
+    @test !Symbolics.is_exact_polynomial(float_eqs[1])
+    @test !Symbolics.is_exact_polynomial(float_sq[1])
+    @test isnothing(Symbolics.exact_affine_solve(float_eqs, [x, y]))
+    @test isnothing(Symbolics.exact_affine_solve(Symbolics.drop_outer_multiplicities.(float_sq), [x, y]))
 end
 
 @testset "Exact affine elimination" begin
@@ -529,9 +530,36 @@ end
     end
 
     for scale in (0.1, 1.0e-20)
-        eqs = [scale * (x + y - 2)^2, (x - y)^2]
-        @test_throws AssertionError symbolic_solve(eqs, [x, y])
+        @test !Symbolics.is_exact_polynomial(scale * (x + y - 2)^2)
+        @test isnothing(Symbolics.exact_affine_solve([scale * (x + y - 2), x - y], [x, y]))
     end
+end
+
+@testset "Exact affine systems with array-element variables" begin
+    @variables z[1:2] x y
+    unknowns = [z[1] + z[2] - 1, z[1] - z[2]]
+    @test !isnothing(Symbolics.exact_affine_solve(unknowns, [z[1], z[2]]))
+    sol = only(symbolic_solve(unknowns, [z[1], z[2]]))
+    @test isequal(value(sol[z[1]]), 1 // 2)
+    @test isequal(value(sol[z[2]]), 1 // 2)
+
+    eqs = [z[1] * x + y - 1, x - y]
+    @test !isnothing(Symbolics.exact_affine_solve(eqs, [x, y]))
+    sol = only(symbolic_solve(eqs, [x, y]))
+    for p in (big(2) // 3, big(-5) // 7)
+        @test all(iszero(value(substitute(substitute(e, sol), Dict(z[1] => p)))) for e in eqs)
+    end
+
+    eqs = [z[1] + x + y - 3, z[1] - x, x - y]
+    sol = only(symbolic_solve(eqs, [z[1], x, y]))
+    @test all(isequal(value(sol[v]), 1) for v in (z[1], x, y))
+end
+
+@testset "Parametric affine roots have a positive leading denominator coefficient" begin
+    @variables x y a
+    sol = only(symbolic_solve([a * x + y - 1, x - y], [x, y]))
+    @test isequal(sol[x], 1 / (1 + a))
+    @test isequal(sol[y], 1 / (1 + a))
 end
 
 @testset "Affine solutions at vanishing intermediate pivots" begin

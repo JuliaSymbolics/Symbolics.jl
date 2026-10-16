@@ -276,10 +276,8 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 
         sols = nothing
         if all(is_exact_polynomial, expr)
-            if dropmultiplicity
-                expr = map(drop_outer_multiplicities, expr)
-            end
-            lin_sol = exact_affine_solve(expr, x)
+            affine_expr = dropmultiplicity ? map(drop_outer_multiplicities, expr) : expr
+            lin_sol = exact_affine_solve(affine_expr, x)
             if !isnothing(lin_sol)
                 sols = [Dict{Num, Any}(var => lin_sol[i] for (i, var) in enumerate(x))]
             end
