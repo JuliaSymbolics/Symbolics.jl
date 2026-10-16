@@ -139,8 +139,33 @@ julia> taylor_coeff(series(y, x, 0:5), x, 0:2:4)
 """
 function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
     if n isa AbstractArray
-        # return array of expressions/equations for each order
-        return taylor_coeff.(Ref(f), Ref(x), n; rationalize, kwargs...)
+        if f isa Equation
+            # apply incremental computation to each side of the equation
+            lhs_coeffs = taylor_coeff(f.lhs, x, n; rationalize, kwargs...)
+            rhs_coeffs = taylor_coeff(f.rhs, x, n; rationalize, kwargs...)
+            return Equation[l ~ r for (l, r) in zip(lhs_coeffs, rhs_coeffs)]
+        end
+
+        isempty(n) && return similar(n, SymbolicT)
+
+        # Differentiate once per order up to max(n), instead of
+        # recomputing (D^k)(f) from scratch for each k.
+        D = Differential(x)
+        max_order = maximum(n)
+        needed = Set{Int}(n)
+        coeffs_by_order = Dict{Int, Any}()
+
+        # expr holds the k-th derivative of f, updated incrementally below
+        expr = expand_derivatives(f)
+        for k in 0:max_order
+            if k in needed
+                c = value(substitute_in_deriv(expr, x => 0; fold = Val(true), kwargs...))
+                coeffs_by_order[k] = _finalize_taylor_coeff(c, f, x, k; rationalize, kwargs...)
+            end
+            k < max_order && (expr = expand_derivatives(D(expr)))
+        end
+
+        return map(k -> coeffs_by_order[k], n)
     elseif f isa Equation
         if ismissing(n)
             # assume user wants maximum order in the equation
@@ -158,10 +183,14 @@ function taylor_coeff(f, x, n = missing; rationalize=true, kwargs...)
 
     # TODO: error if x is not a "pure variable"
     D = Differential(x)
-    n! = factorial(n)
-    c = (D^n)(f) # TODO: optimize the implementation for multiple n with a loop that avoids re-differentiating the same expressions
+    c = (D^n)(f)
     c = expand_derivatives(c)
     c = value(substitute_in_deriv(c, x => 0; fold = Val(true), kwargs...))
+    return _finalize_taylor_coeff(c, f, x, n; rationalize, kwargs...)
+end
+
+function _finalize_taylor_coeff(c, f, x, n; rationalize, kwargs...)
+    n! = factorial(n)
     if _contains_nonfinite_constant(c)
         c = n! * _series_coeff(f, x, n; rationalize, kwargs...)
     end
@@ -215,7 +244,14 @@ function taylor(f, x, ns; rationalize=true, kwargs...)
         return taylor(f.lhs, x, ns; rationalize, kwargs...) ~ taylor(f.rhs, x, ns; rationalize, kwargs...)
     end
 
-    return sum(taylor_coeff(f, x, n; rationalize, kwargs...) * x^n for n in ns)
+    if ns isa Number
+        return taylor_coeff(f, x, ns; rationalize, kwargs...) * x^ns
+    else
+        # any iterable of orders (tuple, generator, ...) takes the incremental array path
+        orders = ns isa AbstractArray ? ns : collect(ns)
+        coeffs = taylor_coeff(f, x, orders; rationalize, kwargs...)
+        return sum(c * x^n for (c, n) in zip(coeffs, orders))
+    end
 end
 function taylor(f, x, x0, n; rationalize=true, kwargs...)
     # 1) substitute dummy x′ = x - x0
