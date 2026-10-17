@@ -466,6 +466,21 @@ end
         f_iip(out, vals)
         @test out == numeric
     end
+    @testset "complex adjoint" begin
+        @variables z1::Complex z2::Complex
+        vals = [1.0 + 2.0im, 3.0 - 1.0im]
+        M = sparse([vals[1] vals[2]; 0 vals[1]])
+        expected = copy(adjoint(M))
+        f_oop, f_iip = build_function(adjoint(sparse([z1 z2; 0 z1])), [z1, z2]; expression = Val{false})
+        result = f_oop(vals)
+        @test result == expected
+        storage = similar(M, ComplexF64)
+        fill!(nonzeros(storage), Complex(NaN, NaN))
+        for out in (similar(result, ComplexF64), adjoint(storage))
+            f_iip(out, vals)
+            @test out == expected
+        end
+    end
 end
 
 @testset "MultithreadedForm expressions can be written to a file and included" begin
