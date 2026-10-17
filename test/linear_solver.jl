@@ -86,6 +86,155 @@ eqs = [
     @test !Symbolics.linear_expansion(x + z([x, y]), y)[3]
 end
 
+@testset "linear_expansion of matrix-vector products (issue #1231)" begin
+    @variables x[1:3] b[1:3] A[1:3, 1:3] s
+
+    Amat, bvec, islin = Symbolics.linear_expansion(A * x + b, x)
+    @test islin
+    @test isequal(Amat, Symbolics.scalarize(A))
+    @test isequal(bvec, Symbolics.scalarize(b))
+
+    Amat, bvec, islin = Symbolics.linear_expansion(A * x + b ~ zeros(Num, 3), x)
+    @test islin
+    @test isequal(Amat, .-Symbolics.scalarize(A))
+    @test isequal(bvec, .-Symbolics.scalarize(b))
+
+    Amat, bvec, islin = Symbolics.linear_expansion(unwrap(A * x + b), unwrap(x))
+    @test islin
+    @test isequal(Amat, Symbolics.scalarize(A))
+    @test isequal(bvec, Symbolics.scalarize(b))
+
+    Amat, bvec, islin = Symbolics.linear_expansion(s .* x .+ b, x)
+    @test islin
+    @test isequal(Amat, Diagonal(fill(unwrap(s), 3)))
+    @test isequal(bvec, Symbolics.scalarize(b))
+
+    # Opaque dependence on the whole array still counts as nonlinear.
+    @variables z(..)
+    @test !Symbolics.linear_expansion(Symbolics.scalarize(z(x) .+ x), Symbolics.scalarize(x))[3]
+end
+
+@testset "linear_expansion array overload preserves LinearExpander semantics" begin
+    @variables x y c q[1:3]
+
+    A, b, islin = Symbolics.linear_expansion([x + y], [x + y])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([1], 1, 1)))
+    @test isequal(Num.(b), Num.([0]))
+    @test isequal(Num.(Symbolics.symbolic_linear_solve([0 ~ x + y], [x + y])), Num.([0]))
+
+    A, b, islin = Symbolics.linear_expansion([y * (x + 1)], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([y], 1, 1)))
+    @test isequal(Num.(b), Num.([y]))
+    @test isequal(Num.(Symbolics.symbolic_linear_solve([y * (x + 1) ~ 0], [x])), Num.([-1]))
+
+    A, b, islin = Symbolics.linear_expansion([y * ifelse(c > 0, 2x + 1, 3x + 2)], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([y * ifelse(c > 0, 2, 3)], 1, 1)))
+    @test isequal(Num.(b), Num.([y * ifelse(c > 0, 1, 2)]))
+
+    A, b, islin = Symbolics.linear_expansion([q[1] * q[2]], [q[1]])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([q[2]], 1, 1)))
+    @test isequal(Num.(b), Num.([0]))
+    @test isequal(Num.(Symbolics.symbolic_linear_solve([q[1] * q[2] ~ 1], [q[1]])), Num.([1 / q[2]]))
+
+    A, b, islin = Symbolics.linear_expansion([y * (3 * (x + y) - 3x)], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([0], 1, 1)))
+    @test isequal(Num.(b), Num.([3y^2]))
+
+    A, b, islin = Symbolics.linear_expansion([y * (3 * (x + y) - 3x) * (x + 3)], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([3y^2], 1, 1)))
+    @test isequal(Num.(b), Num.([9y^2]))
+
+    A, b, islin = Symbolics.linear_expansion([(2x + 1) / y], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([2 / y], 1, 1)))
+    @test isequal(Num.(b), Num.([1 / y]))
+
+    A, b, islin = Symbolics.linear_expansion([sin(y) + 2x], [x])
+    @test islin
+    @test isequal(Num.(A), Num.(reshape([2], 1, 1)))
+    @test isequal(Num.(b), Num.([sin(y)]))
+
+    A, b, islin = Symbolics.linear_expansion([2x + 3y + 4], [x, y])
+    @test islin
+    @test isequal(Num.(A), Num.([2 3]))
+    @test isequal(Num.(b), Num.([4]))
+
+    A, b, islin = Symbolics.linear_expansion([x * y], [x, y])
+    @test islin
+    @test isequal(Num.(A), Num.([y 0]))
+    @test isequal(Num.(b), Num.([0]))
+end
+
+@testset "linear_expansion conservative fast path" begin
+    @variables x y q[1:2]
+    for z0 in (3 * (x + y) - 3x - 3y, 2 * (x + 1) - 2x - 2)
+        A, b, islin = Symbolics.linear_expansion([x + x * y * z0, y], [x, y])
+        @test islin
+        @test isequal(expand.(Num.(A)), Num.([1 0; 0 1]))
+        @test isequal(expand.(Num.(b)), Num.([0, 0]))
+        sol = Symbolics.symbolic_linear_solve([x + x * y * z0 ~ 1, y ~ 2], [x, y])
+        @test isequal(simplify.(sol; expand = true), Num.([1, 2]))
+    end
+    for (t, xs, expected_A, expected_b) in (
+            (x, [x, x], [1 0], [0]),
+            (x + y, [x, x + y], [1 0], [y]),
+            (y * (x + y), [x, x + y], [y 0], [y^2]),
+            (x * y, [x, y], [y 0], [0]),
+            (x * y, [y, x], [x 0], [0]),
+            (q[1] * q[2], [q[1], q[2]], [q[2] 0], [0]),
+        )
+        A, b, islin = Symbolics.linear_expansion([t], xs)
+        @test islin
+        @test isequal(Num.(A), Num.(expected_A))
+        @test isequal(Num.(b), Num.(expected_b))
+    end
+    for t in (x^2, sin(x), y^x)
+        @test !Symbolics.linear_expansion([t], [x, y])[3]
+    end
+end
+
+@testset "linear_expansion scalar and array unknown compatibility" begin
+    @variables x q[1:3] b[1:3]
+    zero_result = (unwrap(Num(0)), unwrap(Num(0)), false)
+    for t in (
+            unwrap(q[1] + 2), unwrap(q[1] * q[2]), unwrap(sum(q)),
+            unwrap(dot(b, q)) + 1, Num(x) + q[1],
+        )
+        result = Symbolics.linear_expansion(t, unwrap(q))
+        @test isequal(result, zero_result)
+        @test typeof(result) === typeof(zero_result)
+    end
+    for (t, expected) in (
+            (unwrap(q + b), (unwrap(Num(1)), unwrap(b), true)),
+            (unwrap(b), (unwrap(Num(0)), unwrap(b), true)),
+            (unwrap(q), (unwrap(Num(1)), unwrap(Num(0)), true)),
+        )
+        result = Symbolics.linear_expansion(t, unwrap(q))
+        @test isequal(result, expected)
+        @test typeof(result) === typeof(expected)
+    end
+end
+
+@testset "linear_expansion zero remainder types" begin
+    @variables x y p
+    for (t, expected) in (
+            (0.5x, 0.0), ((1 // 2) * x, 0 // 1),
+            (x + 0.5y, 0.0), (x + (1 // 2) * y, 0 // 1),
+            (0.5x + y, 0), (x + p * y + 0.5y, 0),
+        )
+        _, b, islin = Symbolics.linear_expansion([t], [x, y])
+        @test islin
+        @test isequal(b, [unwrap(Num(expected))])
+        @test typeof(unwrap_const(b[1])) === typeof(expected)
+    end
+end
+
 @testset "linear_expansion of ifelse" begin
     @variables p
     a, b, islin = Symbolics.linear_expansion(ifelse(p < 1, 2p + 1, 3p + 2), p)
