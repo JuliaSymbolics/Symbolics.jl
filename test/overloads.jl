@@ -366,6 +366,7 @@ for f in [<, <=, >, >=, isless]
 end
 
 @test_nowarn binomial(t, 1)
+@test binomial(t, 3) isa Num
 
 # test for https://github.com/JuliaSymbolics/Symbolics.jl/issues/1028
 let
