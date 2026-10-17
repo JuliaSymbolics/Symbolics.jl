@@ -5,7 +5,7 @@ using Test
 using SymbolicUtils.Code: toexpr, LiteralExpr
 import ..limit2
 
-_repr(x) = repr(toexpr(LiteralExpr(x)) |> Base.remove_linenums!)
+_repr(x) = replace(repr(toexpr(LiteralExpr(x)) |> Base.remove_linenums!), "Main." => "")
 function test_funcs(name, f, args...; broken=false)
     outplace, inplace = build_function(f, args...; checkbounds = true)
     if broken

@@ -167,12 +167,13 @@ function taylor(f, x, ns; rationalize=true, kwargs...)
         return taylor(f.lhs, x, ns; rationalize, kwargs...) ~ taylor(f.rhs, x, ns; rationalize, kwargs...)
     end
 
-    if ns isa AbstractArray
-        # Use the incremental path: compute all coefficients at once, then sum
-        coeffs = taylor_coeff(f, x, ns; rationalize, kwargs...)
-        return sum(c * x^n for (c, n) in zip(coeffs, ns))
-    else
+    if ns isa Number
         return taylor_coeff(f, x, ns; rationalize, kwargs...) * x^ns
+    else
+        # any iterable of orders (tuple, generator, ...) takes the incremental array path
+        orders = ns isa AbstractArray ? ns : collect(ns)
+        coeffs = taylor_coeff(f, x, orders; rationalize, kwargs...)
+        return sum(c * x^n for (c, n) in zip(coeffs, orders))
     end
 end
 function taylor(f, x, x0, n; rationalize=true, kwargs...)
