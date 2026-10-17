@@ -238,6 +238,11 @@ function LinearAlgebra.norm(v::AbstractVector{<:Num}, p::Real = 2)
     return wrap(Symbolics.term(norm, map(unwrap, v), p; type = Real))
 end
 
+function LinearAlgebra.norm(v::SArray{S, <:Num, 1}) where {S}
+    isempty(v) && return 0.0
+    return LinearAlgebra.norm(collect(v)::Vector{Num})
+end
+
 function SymbolicUtils.scalarize(x::Arr{T, N}, ::Val{toplevel}) where {toplevel, T, N}
     scal = SymbolicUtils.scalarize(unwrap(x), Val{toplevel}())::(AbstractArray{_T, N} where {_T})
     if is_wrapper_type(T)
