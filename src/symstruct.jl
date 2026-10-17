@@ -38,6 +38,15 @@ wraps_type(::Type{S}) where {T, S <: SymStruct{T}} = T
 iswrapped(::SymStruct{T}) where {T} = true
 
 """
+    $TYPEDSIGNATURES
+
+Return `true` if type `T` is registered as a symbolic struct via [`@symstruct`](@ref).
+"""
+function is_symstruct_type(::Type{T}) where {T}
+    return has_symwrapper(T)::Bool && wrapper_type(T)::DataType === SymStruct{T}
+end
+
+"""
     issymstruct(x) -> Bool
 
 Return `true` if `x` is a `SymStruct` or a symbolic expression whose `symtype` has been
@@ -46,8 +55,7 @@ registered via [`@symstruct`](@ref). Return `false` otherwise.
 issymstruct(x) = false
 issymstruct(x::SymStruct) = true
 function issymstruct(x::SymbolicT)
-    T = symtype(x)
-    return has_symwrapper(T)::Bool && wrapper_type(T)::DataType === SymStruct{T}
+    return is_symstruct_type(symtype(x))
 end
 
 SymbolicUtils.unwrap(x::SymStruct) = getfield(x, 1)
@@ -117,6 +125,11 @@ it will be treated as a scalar.
 macro symstruct(T, opts = Expr(:block))
     block = Expr(:block)
     where_args = Expr[]
+    raw_T = T
+    raw_where = Any[]
+    if Meta.isexpr(T, :curly)
+        append!(raw_where, @view(T.args[2:end]))
+    end
     nocurly_name = T
     if Meta.isexpr(T, :curly)
         for x in @view(T.args[2:end])
@@ -135,6 +148,8 @@ macro symstruct(T, opts = Expr(:block))
             isconcretetype($temp_typevar) ? $SymStruct{$temp_typevar} : $SymStruct{<:$temp_typevar}
         end
     end)
+
+    literal_constructors = true
 
     @assert Meta.isexpr(opts, :block) """
     Options to `@symstruct` must be specified as a `begin...end` block. Got $opts.
@@ -163,12 +178,92 @@ macro symstruct(T, opts = Expr(:block))
             """
             field = args[1]
             push!(block.args, __field_shape_expr(T, field, where_args, val))
+        elseif opt === :literal_constructors
+            @assert isempty(args) """
+            The `literal_constructors` option must be of the form \
+            `literal_constructors() = value`. Arguments $args were found.
+            """
+            # The right-hand side of an option parses as a short-form function body, so
+            # it arrives wrapped in a block carrying line information.
+            optval = __unwrap_option_value(val)
+            @assert optval isa Bool """
+            The `literal_constructors` option must be given a literal `Bool`. Found \
+            `$optval`.
+            """
+            literal_constructors = optval
         else
             error("Unsupported option $opt.")
         end
     end
 
+    if literal_constructors
+        push!(block.args, __record_ctors_expr(raw_T, raw_where))
+    end
+
     return block
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Build the expression which registers constructor methods producing a [`record_literal`](@ref)
+when any argument is symbolic.
+
+One method is defined per non-empty subset of argument positions that are symbolic. A
+single varargs method would not do: the struct's own `T(::Any, ..., ::Any)` constructor is
+more specific than any `Vararg` signature, so it would always win. Each generated method
+repeats the struct's own type parameters - `(::Type{Record{V}})(...) where {V}`, not
+`(::Type{S})(...) where {S <: Record}`, which would be ambiguous with it - and is strictly
+more specific in its symbolic positions. The methods for larger subsets resolve the
+ambiguities between the smaller ones. Fully concrete construction therefore still reaches
+the struct's own constructor, and any validation it performs is preserved.
+
+The method count is `2^nfields - 1`, so this is skipped for structs with more than
+`RECORD_LITERAL_MAX_FIELDS` fields; those use [`record_literal`](@ref) explicitly.
+"""
+function __record_ctors_expr(raw_T, raw_where)
+    type_expr = QuoteNode(raw_T)
+    # The field count is looked up on the base type: `raw_T` may mention type parameters
+    # which are not bound in the calling module.
+    raw_base = Meta.isexpr(raw_T, :curly) ? raw_T.args[1] : raw_T
+    where_expr = Expr(:vect)
+    append!(where_expr.args, map(QuoteNode, raw_where))
+    quote
+        let T = $(esc(raw_base)), type_expr = $type_expr, where_args = $where_expr
+            nf = try
+                fieldcount(T)
+            catch
+                0
+            end
+            if 0 < nf <= $RECORD_LITERAL_MAX_FIELDS
+                argnames = [Symbol(:a, i) for i in 1:nf]
+                argtuple = Expr(:tuple)
+                append!(argtuple.args, argnames)
+                for mask in 1:((1 << nf) - 1)
+                    call = Expr(:call, Expr(:(::), :RT, Expr(:curly, :Type, type_expr)))
+                    for i in 1:nf
+                        argtype = (mask >> (i - 1)) & 1 == 1 ? $RecordLiteralArg : Any
+                        push!(call.args, Expr(:(::), argnames[i], argtype))
+                    end
+                    sig = isempty(where_args) ? call : Expr(:where, call, where_args...)
+                    body = Expr(:call, $record_literal, :RT, argtuple)
+                    Base.eval(@__MODULE__, Expr(:function, sig, body))
+                end
+            end
+        end
+    end
+end
+
+"""
+    $TYPEDSIGNATURES
+
+The value of a `@symstruct` option, unwrapping the block its right-hand side parses into.
+"""
+function __unwrap_option_value(val)
+    Meta.isexpr(val, :block) || return val
+    body = filter(x -> !(x isa LineNumberNode), val.args)
+    length(body) == 1 || return val
+    return only(body)
 end
 
 function __field_shape_expr(T::Union{Symbol, Expr}, field::QuoteNode,
@@ -232,6 +327,33 @@ Return the name of the struct field accessed by `f`.
 """
 field_name(::SymbolicGetproperty{T, field}) where {T, field} = field
 
+"""
+    $(TYPEDSIGNATURES)
+
+A field access is a variable in its own right, exactly as an array element is: it names a
+leaf of the record. Without this, variable search stops at the record, so an expression in
+`rec.x` reports `rec` -- which is not what the leaves of a scalarized system are keyed on.
+"""
+function SymbolicUtils.operation_is_atomic(::SymbolicGetproperty, args)
+    return SymbolicUtils.default_is_atomic(args[1])
+end
+
+"""
+    $(TYPEDSIGNATURES)
+
+A field access is named through the record it projects out of, exactly as an array element
+is named through its array. Without this, anything that gates on `hasname` (code
+generation, in particular) sees a struct projection as anonymous.
+"""
+SymbolicUtils.operation_hasname(::SymbolicGetproperty, args) = hasname(args[1])
+
+"""
+    $(TYPEDSIGNATURES)
+
+See [`SymbolicUtils.operation_hasname`](@ref).
+"""
+SymbolicUtils.operation_getname(::SymbolicGetproperty, args) = getname(args[1])
+
 function (f::SymbolicGetproperty{T})(x::SymbolicT) where {T}
     unwrap(f(SymStruct{T}(x)))
 end
@@ -263,8 +385,18 @@ function _literal_getproperty(sym::SymStruct{T}, ::Val{name}) where {T, name}
     fShape = field_shape(T, Val{name}())
     fname = BSImpl.Const{VartypeT}(name)
     _struct = unwrap(sym)
-    args = ArgsT{VartypeT}((_struct,))
-    val = BSImpl.Term{VartypeT}(SymbolicGetproperty{T, name}(), args; type = fT, shape = fShape)
+    if is_symbolic_zero(_struct)
+        # Every field of a zero struct is itself zero.
+        val = symbolic_zero(fT, fShape)
+    elseif is_record_literal(_struct)
+        # Field access folds through a struct literal to the corresponding field
+        # expression, exactly as indexing folds through an `array_literal`.
+        val = arguments(_struct)[Base.fieldindex(T, name)::Int]
+    else
+        args = ArgsT{VartypeT}((_struct,))
+        val = BSImpl.Term{VartypeT}(
+            SymbolicGetproperty{T, name}(), args; type = fT, shape = fShape)
+    end
     if has_symwrapper(fT)
         return wrapper_type(fT)(val)
     else
@@ -326,13 +458,13 @@ Return `true` if field `field` of struct type `T` can participate in linear inde
 """
 function symstruct_field_supports_linear_indexing(::Type{T}, ::Val{field}) where {T, field}
     fT = fieldtype(T, field)
-    if has_symwrapper(fT) && wrapper_type(fT) === SymStruct{fT}
+    if is_symstruct_type(fT)
         return symstruct_supports_linear_indexing(fT)
     end
     if fT <: Union{AbstractArray, Tuple}
         efT = eltype(fT)
         return field_shape(T, Val{field}()) isa SU.ShapeVecT && (
-            !has_symwrapper(efT) || wrapper_type(efT) !== SymStruct{efT} ||
+            !is_symstruct_type(efT) ||
                 symstruct_supports_linear_indexing(efT)
         )
     end
@@ -366,7 +498,7 @@ their own [`symstruct_length`](@ref).
 """
 function symstruct_field_length(::Type{T}, ::Val{field}) where {T, field}
     fT = fieldtype(T, field)
-    if has_symwrapper(fT) && wrapper_type(fT) === SymStruct{fT}
+    if is_symstruct_type(fT)
         return symstruct_length(fT)
     end
     # The entire function is well-inferred, and this edge case
@@ -377,7 +509,7 @@ function symstruct_field_length(::Type{T}, ::Val{field}) where {T, field}
     end
     efT = eltype(fT)
     baselen = prod(length, field_shape(T, Val{field}())::SU.ShapeVecT; init = 1)
-    if has_symwrapper(efT) && wrapper_type(efT) === SymStruct{efT}
+    if is_symstruct_type(efT)
         return baselen * symstruct_length(efT)
     end
     return baselen
@@ -424,7 +556,7 @@ Return the range of linear indices within a `SymStruct{T}` that correspond to fi
 function symstruct_field_range(::Type{T}, ::Val{field}) where {T, field}
     return 1:symstruct_field_length(T, Val{field}())
     fT = fieldtype(T, field)
-    if has_symwrapper(fT) && wrapper_type(fT) === SymStruct{fT}
+    if is_symstruct_type(fT)
         return 1:symstruct_length(fT)
     end
     # Same fast-path as in `symstruct_field_length`
@@ -444,7 +576,7 @@ Return the `i`-th scalar symbolic element within field `field` of `s`. For neste
 """
 function symstruct_field_getindex(s::SymStruct{T}, ::Val{field}, i::Integer) where {T, field}
     fT = fieldtype(T, field)
-    if has_symwrapper(fT) && wrapper_type(fT) === SymStruct{fT}
+    if is_symstruct_type(fT)
         return getindex(SymbolicGetproperty{T, field}()(s), i)
     end
     fval = SymbolicGetproperty{T, field}()(s)
@@ -455,7 +587,7 @@ function symstruct_field_getindex(s::SymStruct{T}, ::Val{field}, i::Integer) whe
     end
     fval = unwrap(fval)
     efT = eltype(fT)
-    if has_symwrapper(efT) && wrapper_type(efT) === SymStruct{efT}
+    if is_symstruct_type(efT)
         N = symstruct_length(efT)
         return SymStruct{efT}(fval[SymbolicUtils.stable_eachindex(fval)[div(i - 1, N) + 1]])[mod1(i, N)]
     end
