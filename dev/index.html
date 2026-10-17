@@ -48,7 +48,7 @@ journal = {ACM Commun. Comput. Algebra},
 month = {jan},
 pages = {92–96},
 numpages = {5}
-}</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSymbolics/Symbolics.jl/blob/688cd095d64f7ff5aedbe5768d75d0a04095a818/src/Symbolics.jl#L1">source</a></section></details></article><p>Symbolics.jl is a fast and modern Computer Algebra System (CAS) for a fast and modern programming language (Julia). The goal is to have a high-performance and parallelized symbolic algebra system that is directly extendable in the same language as that of the users.</p><h2 id="Installation"><a class="docs-heading-anchor" href="#Installation">Installation</a><a id="Installation-1"></a><a class="docs-heading-anchor-permalink" href="#Installation" title="Permalink"></a></h2><p>To install Symbolics.jl, use the Julia package manager:</p><pre><code class="language-julia hljs">using Pkg
+}</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSymbolics/Symbolics.jl/blob/9407f0e3c675cb81b54eed2741aed3a5c892c569/src/Symbolics.jl#L1">source</a></section></details></article><p>Symbolics.jl is a fast and modern Computer Algebra System (CAS) for a fast and modern programming language (Julia). The goal is to have a high-performance and parallelized symbolic algebra system that is directly extendable in the same language as that of the users.</p><h2 id="Installation"><a class="docs-heading-anchor" href="#Installation">Installation</a><a id="Installation-1"></a><a class="docs-heading-anchor-permalink" href="#Installation" title="Permalink"></a></h2><p>To install Symbolics.jl, use the Julia package manager:</p><pre><code class="language-julia hljs">using Pkg
 Pkg.add(&quot;Symbolics&quot;)</code></pre><h2 id="Citation"><a class="docs-heading-anchor" href="#Citation">Citation</a><a id="Citation-1"></a><a class="docs-heading-anchor-permalink" href="#Citation" title="Permalink"></a></h2><p>If you use Symbolics.jl, please <a href="https://arxiv.org/abs/2105.03949">cite this paper</a></p><pre><code class="nohighlight hljs">@article{gowda2021high,
   title={High-performance symbolic-numerics via multiple dispatch},
   author={Gowda, Shashi and Ma, Yingbo and Cheli, Alessandro and Gwozdz, Maja and Shah, Viral B and Edelman, Alan and Rackauckas, Christopher},
@@ -57,45 +57,46 @@ Pkg.add(&quot;Symbolics&quot;)</code></pre><h2 id="Citation"><a class="docs-head
 }</code></pre><h2 id="Feature-Summary"><a class="docs-heading-anchor" href="#Feature-Summary">Feature Summary</a><a id="Feature-Summary-1"></a><a class="docs-heading-anchor-permalink" href="#Feature-Summary" title="Permalink"></a></h2><p>Because Symbolics.jl is built into the Julia language and works with its dispatches, generic functions in Base Julia will work with symbolic expressions! Make matrices of symbolic expressions and multiply them: it will just work. Take the LU-factorization. Etc. Thus, see <a href="https://docs.julialang.org/en/v1/">the Julia Documentation</a> for a large list of functionality available in Symbolics.jl.</p><p>A general list of the features is:</p><ul><li>Symbolic arithmetic with type information and multiple dispatch</li><li>Symbolic polynomials and trigonometric functions</li><li>Pattern matching, simplification and substitution</li><li>Differentiation</li><li>Symbolic linear algebra (factorizations, inversion, determinants, eigencomputations, etc.)</li><li>Discrete math (representations of summations, products, binomial coefficients, etc.)</li><li>Logical and Boolean expressions</li><li>Symbolic equation solving and conversion to arbitrary precision</li><li>Support for non-standard algebras (non-commutative symbols and customizable rulesets)</li><li>Special functions (list provided by <a href="https://github.com/JuliaMath/SpecialFunctions.jl">SpecialFunctions.jl</a>)</li><li>Automatic conversion of Julia code to symbolic code</li><li>Generation of (high performance and parallel) functions from symbolic expressions</li><li>Fast automated sparsity detection and generation of sparse Jacobians and Hessians</li></ul><p>and much more.</p><h2 id="Extension-Packages"><a class="docs-heading-anchor" href="#Extension-Packages">Extension Packages</a><a id="Extension-Packages-1"></a><a class="docs-heading-anchor-permalink" href="#Extension-Packages" title="Permalink"></a></h2><p>Below is a list of known extension packages. If you would like your package to be listed here, feel free to open a pull request!</p><ul><li><a href="https://github.com/SciML/ModelingToolkit.jl">ModelingToolkit.jl</a>: Symbolic representations of common numerical systems<ul><li>Ordinary differential equations</li><li>Stochastic differential equations</li><li>Partial differential equations</li><li>Nonlinear systems</li><li>Optimization problems</li><li>Optimal Control</li><li>Causal and acausal modeling (Simulink/Modelica)</li><li>Automated model transformation, simplification, and composition</li></ul></li><li><a href="https://github.com/SciML/Catalyst.jl">Catalyst.jl</a>: Symbolic representations of chemical reactions<ul><li>Symbolically build and represent large systems of chemical reactions</li><li>Generate code for ODEs, SDEs, continuous-time Markov Chains, and more</li><li>Simulate the models using the SciML ecosystem with O(1) Gillespie methods</li></ul></li><li><a href="https://github.com/SciML/DataDrivenDiffEq.jl">DataDrivenDiffEq.jl</a>: Automatic identification of equations from data<ul><li>Automated construction of ODEs and DAEs from data</li><li>Representations of Koopman operators and Dynamic Mode Decomposition (DMD)</li></ul></li><li><a href="https://github.com/astroautomata/SymbolicRegression.jl">SymbolicRegression.jl</a>: Distributed High-Performance symbolic regression<ul><li>Parallelized generic algorithms for finding equations from data</li><li>Pareto frontier-based scoring</li></ul></li><li><a href="https://github.com/JuliaIntervals/ReversePropagation.jl">ReversePropagation.jl</a>: Source-to-source reverse mode automatic differentiation<ul><li>Automated tracing of code and construction of backpropagation equations</li><li>Composes with symbolic transformation and simplification functionality</li></ul></li></ul><h2 id="Reproducibility"><a class="docs-heading-anchor" href="#Reproducibility">Reproducibility</a><a id="Reproducibility-1"></a><a class="docs-heading-anchor-permalink" href="#Reproducibility" title="Permalink"></a></h2><details><summary>The documentation of this SciML package was built using these direct dependencies,</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Status `~/work/Symbolics.jl/Symbolics.jl/docs/Project.toml`
   [6e4b80f9] BenchmarkTools v1.8.0
   [e30172f5] Documenter v1.19.0
-  [0b43b601] Groebner v0.10.7
+  [0b43b601] Groebner v0.10.11
   [23fbe1c1] Latexify v0.16.12
-  [2edaba10] Nemo v0.56.1
+⌅ [2edaba10] Nemo v0.56.2
   [91a5bcdd] Plots v1.41.7
-  [90137ffa] StaticArrays v1.9.20
+  [90137ffa] StaticArrays v1.9.23
   [24249f21] SymPy v2.3.3
   [a0d8a0e1] SymbolicSMT v1.4.1
-  [d1185830] SymbolicUtils v4.46.4
-  [0c5d862f] Symbolics v7.39.2 `~/work/Symbolics.jl/Symbolics.jl`</code></pre></details><details><summary>and using this machine and Julia version.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Julia Version 1.12.7
-Commit 6d172b025e4 (2026-08-15 08:05 UTC)
+  [d1185830] SymbolicUtils v4.51.0
+  [0c5d862f] Symbolics v7.46.0 `~/work/Symbolics.jl/Symbolics.jl`
+Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated`</code></pre></details><details><summary>and using this machine and Julia version.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Julia Version 1.13.2
+Commit 45b6d15e34b (2026-10-14 20:33 UTC)
 Build Info:
   Official https://julialang.org release
 Platform Info:
   OS: Linux (x86_64-linux-gnu)
-  CPU: 4 × AMD EPYC 9V74 80-Core Processor
+  CPU: 4 × AMD EPYC 9V45 96-Core Processor
   WORD_SIZE: 64
-  LLVM: libLLVM-18.1.7 (ORCJIT, znver4)
+  LLVM: libLLVM-20.1.8 (ORCJIT, znver5)
   GC: Built with stock GC
 Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></details><details><summary>A more complete overview of all dependencies and their versions is also provided.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Status `~/work/Symbolics.jl/Symbolics.jl/docs/Manifest.toml`
   [47edcb42] ADTypes v1.24.0
   [a4c015fc] ANSIColoredPrinters v0.0.1
-  [c3fe647b] AbstractAlgebra v0.50.2
+⌅ [c3fe647b] AbstractAlgebra v0.50.4
   [6e696c72] AbstractPlutoDingetjes v1.4.1
   [1520ce14] AbstractTrees v0.4.5
   [7d9f7c33] Accessors v0.1.45
-  [79e6a3ab] Adapt v4.7.0
+  [79e6a3ab] Adapt v4.7.4
   [66dad0bd] AliasTables v1.1.3
   [ec485272] ArnoldiMethod v0.4.0
-  [4fba245c] ArrayInterface v7.30.1
-  [a9b6321e] Atomix v1.2.0
+  [4fba245c] ArrayInterface v7.30.2
+  [a9b6321e] Atomix v1.6.0
   [6e4b80f9] BenchmarkTools v1.8.0
   [e2ed5e7c] Bijections v0.2.2
   [c3b6d118] BitIntegers v0.3.7
-  [fa961155] CEnum v0.5.0
+⌅ [fa961155] CEnum v0.5.0
   [944b1d66] CodecZlib v0.7.9
   [35d6a980] ColorSchemes v3.31.0
-  [3da002f7] ColorTypes v0.12.1
+  [3da002f7] ColorTypes v0.12.4
   [c3611d14] ColorVectorSpace v0.11.0
-  [5ae59095] Colors v0.13.1
+  [5ae59095] Colors v0.13.3
 ⌅ [861a8166] Combinatorics v1.0.2
   [3709ef60] CommonEq v0.2.1
   [38540f10] CommonSolve v0.2.14
@@ -106,72 +107,73 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [8f4d0f93] Conda v1.10.3
   [187b0558] ConstructionBase v1.6.0
   [d38c429a] Contour v0.6.3
-  [adafc99b] CpuId v0.3.1
+  [adafc99b] CpuId v0.3.3
   [a8cc5b0e] Crayons v4.2.0
   [9a962f9c] DataAPI v1.16.0
   [864edb3b] DataStructures v0.19.6
   [e2d170a0] DataValueInterfaces v1.0.0
   [8bb1440f] DelimitedFiles v1.9.1
   [b552c78f] DiffRules v1.16.0
-  [ffbed154] DocStringExtensions v0.9.5
+⌅ [ffbed154] DocStringExtensions v0.9.5
   [e30172f5] Documenter v1.19.0
-  [5b8099bc] DomainSets v0.8.1
+  [5b8099bc] DomainSets v0.8.3
   [7c1d4256] DynamicPolynomials v0.6.8
   [4e289a0a] EnumX v1.0.7
   [e2ba6199] ExprTools v0.1.11
   [55351af7] ExproniconLite v0.10.14
-  [c87230d0] FFMPEG v0.4.5
+  [c87230d0] FFMPEG v0.4.6
 ⌅ [53c48c17] FixedPointNumbers v0.8.6
   [1fa38f19] Format v1.3.7
   [a85aefff] FunctionMaps v0.1.2
   [28b8d3ca] GR v0.73.27
   [d7ba0133] Git v1.5.0
   [86223c79] Graphs v1.15.0
-  [0b43b601] Groebner v0.10.7
+  [0b43b601] Groebner v0.10.11
   [b5f81e59] IOCapture v1.0.0
   [d25df0c9] Inflate v0.1.5
   [18e54dd8] IntegerMathUtils v0.1.4
-  [8197267c] IntervalSets v0.7.14
+  [8197267c] IntervalSets v0.7.15
   [3587e190] InverseFunctions v0.1.17
   [92d709cd] IrrationalConstants v0.2.6
   [82899510] IteratorInterfaceExtensions v1.0.0
   [1019f520] JLFzf v0.1.11
   [692b3bcd] JLLWrappers v1.8.0
-  [682c06a0] JSON v1.8.0
+  [682c06a0] JSON v1.11.0
   [ae98c720] Jieko v0.2.1
+  [929cbde3] LLVM v10.2.1
   [b964fa9f] LaTeXStrings v1.4.1
   [23fbe1c1] Latexify v0.16.12
   [0e77f7df] LazilyInitializedFields v1.3.0
-  [2ab3a3ac] LogExpFunctions v1.0.1
+  [2ab3a3ac] LogExpFunctions v1.0.3
   [1914dd2f] MacroTools v0.5.16
   [d0879d2d] MarkdownAST v0.1.3
   [442fdcdd] Measures v0.3.3
   [e1d29d7a] Missings v1.2.0
-⌅ [2e0e35c7] Moshi v0.3.9
-  [102ac46a] MultivariatePolynomials v0.5.19
-  [d8a4904e] MutableArithmetics v1.8.0
+  [2e0e35c7] Moshi v0.3.13
+  [102ac46a] MultivariatePolynomials v0.5.20
+  [d8a4904e] MutableArithmetics v1.9.0
   [77ba4419] NaNMath v1.1.4
-  [2edaba10] Nemo v0.56.1
-  [bac558e1] OrderedCollections v2.0.1
+⌅ [2edaba10] Nemo v0.56.2
+  [bac558e1] OrderedCollections v2.0.3
   [69de0a69] Parsers v3.0.0
   [ccf2f8ad] PlotThemes v3.3.0
-  [995b91a9] PlotUtils v1.4.4
+  [995b91a9] PlotUtils v1.5.1
   [91a5bcdd] Plots v1.41.7
   [aea7be01] PrecompileTools v1.3.4
-  [21216c6a] Preferences v1.5.2
-  [08abe8d2] PrettyTables v3.4.8
+  [21216c6a] Preferences v1.6.0
+  [08abe8d2] PrettyTables v3.5.0
   [27ebfcd6] Primes v0.5.7
   [43287f4e] PtrArrays v1.4.0
   [438e738f] PyCall v1.96.4
   [fb686558] RandomExtensions v0.4.4
   [988b38a3] ReadOnlyArrays v0.2.0
-  [3cdcf5f2] RecipesBase v1.3.4
+  [3cdcf5f2] RecipesBase v1.4.0
   [01d81517] RecipesPipeline v0.6.12
   [189a3867] Reexport v1.2.2
   [2792f1a3] RegistryInstances v0.1.0
   [05181044] RelocatableFolders v1.0.1
   [ae029012] Requires v1.3.1
-  [7e49a35a] RuntimeGeneratedFunctions v0.5.26
+  [7e49a35a] RuntimeGeneratedFunctions v0.5.27
   [431bcebd] SciMLPublic v1.3.0
   [6c6a2e73] Scratch v1.3.0
   [efcf1570] Setfield v1.1.2
@@ -180,41 +182,40 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [2b935e18] SmallCollections v0.6.3
   [a2af1166] SortingAlgorithms v1.2.3
   [276daf66] SpecialFunctions v2.9.0
-  [860ef19b] StableRNGs v1.0.4
   [0c0c59c1] StarAlgebras v0.3.0
-  [90137ffa] StaticArrays v1.9.20
+  [90137ffa] StaticArrays v1.9.23
   [1e83bf80] StaticArraysCore v1.4.4
   [10745b16] Statistics v1.11.5
   [82ae8749] StatsAPI v1.8.0
   [2913bbd2] StatsBase v0.34.13
-⌅ [892a3eda] StringManipulation v0.5.0
-  [ec057cc2] StructUtils v2.8.5
+  [892a3eda] StringManipulation v0.6.1
+  [ec057cc2] StructUtils v2.10.0
   [24249f21] SymPy v2.3.3
   [458b697b] SymPyCore v0.3.3
   [2efcf032] SymbolicIndexingInterface v0.3.55
-  [19f23fe9] SymbolicLimits v1.2.1
+  [19f23fe9] SymbolicLimits v1.2.2
   [a0d8a0e1] SymbolicSMT v1.4.1
-  [d1185830] SymbolicUtils v4.46.4
-  [0c5d862f] Symbolics v7.39.2 `~/work/Symbolics.jl/Symbolics.jl`
+  [d1185830] SymbolicUtils v4.51.0
+  [0c5d862f] Symbolics v7.46.0 `~/work/Symbolics.jl/Symbolics.jl`
   [3783bdb8] TableTraits v1.0.1
   [bd369af6] Tables v1.14.0
   [ed4db957] TaskLocalValues v0.1.3
   [62fd8b95] TensorCore v0.1.1
-  [8ea1fca8] TermInterface v2.0.0
-  [a759f4b9] TimerOutputs v1.2.1
+  [8ea1fca8] TermInterface v2.0.1
+  [a759f4b9] TimerOutputs v1.2.2
   [3bb67fe8] TranscodingStreams v0.11.3
   [1cfade01] UnicodeFun v0.4.1
-  [013be700] UnsafeAtomics v0.3.2
+  [013be700] UnsafeAtomics v0.4.0
   [41fe7b60] Unzip v0.2.0
   [81def892] VersionParsing v1.3.0
   [d30d5f5c] WeakCacheSets v0.1.0
   [06b161dc] Z3 v1.0.4
   [6e34b625] Bzip2_jll v1.0.9+0
-  [83423d85] Cairo_jll v1.18.7+0
+  [83423d85] Cairo_jll v1.18.8+0
   [ee1fde0b] Dbus_jll v1.16.2+0
   [2702e6a9] EpollShim_jll v0.0.20230411+1
   [2e619515] Expat_jll v2.8.4+0
-⌅ [b22a6f82] FFMPEG_jll v8.1.2+0
+  [b22a6f82] FFMPEG_jll v9.0.2+0
   [e134572f] FLINT_jll v301.600.0+0
   [a3f928ae] Fontconfig_jll v2.17.1+0
   [d7e528f0] FreeType2_jll v2.14.3+1
@@ -224,23 +225,24 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
 ⌅ [b0724c58] GettextRuntime_jll v0.22.4+0
   [61579ee1] Ghostscript_jll v9.55.1+0
   [020c3dae] Git_LFS_jll v3.7.1+0
-  [f8c6e375] Git_jll v2.55.0+0
+  [f8c6e375] Git_jll v2.56.0+0
   [7746bdde] Glib_jll v2.88.3+0
   [3b182d85] Graphite2_jll v1.3.16+0
   [2e76f6c2] HarfBuzz_jll v100.14004.0+0
   [aacddb02] JpegTurbo_jll v3.2.0+1
   [c1c5ebd0] LAME_jll v3.100.3+0
   [88015f11] LERC_jll v4.2.0+0
-  [1d63c593] LLVMOpenMP_jll v22.1.7+0
+  [dad2f222] LLVMExtra_jll v0.0.53+0
+  [1d63c593] LLVMOpenMP_jll v23.1.1+0
 ⌅ [e9f186c6] Libffi_jll v3.4.7+0
   [7e76a0d4] Libglvnd_jll v1.7.1+1
   [94ce4f54] Libiconv_jll v1.18.0+0
-  [4b2f31a3] Libmount_jll v2.42.0+0
+  [4b2f31a3] Libmount_jll v2.42.4+0
   [89763e89] Libtiff_jll v4.7.3+0
-  [38a345b3] Libuuid_jll v2.42.0+0
+  [38a345b3] Libuuid_jll v2.42.4+0
   [e7412a2a] Ogg_jll v1.3.6+0
   [656ef2d0] OpenBLAS32_jll v0.3.34+0
-  [9bd350c2] OpenSSH_jll v10.5.1+0
+  [9bd350c2] OpenSSH_jll v10.6.1+0
   [efe28fd5] OpenSpecFun_jll v0.5.6+0
   [91d4177d] Opus_jll v1.6.1+0
   [36c8627f] Pango_jll v1.58.2+0
@@ -252,7 +254,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [e99dba38] Qt6Wayland_jll v6.10.2+1
   [a44049a8] Vulkan_Loader_jll v1.3.243+0
   [a2964d1f] Wayland_jll v1.24.0+0
-  [ffd25f8a] XZ_jll v5.8.3+0
+  [ffd25f8a] XZ_jll v5.8.4+0
   [f67eecfb] Xorg_libICE_jll v1.1.2+0
   [c834827a] Xorg_libSM_jll v1.2.6+0
   [4f6342f7] Xorg_libX11_jll v1.8.13+0
@@ -274,28 +276,27 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [975044d2] Xorg_xcb_util_keysyms_jll v0.4.1+0
   [0d47668e] Xorg_xcb_util_renderutil_jll v0.3.10+0
   [c22f9ab0] Xorg_xcb_util_wm_jll v0.4.2+0
-  [35661453] Xorg_xkbcomp_jll v1.4.7+0
-  [33bec58e] Xorg_xkeyboard_config_jll v2.47.0+2
+  [35661453] Xorg_xkbcomp_jll v1.5.0+0
+  [33bec58e] Xorg_xkeyboard_config_jll v2.48.0+0
   [c5fb5394] Xorg_xtrans_jll v1.6.0+0
-  [3161d3a3] Zstd_jll v1.5.7+1
   [35ca27e7] eudev_jll v3.2.14+0
 ⌅ [214eeab7] fzf_jll v0.61.1+0
-  [a4ae2306] libaom_jll v3.14.1+0
+  [a4ae2306] libaom_jll v3.15.1+0
   [0ac62f75] libass_jll v0.17.5+0
-  [3eaa8342] libcxxwrap_julia_jll v0.14.10+1
+  [3eaa8342] libcxxwrap_julia_jll v0.14.11+0
   [1183f4f0] libdecor_jll v0.2.2+0
   [8e53e030] libdrm_jll v2.4.134+0
   [2db6ffa8] libevdev_jll v1.13.4+0
   [f638f0a6] libfdk_aac_jll v2.0.4+0
   [36db933b] libinput_jll v1.28.1+0
-  [b53b4c65] libpng_jll v1.6.58+0
+  [b53b4c65] libpng_jll v1.6.59+1
   [9a156e7d] libva_jll v2.23.0+0
   [f27f6e37] libvorbis_jll v1.3.8+0
   [009596ad] mtdev_jll v1.1.7+0
 ⌅ [1270edf5] x264_jll v10164.0.1+0
   [dfaa095f] x265_jll v4.1.0+0
   [d8fb68d0] xkbcommon_jll v1.13.0+0
-  [1bc4e1ec] z3_jll v5.1.0+0
+  [1bc4e1ec] z3_jll v5.3.1+0
   [0dad84c5] ArgTools v1.1.2
   [56f22d72] Artifacts v1.11.0
   [2a0f44e3] Base64 v1.11.0
@@ -305,43 +306,44 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [9fa8497b] Future v1.11.0
   [b77e0a4c] InteractiveUtils v1.11.0
   [ac6e5ff7] JuliaSyntaxHighlighting v1.12.0
-  [b27032c2] LibCURL v0.6.4
+  [b27032c2] LibCURL v1.0.0
   [76f85450] LibGit2 v1.11.0
   [8f399da3] Libdl v1.11.0
-  [37e2e46d] LinearAlgebra v1.12.0
+  [37e2e46d] LinearAlgebra v1.13.0
   [56ddb016] Logging v1.11.0
   [d6f4376e] Markdown v1.11.0
   [a63ad114] Mmap v1.11.0
   [ca575930] NetworkOptions v1.3.0
-  [44cfe95a] Pkg v1.12.1
+  [44cfe95a] Pkg v1.13.0
   [de0858da] Printf v1.11.0
   [9abbd945] Profile v1.11.0
   [3fa0cd96] REPL v1.11.0
   [9a3f8284] Random v1.11.0
-  [ea8e919c] SHA v0.7.0
+  [ea8e919c] SHA v1.0.0
   [9e88b42a] Serialization v1.11.0
   [6462fe0b] Sockets v1.11.0
-  [2f01184e] SparseArrays v1.12.0
+  [2f01184e] SparseArrays v1.13.0
   [f489334b] StyledStrings v1.11.0
   [fa267f1f] TOML v1.0.3
   [a4e569a6] Tar v1.10.0
   [8dfed614] Test v1.11.0
   [cf7118a7] UUIDs v1.11.0
   [4ec0a83e] Unicode v1.11.0
-  [e66e0078] CompilerSupportLibraries_jll v1.3.1+2
+  [e66e0078] CompilerSupportLibraries_jll v1.5.5+2
   [781609d7] GMP_jll v6.3.0+2
-  [deac9b47] LibCURL_jll v8.15.0+0
-  [e37daf67] LibGit2_jll v1.9.0+0
-  [29816b5a] LibSSH2_jll v1.11.3+1
+  [deac9b47] LibCURL_jll v8.22.0+0
+  [e37daf67] LibGit2_jll v1.9.7+0
+  [29816b5a] LibSSH2_jll v1.11.104+0
   [3a97d323] MPFR_jll v4.2.2+0
-  [14a3606d] MozillaCACerts_jll v2025.11.4
-  [4536629a] OpenBLAS_jll v0.3.29+0
+  [14a3606d] MozillaCACerts_jll v2026.8.13
+  [4536629a] OpenBLAS_jll v0.3.30+0
   [05823500] OpenLibm_jll v0.8.7+0
-  [458c3c95] OpenSSL_jll v3.5.6+0
-  [efcefdf7] PCRE2_jll v10.44.0+1
-  [bea87d4a] SuiteSparse_jll v7.8.3+2
-  [83775a58] Zlib_jll v1.3.1+2
+  [458c3c95] OpenSSL_jll v3.5.8+0
+  [efcefdf7] PCRE2_jll v10.46.0+0
+  [bea87d4a] SuiteSparse_jll v7.10.1+0
+  [83775a58] Zlib_jll v1.3.2+0
+  [3161d3a3] Zstd_jll v1.5.7+1
   [8e850b90] libblastrampoline_jll v5.15.0+0
-  [8e850ede] nghttp2_jll v1.64.0+1
-  [3f19e933] p7zip_jll v17.7.0+0
-Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v7.39.2/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v7.39.2/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Wednesday 9 September 2026 00:22">Wednesday 9 September 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+  [8e850ede] nghttp2_jll v1.70.0+0
+  [3f19e933] p7zip_jll v17.8.3+0
+Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v7.46.0/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v7.46.0/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Saturday 17 October 2026 08:50">Saturday 17 October 2026</span>. Using Julia version 1.13.2.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
