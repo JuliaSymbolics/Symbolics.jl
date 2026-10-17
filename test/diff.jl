@@ -826,10 +826,12 @@ end
     # a slice reads only the elements it names, like the scalar equivalent
     @variables x1 x2 x3 y1
     ref = Symbolics.jacobian_sparsity(
-        [y1 * x1, sum([x1, x2] .* [1, 1])], [x1, x2, x3, y1])
+        [y1 * x1, sum([x1, x2] .* [1, 1])], [x1, x2, x3, y1]
+    )
     @variables x[1:3] y
     @test Symbolics.jacobian_sparsity(
-        [y * x[1], sum(x[1:2] .* [1, 1])], [x[1], x[2], x[3], y]) == ref
+        [y * x[1], sum(x[1:2] .* [1, 1])], [x[1], x[2], x[3], y]
+    ) == ref
     @test Symbolics.jacobian_sparsity([sum(x[2:3] .* [1, 1])], [x[1], x[2], x[3]]) ==
         sparse([1, 1], [2, 3], true)
 
@@ -848,6 +850,13 @@ end
     @variables t xt(t)[1:3]
     @test Symbolics.jacobian_sparsity([sum(xt[1:2] .* [1, 1])], collect(xt)) ==
         sparse([1, 1], [1, 2], true, 1, 3)
+end
+
+@testset "Sparsity of array-shaped getindex terms" begin
+    @variables x[1:3]
+    slice = SymbolicUtils.term(getindex, Symbolics.unwrap(x), 1:2; type = Vector{Real}, shape = [1:2])
+    expr = SymbolicUtils.term(sum, slice; type = Real)
+    @test Matrix(Symbolics.jacobian_sparsity([expr], collect(x))) == Bool[1 1 0]
 end
 
 struct Op <: SymbolicUtils.Operator end

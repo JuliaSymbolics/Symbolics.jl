@@ -1045,7 +1045,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
             for (k, y) in enumerate(args)
                 r(y, literal_idx && k == 1)
             end
-            if literal_idx && !is_scalar_indexed(x)
+            if literal_idx && SymbolicUtils.is_array_shape(shape(x))
                 foreach(r ∘ Base.Fix1(getindex, x), SU.stable_eachindex(x)) # if `x` is e.g. `arr[1:2]`, also visit `arr[1]` and `arr[2]` (only the latter are in `vars`)
             end
         end
