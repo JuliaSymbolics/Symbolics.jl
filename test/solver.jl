@@ -359,6 +359,24 @@ end
     end
 
     @test isnothing(symbolic_solve([x^2, x*y, y^2], [x,y], warns=false))
+
+    # https://github.com/JuliaSymbolics/Symbolics.jl/issues/1370
+    # variables passed as a tuple dispatch to the same solver as a vector
+    eqs = [x * y + 2x^2, y^2 - 1]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, (x, y)), [x, y])
+    arr_known_roots = sort_arr(
+        [
+            Dict(x => -1 // 2, y => 1), Dict(x => 0, y => -1),
+            Dict(x => 0, y => 1), Dict(x => 1 // 2, y => -1),
+        ],
+        [x, y]
+    )
+    @test check_equal(arr_calcd_roots, arr_known_roots)
+    @test isequal(symbolic_solve(eqs, (x, y)), symbolic_solve(eqs, [x, y]))
+    @test isequal(
+        symbolic_solve([x^2 - 1, x + 1], (x,)),
+        symbolic_solve([x^2 - 1, x + 1], [x])
+    )
 end
 
 @testset "Multivar parametric" begin
