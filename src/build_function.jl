@@ -110,10 +110,12 @@ Keyword Arguments:
     - `MATLABTarget`: Generates an anonymous function for use in MATLAB and Octave
       environments
 - `parallel`: The kind of parallelism to use in the generated function. Defaults
-  to `SerialForm()`, i.e. no parallelism, if `ex` is a single expression or an
-  array containing <= 1500 non-zero expressions. If `ex` is an array of > 1500
-  non-zero expressions, then `ShardedForm(80, 4)` is used. See below for more on
-  `ShardedForm`.
+  to `SerialForm()`, i.e. no parallelism, for both scalar and array `ex`.
+  For large arrays, opt in with `parallel=Symbolics.ShardedForm()` to split the
+  generated code into smaller RuntimeGeneratedFunctions and reduce compile time.
+  Automatic sharding is not enabled: shard functions do not see Let bindings from
+  `postprocess_fbody` (for example observed equations), so a silent default would
+  be incorrect for those callers.
   Note that the parallel forms are not exported and thus need to be chosen like
   `Symbolics.SerialForm()`.
   The choices are:
@@ -342,7 +344,10 @@ i.e., f(u,p,args...) for the out-of-place and scalar functions and
 Special Keyword Arguments:
 
 - `parallel`: The kind of parallelism to use in the generated function. Defaults
-  to `SerialForm()`, i.e. no parallelism. Note that the parallel forms are not
+  to `SerialForm()`, i.e. no parallelism. Large arrays may opt into
+  `ShardedForm()` via `parallel=` for faster compile; it is not selected
+  automatically because shard RuntimeGeneratedFunctions do not see
+  `postprocess_fbody` Let bindings. Note that the parallel forms are not
   exported and thus need to be chosen like `Symbolics.SerialForm()`.
   The choices are:
   - `SerialForm()`: Serial execution.
@@ -400,8 +405,9 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
     end
     rhss = _recursive_unwrap(rhss)
     states.rewrites[:nanmath] = nanmath
-    # We cannot switch to ShardedForm because it deadlocks with
-    # RuntimeGeneratedFunctions
+    # Do not default to ShardedForm: postprocess_fbody Let bindings are not
+    # visible inside shard RuntimeGeneratedFunctions, so observed-style
+    # equations error. Opt in with parallel=ShardedForm() when safe.
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
