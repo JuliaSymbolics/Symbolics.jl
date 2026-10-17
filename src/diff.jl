@@ -3,6 +3,19 @@ $(TYPEDEF)
 
 Represents a differential operator.
 
+`Differential(x)` differentiates with respect to `x`, which must be a symbolic variable or a
+coordinate of one:
+
+  - a symbolic variable `x`, or a called symbolic function or dependent variable `x(t)`;
+  - a scalar element `x[i]` or a symbolic struct field `rec.x` of a valid target;
+  - the adjoint or transpose of a valid array target, and its scalar elements such as `M'[1, 2]`;
+  - the real or imaginary part `real(z)`, `imag(z)` of a complex variable;
+  - an operator application such as `Differential(t)(u)`.
+
+Any other target throws an `ArgumentError`. This includes constants, arithmetic expressions
+such as `2x`, `x + y` or `(2M)[1, 2]`, slices such as `x[1:2]`, and a complex variable `z`
+itself.
+
 # Fields
 $(FIELDS)
 
@@ -27,25 +40,28 @@ Differential(x, 3)
 ```
 """
 struct Differential <: Operator
-    """The variable or expression to differentiate with respect to."""
+    """The variable to differentiate with respect to. See above for the accepted targets."""
     x::BasicSymbolic{VartypeT}
     """The derivative order. Can be rational for fractional derivatives."""
     order::Union{Int, Rational{Int}}
-    function Differential(x::BasicSymbolic{VartypeT}, order = 1)
+    function Differential(x::BasicSymbolic{VartypeT}, order = 1; unsafe::Bool = false)
         @assert order > 0 "Derivative order must be positive"
         @match x begin
-            BSImpl.Const(;) => throw(ArgumentError("Cannot take derivative with respect to constant."))
-            _ => new(x, order)
+            BSImpl.Const() => throw(ArgumentError("Cannot take derivative with respect to constant."))
+            _ => unsafe || _is_differential_target(x) ||
+                throw(ArgumentError("Cannot take derivative with respect to a non-variable expression `$x`."))
         end
+        return new(x, order)
     end
     Differential(x::Union{Num, Arr}, order = 1) = Differential(unwrap(x), order)
+    Differential(x::Complex{Num}, order = 1) = throw(ArgumentError("Cannot take derivative with respect to the complex value `$x`; differentiate with respect to its real or imaginary part instead."))
     Differential(::CallAndWrap, order = 1) = throw(ArgumentError("Cannot take derivative with respect to a symbolic function."))
-    Differential(::Union{AbstractFloat, Integer}) = error("D(::Number) is not a valid derivative. Derivatives must be taken w.r.t. symbolic variables.")
+    Differential(::Number, order = 1) = throw(ArgumentError("Cannot take derivative with respect to constant."))
 end
 function (D::Differential)(x::BasicSymbolic{VartypeT})
-    @match x begin
+    return @match x begin
         BSImpl.Term(; f, args) && if f isa Differential && isequal(f.x, D.x) end => begin
-            return Differential(D.x, D.order + f.order)(args[1])
+            return Differential(D.x, D.order + f.order; unsafe = true)(args[1])
         end
         _ => return BSImpl.Term{VartypeT}(D, SArgsT((x,)); type = symtype(x), shape = shape(x))
     end
@@ -58,8 +74,24 @@ end
 SymbolicUtils.isbinop(f::Differential) = false
 
 function (s::SymbolicUtils.Substituter)(x::Differential)
-    Differential(s(x.x), x.order)
+    return Differential(s(x.x), x.order; unsafe = true)
 end
+
+function _is_differential_target(x::BasicSymbolic{VartypeT})
+    return @match x begin
+        BSImpl.Sym() => true
+        BSImpl.Term(; f, args) => if f isa BasicSymbolic{VartypeT} || f isa Operator
+            true
+        elseif f === getindex || f isa SymbolicGetproperty || f === adjoint ||
+                f === transpose || f === real || f === imag
+            _is_differential_target(args[1])
+        else
+            false
+        end
+        _ => false
+    end
+end
+_is_differential_target(x) = false
 
 function SymbolicUtils.operator_to_term(::Differential, ex::BasicSymbolic{VartypeT})
     return diff2term(ex)
@@ -128,7 +160,7 @@ Base.:*(D1::ComposedFunction, D2::Differential) = D1 ∘ D2
 Base.:*(D1::Differential, D2::Union{Operator, Function}) = D1 ∘ D2
 function Base.:^(D::Differential, n::Integer)
     iszero(n) && return identity
-    return Differential(D.x, D.order * n)
+    return Differential(D.x, D.order * n; unsafe = true)
 end
 
 function Base.show(io::IO, D::Differential)
@@ -362,7 +394,7 @@ function chain_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::S
     summed_args = SymbolicUtils.ArgsT{VartypeT}()
     sizehint!(summed_args, length(inner_args))
     for a in inner_args
-        t1 = executediff(Differential(a), arg; kw...)
+        t1 = executediff(Differential(a; unsafe = true), arg; kw...)
         t2 = executediff(D, a; kw...)
         push!(summed_args, t1 * t2)
     end
@@ -480,7 +512,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
     order = floor(Int, D.order)
     if order > 1
         for _ in 1:order
-            arg = executediff(Differential(D.x), arg; simplify, throw_no_derivative)
+            arg = executediff(Differential(D.x; unsafe = true), arg; simplify, throw_no_derivative)
         end
         return arg
     end
@@ -550,7 +582,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                         push!(summed_args, reproject_symstruct(arg, root, der))
                         continue
                     elseif der === nothing
-                        push!(summed_args, Differential(a)(arg) * executediff(D, a))
+                        push!(summed_args, Differential(a; unsafe = true)(arg) * executediff(D, a))
                     else
                         push!(summed_args, reproject_symstruct(arg, root, der) * executediff(D, a))
                     end
@@ -571,7 +603,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                         push!(summed_args, der[idx])
                         continue
                     elseif der === nothing
-                        push!(summed_args, Differential(a)(arg) * executediff(D, a))
+                        push!(summed_args, Differential(a; unsafe = true)(arg) * executediff(D, a))
                     else
                         push!(summed_args, der[idx] * executediff(D, a))
                     end
