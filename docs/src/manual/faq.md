@@ -116,3 +116,35 @@ b = only(@variables($a))
 ```
 
 In this example, `@variables($a)` created a variable named `c`, and set this variable to `b`.
+
+## [Why does `A \ b` give `NaN` or make `simplify` extremely slow?](@id faq_symbolic_backslash)
+
+For arrays of symbolic scalars (`Matrix{Num}`), `A \ b` uses an LU factorization
+with soft pivoting (`sym_lu`): each pivot is chosen by fewest expression terms, not
+by numeric magnitude. A pivot that is symbolically nonzero can still be numerically
+zero after substitution, which produces nested `0/0`-style fractions and `NaN`.
+Back-substitution also nests divisions, so the first unknown (`sol[1]`) is usually
+the deepest expression and the slowest (or impossible) to `simplify`. Related
+`DivideError`s during simplification of `1/0`-like forms are tracked separately
+(see [issue 878](https://github.com/JuliaSymbolics/Symbolics.jl/issues/878)).
+
+If you need a closed-form solution that stays valid for every nonsingular numeric
+specialization of `A`, prefer the Laplace (cofactor) paths, which divide only by
+`det(A)` (once, at the end) instead of nesting a division at every elimination step:
+
+```julia
+using Symbolics, LinearAlgebra
+A = Symbolics.@variables(A[1:4, 1:4])[1] |> Symbolics.scalarize
+b = Symbolics.@variables(b[1:4])[1] |> Symbolics.scalarize
+sol = inv(A) * b   # solves A * x = b
+# or Cramer:
+# d = det(A)
+# sol = [det(hcat(A[:, 1:(i-1)], b, A[:, (i+1):end])) / d for i in 1:4]
+```
+
+Laplace expansion is factorial in the matrix size, so this route is practical only
+for small dense systems. Timed on current Symbolics (Julia 1.12), a second call to
+`inv(A)` for a fully symbolic `n×n` matrix is on the order of milliseconds through
+`5×5`, about a second at `7×7`, about ten seconds at `8×8`, and about a minute and
+a half at `9×9`; larger sizes grow quickly. Within the small-`n` range the expressions
+evaluate correctly even when `A[1,1] == 0`, where `A \ b` can return `NaN`/`Inf`.
