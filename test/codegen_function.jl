@@ -429,21 +429,16 @@ end
     end
 end
 
-@testset "`fuse_unalias` and `fuse_output_array`" begin
+@testset "`fuse_unalias`" begin
     @test Symbolics.CodegenFunctionOptions().fuse_unalias
-    @test Symbolics.CodegenFunctionOptions().fuse_output_array === nothing
     probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
     for (expr, args) in ((probe, [a]), ([probe], [[a]]))
         empty!(PROBED_REWRITES)
         Symbolics.codegen_function(IRStructure{SymReal}(), expr, args)
         @test PROBED_REWRITES[:fuse_unalias] === true
-        @test !haskey(PROBED_REWRITES, :fuse_output_array)
         empty!(PROBED_REWRITES)
-        Symbolics.codegen_function(
-            IRStructure{SymReal}(), expr, args; fuse_unalias = false, fuse_output_array = a
-        )
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; fuse_unalias = false)
         @test PROBED_REWRITES[:fuse_unalias] === false
-        @test isequal(PROBED_REWRITES[:fuse_output_array], unwrap(a))
     end
 
     # SymbolicUtils updates in place from the release that adds `Code.FUSE_UNALIAS_KEY`.
@@ -455,7 +450,7 @@ end
         )
         _, iip = Symbolics.codegen_function(
             ir, maker, [p, q, dt];
-            fuse_broadcasts = true, fuse_unalias = false, fuse_output_array = p
+            fuse_broadcasts = true, fuse_unalias = false
         )
         @test occursin("fused_materialize_noalias!", string(iip))
         @test !occursin("unalias(", replace(string(iip), "noalias" => ""))
