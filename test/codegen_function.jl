@@ -461,3 +461,28 @@ end
         @test pv == expected
     end
 end
+
+@testset "`fuse_output_eltype`" begin
+    @test !Symbolics.CodegenFunctionOptions().fuse_output_eltype
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; fuse_output_eltype = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:fuse_output_eltype] === something(setting, false)
+    end
+
+    # SymbolicUtils converts from the release that adds `Code.FUSE_OUTPUT_ELTYPE_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_OUTPUT_ELTYPE_KEY)
+        @variables p[1:20] q[1:20]
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}([[1:20]], [unwrap(p .+ 0.1 .* q)])
+        _, iip = Symbolics.codegen_function(
+            ir, maker, [p, q]; fuse_broadcasts = true, fuse_output_eltype = true
+        )
+        f! = eval(iip)
+        pv, qv = Float32.(1:20) ./ 3, Float32.(20:-1:1) ./ 7
+        out = zeros(Float32, 20)
+        Base.invokelatest(f!, out, pv, qv)
+        @test out == pv .+ 0.1f0 .* qv
+    end
+end
