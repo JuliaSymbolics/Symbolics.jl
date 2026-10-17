@@ -676,10 +676,10 @@ end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
     if parent(rhss) !== rhss
-        # Sparse parents are written through `out.nzval`. Any other wrapper (e.g.
-        # `Transpose`) may index differently from its parent, so densify it.
         if _issparse(rhss)
-            return _set_array(out, outputidxs, parent(rhss), checkbounds, skipzeros)
+            nz = findnz(sparse(rhss))
+            indices = CartesianIndex.(nz[1:(end - 1)]...)
+            return _set_array(out, indices, nz[end], checkbounds, skipzeros)
         end
         rhss = collect(rhss)
     end
