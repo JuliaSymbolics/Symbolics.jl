@@ -121,7 +121,38 @@ function wraps_type end
 has_symwrapper(::Type) = false
 is_wrapper_type(::Type) = false
 
-function wrap_func_expr(mod, expr, wrap_arrays = true)
+fntype_callable_type(::Type{FnType{A, R, T}}) where {A, R, T} = T
+fntype_callable_type(::Any) = Nothing
+
+# A symbolic function whose `symtype` is `FnType{A, R, T}` stands for a value of type `T`.
+function symtype_represents(S, T)
+    S <: T && return true
+    C = fntype_callable_type(S)
+    return C !== Nothing && C <: T
+end
+
+function registration_signatures(block)
+    Meta.isexpr(block, :block) || throw(ArgumentError("registration options must be a block"))
+    signatures = []
+    for option in block.args
+        MacroTools.isline(option) && continue
+        Meta.isexpr(option, :(=), 2) && option.args[1] === :signatures ||
+            throw(ArgumentError("expected signatures = [...] in registration options"))
+        signatures = option.args[2]
+    end
+    return signatures
+end
+
+function parse_args_list(args_list)
+    if args_list isa AbstractVector
+        return map(args_list) do signature
+            signature isa Tuple ? signature : (signature,)
+        end
+    end
+    return args_list
+end
+
+function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
     @assert expr.head == :function || (expr.head == :(=) &&
                                        expr.args[1] isa Expr &&
                                        expr.args[1].head == :call)
@@ -143,17 +174,17 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
     impl_name = Symbol(fname,"_", hash(string(args)*string(kwargs)))
 
     function kwargname(kwarg)
-        if kwarg isa Expr && kwarg.head == :kw
-            kwarg.args[1]
-        elseif kwarg isa Expr && kwarg.head == :(...)
-            kwarg.args[1]
+        return if kwarg isa Expr && kwarg.head in (:kw, :(...), :(::))
+            kwargname(kwarg.args[1])
         else
             kwarg
         end
     end
 
     function argname(arg)
-        if arg isa Expr && (arg.head == :(::) || arg.head == :(...))
+        return if arg isa Expr && arg.head == :(...)
+            throw(ArgumentError("@wrapped does not support varargs arguments; got `$arg` in the definition of `$fname`"))
+        elseif arg isa Expr && arg.head == :(::)
             arg.args[1]
         elseif arg isa Expr
             error("$arg not supported as an argument")
@@ -162,7 +193,8 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         end
     end
 
-    names = vcat(argname.(args), kwargname.(kwargs))
+    names = argname.(args)
+    kwnames = kwargname.(kwargs)
 
     function type_options(arg)
         # for every argument find the types that
@@ -197,9 +229,6 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
                 end
             end
             Ts
-        elseif arg isa Expr && arg.head == :(...)
-            Ts = type_options(arg.args[1])
-            map(x->Vararg{x},Ts)
         else
             (Any,)
         end
@@ -207,9 +236,11 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
 
     types = map(type_options, args)
 
-    impl = :(function $impl_name($self, $(names...))
-        $body
-    end)
+    impl = :(
+        function $impl_name($self, $(names...), $(kwnames...))
+            $body
+        end
+    )
 
     function is_wrapped_array_eltype(T)
         T <: AbstractArray || return false
@@ -226,7 +257,31 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         error("Unreachable")
     end
     # TODO: maybe don't drop first lol
-    methods = map(Iterators.drop(Iterators.product(types...), 1)) do Ts
+    if args_list isa Union{Expr, Symbol}
+        args_list = Base.eval(mod, args_list)
+    end
+    args_list = parse_args_list(args_list)
+    if isempty(args_list)
+        it = Iterators.drop(Iterators.product(types...), 1)
+    else
+        it = map(args_list) do signature
+            length(signature) == length(args) || throw(ArgumentError(
+                "each argument signature must match the number of positional arguments"))
+            Ts = map(signature) do T
+                T isa Type ? T : Base.eval(mod, T)
+            end
+            all(T -> T isa Type, Ts) || throw(ArgumentError(
+                "argument signatures must contain types"))
+            all(i -> any(U -> Ts[i] <: U, types[i]), eachindex(Ts)) ||
+                throw(ArgumentError("argument signatures must use supported argument types"))
+            any(T -> T <: SymbolicT || is_wrapper_type(T) ||
+                (T <: AbstractArray && (T <: AbstractArray{<:SymbolicT} ||
+                    is_wrapped_array_eltype(T))), Ts) || throw(ArgumentError(
+                "each argument signature must include a symbolic argument"))
+            Ts
+        end
+    end
+    methods = map(it) do Ts
         method_args = map(names, Ts) do n, T
             :($n::$T)
         end
@@ -243,7 +298,7 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
                 name
             end
         end
-        implcall = :($impl_name($self, $(impl_args...)))
+        implcall = :($impl_name($self, $(impl_args...), $(kwnames...)))
         if any_wrapper
             implcall = :($wrap($implcall))
         end
@@ -251,7 +306,7 @@ function wrap_func_expr(mod, expr, wrap_arrays = true)
         body = Expr(:block)
         for (i, T) in enumerate(Ts)
             if T === BasicSymbolic{VartypeT}
-                push!(body.args, :(@assert $symtype($(names[i])) <: $(types[i][1])))
+                push!(body.args, :(@assert $symtype_represents($symtype($(names[i])), $(types[i][1]))))
             elseif T <: (AbstractArray{S} where {S <: SymbolicT}) && eltype(types[i][1]) !== Any
                 push!(body.args, :(@assert $symtype($(names[i])[1]) <: $(eltype(types[i][1]))))
             end
@@ -307,10 +362,12 @@ the result is re-wrapped with [`Symbolics.wrap`](@ref) whenever at least one arg
 wrapped — so passing `Num`s in gets a `Num` back out, while passing raw `BasicSymbolic`s in
 returns a raw expression. Symbolic arguments additionally get an `@assert` that their
 `symtype` matches the declared annotation, which turns a type mismatch into an error at the
-call rather than a wrong answer downstream.
+call rather than a wrong answer downstream. A symbolic function whose `symtype` is
+`FnType{A, R, T}` matches an annotation `T`, since it stands for a callable of type `T`.
 
 Keyword arguments are forwarded as declared and are not expanded over; only positional
-arguments participate in the product.
+arguments participate in the product. Varargs arguments (`xs...`) are not supported and
+throw an `ArgumentError` at macro-expansion time.
 
 The optional trailing argument (default `true`) controls whether array-typed arguments are
 expanded over their symbolic-array and wrapped-array options. Pass `false` to suppress
@@ -334,7 +391,15 @@ applicable(foo, wrap(Foo{Int}()), wrap(2)) # true
 
 See also: [`@symbolic_wrap`](@ref), [`Symbolics.wrap`](@ref),
 [`SymbolicUtils.unwrap`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.unwrap).
+
+A final options block can set `signatures = [(Num, Real), ...]` to select the
+symbolic overloads to generate. Each tuple must match the positional argument
+count and include a symbolic type. Omitting `signatures`, or using an empty
+list, generates the default combinations.
 """
-macro wrapped(expr, wrap_arrays = true)
-    esc(wrap_func_expr(__module__, expr, wrap_arrays))
+macro wrapped(expr, wrap_arrays = true, block = :(begin end))
+    if Meta.isexpr(wrap_arrays, :block)
+        block, wrap_arrays = wrap_arrays, true
+    end
+    esc(wrap_func_expr(__module__, expr, wrap_arrays, registration_signatures(block)))
 end

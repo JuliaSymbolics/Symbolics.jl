@@ -10,6 +10,9 @@ on:
       - master
     paths-ignore:
       - 'docs/**'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -28,6 +31,8 @@ jobs:
           - '1'
         include:
           - group: QA
+            version: '1.10'
+          - group: Core
             version: '1.10'
     steps:
       - uses: actions/checkout@v7
