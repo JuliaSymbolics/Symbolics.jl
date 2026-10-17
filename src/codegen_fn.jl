@@ -68,6 +68,10 @@ Fields:
   infer it.
 - `outputidxs`: explicit output indices for in-place array codegen, or `nothing`.
 - `skipzeros`: skip writing structural zeros in in-place array codegen.
+- `scalarize_single_element_regions`: when `false`, a single-element region of an
+  `ArrayMaker` output that holds an array expression is written through a view of the
+  output instead of being scalarized. Arrays that disallow scalar indexing, such as GPU
+  arrays, need `false`.
 """
 struct CodegenFunctionOptions
     nanmath::Bool
@@ -79,17 +83,19 @@ struct CodegenFunctionOptions
     similarto::Any
     outputidxs::Any
     skipzeros::Bool
+    scalarize_single_element_regions::Bool
 end
 
 function CodegenFunctionOptions(;
         nanmath::Bool = true, wrap_code::Tuple = (identity, identity),
         checkbounds = false, iip_config::NTuple{2, Bool} = (true, true),
         sort_addmul = false, optimize = nothing, similarto = nothing,
-        outputidxs = nothing, skipzeros = false, kwargs...
+        outputidxs = nothing, skipzeros = false, scalarize_single_element_regions = true,
+        kwargs...
     )
     return CodegenFunctionOptions(
         nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
-        similarto, outputidxs, skipzeros
+        similarto, outputidxs, skipzeros, scalarize_single_element_regions
     )
 end
 
@@ -117,13 +123,15 @@ end
 function codegen_function(
         ir::IRStructure{VartypeT}, expr, args::Vector, opts::CodegenFunctionOptions
     )
-    (; nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize) = opts
+    (; nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
+        scalarize_single_element_regions) = opts
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
     if nanmath
         rewrites[:nanmath] = true
     end
     rewrites[:sort_addmul] = sort_addmul
+    rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
 
@@ -177,13 +185,14 @@ function codegen_function(
         opts::CodegenFunctionOptions
     )
     (; similarto, nanmath, wrap_code, iip_config, outputidxs, skipzeros, checkbounds,
-        optimize, sort_addmul) = opts
+        optimize, sort_addmul, scalarize_single_element_regions) = opts
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
     if nanmath
         rewrites[:nanmath] = true
     end
     rewrites[:sort_addmul] = sort_addmul
+    rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
 
     expr = _recursive_unwrap(expr)
 

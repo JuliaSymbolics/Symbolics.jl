@@ -619,3 +619,5 @@ struct Baz{T} end
     @test SU.promote_symtype(Bar, Int) === Bar{Int}
     @test SU.promote_symtype(Baz, String) === Baz{String}
 end
+
+include("registration_signatures.jl")
