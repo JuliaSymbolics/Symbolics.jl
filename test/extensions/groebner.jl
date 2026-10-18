@@ -3,6 +3,8 @@ using Symbolics: symbol_to_poly, poly_to_symbol
 using Groebner
 using Test
 
+include("../multivar_components.jl")
+
 @variables x y z
 
 syms = [
