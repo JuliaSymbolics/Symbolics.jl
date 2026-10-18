@@ -361,3 +361,44 @@ end
     without = Symbolics.codegen_function(ir, [sqrt(a)], [[a]]; nanmath = true, sort_addmul = true)
     @test string(with_bogus) == string(without)
 end
+
+# Records the `rewrites` that `codegen_function` hands to SymbolicUtils' code generation.
+struct RewritesProbe end
+const PROBED_REWRITES = Dict{Any, Any}()
+function SymbolicUtils.Code.codegen_function!(
+        ::RewritesProbe, cs::SymbolicUtils.Code.CodegenState{T},
+        expr::SymbolicUtils.BasicSymbolic{T}, expr_idx::Integer
+    ) where {T}
+    merge!(PROBED_REWRITES, cs.rewrites)
+    return SymbolicUtils.Code.codegen!(cs, expr_idx, cs(only(arguments(expr))))
+end
+
+@testset "`scalarize_single_element_regions`" begin
+    @test Symbolics.CodegenFunctionOptions().scalarize_single_element_regions
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    # Both `codegen_function` methods: a symbolic expression and an array of them.
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; scalarize_single_element_regions = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:scalarize_single_element_regions] === something(setting, true)
+    end
+
+    # Longer than `SymbolicUtils.Code.FILL_ARR_LIMIT`, so the output is not scalarized as a whole.
+    @variables p[1:20] q[1:20]
+    regions = [[1:19], [20:20]]
+    values = [unwrap(p[1:19] .+ q[1:19]), unwrap(p[20:20] .- q[1:1])]
+    maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(regions, values)
+    _, iip = Symbolics.codegen_function(ir, maker, [p, q])
+    @test occursin("batched_setindex!", string(iip))
+    # SymbolicUtils honours the rewrite from the first release after 4.50.0
+    # (JuliaSymbolics/SymbolicUtils.jl#1154).
+    if pkgversion(SymbolicUtils) > v"4.50.0"
+        _, iip = Symbolics.codegen_function(ir, maker, [p, q]; scalarize_single_element_regions = false)
+        @test !occursin("batched_setindex!", string(iip))
+        f! = eval(iip)
+        out = zeros(20)
+        Base.invokelatest(f!, out, collect(1.0:20), collect(10.0:10:200))
+        @test out ≈ [collect(1.0:19) .+ collect(10.0:10:190); 20.0 - 10.0]
+    end
+end

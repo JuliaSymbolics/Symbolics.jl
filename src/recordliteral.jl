@@ -18,7 +18,9 @@ Operation used to represent a symbolic struct literal of type `T`. A term using 
 operation carries symtype `T` and takes one argument per field of `T`, in `fieldnames(T)`
 order.
 
-This is the record counterpart of [`SymbolicUtils.array_literal`](@ref). An array whose
+This is the record counterpart of
+[SymbolicUtils.array_literal](https://docs.sciml.ai/SymbolicUtils/stable/api/#SymbolicUtils.array_literal).
+An array whose
 elements are symbolic is still an array, so `[p, q]` needs no special representation. A
 struct is nominal and its fields are usually concretely typed, so `T(p, q)` cannot be
 built as a value of `T` at all. A literal term stands in for that value: it names the

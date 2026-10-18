@@ -198,7 +198,7 @@ julia> inverse_laplace(7/(s+3)^3, F, s, f, t)
 (7//2)*exp(-3t)*(t^2)
 
 julia> inverse_laplace((s+2)/(s^2 - 3s - 4), F, s, f, t)
--(1//5)*exp(-t) + (6//5)*exp((4//1)*t)
+-(1//5)*exp(-t) + (6//5)*exp(4t)
 
 julia> inverse_laplace(1/s^4, F, s, f, t)
 (t^3) / 6
@@ -281,7 +281,7 @@ julia> Dt = Differential(t)
 Differential(t, 1)
 
 julia> laplace_solve_ode(Dt(f(t)) + 3f(t) ~ t^2*exp(-3t) + t*exp(-2t) + t, f, t, [1])
--(1//9) - exp((-2//1)*t) + (19//9)*exp((-3//1)*t) + (1//3)*t + exp((-2//1)*t)*t + (1//3)*exp((-3//1)*t)*(t^3)
+-(1//9) - exp(-2t) + (19//9)*exp(-3t) + (1//3)*t + exp(-2t)*t + (1//3)*exp(-3t)*(t^3)
 
 julia> laplace_solve_ode((Dt^2)(f(t)) + f(t) ~ 2 + 2cos(t), f, t, [0, 0])
 (2//1) - (2//1)*cos(t) + sin(t)*t
