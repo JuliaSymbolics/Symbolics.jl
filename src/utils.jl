@@ -726,13 +726,13 @@ function evaluate(ineq::Inequality, subs)
     rhs = substitute(ineq.rhs, subs)
     if (ineq.relational_op == geq)
         return if SymbolicUtils.isconst(rhs) && SymbolicUtils.isconst(lhs)
-            isless(unwrap_const(rhs), unwrap_const(lhs))::Bool
+            (unwrap_const(rhs) <= unwrap_const(lhs))::Bool
         else
             isless(rhs, lhs)
         end
     elseif (ineq.relational_op == leq)
         return if SymbolicUtils.isconst(lhs) && SymbolicUtils.isconst(rhs)
-            isless(unwrap_const(lhs), unwrap_const(rhs))::Bool
+            (unwrap_const(lhs) <= unwrap_const(rhs))::Bool
         else
             isless(lhs, rhs)
         end
