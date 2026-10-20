@@ -4,9 +4,11 @@ import DomainSets.ClosedInterval
 _is_nonneg_int(x) = x isa Integer && x >= 0
 # non-integer real exponents with a convergent transform: L{t^n} = Γ(n+1)/s^(n+1) for n > -1
 _is_frac_power(x) = x isa Real && !(x isa Integer) && x > -1
+# whether a transform result still contains an unevaluated integral-definition fallback
+_has_integral(x) = (y = unwrap(x); y isa BasicSymbolic && hasnode(z -> iscall(z) && operation(z) isa Integral, y))
 
 # from https://tutorial.math.lamar.edu/Classes/DE/Laplace_Table.aspx
-transform_rules(f, t, F, s) = Symbolics.Chain([
+transform_rules(f, t, F, s; trig_reduce=false) = Symbolics.Chain([
     @rule 1 => 1/s
     @rule exp(t) => 1/(s - 1)
     @rule exp(~a * t) => 1/(-~a + s)
@@ -40,7 +42,8 @@ transform_rules(f, t, F, s) = Symbolics.Chain([
     @rule t*exp(~a * t) => 1 / (-~a + s)^(2)
     @rule t^(~n::_is_nonneg_int) * exp(t) => factorial(~n) / (s - 1)^(~n + 1)
     @rule t*exp(t) => 1 / (s - 1)^(2)
-    @rule exp(~c*t) * ~g => laplace(~g, f, t, F, s - ~c) # s-shift rule
+    @rule exp((~!c)*t) * ~g => laplace(~g, f, t, F, s - ~c; trig_reduce=trig_reduce) # s-shift rule
+    @rule exp((~!c)*t) / ~g => laplace(1/~g, f, t, F, s - ~c; trig_reduce=trig_reduce) # s-shift rule, negative powers are stored as quotients
     @rule f(t)*t => -Differential(s)(F(s)) # s-derivative rule
     @rule f(t)*t^(~n::_is_nonneg_int) => (-1)^(~n) * (Differential(s)^~n)(F(s)) # s-derivative rule
     @rule f(~a + t) => exp(~a*s)*F(s) # t-shift rule
@@ -48,13 +51,15 @@ transform_rules(f, t, F, s) = Symbolics.Chain([
 ])
 
 """
-    laplace(expr, f, t, F, s)
+    laplace(expr, f, t, F, s; trig_reduce=false)
 
 Performs the Laplace transform of `expr` with respect to the variable `t`, where `f(t)` is a function in `expr` being transformed, and `F(s)` is the Laplace transform of `f(t)`. Returns the transformed expression in terms of `s`.
 
 Note that `f(t)` and `F(s)` should be defined using `@syms`
 
 Currently relies mostly on linearity and a rules table. When the rules table does not apply, it falls back to the integral definition of the Laplace transform.
+
+With `trig_reduce=true`, terms the rules cannot transform are first rewritten with `SymbolicUtils.trig_reduce`, turning products and powers of trigonometric and hyperbolic functions of `t` into sums of single harmonics (e.g. `2cos(t)sin(t)` into `sin(2t)`). The rewritten term is used only if it can be fully transformed. This is off by default because `trig_reduce` can be expensive.
 
 # Examples
 
@@ -86,9 +91,15 @@ julia> laplace(5f(t-4), f, t, F, s) # t-shift rule
 
 julia> laplace(log(t), f, t, F, s) # fallback to definition
 Integral(t, 0.0 .. Inf)(exp(-s*t)*log(t))
+
+julia> laplace(sqrt(t), f, t, F, s)
+sqrt(π) / (2(s^1.5))
+
+julia> laplace(2cos(t)*sin(t), f, t, F, s; trig_reduce=true)
+2 / (4 + s^2)
 ```
 """
-function laplace(expr, f, t, F, s; rules=nothing)
+function laplace(expr, f, t, F, s; rules=nothing, trig_reduce=false)
     expr = expand(expr)
 
     if isequal(expr, 0)
@@ -98,7 +109,7 @@ function laplace(expr, f, t, F, s; rules=nothing)
     Dt = Differential(t)
 
     if rules === nothing
-        rules = transform_rules(f, t, F, s)
+        rules = transform_rules(f, t, F, s; trig_reduce=trig_reduce)
     end
 
     transformed = rules(expr)
@@ -125,6 +136,18 @@ function laplace(expr, f, t, F, s; rules=nothing)
 
     # unable to apply linearity, so return based on definition
     if length(terms) == 1 && length(filter(x->isempty(Symbolics.get_variables(x)), _true_factors(terms[1]))) == 0
+        # opt-in last resort: rewrite products and powers of trigonometric/hyperbolic functions
+        # of t as sums of single harmonics, which the rules handle (e.g. 2cos(t)sin(t) -> sin(2t));
+        # only a fully transformed result is accepted, otherwise the fallback is unchanged
+        if trig_reduce
+            reduced = SymbolicUtils.trig_reduce(unwrap(expr); vars = [unwrap(t)])
+            if !isequal(reduced, unwrap(expr))
+                transformed = laplace(wrap(reduced), f, t, F, s, rules=rules, trig_reduce=true)
+                if !_has_integral(transformed)
+                    return transformed
+                end
+            end
+        end
         return Integral(t in ClosedInterval(0, Inf))(expr*exp(-s*t))
     end
 
@@ -133,17 +156,17 @@ function laplace(expr, f, t, F, s; rules=nothing)
         factors = _true_factors(term)
         constant = filter(x -> isempty(Symbolics.get_variables(x)), factors)
         if !isempty(constant)
-            result += laplace(term / constant[1], f, t, F, s, rules=rules) * constant[1]
+            result += laplace(term / constant[1], f, t, F, s, rules=rules, trig_reduce=trig_reduce) * constant[1]
         else 
-            result += laplace(term, f, t, F, s, rules=rules)
+            result += laplace(term, f, t, F, s, rules=rules, trig_reduce=trig_reduce)
         end
     end
 
     return result
 end
 
-function laplace(expr::Equation, f, t, F, s)
-    return laplace(expr.lhs, f, t, F, s) ~ laplace(expr.rhs, f, t, F, s)
+function laplace(expr::Equation, f, t, F, s; kwargs...)
+    return laplace(expr.lhs, f, t, F, s; kwargs...) ~ laplace(expr.rhs, f, t, F, s; kwargs...)
 end
 
 # postprocess_root prevents automatic evaluation of sqrt to its floating point value
