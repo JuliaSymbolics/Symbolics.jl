@@ -14,9 +14,16 @@ import Nemo, Groebner
 @test isequal(laplace(exp(3t)*(t^2 + 4t + 2), f, t, F, s), 2/(s-3)^3 + 4/(s-3)^2 + 2/(s-3))
 @test isequal(laplace(6exp(5t)*cos(2t) - exp(7t), f, t, F, s), 6(s-5)/((s-5)^2 + 4) + expand(-1/(s-7)))
 
+# regression tests for fixed transform rules
+@test isequal(laplace(t*exp(t), f, t, F, s), 1/(s-1)^2)
+@test isequal(laplace(t^3*exp(t), f, t, F, s), 6/(s-1)^4)
+@test isequal(laplace(t*sin(t), f, t, F, s), 2s/(1 + s^2)^2)
+
 # https://www.math.lsu.edu/~adkins/m2065/2065s08review2a.pdf
 @test isequal(inverse_laplace(7/(s+3)^3, F, s, f, t), (7//2)t^2 * exp(-3t))
 @test isequal(inverse_laplace((s-9)/(s^2 + 9), F, s, f, t), cos(3t) - 3sin(3t))
+# regression test for fixed inverse rule
+@test isequal(inverse_laplace(s*(-4 + s^2)/(4 + s^2)^2, F, s, f, t; warns=false), cos(2t) - 2t*sin(2t))
 # partial fraction decomposition
 @test isequal(inverse_laplace((s+2)/(s^2 - 3s - 4), F, s, f, t), (6//5)*exp(4t) - (1//5)*exp(-t))
 @test isequal(inverse_laplace(1/(s^2 - 10s + 9), F, s, f, t), (1//8)*exp(9t) - (1//8)*exp(t))
