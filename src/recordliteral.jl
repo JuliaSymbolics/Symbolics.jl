@@ -127,13 +127,6 @@ function record_literal_term(::Type{T}, args; check::Bool = true) where {T}
         RecordLiteral{T}(), cargs; type = T, shape = SU.ShapeVecT())
 end
 
-"""
-    $TYPEDSIGNATURES
-
-`T` with `Nothing` and `Missing` removed, or `Union{}` if that is all it was. These mark a
-field, or an element of one, that has not been filled in, and say nothing about the type
-it will hold.
-"""
 function _type_without(@nospecialize(a), @nospecialize(b))
     a <: b && return Union{}
     if a isa Union
@@ -142,6 +135,13 @@ function _type_without(@nospecialize(a), @nospecialize(b))
     return a
 end
 
+"""
+    $TYPEDSIGNATURES
+
+`T` with `Nothing` and `Missing` removed, or `Union{}` if that is all it was. These mark a
+field, or an element of one, that has not been filled in, and say nothing about the type
+it will hold.
+"""
 without_sentinels(@nospecialize(T)) = _type_without(_type_without(T, Nothing), Missing)
 
 """
