@@ -1,13 +1,19 @@
 import DomainSets.ClosedInterval
 
+# exponents for which factorial(n) and Differential(s)^n are defined
+_is_nonneg_int(x) = x isa Integer && x >= 0
+# non-integer real exponents with a convergent transform: L{t^n} = Γ(n+1)/s^(n+1) for n > -1
+_is_frac_power(x) = x isa Real && !(x isa Integer) && x > -1
+
 # from https://tutorial.math.lamar.edu/Classes/DE/Laplace_Table.aspx
 transform_rules(f, t, F, s) = Symbolics.Chain([
     @rule 1 => 1/s
     @rule exp(t) => 1/(s - 1)
     @rule exp(~a * t) => 1/(-~a + s)
     @rule t => 1/s^2
-    @rule t^~n => factorial(~n)/s^(~n + 1)
+    @rule t^(~n::_is_nonneg_int) => factorial(~n)/s^(~n + 1)
     @rule sqrt(t) => term(sqrt, pi)/(2 * s^(3/2))
+    @rule t^(~n::_is_frac_power) => term(gamma, ~n + 1)/s^(~n + 1)
     @rule sin(t) => 1/(1 + s^2)
     @rule sin(~a * t) => ~a/((~a)^2 + s^2)
     @rule cos(t) => s/(1 + s^2)
@@ -30,13 +36,13 @@ transform_rules(f, t, F, s) = Symbolics.Chain([
     @rule exp(~a*t) * cos(~b * t) => (-~a+s) / ((~b)^2 + (-~a+s)^2)
     @rule exp(~a*t) * sinh(~b * t) => ~b / (-(~b)^2 + (-~a+s)^2)
     @rule exp(~a*t) * cosh(~b * t) => (-~a+s) / (-(~b)^2 + (-~a+s)^2)
-    @rule t^~n * exp(~a * t) => factorial(~n) / (-~a + s)^(~n + 1)
+    @rule t^(~n::_is_nonneg_int) * exp(~a * t) => factorial(~n) / (-~a + s)^(~n + 1)
     @rule t*exp(~a * t) => 1 / (-~a + s)^(2)
-    @rule t^~n * exp(t) => factorial(~n) / (s - 1)^(~n + 1)
+    @rule t^(~n::_is_nonneg_int) * exp(t) => factorial(~n) / (s - 1)^(~n + 1)
     @rule t*exp(t) => 1 / (s - 1)^(2)
     @rule exp(~c*t) * ~g => laplace(~g, f, t, F, s - ~c) # s-shift rule
     @rule f(t)*t => -Differential(s)(F(s)) # s-derivative rule
-    @rule f(t)*t^(~n) => (-1)^(~n) * (Differential(s)^~n)(F(s)) # s-derivative rule
+    @rule f(t)*t^(~n::_is_nonneg_int) => (-1)^(~n) * (Differential(s)^~n)(F(s)) # s-derivative rule
     @rule f(~a + t) => exp(~a*s)*F(s) # t-shift rule
     @rule f(t) => F(s)
 ])

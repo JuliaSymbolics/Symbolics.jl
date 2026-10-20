@@ -18,6 +18,22 @@ import Nemo, Groebner
 @test isequal(laplace(t*exp(t), f, t, F, s), 1/(s-1)^2)
 @test isequal(laplace(t^3*exp(t), f, t, F, s), 6/(s-1)^4)
 @test isequal(laplace(t*sin(t), f, t, F, s), 2s/(1 + s^2)^2)
+@test isequal(laplace(sqrt(t), f, t, F, s), Symbolics.term(sqrt, pi)/(2 * s^(3//2)))
+@test isequal(laplace(t^(1//2), f, t, F, s), Symbolics.term(sqrt, pi)/(2 * s^(3//2)))
+@test isequal(laplace(t^(3//2), f, t, F, s), Symbolics.term(Symbolics.gamma, 5//2)/s^(5//2))
+@test isequal(laplace(t^(5//2), f, t, F, s), Symbolics.term(Symbolics.gamma, 7//2)/s^(7//2))
+@test isequal(laplace(t^(-1//2), f, t, F, s), Symbolics.term(Symbolics.gamma, 1//2)/s^(1//2))
+# powers with n <= -1 diverge: fall back to the integral definition rather than erroring
+@test Symbolics.operation(Symbolics.value(laplace(t^(-2), f, t, F, s))) isa Symbolics.Integral
+@test Symbolics.operation(Symbolics.value(laplace(1/t, f, t, F, s))) isa Symbolics.Integral
+@test isequal(laplace(t^(1//2)*exp(2t), f, t, F, s), Symbolics.term(sqrt, pi)/(2 * (s - 2)^(3//2)))
+@test isequal(laplace(t^(3//2)*exp(2t), f, t, F, s), Symbolics.term(Symbolics.gamma, 5//2)/(s - 2)^(5//2))
+# fractional or symbolic powers without a closed-form rule fall back to the integral definition
+@test Symbolics.operation(Symbolics.value(laplace(t^(1//2)*f(t), f, t, F, s))) isa Symbolics.Integral
+let
+    @variables n
+    @test Symbolics.operation(Symbolics.value(laplace(t^n, f, t, F, s))) isa Symbolics.Integral
+end
 
 # https://www.math.lsu.edu/~adkins/m2065/2065s08review2a.pdf
 @test isequal(inverse_laplace(7/(s+3)^3, F, s, f, t), (7//2)t^2 * exp(-3t))
