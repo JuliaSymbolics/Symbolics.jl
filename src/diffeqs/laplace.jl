@@ -1,11 +1,17 @@
 import DomainSets.ClosedInterval
 
 # exponents for which factorial(n) and Differential(s)^n are defined
-_is_nonneg_int(x) = x isa Integer && x >= 0
+function _is_nonneg_int(@nospecialize(x))
+    x = unwrap_const(x)
+    return x isa Integer && (x >= 0)::Bool
+end
 # non-integer real exponents with a convergent transform: L{t^n} = Γ(n+1)/s^(n+1) for n > -1
-_is_frac_power(x) = x isa Real && !(x isa Integer) && x > -1
+function _is_frac_power(@nospecialize(x))
+    x = unwrap_const(x)
+    return x isa Real && !(x isa Integer) && (x > -1)::Bool
+end
 # whether a transform result still contains an unevaluated integral-definition fallback
-_has_integral(x) = (y = unwrap(x); y isa BasicSymbolic && hasnode(z -> iscall(z) && operation(z) isa Integral, y))
+_has_integral(x) = (y = unwrap(x); y isa SymbolicT && hasnode(z -> iscall(z) && operation(z) isa Integral, y))
 
 # from https://tutorial.math.lamar.edu/Classes/DE/Laplace_Table.aspx
 transform_rules(f, t, F, s; trig_reduce=false) = Symbolics.Chain([
