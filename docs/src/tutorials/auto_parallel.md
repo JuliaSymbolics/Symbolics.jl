@@ -70,7 +70,7 @@ fastf = eval(Symbolics.build_function(du,u,
 Now let's compute the sparse Jacobian function and compile a fast multithreaded version:
 
 ```@example auto_parallel
-jac = Symbolics.sparsejacobian(vec(du), vec(u))
+jac = Symbolics.sparsejacobian(vec(du), vec(collect(u)))
 row,col,val = findnz(jac)
 scatter(row,col,legend=false,ms=1,c=:black)
 ```
