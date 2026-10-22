@@ -899,6 +899,7 @@ end
 
 function jacobian(ops, vars; simplify=false, kwargs...)
     ops = vec(scalarize(ops))
+    ops isa Vector || (ops = collect(ops))
     if ops isa Vector{Num}
         ops = unwrap.(ops)::Vector{SymbolicT}
     elseif ops isa Vector{SymbolicT}
@@ -907,6 +908,7 @@ function jacobian(ops, vars; simplify=false, kwargs...)
     end
     # Suboptimal, but prevents wrong results on Arr for now. Arr resulting from a symbolic function will fail on this due to unknown size.
     vars = vec(scalarize(vars))
+    vars isa Vector || (vars = collect(vars))
     if vars isa Vector{Num}
         vars = unwrap.(vars)::Vector{SymbolicT}
     elseif vars isa Vector{SymbolicT}
