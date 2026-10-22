@@ -310,6 +310,26 @@ function Symbolics.solve_multivar(eqs::Vector, vars::Vector{Num}; dropmultiplici
     !isnothing(sol) && return sol
     tr_basis = transendence_basis(eqs, vars)
     isempty(tr_basis) && return nothing
+    # Factoring preserves components where a coefficient in the free variables vanishes.
+    basis = Symbolics.wrap.(Symbolics.groebner_basis(eqs))
+    for (i, eq) in enumerate(basis)
+        _, factors = Symbolics.factor_use_nemo(eq)
+        filter!(f -> !isempty(intersect(Symbolics.get_variables(f), vars)), factors)
+        length(factors) > 1 || continue
+        solutions = []
+        for factor in factors
+            branch = copy(basis)
+            branch[i] = factor
+            branch = Symbolics.wrap.(Symbolics.groebner_basis(branch))
+            isequal(branch, [1]) && continue
+            branch_solutions = Symbolics.solve_multivar(
+                branch, vars; dropmultiplicity = dropmultiplicity, warns = warns
+            )
+            isnothing(branch_solutions) && return nothing
+            append!(solutions, branch_solutions)
+        end
+        return dropmultiplicity ? unique(solutions) : solutions
+    end
     vars_gen = setdiff(vars, tr_basis)
     # Empty vars_gen would send solve_zerodim into an infinite separating-form loop.
     isempty(vars_gen) && return nothing
