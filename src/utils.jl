@@ -196,10 +196,10 @@ Base.Symbol(x::Num) = Symbol(unwrap(x))
 tosymbol(t::Num; kwargs...) = tosymbol(value(t); kwargs...)
 
 """
-    diff2term(x) -> BasicSymbolic
+    diff2term(x)
 
-Convert a differential variable to a `Term`. Note that it only takes a `Term`
-not a `Num`.
+Convert a differentiated variable to a named symbolic variable, preserving field
+and index accesses. Scalar and array wrappers are preserved.
 
 ```jldoctest
 julia> using Symbolics
@@ -218,6 +218,9 @@ uˍxt(x, t)
 
 julia> Symbolics.diff2term(Symbolics.value(Dt(z[1])))
 (zˍt(t))[1]
+
+julia> isequal(Symbolics.diff2term(Dt(z[1:1])), Symbolics.diff2term(Dt(z))[1:1])
+true
 ```
 """
 function diff2term(O::SymbolicT)
@@ -235,27 +238,25 @@ function diff2term(O::SymbolicT)
     end
     isempty(opchain) && return O
 
-    # Handle struct field accesses: D(f.x) → diff2term(D(f)).x
+    # Array slices need not have a name, so rename their base variable.
     # References to SymbolicGetproperty / field_name / SymStruct are late-bound (from symstruct.jl).
-    has_gp = false
-    access_ops = Union{Symbol, SU.StableIndex{Int}}[]
+    access_ops = Union{Symbol, SymbolicT}[]
     cur = inner
     while iscall(cur)
         f = operation(cur)
         args = arguments(cur)
         if f isa SymbolicGetproperty
-            has_gp = true
             push!(access_ops, field_name(f))              # Symbol (field name)
             cur = args[1]
         elseif f === getindex
-            push!(access_ops, SU.StableIndex{Int}(cur))  # StableIndex extracted from the full getindex term
+            push!(access_ops, cur)
             cur = args[1]
         else
             break
         end
     end
 
-    if has_gp
+    if !isempty(access_ops)
         # Reconstruct D^n(cur) and apply diff2term to the base variable.
         diff_cur = cur
         for d in Iterators.reverse(opchain)    # opchain is outer→inner; reverse to build inside-out
@@ -267,8 +268,8 @@ function diff2term(O::SymbolicT)
             if op isa Symbol
                 T = symtype(result)
                 result = unwrap(getproperty(SymStruct{T}(result), op))
-            else   # SU.StableIndex{Int}
-                result = result[op]
+            else
+                result = result[unwrap_const.(arguments(op)[2:end])...]
             end
         end
         return result
