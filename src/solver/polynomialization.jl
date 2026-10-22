@@ -324,7 +324,7 @@ function detect_sqrtpoly(lhs, var)
         end
     end
 
-    isequal(sqrt_term_n + poly_term_n, lhs)
+    return sqrt_term && isequal(sqrt_term_n + poly_term_n, lhs)
 end
 
 function attract_and_solve_sqrtpoly(lhs, var)
