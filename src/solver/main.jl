@@ -48,6 +48,14 @@ Currently, `symbolic_solve` supports
 - Systems of linear and polynomials equations (without extra parameters, for now)
 - Equations with transcendental functions (with parameters)
 
+!!! note
+    For non-square (underdetermined / positive-dimensional) polynomial systems,
+    `symbolic_solve` may return a parametric solution by choosing a transcendence
+    basis heuristically. That choice is not proven correct for every system
+    (irreducible components can have different transcendence bases), so such
+    results should be treated as provisional and checked by substitution when
+    possible.
+
 ## Examples
 
 ### `solve_univar` (uses factoring and analytic solutions up to degree 4)
