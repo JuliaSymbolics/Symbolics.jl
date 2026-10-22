@@ -237,7 +237,7 @@ include("taylor.jl")
 export series, taylor, taylor_coeff
 
 export SymStruct, @symstruct
-@public record_literal, is_record_literal, RecordLiteral
+@public record_literal, is_record_literal, RecordLiteral, record_literal_term
 include("symstruct.jl")
 include("recordliteral.jl")
 include("symzero.jl")
