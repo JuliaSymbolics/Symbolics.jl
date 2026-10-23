@@ -11,7 +11,7 @@ function _is_frac_power(@nospecialize(x))
     return x isa Real && !(x isa Integer) && (x > -1)::Bool
 end
 # whether a transform result still contains an unevaluated integral-definition fallback
-_has_integral(x) = (y = unwrap(x); y isa SymbolicT && hasnode(z -> iscall(z) && operation(z) isa Integral, y))
+_has_integral(x) = (y = unwrap(x); y isa SymbolicT && SU.query(z -> iscall(z) && operation(z) isa Integral, y))
 
 # from https://tutorial.math.lamar.edu/Classes/DE/Laplace_Table.aspx
 transform_rules(f, t, F, s; trig_reduce=false) = Symbolics.Chain([
