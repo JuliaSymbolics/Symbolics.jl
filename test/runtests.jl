@@ -86,6 +86,9 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "RootFinding solver" begin include("solver.jl") end
         @safetestset "Function inverses test" begin include("inverse.jl") end
         @safetestset "Taylor Series Test" begin include("taylor.jl") end
+        @safetestset "Series Core Test" begin include("series_core.jl") end
+        @safetestset "Series Expansion (_nseries) Test" begin include("series_nseries.jl") end
+        @safetestset "Series leadterm / expand_series Test" begin include("series_leadterm.jl") end
         @safetestset "Discontinuity registration test" begin include("discontinuities.jl") end
         @safetestset "ODE solver test" begin include("diffeqs.jl") end
         @safetestset "Laplace transform test" begin include("laplace.jl") end

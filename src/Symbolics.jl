@@ -235,6 +235,8 @@ export groebner_basis, is_groebner_basis
 
 include("taylor.jl")
 export series, taylor, taylor_coeff
+include("series_expansion.jl")
+export leadterm, expand_series
 
 export SymStruct, @symstruct
 include("symstruct.jl")
