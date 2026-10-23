@@ -217,7 +217,7 @@ see also: [`is_periodic`](@ref)
 function fundamental_period end
 
 for fn in [sin, cos, csc, sec, NaNMath.sin, NaNMath.cos]
-    @eval fundamental_period(::typeof($fn)) = 2pi
+    @eval fundamental_period(::typeof($fn)) = Symbolics.term(*, 2, Base.MathConstants.pi)
 end
 
 for fn in [sind, cosd, cscd, secd]
@@ -231,6 +231,6 @@ for fn in [tand, cotd]
 end
 
 for fn in [tan, cot, NaNMath.tan]
-    # `1pi isa Float64` whereas `pi isa Irrational{:π}`
-    @eval fundamental_period(::typeof($fn)) = 1pi
+    # Keep π symbolic so Int*π does not promote to Float64.
+    @eval fundamental_period(::typeof($fn)) = Symbolics.term(*, 1, Base.MathConstants.pi)
 end
