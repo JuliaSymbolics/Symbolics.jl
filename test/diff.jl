@@ -987,4 +987,7 @@ let
     @test isequal(Nabla([a, b])(1), [0, 0])
     @test isequal(Nabla([a, b])(2.5), [0, 0])
     @test isequal(expand_derivatives(Laplacian([a, b])(1)), 0)
+    directional = LinearAlgebra.dot([1, 2], Nabla([a, b]))
+    @test isequal(expand_derivatives.(directional([a^2, b^2])), [2a, 4b])
+    @test isequal(expand_derivatives(directional(a^2 + b^2)), 2a + 4b)
 end

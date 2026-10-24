@@ -1424,7 +1424,8 @@ end
 
 function LinearAlgebra.dot(x::AbstractVector, D::ArrayDifferentialOperator)
     check_operator_length(D, x)
-    return y -> sum(x[i] * D.differentials[i](y) for i in eachindex(x))
+    directional(y) = sum(x[i] * D.differentials[i](y) for i in eachindex(x))
+    return y -> y isa AbstractVector ? Num[directional(yj) for yj in scalarize(y)] : directional(y)
 end
 
 function LinearAlgebra.dot(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
