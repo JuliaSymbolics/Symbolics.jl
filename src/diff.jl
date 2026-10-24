@@ -1403,7 +1403,9 @@ function (D::ArrayDifferentialOperator)(x::AbstractVector)
 end
 
 function (D1::ArrayDifferentialOperator)(D2::ArrayDifferentialOperator)
-    @assert all(v -> any(isequal(v), D2.vars), D1.vars)
+    all(v -> any(isequal(v), D2.vars), D1.vars) || throw(ArgumentError("Operators have different variables and cannot be composed."))
+    length(D1.vars) == length(D1.differentials) == length(D2.vars) == length(D2.differentials) ||
+        throw(DimensionMismatch("Operators have different numbers of components and cannot be composed."))
     return ArrayDifferentialOperator(D1.vars, Any[d1 ∘ d2 for (d1, d2) in zip(D1.differentials, D2.differentials)], "(" * D1.name * "∘" * D2.name * ")")
 end
 
@@ -1455,4 +1457,4 @@ function Base.:(==)(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator
     @variables x[1:length(D1.vars)]
     return all(isequal.(D1(collect(x)), D2(collect(x))))
 end
-Base.hash(D::ArrayDifferentialOperator, u::UInt) = hash(D.name, hash(D.vars, u))
+Base.hash(D::ArrayDifferentialOperator, u::UInt) = hash(length(D.vars), hash(D.vars, u))

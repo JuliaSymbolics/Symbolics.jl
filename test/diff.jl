@@ -964,4 +964,12 @@ let
             ],
         ),
     )
+
+    @variables a b
+    D = Nabla([a, b])
+    @test D(D)(D) == D(D(D))
+    @test hash(D(D)(D)) == hash(D(D(D)))
+    @test get(Dict(D(D)(D) => 1), D(D(D)), :missing) == 1
+    @test_throws DimensionMismatch Nabla([a])(Nabla([a, b]))
+    @test_throws DimensionMismatch Nabla([a, a])(Nabla([a]))
 end
