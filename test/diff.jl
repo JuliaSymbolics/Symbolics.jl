@@ -926,10 +926,15 @@ let
 
     out = ∇ × y
     @test isequal(out, Curl(x)(y))
-    @test all(isequal.(scalarize(out), [Differential(x[2])(y[3]) - Differential(x[3])(y[2]),
-        Differential(x[3])(y[1]) - Differential(x[1])(y[3]),
-        Differential(x[1])(y[2]) - Differential(x[2])(y[1])]))
-
+    @test all(
+        isequal.(
+            scalarize(out), [
+                Differential(x[2])(y[3]) - Differential(x[3])(y[2]),
+                Differential(x[3])(y[1]) - Differential(x[1])(y[3]),
+                Differential(x[1])(y[2]) - Differential(x[2])(y[1]),
+            ]
+        )
+    )
 
 
     out = (∇ ⋅ ∇)(y)
@@ -937,9 +942,11 @@ let
     @test all(
         isequal.(
             scalarize(out),
-            [Differential(x[1])(Differential(x[1])(y[1])) + Differential(x[2])(Differential(x[2])(y[1])) + Differential(x[3])(Differential(x[3])(y[1])),
+            [
+                Differential(x[1])(Differential(x[1])(y[1])) + Differential(x[2])(Differential(x[2])(y[1])) + Differential(x[3])(Differential(x[3])(y[1])),
                 Differential(x[1])(Differential(x[1])(y[2])) + Differential(x[2])(Differential(x[2])(y[2])) + Differential(x[3])(Differential(x[3])(y[2])),
-                Differential(x[1])(Differential(x[1])(y[3])) + Differential(x[2])(Differential(x[2])(y[3])) + Differential(x[3])(Differential(x[3])(y[3]))],
+                Differential(x[1])(Differential(x[1])(y[3])) + Differential(x[2])(Differential(x[2])(y[3])) + Differential(x[3])(Differential(x[3])(y[3])),
+            ],
         ),
     )
 
@@ -950,9 +957,11 @@ let
     @test all(
         isequal.(
             scalarize(out),
-            [Differential(x[2])(Differential(x[3])(y[1])) - Differential(x[3])(Differential(x[2])(y[1])),
+            [
+                Differential(x[2])(Differential(x[3])(y[1])) - Differential(x[3])(Differential(x[2])(y[1])),
                 Differential(x[3])(Differential(x[1])(y[2])) - Differential(x[1])(Differential(x[3])(y[2])),
-                Differential(x[1])(Differential(x[2])(y[3])) - Differential(x[2])(Differential(x[1])(y[3]))],
+                Differential(x[1])(Differential(x[2])(y[3])) - Differential(x[2])(Differential(x[1])(y[3])),
+            ],
         ),
     )
 end

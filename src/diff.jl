@@ -1394,7 +1394,7 @@ Curl(vars) = x -> LinearAlgebra.cross(Nabla(vars), x)
 Laplacian(vars) = LinearAlgebra.dot(Nabla(vars), Nabla(vars))
 
 function check_operator_length(D::ArrayDifferentialOperator, x)
-    length(D.vars) == length(x) || throw(DimensionMismatch("Vector must be same length as vars in Operator $(D.name)."))
+    return length(D.vars) == length(x) || throw(DimensionMismatch("Vector must be same length as vars in Operator $(D.name)."))
 end
 
 function (D::ArrayDifferentialOperator)(x::AbstractVector)
