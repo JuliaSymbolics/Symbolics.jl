@@ -1409,7 +1409,7 @@ function (D::ArrayDifferentialOperator)(x::AbstractVector)
     return Num[D.differentials[i](x[i]) for i in eachindex(x)]
 end
 
-(D::ArrayDifferentialOperator)(x::Num) = Num[d(x) for d in D.differentials]
+(D::ArrayDifferentialOperator)(x::Union{Num, AbstractFloat, Integer}) = Num[d(x) for d in D.differentials]
 
 function (D1::ArrayDifferentialOperator)(D2::ArrayDifferentialOperator)
     all(v -> any(isequal(v), D2.vars), D1.vars) || throw(ArgumentError("Operators have different variables and cannot be composed."))

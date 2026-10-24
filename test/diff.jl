@@ -984,4 +984,7 @@ let
     lap = Laplacian([a, b])(f)
     @test lap isa Num
     @test isequal(expand_derivatives(lap), 4)
+    @test isequal(Nabla([a, b])(1), [0, 0])
+    @test isequal(Nabla([a, b])(2.5), [0, 0])
+    @test isequal(expand_derivatives(Laplacian([a, b])(1)), 0)
 end
