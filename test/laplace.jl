@@ -45,6 +45,19 @@ import Nemo, Groebner
 @variables n
 @test Symbolics._has_integral(laplace(t^n, f, t, F, s))
 
+# AC-matching soundness: a parameter slot ~a must not bind a factor containing t, otherwise
+# t would leak into the s-domain. These products must fall back to the integral definition.
+@variables a b omega
+@test Symbolics._has_integral(laplace(sin(cos(t)*t), f, t, F, s))
+@test Symbolics._has_integral(laplace(sin(t*cos(t)), f, t, F, s))
+@test Symbolics._has_integral(laplace(cos(sin(t)*t), f, t, F, s))
+# symbolic parameters are constants w.r.t. t and must factor out / be accepted as coefficients
+@test isequal(laplace(a*sin(2t), f, t, F, s), 2a/(4 + s^2))
+@test isequal(laplace(a*sin(omega*t), f, t, F, s), a*omega/(omega^2 + s^2))
+@test isequal(laplace(a*cos(omega*t), f, t, F, s), a*s/(omega^2 + s^2))
+@test isequal(laplace(a*t^2, f, t, F, s), 2a/s^3)
+@test isequal(laplace(sin(omega*t), f, t, F, s), omega/(omega^2 + s^2))
+
 # opt-in trig_reduce for products and powers of trig/hyperbolic functions (values verified against SymPy)
 @test isequal(laplace(2cos(t)*sin(t), f, t, F, s; trig_reduce=true), 2/(s^2 + 4))
 @test isequal(laplace(sin(t)^2, f, t, F, s; trig_reduce=true), -(1//2)*s/(s^2 + 4) + (1//2)/s)
@@ -66,6 +79,23 @@ import Nemo, Groebner
 # partial fraction decomposition
 @test isequal(inverse_laplace((s+2)/(s^2 - 3s - 4), F, s, f, t), (6//5)*exp(4t) - (1//5)*exp(-t))
 @test isequal(inverse_laplace(1/(s^2 - 10s + 9), F, s, f, t), (1//8)*exp(9t) - (1//8)*exp(t))
+
+# inverse power rule with fractional exponents uses gamma instead of factorial (no crash)
+@test isequal(inverse_laplace(1/s^(3//2), F, s, f, t; warns=false), t^(1//2)/Symbolics.term(Symbolics.gamma, 3//2))
+@test isequal(inverse_laplace(1/s^(5//2), F, s, f, t; warns=false), t^(3//2)/Symbolics.term(Symbolics.gamma, 5//2))
+@test isequal(inverse_laplace(1/(s+2)^(3//2), F, s, f, t; warns=false), exp(-2t)*t^(1//2)/Symbolics.term(Symbolics.gamma, 3//2))
+# symbolic constants factor out of the inverse transform
+@variables c d
+@test isequal(inverse_laplace(c/(s+d), F, s, f, t; warns=false), c*exp(-d*t))
+
+# irreducible quadratic denominators via completing the square (values verified against SymPy)
+# (2s+3)/((s+2)^2+9) = (2(s+2)-1)/((s+2)^2+9) -> exp(-2t)(2cos3t - (1/3)sin3t)
+@test isequal(inverse_laplace((2s+3)/(s^2+4s+13), F, s, f, t; warns=false),
+              2*(cos(3t) - (2//3)*sin(3t))*exp(-2t) + exp(-2t)*sin(3t))
+@test isequal(expand(inverse_laplace(1/(s^2+2s+5), F, s, f, t; warns=false) - (1//2)*exp(-t)*sin(2t)), 0)
+@test isequal(expand(inverse_laplace(s/(s^2+2s+5), F, s, f, t; warns=false) - exp(-t)*(cos(2t) - (1//2)*sin(2t))), 0)
+# repeated real root
+@test isequal(inverse_laplace(1/(s^2+4s+4), F, s, f, t; warns=false), exp(-2t)*t)
 
 Dt = Differential(t)
 @test_skip isequal(laplace_solve_ode(Dt(f(t)) + 3f(t) ~ t^2*exp(-3t) + t*exp(-2t) + t, f, t, [1]), (1//3)*t^3*exp(-3t) + t*exp(-2t) + (1//3)*t + (19//9)*exp(-3t) - exp(-2t) - 1//9) # generates very large system of equations that solve_interms_ofvar has trouble with
