@@ -972,4 +972,9 @@ let
     @test get(Dict(D(D)(D) => 1), D(D(D)), :missing) == 1
     @test_throws DimensionMismatch Nabla([a])(Nabla([a, b]))
     @test_throws DimensionMismatch Nabla([a, a])(Nabla([a]))
+    @test_throws DimensionMismatch LinearAlgebra.dot(Nabla([a]), Nabla([a, a]))
+    @test_throws DimensionMismatch LinearAlgebra.dot(Nabla([a, a]), Nabla([a]))
+    @variables c[1:3]
+    @test_throws DimensionMismatch LinearAlgebra.cross(Nabla([c[1], c[2]]), Nabla(c))
+    @test_throws DimensionMismatch LinearAlgebra.cross(Nabla(c), Nabla([c[1], c[2]]))
 end

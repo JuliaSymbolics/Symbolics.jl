@@ -1397,6 +1397,13 @@ function check_operator_length(D::ArrayDifferentialOperator, x)
     return length(D.vars) == length(x) || throw(DimensionMismatch("Vector must be same length as vars in Operator $(D.name)."))
 end
 
+function check_composable(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
+    length(D1.vars) == length(D1.differentials) == length(D2.vars) == length(D2.differentials) ||
+        throw(DimensionMismatch("Operators have different numbers of components and cannot be composed."))
+    all(isequal.(D1.vars, D2.vars)) || throw(ArgumentError("Operators have different variables and cannot be composed."))
+    return nothing
+end
+
 function (D::ArrayDifferentialOperator)(x::AbstractVector)
     check_operator_length(D, x)
     return Num[D.differentials[i](x[i]) for i in eachindex(x)]
@@ -1419,7 +1426,7 @@ function LinearAlgebra.dot(x::AbstractVector, D::ArrayDifferentialOperator)
 end
 
 function LinearAlgebra.dot(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
-    all(isequal.(D1.vars, D2.vars)) || throw(ArgumentError("Operators have different variables and cannot be composed."))
+    check_composable(D1, D2)
     return x -> Num[sum((D1.differentials[i] ∘ D2.differentials[i])(xj) for i in eachindex(D1.vars)) for xj in scalarize(x)]
 end
 
@@ -1444,7 +1451,7 @@ end
 
 function LinearAlgebra.cross(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
     length(D1.vars) == length(D2.vars) == 3 || throw(DimensionMismatch("Cross product is only defined in 3 dimensions."))
-    all(isequal.(D1.vars, D2.vars)) || throw(ArgumentError("Operators have different variables and cannot be composed."))
+    check_composable(D1, D2)
     return ArrayDifferentialOperator(D1.vars, crosscompose(D1.differentials, D2.differentials), "(" * D1.name * "×" * D2.name * ")")
 end
 
