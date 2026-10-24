@@ -1,6 +1,8 @@
 using Symbolics
+using SymbolicUtils
 using Test
 using LinearAlgebra
+using SymbolicUtils: symtype
 
 # Transpose and multiply
 
@@ -17,8 +19,14 @@ function adjmul_rand_leaf()
     a = rand(adjmul_leaf_nodes)
     rand(Bool) ?  a' : a
 end
-isadjvec(x::Symbolics.ArrayOp) = x.term.f == adjoint && ndims(Symbolics.arguments(x.term)[1]) == 1
-isadjvec(x) = false
+function isadjvec(x)
+    iscall(x) && (operation(x) === adjoint || operation(x) === transpose) && (
+        ndims(arguments(x)[1]) == 1 ||
+        ndims(arguments(x)[1]) == 2 && length(axes(arguments(x)[1], 2)) == 1)
+end
+isadjvec(x::Adjoint) = ndims(parent(x)) == 1
+isadjvec(x::Transpose) = ndims(parent(x)) == 1
+isdot(A, b) = isadjvec(A) && ndims(b) == 1
 
 function rand_mul_expr(a=adjmul_rand_leaf(),
                        b=adjmul_rand_leaf())
@@ -39,19 +47,15 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
     sz = try size(a * b) catch err; nothing end
 
     if sz !== nothing
-        try
-            size(a)
-            size(b)
-            @goto test_size
-        catch err
-            return # no size known
+        if size(a) isa SymbolicUtils.Unknown || size(b) isa SymbolicUtils.Unknown
+            return
         end
-        @label test_size
 
-        if (isadjvec(Symbolics.unwrap(a)) && ndims(b) == 1) || Symbolics.isdot(a, b)
+        if (isadjvec(Symbolics.unwrap(a)) && ndims(b) == 1) || isdot(a, b)
             if size(a*b) != ()
                 println("a * b is wrong:")
                 @show a b
+                @show symtype(a) symtype(b)
                 @show typeof(a) typeof(b)
                 return @test size(a*b) == ()
             else
@@ -62,12 +66,20 @@ function rand_mul_expr(a=adjmul_rand_leaf(),
         ab_sample = rand(stype(eltype(a)), size(a)...) * rand(stype(eltype(b)), size(b)...)
         if size(a * b) == size(ab_sample)
             @test true
-            @test (eltype(a*b) <: Real && eltype(ab_sample) <: Real) || (eltype(ab_sample) <: Complex && eltype(a*b) <: Complex)
+            @test (eltype(symtype(a*b)) <: Real && eltype(ab_sample) <: Real) || (eltype(ab_sample) <: Complex && eltype(symtype(a*b)) <: Complex)
         else
             println("a * b is wrong:")
             @show a b
+                @show symtype(a) symtype(b)
             @show typeof(a) typeof(b)
-            @test size(a * b) == size(rand(size(a)...) * rand(size(b)...))
+            @show a * b
+            @show isadjvec(Symbolics.unwrap(a))
+            target_size = size(rand(size(a)...) * rand(size(b)...))
+            @show target_size
+            if target_size == (1,) && isadjvec(Symbolics.unwrap(a))
+                target_size = ()
+            end
+            @test size(a * b) == target_size
         end
     end
 end

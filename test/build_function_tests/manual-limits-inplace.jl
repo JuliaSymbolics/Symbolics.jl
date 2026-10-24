@@ -1,12 +1,13 @@
-:(function (u,)
-      let ˍ₋out = zeros(Float64, map(length, (Base.OneTo(5), Base.OneTo(5))))
-          begin
-              for (j, j′) = zip(1:5, reset_to_one(1:5))
-                  for (i, i′) = zip(1:5, reset_to_one(1:5))
-                      ˍ₋out[i′, j′] = (+)(ˍ₋out[i′, j′], (getindex)(u, (limit)((+)(-1, i), 5), (limit)((+)(1, j), 5)))
+:(function (ˍ₋out, u)
+      let _out = ˍ₋out
+          var"%_out" = for _2 = 1:1:5
+                  for _1 = 1:1:5
+                      begin
+                          _out[(CartesianIndex)(_1, _2)] = (+)((getindex)(_out, _1, _2), (getindex)(u, (limit2)((+)(-1, _1), 5), (limit2)((+)(1, _2), 5)))
+                          nothing
+                      end
                   end
               end
-          end
-          ˍ₋out
+          _out
       end
   end)

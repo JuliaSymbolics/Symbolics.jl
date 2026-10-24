@@ -11,21 +11,43 @@ and easily understandable to all Julia programmers.
 
 ## Functionality Inherited From SymbolicUtils.jl
 
+The [`substitute`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.substitute)
+and [`simplify`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.simplify)
+functions are provided by SymbolicUtils and reexported by Symbolics.
+Documentation for `rewriter` can be found [here](https://docs.sciml.ai/SymbolicUtils/stable/manual/rewrite/#Rule-based-rewriting), using the `@rule` macro or the `@acrule` macro from SymbolicUtils.jl.
+
+## Functionality Provided by SymPy.jl Integration
+
+SymPy also includes solves as well, and the SymPy.jl extensions allow for automatically converting
+Symbolics expressions for use in its simplifier.
+
 ```@docs
-SymbolicUtils.substitute
-SymbolicUtils.simplify
+Symbolics.sympy_simplify
 ```
-Documentation for `rewriter` can be found [here](https://symbolicutils.juliasymbolics.org/rewrite/), using the `@rule` macro or the `@acrule` macro from SymbolicUtils.jl.
 
 ## Additional Manipulation Functions
 
 Other additional manipulation functions are given below.
 
 ```@docs
+SymbolicUtils.substitute
 Symbolics.get_variables
 Symbolics.tosymbol
 Symbolics.diff2term
-Symbolics.solve_for
 Symbolics.degree
 Symbolics.coeff
+Symbolics.fixpoint_sub
+Symbolics.evaluate
+Symbolics.symbolic_to_float
+Symbolics.terms(x)
+Symbolics.factors(x)
+numerator(x::Union{Num, SymbolicUtils.BasicSymbolic})
+denominator(x::Union{Num, SymbolicUtils.BasicSymbolic})
+Symbolics.arguments
+Symbolics.hasnode
+Symbolics.filterchildren
+Symbolics.replacenode
+Symbolics.gather_factor
+Symbolics.FixpointSubstituter
+Symbolics.sympy_pythoncall_simplify
 ```

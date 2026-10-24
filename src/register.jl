@@ -1,7 +1,5 @@
-using SymbolicUtils: Symbolic
-
 """
-    @register_symbolic(expr, define_promotion = true, Ts = [Num, Symbolic, Real])
+    @register_symbolic(expr, define_promotion = true, Ts = [Real])
 
 Overload appropriate methods so that Symbolics can stop tracing into the
 registered function. If `define_promotion` is true, then a promotion method in
@@ -21,106 +19,288 @@ overwriting.
 @register_symbolic goo(x, y::Int) # `y` is not overloaded to take symbolic objects
 @register_symbolic hoo(x, y)::Int # `hoo` returns `Int`
 ```
+See `@register_array_symbolic` to register functions which return arrays.
+
+A final options block can set `signatures = [(Num, Real), ...]` to select the
+symbolic overloads to generate. Each tuple must match the positional argument
+count and include a symbolic type. Omitting `signatures`, or using an empty
+list, generates the default combinations.
 """
-macro register_symbolic(expr, define_promotion = true, Ts = [])
+macro register_symbolic(expr, define_promotion = true, wrap_arrays = true, block = :(begin end))
+    if Meta.isexpr(define_promotion, :block)
+        block, define_promotion = define_promotion, true
+    elseif Meta.isexpr(wrap_arrays, :block)
+        block, wrap_arrays = wrap_arrays, true
+    end
+    args_list = registration_signatures(block)
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
+
+    args′ = map((a, T) -> :($a::$T), argnames, Ts)
+    ret_type = isnothing(ret_type) ? Real : ret_type
+    N = length(args′)
+    symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
+    inner = :(function $f($(args′...))
+        args = ($(argnames...),)
+        if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
+            args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
+            $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type = $ret_type, shape = $(SymbolicUtils.ShapeVecT()))
+        else
+            $f($(argnames...))
+        end
+    end)
+    fexpr = wrap_func_expr(__module__, inner, wrap_arrays, args_list)
+
+    if define_promotion
+        type_args = [:($name::$Type) for name in argnames]
+        T = type_T_tag(f,argnames)
+        promote_expr = quote
+            if $ftype === DataType || $ftype === Union || $ftype === UnionAll
+                function (::$typeof($promote_symtype))(::Type{$T}, $(type_args...)) where {$T <: $f}
+                    $ret_type
+                end
+                function (::$(typeof(SymbolicUtils.promote_shape)))(::Type{$T}, args::$(SymbolicUtils.ShapeT)...) where {$T <: $f}
+                    @nospecialize args
+                    $(SymbolicUtils.ShapeVecT)()
+                end
+            else
+                (::$typeof($promote_symtype))(::$ftype, $(type_args...)) = $ret_type
+                function (::$(typeof(SymbolicUtils.promote_shape)))(::$ftype, args::$(SymbolicUtils.ShapeT)...)
+                    @nospecialize args
+                    $(SymbolicUtils.ShapeVecT)()
+                end
+            end
+        end
+        fexpr = :($fexpr; $promote_expr)
+    end
+    esc(fexpr)
+end
+
+function destructure_registration_expr(expr)
     if expr.head === :(::)
         ret_type = expr.args[2]
         expr = expr.args[1]
     else
-        ret_type = Real
+        ret_type = nothing
     end
-
     @assert expr.head === :call
 
     f = expr.args[1]
     args = expr.args[2:end]
 
-    if f isa Expr && f.head == :(::)
-        @assert length(f.args) == 2
-    end
+    # Default arg types to Real
+    Ts = map(a -> a isa Symbol ? Real : (@assert(a.head == :(::)); a.args[2]), args)
+    argnames = map(a -> a isa Symbol ? a : a.args[1], args)
 
-    types = map(args) do x
-        if x isa Symbol
-            :(($Real, $wrapper_type($Real), $Symbolic{<:$Real}))
-        elseif Meta.isexpr(x, :(::))
-            T = x.args[2]
-            :($has_symwrapper($T) ?
-              ($T, $Symbolic{<:$T}, $wrapper_type($T),) :
-              ($T, $Symbolic{<:$T}))
-        else
-            error("Invalid argument format $x")
-        end
-    end
-
-    eval_method = :(@eval function $f($(Expr(:$, :(var"##_register_macro_s"...))),)
-                        args = [$(Expr(:$, :(var"##_register_macro_s_syms"...)))]
-                        unwrapped_args = map($unwrap, args)
-                        res = if !any(x->$issym(x) || $istree(x), unwrapped_args)
-                            $f(unwrapped_args...)
-                        else
-                            $Term{$ret_type}($f, unwrapped_args)
-                        end
-                        if typeof.(args) == typeof.(unwrapped_args)
-                            return res
-                        else
-                            return $wrap(res)
-                        end
-                    end)
-    verbose = false
-    mod, fname = f isa Expr && f.head == :(.) ? f.args : (:(@__MODULE__), QuoteNode(f))
-    Ts = Symbol("##__Ts")
     ftype = if f isa Expr && f.head == :(::)
+        if length(f.args) == 1
+            error("please name the callable object, i.e. use (f::$(f.args[end])) instead of $f")
+        end
+        @assert length(f.args) == 2
         f.args[end]
     else
         :($typeof($f))
     end
-    quote
-        $Ts = [Tuple{x...} for x in Iterators.product($(types...),)
-                if any(x->x <: $Symbolic || Symbolics.is_wrapper_type(x), x)]
-        if $verbose
-            println("Candidates")
-            map(println, $Ts)
-        end
-
-        for sig in $Ts
-            var"##_register_macro_s" = map(((i,T,),)->Expr(:(::), Symbol("arg", i), T), enumerate(sig.parameters))
-            var"##_register_macro_s_syms" = map(x->x.args[1], var"##_register_macro_s")
-            $eval_method
-        end
-        if $define_promotion
-            (::$typeof($promote_symtype))(::$ftype, args...) = $ret_type
-        end
-    end |> esc
+    f, ftype, argnames, Ts, ret_type
 end
 
-Base.@deprecate_binding var"@register" var"@register_symbolic"
+function type_T_tag(f,argnames)
+    T = :T
+    for i in 1:length(argnames) + 1
+        if T == f || T in argnames
+            T = Symbol(:_,T)
+        else
+            break
+        end
+    end
+    return T
+end
 
-# Ensure that Num that get @registered from outside the ModelingToolkit
-# module can work without having to bring in the associated function into the
-# ModelingToolkit namespace. We basically store information about functions
-# registered at runtime in a ModelingToolkit variable,
-# `registered_external_functions`. It's not pretty, but we are limited by the
-# way GeneralizedGenerated builds a function (adding "ModelingToolkit" to every
-# function call).
-# ---
-const registered_external_functions = Dict{Symbol,Module}()
-function inject_registered_module_functions(expr)
-    MacroTools.postwalk(expr) do x
-        # Find all function calls in the expression and extract the function
-        # name and calling module.
-        MacroTools.@capture(x, f_module_.f_name_(xs__))
-        if isnothing(f_module)
-            MacroTools.@capture(x, f_name_(xs__))
+nested_unwrap(x) = unwrap(x)
+nested_unwrap(x::Arr) = unwrap(x)
+nested_unwrap(x::AbstractArray) = unwrap.(x)
+
+function is_symbolic_or_array_of_symbolic(x)
+    return issym(x) || iscall(x)
+end
+function is_symbolic_or_array_of_symbolic(arr::AbstractArray)
+    return any(is_symbolic_or_array_of_symbolic.(arr))
+end
+
+symbolic_eltype(x) = eltype(x)
+symbolic_eltype(x::AbstractArray{BasicSymbolic{T}}) where {T} = eltype(symtype(Const{T}(x)))
+symbolic_eltype(::AbstractArray{Num}) = Real
+symbolic_eltype(::AbstractArray{symT}) where {eT, symT <: Arr{eT}} = eT
+
+# An array with the given shape, so that a registered `size` expression evaluated in
+# `promote_shape` sees each argument's `size`/`length`/`axes` rather than its shape vector.
+shape_placeholder(sh::SymbolicUtils.ShapeVecT) = CartesianIndices(Tuple(sh))
+shape_placeholder(sh) = sh
+
+function register_array_symbolic(f, ftype, argnames, Ts, ret_type, partial_defs = :(), define_promotion = true, wrap_arrays = true, caller = @__MODULE__)
+    def_assignments = MacroTools.rmlines(partial_defs).args
+    defs = map(def_assignments) do ex
+        @assert ex.head == :(=)
+        ex.args[1] => ex.args[2]
+    end |> Dict
+    args_list = get(defs, :signatures, [])
+    # `promote_symtype` only sees argument types and cannot evaluate `size`, but a literal
+    # tuple `size` still fixes `ndims`.
+    promote_nd = get(defs, :ndims) do
+        sz = get(defs, :size, nothing)
+        if Meta.isexpr(sz, :tuple) && !any(a -> Meta.isexpr(a, :...), sz.args)
+            length(sz.args)
+        else
+            -1
+        end
+    end
+
+    shape_expr = if haskey(defs, :size)
+        quote
+            sz = $(defs[:size])
+            nd = length(sz)
+            sh = $(SymbolicUtils.ShapeVecT)(map(Base.UnitRange{Int} ∘ Base.OneTo, sz))
+        end
+    else
+        quote
+            nd = $(get(defs, :ndims, -1))
+            sh = $(SymbolicUtils.Unknown)(nd)
+        end
+    end
+    eltype_expr = get(defs, :eltype, Any)
+    container_type = get(defs, :container_type, Array)
+
+    args′ = map((a, T) -> :($a::$T), argnames, Ts)
+    N = length(args′)
+    symbolicT = Union{BasicSymbolic{VartypeT}, AbstractArray{BasicSymbolic{VartypeT}}}
+    assigns = macroexpand(@__MODULE__, :(Base.Cartesian.@nexprs $N i -> ($argnames[i] = args[i])))
+    inner = :(function $f($(args′...))
+        args = ($(argnames...),)
+        if Base.Cartesian.@nany $N i -> args[i] isa $symbolicT
+            args = Base.Cartesian.@ntuple $N i -> $Const{$VartypeT}(args[i])
+            $assigns
+            $shape_expr
+            eltype = $eltype ∘ $symtype
+            type = if nd == -1
+                $container_type{$eltype_expr}
+            else
+                $container_type{$eltype_expr, nd}
+            end
+            $Term{$VartypeT}($f, $(SymbolicUtils.ArgsT){$VartypeT}(args); type, shape = sh)
+        else
+            $f($(argnames...))
+        end
+    end)
+    fexpr = wrap_func_expr(caller, inner, wrap_arrays, args_list)
+
+    if define_promotion
+        if promote_nd == -1
+            @warn """
+            `@register_array_symbolic` could not infer `ndims` for `$f`.
+            `promote_symtype` will return a `UnionAll` like `Array{Real}` instead of a concrete \
+            `Array{Real,N}`, which can break IR substitution (see JuliaSymbolics/Symbolics.jl#1845).
+            Add `ndims = N` to the registration block (for example `ndims = 1` for a vector result).
+            Tuple `size = (...)` without splats is also enough to infer `ndims`.
+            """
+        end
+        is_callable_struct = f isa Expr && f.head == :(::)
+        fn_arg = if is_callable_struct
+            f
+        else
+            :(f::$ftype)
+        end
+        fn_arg_name = if is_callable_struct
+            f.args[1]
+        else
+            :f
         end
 
-        if !isnothing(f_name)
-            # Set the calling module to the module that registered it.
-            mod = get(registered_external_functions, f_name, f_module)
-            if !isnothing(mod) && mod != Base
-                x.args[1] = :($mod.$f_name)
+        shape_args = [:($name::$(SymbolicUtils.ShapeT)) for name in argnames]
+        type_args = [:($name::$Type) for name in argnames]
+        promote_symtype_body = quote
+            f = $fn_arg_name
+            container_type = $container_type
+            nd = $promote_nd
+            etype = $eltype_expr
+            if nd == -1
+                return container_type{etype}
+            else
+                return container_type{etype, nd}
             end
         end
-
-        return x
+        promote_shape_body = quote
+            @nospecialize $(argnames...)
+            $([:($a = $shape_placeholder($a)) for a in argnames]...)
+            $shape_expr
+            return sh
+        end
+        T = type_T_tag(f,argnames)
+        promote_expr = quote
+            if $ftype === DataType || $ftype === Union || $ftype === UnionAll
+                function (::$typeof($promote_symtype))(::Type{$T}, $(type_args...)) where {$T <: $f}
+                    $promote_symtype_body
+                end
+                function (::$(typeof(SymbolicUtils.promote_shape)))(::Type{$T}, $(shape_args...)) where {$T <: $f}
+                    $promote_shape_body
+                end
+            else
+                function (::$typeof($promote_symtype))($fn_arg, $(type_args...))
+                    $promote_symtype_body
+                end
+                function (::$(typeof(SymbolicUtils.promote_shape)))($fn_arg, $(shape_args...))
+                    $promote_shape_body
+                end
+            end
+        end
+        fexpr = :($fexpr; $promote_expr)
     end
+
+    return fexpr
+end
+
+"""
+    @register_array_symbolic(expr, define_promotion = true)
+
+Example:
+
+```julia
+# Let's say vandermonde takes an n-vector and returns an n x n matrix
+@register_array_symbolic vandermonde(x::AbstractVector) begin
+    size=(length(x), length(x))
+    eltype=eltype(x) # optional, will default to the promoted eltypes of x
+end
+```
+
+`ndims` is inferred from a non-splat tuple `size = (...)` when possible. When it
+cannot be inferred (for example `size = size(x)`), add `ndims` explicitly to keep
+`promote_symtype` concrete; otherwise a warning is emitted and `promote_symtype`
+returns the `UnionAll` `container_type{eltype}`.
+
+You can also register calls on callable structs:
+
+```julia
+@register_array_symbolic (c::Conv)(x::AbstractMatrix) begin
+    size=size(x) .- size(c.kernel) .+ 1
+    eltype=promote_type(eltype(x), eltype(c))
+    ndims=2
+end
+```
+
+If `define_promotion = true` then a promotion method in the form of
+```julia
+SymbolicUtils.promote_symtype(::typeof(f_registered), args...) = # inferred or annotated return type
+```
+
+is defined for the register function. Note that when defining multiple register
+overloads for one function, all the rest of the registers must set
+`define_promotion` to `false` except for the first one, to avoid method
+overwriting.
+
+Set `signatures = [(Num, Real), ...]` in the existing array options block to
+select the symbolic overloads to generate. Each tuple must match the positional
+argument count and include a symbolic type. Omitting `signatures`, or using an
+empty list, generates the default combinations.
+"""
+macro register_array_symbolic(expr, block, define_promotion = true, wrap_arrays = true)
+    f, ftype, argnames, Ts, ret_type = destructure_registration_expr(expr)
+    esc(register_array_symbolic(f, ftype, argnames, Ts, ret_type, block, define_promotion, wrap_arrays, __module__))
 end

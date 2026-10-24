@@ -26,3 +26,6 @@ Manifest.toml
 
 # Ignore directory created by vscode
 .vscode
+
+# CondaPkg environment files
+.CondaPkg/

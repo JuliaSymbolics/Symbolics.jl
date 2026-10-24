@@ -1,11 +1,38 @@
 using Base.Threads
-using SymbolicUtils.Code: LazyState
+using SymbolicUtils.Code: LazyState, apply_optimization_rules
 
 abstract type BuildTargets end
 struct JuliaTarget <: BuildTargets end
 struct StanTarget <: BuildTargets end
 struct CTarget <: BuildTargets end
+
+"""
+    MATLABTarget()
+
+A `build_function` target that generates an anonymous function expression for MATLAB and
+GNU Octave.
+
+# Arguments
+
+None.
+
+# Keywords
+
+None. Pass this target as `target` to [`build_function`](@ref).
+
+# Examples
+
+```julia
+julia> @variables x
+1-element Vector{Num}:
+ x
+
+julia> build_function(x^2, x; target = MATLABTarget()) isa String
+true
+```
+"""
 struct MATLABTarget <: BuildTargets end
+@public MATLABTarget
 
 abstract type ParallelForm end
 struct SerialForm <: ParallelForm end
@@ -34,25 +61,44 @@ function throw_missing_specialization(n)
 end
 
 """
-`build_function`
+    build_function(ex, args...;
+                   expression = Val{true},
+                   target = JuliaTarget(),
+                   parallel=nothing,
+                   kwargs...)
 
-Generates a numerically-usable function from a Symbolics `Num`.
-
-```julia
-build_function(ex, args...;
-               expression = Val{true},
-               target = JuliaTarget(),
-               parallel=nothing,
-               kwargs...)
-```
+Generates a numerically-usable function from a Symbolics `Num`, a symbolic
+array (`Arr`), or an `AbstractArray` of `Num`s.
 
 Arguments:
 
-- `ex`: The `Num` to compile
+- `ex`: The `Num`, `Arr`, or `AbstractArray` of `Num`s to compile
 - `args`: The arguments of the function
 - `expression`: Whether to generate code or whether to generate the compiled form.
   By default, `expression = Val{true}`, which means that the code for the
   function is returned. If `Val{false}`, then the returned value is compiled.
+
+Return Value:
+
+- If `ex` is a scalar, a single function `f(args...)` is returned which
+  computes the value of the expression.
+- If `ex` is an `AbstractArray` or an `Arr`, a 2-tuple of functions `(f, f!)`
+  is returned:
+    - `f(args...)`: the out-of-place function, which computes and returns the
+      output array.
+    - `f!(out, args...)`: the in-place function, which mutates `out` with the
+      result and returns it.
+
+When `expression = Val{true}`, these are returned as `Expr`s which can be
+`eval`ed into functions. When `expression = Val{false}`, the returned
+functions are compiled `RuntimeGeneratedFunction`s which can be called
+directly, e.g.:
+
+```julia
+f, f! = build_function(ex, args...; expression = Val{false})
+f(args)        # out-of-place evaluation
+f!(out, args)  # in-place evaluation
+```
 
 Keyword Arguments:
 
@@ -79,6 +125,11 @@ Keyword Arguments:
   - `MultithreadedForm()`: Multithreaded execution with a static split, evenly
     splitting the number of expressions per thread.
 - `fname`: Used by some targets for the name of the function in the target space.
+- `iip_config`: A 2-tuple of `Bool`s `(oop, iip)` selecting whether the out-of-place
+  and in-place functions are generated. Defaults to `(true, true)`. A variant that
+  is turned off is still returned as a stub so that the 2-tuple shape is kept, and
+  calling the stub throws an `ArgumentError`. Only applies when `ex` is an array
+  (scalar `ex` returns a single function).
 
 Note that not all build targets support the full compilation interface. Check the
 individual target documentation for details.
@@ -90,7 +141,6 @@ end
 # Scalar output
 
 unwrap_nometa(x) = unwrap(x)
-unwrap_nometa(x::CallWithMetadata) = unwrap(x.f)
 function destructure_arg(arg::Union{AbstractArray, Tuple,NamedTuple}, inbounds, name)
     if !(arg isa Arr)
         DestructuredArgs(map(unwrap_nometa, arg), name, inbounds=inbounds, create_bindings=false)
@@ -100,6 +150,21 @@ function destructure_arg(arg::Union{AbstractArray, Tuple,NamedTuple}, inbounds, 
 end
 destructure_arg(arg, _, _) = unwrap_nometa(arg)
 
+function default_arg_name(i)
+    Symbol("ˍ₋arg$(i)")
+end
+
+const DEFAULT_OUTSYM = Symbol("ˍ₋out")
+
+# don't CSE inside operators
+SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator) = false
+# don't CSE inside `getindex` of things created via `@variables`
+# EXCEPT called variables
+function SymbolicUtils.Code.cse_inside_expr(sym, ::typeof(getindex))
+    x = arguments(sym)[1]
+    return !hasmetadata(x, VariableSource) || SymbolicUtils.is_called_function_symbolic(x)
+end
+
 function _build_function(target::JuliaTarget, op, args...;
                          conv = toexpr,
                          expression = Val{true},
@@ -108,18 +173,30 @@ function _build_function(target::JuliaTarget, op, args...;
                          states = LazyState(),
                          linenumbers = true,
                          wrap_code = nothing,
-                         cse = false, kwargs...)
-  dargs = map((x) -> destructure_arg(x[2], !checkbounds, Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-    expr = if cse
-        fun = Func(dargs, [], Code.cse(unwrap(op)))
-        (wrap_code !== nothing) && (fun = wrap_code(fun))
-        conv(fun, states)
-    else
-        fun = Func(dargs, [], op)
-        (wrap_code !== nothing) && (fun = wrap_code(fun))
-        conv(fun, states)
+                         cse = false,
+                         nanmath = true,
+                         kwargs...)
+    op = _recursive_unwrap(op)
+    if symtype(op) <: AbstractArray
+        if wrap_code === nothing
+            wrap_code = (identity, identity)
+        end
+        return _build_function(target, wrap(op), args...; conv, expression, expression_module, checkbounds, states, linenumbers, cse, nanmath, wrap_code, kwargs...)
     end
-
+    states.rewrites[:nanmath] = nanmath
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
+    fun = Func(dargs, [], op)
+    if wrap_code !== nothing
+        fun = wrap_code(fun)
+    end
+    if cse
+        fun = Code.cse(fun)
+    end
+    expr = conv(fun, states)
+    if !checkbounds
+        @assert Meta.isexpr(expr, :function)
+        expr.args[2] = :(@inbounds begin; $(expr.args[2]); end)
+    end
     if expression == Val{true}
         expr
     else
@@ -127,46 +204,62 @@ function _build_function(target::JuliaTarget, op, args...;
     end
 end
 
-SymbolicUtils.Code.get_symbolify(x::Arr) = SymbolicUtils.Code.get_symbolify(unwrap(x))
+function get_unimplemented_expr(dargs)
+    Func(dargs, [], term(throw_missing_specialization, length(dargs)))
+end
 
-function _build_function(target::JuliaTarget, op::Union{Arr, ArrayOp}, args...;
+SymbolicUtils.Code.get_rewrites(x::Arr) = SymbolicUtils.Code.get_rewrites(unwrap(x))
+
+function _build_function(target::JuliaTarget, op::Arr, args...;
                          conv = toexpr,
                          expression = Val{true},
                          expression_module = @__MODULE__(),
                          checkbounds = false,
                          states = LazyState(),
                          linenumbers = true,
-                         cse = false, kwargs...)
-
-    dargs = map((x) -> destructure_arg(x[2], !checkbounds,
-                                  Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
-
-    expr = if cse
-        conv(Func(dargs, [], Code.cse(unwrap(op))), states)
+                         cse = false,
+                         nanmath = true,
+                         wrap_code = (identity, identity),
+                         iip_config = (true, true),
+                         kwargs...)
+    op = _recursive_unwrap(op)
+    dargs = map((x) -> destructure_arg(x[2], !checkbounds, default_arg_name(x[1])), enumerate(collect(args)))
+    states.rewrites[:nanmath] = nanmath
+    if iip_config[1]
+        oop_expr = wrap_code[1](Func(dargs, [], op))
     else
-        conv(Func(dargs, [], op), states)
+        oop_expr = get_unimplemented_expr(dargs)
     end
 
-    outsym = Symbol("ˍ₋out")
-    body = inplace_expr(unwrap(op), outsym)
-    oop_expr = conv(Func([outsym, dargs...], [], body), states)
-
-    N = length(shape(op))
-    op = unwrap(op)
-    if op isa ArrayOp && istree(op.term)
-        op_body = op.term
+    outsym = DEFAULT_OUTSYM
+    if iip_config[2]
+        body = inplace_expr(op, outsym)
+        iip_expr = wrap_code[2](Func(vcat(outsym, dargs), [], body))
     else
-        op_body = :(let $outsym = zeros(Float64, map(length, ($(shape(op)...),)))
-                   $body
-              $outsym
-          end) |> LiteralExpr
+        iip_expr = get_unimplemented_expr([outsym; dargs])
     end
-    ip_expr = conv(Func(dargs, [], op_body), states)
+
+    if cse
+        oop_expr = Code.cse(oop_expr)
+        iip_expr = Code.cse(iip_expr)
+    end
+    oop_expr = conv(oop_expr, states)
+    if SymbolicUtils.isarrayop(op) && !haskey(states.rewrites, :arrayop_output)
+        states.rewrites[:arrayop_output] = outsym
+    end
+    iip_expr = conv(iip_expr, states)
+
+    if !checkbounds
+        @assert Meta.isexpr(oop_expr, :function)
+        oop_expr.args[2] = :(@inbounds begin; $(oop_expr.args[2]); end)
+        @assert Meta.isexpr(iip_expr, :function)
+        iip_expr.args[2] = :(@inbounds begin; $(iip_expr.args[2]); end)
+    end
     if expression == Val{true}
-        oop_expr, ip_expr
+        oop_expr, iip_expr
     else
         _build_and_inject_function(expression_module, oop_expr),
-        _build_and_inject_function(expression_module, ip_expr)
+        _build_and_inject_function(expression_module, iip_expr)
     end
 end
 
@@ -176,10 +269,20 @@ function _build_and_inject_function(mod::Module, ex)
     elseif ex.head == :(->)
         return _build_and_inject_function(mod, Expr(:function, ex.args...))
     end
-    # XXX: Workaround to specify the module as both the cache module AND context module.
-    # Currently, the @RuntimeGeneratedFunction macro only sets the context module.
-    module_tag = getproperty(mod, RuntimeGeneratedFunctions._tagname)
-    RuntimeGeneratedFunctions.RuntimeGeneratedFunction(module_tag, module_tag, ex; opaque_closures=false)
+    return RuntimeGeneratedFunction(mod, mod, _shards_to_rgfs(mod, ex))
+end
+
+# Inside a RuntimeGeneratedFunction the inline `MultithreadedForm` shard closures would
+# become opaque closures, and on Julia 1.10/1.11 calling an opaque closure with three or
+# more arguments through `Funcall` segfaults. Compile each shard to its own RGF instead.
+function _shards_to_rgfs(mod::Module, ex)
+    ex isa Expr || return ex
+    args = Any[_shards_to_rgfs(mod, a) for a in ex.args]
+    if ex.head === :call && length(args) == 3 && args[1] === Funcall &&
+            Meta.isexpr(args[2], :function)
+        args[2] = drop_expr(RuntimeGeneratedFunction(mod, mod, args[2]; opaque_closures = false))
+    end
+    return Expr(ex.head, args...)
 end
 
 toexpr(n::Num, st) = toexpr(value(n), st)
@@ -213,16 +316,16 @@ end
 Build function target: `JuliaTarget`
 
 ```julia
-function _build_function(target::JuliaTarget, rhss, args...;
-                         conv = toexpr, 
-                         expression = Val{true},
-                         checkbounds = false,
-                         linenumbers = false,
-                         headerfun = addheader, outputidxs=nothing,
-                         convert_oop = true, force_SA = false,
-                         skipzeros = outputidxs===nothing,
-                         fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
-                         parallel=SerialForm(), kwargs...)
+_build_function(target::JuliaTarget, rhss, args...;
+                conv = toexpr,
+                expression = Val{true},
+                checkbounds = false,
+                linenumbers = false,
+                headerfun = addheader, outputidxs=nothing,
+                convert_oop = true, force_SA = false,
+                skipzeros = outputidxs===nothing,
+                fillzeros = skipzeros && !(typeof(rhss)<:SparseMatrixCSC),
+                parallel=SerialForm(), kwargs...)
 ```
 
 Generates a Julia function which can then be utilized for further evaluations.
@@ -261,10 +364,17 @@ Special Keyword Arguments:
 - `force_SA`: Forces the output of the OOP version to be a StaticArray.
   Defaults to `false`, and outputs a static array when the first argument
   is a static array.
+- `similarto`: An `AbstractArray` subtype which controls the type of the
+  returned array for the OOP version. If provided, it ignores the value of `force_SA`.
 - `skipzeros`: Whether to skip filling zeros in the in-place version if the
   filling function is 0.
 - `fillzeros`: Whether to perform `fill(out,0)` before the calculations to ensure
   safety with `skipzeros`.
+- `iip_config`: A 2-tuple of `Bool`s `(oop, iip)` selecting whether the out-of-place
+  and in-place functions are generated. Defaults to `(true, true)`. A variant that
+  is turned off is still returned as a stub so that the 2-tuple shape is kept, and
+  calling the stub throws an `ArgumentError`. Only applies when `rhss` is an array
+  (scalar `rhss` returns a single function).
 """
 function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        conv=toexpr,
@@ -276,55 +386,80 @@ function _build_function(target::JuliaTarget, rhss::AbstractArray, args...;
                        outputidxs=nothing,
                        skipzeros = false,
                        force_SA = false,
+                       similarto = nothing,
                        wrap_code = (nothing, nothing),
                        fillzeros = skipzeros && !(rhss isa SparseMatrixCSC),
                        states = LazyState(),
                        iip_config = (true, true),
-                       parallel=nothing, cse = false, kwargs...)
-
+                       nanmath = true,
+                       parallel=nothing, cse = false,
+                       optimize = nothing,
+                       kwargs...)
+    if rhss isa SubArray
+        rhss = copy(rhss)
+    end
+    rhss = _recursive_unwrap(rhss)
+    states.rewrites[:nanmath] = nanmath
     # We cannot switch to ShardedForm because it deadlocks with
     # RuntimeGeneratedFunctions
     dargs = map((x) -> destructure_arg(x[2], !checkbounds,
                                   Symbol("ˍ₋arg$(x[1])")), enumerate([args...]))
     i = findfirst(x->x isa DestructuredArgs, dargs)
-    similarto = force_SA ? SArray : i === nothing ? Array : dargs[i].name
+    if similarto === nothing
+        similarto = force_SA ? SArray : i === nothing ? Array : dargs[i].name
+    end
 
     oop, iip = iip_config
-    oop_body = if oop
-        postprocess_fbody(make_array(parallel, dargs, rhss, similarto, cse))
+    if oop
+        oop_expr = Func(dargs, [], postprocess_fbody(make_array(parallel, dargs, rhss, similarto)))
+        if wrap_code[1] !== nothing
+            oop_expr = wrap_code[1](oop_expr)
+        end
     else
-        term(throw_missing_specialization, length(dargs))
-    end
-    oop_expr = Func(dargs, [], oop_body)
-
-    if !isnothing(wrap_code[1])
-        oop_expr = wrap_code[1](oop_expr)
+        oop_expr = get_unimplemented_expr(dargs)
     end
 
-    out = Sym{Any}(:ˍ₋out)
-    ip_body = if iip
-        postprocess_fbody(set_array(parallel,
+
+    if iip
+        out = Sym{VartypeT}(DEFAULT_OUTSYM; type = Any, shape = SymbolicUtils.Unknown(-1))
+        iip_expr = Func(vcat(out, dargs), [], postprocess_fbody(set_array(parallel,
                                     dargs,
                                     out,
                                     outputidxs,
                                     rhss,
                                     checkbounds,
-                                    skipzeros,
-                                    cse,))
+                                    skipzeros)))
+        if wrap_code[2] !== nothing
+            iip_expr = wrap_code[2](iip_expr)
+        end
     else
-        term(throw_missing_specialization, length(dargs) + 1)
-    end
-    ip_expr = Func([out, dargs...], [], ip_body)
-
-    if !isnothing(wrap_code[2])
-        ip_expr = wrap_code[2](ip_expr)
+        iip_expr = get_unimplemented_expr([DEFAULT_OUTSYM; dargs])
     end
 
+    if cse
+        oop_expr = Code.cse(oop_expr)
+        iip_expr = Code.cse(iip_expr)
+    end
+
+    if !isnothing(optimize) 
+        iip_expr = apply_optimization_rules(iip_expr, states, optimize)
+        oop_expr = apply_optimization_rules(oop_expr, states, optimize)
+    end
+
+    oop_expr = conv(oop_expr, states)
+    iip_expr = conv(iip_expr, states)
+
+    if !checkbounds
+        @assert Meta.isexpr(oop_expr, :function)
+        oop_expr.args[2] = :(@inbounds begin; $(oop_expr.args[2]); end)
+        @assert Meta.isexpr(iip_expr, :function)
+        iip_expr.args[2] = :(@inbounds begin; $(iip_expr.args[2]); end)
+    end
     if expression == Val{true}
-        return conv(oop_expr, states), conv(ip_expr, states)
+        return oop_expr, iip_expr
     else
-        return _build_and_inject_function(expression_module, conv(oop_expr, states)),
-        _build_and_inject_function(expression_module, conv(ip_expr, states))
+        return _build_and_inject_function(expression_module, oop_expr),
+        _build_and_inject_function(expression_module, iip_expr)
     end
 end
 
@@ -332,35 +467,28 @@ _nnz(x::AbstractArray) = length(x)
 _nnz(x::AbstractSparseArray) = nnz(x)
 _nnz(x::Union{Base.ReshapedArray, LinearAlgebra.Transpose}) = _nnz(parent(x))
 
-function make_array(s, dargs, arr, similarto, cse)
+function make_array(s, dargs, arr, similarto)
     s !== nothing && Base.@warn("Parallel form of $(typeof(s)) not implemented")
-    _make_array(arr, similarto, cse)
+    _make_array(arr, similarto)
 end
 
-function make_array(s::SerialForm, dargs, arr, similarto, cse)
-    _make_array(arr, similarto, cse)
+function make_array(s::SerialForm, dargs, arr, similarto)
+    _make_array(arr, similarto)
 end
 
-function make_array(s::ShardedForm, closed_args, arr, similarto, cse)
+function make_array(s::ShardedForm, closed_args, arr, similarto)
     if arr isa AbstractSparseArray
-
-        return LiteralExpr(quote
-                               $SparseMatrixCSC($(arr.m),
-                                               $(arr.n),
-                                               copy($(arr.colptr)),
-                                               copy($(arr.rowval)),
-                                               $(make_array(s,
-                                                            closed_args,
-                                                            arr.nzval,
-                                                            Vector,cse)))
-                           end)
+        return term(SparseMatrixCSC, arr.m, arr.n, copy(arr.colptr), copy(arr.rowval), make_array(s, closed_args, arr.nzval, Vector))
     end
     per_task = ceil(Int, length(arr) / s.ncalls)
     slices = collect(Iterators.partition(arr, per_task))
     arrays = map(slices) do slice
-        Func(closed_args, [], _make_array(slice, similarto, cse)), closed_args
+        Func(closed_args, [], _make_array(slice, similarto)), closed_args
     end
-    SpawnFetch{typeof(s)}(first.(arrays), last.(arrays), vcat)
+    return SpawnFetch{typeof(s)}(
+        first.(arrays), last.(arrays),
+        VcatReshape(size(arr))
+    )
 end
 
 struct Funcall{F, T}
@@ -370,15 +498,24 @@ end
 
 (f::Funcall)() = f.f(f.args...)
 
+struct VcatReshape{Dims}
+    dims::Dims
+end
+
+(c::VcatReshape)(xs...) = reshape(vcat(xs...), c.dims)
+
 function toexpr(p::SpawnFetch{MultithreadedForm}, st)
     args = isnothing(p.args) ?
               Iterators.repeated((), length(p.exprs)) : p.args
     spawns = map(p.exprs, args) do thunk, a
-        ex = :($Funcall($(drop_expr(@RuntimeGeneratedFunction(@__MODULE__, toexpr(thunk, st), false))),
-                       ($(toexpr.(a, (st,))...),)))
+        ex = :(
+            $Funcall(
+                $(toexpr(thunk, st)),
+                ($(toexpr.(a, (st,))...),)
+            )
+        )
         quote
-            let
-                task = Base.Task($ex)
+            let task = Base.Task($ex)
                 task.sticky = false
                 Base.schedule(task)
                 task
@@ -420,39 +557,57 @@ end
 function nzmap(f, x::AbstractSparseArray)
     Setfield.@set x.nzval = nzmap(f, x.nzval)
 end
+
+function nzmap(f, x::UpperTriangular)
+    UpperTriangular(nzmap(f, parent(x)))
+end
+
+function nzmap(f, x::LowerTriangular)
+    UpperTriangular(nzmap(f, parent(x)))
+end
+
 nzmap(f, x) = map(f, x)
 
 _issparse(x::AbstractArray) = issparse(x)
 _issparse(x::Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}) = _issparse(parent(x))
 
-function _make_sparse_array(arr, similarto, cse)
+function setparent(arr, val)
+    Setfield.@set arr.parent = val
+end
+
+function set_nzval(arr, val)
+    Setfield.@set arr.nzval = val
+end
+
+function _make_sparse_array(arr, similarto)
     if arr isa Union{SubArray, Base.ReshapedArray, LinearAlgebra.Transpose}
-        LiteralExpr(quote
-            $Setfield.@set $(nzmap(x->true, arr)).parent =
-                $(_make_array(parent(arr), typeof(parent(arr)), cse))
-            end)
+        newarr = _make_array(parent(arr), typeof(parent(arr)))
+        return term(setparent, nzmap(Returns(true), arr), newarr)
     else
-        LiteralExpr(quote
-                        let __reference = copy($(nzmap(x->true, arr)))
-                            $Setfield.@set __reference.nzval =
-                            $(_make_array(arr.nzval, Vector{symtype(eltype(arr))}, cse))
-                        end
-                    end)
+        # Empty `nzval` has no eltype to infer; `Int` matches literal constants.
+        output_eltype = isempty(arr.nzval) ? Int : nothing
+        newarr = _make_array(arr.nzval, Vector{symtype(eltype(arr))}, output_eltype)
+        return Let([Assignment(:__reference, term(copy, nzmap(Returns(true), arr)))], term(set_nzval, :__reference, newarr), true)
     end
 end
 
-function _make_array(rhss::AbstractArray, similarto, cse)
-    arr = nzmap(x->_make_array(x, similarto, cse), rhss)
+function _make_array(rhs::UpperTriangular, similarto)
+    return term(UpperTriangular, _make_array(parent(rhs), similarto))
+end
+function _make_array(rhs::LowerTriangular, similarto)
+    return term(LowerTriangular, _make_array(parent(rhs), similarto))
+end
+
+function _make_array(rhss::AbstractArray, similarto, output_eltype = nothing)
+    arr = nzmap(x->_make_array(x, similarto), rhss)
     if _issparse(arr)
-        _make_sparse_array(arr, similarto, cse)
-    elseif cse
-        Code.cse(MakeArray(unwrap.(arr), similarto))
+        _make_sparse_array(arr, similarto)
     else
-        MakeArray(arr, similarto)
+        MakeArray(arr, similarto, output_eltype)
     end
 end
 
-_make_array(x, similarto, cse) = x
+_make_array(x, similarto) = x
 
 ## In-place version
 
@@ -475,14 +630,18 @@ function recursive_split(leaf_f, s, out, args, outputidxs, xs)
         fs = map(slices) do slice
             recursive_split(leaf_f, s, out, args, first.(slice), last.(slice))
         end
-        return Func(args, [],
-                    SpawnFetch{typeof(s)}(fs, [args for f in fs],
-                                          (@inline noop(x...) = nothing)),
-                    [])
+        return Func(
+            args, [],
+            SpawnFetch{typeof(s)}(
+                fs, [args for f in fs],
+                Returns(nothing)
+            ),
+            []
+        )
     end
 end
 
-function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros, cse)
+function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkbounds, skipzeros)
     if rhss isa AbstractSparseArray
         return set_array(s,
                          closed_args,
@@ -490,8 +649,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
                          nothing,
                          rhss.nzval,
                          checkbounds,
-                         skipzeros,
-                         cse)
+                         skipzeros)
     end
 
     outvar = !(out isa Sym) ? gensym("out") : out
@@ -502,7 +660,7 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     all_args = [outvar, closed_args...]
     ex = recursive_split(s, outvar, all_args, outputidxs, rhss) do idxs, xs
         Func(all_args, [],
-             _set_array(outvar, idxs, xs, checkbounds, skipzeros, cse),
+             _set_array(outvar, idxs, xs, checkbounds, skipzeros),
              [])
     end.body
 
@@ -512,33 +670,34 @@ function set_array(s::ShardedForm, closed_args, out, outputidxs, rhss, checkboun
     end)
 end
 
-function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros, cse)
-    _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros, cse)
+function _set_array(out, outputidxs, rhss::AbstractSparseArray, checkbounds, skipzeros)
+    Let([Assignment(Symbol("%$out"), _set_array(LiteralExpr(:($out.nzval)), nothing, rhss.nzval, checkbounds, skipzeros))], out, false)
 end
 
-function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros, cse)
+function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
+    if parent(rhss) !== rhss
+        # Sparse parents are written through `out.nzval`. Any other wrapper (e.g.
+        # `Transpose`) may index differently from its parent, so densify it.
+        if _issparse(rhss)
+            return _set_array(out, outputidxs, parent(rhss), checkbounds, skipzeros)
+        end
+        rhss = collect(rhss)
+    end
     if outputidxs === nothing
         outputidxs = collect(eachindex(rhss))
     end
-    # sometimes outputidxs is a Tuple
-    ii = findall(i->!(rhss[i] isa AbstractArray) && !(skipzeros && _iszero(rhss[i])), eachindex(outputidxs))
-    jj = findall(i->rhss[i] isa AbstractArray, eachindex(outputidxs))
-    exprs = []
-    setterexpr = SetArray(!checkbounds,
-                          out,
-                          [AtIndex(outputidxs[i],
-                                   rhss[i])
-                           for i in ii])
-    cse ? push!(exprs, Code.cse(setterexpr)) : push!(exprs, setterexpr)
-    for j in jj
-        push!(exprs, _set_array(LiteralExpr(:($out[$j])), nothing, rhss[j], checkbounds, skipzeros, cse))
+    indexes = AtIndex[]
+    for (i, outi) in enumerate(outputidxs)
+        if !(rhss[i] isa AbstractArray) && !(skipzeros && _iszero(rhss[i]))
+            push!(indexes, AtIndex(outi, rhss[i]))
+        elseif rhss[i] isa AbstractArray
+            push!(indexes, AtIndex(outi, _set_array(LiteralExpr(:($out[$outi])), nothing, rhss[outi], checkbounds, skipzeros)))
+        end
     end
-    LiteralExpr(quote
-                    $(exprs...)
-                end)
+    return SetArray(!checkbounds, out, indexes, true)
 end
 
-_set_array(out, outputidxs, rhs, checkbounds, skipzeros, cse) = rhs
+_set_array(out, outputidxs, rhs, checkbounds, skipzeros) = rhs
 
 
 function vars_to_pairs(name,vs::Union{Tuple, AbstractArray}, symsdict=Dict())
@@ -571,23 +730,24 @@ function buildvarnumbercache(args...)
     return Dict(varnumsdict)
 end
 
-function numbered_expr(O::Symbolic,varnumbercache,args...;varordering = args[1],offset = 0,
+function numbered_expr(O::BasicSymbolic,varnumbercache,args...;varordering = args[1],offset = 0,
                        states = LazyState(),
                        lhsname=:du,rhsnames=[Symbol("MTK$i") for i in 1:length(args)])
     O = value(O)
-    if (issym(O) || issym(operation(O))) || (istree(O) && operation(O) == getindex)
+    O isa BasicSymbolic || return O
+    if (issym(O) || issym(operation(O))) || (iscall(O) && operation(O) == getindex)
         (j,i) = get(varnumbercache, O, (nothing, nothing))
         if !isnothing(j)
             return i==0 ? :($(rhsnames[j])) : :($(rhsnames[j])[$(i+offset)])
         end
     end
-    if istree(O)
+    if iscall(O)
         if operation(O) === getindex
             args = arguments(O)
             Expr(:ref, toexpr(args[1], states), toexpr.(args[2:end] .+ offset, (states,))...)
         else
             Expr(:call, Symbol(operation(O)), (numbered_expr(x,varnumbercache,args...;offset=offset,lhsname=lhsname,
-                                                             rhsnames=rhsnames,varordering=varordering) for x in arguments(O))...)
+                                                             rhsnames=rhsnames,varordering=varordering) for x in sorted_arguments(O))...)
         end
     elseif issym(O)
         tosymbol(O, escape=false)
@@ -611,6 +771,11 @@ numbered_expr(c,args...;kwargs...) = c
 numbered_expr(c::Num,args...;kwargs...) = error("Num found")
 
 
+# The solver introduces "safe" variants of some math functions that handle
+# negative/complex inputs in Julia. They have no C equivalent, so map them back
+# to the standard math.h names when generating C code.
+const c_safe_function_renames = Dict(:ssqrt => :sqrt, :scbrt => :cbrt, :slog => :log)
+
 # Replace certain multiplication and power expressions so they form valid C code
 # Extra factors of 1 are hopefully eliminated by the C compiler
 function coperators(expr)
@@ -619,6 +784,9 @@ function coperators(expr)
         if e isa Expr
             coperators(e)
         end
+    end
+    if expr.head == :call && expr.args[1] isa Symbol
+        expr.args[1] = get(c_safe_function_renames, expr.args[1], expr.args[1])
     end
     for i in eachindex(expr.args)
         if expr.args[i] isa Rational
@@ -662,26 +830,40 @@ function coperators(expr)
     expr
 end
 
+function _check_ctarget_expression(expression)
+    expression == Val{true} && return
+    if expression isa Bool
+        throw(ArgumentError(
+            "CTarget does not accept expression=$(expression) (a Bool). " *
+            "Pass expression=Val{true} to get the C source as a String, then " *
+            "compile it yourself (e.g. with Libdl/ccall)."))
+    else
+        throw(ArgumentError(
+            "CTarget with expression=$(expression) is not supported. " *
+            "CTarget emits C source code, not Julia; use expression=Val{true} " *
+            "and compile the generated C yourself (e.g. with Libdl/ccall)."))
+    end
+end
+
 
 """
 Build function target: `CTarget`
 
 ```julia
-function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
-                         conv = toexpr, expression = Val{true},
-                         fname = :diffeqf,
-                         lhsname=:du,rhsnames=[Symbol("RHS\$i") for i in 1:length(args)],
-                         libpath=tempname(),compiler=:gcc)
+_build_function(target::CTarget, eqs::Array{<:Equation}, args...;
+                conv = toexpr, expression = Val{true},
+                fname = :diffeqf,
+                lhsname=:du,rhsnames=[Symbol("RHS\$i") for i in 1:length(args)],
+                libpath=tempname(), compiler=:gcc)
 ```
 
-This builds an in-place C function. Only works on arrays of equations. If
-`expression == Val{false}`, then this builds a function in C, compiles it,
-and returns a lambda to that compiled function. These special keyword arguments
-control the compilation:
-
-- libpath: the path to store the binary. Defaults to a temporary path.
-- compiler: which C compiler to use. Defaults to :gcc, which is currently the
-  only available option.
+This builds an in-place C function. Only works on arrays of equations.
+`expression` must be `Val{true}` (the default); the return value is C source
+code as a `String`. `expression=Val{false}` is not supported because CTarget
+emits C, not Julia, and Symbolics cannot guarantee a C compiler or library path.
+Pass `expression=Val{true}` (not a `Bool` such as `true`). The keyword
+arguments `libpath` and `compiler` are accepted for API compatibility but are
+unused.
 """
 function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                          conv = toexpr, expression = Val{true},
@@ -690,6 +872,8 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
                          libpath=tempname(),compiler=:gcc)
 
     @warn "build_function(::Array{<:Equation}...) is deprecated. Use build_function(::AbstractArray...) instead."
+
+    _check_ctarget_expression(expression)
 
     varnumbercache = buildvarnumbercache(args...)
     differential_equation = string(join([numbered_expr(eq,varnumbercache,args...,lhsname=lhsname,
@@ -703,23 +887,7 @@ function _build_function(target::CTarget, eqs::Array{<:Equation}, args...;
     }
     """
 
-    if expression == Val{true}
-        return ex
-    else
-        @assert compiler == :gcc
-        ex = build_function(eqs,args...;target=Symbolics.CTarget())
-        open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
-            print(f, ex)
-        end
-        drop_expr(@RuntimeGeneratedFunction(@__MODULE__,
-                                            :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64)
-                                              -> ccall(("diffeqf", $libpath),
-                                                       Cvoid, (Ptr{Float64},
-                                                               Ptr{Float64},
-                                                               Ptr{Float64},
-                                                               Float64), du, u,
-                                                               p, t)), false))
-    end
+    return ex
 end
 
 
@@ -727,25 +895,24 @@ end
 Build function target: `CTarget`
 
 ```julia
-function _build_function(target::CTarget, ex::AbstractArray, args...;
-                         columnmajor = true,
-                         conv        = toexpr,
-                         expression  = Val{true},
-                         fname       = :diffeqf,
-                         lhsname     = :du,
-                         rhsnames    = [Symbol("RHS\$i") for i in 1:length(args)],
-                         libpath     = tempname(),
-                         compiler    = :gcc)
+_build_function(target::CTarget, ex::AbstractArray, args...;
+                columnmajor = true,
+                conv        = toexpr,
+                expression  = Val{true},
+                fname       = :diffeqf,
+                lhsname     = :du,
+                rhsnames    = [Symbol("RHS\$i") for i in 1:length(args)],
+                libpath     = tempname(),
+                compiler    = :gcc)
 ```
 
-This builds an in-place C function. Only works on expressions. If
-`expression == Val{false}`, then this builds a function in C, compiles it,
-and returns a lambda to that compiled function. These special keyword arguments
-control the compilation:
-
-- libpath: the path to store the binary. Defaults to a temporary path.
-- compiler: which C compiler to use. Defaults to :gcc, which is currently the
-  only available option.
+This builds an in-place C function. Only works on expressions.
+`expression` must be `Val{true}` (the default); the return value is C source
+code as a `String`. `expression=Val{false}` is not supported because CTarget
+emits C, not Julia, and Symbolics cannot guarantee a C compiler or library path.
+Pass `expression=Val{true}` (not a `Bool` such as `true`). The keyword
+arguments `libpath` and `compiler` are accepted for API compatibility but are
+unused.
 """
 function _build_function(target::CTarget, ex::AbstractArray, args...;
                          columnmajor = true,
@@ -757,10 +924,13 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
                          libpath     = tempname(),
                          compiler    = :gcc)
 
+    _check_ctarget_expression(expression)
+
     if !columnmajor
         return _build_function(target, hcat([row for row ∈ eachrow(ex)]...), args...;
                                columnmajor = true,
                                conv        = conv,
+                               expression  = expression,
                                fname       = fname,
                                lhsname     = lhsname,
                                rhsnames    = rhsnames,
@@ -789,23 +959,7 @@ function _build_function(target::CTarget, ex::AbstractArray, args...;
     void $fname($(argstrs...)) {$([string("\n  ", eqn) for eqn ∈ equations]...)\n}
     """
 
-    if expression == Val{true}
-        return ccode
-    else
-        @assert compiler == :gcc
-        open(`gcc -fPIC -O3 -msse3 -xc -shared -o $(libpath * "." * Libdl.dlext) -`, "w") do f
-            print(f, ccode)
-        end
-        drop_expr(@RuntimeGeneratedFunction(@__MODULE__,
-                                            :((du::Array{Float64},u::Array{Float64},p::Array{Float64},t::Float64)
-                                              -> ccall(("diffeqf", $libpath),
-                                                       Cvoid, (Ptr{Float64},
-                                                               Ptr{Float64},
-                                                               Ptr{Float64},
-                                                               Float64), du, u,
-                                                       p, t)), false))
-    end
-
+    return ccode
 end
 _build_function(target::CTarget, ex::Num, args...; kwargs...) = _build_function(target, [ex], args...; kwargs...)
 
@@ -814,14 +968,14 @@ _build_function(target::CTarget, ex::Num, args...; kwargs...) = _build_function(
 Build function target: `StanTarget`
 
 ```julia
-function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
-                         conv = toexpr, expression = Val{true},
-                         fname = :diffeqf, lhsname=:internal_var___du,
-                         rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
+_build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
+                conv = toexpr, expression = Val{true},
+                fname = :diffeqf, lhsname=:internal_var___du,
+                rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
 This builds an in-place Stan function compatible with the Stan differential equation solvers.
-Unlike other build targets, this one requires (vs, ps, iv) as the function arguments.
+Unlike other build targets, this one requires `(vs, ps, iv)` as the function arguments.
 Only allowed on arrays of equations.
 """
 function _build_function(target::StanTarget, eqs::Array{<:Equation}, vs, ps, iv;
@@ -853,16 +1007,16 @@ end
 Build function target: `StanTarget`
 
 ```julia
-function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
-                         columnmajor = true,
-                         conv        = toexpr,
-                         expression  = Val{true},
-                         fname       = :diffeqf, lhsname=:internal_var___du,
-                         rhsnames    =  [:internal_var___u,:internal_var___p,:internal_var___t])
+_build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
+                columnmajor = true,
+                conv        = toexpr,
+                expression  = Val{true},
+                fname       = :diffeqf, lhsname=:internal_var___du,
+                rhsnames    =  [:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
 This builds an in-place Stan function compatible with the Stan differential equation solvers.
-Unlike other build targets, this one requires (vs, ps, iv) as the function arguments.
+Unlike other build targets, this one requires `(vs, ps, iv)` as the function arguments.
 Only allowed on expressions, and arrays of expressions.
 """
 function _build_function(target::StanTarget, ex::AbstractArray, vs, ps, iv;
@@ -911,13 +1065,13 @@ _build_function(target::StanTarget, ex::Num, vs, ps, iv; kwargs...) = _build_fun
 Build function target: `MATLABTarget`
 
 ```julia
-function _build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
-                         conv = toexpr, expression = Val{true},
-                         lhsname=:internal_var___du,
-                         rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
+_build_function(target::MATLABTarget, eqs::Array{<:Equation}, args...;
+                conv = toexpr, expression = Val{true},
+                lhsname=:internal_var___du,
+                rhsnames=[:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
-This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.
+This builds an out of place anonymous function `@(t,rhsnames[1])` to be used in MATLAB.
 Compatible with the MATLAB differential equation solvers. Only allowed on expressions,
 and arrays of expressions.
 """
@@ -944,13 +1098,13 @@ end
 Build function target: `MATLABTarget`
 
 ```julia
-function _build_function(target::MATLABTarget, ex::AbstractArray, args...;
-                         columnmajor = true,
-                         conv        = toexpr,
-                         expression  = Val{true},
-                         fname       = :diffeqf,
-                         lhsname     = :internal_var___du,
-                         rhsnames    = [:internal_var___u,:internal_var___p,:internal_var___t])
+_build_function(target::MATLABTarget, ex::AbstractArray, args...;
+                columnmajor = true,
+                conv        = toexpr,
+                expression  = Val{true},
+                fname       = :diffeqf,
+                lhsname     = :internal_var___du,
+                rhsnames    = [:internal_var___u,:internal_var___p,:internal_var___t])
 ```
 
 This builds an out of place anonymous function @(t,rhsnames[1]) to be used in MATLAB.

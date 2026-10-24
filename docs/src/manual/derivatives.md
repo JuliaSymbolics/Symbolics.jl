@@ -13,7 +13,13 @@ the differentials down to basic one-variable expressions.
 ```@docs
 Differential
 expand_derivatives
+is_derivative
 ```
+
+!!! note
+    For symbolic differentiation, all registered functions in the symbolic expression
+    need a registered derivative. For more information, see the
+    [function registration](@ref function_registration) page.
 
 ## High-Level Differentiation Functions
 
@@ -29,6 +35,9 @@ Symbolics.gradient
 Symbolics.hessian
 Symbolics.sparsehessian
 Symbolics.sparsehessian_vals
+Symbolics.get_differential_vars
+Symbolics.substitute_in_deriv
+Symbolics.substitute_in_deriv_and_depvar
 ```
 
 ## Adding Analytical Derivatives
@@ -50,11 +59,12 @@ However, often you may want to define your own derivatives so that way
 automatic Jacobian etc. calculations can utilize this information. This can
 allow for more succinct versions of the derivatives to be calculated
 to scale to larger systems. You can define derivatives for your
-function via the dispatch:
+function via the macro:
 
 ```julia
-# `N` arguments are accepted by the relevant method of `my_function`
-Symbolics.derivative(::typeof(my_function), args::NTuple{N,Any}, ::Val{i})
+@register_derivative my_function(args...) i begin
+    # ...
+end
 ```
 
 where `i` means that it's the derivative with respect to the `i`th argument. `args` is the
@@ -64,5 +74,7 @@ You should return an `Term` for the derivative of your function.
 For example, `sin(t)`'s derivative (by `t`) is given by the following:
 
 ```@example derivatives
-Symbolics.derivative(::typeof(sin), args::NTuple{1,Any}, ::Val{1}) = cos(args[1])
+@register_derivative sin(t) 1 cos(t)
 ```
+
+For more information see [`@register_derivative`](@ref).

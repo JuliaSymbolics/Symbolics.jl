@@ -1,12 +1,13 @@
-:(function (x,)
-      let ˍ₋out = zeros(Float64, map(length, (1:4, 1:4)))
-          begin
-              for (j, j′) = zip(1:4, reset_to_one(1:4))
-                  for (i, i′) = zip(1:4, reset_to_one(1:4))
-                      ˍ₋out[i′, j′] = (+)(ˍ₋out[i′, j′], (getindex)(x, j, i))
+:(function (ˍ₋out, x)
+      let _out = ˍ₋out
+          var"%_out" = for _2 = 1:1:4
+                  for _1 = 1:1:4
+                      begin
+                          _out[(CartesianIndex)(_1, _2)] = (+)((getindex)(_out, _1, _2), (getindex)(x, _2, _1))
+                          nothing
+                      end
                   end
               end
-          end
-          ˍ₋out
+          _out
       end
   end)

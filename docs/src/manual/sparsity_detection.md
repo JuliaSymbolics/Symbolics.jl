@@ -27,3 +27,9 @@ Symbolics.hessian_sparsity
 Symbolics.islinear
 Symbolics.isaffine
 ```
+
+## ADTypes.jl interface
+
+```@docs
+Symbolics.SymbolicsSparsityDetector
+```

@@ -1,0 +1,506 @@
+using Symbolics
+using SymbolicUtils, SymbolicUtils.Code
+import SymbolicUtils as SU
+using Test
+
+struct Record1
+    x::Int
+    y::String
+    z::Vector{Real}
+end
+
+@symstruct Record1
+
+@testset "`isequal` and `hash`" begin
+    @variables rec1::Record1
+    @test isequal(rec1, rec1)
+    @test isequal(rec1, SU.unwrap(rec1))
+    @test isequal(SU.unwrap(rec1), rec1)
+    @test hash(rec1) == hash(SU.unwrap(rec1))
+end
+
+@testset "`getproperty` operation and arguments" begin
+    @variables rec1::Record1
+    ex = SU.unwrap(rec1.x)
+    @test operation(ex) === Symbolics.SymbolicGetproperty{Record1, :x}()
+    @test isequal(arguments(ex), [SU.unwrap(rec1)])
+end
+
+@testset "`promote_symtype`" begin
+    @variables rec1::Record1
+    @test SU.promote_symtype(operation(SU.unwrap(rec1.x)), Record1) === Int
+    @test SU.promote_symtype(operation(SU.unwrap(rec1.y)), Record1) === String
+    @test SU.promote_symtype(operation(SU.unwrap(rec1.z)), Record1) === Vector{Real}
+end
+
+@testset "Basic record" begin
+    @variables rec::Record1
+
+    @test rec isa Symbolics.SymStruct{Record1}
+    ex = rec.x
+    @test ex isa Num
+    @test SU.symtype(SU.unwrap(ex)) === Int
+
+    ex = rec.y
+    @test ex isa Symbolics.SymbolicT
+    @test SU.symtype(ex) === String
+
+    ex = rec.z
+    @test ex isa Symbolics.Arr{Num, 1}
+    @test SU.symtype(SU.unwrap(ex)) === Vector{Real}
+    @test SU.shape(SU.unwrap(ex)) === SU.Unknown(1)
+
+    @test toexpr(rec.x) == :(rec.x)
+    ex = [rec.y, rec.x + rec.z[1]]
+    val = eval(quote
+        let rec = Record1(1, "abc", [1.0, 2.0])
+            $(toexpr(ex))
+        end
+    end)
+    @test val == ["abc", 2.0]
+end
+
+struct Record2{T}
+    x::Int
+    y::String
+    z::Vector{T}
+end
+
+@symstruct Record2{T} begin
+    shape(:z) = [1:3]
+end
+
+@testset "Parametric record with specified shape" begin
+    @variables rec::Record2{Int}
+
+    ex = rec.z
+    @test ex isa Symbolics.Arr{Num, 1}
+    @test SU.symtype(SU.unwrap(ex)) === Vector{Int}
+    @test SU.shape(SU.unwrap(ex)) == [1:3]
+
+    ex = rec.z[1]
+    @test ex isa Num
+    @test SU.symtype(SU.unwrap(ex)) === Int
+end
+
+@testset "Recursive struct" begin
+    @variables rec::Record2{Record2{Record1}}
+
+    ex = rec.z
+    @test ex isa Symbolics.Arr{Symbolics.SymStruct{Record2{Record1}}, 1}
+    @test SU.symtype(SU.unwrap(ex)) === Vector{Record2{Record1}}
+    @test SU.shape(SU.unwrap(ex)) == [1:3]
+
+    ex = rec.z[1]
+    @test ex isa Symbolics.SymStruct{Record2{Record1}}
+    @test SU.symtype(SU.unwrap(ex)) === Record2{Record1}
+
+    ex = rec.z[1].z
+    @test ex isa Symbolics.Arr{Symbolics.SymStruct{Record1}, 1}
+    @test SU.symtype(SU.unwrap(ex)) === Vector{Record1}
+    @test SU.shape(SU.unwrap(ex)) == [1:3]
+
+    ex = rec.z[1].z[1]
+    @test ex isa Symbolics.SymStruct{Record1}
+    @test SU.symtype(SU.unwrap(ex)) === Record1
+
+    ex = rec.z[1].z[1].z
+    @test ex isa Symbolics.Arr{Num, 1}
+    @test SU.symtype(SU.unwrap(ex)) === Vector{Real}
+    @test SU.shape(SU.unwrap(ex)) === SU.Unknown(1)
+
+    @test toexpr(rec.z[1].z[2].z[3]) == :($getindex($getindex($getindex(rec.z, 1).z, 2).z, 3))
+    @variables rec::Record2{Record1}
+    val = eval(quote
+        let rec = Record2{Record1}(1, "A",
+                                   [Record1(2, "B", [2.0, 3.0]),
+                                       Record1(3, "C", [3.0, 4.0]),
+                                       Record1(4, "D", [4.0, 5.0])])
+            $(toexpr(rec.x + rec.z[1].x + rec.z[2].z[1] + rec.z[3].z[2]))
+        end
+    end)
+    @test val == 1 + 2 + 3.0 + 5.0
+end
+
+abstract type AbstractRecord1 end
+
+@symstruct AbstractRecord1 begin
+    shape(:x) = [1:3]
+end
+
+struct ConcreteRecord1_1 <: AbstractRecord1
+    x::Vector{Int}
+end
+
+struct ConcreteRecord1_2 <: AbstractRecord1
+    x::Vector{Int}
+end
+
+@symstruct ConcreteRecord1_2 begin
+    shape(:x) = [1:2]
+end
+
+record_op1(x::ConcreteRecord1_1) = sum(x.x)
+record_op1(x::ConcreteRecord1_2) = prod(x.x)
+
+@register_symbolic record_op1(x::AbstractRecord1)
+
+record_arrop1(x::Vector{<:AbstractRecord1}) = sum(record_op1, x)
+
+@register_symbolic record_arrop1(x::Vector{AbstractRecord1})
+
+@testset "`@symstruct` of simple abstract type" begin
+    @test Symbolics.has_symwrapper(AbstractRecord1)
+    @test Symbolics.wrapper_type(AbstractRecord1) == SymStruct{<:AbstractRecord1}
+    @test Symbolics.wrapper_type(ConcreteRecord1_1) === SymStruct{ConcreteRecord1_1}
+
+    @variables r1::ConcreteRecord1_1 r2::ConcreteRecord1_2
+    @test SU.shape(r1.x) == [1:3]
+    @test SU.shape(r2.x) == [1:2]
+end
+
+@testset "Function registration with symbolic structs" begin
+    @variables r1::ConcreteRecord1_1 r2::ConcreteRecord1_2
+    ex = record_op1(r1)
+    @test operation(SU.unwrap(ex)) === record_op1
+
+    val = eval(quote
+        let r1 = ConcreteRecord1_1([2,2,3])
+            $(toexpr(ex))
+        end
+    end)
+    @test val == 7
+
+    ex = record_op1(r2)
+    @test operation(SU.unwrap(ex)) === record_op1
+
+    val = eval(quote
+        let r2 = ConcreteRecord1_2([2,2,3])
+            $(toexpr(ex))
+        end
+    end)
+    @test val == 12
+
+    @variables r3[1:2]::ConcreteRecord1_1 r4[1:2]::ConcreteRecord1_2
+
+    ex = record_arrop1(r3)
+    @test operation(SU.unwrap(ex)) === record_arrop1
+    val = eval(quote
+        let r3 = [ConcreteRecord1_1([2,3,4]), ConcreteRecord1_1([3,4,5])]
+            $(toexpr(ex))
+        end
+    end)
+    @test val == 21
+
+    ex = record_arrop1(r4)
+    @test operation(SU.unwrap(ex)) === record_arrop1
+    val = eval(quote
+        let r4 = [ConcreteRecord1_2([2,3,4]), ConcreteRecord1_2([3,4,5])]
+            $(toexpr(ex))
+        end
+    end)
+    @test val == 84
+
+    ex = record_arrop1([r3[1], r1])
+    @test operation(SU.unwrap(ex)) === record_arrop1
+    ex = record_arrop1([r4[1], r2])
+    @test operation(SU.unwrap(ex)) === record_arrop1
+end
+
+abstract type AbstractRecord2{T} end
+
+@symstruct AbstractRecord2
+
+@testset "Registering type without parameters works" begin
+    @test Symbolics.has_symwrapper(AbstractRecord2)
+    @test Symbolics.wrapper_type(AbstractRecord2) == SymStruct{<:AbstractRecord2}
+    @test Symbolics.has_symwrapper(AbstractRecord2{Int})
+    @test Symbolics.wrapper_type(AbstractRecord2{Int}) == SymStruct{<:AbstractRecord2{Int}}
+end
+
+@testset "`issymstruct`" begin
+    @variables x rec1::Record1
+    # SymStruct instance → true
+    @test Symbolics.issymstruct(rec1)
+    # Unwrapped BasicSymbolic whose symtype is a registered struct → true
+    @test Symbolics.issymstruct(SU.unwrap(rec1))
+    # Plain scalar variable → false
+    @test !Symbolics.issymstruct(x)
+    @test !Symbolics.issymstruct(SU.unwrap(x))
+    # Field-access result (symtype Int, not a struct type) → false
+    @test !Symbolics.issymstruct(SU.unwrap(rec1.x))
+    # Non-symbolic value → false
+    @test !Symbolics.issymstruct(1)
+end
+
+@testset "Linear indexing" begin
+    # Record1 has z::Vector{Real} with unknown shape → linear indexing not supported
+    @test !Symbolics.symstruct_supports_linear_indexing(Record1)
+    # Record2{Int} has shape(:z) = [1:3] → supported
+    @test Symbolics.symstruct_supports_linear_indexing(Record2{Int})
+
+    @variables rec::Record2{Int}
+    # x::Int (1 element) + y::String (1 element) + z::Vector{Int} shape [1:3] (3 elements) = 5
+    @test length(rec) == 5
+
+    @test isequal(rec[1], SU.unwrap(rec.x))
+    @test isequal(rec[2], SU.unwrap(rec.y))
+    @test isequal(rec[3], SU.unwrap(rec.z[1]))
+    @test isequal(rec[4], SU.unwrap(rec.z[2]))
+    @test isequal(rec[5], SU.unwrap(rec.z[3]))
+
+    @test_throws BoundsError rec[0]
+    @test_throws BoundsError rec[6]
+
+    elems = collect(rec)
+    @test length(elems) == 5
+    @test all(e -> e isa Symbolics.SymbolicT, elems)
+    @test isequal(elems[1], rec[1])
+    @test isequal(elems[5], rec[5])
+end
+
+@testset "Linear indexing with nested SymStruct" begin
+    @test Symbolics.symstruct_supports_linear_indexing(Record2{Record2{Int}})
+    # x(1) + y(1) + z::Vector{Record2{Int}} [1:3] × 5 each = 2 + 15 = 17
+    @test Symbolics.symstruct_length(Record2{Record2{Int}}) == 17
+
+    @variables rec::Record2{Record2{Int}}
+    @test length(rec) == 17
+
+    # z starts at index 3; z[1] contributes indices 3..7 (5 elements)
+    @test isequal(rec[3], SU.unwrap(rec.z[1].x))     # z[1].x (first scalar field)
+    @test isequal(rec[4], SU.unwrap(rec.z[1].y))     # z[1].y (second scalar field)
+    @test isequal(rec[7], SU.unwrap(rec.z[1].z[3]))  # z[1].z[3] (last element of z[1])
+    # z[2] starts at index 8
+    @test isequal(rec[8], SU.unwrap(rec.z[2].x))
+end
+
+@testset "`diff2term` with SymStruct field access" begin
+    @variables t rec(t)::Record2{Int}
+    D = Differential(t)
+
+    # diff2term(D(rec(t).x)) should equal the .x field of diff2term(D(rec(t)))
+    x_term = SU.unwrap(rec.x)
+    dt_x = Symbolics.diff2term(D(x_term))
+    @test SU.symtype(dt_x) === Int
+
+    rec_term = SU.unwrap(rec)
+    dt_rec = Symbolics.diff2term(D(rec_term))
+    @test isequal(dt_x, SU.unwrap(getproperty(Symbolics.SymStruct{Record2{Int}}(dt_rec), :x)))
+
+    # diff2term(D(rec(t).z[2])) should equal diff2term(D(rec(t))).z[2]
+    z2_term = SU.unwrap(rec.z[2])
+    dt_z2 = Symbolics.diff2term(D(z2_term))
+    @test SU.symtype(dt_z2) === Int
+    z_arr = getproperty(Symbolics.SymStruct{Record2{Int}}(dt_rec), :z)
+    @test isequal(dt_z2, SU.unwrap(z_arr[2]))
+end
+
+struct DiffInner
+    a::Real
+    b::Real
+end
+struct DiffOuter
+    p::Real
+    q::DiffInner
+end
+@symstruct DiffInner
+@symstruct DiffOuter
+
+@testset "differentiating SymStruct field accesses" begin
+    @variables t rec(t)::Record2{Int} out(t)::DiffOuter
+    D = Differential(t)
+
+    # A field access names a leaf of the record, so the derivative stays intact rather
+    # than chain-ruling into a derivative of the record itself.
+    @test isequal(SU.unwrap(expand_derivatives(D(rec.x))), SU.unwrap(D(rec.x)))
+    @test isequal(SU.unwrap(expand_derivatives(D(D(rec.x)))), SU.unwrap(D(D(rec.x))))
+
+    # The chain may mix fields and indices.
+    @test isequal(SU.unwrap(expand_derivatives(D(rec.z[2]))), SU.unwrap(D(rec.z[2])))
+    @test isequal(SU.unwrap(expand_derivatives(D(out.q.a))), SU.unwrap(D(out.q.a)))
+
+    # Leaves compose with the ordinary differentiation rules.
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(rec.x^2))), SU.unwrap(2 * rec.x * D(rec.x)))
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(sin(rec.x)))), SU.unwrap(cos(rec.x) * D(rec.x)))
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(out.p * out.q.a))),
+        SU.unwrap(D(out.p) * out.q.a + out.p * D(out.q.a))
+    )
+
+    # A record that does not depend on the differentiation variable contributes nothing.
+    @variables norec::Record2{Int}
+    @test iszero(expand_derivatives(D(norec.x)))
+
+    # Differentiating with respect to a field itself.
+    @test isequal(
+        SU.unwrap(expand_derivatives(Differential(rec.x)(rec.x^2))), SU.unwrap(2 * rec.x))
+end
+
+struct DiffArr
+    a::Real
+    v::Vector{Real}
+end
+struct DiffLoose
+    a::Real
+    w::Vector{Real}
+end
+@symstruct DiffArr begin
+    shape(:v) = [1:3]
+end
+@symstruct DiffLoose
+# Recursive through an array field, which the type walk in `is_zeroable` has to terminate on.
+struct DiffRec
+    a::Real
+    kids::Vector{DiffRec}
+end
+@symstruct DiffRec
+
+"""
+Return `true` if inference constant-folds the zero-argument `f` to the literal `val`.
+"""
+function folds_to(f, val)
+    ci, _ = only(Base.code_typed(f, (); optimize = true))
+    ret = ci.code[end]
+    return ret isa Core.ReturnNode && isdefined(ret, :val) && ret.val === val
+end
+
+@testset "`is_zeroable`" begin
+    @test Symbolics.is_zeroable(Real)
+    @test Symbolics.is_zeroable(Vector{Real})
+    @test Symbolics.is_zeroable(DiffInner)
+    @test Symbolics.is_zeroable(DiffOuter)
+    @test Symbolics.is_zeroable(DiffLoose)
+    @test Symbolics.is_zeroable(DiffRec)
+    # `Record2` has a `String` field, which has no additive identity.
+    @test !Symbolics.is_zeroable(Record2{Int})
+    @test !Symbolics.is_zeroable(String)
+
+    # The type walk must happen at compile time, so that callers which branch on
+    # `is_zeroable` do not pay for it at runtime. This relies on the `:foldable`
+    # annotation on `is_zeroable`; inference cannot derive it, because the walk is
+    # recursive.
+    @test folds_to(() -> Symbolics.is_zeroable(Real), true)
+    @test folds_to(() -> Symbolics.is_zeroable(Vector{Real}), true)
+    @test folds_to(() -> Symbolics.is_zeroable(DiffInner), true)
+    @test folds_to(() -> Symbolics.is_zeroable(DiffOuter), true)
+    @test folds_to(() -> Symbolics.is_zeroable(DiffRec), true)
+    @test folds_to(() -> Symbolics.is_zeroable(Record2{Int}), false)
+    @test folds_to(() -> Symbolics.is_zeroable(String), false)
+end
+
+@testset "differentiating a struct that does not depend on the variable" begin
+    @variables t noout::DiffOuter noarr::DiffArr noloose::DiffLoose
+    D = Differential(t)
+
+    # The derivative of a record that does not depend on the differentiation variable is
+    # a zero of the *same* symtype, not a scalar `0`.
+    z = SU.unwrap(expand_derivatives(D(SU.unwrap(noout))))
+    @test Symbolics.is_symbolic_zero(z)
+    @test SU.symtype(z) === DiffOuter
+
+    # Every field of a zero struct is itself zero, recursively.
+    zs = Symbolics.SymStruct{DiffOuter}(z)
+    @test iszero(zs.p)
+    @test SU.symtype(SU.unwrap(zs.q)) === DiffInner
+    @test Symbolics.is_symbolic_zero(SU.unwrap(zs.q))
+    @test iszero(zs.q.a)
+    @test iszero(zs.q.b)
+
+    # A field with a declared shape gives a concrete array of zeros, which folds when
+    # indexed.
+    za = Symbolics.SymStruct{DiffArr}(SU.unwrap(expand_derivatives(D(SU.unwrap(noarr)))))
+    @test SU.symtype(SU.unwrap(za.v)) === Vector{Real}
+    @test SU.shape(SU.unwrap(za.v)) == [1:3]
+    @test Symbolics._iszero(SU.unwrap(za.v))
+    @test all(i -> iszero(za.v[i]), 1:3)
+    @test iszero(za.a)
+
+    # A field whose shape is not known cannot be materialized, so it stays a lazy zero.
+    # Its scalar siblings still fold.
+    zl = Symbolics.SymStruct{DiffLoose}(SU.unwrap(expand_derivatives(D(SU.unwrap(noloose)))))
+    @test SU.symtype(SU.unwrap(zl.w)) === Vector{Real}
+    @test SU.shape(SU.unwrap(zl.w)) == SU.Unknown(1)
+    @test Symbolics.is_symbolic_zero(SU.unwrap(zl.w))
+    @test iszero(zl.a)
+end
+
+@testset "differentiating a struct with no zero" begin
+    @variables t norec::Record2{Int} rec(t)::Record2{Int}
+    D = Differential(t)
+
+    # `Record2` has a `String` field, so the whole record has no zero to return.
+    @test_throws ArgumentError expand_derivatives(D(SU.unwrap(norec)))
+    @test_throws ArgumentError expand_derivatives(D(SU.unwrap(norec.y)))
+
+    # Numeric fields of the same record are unaffected - only the fields that have no
+    # zero are rejected.
+    @test Symbolics._iszero(expand_derivatives(D(SU.unwrap(norec.x))))
+    @test Symbolics._iszero(expand_derivatives(D(SU.unwrap(norec.z[2]))))
+
+    # A record that does depend on the variable is still returned unexpanded, with its
+    # symtype intact.
+    drec = SU.unwrap(expand_derivatives(D(SU.unwrap(rec))))
+    @test isequal(drec, SU.unwrap(D(SU.unwrap(rec))))
+    @test SU.symtype(drec) === Record2{Int}
+end
+
+struct ZeroPlan
+    a::Float64
+end
+zeroplan_pos(p, t) = 0.0
+zeroplan_vel(p, t) = 0.0
+@register_symbolic zeroplan_pos(p::SU.FnType{Tuple, Real}, t::Real)
+@register_symbolic zeroplan_vel(p::SU.FnType{Tuple, Real}, t::Real)
+Symbolics.@register_derivative zeroplan_pos(p, t) 2 zeroplan_vel(p, t)
+
+norec_fn(r, t) = 0.0
+@register_symbolic norec_fn(r::Record2{Int}, t::Real)
+
+@testset "a constant argument with no zero contributes nothing" begin
+    @variables t q norec::Record2{Int}
+    zplan = only(@variables (zplan::ZeroPlan)(..))
+    D = Differential(t)
+
+    # A subterm without the differentiation variable contributes nothing to the chain
+    # rule, so it must not be asked for a derivative - its type may well have no zero.
+    # A callable parameter is one such: its symtype is an `FnType`, and the registered
+    # rule supplies the whole derivative.
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(zeroplan_pos(zplan, t)))),
+        SU.unwrap(zeroplan_vel(zplan, t))
+    )
+
+    # A record with a `String` field is another: unzeroable in its own right, yet
+    # perfectly good as a constant argument.
+    @test isequal(
+        SU.unwrap(expand_derivatives(D(norec_fn(norec, t)))),
+        SU.unwrap(D(SU.unwrap(norec_fn(norec, t))))
+    )
+
+    # The same holds wherever such a call is nested, since each of these differentiates
+    # the numeric call rather than the argument.
+    for ex in (norec_fn(norec, t) + q, norec_fn(norec, t) * q,
+               norec_fn(norec, t) / q, norec_fn(norec, t)^2)
+        @test SU.unwrap(expand_derivatives(D(ex))) isa SU.BasicSymbolic
+    end
+
+    # Asking for the derivative of the unzeroable value itself is still an error: there
+    # the zero would be the answer, not a factor that drops out.
+    @test_throws ArgumentError expand_derivatives(D(SU.unwrap(norec)))
+end
+
+using SymbolicIndexingInterface: SymbolicIndexingInterface as SII
+
+@testset "field accesses are named through their record" begin
+    @variables rec::Record2{Int} nest::Record2{Record2{Int}}
+    @test SII.hasname(SU.unwrap(rec.x))
+    # Named through the record, exactly as an array element is named through its array.
+    @test SII.getname(SU.unwrap(rec.x)) === :rec
+    @test SII.getname(SU.unwrap(rec.y)) === :rec
+    # Composes through nesting and through array-valued fields.
+    @test SII.getname(SU.unwrap(rec.z[2])) === :rec
+    @test SII.getname(SU.unwrap(nest.z[1].x)) === :nest
+end

@@ -1,26 +1,14 @@
+"""
+    NAMESPACE_SEPARATOR
+
+Character used to separate nested symbolic names when Symbolics displays a
+namespace-qualified variable.
+
+The separator is `₊` and is used by variable construction and display code.
+"""
 const NAMESPACE_SEPARATOR = '₊'
 
-struct Connection
-    systems
-end
-Connection() = Connection(nothing)
-
-function connect(sys1, sys2, syss...)
-    syss = (sys1, sys2, syss...)
-    length(unique(nameof, syss)) == length(syss) || error("connect takes distinct systems!")
-    Equation(Connection(), Connection(syss)) # the RHS are connected systems
-end
-
-function Base.show(io::IO, c::Connection)
-    print(io, "connect(")
-    n = length(c.systems)
-    for (i, s) in enumerate(c.systems)
-        str = join(split(string(nameof(s)), NAMESPACE_SEPARATOR), '.')
-        print(io, str)
-        i != n && print(io, ", ")
-    end
-    print(io, ")")
-end
+hide_lhs(_) = false
 
 """
 $(TYPEDEF)
@@ -32,40 +20,30 @@ $(FIELDS)
 """
 struct Equation
     """The expression on the left-hand side of the equation."""
-    lhs
+    lhs::BasicSymbolic{VartypeT}
     """The expression on the right-hand side of the equation."""
-    rhs
+    rhs::BasicSymbolic{VartypeT}
     function Equation(lhs, rhs)
-        new(value(lhs), value(rhs))
+        new(unwrap(lhs), unwrap(rhs))
     end
 end
-Base.:(==)(a::Equation, b::Equation) = all(isequal.((a.lhs, a.rhs), (b.lhs, b.rhs)))
+Base.:(==)(a::Equation, b::Equation) = isequal(a.lhs, b.lhs) && isequal(a.rhs, b.rhs)
 Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 
 function Base.show(io::IO, eq::Equation)
-    if eq.lhs isa Connection
-        show(io, eq.rhs)
+    warn_load_latexify()
+    if hide_lhs(unwrap_const(eq.lhs))::Bool
+        show(io, unwrap_const(eq.rhs))
     else
         print(io, eq.lhs, " ~ ", eq.rhs)
     end
 end
 
-scalarize(eq::Equation) = scalarize(eq.lhs) ~ scalarize(eq.rhs)
+SymbolicUtils.scalarize(eq::Equation, args...) = scalarize(eq.lhs, args...) .~ scalarize(eq.rhs, args...)
 SymbolicUtils.simplify(x::Equation; kw...) = simplify(x.lhs; kw...) ~ simplify(x.rhs; kw...)
-# ambiguity
-for T in [:Pair, :Any]
-    @eval function SymbolicUtils.substitute(x::Equation, rules::$T; kw...)
-        sub = substituter(rules)
-        sub(x.lhs; kw...) ~ sub(x.rhs; kw...)
-    end
-
-    @eval function SymbolicUtils.substitute(eqs::Array{Equation}, rules::$T; kw...)
-        sub = substituter(rules)
-        sub.(lhss(eqs); kw...) .~ sub.(rhss(eqs); kw...)
-    end
+function (s::SymbolicUtils.Substituter)(eq::Equation)
+    s(eq.lhs) ~ s(eq.rhs)
 end
-
-SymbolicUtils.substitute(nums::Array{Num}, rules; kw...) = substituter(rules).(nums; kw...)
 
 lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
@@ -92,19 +70,15 @@ julia> x - y ~ 0
 x - y ~ 0
 
 julia> A ~ B
-(broadcast(~, A, B))[1:3,1:3]
+A ~ B
 
 julia> A .~ 3x
 (broadcast(~, A, 3x))[1:3,1:3]
 ```
 """
 function Base.:~(lhs, rhs)
-    if isarraysymbolic(lhs) || isarraysymbolic(rhs)
-        if isarraysymbolic(lhs) && isarraysymbolic(rhs)
-            lhs .~ rhs
-        else
-            throw(ArgumentError("Cannot equate an array with a scalar. Please use broadcast `.~`."))
-        end
+    if (isarraysymbolic(lhs) || isarraysymbolic(rhs)) && ((sl = size(lhs)) != (sr = size(rhs)))
+        throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
     else
         Equation(lhs, rhs)
     end
@@ -128,11 +102,9 @@ end
 
 canonical_form(eq::Equation) = eq.lhs - eq.rhs ~ 0
 
-get_variables(eq::Equation) = unique(vcat(get_variables(eq.lhs), get_variables(eq.rhs)))
-
-struct ConstrainedEquation
-  constraints
-  eq
+function SymbolicUtils.search_variables!(buffer, eq::Equation; kw...)
+    SymbolicUtils.search_variables!(buffer, eq.lhs; kw...)
+    SymbolicUtils.search_variables!(buffer, eq.rhs; kw...)
 end
 
 function expand_derivatives(eq::Equation, simplify=false)

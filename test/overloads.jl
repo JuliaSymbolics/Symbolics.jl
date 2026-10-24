@@ -1,8 +1,11 @@
 using Symbolics: Sym, FnType, Term, value, scalarize
 using Symbolics
 using LinearAlgebra
-using SparseArrays: sparse
+using SparseArrays: sparse, sparsevec
+using StaticArraysCore: SArray
+import SpecialFunctions
 using Test
+using SymbolicUtils: BasicSymbolic, evaluate
 
 a, b, c = :runtime_symbol_value, :value_b, :value_c
 vars = @variables t $a $b(t) $c(t)[1:3]
@@ -11,14 +14,49 @@ vars = @variables t $a $b(t) $c(t)[1:3]
 @test b === :value_b
 @test c === :value_c
 @test isequal(vars[1], t)
-@test isequal(vars[2], Num(Sym{Real}(a)))
-@test isequal(vars[3], Num(Sym{FnType{Tuple{Any},Real}}(b)(value(t))))
+@test isequal(vars[2], Num(Sym{SymReal}(a; type = Real)))
+@test isequal(vars[3], Num(Sym{SymReal}(b; type = FnType{Tuple,Real,Nothing})(value(t))))
 
 vars = @variables a,b,c,d,e,f,g,h,i
 @test isequal(vars, [a,b,c,d,e,f,g,h,i])
 @test isequal(transpose(a), a)
 @test isequal(a', a)
 @test isequal(sincos(a), (sin(a), cos(a)))
+
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/1763
+@test isequal(sincospi(a), (sinpi(a), cospi(a)))
+@test isinteger(Num(2))
+@test !isinteger(Num(2.5))
+@test !isinteger(a)
+@variables nint::Int
+@test isinteger(nint)
+@variables zcplx::Complex
+# `sinpi(::Complex{Num})` / `cospi(::Complex{Num})` go through `Base`'s
+# complex implementations, which dispatch on `isinteger(::Num)`.
+@test sinpi(zcplx) isa Complex{Num}
+@test cospi(zcplx) isa Complex{Num}
+@test sincospi(zcplx) isa Tuple{Complex{Num}, Complex{Num}}
+
+@testset "isinf/isnan/isfinite on Num" begin
+    for v in (Inf, -Inf)
+        @test isinf(Num(v))
+        @test !isnan(Num(v))
+        @test !isfinite(Num(v))
+    end
+    @test !isinf(Num(NaN))
+    @test isnan(Num(NaN))
+    @test !isfinite(Num(NaN))
+    for v in (1.0, 0)
+        @test !isinf(Num(v))
+        @test !isnan(Num(v))
+        @test isfinite(Num(v))
+    end
+    @test !isinf(a)
+    @test !isnan(a)
+    @test isfinite(a)
+    @test isfinite(a + b)
+    @test_nowarn lu(Num[a 1; b 2], NoPivot())
+end
 
 @test substitute(a ~ b, Dict(a=>1, b=>c)) == (1 ~ c)
 
@@ -30,7 +68,7 @@ aa = a; # old a
 @test isequal(a, aa)
 @test hash(a) == hash(aa)
 
-@test isequal(Symbolics.get_variables(a+aa+1), [a])
+@test isequal(Symbolics.get_variables(a+aa+1), Set([a]))
 
 @test hash(a+b ~ c+d) == hash(a+b ~ c+d)
 
@@ -112,26 +150,20 @@ M \ [1, 2]
 # test det
 @variables X[1:4,1:4]
 d1 = det(X, laplace=true)
-d2 = det(X, laplace=false)
 _det1 = eval(build_function(d1,X))
-_det2 = eval(build_function(d2,X))
 A = [1 1 1 1
      1 0 1 1
      1 1 0 1
      1 1 1 0]
 @test _det1(map(Num, A)) == -1
-@test _det2(map(Num, A)) == -1
 
 @variables X[1:3,1:3]
 d1 = det(X, laplace=true)
-d2 = det(X, laplace=false)
 _det1 = eval(build_function(d1, X))
-_det2 = eval(build_function(d2, X))
 A = [1 1 1
      1 0 1
      1 1 1]
 @test _det1(map(Num, A)) == 0
-@test _det2(map(Num, A)) == 0
 
 @variables a b c d
 z1 = a + b * im
@@ -153,24 +185,118 @@ z2 = c + d * im
 @test isequal(2 - z1, Complex(2 - a, -b))
 @test isequal(z1 ^ 2, a^2 - b^2 + 2a*b*im)
 
+@testset "Num dispatch intersections" begin
+    @test Num(1 + 0im) isa Num
+    @test_throws InexactError Num(1 + 2im)
+    @test_throws InexactError convert(Num, 1 + 2im)
+    @test (1 + 2im == a) isa Num
+    @test (a == 1 + 2im) isa Num
+    @test (Base.MathConstants.pi == a) isa Num
+    @test (a == Base.MathConstants.pi) isa Num
+    @test !isequal(1 + 2im, a)
+    @test !isequal(a, 1 + 2im)
+    @test isequal((Complex(a, b)^false), Complex(1, 0))
+    @test promote_type(Complex{Float64}, Num) === Complex{Num}
+
+    for value in (1.0, 1 + 2im, unwrap(a))
+        @test (SymbolicUtils.:<ₑ(a, value)) isa Bool
+        @test (SymbolicUtils.:<ₑ(value, a)) isa Bool
+    end
+end
+
+@testset "Num package-array intersections" begin
+    bits = BitVector([true, false])
+    sparse_vector = sparsevec([1], [1.0], 2)
+    static_vector = SArray{Tuple{2}}((1.0, 2.0))
+
+    @test bits / a isa BasicSymbolic
+    @test a / bits isa BasicSymbolic
+    @test sparse_vector / a isa BasicSymbolic
+    @test static_vector / a isa BasicSymbolic
+    @test a \ static_vector isa BasicSymbolic
+    @test view([1.0 2.0; 3.0 4.0], :, :) / a isa BasicSymbolic
+    @test a \ view([1.0, 2.0], :) isa BasicSymbolic
+    @test sparse([1.0 0.0; 0.0 2.0]) / a isa BasicSymbolic
+    @test a / (1:3) isa BasicSymbolic
+    @test (a in 1:3) isa BasicSymbolic
+    @test (a in static_vector) isa BasicSymbolic
+    for values in (
+            view([1.0, 2.0], :), Diagonal([1.0, 2.0]),
+            Symmetric([1.0 0.0; 0.0 2.0]), adjoint([1.0, 2.0]),
+        )
+        @test (a in values) isa BasicSymbolic
+    end
+
+    upper = UpperTriangular(Num[1 1; 0 1])
+    upper_rhs = sparsevec([1, 2], Num[2, 1], 2)
+    @test ldiv!(upper, upper_rhs) == Num[1, 1]
+    upper_rhs = sparsevec([1, 2], Num[2, 1], 2)
+    upper_output = Num[0, 0]
+    @test ldiv!(upper, upper_rhs, upper_output) == Num[1, 1]
+
+    unit_lower = UnitLowerTriangular(Num[1 0; 1 1])
+    lower_rhs = sparsevec([1, 2], Num[1, 2], 2)
+    @test ldiv!(unit_lower, lower_rhs) == Num[1, 1]
+    lower_rhs = sparsevec([1, 2], Num[1, 2], 2)
+    lower_output = Num[0, 0]
+    @test ldiv!(unit_lower, lower_rhs, lower_output) == Num[1, 1]
+end
+
+@testset "Num scalar method intersections" begin
+    for f in (
+            SpecialFunctions.besseli, SpecialFunctions.besselj,
+            SpecialFunctions.besselk, SpecialFunctions.bessely,
+        )
+        @test f(a, 1.0) isa Num
+        @test f(a, 1.0im) isa Num
+    end
+    @test copysign(1, a) isa Num
+    @test copysign(1.0f0, a) isa Num
+    @test copysign(1.0, a) isa Num
+    @test SpecialFunctions.polygamma(1, a) isa Num
+end
+
+@testset "Num structured-array intersections" begin
+    structured = (
+        Bidiagonal([1.0, 2.0], [3.0], :U),
+        Diagonal([1.0, 2.0]),
+        Tridiagonal([1.0], [2.0, 3.0], [4.0]),
+        SymTridiagonal([1.0, 2.0], [3.0]),
+        Symmetric([1.0 2.0; 2.0 3.0]),
+        Hermitian([1.0 2.0; 2.0 3.0]),
+        UpperHessenberg([1.0 2.0; 3.0 4.0]),
+        UpperTriangular([1.0 2.0; 0.0 3.0]),
+        LowerTriangular([1.0 0.0; 2.0 3.0]),
+        UnitUpperTriangular([1.0 2.0; 0.0 1.0]),
+        UnitLowerTriangular([1.0 0.0; 2.0 1.0]),
+    )
+    for matrix in structured
+        @test (matrix / a) isa BasicSymbolic
+        @test (a \ matrix) isa BasicSymbolic
+    end
+    for matrix in (structured[2], structured[4], structured[5], structured[6])
+        @test (matrix^a) isa BasicSymbolic
+    end
+    @test (a^[1.0 0.0; 0.0 1.0]) isa BasicSymbolic
+end
+
 @test isequal((0 ~ a+0*im), 0 ~ a)
 @test isequal((im ~ b+c*im), [0 ~ b; 1 ~ c])
 @test isequal((0 ~ z1), [0 ~ a, 0 ~ b])
 @test isequal((z1 ~ z2), [a ~ c, b ~ d])
 
-@test a + im === Complex(a, Num(true))
+@test a + im === Complex(a, Num(1))
 @test real(a) === a
 @test conj(a) === a
 @test imag(a) === Num(0)
 
-@test isequal(sign(x), Num(SymbolicUtils.Term{Int}(sign, [Symbolics.value(x)])))
+@test isequal(sign(x), Num(SymbolicUtils.Term{SymReal}(sign, [Symbolics.value(x)]; type = Real)))
 @test sign(Num(1)) isa Num
-@test isequal(sign(Num(1)), Num(1))
-@test isequal(sign(Num(-1)), Num(-1))
-                    
+@test isequal(evaluate(sign(Num(1))), Num(1))
+@test isequal(evaluate(sign(Num(-1))), Num(-1))
+
 @test isequal(ℯ^a, exp(a))
 
-using IfElse: ifelse
 @test isequal(Symbolics.derivative(abs(x), x), ifelse(signbit(x), -1, 1))
 @test isequal(Symbolics.derivative(sign(x), x), 0)
 @test isequal(Symbolics.derivative(signbit(x), x), 0)
@@ -181,10 +307,13 @@ using IfElse: ifelse
 @test iszero(complex(Num(0), Num(0)))
 
 x = Num.(randn(10))
-@test norm(x) == norm(Symbolics.value.(x))
-@test norm(x, Inf) == norm(Symbolics.value.(x), Inf)
-@test norm(x, 1) == norm(Symbolics.value.(x), 1)
-@test norm(x, 1.2) == norm(Symbolics.value.(x), 1.2)
+@test value(evaluate(norm(x))) ≈ norm(Symbolics.value.(x))
+@test value(evaluate(norm(x, Inf))) == norm(Symbolics.value.(x), Inf)
+@test value(evaluate(norm(x, 1))) ≈ norm(Symbolics.value.(x), 1)
+@test value(evaluate(norm(x, 1.2))) ≈ norm(Symbolics.value.(x), 1.2)
+
+@test evaluate.(clamp.(x, 0, 1)) == clamp.(Symbolics.value.(x), 0, 1)
+@test isequal(Symbolics.derivative(clamp(a, 0, 1), a), ifelse(a < 0, 0, ifelse(a>1, 0, 1)))
 
 @variables x[1:2]
 @test isequal(scalarize(norm(x)), sqrt(abs2(x[1]) + abs2(x[2])))
@@ -203,7 +332,7 @@ x = Num.(randn(10))
 
 @variables x[1:3]
 ex = x[1]+x[2]
-@test isequal(Symbolics.get_variables(ex), Symbolics.scalarize(x[1:2]))
+@test issetequal(Symbolics.get_variables(ex), Symbolics.scalarize(x[1:2]))
 
 @variables x
 A = [x[1] 2
@@ -234,4 +363,38 @@ stringcontent = string(d.content)
 @variables t
 for f in [<, <=, >, >=, isless]
     @test_nowarn f(t, 1.0)
+end
+
+@test_nowarn binomial(t, 1)
+
+# test for https://github.com/JuliaSymbolics/Symbolics.jl/issues/1028
+let
+    @variables t A(t) B
+    @test try binomial(A, 2*B^2)
+        true
+    catch
+        false
+    end
+    @test try binomial(Symbolics.value(A), Symbolics.value(2*B^2))
+        true
+    catch
+        false
+    end
+end
+
+using Symbolics: scalarize
+@variables X[1:3, 1:3] x
+sX = fill(x, 3, 3)
+sx = fill(x, 3)
+@test isequal(scalarize(X + sX), scalarize(X) + sX)
+@test isequal(scalarize(X * sX), scalarize(X) * sX)
+@test isequal(scalarize(X * sx), scalarize(X) * sx)
+
+@testset "Equations from nonsymbolic operands" begin
+    @variables x y
+    @test (1 ~ 3) isa Equation
+    @test (nothing ~ nothing) isa Equation
+    @test ([x, y] ~ [1, 2]) isa Equation
+    @test isequal(substitute(x ~ y, Dict(x => 1, y => 2)), Equation(1, 2))
+    @test copysign(1 // 2, x) isa Num
 end

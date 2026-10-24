@@ -3,100 +3,218 @@ $(DocStringExtensions.README)
 """
 module Symbolics
 
-using DocStringExtensions, Markdown
+import PrecompileTools
+using PrecompileTools: @compile_workload, @setup_workload
 
-using LinearAlgebra
+import PrecompileTools: @recompile_invalidations
 
-using Reexport
+@recompile_invalidations begin
+    import CommonWorldInvalidations
 
-using DomainSets
+import DocStringExtensions, Markdown
+using DocStringExtensions: FIELDS, SIGNATURES, TYPEDEF, TYPEDSIGNATURES
 
-using Setfield
+import LinearAlgebra
+using LinearAlgebra: Adjoint, Eigen, I, LU, LowerTriangular, SingularException,
+    Transpose, UnitLowerTriangular, UpperTriangular, cond, det, diag, diagm, isdiag,
+    istril, istriu, lu, mul!, norm, tril
 
-import DomainSets: Domain
-@reexport using SymbolicUtils
+import Primes
 
-import SymbolicUtils: similarterm, istree, operation, arguments, symtype, metadata
+import Setfield
 
-import SymbolicUtils: Term, Add, Mul, Pow, Sym, Div, BasicSymbolic,
-                      FnType, @rule, Rewriters, substitute,
-                      promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv
+    import DomainSets: Domain, DomainSets
+    import IntervalSets
 
-using SymbolicUtils.Code
+import TermInterface
+using TermInterface: sorted_arguments
+import TermInterface: maketerm, iscall, operation, arguments, metadata
+
+import SymbolicUtils: Term, Sym, BasicSymbolic, Const,
+    FnType, @rule, Rewriters, substitute, symtype, shape, unwrap, unwrap_const,
+    promote_symtype, isadd, ismul, ispow, isterm, issym, isdiv, BSImpl, scalarize,
+    Operator, _iszero, _isone, search_variables, search_variables!, ArgsT, ROArgsT,
+    ifelse_eager, ifelse_branching, Unknown
+import SymbolicUtils as SU
+
+import SymbolicUtils.Code
+using SymbolicUtils.Code: Assignment, AtIndex, DestructuredArgs, Func, Let,
+    LiteralExpr, MakeArray, SetArray, SpawnFetch
 
 import SymbolicUtils.Rewriters: Chain, Prewalk, Postwalk, Fixpoint
 
 import SymbolicUtils.Code: toexpr
 
 import ArrayInterface
+import RuntimeGeneratedFunctions
+using RuntimeGeneratedFunctions: @RuntimeGeneratedFunction, RuntimeGeneratedFunction, drop_expr
+import MacroTools
 
-using RuntimeGeneratedFunctions
+import SymbolicIndexingInterface
+using SymbolicIndexingInterface: ArraySymbolic, NotSymbolic, ScalarSymbolic, getname,
+    hasname, symbolic_type
+
+import SymbolicLimits
+
+using ADTypes: ADTypes
+
+import SymbolicUtils
+using SymbolicUtils: @acrule, @syms, IRStructure, SafeReal, SymReal, TreeReal, expand,
+    flatten_fractions, getmetadata, hasmetadata, setmetadata, simplify,
+    simplify_fractions, term, vartype
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
-# re-export
+import SciMLPublic: @public
 
-export simplify, substitute
+using Moshi.Match: @match
 
-using SciMLBase, IfElse
+import Preferences: @load_preference
+end
+
+using SymbolicUtils: @arrayop, @makearray, @rule, BS, Rewriters, RuleSet,
+    arguments, get_reachability, ifelse_branching, ifelse_eager, iscall, istree,
+    operation, populate_ir!, print_ir, quick_cancel, substitute, unwrap_const
+export @acrule, @arrayop, @makearray, @rule, @syms, BS, IRStructure, Rewriters, RuleSet,
+    SafeReal, SymReal, SymbolicUtils, TreeReal, Unknown, arguments, expand,
+    flatten_fractions, get_reachability, getmetadata, hasmetadata, ifelse_branching,
+    ifelse_eager, iscall, istree, operation, populate_ir!, print_ir, quick_cancel,
+    scalarize, setmetadata, shape, simplify, simplify_fractions, sorted_arguments,
+    substitute, term, unwrap, unwrap_const, vartype
+const DEFAULT_VARTYPE_PREF = @load_preference("vartype", "SymReal")
+const VartypeT = @static if DEFAULT_VARTYPE_PREF == "SymReal"
+    SymReal
+elseif DEFAULT_VARTYPE_PREF == "SafeReal"
+    SafeReal
+elseif DEFAULT_VARTYPE_PREF == "TreeReal"
+    TreeReal
+else
+    error("""
+    Invalid vartype preference: $DEFAULT_VARTYPE_PREF. Must be one of "SymReal", \
+    "SafeReal" or "TreeReal".
+    """)
+end
+const COMMON_ONE = SymbolicUtils.one_of_vartype(VartypeT)
+const COMMON_ZERO = SymbolicUtils.zero_of_vartype(VartypeT)
+const SymbolicT = BasicSymbolic{VartypeT}
+const SArgsT = SymbolicUtils.ArgsT{VartypeT}
+const SConst = SymbolicUtils.BSImpl.Const{VartypeT}
+const SSym = SymbolicUtils.Sym{VartypeT}
+const STerm = SymbolicUtils.Term{VartypeT}
+
+export simplify, substitute, substitute_in_deriv, substitute_in_deriv_and_depvar # (re-)export
+
+import AbstractPlutoDingetjes: is_inside_pluto
+const WARNED_LATEXIFY = Ref(false)
+function warn_load_latexify()
+    is_inside_pluto() || return
+    WARNED_LATEXIFY[] && return
+    @warn """
+    Attempting to print a symbolic expression in a Pluto notebook. Please run \
+    `import Latexify` to enable pretty-printing of symbolic expressions. This \
+    warning will only display once.
+    """
+    WARNED_LATEXIFY[] = true
+    return nothing
+end
+
 export Num
-using MacroTools
-import MacroTools: splitdef, combinedef, postwalk, striplines
+import MacroTools: splitdef
 include("wrapper-types.jl")
 
-include("num.jl")
+@recompile_invalidations begin
+    include("num.jl")
+end
+function (s::SymbolicUtils.Substituter)(x::Num)
+    Num(s(unwrap(x)))
+end
+
+
+include("rewrite-helpers.jl")
 include("complex.jl")
 
 """
-    substitute(expr, s)
+    substitute(expr, s; fold=Val(false))
 
 Performs the substitution on `expr` according to rule(s) `s`.
+If `fold=Val(true)`, expressions which can be fully evaluated will be evaluated to a number.
+
+!!! warning "Does not penetrate `Differential`"
+    As of Symbolics.jl v7 (SymbolicUtils.jl v4), `substitute` does **not** recurse into
+    the arguments of `Differential` expressions. For example,
+    `substitute(D(x), Dict(x => y))` returns `D(x)`, not `D(y)`.
+    Use [`substitute_in_deriv`](@ref) or [`substitute_in_deriv_and_depvar`](@ref) to
+    substitute inside `Differential` applications.
+
+
 # Examples
-```julia
+
+```jldoctest
+julia> using Symbolics
+
 julia> @variables t x y z(t)
 4-element Vector{Num}:
     t
     x
     y
  z(t)
+
 julia> ex = x + y + sin(z)
-(x + y) + sin(z(t))
+sin(z(t)) + x + y
+
 julia> substitute(ex, Dict([x => z, sin(z) => z^2]))
-(z(t) + y) + (z(t) ^ 2)
+y + z(t) + z(t)^2
+
+julia> substitute(sqrt(2x), Dict([x => 1]))
+sqrt(2)
+
+julia> substitute(sqrt(2x), Dict([x => 1]); fold=Val(true))
+1.4142135623730951
 ```
 """
 substitute
 
-export Equation, ConstrainedEquation
+export Equation
 include("equations.jl")
 
 export Inequality, ≲, ≳
 include("inequality.jl")
 
-include("utils.jl")
+import Bijections, DynamicPolynomials
+import DynamicPolynomials as DP
+import MultivariatePolynomials as MP
+import MutableArithmetics as MA
 
-using ConstructionBase
+import ConstructionBase
 include("arrays.jl")
 
-export @register, @register_symbolic
+export tosymbol, terms, factors
+export gather_factor
+include("utils.jl")
+
+export @register_symbolic, @register_array_symbolic
 include("register.jl")
 
-using TreeViews
-export @variables, Variable
+import SparseArrays
+using SparseArrays: AbstractSparseArray, AbstractSparseVector, SparseMatrixCSC,
+    SparseVector, findnz, issparse, nnz, sparse
+export @variables
 include("variable.jl")
 
+function slog end; function ssqrt end; function scbrt end
+import DiffRules, SpecialFunctions, NaNMath
+using SpecialFunctions: airyai, airyaiprime, airybi, airybiprime, besselj0, besselj1,
+    bessely0, bessely1, beta, dawson, digamma, erf, erfc, erfcinv, erfcx, erfi,
+    erfinv, expinti, gamma, invdigamma, lbeta, lgamma, trigamma
 include("linearity.jl")
 
-using DiffRules, SpecialFunctions, NaNMath
 
-using SparseArrays
-
-export Differential, expand_derivatives
-
+export Differential, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
+include("register_derivatives.jl")
 include("diff.jl")
 
-export Difference, DiscreteUpdate
+export SymbolicsSparsityDetector
 
-include("difference.jl")
+include("adtypes.jl")
 
 export infimum, supremum
 include("domains.jl")
@@ -106,76 +224,520 @@ include("integral.jl")
 
 include("array-lib.jl")
 
-include("linear_algebra.jl")
+import LogExpFunctions
+include("logexpfunctions-lib.jl")
 
-using Groebner
+include("linear_algebra.jl")
+export symbolic_linear_solve, solve_for
+
 include("groebner_basis.jl")
-export groebner_basis
+export groebner_basis, is_groebner_basis
+
+include("taylor.jl")
+export series, taylor, taylor_coeff
+
+export SymStruct, @symstruct
+@public record_literal, is_record_literal, RecordLiteral, record_literal_term
+include("symstruct.jl")
+include("recordliteral.jl")
+include("symzero.jl")
 
 import Libdl
 include("build_function.jl")
+include("codegen_fn.jl")
 export build_function
 
-import Distributions
+include("conditionals.jl")
+
 include("extra_functions.jl")
 
-using Latexify
-using LaTeXStrings
-include("latexify_recipes.jl")
-
-using RecipesBase
+import RecipesBase
+using RecipesBase: @recipe
 include("plot_recipes.jl")
+
+include("latexify_recipes.jl")
 
 include("semipoly.jl")
 
-include("solver.jl")
-export solve_single_eq
-export solve_system_eq
-export lambertw
 
 include("parsing.jl")
 export parse_expr_to_symbolic
 
+include("error_hints.jl")
+
+include("limits.jl")
+export limit
+
+include("partialfractions.jl")
+export partial_frac_decomposition
+
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
-(::Type{T})(x::SymbolicUtils.Symbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
+(::Type{T})(x::SymbolicUtils.BasicSymbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))
 for T in [Num, Complex{Num}]
     @eval begin
         #(::Type{S})(x::$T) where {S<:Union{NumberTypes,AbstractArray}} = S(Symbolics.unwrap(x))::S
 
-        SymbolicUtils.simplify(n::$T; kw...) = wrap(SymbolicUtils.simplify(unwrap(n); kw...))
-        SymbolicUtils.simplify_fractions(n::$T; kw...) = wrap(SymbolicUtils.simplify_fractions(unwrap(n); kw...))
-        SymbolicUtils.expand(n::$T) = wrap(SymbolicUtils.expand(unwrap(n)))
-        substitute(expr::$T, s::Pair; kw...) = wrap(substituter(s)(unwrap(expr); kw...)) # backward compat
-        substitute(expr::$T, s::Vector; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
-        substitute(expr::$T, s::Dict; kw...) = wrap(substituter(s)(unwrap(expr); kw...))
+        SymbolicUtils.simplify(n::$T; kw...) = $T(SymbolicUtils.simplify(unwrap(n); kw...))
+        SymbolicUtils.simplify_fractions(n::$T; kw...) = $T(SymbolicUtils.simplify_fractions(unwrap(n); kw...))
+        SymbolicUtils.expand(n::$T) = $T(SymbolicUtils.expand(unwrap(n)))
 
         SymbolicUtils.Code.toexpr(x::$T) = SymbolicUtils.Code.toexpr(unwrap(x))
 
-        SymbolicUtils.setmetadata(x::$T, t, v) = wrap(SymbolicUtils.setmetadata(unwrap(x), t, v))
+        SymbolicUtils.setmetadata(x::$T, t, v) = $T(SymbolicUtils.setmetadata(unwrap(x), t, v))
         SymbolicUtils.getmetadata(x::$T, t) = SymbolicUtils.getmetadata(unwrap(x), t)
         SymbolicUtils.hasmetadata(x::$T, t) = SymbolicUtils.hasmetadata(unwrap(x), t)
 
         Broadcast.broadcastable(x::$T) = x
-    end
-    for S in [:(Symbolic{<:FnType}), :CallWithMetadata]
-        @eval (f::$S)(x::$T, y...) = wrap(f(unwrap(x), unwrap.(y)...))
+        SymbolicUtils.scalarize(x::$T) = $T(scalarize(unwrap(x)))
     end
 end
 
+# Symbolic solver
+include("solver/preprocess.jl")
+include("solver/nemo_stuff.jl")
+include("solver/solve_helpers.jl")
+include("solver/postprocess.jl")
+include("solver/univar.jl")
+include("solver/ia_helpers.jl")
+include("solver/polynomialization.jl")
+include("solver/attract.jl")
+include("solver/ia_main.jl")
+include("solver/main.jl")
+include("solver/special_cases.jl")
+export symbolic_solve
+
+# Diff Eq Solver
+include("diffeqs/diffeqs.jl")
+include("diffeqs/systems.jl")
+include("diffeqs/diffeq_helpers.jl")
+include("diffeqs/laplace.jl")
+export SymbolicLinearODE, symbolic_solve_ode, solve_linear_ode_system, solve_symbolic_IVP, laplace, inverse_laplace, laplace_solve_ode
+
+# Sympy Functions
+
+"""
+    symbolics_to_sympy(expr)
+
+Converts a Symbolics.jl expression to a SymPy expression. It is represented in
+[SymPy.jl](https://juliapy.github.io/SymPy.jl/dev/) format and thus can use all
+of the wrapped functionality from SymPy.jl.
+
+For conversion back to Symbolics, see `sympy_to_symbolics`.
+
+# Arguments
+
+- `expr`: A Symbolics.jl expression
+
+# Example
+
+```julia
+using Symbolics
+@variables x y
+expr = x^2 + y
+sympy_expr = symbolics_to_sympy(expr)
+```
+"""
 function symbolics_to_sympy end
-export symbolics_to_sympy
 
-@static if !isdefined(Base, :get_extension)
-    using Requires
-end
+"""
+    sympy_to_symbolics(sympy_expr, vars)
+Converts a SymPy expression to Symbolics.jl.
+# Arguments
+- `sympy_expr`: SymPy expression.
+- `vars`: List or dictionary of Symbolics variables.
+# Example
+```julia
+@variables x y
+sympy_expr = SymPy.Sym("x")^2 + SymPy.Sym("y")
+symbolics_expr = sympy_to_symbolics(sympy_expr, [x, y])
+```
+"""
+function sympy_to_symbolics end
 
-@static if !isdefined(Base,:get_extension)
-    function __init__()
-        @require SymPy="24249f21-da20-56a4-8eb1-6a02cf4ae2e6" begin
-            include("../ext/SymbolicsSymPyExt.jl")
+"""
+    sympy_linear_solve(A, b)
+Solves linear system Ax = b using SymPy.
+# Arguments
+- `A`: Matrix of Symbolics expressions.
+- `b`: Vector of Symbolics expressions.
+# Returns
+Vector of Symbolics solutions.
+# Example
+```julia
+@variables x y
+A = [1 2; 3 4]
+b = [x, y]
+sol = sympy_linear_solve(A, b)
+```
+"""
+function sympy_linear_solve end
+
+"""
+    sympy_algebraic_solve(expr, var)
+Solves algebraic equation(s) expr = 0 for var(s) using SymPy.
+# Arguments
+- `expr`: Symbolics expression or vector of expressions for a system of equations (linear or nonlinear).
+- `var`: Symbolics variable or vector of variables to solve for.
+# Returns
+- For a single equation: List of Symbolics solutions.
+- For a system: List of dictionaries mapping variables to solutions.
+# Example
+```julia
+@variables x y
+# Single equation
+expr = x^2 - 4
+sol = sympy_algebraic_solve(expr, x)  # Returns [2, -2]
+# Nonlinear system
+eqs = [x^2 + y^2 - 4, x - y]  # Circle and line
+sol = sympy_algebraic_solve(eqs, [x, y])  # Returns [{x=>1, y=>1}, {x=>-1, y=>-1}]
+```
+"""
+function sympy_algebraic_solve end
+
+"""
+    sympy_integrate(expr, var)
+Computes indefinite integral of expr w.r.t. var using SymPy.
+# Arguments
+- `expr`: Symbolics expression.
+- `var`: Symbolics variable.
+# Returns
+Symbolics integral.
+# Example
+```julia
+@variables x
+expr = x^2
+result = sympy_integrate(expr, x)
+```
+"""
+function sympy_integrate end
+
+"""
+    sympy_limit(expr, var, val)
+Computes limit of expr as var approaches val using SymPy.
+# Arguments
+- `expr`: Symbolics expression.
+- `var`: Symbolics variable.
+- `val`: Symbolics expression or number.
+# Returns
+Symbolics limit.
+# Example
+```julia
+@variables x
+expr = 1/x
+result = sympy_limit(expr, x, 0)
+```
+"""
+function sympy_limit end
+
+"""
+    sympy_simplify(expr)
+Simplifies a Symbolics expression using SymPy.
+# Arguments
+- `expr`: Symbolics expression.
+# Returns
+Simplified Symbolics expression.
+# Example
+```julia
+@variables x
+expr = x^2 + 2x^2
+result = sympy_simplify(expr)
+```
+"""
+function sympy_simplify end
+
+"""
+    sympy_ode_solve(expr, func, var)
+Solves ODE expr = 0 for function func w.r.t. var using SymPy.
+# Arguments
+- `expr`: Symbolics expression representing ODE (set to 0).
+- `func`: Symbolics function (e.g., f(x)).
+- `var`: Independent Symbolics variable.
+# Returns
+Symbolics solution(s).
+# Example
+```julia
+@variables x
+@syms f(x)
+expr = Symbolics.Derivative(f, x) - 2*f
+sol = sympy_ode_solve(expr, f, x)  # Returns C1*exp(2*x)
+```
+"""
+function sympy_ode_solve end
+
+export symbolics_to_sympy, sympy_to_symbolics
+export sympy_linear_solve, sympy_algebraic_solve, sympy_integrate, sympy_limit, sympy_simplify,sympy_ode_solve
+
+"""
+    symbolics_to_sympy_pythoncall(expr)
+Converts a Symbolics expression to SymPyPythonCall.
+For conversion back to Symbolics, see `sympy_pythoncall_to_symbolics`.
+# Arguments
+- `expr`: Symbolics expression.
+# Example
+```julia
+@variables x
+expr = x^2 + 1
+sympy_expr = symbolics_to_sympy_pythoncall(expr)
+```
+"""
+function symbolics_to_sympy_pythoncall end
+
+"""
+    sympy_pythoncall_to_symbolics(sympy_expr, vars)
+Converts a SymPyPythonCall expression to Symbolics.jl.
+# Arguments
+- `sympy_expr`: SymPyPythonCall expression.
+- `vars`: List or dictionary of Symbolics variables.
+# Example
+```julia
+@variables x y
+# Assuming sympy_expr is a SymPyPythonCall expression
+symbolics_expr = sympy_pythoncall_to_symbolics(sympy_expr, [x, y])
+```
+"""
+function sympy_pythoncall_to_symbolics end
+
+"""
+    sympy_pythoncall_linear_solve(A, b)
+Solves linear system Ax = b using SymPyPythonCall.
+# Arguments
+- `A`: Matrix of Symbolics expressions.
+- `b`: Vector of Symbolics expressions.
+# Returns
+Vector of Symbolics solutions.
+# Example
+```julia
+@variables x y
+A = [1 2; 3 4]
+b = [x, y]
+sol = sympy_pythoncall_linear_solve(A, b)
+```
+"""
+function sympy_pythoncall_linear_solve end
+
+"""
+    sympy_pythoncall_algebraic_solve(expr, var)
+Solves algebraic equations using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression or vector of expressions.
+- `var`: Variable or vector of variables to solve for.
+# Returns
+Symbolics solution(s).
+# Example
+```julia
+@variables x y
+expr = x^2 - 4
+sol = sympy_pythoncall_algebraic_solve(expr, x)  # Returns [2, -2]
+eqs = [x^2 + y^2 - 2, x - y]
+sol = sympy_pythoncall_algebraic_solve(eqs, [x, y])  # Returns [{x=>1, y=>1}, {x=>-1, y=>-1}]
+```
+"""
+function sympy_pythoncall_algebraic_solve end
+
+"""
+    sympy_pythoncall_integrate(expr, var)
+Performs symbolic integration using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression to integrate.
+- `var`: Variable of integration.
+# Returns
+Symbolics expression representing the integral.
+# Example
+```julia
+@variables x
+expr = x^2
+result = sympy_pythoncall_integrate(expr, x)
+```
+"""
+function sympy_pythoncall_integrate end
+
+"""
+    sympy_pythoncall_limit(expr, var, val)
+Computes symbolic limits using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression.
+- `var`: Variable approaching the limit.
+- `val`: Value the variable approaches.
+# Returns
+Symbolics expression representing the limit.
+# Example
+```julia
+@variables x
+expr = sin(x)/x
+result = sympy_pythoncall_limit(expr, x, 0)
+```
+"""
+function sympy_pythoncall_limit end
+
+"""
+    sympy_pythoncall_simplify(expr)
+Simplifies symbolic expressions using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression to simplify.
+# Returns
+Simplified Symbolics expression.
+# Example
+```julia
+@variables x
+expr = (x^2 - 1)/(x - 1)
+result = sympy_pythoncall_simplify(expr)
+```
+"""
+function sympy_pythoncall_simplify end
+
+"""
+    sympy_pythoncall_ode_solve(expr, func, var)
+Solves ordinary differential equations using SymPyPythonCall.
+# Arguments
+- `expr`: Symbolics expression representing the ODE.
+- `func`: Function to solve for.
+- `var`: Independent variable.
+# Returns
+Symbolics solution(s).
+# Example
+```julia
+@variables x
+@syms f(x)
+expr = Symbolics.Derivative(f, x) - 2*f
+sol = sympy_pythoncall_ode_solve(expr, f, x)  # Returns C1*exp(2*x)
+```
+"""
+function sympy_pythoncall_ode_solve end
+
+export symbolics_to_sympy_pythoncall, sympy_pythoncall_to_symbolics
+export sympy_pythoncall_linear_solve, sympy_pythoncall_algebraic_solve, sympy_pythoncall_integrate, sympy_pythoncall_limit, sympy_pythoncall_simplify, sympy_pythoncall_ode_solve
+
+function __init__()
+    Base.Experimental.register_error_hint(TypeError) do io, exc
+        if exc.expected == Bool && exc.got isa Num
+            println(io,
+                "\nA symbolic expression appeared in a Boolean context. This error arises in situations where Julia expects a Bool, like ")
+            printstyled(io, "if boolean_condition", color = :blue)
+            printstyled(
+                io, "\t\t use ifelse(boolean_condition, then branch, else branch)\n",
+                color = :green)
+            printstyled(io, "x && y", color = :blue)
+            printstyled(io, "\t\t\t\t use x & y\n", color = :green)
+            printstyled(io, "boolean_condition ? a : b", color = :blue)
+            printstyled(io, "\t use ifelse(boolean_condition, a, b)\n", color = :green)
+            print(io,
+                "but a symbolic expression appeared instead of a Bool. For help regarding control flow with symbolic variables, see https://docs.sciml.ai/ModelingToolkit/dev/basics/FAQ/#How-do-I-handle-if-statements-in-my-symbolic-forms?")
         end
     end
+    SymbolicUtils.hashcons(RootsOf, true)
+    SymbolicUtils.hashcons(IM, true)
+    SymbolicUtils.hashcons(COMMON_ONE, true)
+    SymbolicUtils.hashcons(COMMON_ZERO, true)
+    SymbolicUtils.hashcons(IIP_OUTSYM, true)
+    SymbolicUtils.hashcons(IIP_ALLOCATOR, true)
 end
+
+export inverse, left_inverse, right_inverse, @register_inverse, has_inverse, has_left_inverse, has_right_inverse
+include("inverse.jl")
+
+export rootfunction, left_continuous_function, right_continuous_function, @register_discontinuity,
+    majorization_function, minorization_function, approximation_function
+include("discontinuities.jl")
+
+include("despecialize.jl")
+
+@public Arr, NAMESPACE_SEPARATOR, VariableDefaultValue, VariableSource
+@public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
+@public get_variables, get_variables!, get_differential_vars, option_to_metadata_type
+@public variable, wrap, linear_expansion, LinearExpander
+@public _toexpr_metadata, _toexpr_op
+@public value
+@public CodegenFunctionOptions, codegen_function
+@public diff2term, map_subscripts
+@public fixpoint_sub
+@public symbolic_zero, is_zeroable, SymbolicZero
+@public SymbolicCallable
+
+@setup_workload begin
+    fold1 = Val{false}()
+    @compile_workload begin
+        @syms x y f(t) q[1:5]
+        SymbolicUtils.Sym{SymReal}(:a; type = Real, shape = SymbolicUtils.ShapeVecT())
+        x + y
+        x * y
+        x / y
+        x ^ y
+        x ^ 5
+        6 ^ x
+        x - y
+        -y
+        2y
+        z = 2
+        dict = SymbolicUtils.ACDict{VartypeT}()
+        dict[x] = 1
+        dict[y] = 1
+        type::typeof(DataType) = rand() < 0.5 ? Real : Float64
+        nt = (; type, shape, unsafe = true)
+        Base.pairs(nt)
+        BSImpl.AddMul{VartypeT}(1, dict, SymbolicUtils.AddMulVariant.MUL; type, shape = SymbolicUtils.ShapeVecT(), unsafe = true)
+        *(y, z)
+        *(z, y)
+        SymbolicUtils.symtype(y)
+        f(x)
+        (5x / 5)
+        expand((x + y) ^ 2)
+        simplify(x ^ (1//2) + (sin(x) ^ 2 + cos(x) ^ 2) + 2(x + y) - x - y)
+        ex = x + 2y + sin(x)
+        rules1 = Dict(x => y)
+        rules2 = Dict(x => 1)
+        Dx = Differential(x)
+        Differential(y)(ex)
+        uex = unwrap(ex)
+        executediff(Dx, uex)
+        # Running `fold = Val(true)` invalidates the precompiled statements
+        # for `fold = Val(false)` and itself doesn't precompile anyway.
+        # substitute(ex, rules1)
+        substitute(ex, rules1; fold = fold1)
+        substitute(ex, rules2; fold = fold1)
+        @variables foo
+        f(foo)
+        @variables x y f(::Real) q[1:5]
+        x + y
+        x * y
+        x / y
+        x ^ y
+        x ^ 5
+        # 6 ^ x
+        x - y
+        -y
+        2y
+        symtype(y)
+        z = 2
+        *(y, z)
+        *(z, y)
+        f(x)
+        (5x / 5)
+        [x, y]
+        [x, f, f]
+        promote_type(Int, Num)
+        promote_type(Real, Num)
+        promote_type(Float64, Num)
+        # expand((x + y) ^ 2)
+        # simplify(x ^ (1//2) + (sin(x) ^ 2 + cos(x) ^ 2) + 2(x + y) - x - y)
+        ex = x + 2y + sin(x)
+        rules1 = Dict(x => y)
+        # rules2 = Dict(x => 1)
+        # Running `fold = Val(true)` invalidates the precompiled statements
+        # for `fold = Val(false)` and itself doesn't precompile anyway.
+        # substitute(ex, rules1)
+        substitute(ex, rules1; fold = fold1)
+        linear_expansion(ex, y)
+        # substitute(ex, rules2; fold = fold1)
+        # substitute(ex, rules2)
+        # substitute(ex, rules1; fold = fold2)
+        # substitute(ex, rules2; fold = fold2)
+        q[1]
+        q'q
+        
+    end
+end
+
+precompile(Tuple{typeof(Base.:(^)), SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymbolicUtils.SymReal}, Int})
 
 end # module

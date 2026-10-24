@@ -1,0 +1,33 @@
+using Symbolics
+using SymbolicUtils
+using SymbolicIndexingInterface
+
+@test all(symbolic_type.([SymbolicUtils.BasicSymbolic, Symbolics.Num, Complex{Symbolics.Num}, Symbolics.CallAndWrap]) .==
+          (ScalarSymbolic(),))
+@test symbolic_type(Symbolics.Arr) == ArraySymbolic()
+@variables x
+@test symbolic_type(x) == ScalarSymbolic()
+@variables y[1:3]
+@test symbolic_type(y) == ArraySymbolic()
+@test symbolic_type(Symbolics.unwrap(y)) == ArraySymbolic()
+@test all(symbolic_type.(collect(y)) .== (ScalarSymbolic(),))
+@test symbolic_type(Symbolics.unwrap(y .* y)) == ArraySymbolic()
+@variables z(..)
+@test symbolic_type(z) == ScalarSymbolic()
+@variables xc::Complex{Real}
+@test symbolic_type(xc) == ScalarSymbolic()
+@variables (yc::Complex{Real})[1:3]
+@test symbolic_type(yc) == ArraySymbolic()
+
+@variables x y z
+subs = Dict(x => 0.1, y => 2z)
+subs2 = merge(subs, Dict(z => 2x+3))
+
+@test Symbolics.value(symbolic_evaluate(x, subs)) == 0.1
+@test isequal(symbolic_evaluate(y, subs), 2z)
+@test Symbolics.value(symbolic_evaluate(y, subs2)) == 6.4
+
+@testset "`hasname` for `getindex`ed trees" begin
+    @variables x[1:2] y[1:2]
+    @test !Symbolics.hasname((x .+ y)[1])
+end

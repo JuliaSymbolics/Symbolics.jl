@@ -3,9 +3,16 @@ on:
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - 'docs/**'
   push:
     branches:
       - master
+    paths-ignore:
+      - 'docs/**'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -14,12 +21,21 @@ jobs:
       matrix:
         group:
           - Core
+          - QA
           - Downstream
+          - GroebnerExt
+          - SymPy
+          - SymPyPythonCall
+          - D3TreesExt
         version:
           - '1'
-          - '1.6'
+        include:
+          - group: QA
+            version: '1.10'
+          - group: Core
+            version: '1.10'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - run: |
@@ -27,7 +43,7 @@ jobs:
       - uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.version }}
-      - uses: actions/cache@v3
+      - uses: actions/cache@v6
         env:
           cache-name: cache-artifacts
         with:
@@ -41,7 +57,40 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         env:
           GROUP: ${{ matrix.group }}
-      - uses: julia-actions/julia-processcoverage@v1
-      - uses: codecov/codecov-action@v3
         with:
-          file: lcov.info
+          force_latest_compatible_version: 'false'
+
+  test-x86:
+    name: Core (julia 1, ubuntu-latest, x86)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: |
+          if [ "`git rev-parse --abbrev-ref HEAD`" != master ]; then git fetch origin master:master; fi
+      - name: Install 32-bit runtime libraries (i386)
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libc6:i386 libstdc++6:i386 libgcc-s1:i386 libatomic1:i386
+      - uses: julia-actions/setup-julia@v1
+        with:
+          version: '1'
+          arch: x86
+      - uses: actions/cache@v6
+        env:
+          cache-name: cache-artifacts
+        with:
+          path: ~/.julia/artifacts
+          key: ${{ runner.os }}-test-x86-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-test-x86-${{ env.cache-name }}-
+            ${{ runner.os }}-test-x86-
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        env:
+          GROUP: Core
+        with:
+          force_latest_compatible_version: 'false'

@@ -1,372 +1,327 @@
 import Base: getindex
+inner_unwrap(x) = x isa AbstractArray ? unwrap.(x) : x
 
 ##### getindex #####
-struct GetindexPosthookCtx end
+@inline _indexed_ndims(idx, idxs...) = SymbolicUtils._indexed_ndims(typeof(idx)) + _indexed_ndims(idxs...)
+@inline _indexed_ndims() = 0
 
-@wrapped function getindex_posthook(f, x::AbstractArray)
-    if hasmetadata(x, GetindexPosthookCtx)
-        g = getmetadata(x, GetindexPosthookCtx)
-        setmetadata(x,
-            GetindexPosthookCtx,
-            (res, args...) -> f(g(res, args...), args...))
-    else
-        setmetadata(x, GetindexPosthookCtx, f)
-    end
+function wrapper_fn_from_idxs(x::Arr{T, N}, idxs...) where {T, N}
+    any(i -> i isa Union{Num, BasicSymbolic{VartypeT}, Arr}, idxs) && return identity
+    
+    nd = _indexed_ndims(idxs...)
+    return nd == 0 ? is_wrapper_type(T) ? T : identity : Arr{T, nd}
 end
-function Base.getindex(x::SymArray, idx::CartesianIndex)
-    return x[Tuple(idx)...]
-end
-
-function Base.getindex(x::SymArray, idx...)
-    idx = unwrap.(idx)
-    meta = metadata(unwrap(x))
-    if shape(x) !== Unknown() && all(i -> i isa Integer, idx)
-        II = CartesianIndices(axes(x))
-        @boundscheck begin
-            if !checkbounds(Bool, II, idx...)
-                throw(BoundsError(x, idx))
-            end
-        end
-        ii = II[idx...]
-        res = Term{eltype(symtype(x))}(getindex, [x, Tuple(ii)...]; metadata = meta)
-    elseif all(i -> symtype(i) <: Integer, idx)
-        shape(x) !== Unknown() && @boundscheck begin
-            if length(idx) > 1
-                for (a, i) in zip(axes(x), idx)
-                    if i isa Integer && !(i in a)
-                        throw(BoundsError(x, idx))
-                    end
-                end
-            end
-        end
-        res = Term{eltype(symtype(x))}(getindex, [x, idx...]; metadata = meta)
-    elseif length(idx) == 1 && symtype(first(idx)) <: CartesianIndex
-        i = first(idx)
-        ii = i isa CartesianIndex ? Tuple(i) : arguments(i)
-
-        return getindex(x, ii...)
-    else
-        input_idx = []
-        output_idx = []
-        ranges = Dict{BasicSymbolic,AbstractRange}()
-        subscripts = makesubscripts(length(idx))
-        for (j, i) in enumerate(idx)
-            if symtype(i) <: Integer
-                push!(input_idx, i)
-            elseif i isa Colon
-                push!(output_idx, subscripts[j])
-                push!(input_idx, subscripts[j])
-            elseif i isa AbstractVector
-                isym = subscripts[j]
-                push!(output_idx, isym)
-                push!(input_idx, isym)
-                ranges[isym] = i
-            else
-                error("Don't know how to index by $i")
-            end
-        end
-
-        term = Term{Any}(getindex, [x, idx...]; metadata = meta)
-        T = eltype(symtype(x))
-        N = ndims(x) - count(i -> symtype(i) <: Integer, idx)
-        res = ArrayOp(atype(symtype(x)){T,N},
-            (output_idx...,),
-            x[input_idx...],
-            +,
-            term,
-            ranges)
-    end
-
-    if hasmetadata(x, GetindexPosthookCtx)
-        f = getmetadata(x, GetindexPosthookCtx, identity)
-        f(res, x, idx...)
-    else
-        res
-    end
-end
-
+wrapper_fn_from_idxs(x::Arr{T, N}, idx::SymbolicUtils.StableIndex{Int}) where {T, N} = T
 # Wrapped array should wrap the elements too
+function Base.getindex(x::Arr{T, N}, idx::CartesianIndex{N}) where {T, N}
+    if is_wrapper_type(T)
+        T(unwrap(x)[idx])
+    else
+        unwrap(x)[idx]
+    end
+end
 function Base.getindex(x::Arr, idx...)
-    wrap(unwrap(x)[idx...])
+    wrapper_fn_from_idxs(x, idx...)(unwrap(x)[unwrap.(idx)...])
 end
-function Base.getindex(x::Arr, idx::Symbolic{<:Integer}...)
-    wrap(unwrap(x)[idx...])
+const SymIdxT = Union{Num, BasicSymbolic{VartypeT}}
+function Base.getindex(x::Arr, idx::SymIdxT, idxs...)
+    wrapper_fn_from_idxs(x, unwrap(idx), idxs...)(unwrap(x)[unwrap(idx), unwrap.(idxs)...])
 end
-function Base.getindex(x::Arr, I::Symbolic{CartesianIndex})
-    wrap(unwrap(x)[tup(I)...])
+function Base.getindex(x::Arr, i1, idx::SymIdxT, idxs...)
+    wrapper_fn_from_idxs(x, i1, unwrap(idx), idxs...)(unwrap(x)[(i1), unwrap(idx), unwrap.(idxs)...])
 end
-Base.getindex(I::Symbolic{CartesianIndex}, i::Integer) = tup(I)[i]
-
-function Base.getindex(A::AbstractArray{T}, I::Symbolic{CartesianIndex}) where {T}
-    term(getindex, A, tup(I)..., type=T)
+function Base.getindex(x::Arr, i1::SymIdxT, idx::SymIdxT, idxs...)
+    wrapper_fn_from_idxs(x, unwrap(i1), unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(idx), unwrap.(idxs)...])
 end
-
-function Base.CartesianIndex(x::Symbolic{<:Integer}, xs::Symbolic{<:Integer}...)
-    term(CartesianIndex, x, xs..., type=CartesianIndex)
+function Base.getindex(x::Arr, i1, i2, idx::SymIdxT, idxs...)
+    wrapper_fn_from_idxs(x, i1, i2, unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
 end
-
+function Base.getindex(x::Arr, i1::SymIdxT, i2, idx::SymIdxT, idxs...)
+    return wrapper_fn_from_idxs(x, unwrap(i1), i2, unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
+end
+function Base.getindex(x::Arr, i1, i2::SymIdxT, idx::SymIdxT, idxs...)
+    wrapper_fn_from_idxs(x, i1, unwrap(i2), unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
+end
+function Base.getindex(x::Arr, i1::SymIdxT, i2::SymIdxT, idx::SymIdxT, idxs...)
+    wrapper_fn_from_idxs(x, unwrap(i1), unwrap(i2), unwrap(idx), idxs...)(unwrap(x)[unwrap(i1), unwrap(i2), unwrap(idx), unwrap.(idxs)...])
+end
 
 import Base: +, -, *
-tup(c::CartesianIndex) = Tuple(c)
-tup(c::Symbolic{CartesianIndex}) = istree(c) ? arguments(c) : error("Cartesian index not found")
-
-@wrapped function -(x::CartesianIndex, y::CartesianIndex)
-    CartesianIndex((tup(x) .- tup(y))...)
-end
-@wrapped function +(x::CartesianIndex, y::CartesianIndex)
-    CartesianIndex((tup(x) .+ tup(y))...)
-end
-
-@wrapped function *(x::CartesianIndex, y::CartesianIndex)
-    CartesianIndex((tup(x) .* tup(y))...)
-end
-
-@wrapped function *(a::Integer, x::CartesianIndex)
-    CartesianIndex((a * tup(x))...)
-end
-
-@wrapped function *(x::CartesianIndex, b::Integer)
-    CartesianIndex((tup(x) * b)...)
-end
-
-
-function propagate_ndims(::typeof(getindex), x, idx...)
-    ndims(x) - count(x -> symtype(x) <: Integer, idx)
-end
-
-function propagate_shape(::typeof(getindex), x, idx...)
-    @oops axes = shape(x)
-
-    idx1 = to_indices(CartesianIndices(axes), axes, idx)
-    ([1:length(x) for x in idx1 if !(symtype(x) <: Number)]...,)
-end
-
-propagate_eltype(::typeof(getindex), x, idx...) = geteltype(x)
-
-function SymbolicUtils.promote_symtype(::typeof(getindex), X, ii...)
-    @assert all(i -> i <: Integer, ii) "user arrterm to create arr term."
-
-    eltype(X)
-end
-
 
 #### Broadcast ####
-#
-
-using Base.Broadcast
-
-Base.broadcastable(s::SymArray) = s
-struct SymBroadcast <: Broadcast.BroadcastStyle end
-Broadcast.BroadcastStyle(::Type{<:SymArray}) = SymBroadcast()
-Broadcast.result_style(::SymBroadcast) = SymBroadcast()
-Broadcast.BroadcastStyle(::SymBroadcast, ::Broadcast.BroadcastStyle) = SymBroadcast()
-
-isonedim(x, i) = shape(x) == Unknown() ? false : isone(size(x, i))
-
-function Broadcast.copy(bc::Broadcast.Broadcasted{SymBroadcast})
-    # Do the thing here
-    ndim = mapfoldl(ndims, max, bc.args, init=0)
-    subscripts = makesubscripts(ndim)
-
-    onedim_count = mapreduce(+, bc.args) do x
-        if ndims(x) != 0
-            map(i -> isonedim(x, i) ? 1 : 0, 1:ndim)
-        else
-            map(i -> 1, 1:ndim)
-        end
-    end
-
-    extruded = map(x -> x < length(bc.args), onedim_count)
-
-    expr_args′ = map(bc.args) do x
-        if ndims(x) != 0
-            subs = map(i -> extruded[i] && isonedim(x, i) ?
-                            1 : subscripts[i], 1:ndims(x))
-            x[subs...]
-        elseif x isa Base.RefValue
-            x[]
-        else
-            x
-        end
-    end
-    expr = term(bc.f, expr_args′...) # Imagine x .=> y -- if you don't have a term
-    # then you get pairs, and index matcher cannot
-    # recurse into pairs
-    Atype = propagate_atype(broadcast, bc.f, bc.args...)
-    args = map(x -> x isa Base.RefValue ? Term{Any}(Ref, [x[]]) : x, bc.args)
-    ArrayOp(Atype{symtype(expr),ndim},
-        (subscripts...,),
-        expr,
-        +,
-        Term{Any}(broadcast, [bc.f, args...]))
-end
 
 # On wrapper:
 struct SymWrapBroadcast <: Broadcast.BroadcastStyle end
 
-Base.broadcastable(s::Arr) = s
-
-Broadcast.BroadcastStyle(::Type{<:Arr}) = SymWrapBroadcast()
-
-Broadcast.result_style(::SymWrapBroadcast) = SymWrapBroadcast()
+Broadcast.BroadcastStyle(::Type{T}) where {T <: Arr} = SymWrapBroadcast()
 
 Broadcast.BroadcastStyle(::SymWrapBroadcast,
     ::Broadcast.BroadcastStyle) = SymWrapBroadcast()
-Broadcast.BroadcastStyle(::SymBroadcast,
+Broadcast.BroadcastStyle(::SymWrapBroadcast, ::Broadcast.Unknown) = SymWrapBroadcast()
+Broadcast.BroadcastStyle(::SymbolicUtils.SymBroadcast,
     ::SymWrapBroadcast) = Broadcast.Unknown()
 
-function Broadcast.copy(bc::Broadcast.Broadcasted{SymWrapBroadcast})
-    args = map(bc.args) do arg
-        if arg isa Broadcast.Broadcasted
-            return Broadcast.copy(arg)
-        else
-            return arg
-        end
+unwrap_broadcasts(head, args...) = (unwrap_broadcast(head), unwrap_broadcasts(args...)...)
+unwrap_broadcasts() = ()
+unwrap_broadcast(x) = unwrap(x)
+function unwrap_broadcast(bc::Broadcast.Broadcasted{SymWrapBroadcast})
+    Broadcast.Broadcasted{SymbolicUtils.SymBroadcast{VartypeT}}(bc.f, unwrap_broadcasts(bc.args...), bc.axes)
+end
+
+function Base.copy(bc::Broadcast.Broadcasted{SymWrapBroadcast})
+    return wrap(copy(unwrap_broadcast(bc)))
+end
+
+#################### POLYADIC ################
+
+*(x::Arr, y::Number) = *(unwrap(x), unwrap(y))
+*(x::Number, y::Arr) = *(unwrap(x), unwrap(y))
+*(x::Arr, y::BasicSymbolic{VartypeT}) = *(unwrap(x), y)
+*(x::Arr, y::Arr) = *(unwrap(x), unwrap(y))
+*(x::Arr, y::AbstractMatrix) = *(unwrap(x), y)
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose)
+    @eval *(x::Arr{<:Any, 1}, y::$T{<:Any, <:AbstractMatrix}) = *(unwrap(x), y)
+end
+*(x::Arr, y::AbstractVector) = *(unwrap(x), y)
+*(x::AbstractMatrix, y::Arr) = *(x, unwrap(y))
+*(x::LinearAlgebra.Diagonal, y::Arr) = *(x, unwrap(y))
+*(x::Arr{<:Any, 2}, y::LinearAlgebra.Diagonal) = *(unwrap(x), y)
+const _Triangular = Union{
+    LinearAlgebra.LowerTriangular, LinearAlgebra.UnitLowerTriangular,
+    LinearAlgebra.UnitUpperTriangular, LinearAlgebra.UpperTriangular,
+}
+# Julia 1.10's LinearAlgebra dispatches on the non-public abstract `AbstractTriangular`;
+# later versions use the concrete union, which needs the second set of methods.
+for T in (LinearAlgebra.AbstractTriangular, _Triangular), N in (1, 2)
+    @eval *(x::$T, y::Arr{<:Any, $N}) = *(x, unwrap(y))
+end
+for T in (LinearAlgebra.AbstractTriangular, _Triangular)
+    @eval *(x::Arr{<:Any, 2}, y::$T) = *(unwrap(x), y)
+end
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose), N in (1, 2)
+    @eval *(
+        x::$T{<:Any, <:AbstractVector}, y::Arr{<:Any, $N}
+    ) = *(x, unwrap(y))
+end
+# The combined signature resolves the intersection with LinearAlgebra's union method.
+function *(
+        x::Union{
+            LinearAlgebra.Adjoint{<:Any, <:AbstractVector},
+            LinearAlgebra.Transpose{<:Any, <:AbstractVector},
+        }, y::Arr{<:Any, 1}
+    )
+    return *(x, unwrap(y))
+end
+function *(x::LinearAlgebra.Adjoint{T, <:AbstractVector}, y::Arr{S, 1}) where {
+        T <: Number, S <: Number,
+    }
+    return *(x, unwrap(y))
+end
+function *(x::LinearAlgebra.Transpose{T, <:AbstractVector}, y::Arr{T, 1}) where {T <: Real}
+    return *(x, unwrap(y))
+end
+function *(
+        x::_StaticArray{Tuple{N, M}, T, 2}, y::Arr{S, 1}
+    ) where {N, M, T, S}
+    return *(x, unwrap(y))
+end
+function *(
+        x::Arr, y::Union{
+            LinearAlgebra.Adjoint{<:Any, <:AbstractVector},
+            LinearAlgebra.Transpose{<:Any, <:AbstractVector},
+        }
+    )
+    return *(unwrap(x), y)
+end
+function *(
+        x::LinearAlgebra.Adjoint{<:Number, <:AbstractVector}, y::Arr,
+        z::AbstractVector{<:Number}
+    )
+    return *(x, unwrap(y), unwrap(z))
+end
+function *(
+        x::LinearAlgebra.Transpose{<:Real, <:AbstractVector}, y::Arr,
+        z::AbstractVector{<:Real}
+    )
+    return *(x, unwrap(y), unwrap(z))
+end
+function *(
+        x::Union{Real, Complex}, y::Arr{T, 2}, z::Arr{S, 1}
+    ) where {T <: Union{Real, Complex}, S <: Union{Real, Complex}}
+    return *(unwrap(x), unwrap(y), unwrap(z))
+end
+*(x::Arr, y::Arr, z::Number) = *(unwrap(x), unwrap(y), unwrap(z))
+
+function +(x::Arr, args::AbstractArray...)
+    return +(unwrap(x), args...)
+end
+function +(x::Arr, y::AbstractArray, args::AbstractArray...)
+    return +(unwrap(x), y, args...)
+end
+function +(x1::Arr, x2::Arr, args::AbstractArray...)
+    return +(unwrap(x1), unwrap(x2), args...)
+end
+function +(x::Arr, y::_StaticArray)
+    return +(unwrap(x), y)
+end
+
+for T1 in [Arr, AbstractArray], T2 in [Arr, AbstractArray]
+    T1 == T2 == AbstractArray && continue
+    @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Num(unwrap(x1) \ unwrap(x2))
+    @eval Base.:(\)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
+    if T1 == Arr
+        @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 1}) = Arr{Num, 1}(unwrap(x1) \ unwrap(x2))
+        @eval Base.:(\)(x1::$T1{Num, 2}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) \ unwrap(x2))
     end
-    wrap(broadcast(bc.f, map(unwrap, args)...))
+
+    @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
+    @eval Base.:(/)(x1::$T1{Num, 1}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
+    @eval Base.:(/)(x1::$T1{Num, 2}, x2::$T2{Num, 2}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
 end
 
+Base.:(/)(x1::Num, x2::Arr{Num, 1}) = Arr{Num, 2}(unwrap(x1) / unwrap(x2))
 
-#################### TRANSPOSE ################
-#
-@wrapped function Base.adjoint(A::AbstractMatrix)
-    @syms i::Int j::Int
-    @arrayop (i, j) A[j, i] term = A'
+const _TriangularNum = Union{
+    LinearAlgebra.LowerTriangular{Num}, LinearAlgebra.UpperTriangular{Num},
+}
+const _UnitTriangularNum = Union{
+    LinearAlgebra.UnitLowerTriangular{Num}, LinearAlgebra.UnitUpperTriangular{Num},
+}
+# The vector cases are dispatch bridges that preserve the underlying dimension error.
+for T in (LinearAlgebra.Diagonal{Num}, _TriangularNum, _UnitTriangularNum), N in (1, 2)
+    @eval Base.:(/)(A::Arr{Num, $N}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
 end
-
-@wrapped function Base.adjoint(b::AbstractVector)
-    @syms i::Int
-    @arrayop (1, i) b[i] term = b'
+for T in (
+        LinearAlgebra.Bidiagonal{Num},
+        LinearAlgebra.Adjoint{Num, <:LinearAlgebra.Bidiagonal},
+        LinearAlgebra.Transpose{Num, <:LinearAlgebra.Bidiagonal},
+    )
+    @eval Base.:(/)(A::Arr{Num, 2}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
 end
-
-import Base: *, \
-
-using LinearAlgebra
-
-isdot(A, b) = isadjointvec(A) && ndims(b) == 1
-
-isadjointvec(A::Adjoint) = ndims(parent(A)) == 1
-isadjointvec(A::Transpose) = ndims(parent(A)) == 1
-
-function isadjointvec(A)
-    if istree(A)
-        (operation(A) === (adjoint) ||
-         operation(A) == (transpose)) && ndims(arguments(A)[1]) == 1
-    else
-        false
+if isdefined(LinearAlgebra, :UpperHessenberg)
+    for T in (
+            LinearAlgebra.UpperHessenberg{Num},
+            LinearAlgebra.Adjoint{Num, <:LinearAlgebra.UpperHessenberg{Num}},
+            LinearAlgebra.Transpose{Num, <:LinearAlgebra.UpperHessenberg{Num}},
+        )
+        @eval Base.:(/)(A::Arr{Num, 2}, B::$T) = Arr{Num, 2}(unwrap(A) / unwrap(B))
+    end
+end
+for T in (LinearAlgebra.Adjoint, LinearAlgebra.Transpose)
+    @eval function Base.:(/)(
+            A::$T{Num, <:AbstractVector}, B::Arr{Num, 2}
+        )
+        return Arr{Num, 2}(unwrap(A) / unwrap(B))
     end
 end
 
-isadjointvec(A::ArrayOp) = isadjointvec(A.term)
+Base.exp(m::Matrix{Num}) = Arr{Num, 2}(exp(SConst(m)))
+Base.exp(m::Matrix{Complex{Num}}) = Arr{Complex{Num}, 2}(exp(SConst(m)))
 
-# TODO: add more such methods
-function getindex(A::AbstractArray, i::Symbolic{<:Integer}, ii::Symbolic{<:Integer}...)
-    Term{eltype(A)}(getindex, [A, i, ii...])
+function Base.transpose(x::Arr{T, N}) where {T, N}
+    return Arr{T, 2}(Base.transpose(unwrap(x)))
 end
-
-function getindex(A::AbstractArray, i::Int, j::Symbolic{<:Integer})
-    Term{eltype(A)}(getindex, [A, i, j])
-end
-
-function getindex(A::AbstractArray, j::Symbolic{<:Integer}, i::Int)
-    Term{eltype(A)}(getindex, [A, j, i])
-end
-
-function getindex(A::Arr, i::Int, j::Symbolic{<:Integer})
-    wrap(unwrap(A)[i, j])
-end
-
-function getindex(A::Arr, j::Symbolic{<:Integer}, i::Int)
-    wrap(unwrap(A)[j, i])
-end
-
-function _matmul(A, B)
-    @syms i::Int j::Int k::Int
-    if isadjointvec(A)
-        op = operation(A.term)
-        return op(op(B) * first(arguments(A.term)))
-    end
-    return @arrayop (i, j) A[i, k] * B[k, j] term = (A * B)
-end
-
-@wrapped (*)(A::AbstractMatrix, B::AbstractMatrix) = _matmul(A, B)
-@wrapped (*)(A::AbstractVector, B::AbstractMatrix) = _matmul(A, B)
-
-function _matvec(A, b)
-    @syms i::Int k::Int
-    sym_res = @arrayop (i,) A[i, k] * b[k] term=(A*b)
-    if isdot(A, b)
-        return sym_res[1]
-    else
-        return sym_res
-    end
-end
-@wrapped (*)(A::AbstractMatrix, b::AbstractVector) = _matvec(A, b)
-
-# specialize `dot` to dispatch on `Symbolic{<:Number}` to eventually work for 
-# arrays of (possibly unwrapped) Symbolic types, see issue #831
-@wrapped LinearAlgebra.dot(x::Number, y::Number) = conj(x) * y
 
 #################### MAP-REDUCE ################
-#
 
-@wrapped Base.map(f, x::AbstractArray) = _map(f, x)
-@wrapped Base.map(f, x::AbstractArray, xs...) = _map(f, x, xs...)
-@wrapped Base.map(f, x, y::AbstractArray, z...) = _map(f, x, y, z...)
-@wrapped Base.map(f, x, y, z::AbstractArray, w...) = _map(f, x, y, z, w...)
-
-function _map(f, x, xs...)
-    N = ndims(x)
-    idx = makesubscripts(N)
-
-    expr = f(map(a -> a[idx...], [x, xs...])...)
-
-    Atype = propagate_atype(map, f, x, xs...)
-    ArrayOp(Atype{symtype(expr),N},
-        (idx...,),
-        expr,
-        +,
-        Term{Any}(map, [f, x, xs...]))
-end
-
-@inline _mapreduce(f, g, x, dims, kw) = mapreduce(f, g, x; dims=dims, kw...)
-
-function scalarize_op(::typeof(_mapreduce), t)
-    f, g, x, dims, kw = arguments(t)
-    # we wrap and unwrap to make things work smoothly.
-    # we need the result unwrapped to allow recursive scalarize to work.
-    unwrap(_mapreduce(f, g, collect(wrap(x)), dims, kw))
-end
-
-@wrapped function Base.mapreduce(f, g, x::AbstractArray; dims=:, kw...)
-    idx = makesubscripts(ndims(x))
-    out_idx = [dims == (:) || i in dims ? 1 : idx[i] for i = 1:ndims(x)]
-    expr = f(x[idx...])
-    T = symtype(g(expr, expr))
-    if dims === (:)
-        return Term{T}(_mapreduce, [f, g, x, dims, (kw...,)])
-    end
-
-    Atype = propagate_atype(_mapreduce, f, g, x, dims, (kw...,))
-    ArrayOp(Atype{T,ndims(x)},
-        (out_idx...,),
-        expr,
-        g,
-        Term{Any}(_mapreduce, [f, g, x, dims, (kw...,)]))
-end
-
-for (ff, opts) in [sum => (identity, +, false),
-    prod => (identity, *, true),
-    any => (identity, (|), false),
-    all => (identity, (&), true)]
-
-    f, g, init = opts
-    @eval @wrapped function (::$(typeof(ff)))(x::AbstractArray;
-        dims=:, init=$init)
-        mapreduce($f, $g, x, dims=dims, init=init)
-    end
-    @eval @wrapped function (::$(typeof(ff)))(f::Function, x::AbstractArray;
-        dims=:, init=$init)
-        mapreduce(f, $g, x, dims=dims, init=init)
+for Tf in (BasicSymbolic, Any)
+    @eval begin
+        function Base.map(f::$Tf, x::Arr)
+            return wrap(map(f, unwrap(x)))
+        end
+        function Base.map(f::$Tf, x::Arr, xs::Arr...)
+            return wrap(map(f, unwrap(x), unwrap.(xs)...))
+        end
+        function Base.map(f::$Tf, x::Arr, y::BasicSymbolic, ys...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::Arr, y::AbstractArray, ys::AbstractArray...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::Arr, y::_StaticArray, ys::AbstractArray...)
+            return wrap(map(f, unwrap(x), y, unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::AbstractArray, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::_StaticArray, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
+        function Base.map(f::$Tf, x::BasicSymbolic, y::Arr, ys::Arr...)
+            return wrap(map(f, x, unwrap(y), unwrap.(ys)...))
+        end
     end
 end
+
+for Tf in (BasicSymbolic, Any)
+    @eval Base.map(f::$Tf, R::Base.ReshapedArray{T, N, <:Arr}) where {T, N} = map(f, collect(R))
+end
+
+for Tf in (BasicSymbolic, Any), Tr in (BasicSymbolic, Any)
+    @eval begin
+        function Base.mapreduce(f::$Tf, op::$Tr, x::Arr; kw...)
+            return wrap(mapreduce(f, op, unwrap(x); kw...))
+        end
+        function Base.mapreduce(f::$Tf, op::$Tr, x::Arr, xs::Arr...; kw...)
+            return wrap(mapreduce(f, op, unwrap(x), unwrap.(xs)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::Arr, y::AbstractArray,
+                ys::AbstractArray...; kw...
+            )
+            return wrap(mapreduce(f, op, unwrap(x), y, unwrap.(ys)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::AbstractArray, y::Arr, ys::Arr...; kw...
+            )
+            return wrap(mapreduce(f, op, x, unwrap(y), unwrap.(ys)...; kw...))
+        end
+        function Base.mapreduce(
+                f::$Tf, op::$Tr, x::BasicSymbolic, y::Arr, ys::Arr...; kw...
+            )
+            return wrap(mapreduce(f, op, x, unwrap(y), unwrap.(ys)...; kw...))
+        end
+    end
+end
+
+function LinearAlgebra.dot(x::Arr{T}, y::Arr{T}) where {T}
+    T(LinearAlgebra.dot(unwrap(x), unwrap(y)))
+end
+
+#################### REGISTRATION ################
+
+@register_array_symbolic LinearAlgebra.triu(x::AbstractArray) begin
+    size = size(x)
+    eltype = eltype(x)
+    ndims = ndims(x)
+end
+
+@register_array_symbolic LinearAlgebra.tril(x::AbstractArray) begin
+    size = size(x)
+    eltype = eltype(x)
+    ndims = ndims(x)
+end
+
+@register_array_symbolic LinearAlgebra.normalize(x::AbstractArray) begin
+    size = size(x)
+    eltype = eltype(x)
+    ndims = ndims(x)
+end
+
+@register_symbolic LinearAlgebra.tr(x::AbstractMatrix)
+
+# Eigenvalues of a symbolic matrix have no closed form, so `eigmax`/`eigmin`
+# build unevaluated symbolic terms (like `tr`) rather than computing numerically;
+# without this they fall through to `eigvals!`, which errors on a symbolic matrix.
+@register_symbolic LinearAlgebra.eigmax(x::AbstractMatrix)
+@register_symbolic LinearAlgebra.eigmin(x::AbstractMatrix)
+
+# `logdet` of a symbolic matrix likewise has no closed form; without this it
+# reaches a numeric factorization and errors. `logdet` rather than `log(det(x))`
+# because the two differ for a negative determinant, and callers that analyse the
+# expression need the atom preserved.
+@register_symbolic LinearAlgebra.logdet(x::AbstractMatrix)
+
+# The default (p = 2) operator norm is the largest singular value, which has no closed
+# form; without this it reaches `svdvals!` and errors on a symbolic matrix.
+@register_symbolic LinearAlgebra.opnorm(x::AbstractMatrix)

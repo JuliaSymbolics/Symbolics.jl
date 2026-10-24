@@ -1,0 +1,420 @@
+Base.:^(a::Complex{<:Real}, b::Num) = Symbolics.Pow(a, b)
+
+# The solver builds roots from Nemo factor dictionaries, whose iteration order is
+# hash-dependent, so without an explicit sort the returned root order can change
+# across Julia versions and processes. Numeric roots sort in ascending order with
+# conjugate pairs ordered positive-imaginary-part first (the convention
+# `const_coeff_solve` relies on when assigning constants to cos/sin terms), and
+# symbolic roots sort with the canonical term order.
+function lt_roots(a, b)
+    va, vb = value(a), value(b)
+    if va isa Complex && vb isa Complex
+        return (real(va), -imag(va)) < (real(vb), -imag(vb))
+    elseif va isa Real && vb isa Real
+        return va < vb
+    elseif va isa Number && vb isa Number
+        return va <ₑ vb
+    else
+        va isa Number && return true
+        vb isa Number && return false
+        return a <ₑ b
+    end
+end
+
+"""
+    symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
+
+`symbolic_solve` is a function which attempts to solve input equations/expressions symbolically using various methods.
+
+## Arguments
+- expr: Could be a single univar expression in the form of a poly or multiple univar expressions or multiple multivar polys or a transcendental nonlinear function.
+
+- x: Could be a single variable or an array of variables which should be solved
+
+- dropmultiplicity (optional): Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If dropmultiplicity is inputted as false, then the output is `[-1, -1]`.
+
+- warns (optional): When invalid expressions or cases are inputted, should the solver warn you of such cases before returning nothing? if this is set to false, the solver returns nothing. By default, warns are set to true.
+
+## Supported input
+The base solver (`symbolic_solve`) has multiple solvers which chooses from depending on the the type of input
+(multiple/uni var and multiple/single expression) only after ensuring that the input is valid.
+
+The expressions inputted can contain parameters, which are assumed to be transcendental.
+A parameter "a" is transcendental if there exists no polynomial P with
+rational coefficients such that P(a) = 0. Check the examples section.
+
+Currently, `symbolic_solve` supports
+- Linear and polynomial equations (with parameters)
+- Systems of linear and polynomials equations (without extra parameters, for now)
+- Equations with transcendental functions (with parameters)
+
+## Examples
+
+### `solve_univar` (uses factoring and analytic solutions up to degree 4)
+!!! note
+    The package `Nemo` is needed in order to use `solve_univar` as well as `solve_multipoly`,
+    so executing `using Nemo` as you will see in the following examples is necessary; otherwise,
+    the function will throw an error.
+```jldoctest
+julia> using Symbolics, Nemo;
+
+julia> @variables x a b;
+
+julia> expr = expand((x + b)*(x^2 + 2x + 1)*(x^2 - a))
+-a*b - a*x - 2a*b*x - 2a*(x^2) + b*(x^2) + x^3 - a*b*(x^2) - a*(x^3) + 2b*(x^3) + 2(x^4) + b*(x^4) + x^5
+
+julia> roots = symbolic_solve(expr, x);
+
+julia> length(roots)
+4
+
+julia> length(unique(roots))
+4
+
+julia> roots_with_multiplicity = symbolic_solve(expr, x, dropmultiplicity=false);
+
+julia> length(roots_with_multiplicity)
+5
+
+julia> length(unique(roots_with_multiplicity))
+4
+```
+```jldoctest
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> a = only(@variables a)
+a
+
+julia> Symbolics.symbolic_solve(x^2 + a*x + 6, x)
+2-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
+ -(1//2)*a + (1//2)*√(-24 + a^2)
+ -(1//2)*a - (1//2)*√(-24 + a^2)
+```
+```jldoctest
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.symbolic_solve(x^7 - 1, x)
+2-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
+ 1
+ roots_of((1//1) + x + x^2 + x^3 + x^4 + x^5 + x^6, x)
+```
+### `solve_multivar` (uses Groebner basis and `solve_univar` to find roots)
+!!! note
+    Similar to `solve_univar`, `Groebner` is needed for `solve_multivar` or to be fully functional.
+```jldoctest
+julia> using Symbolics, Groebner
+
+julia> @variables x y z
+3-element Vector{Num}:
+ x
+ y
+ z
+
+julia> eqs = [x+y^2+z, z*x*y, z+3x+y]
+3-element Vector{Num}:
+ x + z + y^2
+       x*y*z
+  3x + y + z
+
+julia> length(Symbolics.symbolic_solve(eqs, [x,y,z]))
+3
+```
+
+!!! note
+    If `Nemo` or `Groebner` are not imported when needed, the solver throws an error.
+```julia
+julia> using Symbolics
+
+julia> @variables x y z;
+
+julia> symbolic_solve(x+1, x)
+ERROR: "Nemo is required. Execute `using Nemo` to enable this functionality."
+
+julia> symbolic_solve([x+1, y], [x, y])
+ERROR: "Groebner bases engine is required. Execute `using Groebner` to enable this functionality."
+```
+### `solve_multipoly` (uses GCD between the input polys)
+```jldoctest
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.symbolic_solve([x-1, x^3 - 1, x^2 - 1, (x-1)^20], x)
+1-element Vector{Any}:
+ 1
+```
+
+### `ia_solve` (solving by isolation and attraction)
+```jldoctest
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> length(Symbolics.symbolic_solve(2^(x+1) + 5^(x+3), x))
+1
+```
+```jldoctest
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.symbolic_solve(log(x+1)+log(x-1), x)
+1-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
+ (1//2)*√(8.0)
+```
+```jldoctest
+julia> using Symbolics
+
+julia> a = only(@variables a)
+a
+
+julia> b = only(@variables b)
+b
+
+julia> c = only(@variables c)
+c
+
+julia> x = only(@variables x)
+x
+
+julia> typeof(Symbolics.symbolic_solve(a*x^b + c, x)) <: AbstractVector
+true
+```
+
+### Evaluating output (converting to floats)
+If you want to evaluate the exact expressions found by `symbolic_solve`, you can do the following:
+```jldoctest
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> roots = Symbolics.symbolic_solve(2^(x+1) + 5^(x+3), x); length(roots)
+1
+
+julia> length(Symbolics.symbolic_to_float.(roots))
+1
+```
+"""
+function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where {T}
+    expr_univar = false
+    x_univar = false
+
+    if (T === Num || T === BasicSymbolic{VartypeT} && symtype(x) <: Real)
+        x_univar = true
+        check_x(x)
+    else
+        for var in x
+            check_x(var)
+        end
+    end
+    if expr isa Equation
+        expr = expr.lhs - expr.rhs
+    end
+    if isarraysymbolic(expr)
+        expr = vec(scalarize(expr))
+    end
+    if !(expr isa AbstractVector)
+        expr_univar = true
+        check_expr_validity(expr)
+        isequal(expr, 0) && return []
+    else
+        expr = Vector{Any}(expr)
+        for i in eachindex(expr)
+            expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
+            check_expr_validity(expr[i])
+            if !check_poly_inunivar(expr[i], x)
+                warns && @warn("Solve can not solve this input currently")
+                return nothing
+            end
+        end
+        expr = Vector{Num}(expr)
+    end
+
+    if !expr_univar && x_univar
+        x = [x]
+        x_univar = false
+    end
+
+    if x_univar
+        sols = check_poly_inunivar(expr, x) ?
+               solve_univar(expr, x, dropmultiplicity = dropmultiplicity) :
+               ia_solve(expr, x, warns = warns)
+        isequal(sols, nothing) && return nothing
+        sols = map(postprocess_root, sols)
+        sort!(sols, lt = lt_roots)
+        return sols
+    elseif expr_univar
+        all_vars = get_variables(expr)
+        diff_vars = setdiff(wrap.(all_vars), x)
+        if length(diff_vars) == 1
+            return solve_interms_ofvar(expr, diff_vars[1], dropmultiplicity=dropmultiplicity, warns=warns)
+        end
+
+        expr = [expr]
+    end
+
+
+    if !x_univar
+        for e in expr
+            for var in x
+                if !check_poly_inunivar(e, var)
+                    warns && @warn("This system can not be currently solved by `symbolic_solve`.")
+                    return nothing
+                end
+            end
+        end
+
+        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+        isequal(sols, nothing) && return nothing
+        sols = convert(Vector{Any}, sols)
+        for i in eachindex(sols)
+            for var in x
+                sols[i][var] = postprocess_root(sols[i][var])
+            end
+            if length(collect(keys(sols[i]))) == 1
+                sols[i] = collect(values(sols[i]))[1]
+            end
+        end
+
+        return sols
+    end
+end
+
+function symbolic_solve(expr; x...)
+    if expr isa Vector
+        expr = convert(Vector{Any}, expr)
+        for i in eachindex(expr)
+            expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
+        end
+    else
+        expr = expr isa Equation ? expr.lhs - expr.rhs : expr
+    end
+
+
+    r = filter_poly.(expr)
+    subs, filtered = r isa Tuple ? r : (map(t -> t[1], r), map(t -> t[2], r))
+
+    sub_vars = []
+    if !isempty(subs)
+        sub_vars = reduce(vcat, subs isa Dict ? collect(keys(subs)) : collect.(keys.(subs)))
+    end
+
+    vars_list = Set{BasicSymbolic{VartypeT}}()
+    for ex in wrap(filtered)
+        SymbolicUtils.search_variables!(vars_list, ex)
+    end
+    # vars_list = get_variables.(filtered)
+    # filt_vars = unique(isa(vars_list, AbstractArray) && all(isa.(vars_list, AbstractArray)) ? reduce(vcat, vars_list) : vars_list)
+    filt_vars = collect(vars_list)
+    vars = isempty(sub_vars) ? filt_vars : setdiff(filt_vars, sub_vars)
+    vars = wrap.(vars)
+    @assert all(v isa Num for v in vars) "All variables should be Nums or BasicSymbolics"
+
+    vars = isone(length(vars)) ? vars[1] : vars
+    return symbolic_solve(expr, vars; x...)
+end
+
+
+"""
+    solve_univar(expression, x; dropmultiplicity=true)
+This solver uses analytic solutions up to degree 4 to solve univariate polynomials.
+It first handles the special case of the expression being of operation `^`. E.g. ```math (x+2)^{20}```.
+We solve this by removing the int `20`, then solving the poly ```math x+2``` on its own.
+If the parameter mult of the solver is set to true, we then repeat the found roots of ```math x+2```
+twenty times before returning the results to the user.
+
+Step 2 is filtering the expression after handling this special case, and then factoring
+it using `factor_use_nemo`. We then solve all the factors outputted using the analytic methods
+implemented in the function `get_roots` and its children.
+
+# Arguments
+- expr: Single symbolics Num or SymbolicUtils.BasicSymbolic expression. This is equated to 0 and then solved. E.g. `expr = x+2`, we solve `x+2 = 0`
+
+- x: Single symbolics variable
+
+- dropmultiplicity (optional): Print repeated roots or not?
+
+- strict (optional): Bool that enables/disables strict assert if input expression is a univariate polynomial or not. If strict=true and expression is not a polynomial, `solve_univar` throws an assertion error.
+
+# Examples
+
+"""
+function solve_univar(expression, x; dropmultiplicity=true, strict=true)
+    args = []
+    mult_n = 1
+    expression = unwrap(expression)
+
+    # handle multiplicities (repeated roots), i.e. (x+1)^20
+    if iscall(expression)
+        expr = unwrap(simplify((copy(wrap(expression)))))
+        args = arguments(expr)
+        operation = SymbolicUtils.operation(expr)
+        if isequal(operation, ^) && SymbolicUtils.isconst(args[2]) && (a2 = unwrap_const(args[2]); a2 isa Integer)
+            expression = wrap(args[1])
+            mult_n = a2
+        end
+    end
+
+    subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions=true)
+    if !strict && !check_polynomial(filtered_expr, strict=false)
+        return [RootsOf(wrap(expression), wrap(x))]
+    end
+    coeffs, constant = polynomial_coeffs(filtered_expr, [x])
+    degree = sdegree(coeffs, x)
+
+    u, factors = factor_use_nemo(wrap(filtered_expr))
+    factors = convert(Vector{Any}, factors)
+
+    factors_subbed = map(factor -> ssubs(factor, subs), factors)
+    arr_roots = []
+    is_unfactored = length(factors_subbed) == 1 &&
+        isequal(u * first(factors_subbed), wrap(expression))
+
+    if degree < 5 && is_unfactored
+        arr_roots = get_roots(expression, x)
+
+        # multiplicities (repeated roots)
+        if !dropmultiplicity
+            og_arr_roots = copy(arr_roots)
+            for i in 1:(mult_n - 1)
+                append!(arr_roots, og_arr_roots)
+            end
+        end
+    elseif !is_unfactored
+        for i in eachindex(factors_subbed) 
+            if !any(isequal(x, var) for var in get_variables(factors[i]))
+                continue
+            end
+            roots = solve_univar(factors_subbed[i], x, dropmultiplicity = dropmultiplicity)
+            append!(arr_roots, roots)
+        end
+    end
+
+    for i in reverse(eachindex(arr_roots))
+        for j in eachindex(assumptions)
+            if isequal(substitute(assumptions[j], Dict(x=>arr_roots[i])), 0)
+                deleteat!(arr_roots, i)
+            end
+        end
+    end
+
+    if isequal(arr_roots, [])
+        return [RootsOf(wrap(expression), wrap(x))]
+    end
+
+    return arr_roots
+end
+
+function solve_multivar(eqs::Any, vars::Any; dropmultiplicity = true, warns = true)
+    throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
+end

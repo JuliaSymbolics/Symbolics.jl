@@ -1,49 +1,763 @@
 using Symbolics
+import Symbolics: ssqrt, slog, scbrt, symbolic_solve, ia_solve, postprocess_root, value
+using SymbolicUtils
+using SymbolicUtils: Const
 using Test
+
+# @testset "ia_solve without Nemo" begin
+#     @test Base.get_extension(Symbolics, :SymbolicsNemoExt) === nothing
+#     @variables x
+#     roots = ia_solve(log(2 + x), x)
+#     roots = @test_warn ["Nemo", "required"] ia_solve(log(2 + x^2), x)
+#     @test operation(roots[1]) === Symbolics.RootsOf
+# end
+
+using Groebner, Nemo
+E = Base.MathConstants.e
+
+function sort_roots(roots)
+    return sort(roots, lt = (x,y) -> real(x)==real(y) ? imag(x)<imag(y) : real(x)<real(y))
+end
+
+function sort_arr(sols, vars)
+    for i in eachindex(sols) 
+        sols[i] = convert(Dict{Num, Any}, sols[i])
+        for (var, root) in sols[i]
+            sols[i][var] = eval(Symbolics.toexpr(root))
+        end
+    end
+
+    extract_root(c) = (real(c), imag(c))
+    sort_root(dict) = Tuple(extract_root(dict[var]) for var in vars)
+
+    # Sorting the answers lexicographically
+    sols = sort(sols, by=sort_root)
+end
+
+function check_equal(arr1, arr2)
+    l1 = length(arr1)
+    if l1 != length(arr2)
+        return false
+    end
+    for i = 1:l1
+        issetequal(keys(arr1[i]), keys(arr2[i])) || return false
+        for k in keys(arr1[i])
+            isequal(arr1[i][k], arr2[i][k]) || return false
+        end
+    end
+    return true
+end
+
+function check_approx(arr1, arr2)
+    l1 = length(arr1)
+    if l1 != length(arr2)
+        return false
+    end
+    for i = 1:l1
+        if !isequal(keys(arr1[i]), keys(arr2[i]))
+            return false
+        end
+        for (k1, v1) in arr1[i]
+            isapprox(arr2[i][k1], v1; atol = 1e-6) || return false
+        end
+    end
+    return true
+end
+
+@variables x y z a b c d e s
+
+@testset "Solving in terms of a constant var" begin
+    eq = ((s^2 + 1)/(s^2 + 2*s + 1)) - ((s^2 + a)/(b*c*s^2 + (b+c)*s + d))
+    calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b,c,d])
+    solve_roots = sort_arr(symbolic_solve(eq, [a,b,c,d]), [a,b,c,d])
+    known_roots = sort_arr([Dict(a=>1, b=>1, c=>1, d=>1)], [a,b,c,d])
+    @test check_approx(calcd_roots, known_roots)   
+    @test check_approx(solve_roots, known_roots)   
+
+    eq = (a+b)*s^2 - 2s^2 + 2*b*s - 3*s
+    calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b])
+    solve_roots = sort_arr(symbolic_solve(eq, [a,b]), [a,b])
+    known_roots = sort_arr([Dict(a=>1/2, b=>3/2)], [a,b])
+    @test check_approx(calcd_roots, known_roots)   
+    @test check_approx(solve_roots, known_roots)   
+
+    eq = (a*x^2+b)*s^2 - 2s^2 + 2*b*s - 3*s + 2(x^2)*(s^3) + 10*s^3
+    calcd_roots = sort_arr(Symbolics.solve_interms_ofvar(eq, s), [a,b,x])
+    solve_roots = sort_arr(symbolic_solve(eq, [a,b,x]), [a,b,x])
+    known_roots = sort_arr([Dict(a=>-1/10, b=>3/2, x=>-im*sqrt(5)), Dict(a=>-1/10, b=>3/2, x=>im*sqrt(5))], [a,b,x])
+    @test check_approx(calcd_roots, known_roots)   
+    @test check_approx(solve_roots, known_roots)   
+end
+
+@testset "Invalid input" begin
+    @test_throws AssertionError symbolic_solve(x, x^2)
+end
+
+@testset "Nice univar cases" begin
+    found_roots = symbolic_solve(1/x^2 ~ 1/y^2 - 2/x^3 * (x-y), x)
+    known_roots = Symbolics.unwrap.([y, -2y])
+    @test isequal(found_roots, known_roots)
+end
+
+@testset "Deterministic root order" begin
+    # Root order must not depend on hash/dictionary iteration order, which varies
+    # across Julia versions. Numeric roots sort ascending, complex conjugate pairs
+    # sort positive-imaginary-part first, and symbolic roots sort with `<ₑ`.
+    @test isequal(Symbolics.value.(symbolic_solve(x^3 - 6x^2 + 11x - 6, x)), [1, 2, 3])
+    @test isequal(Symbolics.value.(symbolic_solve((x - 5)*(x + 1)*(x - 2), x)), [-1, 2, 5])
+    @test isequal(Symbolics.value.(symbolic_solve(x^2 + x - 6, x)), [-3, 2])
+    @test isequal(Symbolics.value.(symbolic_solve(x^2 + 1, x)), [im, -im])
+end
+
+@testset "Numeric roots precede roots_of" begin
+    sols = symbolic_solve(x^7 - 1, x)
+    @test length(sols) == 2
+    @test isequal(unwrap_const(sols[1]), 1)
+    @test isequal(operation(Symbolics.value(sols[2])), Symbolics.RootsOf)
+end
+
+@testset "Deg 1 univar" begin
+    @test isequal(unwrap_const(only(symbolic_solve(x+1, x))), -1)
+
+    @test isequal(unwrap_const(only(symbolic_solve(2x+1, x))), -1/2)
+
+    @test isequal(unwrap_const(only(symbolic_solve(x, x))), 0) 
+
+    @test isequal(unwrap_const(only(symbolic_solve((x+1)^20, x))), -1)
+
+    @test isequal(only(Symbolics.get_roots_deg1(x + y^3, x)), -y^3)
+
+    expr = x - Symbolics.term(sqrt, 2)
+    @test isequal(symbolic_solve(expr, x)[1], Symbolics.term(sqrt, 2))
+
+    expr = x + im
+    @test unwrap_const(symbolic_solve(expr, x)[1]) == -im
+end
+
+@testset "Deg 2 univar" begin
+    expr = x^2 + 1
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg2(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = sort_roots([-im, im])
+    @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(arr_solve_roots .≈ arr_known_roots)
+
+    expr = x^2 + 2x + 10
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg2(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = sort_roots([-1 + 3im, -1 - 3im])
+    @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(arr_solve_roots .≈ arr_known_roots)
+
+    expr = x^2 - 10x + 25
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg2(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = [5,5]
+    @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(arr_solve_roots .≈ arr_known_roots)
+end
+
+@testset "Deg 3 univar" begin
+    expr = x^3 - 2x^2 + x - 2 
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg3(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = sort_roots([2, -im, im])
+    @test all(isapprox.(arr_get_roots, arr_known_roots, atol=0.0000001))
+    @test all(arr_solve_roots .≈ arr_known_roots)
+
+    expr = x^3 + x^2 + x + 1
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg3(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = sort_roots([-1, -im, im])
+    @test all(isapprox.(arr_get_roots, arr_known_roots, atol=0.0000001))
+    @test all(arr_solve_roots .≈ arr_known_roots)
+
+    expr = x^3 + 10x
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg3(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = sort_roots([0, -sqrt(10)*im, sqrt(10)*im])
+    @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(arr_solve_roots .≈ arr_known_roots)
+end
+
+@testset "Deg 4 univar" begin
+    expr = x^4 + 1
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = sort_roots(eval.([-(complex(-1))^(1/4),(complex(-1))^(1/4), (complex(-1))^(3/4), -(complex(-1))^(3/4)]))
+    @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(arr_solve_roots .≈ arr_known_roots)
+
+    expr = x^4 - 3x^2 + 2
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = sort_roots(eval.([-1, 1, sqrt(2), -sqrt(2)]))
+    @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(arr_solve_roots .≈ arr_known_roots)
+
+    expr = x^4 - x^3 - 2x^2 + 6x - 4
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    arr_known_roots = sort_roots(eval.([-2, 1, 1-im, 1+im]))
+    @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(arr_solve_roots .≈ arr_known_roots)
+
+    expr = 386314 - 412163*x - 357800*(x^2) + 1029179*(x^3) - 111927*(x^4)
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(Symbolics.get_roots_deg4(expr, x))))
+    arr_solve_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    r_novar = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr))))
+    arr_known_roots = sort_roots(eval.([0.5840484 + 0.4176250im, 0.5840484 - 0.4176250im,
+    8.788773679354421, -0.76177906049]))
+    @test all(isapprox.(arr_known_roots, arr_get_roots, atol=0.00001))
+    @test all(isapprox.(arr_known_roots, arr_solve_roots, atol=0.00001))
+    @test all(isapprox.(arr_known_roots, r_novar, atol=0.00001))
+end
+
+@testset "Higher degree univar" begin
+    expr = -b + a*x + c*x - d*x^2 + b*x^3 - a*x^4 - x^5
+    root = only(symbolic_solve(expr, x))
+    @test operation(root) === Symbolics.RootsOf
+    @test isequal(arguments(root), [Symbolics.unwrap(expr), Symbolics.unwrap(x)])
+end
+
+@testset "Complex coeffs univar" begin
+    expr = x^4 + sqrt(complex(-2//1))
+    arr_get_roots = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    r_novar = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr))))
+    arr_known_roots = sort_roots(eval.([-Complex(-1)^(3/8)*2^(1/8), Complex(-1)^(3/8)*2^(1/8), 
+        Complex(-1)^(7/8)*2^(1/8), -Complex(-1)^(7/8)*2^(1/8)]))
+    @test all(arr_get_roots .≈ arr_known_roots)
+    @test all(r_novar .≈ arr_known_roots)
+
+    # standby
+    # expr = x^3 + sqrt(complex(-2//1))*x + 2
+end
+
+@testset "Multipoly solver" begin
+    @test isequal(unwrap_const(symbolic_solve([x^2 - 1, x + 1], x)[1]), -1)
+    @test isequal(symbolic_solve([x^2 - a^2, x + a], x)[1], -a)
+    @test isequal(symbolic_solve([x^20 - a^20, x + a], x)[1], -a)
+end
+@testset "Multivar solver" begin
+    @variables x y z
+    @test symbolic_solve([x^4 - 1, x - 2], [x]) === nothing
+
+    # Vector-valued Equation should take the system path
+    sol_vec_eq = sort_arr(symbolic_solve([0, 0] ~ [x^2 - 4, x + y], [x, y]), [x, y])
+    sol_vec = sort_arr(symbolic_solve([0 ~ x^2 - 4, 0 ~ x + y], [x, y]), [x, y])
+    @test check_equal(sol_vec_eq, sol_vec)
+    @test check_equal(sol_vec_eq, sort_arr([Dict(x => -2, y => 2), Dict(x => 2, y => -2)], [x, y]))
+
+    err = try
+        Symbolics.check_expr_validity([x, y])
+        nothing
+    catch e
+        e
+    end
+    @test err isa AssertionError
+    @test occursin("Invalid input of type", err.msg)
+    @test occursin("Vector", err.msg)
+
+    # TODO: test this properly
+    sol = symbolic_solve([x^3 + 1, x*y^3 - 1], [x, y])
+
+    eqs = [x*y + 2x^2, y^2 -1]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
+    r_novar = sort_arr(symbolic_solve(eqs), [x,y])
+    arr_known_roots = sort_arr([Dict(x=>-1//2, y=>1), Dict(x=>0, y=>-1), Dict(x=>0, y=>1), Dict(x=>1//2, y=>-1)], [x,y])
+    arr_known_roots = sort_arr(arr_known_roots, [x,y])
+    @test check_equal(arr_calcd_roots, arr_known_roots)   
+    @test check_equal(r_novar, arr_known_roots)   
+
+    eqs = [x-y-z, x+y-z^2, x^2 + y^2 - 1]
+    eqs_in_equation_form = [x-y ~ z, x+y-z^2 ~ 0, x^2 + y^2 ~ 1]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z]), [x,y,z])
+    r_novar = sort_arr(symbolic_solve(eqs_in_equation_form), [x,y,z])
+    r_eq = sort_arr(symbolic_solve(eqs_in_equation_form, [x,y,z]), [x,y,z])
+    arr_known_roots = sort_arr([Dict(x => 0, y=>1, z=>-1), Dict(x=>1, y=>0, z=>1),
+        Dict(x=>(1/2)*(-2-sqrt(2)*im), y=>(1/2)*(-2+sqrt(2)*im), z=>-sqrt(2)*im),
+        Dict(x=>(1/2)*(-2+sqrt(2)*im), y=>(1/2)*(-2-sqrt(2)*im), z=>sqrt(2)*im)], [x,y,z])
+    @test check_approx(arr_calcd_roots, arr_known_roots)   
+    @test check_approx(r_novar, arr_known_roots)   
+    @test check_approx(r_eq, arr_known_roots)   
+
+    eqs = [x^2, y, z]
+    eqs_in_equation_form = [x^2 ~ 0, y ~ 0, z ~ 0]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z], dropmultiplicity=false), [x,y,z])
+    r_novar = sort_arr(symbolic_solve(eqs, dropmultiplicity=false), [x,y,z])
+    r_eq_novar = sort_arr(symbolic_solve(eqs_in_equation_form, dropmultiplicity=false), [x,y,z])
+    arr_known_roots = sort_arr([Dict(x=>0, y=>0, z=>0), Dict(x=>0, y=>0, z=>0)], [x,y,z])
+    @test check_equal(arr_calcd_roots, arr_known_roots)   
+    @test check_equal(r_novar, arr_known_roots)   
+    @test check_equal(r_eq_novar, arr_known_roots)   
+
+    eqs = [y^2 - 1, x]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
+    arr_known_roots = sort_arr([Dict(y=>1//1, x=>0//1), Dict(y=>-1//1, x=>0//1)], [x,y])
+    @test check_equal(arr_calcd_roots, arr_known_roots)   
+
+
+    eqs = [x^5 + x, y]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y]), [x,y])
+    arr_known_roots = sort_arr([Dict(x=>0, y=>0), Dict(x=>-(complex(-1))^(1/4), y=>0),
+    Dict(x=>(complex(-1))^(1/4), y=>0), Dict(x=>-(complex(-1))^(3/4), y=>0),
+    Dict(x=>(complex(-1))^(3/4), y=>0)], [x,y])
+    @test check_approx(arr_calcd_roots, arr_known_roots)   
+
+    @test symbolic_solve([x*y - 1, y], [x,y]) === nothing
+    @test symbolic_solve([x+y+1, x+y+2], [x,y]) === nothing
+
+    eqs = [-1 + y + z + x^2,
+           -1 + x + z + y^2,
+           -1 + x + y + z^2]
+    arr_calcd_roots = sort_arr(symbolic_solve(eqs, [x,y,z]), [x,y,z])
+    arr_known_roots = sort_arr([Dict(z=>0, y=>1, x=>0),
+    Dict(z=>1, y=>0, x=>0),
+    Dict(z=>0, y=>0, x=>1),
+    Dict(z=>-1+sqrt(2), y=>-1+sqrt(2), x=>-1+sqrt(2)),
+    Dict(z=>-1-sqrt(2), y=>-1-sqrt(2), x=>-1-sqrt(2))], [x,y,z])
+    @test check_approx(arr_calcd_roots, arr_known_roots)    
+
+    # cyclic 3
+    @variables z1 z2 z3
+    eqs = [z1 + z2 + z3, z1*z2 + z1*z3 + z2*z3, z1*z2*z3 - 1]
+    sol = symbolic_solve(eqs, [z1,z2,z3])
+    backward = [Symbolics.substitute(eqs, s) for s in sol]
+    @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
+
+    @variables x y
+    eqs = [2332//232*x + 2131232*y - 1//343434, x + y + 1]
+    sol = symbolic_solve(eqs, [x,y])
+    backward = [Symbolics.substitute(eqs, s) for s in sol]
+    @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
+
+    @variables H1 H2
+    eqs = [
+        -288421779135875 // 1125899906842624 * H1^2 + 1963378034549373 // 562949953421312 * H1 - 4,
+        -288421779135875 // 844424930131968 * H1 * H2 + 1963378034549373 // 562949953421312 * H2 - 4,
+    ]
+    sol = symbolic_solve(eqs, [H1, H2])
+    @test length(sol) == 2
+    backward = [Symbolics.substitute(eqs, s) for s in sol]
+    @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol = 1.0e-6)), backward)
+    disc = sqrt(big(2555917089509096769845824549129))
+    h1_a = (big(1963378034549373) + disc) / big(288421779135875)
+    h1_b = (big(1963378034549373) - disc) / big(288421779135875)
+    h2_of(h1) = 4 / (1963378034549373 // 562949953421312 - 288421779135875 // 844424930131968 * h1)
+    arr_known_roots = sort_arr(
+        [
+            Dict(H1 => h1_a, H2 => h2_of(h1_a)),
+            Dict(H1 => h1_b, H2 => h2_of(h1_b)),
+        ], [H1, H2],
+    )
+    @test check_approx(sort_arr(sol, [H1, H2]), arr_known_roots)
+
+    @test isnothing(symbolic_solve([x*y - 1, sin(x)], [x, y]))
+
+    @variables x y z
+    boot = 10
+    for i in 1:boot
+        # at most 4 roots by Bézout's theorem
+        rand_eq(xs, d) = rand(-10:10) + rand(-10:10)*x + rand(-10:10)*y + rand(-10:10)*x*y + rand(-10:10)*x^2 + rand(-10:10)*y^2
+        eqs = [rand_eq([x,y],2), rand_eq([x,y],2)]
+        sol = symbolic_solve(eqs, [x,y])
+        backward = [Symbolics.substitute(eqs, s) for s in sol]
+        @test all(x -> all(isapprox.(eval(Symbolics.toexpr(x)), 0; atol=1e-6)), backward)
+    end
+
+    @test isnothing(symbolic_solve([x^2, x*y, y^2], [x,y], warns=false))
+end
+
+@testset "Multivar parametric" begin
+    @variables x y a
+    @test isequal(value(only(symbolic_solve([x + a, a - 1], x))), -1)
+    @test isequal(symbolic_solve([x - a, y + a], [x, y]), [Dict(y => -a, x => a)])
+    @test isequal(symbolic_solve([x*y - a, x*y + x], [x, y]), [Dict(y => Const{SymReal}(-1), x => -a)])
+    @test symbolic_solve([x*y - a, 1 ~ 3], [x, y]) === nothing
+
+    @test isnothing(symbolic_solve([x*y - 1, sin(x)], [x, y]))
+
+    @test isnothing(symbolic_solve([x*y - a, sin(x)], [x, y]))
+
+    @variables t w u v
+    sol = symbolic_solve([t*w - 1 ~ 4, u + v + w ~ 1], [t,w])
+    @test isequal(sol, [Dict(t => -5 / (-1//1 + u + v), w => 1//1 - u - v)])
+
+    sol = symbolic_solve([x-y, y-z], [x])
+    @test isequal(sol, [z]) || isequal(sol, [y])
+
+    sol = symbolic_solve([x-y, y-z], [x, y])
+    @test isequal(sol, [Dict(x=>z, y=>z)])
+
+    sol = value.(symbolic_solve([x + y - z, y - z], [x]))
+    @test isequal(sol, [0])
+
+    @variables s::Real
+    @variables u_g::Real u_a::Real u_a2::Real
+    @variables i_c1::Real i_r1::Real i_probe::Real
+    @variables r0::Real r1::Real rinterface::Real c1::Real
+    solve_vars = [u_a, u_a2, i_c1, i_r1, i_probe]
+    eqs = [
+        u_g - u_a - r0 * (i_c1 + i_r1 + i_probe),
+        u_a - u_a2 - r1 * i_r1,
+        u_a2 - rinterface * (i_c1 + i_r1),
+        i_c1 - s * c1 * (u_a - u_a2),
+    ]
+    sol = symbolic_solve(eqs, solve_vars)
+    @test sol isa AbstractVector
+    @test length(sol) == 1
+    @test count(v -> isequal(sol[1][v], v), solve_vars) == 1
+    @test all(eq -> isequal(simplify(expand(substitute(eq, sol[1]))), 0), eqs)
+
+    @variables b
+    sol = symbolic_solve([a * x - b], [x, y])
+    @test sol isa AbstractVector
+    @test length(sol) == 1
+    @test count(v -> isequal(sol[1][v], v), [x, y]) == 1
+    @test isequal(simplify(expand(substitute(a * x - b, sol[1]))), 0)
+end
+
+@testset "Factorisation" begin
+    f = 10x
+    u, factors = Symbolics.factor_use_nemo(f)
+    @test isequal(u, 10) && isequal(factors, [x])
+
+    f = Symbolics.wrap(10)
+    u, factors = Symbolics.factor_use_nemo(f)
+    @test isequal(u, 10) && isempty(factors)
+
+    f = x^2 - 1
+    u, factors = Symbolics.factor_use_nemo(f)
+    @test isequal(u, 1) && isequal(expand(u*prod(factors) - f), 0)
+
+    f = expand((x + 1//3) * ((x*y)^2 + 2x*y + y^2) * (x - z))
+    u, factors = Symbolics.factor_use_nemo(f)
+    @test isequal(expand(u*prod(factors) - f), 0)
+end
+
+
+# Post Process roots #
+@testset "Post Process roots" begin
+    SymbolicUtils.@syms __x
+    __symsqrt(x) = SymbolicUtils.term(ssqrt, x)
+    term = SymbolicUtils.term
+    @test Symbolics.postprocess_root(2 // 1) == 2 && Symbolics.postprocess_root(2 + 0*im) == 2
+    @test Symbolics.postprocess_root(__symsqrt(4)) == 2
+    @test isequal(Symbolics.postprocess_root(__symsqrt(__x)^2), __x)
+
+
+    @test isequal(Symbolics.postprocess_root(term(^, 0, __x)), 0)
+    @test_broken isequal(Symbolics.postprocess_root(term(/, __x, 0)), Inf)
+    @test value(Symbolics.postprocess_root(term(^, __x, 0) )) == 1
+    @test value(Symbolics.postprocess_root(term(^, Base.MathConstants.e, 0) )) == 1
+    @test value(Symbolics.postprocess_root(term(^, Base.MathConstants.pi, 1) )) ≈ Base.MathConstants.pi
+    @test isequal(Symbolics.postprocess_root(term(^, __x, 1) ), __x)
+
+    x = Symbolics.term(sqrt, 2)
+    @test isequal(Symbolics.postprocess_root( expand((x + 1)^4) ), 17 + 12x)
+    @test isequal(Symbolics.postprocess_root( x^5 ), 4 * x)
+
+    @test isequal(Symbolics.postprocess_root(Symbolics.term(sqrt, 9//4)), 3//2)
+    @test isequal(Symbolics.postprocess_root(Symbolics.term(sqrt, -27//8)), im*3//2*Symbolics.term(sqrt, 3//2))
+end
+
+
+# Filter Poly # For future reference, i think @check_polynomial is not enough of a test.
+@testset "Filter poly" begin
+    @variables x y z c1 c2 
+    poly = x*sqrt(complex(-2)) + 2.23324234
+    subs, filtered_poly = Symbolics.filter_poly(poly, x)
+    @test Symbolics.check_polynomial(filtered_poly)
+
+    poly = x + 2im
+    subs, filtered_poly = Symbolics.filter_poly(poly, x)
+    @test Symbolics.check_polynomial(filtered_poly)
+
+    poly = im*x + Symbolics.wrap(Symbolics.term(sqrt, 2))
+    subs, filtered_poly = Symbolics.filter_poly(poly, x)
+    @test Symbolics.check_polynomial(filtered_poly)
+
+    poly = (1/im)*x + 3*y*z
+    subs, filtered_poly = Symbolics.filter_poly(poly, x)
+    @test Symbolics.check_polynomial(filtered_poly)
+
+    poly = (x+1)*Symbolics.term(log, 3)
+    subs, filtered_poly = Symbolics.filter_poly(poly, x)
+    @test Symbolics.check_polynomial(filtered_poly)
+end
+
+
+@testset "n func occ (smart occurrence counter)" begin
+    @test Symbolics.n_func_occ(x, x) == 1
+    @test Symbolics.n_func_occ(log(x), x) == 1
+    @test Symbolics.n_func_occ(log(x) + x, x) == 2
+
+    # standby
+    # @test Symbolics.(log(y) + x , x) == 1
+    @test Symbolics.n_func_occ(log(a*x) + b, x) == 1
+    
+    @test Symbolics.n_func_occ(log(x + sin((x^2 + x)/log(x))), x) == 3
+    @test Symbolics.n_func_occ(x^2 + x + x^3, x) == 1
+    @test Symbolics.n_func_occ(log(x)^2 - 17, x) == 1
+    @test Symbolics.n_func_occ(2^(x^2 + x) + 5^(x+3), x) == 2
+
+    expr = log( log(x) + log(x) ) + log( log(x) + log(x) ) - 11
+    @test Symbolics.n_func_occ(expr, x) == 1
+
+    # log(2) - 3log(5) + x*log(2) - x*log(5)
+    expr = expand((1 + x)*Symbolics.term(log, 2) - (3 + x)*Symbolics.term(log, 5))
+    @test Symbolics.n_func_occ(expr, x) == 1
+
+    @test Symbolics.n_func_occ(sqrt(abs2(x) + y), x) == 1
+    @test Symbolics.n_func_occ(abs2(x) + y, x) == 1
+    @test Symbolics.n_func_occ(abs(x) + y, x) == 1
+end
+
+
+
+@testset "Isolate/Attract solve" begin
+    lhs = ia_solve(a*x^b + c, x)[1]
+    lhs2 = symbolic_solve(a*x^b + c, x)[1]
+    rhs = Symbolics.term(^, -c.val/a.val, 1/b.val) 
+    @test_broken isequal(lhs, rhs)
+
+    @test isequal(value(symbolic_solve(2/x, x)[1]), Inf)
+    @test isequal(value(symbolic_solve(x^1.5, x)[1]), 0)
+
+    lhs = symbolic_solve(log(a*x)-b,x)[1]
+    @test isequal(Symbolics.value(substitute(lhs, Dict(a=>1, b=>1); fold = Val(true))), 1E)
+    
+    expr = x + 2
+    lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
+    lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
+    rhs = [-2]
+    @test lhs[1] ≈ rhs[1]
+    @test lhs_solve[1] ≈ rhs[1]
+
+    expr = sqrt(log(cbrt(x^2)))
+    lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    rhs = sort_roots([1, -1])
+    @test all(isapprox.(lhs, rhs, atol=1e-6))
+    @test all(isapprox.(lhs_solve, rhs, atol=1e-6))
+
+    expr = log(x+1) + log(x-1)
+    @test isapprox(eval(Symbolics.toexpr(symbolic_solve(expr, x)[1])), sqrt(2), atol=1e-6)
+
+    expr = 2^(x+1) + 5^(x+3)
+    lhs = ComplexF64.(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
+    rhs = [(-im*Base.MathConstants.pi - log(2) + 3log(5))/(log(2) - log(5))]
+    @test lhs[1] ≈ rhs[1] || conj(lhs[1]) ≈ rhs[1]
+    @test lhs_solve[1] ≈ rhs[1] || conj(lhs_solve[1]) ≈ rhs[1]
+
+    expr = 3*2^(x+3) + 2*5^(x+1)
+    lhs = eval.(Symbolics.toexpr.(ia_solve(expr, x)))
+    lhs_solve = eval.(Symbolics.toexpr.(symbolic_solve(expr, x)))
+    rhs = [(-im*Base.MathConstants.pi + log(5) - log(12))/(log(2) - log(5))]
+    @test lhs[1] ≈ rhs[1] || lhs[1] ≈ conj(rhs[1])
+    @test lhs_solve[1] ≈ rhs[1] || lhs_solve[1] ≈ conj(rhs[1])
+
+    expr = exp(2x)*exp(x^2 + 3) + 3
+    lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    rhs = sort_roots([-1 + sqrt(-2 + im*Base.MathConstants.pi + log(3)),
+        -1 - sqrt(-2 + im*Base.MathConstants.pi + log(3))])
+    @test all(lhs .≈ rhs)
+    @test all(lhs_solve .≈ rhs)
+
+    expr = x/5 + 3x^2
+    lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    rhs = sort_roots([0, -1//15])
+    @test all(lhs .≈ rhs)
+    @test all(lhs_solve .≈ rhs)
+
+
+    expr = log(x)^2 + log(x) + 1
+    lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    rhs = sort_roots([E^(-(complex(-1))^(1/3)), E^((complex(-1))^(2/3))])
+    @test all(lhs .≈ rhs)
+    @test all(lhs_solve .≈ rhs)
+
+    expr = 2log(x^2 + 1)^2 + 3log(x^2 + 1) + 1
+    lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    rhs = sort_roots([-im*ssqrt(1 - 1/E), im*ssqrt(1 - 1/E),
+        -im*ssqrt(1 - 1/ssqrt(E)), im*ssqrt(1 - 1/ssqrt(E))])
+    @test all(lhs .≈ rhs)
+    @test all(lhs_solve .≈ rhs)
+
+
+    # this has c1 subbed, ia_solve still needs to incl c1
+    # much like sin and cos solutions (i.e. infinite solutions)
+    expr = 9^(x^2 + 1) + 3^(x^2 + 1) + 2
+    lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    rhs = sort_roots([-ssqrt(-1 + slog(1/2*(-1 - im*ssqrt(7)))/slog(3)),
+        ssqrt(-1 + slog(1/2*(-1 - im*ssqrt(7)))/slog(3)),
+        ssqrt(-1 + slog(1/2*(-1 + im*ssqrt(7)))/slog(3)),
+        -ssqrt(-1 + slog(1/2*(-1 + im*ssqrt(7)))/slog(3))])
+
+    @test all(lhs .≈ rhs)
+    @test all(lhs_solve .≈ rhs)
+
+    @testset "Keyword arguments" begin
+        expr = sec(x ^ 2 + 4x + 4) ^ 3 - 3
+        roots = ia_solve(expr, x)
+        @test length(roots) == 6 # 2 quadratic roots * 3 roots from cbrt(3)
+        @test length(Symbolics.get_variables(roots[1])) == 1
+        _n = only(Symbolics.get_variables(roots[1]))
+        vals = eval.(Symbolics.toexpr.(substitute.(roots, (Dict(_n => 0),))))
+        @test all(x -> isapprox(value(abs(sec(x^2 + 4x + 4) ^ 3 - 3)), 0.0, atol = 1e-14), vals)
+
+        roots = ia_solve(expr, x; complex_roots = false)
+        @test length(roots) == 2
+        # the `n` in `θ + n * 2π`
+        @test length(Symbolics.get_variables(roots[1])) == 1
+        _n = only(Symbolics.get_variables(roots[1]))
+        vals = eval.(Symbolics.toexpr.(substitute.(roots, (Dict(_n => 0),))))
+        @test all(x -> isapprox(norm(sec(x^2 + 4x + 4) ^ 3 - 3), 0.0, atol = 1e-14), vals)
+
+        roots = ia_solve(expr, x; complex_roots = false, periodic_roots = false)
+        @test length(roots) == 2
+        @test length(Symbolics.get_variables(roots[1])) == 0
+        @test length(Symbolics.get_variables(roots[2])) == 0
+        vals = eval.(Symbolics.toexpr.(roots))
+        @test all(x -> isapprox(norm(sec(x^2 + 4x + 4) ^ 3 - 3), 0.0, atol = 1e-14), vals)
+    end
+end
+
+@testset "Sqrt case poly" begin
+    # f(x) + sqrt(g(x)) + c
+    expr = x + sqrt(x+1) - 5
+    lhs_ia = ia_solve(expr, x)[1]
+    lhs_att = Symbolics.attract_and_solve_sqrtpoly(expr, x)[1]
+    lhs_solve = symbolic_solve(expr, x)[1]
+    @test all(isequal(value(answer), 3) for answer in [lhs_ia, lhs_att, lhs_solve])
+
+    expr = x^2 + x + sqrt(x) + 2
+    lhs = sort_roots(eval.(Symbolics.toexpr.(ia_solve(expr, x))))
+    lhs_solve = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(expr, x))))
+    rhs = sort_roots([-0.860929555 - 1.604034315im, -0.860929555 + 1.604034315im])
+    @test all(isapprox.(lhs, rhs, atol=1e-6))
+    @test all(isapprox.(lhs_solve, rhs, atol=1e-6))
+    @test all(isequal.(lhs, lhs_solve))
+end
+
+@testset "Turn to poly" begin
+    @variables x
+    # does not sub because these can not be solved as polys
+    expr = log(x+1)^2 + log(x) + 1
+    expr, sub = Symbolics.turn_to_poly(expr, x)
+    @test isequal(sub, Dict())
+
+    expr = 2log(x)^2 + sin(x) + 1
+    expr, sub = Symbolics.turn_to_poly(expr, x)
+    @test isequal(sub, Dict())
+
+    
+    # subs and turns to polys
+    expr = log(x)^2 + log(x) + 1
+    expr, sub = Symbolics.turn_to_poly(expr, x)
+    @test Symbolics.check_polynomial(expr)
+
+    expr = 2log(x^2 + 1)^2 + 3log(x^2 + 1) + 1
+    expr, sub = Symbolics.turn_to_poly(expr, x)
+    @test Symbolics.check_polynomial(expr)
+
+    expr = sin(x^2)^2 + 3sin(x^2) + 1
+    expr, sub = Symbolics.turn_to_poly(expr, x)
+    @test Symbolics.check_polynomial(expr)
+
+    expr = 9^(x^2 + 1) + 3^(x^2 + 1) + 2
+    expr, sub = Symbolics.turn_to_poly(expr, x)
+    @test Symbolics.check_polynomial(expr)
+end
+
+
 using LambertW
 
 
 #Testing
 
-@testset "solving tests" begin
-	
-	function hasFloat(expr)#make sure answer does not contain any strange floats
-		if expr isa Float64
-			return !isinteger(expr) && expr != float(pi) && expr != exp(1.0)
-		elseif expr isa Equation
-			return hasFloat(expr.lhs) || hasFloat(expr.rhs)
-		elseif istree(expr)
-			elements = arguments(expr)
-			for element in elements
-				if hasFloat(element)
-					return true
-				end
-			end
-		end
-		return false
-	end
-	correctAns(p,a) = isequal(sort(Symbolics.convert_solutions_to_floats(p)),a) && !hasFloat(p)
-	
-	@syms x y z a b c
-	
-	#quadratics
-	@test correctAns(solve_single_eq(x^2~4,x),[-2.0,2.0])
-	@test correctAns(solve_single_eq(x^2~2,x),[-sqrt(2.0),sqrt(2.0)])
-	@test correctAns(solve_single_eq(x^2~32,x),[-sqrt(32.0),sqrt(32.0)])
-	@test correctAns(solve_single_eq(x^3~32,x),[32.0^(1.0/3.0)])
-	#lambert w
-	@test correctAns(solve_single_eq(x^x~2,x),[log(2.0)/lambertw(log(2.0))])
-	@test correctAns(solve_single_eq(2*x*exp(x)~3,x),[LambertW.lambertw(3.0/2.0)])
-	#more challenging quadratics
-	@test correctAns(solve_single_eq(x+sqrt(1+x)~5,x),[3.0])
-	@test correctAns(solve_single_eq(2*x^2-6*x-7~0,x),[(3.0/2.0)-sqrt(23.0)/2.0,(3.0/2.0)+sqrt(23.0)/2.0])
-	#functions inverses
-	@test correctAns(solve_single_eq(exp(x^2)~7,x),[-sqrt(log(7.0)),sqrt(log(7.0))])
-	@test correctAns(solve_single_eq(sin(x+3)~1//3,x),[asin(1.0/3.0)-3.0])
-	#strange
-	@test correctAns(solve_single_eq(sin(x+2//5)+cos(x+2//5)~1//2,x),[acos(0.5/sqrt(2.0))+3.141592653589793/4.0-(2.0/5.0)])
-	#product
-	@test correctAns(solve_single_eq((x^2-4)*(x+1)~0,x),[-2.0,-1.0,2.0])
+@testset "Algebraic solver tests" begin
+    function correctAns(solve_roots, known_roots)
+        solve_roots = sort_roots(eval.(Symbolics.toexpr.(solve_roots)))
+        known_roots = sort_roots(known_roots)
+        r = isapprox.(solve_roots, known_roots, atol=1e-6)
+        isequal(r, []) && return false
+        return all(r)
+    end
+
+    #quadratics
+    @test correctAns(symbolic_solve(x^2~4,x), [-2, 2])
+    @test correctAns(symbolic_solve(x^2~2,x),[-sqrt(2.0),sqrt(2.0)])
+    @test correctAns(symbolic_solve(x^2~32,x),[-sqrt(32.0),sqrt(32.0)])
+    @test correctAns([symbolic_solve(x^3~32,x)[1]],[32.0^(1.0/3.0)])
+
+    #lambert w, currently unsupported
+    @test_broken correctAns(symbolic_solve(x^x~2, x, warns=false),[log(2.0)/LambertW.lambertw(log(2.0))])
+    @test_broken correctAns(symbolic_solve(2*x*exp(x)~3, x, warns=false),[LambertW.lambertw(3.0/2.0)])
+
+    #more challenging quadratics
+    @test correctAns(symbolic_solve(x+sqrt(1+x)~5,x),[3.0])
+    @test correctAns(symbolic_solve(2*x^2-6*x-7~0,x),[(3.0/2.0)-sqrt(23.0)/2.0,(3.0/2.0)+sqrt(23.0)/2.0])
+
+    #functions inverses
+    @test correctAns(symbolic_solve(exp(x^2)~7,x),[-sqrt(log(7.0)),sqrt(log(7.0))])
+
+    root = symbolic_solve(sin(x+3)~1//3,x)[1]
+    var = first(Symbolics.get_variables(root))
+    root = Symbolics.ssubs(root, Dict(var=>0))
+    @test correctAns([root],[asin(1.0/3.0)-3.0])
+
+    @test_broken correctAns(symbolic_solve(sin(x+2//5)+cos(x+2//5)~1//2 , x, warns=false), [acos(0.5/sqrt(2.0))+pi/4.0-(2.0/5.0)])
+
+    #product
+    @test correctAns(symbolic_solve((x^2-4)*(x+1)~0,x),[-2.0,-1.0,2.0])
 end
 
+@testset "`NaN` handling in `$fn`" for fn in [ssqrt, slog, scbrt]
+    x = fn(NaN)
+    @test x isa Real && isnan(x)
+    x = fn(NaN + NaN * im)
+    @test x isa Complex && isnan(x)
+end
 
+@testset "exact_div keeps `//` for numbers and accepts symbolics" begin
+    @variables a
+    # Numbers keep exact rational division; `/` there would return a float and
+    # the closed-form root formulas rely on the exactness.
+    @test Symbolics.exact_div(3, 8) === 3 // 8
+    @test Symbolics.exact_div(3 // 4, 2) === 3 // 8
+    @test Symbolics.exact_div(big(3), 8) == 3 // 8
+    @test Symbolics.exact_div(1.5, 2) === 0.75
+
+    # `//` has no method for a symbolic operand, which is the bug this replaces.
+    @test_throws MethodError value(a) // 8
+    @test isequal(Symbolics.exact_div(1, value(a)), 1 / value(a))
+    @test isequal(Symbolics.exact_div(value(a), 2), value(a) / 2)
+end
+
+@testset "parametric cubics and quartics have closed-form roots" begin
+    @variables x a A1 A4
+
+    # Both used to throw `MethodError: no method matching //(::BigInt,
+    # ::BasicSymbolic)` from the closed-form formulas in `univar.jl`.
+    @test length(Symbolics.get_roots_deg3(value(a * x^3 + 2x + 1), value(x))) == 3
+    @test length(Symbolics.get_roots_deg4(value(a^2 * x^4 + 1), value(x))) == 4
+
+    for ex in [x^4 + a, a * x^4 + 1, x^4 + a * x + 1, A1^2 * x^4 + A4^2]
+        roots = symbolic_solve(ex, x)
+        @test roots !== nothing
+        @test length(roots) == 4
+    end
+
+    # Numeric quartics are unaffected. `correctAns` above is local to its own
+    # testset, so the comparison is spelled out here.
+    numeric = sort_roots(eval.(Symbolics.toexpr.(symbolic_solve(x^4 - 3x^2 + 2, x))))
+    expected = sort_roots([-sqrt(2.0), -1.0, 1.0, sqrt(2.0)])
+    @test all(isapprox.(numeric, expected; atol = 1.0e-6))
+end

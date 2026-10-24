@@ -1,4 +1,10 @@
 using Documenter, Symbolics, SymbolicUtils
+import Nemo, Groebner, SymPy
+
+DocMeta.setdocmeta!(Symbolics, :DocTestSetup, :(using Symbolics); recursive = true)
+
+cp("./docs/Manifest.toml", "./docs/src/assets/Manifest.toml", force = true)
+cp("./docs/Project.toml", "./docs/src/assets/Project.toml", force = true)
 
 # Make sure that plots don't throw a bunch of warnings / errors!
 ENV["GKSwstype"] = "100"
@@ -17,43 +23,52 @@ mathengine = MathJax3(Dict(:loader => Dict("load" => ["[tex]/require", "[tex]/ma
 makedocs(
     sitename="Symbolics.jl",
     authors="Chris Rackauckas",
-    modules=[Symbolics,SymbolicUtils],
-    clean=true,doctest=false,
-    strict=[
-        :doctest,
-        :linkcheck,
-        :parse_error,
-        :example_block,
-        # Other available options are
-        # :autodocs_block, :cross_references, :docs_block, :eval_block, :example_block, :footnote, :meta_block, :missing_docs, :setup_block
-    ],
-    format = Documenter.HTML(#analytics = "UA-90474609-3",
-                             assets = ["assets/favicon.ico"]),
+    modules=[Symbolics],
+    clean=true, doctest=true, linkcheck = true, checkdocs = :public,
+    format = Documenter.HTML(assets = ["assets/favicon.ico"],
                              mathengine = mathengine,
-                             #canonical="https://mtk.sciml.ai/stable/"),
+                             canonical="https://docs.sciml.ai/Symbolics/stable/"),
     pages=[
         "Home" => "index.md",
         "getting_started.md",
         "Tutorials" => Any[
             "tutorials/auto_parallel.md",
-            "tutorials/converting_to_C.md"
-        ],
-        "Examples" => Any[
-            "examples/perturbation.md"
+            "tutorials/converting_to_C.md",
+            "tutorials/perturbation.md"
         ],
         "Manual" => Any[
-            "manual/variables.md",
-            "manual/expression_manipulation.md",
-            "manual/derivatives.md",
-            "manual/groebner.md",
-            "manual/arrays.md",
-            "manual/build_function.md",
-            "manual/functions.md",
-            "manual/parsing.md",
-            "manual/io.md",
-            "manual/sparsity_detection.md",
-            "manual/types.md",
-            "manual/faq.md"
+            "Basics" => [
+                "manual/variables.md",
+                "manual/expression_manipulation.md",
+                "manual/faq.md",
+                "manual/external.md",
+                "manual/arrays.md",
+                "manual/build_function.md",
+                "manual/functions.md",
+                "manual/parsing.md",
+                "manual/io.md",
+                "manual/types.md",
+                "manual/metadata.md",
+            ],
+
+            "Algebra" => [
+                "manual/solver.md",
+                "manual/groebner.md",
+                "manual/constraint_satisfaction.md",
+                "manual/partial_fractions.md",
+            ],
+
+            "Calculus" => [
+                "manual/derivatives.md",
+                "manual/integration.md",
+                "manual/ode.md",
+                "manual/taylor.md",
+                "manual/sparsity_detection.md",
+                "manual/limits.md",
+            ],
+
+            "manual/misc.md",
+            "manual/discontinuities.md",
         ],
         "Comparison Against SymPy" => "comparison.md",
     ]

@@ -1,17 +1,22 @@
-function nterms(t)
-    if istree(t)
-        return reduce(+, map(nterms, arguments(t)), init=0)
-    else
-        return 1
+function nterms(t::SymbolicT, cache::Base.IdDict{SymbolicT, Int} = Base.IdDict{SymbolicT, Int}())
+    closure = let t = t, cache = cache
+        function __closure()
+            iscall(t) || return 1
+            return sum(Base.Fix2(nterms, cache), arguments(t))
+        end
     end
+    get!(closure, cache, t)
 end
+nterms(t::Num) = nterms(unwrap(t))
+nterms(t::Num, cache) = nterms(unwrap(t), cache)
 
 # Soft pivoted
-# Note: we call this function with a matrix of Union{SymbolicUtils.Symbolic, Any}
-function sym_lu(A; check=true)
+function sym_lu(A::AbstractMatrix{Num}; check=true)
+    nterms_cache = Base.IdDict{SymbolicT, Int}()
     SINGULAR = typemax(Int)
     m, n = size(A)
-    F = map(x->x isa RCNum ? x : Num(x), A)
+    F = Matrix{Num}(undef, size(A)...)
+    copyto!(F, A)
     minmn = min(m, n)
     p = Vector{LinearAlgebra.BlasInt}(undef, minmn)
     info = 0
@@ -19,7 +24,7 @@ function sym_lu(A; check=true)
         kp = k
         amin = SINGULAR
         for i in k:m
-            absi = _iszero(F[i, k]) ? SINGULAR : nterms(F[i,k])
+            absi = _iszero(F[i, k]) ? SINGULAR : nterms(F[i,k], nterms_cache)
             if absi < amin
                 kp = i
                 amin = absi
@@ -28,7 +33,7 @@ function sym_lu(A; check=true)
 
         p[k] = kp
 
-        if amin == SINGULAR && !(amin isa Symbolic) && (amin isa Number) && iszero(info)
+        if amin == SINGULAR && iszero(info)
             info = k
         end
 
@@ -50,21 +55,24 @@ function sym_lu(A; check=true)
     LU(F, p, convert(LinearAlgebra.BlasInt, info))
 end
 
-# Given a vector of equations and a
-# list of independent variables,
-# return the coefficient matrix `A` and a
-# vector of constants (possibly symbolic) `b` such that
-# A \ b will solve the equations for the vars
-function A_b(eqs::AbstractArray, vars::AbstractArray, check)
-    exprs = rhss(eqs) .- lhss(eqs)
-    if check
-        for ex in exprs
-            @assert isaffine(ex, vars)
-        end
-    end
-    A = jacobian(exprs, vars)
-    b = A * vars - exprs
-    A, b
+"""
+    solve_for(eqs, vars; simplify = false, check = true)
+
+Deprecated. Use [`Symbolics.symbolic_linear_solve`](@ref) instead, which takes the same
+arguments and returns the same result.
+
+`solve_for` was the original name for Symbolics' linear equation solver. It was renamed to
+`symbolic_linear_solve` when [`Symbolics.symbolic_solve`](@ref) was added, so that the two
+solvers have names that say how they differ: `symbolic_solve` handles nonlinear (polynomial)
+systems and returns all roots, while `symbolic_linear_solve` solves a linear system by
+factorization and returns the single solution.
+
+Calling `solve_for` forwards to `symbolic_linear_solve` and emits a deprecation warning. It
+will be removed in the next breaking release.
+"""
+function solve_for(eq::Any, var::Any; simplify=false, check=true)
+    Base.depwarn("solve_for is deprecated, please use symbolic_linear_solve instead.", :solve_for)
+    return symbolic_linear_solve(eq, var; simplify=simplify, check=check)
 end
 
 """
@@ -78,53 +86,69 @@ Currently only works if all equations are linear. `check` if the expr is linear
 w.r.t `vars`.
 
 # Examples
-```julia
+```jldoctest
 julia> @variables x y
 2-element Vector{Num}:
  x
  y
 
-julia> Symbolics.solve_for(x + y ~ 0, x)
+julia> Symbolics.symbolic_linear_solve(x + y ~ 0, x)
 -y
 
-julia> Symbolics.solve_for([x + y ~ 0, x - y ~ 2], [x, y])
-2-element Vector{Float64}:
-  1.0
- -1.0
+julia> all(Symbolics.value.(Symbolics.symbolic_linear_solve([x + y ~ 0, x - y ~ 2], [x, y])) .== [1, -1])
+true
 ```
 """
-function solve_for(eq, var; simplify=false, check=true) # scalar case
+function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar case
     # simplify defaults for `false` as canonicalization should handle most of
     # the cases.
     a, b, islinear = linear_expansion(eq, var)
     check && @assert islinear
     islinear || return nothing
     # a * x + b = 0
-    if eq isa AbstractArray && var isa AbstractArray
-        x = _solve(a, -b, simplify)
-    else
-        x = a \ -b
-    end
+    x = __solve(a, b, simplify)
     simplify || return x
-    if x isa AbstractArray
-        SymbolicUtils.simplify.(simplify_fractions.(x))
-    else
-        SymbolicUtils.simplify(simplify_fractions(x))
+    if x isa SymbolicT
+        return SymbolicUtils.simplify(x)
     end
+    map!(SymbolicUtils.simplify, x, x)
+    return x
 end
-solve_for(eq::Equation, var::T; x...) where {T<:AbstractArray} = solve_for([eq],var, x...)
-solve_for(eq::T, var::Num; x...) where {T<:AbstractArray} = first(solve_for(eq,[var], x...))
 
-function _solve(A::AbstractMatrix, b::AbstractArray, do_simplify)
-    A = Num.(SymbolicUtils.quick_cancel.(A))
-    b = Num.(SymbolicUtils.quick_cancel.(b))
-    sol = value.(sym_lu(A) \ b)
+function __solve(a::AbstractArray{SymbolicT}, b::AbstractArray{SymbolicT}, simplify::Bool)
+    @inbounds for i in eachindex(b)
+        b[i] = -b[i]
+    end
+    return _solve(a, b, simplify)
+end
+function __solve(a::SymbolicT, b::SymbolicT, simplify::Bool)
+    if (a === COMMON_ZERO) || _iszero(a)
+        return SymbolicUtils.Const{VartypeT}(NaN)
+    end
+    return a \ -b
+end
+__solve(a::Num, b::Num, simplify::Bool) = Num(__solve(unwrap(a), unwrap(b), simplify))
+
+symbolic_linear_solve(eq::Equation, var::T; x...) where {T<:AbstractArray} = symbolic_linear_solve([eq], var; x...)
+symbolic_linear_solve(eq::T, var::Num; x...) where {T<:AbstractArray} = first(symbolic_linear_solve(eq, [var]; x...))
+
+
+function _solve(A::AbstractMatrix{SymbolicT}, b, do_simplify)
+    _solve(Num.(A), b, do_simplify)
+end
+function _solve(A::AbstractMatrix{Num}, b::Union{AbstractArray{Num}, AbstractArray{SymbolicT}}, do_simplify)
+    for i in eachindex(A)
+        A[i] = SymbolicUtils.quick_cancel(A[i])
+    end
+    for i in eachindex(b)
+        b[i] = SymbolicUtils.quick_cancel(b[i])
+    end
+    sol = sym_lu(A) \ b
     do_simplify ? SymbolicUtils.simplify_fractions.(sol) : sol
 end
 
-LinearAlgebra.ldiv!(A::UpperTriangular{<:Union{Symbolic,RCNum}}, b::AbstractVector{<:Union{Symbolic,RCNum}}, x::AbstractVector{<:Union{Symbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
-    LinearAlgebra.require_one_based_indexing(A, b, x)
+    Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
@@ -142,9 +166,8 @@ function symsub!(A::UpperTriangular, b::AbstractVector, x::AbstractVector = b)
     x
 end
 
-LinearAlgebra.ldiv!(A::UnitLowerTriangular{<:Union{Symbolic,RCNum}}, b::AbstractVector{<:Union{Symbolic,RCNum}}, x::AbstractVector{<:Union{Symbolic,RCNum}} = b) = symsub!(A, b, x)
 function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = b)
-    LinearAlgebra.require_one_based_indexing(A, b, x)
+    Base.require_one_based_indexing(A, b, x)
     n = size(A, 2)
     if !(n == length(b) == length(x))
         throw(DimensionMismatch("second dimension of left hand side A, $n, length of output x, $(length(x)), and length of right hand side b, $(length(b)), must be equal"))
@@ -161,7 +184,20 @@ function symsub!(A::UnitLowerTriangular, b::AbstractVector, x::AbstractVector = 
     x
 end
 
-minor(B, j) = @view B[2:end, 1:size(B,2) .!= j]
+const _SymEltype = Union{BasicSymbolic, RCNum}
+# The two-argument methods mirror LinearAlgebra's own signatures so that its strided and
+# sparse `ldiv!` methods do not take precedence over the symbolic substitution.
+for T in (UpperTriangular, UnitLowerTriangular)
+    @eval begin
+        LinearAlgebra.ldiv!(A::$T{<:_SymEltype}, b::StridedVector{<:_SymEltype}) = symsub!(A, b, b)
+        LinearAlgebra.ldiv!(A::$T{<:_SymEltype}, b::AbstractVector{<:_SymEltype}, x::AbstractVector{<:_SymEltype}) = symsub!(A, b, x)
+    end
+    for S in (:(StridedMatrix{E}), :(Adjoint{E, <:StridedMatrix{E}}), :(Transpose{E, <:StridedMatrix{E}}))
+        @eval LinearAlgebra.ldiv!(A::$T{E, <:$S}, b::SparseVector{<:_SymEltype}) where {E <: _SymEltype} = symsub!(A, b, b)
+    end
+end
+
+minor(B, j) = @view B[2:end, 1:size(B, 2) .!= j]
 minor(B, i, j) = @view B[1:size(B,1) .!= i, 1:size(B,2) .!= j]
 function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
     if laplace
@@ -182,8 +218,8 @@ function LinearAlgebra.det(A::AbstractMatrix{<:RCNum}; laplace=true)
     end
 end
 
-LinearAlgebra.inv(A::AbstractMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
-LinearAlgebra.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::AbstractMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
+Base.inv(A::StridedMatrix{<:RCNum}; laplace=true) = _invl(A; laplace=laplace)
 
 function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
     if laplace
@@ -208,116 +244,328 @@ function _invl(A::AbstractMatrix{<:RCNum}; laplace=true)
     end
 end
 
-function LinearAlgebra.norm(x::AbstractArray{<:RCNum}, p::Real=2)
-    p = value(p)
-    issym = p isa Symbolic
-    if !issym && p == 2
-        sqrt(sum(x->abs2(x), x))
-    elseif !issym && isone(p)
-        sum(abs, x)
-    elseif !issym && isinf(p)
-        mapreduce(abs, max, x)
-    else
-        sum(x->abs(x)^p, x)^inv(p)
-    end
-end
-
 """
     (a, b, islinear) = linear_expansion(t, x)
 
-When `islinear`, return `a` and `b` such that `a * x + b == t`.
+When `islinear`, return `a` and `b` such that `a * x + b == t`. Instead of calling
+`linear_expansion` multiple times with the same `x`, prefer using
+[`Symbolics.LinearExpander`](@ref).
 """
-function linear_expansion(t, x)
-    a, b, islinear = _linear_expansion(t, x)
-    x isa Num ? (wrap(a), wrap(b), islinear) : (a, b, islinear)
+function linear_expansion(t, x::Num)
+    a, b, islin = linear_expansion(t, unwrap(x))
+    Num(a), Num(b), islin
 end
-function linear_expansion(ts::AbstractArray, xs::AbstractArray)
-    A = Matrix{Num}(undef, length(ts), length(xs))
-    bvec = Vector{Num}(undef, length(ts))
-    islinear = true
-    for (i, t) in enumerate(ts)
-        b = t isa Equation ? t.rhs - t.lhs : t
-        for (j, x) in enumerate(xs)
-            a, b, islinear = _linear_expansion(b, x)
-            islinear &= islinear
-            islinear || @goto FINISH
-            A[i, j] = a
+
+@inline function linear_expansion(t, x::SymbolicT)
+    return LinearExpander(x)(unwrap(t))
+end
+
+function linear_expansion(ts::AbstractArray{T}, xs::AbstractArray{S}) where {T <: Union{Num, SymbolicT, Equation}, S <: Union{SymbolicT, Num}}
+    ts = vec(ts)
+    xs = vec(xs)
+    A = Matrix{SymbolicT}(undef, length(ts), length(xs))
+    bvec = Vector{SymbolicT}(undef, length(ts))
+    map!(bvec, ts) do t
+        if t isa Equation
+            return t.rhs - t.lhs
+        elseif t isa Num
+            return unwrap(t)
+        else
+            return t
         end
-        bvec[i] = b
     end
-    @label FINISH
-    return A, bvec, islinear
+    for (j, x) in enumerate(xs)
+        lex = LinearExpander(unwrap(x))
+        for (i, t) in enumerate(bvec)
+            a, resid, islin = lex(t)
+            islin || return A, bvec, false
+            A[i, j] = a
+            bvec[i] = resid
+        end
+    end
+    return A, bvec, true
 end
-# _linear_expansion always returns `Symbolic`
-function _linear_expansion(t::Equation, x)
-    a₂, b₂, islinear = linear_expansion(t.rhs, x)
-    islinear || return (a₂, b₂, false)
-    a₁, b₁, islinear = linear_expansion(t.lhs, x)
+@inline trivial_linear_expansion(t, x) = isequal(t, x) ? (COMMON_ONE, COMMON_ZERO, true) : (COMMON_ZERO, t, true)
+
+is_expansion_leaf(t) = !iscall(t) || (operation(t) isa Operator)
+@noinline throw_bad_expansion() = error("The operation is an Operator. This should never happen.")
+
+const LinearExpansionResultT = Tuple{SymbolicT, SymbolicT, Bool}
+"""
+    $TYPEDEF
+
+A functor which acts as the workhorse for [`Symbolics.linear_expansion`](@ref). The operation
+`linear_expansion(t::Symbolics.SymbolicT, x::Symbolics.SymbolicT)` can equivalently be
+phrased as `LinearExpander(x)(t)`. This functor caches data during processing, and thus
+several `linear_expansion` calls with the same `x` can be rephrased as multiple calls to
+`LinearExpansion(x)`. This can help avoid repeated computation and allocations.
+"""
+struct LinearExpander
+    x::SymbolicT
+    arr::Union{SymbolicT, Nothing}
+    occursin_cache::Dict{SymbolicT, Bool}
+    result_cache::Dict{SymbolicT, LinearExpansionResultT}
+    strict::Bool
+end
+
+"""
+    $TYPEDSIGNATURES
+
+Create a `LinearExpander`. If `strict == true`, `ex` occurring in the condition of `ifelse`
+will not be considered linear.
+"""
+function LinearExpander(ex::SymbolicT; strict = false)
+    @match ex begin
+        BSImpl.Term(; f, args) && if f === getindex end => begin
+            LinearExpander(ex, args[1], Dict{SymbolicT, Bool}(ex => true, args[1] => true), Dict{SymbolicT, LinearExpansionResultT}(), strict)
+        end
+        _ => LinearExpander(ex, nothing, Dict{SymbolicT, Bool}(ex => true), Dict{SymbolicT, LinearExpansionResultT}(), strict)
+    end
+end
+LinearExpander(ex::Num; kw...) = LinearExpander(unwrap(ex); kw...)
+
+@inline function _linear_expansion_predicate(lex::LinearExpander, t::SymbolicT)
+    (; x, arr) = lex
+    isequal(t, x) && return true
+    arr isa SymbolicT && isequal(t, arr) && return true
+end
+
+function _linear_expansion_occursin(lex::LinearExpander, t::SymbolicT)
+    (; x, arr, occursin_cache) = lex
+    cached = get(occursin_cache, t, nothing)
+    if cached isa Bool
+        return cached
+    end
+    _linear_expansion_predicate(lex, t) && return true
+    iscall(t) || return false
+    return occursin_cache[t] = any(Base.Fix1(_linear_expansion_occursin, lex), arguments(t))
+end
+
+function _linear_expansion_recurse(lex::LinearExpander, t::SymbolicT)
+    result = get(lex.result_cache, t, nothing)
+    if result isa LinearExpansionResultT
+        return result
+    end
+    result = lex(t)
+    lex.result_cache[t] = result
+    return result
+end
+
+# _linear_expansion always returns `SymbolicT`
+(lex::LinearExpander)(t) = (COMMON_ZERO, SConst(t), true)
+
+function (lex::LinearExpander)(t::Equation)
+    a₂, b₂, islinear = lex(t.rhs)
+    islinear || return (COMMON_ZERO, COMMON_ZERO, false)
+    a₁, b₁, islinear = lex(t.lhs)
     # t.rhs - t.lhs = 0
     return (a₂ - a₁, b₂ - b₁, islinear)
 end
-trivial_linear_expansion(t, x) = isequal(t, x) ? (1, 0, true) : (0, t, true)
 
-is_expansion_leaf(t) = !istree(t) || (operation(t) isa Differential)
-@noinline expansion_check(op) = op isa Differential && error("The operation is a Differential. This should never happen.")
-function _linear_expansion(t, x)
-    t = value(t)
-    t isa Symbolic || return (0, t, true)
-    x = value(x)
+(lex::LinearExpander)(t::Num) = lex(unwrap(t))
+
+const SUPPORTS_LINEAR_EXPANDER_NEED_REMAINDER = true
+
+function (lex::LinearExpander)(t::SymbolicT; need_remainder::Bool = true)
+    (; x) = lex
     is_expansion_leaf(t) && return trivial_linear_expansion(t, x)
-    isequal(t, x) && return (1, 0, true)
+    isequal(t, x) && return (COMMON_ONE, COMMON_ZERO, true)
+    _linear_expansion_occursin(lex, t) || return (COMMON_ZERO, t, true)
 
-    op, args = operation(t), arguments(t)
-    expansion_check(op)
+    @match t begin
+        BSImpl.Term(; f) && if f isa Operator end => throw_bad_expansion()
+        BSImpl.AddMul(; coeff, dict, variant, type, shape) => begin
+            if variant === SymbolicUtils.AddMulVariant.ADD
+                # `t = coeff + Σ v*k` with each `k = a_k*x + b_k`. Addends free of
+                # `x` have `a_k == 0` and `b_k === k`, so keep them in the original
+                # dict and only splice in the ones that change, instead of re-summing
+                # (re-hashconsing) every addend.
+                a_buffer = SArgsT()
+                b_newdict = dict
+                b_extras = SArgsT()
+                b_dirty = false
+                for (k, v) in dict
+                    a, b, islin = _linear_expansion_recurse(lex, k)
+                    islin || return (COMMON_ZERO, COMMON_ZERO, false)
+                    if _iszero(a) && isequal(b, k)
+                        continue
+                    end
+                    _iszero(a) || push!(a_buffer, a * v)
+                    # When the caller doesn't need the remainder skip rebuilding it:
+                    need_remainder || continue
+                    if !b_dirty
+                        b_newdict = copy(dict)
+                        b_dirty = true
+                    end
+                    delete!(b_newdict, k)
+                    _iszero(b) || push!(b_extras, b * v)
+                end
+                a = isempty(a_buffer) ? COMMON_ZERO : SymbolicUtils.add_worker(VartypeT, a_buffer)
+                need_remainder || return (a, COMMON_ZERO, true)
+                if !b_dirty
+                    return a, t, true
+                end
+                b = SymbolicUtils.Add{VartypeT}(coeff, b_newdict; type, shape)
+                if !isempty(b_extras)
+                    push!(b_extras, b)
+                    b = SymbolicUtils.add_worker(VartypeT, b_extras)
+                end
+                return a, b, true
+            else
+                a = COMMON_ZERO
+                b = COMMON_ZERO
+                k = COMMON_ZERO
+                newdict = dict
+                dirty = false
+                extras = SArgsT()
+                for (_k, _v) in dict
+                    _a, _b, islin = _linear_expansion_recurse(lex, _k)
+                    islin || return (COMMON_ZERO, COMMON_ZERO, false)
+                    _a_zero = _iszero(_a)
+                    if _a_zero
+                        isequal(_b, _k) && continue
+                        if !dirty
+                            newdict = copy(dict)
+                            dirty = true
+                        end
+                        delete!(newdict, _k)
+                        if SymbolicUtils.ismul(_b)
+                            push!(extras, _b ^ _v)
+                        else
+                            newdict[_b] = _v
+                        end
+                        continue
+                    end
+                    _a_zero && continue
+                    a === COMMON_ZERO || return (COMMON_ZERO, COMMON_ZERO, false)
+                    _isone(_v) || return (COMMON_ZERO, COMMON_ZERO, false)
+                    a = _a
+                    b = _b
+                    k = _k
+                end
+                if a === COMMON_ZERO
+                    dirty || return (COMMON_ZERO, t, true)
+                    b = SymbolicUtils.Mul{VartypeT}(coeff, newdict; type, shape)
+                    if !isempty(extras)
+                        push!(extras, b)
+                        b = SymbolicUtils.mul_worker(VartypeT, extras)
+                    end
+                    return (COMMON_ZERO, b, true)
+                end
+                if !dirty
+                    newdict = copy(dict)
+                end
+                delete!(newdict, k)
+                tmp = SymbolicUtils.Mul{VartypeT}(coeff, newdict; type, shape)
+                if !isempty(extras)
+                    push!(extras, tmp)
+                    tmp = SymbolicUtils.mul_worker(VartypeT, extras)
+                end
+                return (a * tmp, b * tmp, true)
+            end
+        end
+        BSImpl.Term(; f, args) => begin
+            if f === (-)
+                @assert length(args) == 1
+                a, b, islin = _linear_expansion_recurse(lex, args[1])
+                islin || return (COMMON_ZERO, COMMON_ZERO, false)
+                return -a, -b, islin
+            elseif f === (^)
+                # If we are here, then both the base and exponent are non-trivial yet the
+                # expression contains `x`. Thus `t` cannot be linear in `x`
+                return (COMMON_ZERO, COMMON_ZERO, false)
+            elseif f === getindex
+                # This is a `getindex` expression that somehow contains `x`. It is not
+                # identical to `x`, otherwise we would have exited earlier.
+                #
+                # Case 1: `x` is an indexed array and `t` is another element of the same
+                # array
+                arrt = args[1]
+                @match x begin
+                    BSImpl.Term(; f = fx, args = argsx) && if fx === getindex end => begin
+                        isequal(arrt, argsx[1]) && return (COMMON_ZERO, t, true)
+                    end
+                    _ => nothing
+                end
 
-    if op === (+)
-        a₁ = b₁ = 0
-        islinear = true
-        # (a₁ x + b₁) + (a₂ x + b₂) = (a₁ + a₂) x + (b₁ + b₂)
-        for (i, arg) in enumerate(args)
-            a₂, b₂, islinear = linear_expansion(arg, x)
-            islinear || return (a₁, b₁, false)
-            a₁ += a₂
-            b₁ += b₂
+                indexed_t = scalarize(t)
+                # when indexing a registered function/callable symbolic
+                # scalarizing and indexing leads to the same symbolic variable
+                # which causes a StackOverflowError without this
+                isequal(t, indexed_t) && return (COMMON_ZERO, COMMON_ZERO, false)
+                return _linear_expansion_recurse(lex, indexed_t)
+            elseif f === ifelse
+                cond, iftrue, iffalse = args
+                if lex.strict && _linear_expansion_occursin(lex, cond)
+                    return (COMMON_ZERO, COMMON_ZERO, false)
+                end
+                truea, trueb, istruelinear = _linear_expansion_recurse(lex, iftrue)
+                istruelinear || return (COMMON_ZERO, t, false)
+                falsea, falseb, isfalselinear = _linear_expansion_recurse(lex, iffalse)
+                isfalselinear || return (COMMON_ZERO, t, false)
+                a = isequal(truea, falsea) ? truea : ifelse(cond, truea, falsea)
+                b = isequal(trueb, falseb) ? trueb : ifelse(cond, trueb, falseb)
+                return (a, b, true)
+            elseif f === LinearAlgebra.dot
+                a, b = args
+                sh = SymbolicUtils.shape(a)
+                if !SymbolicUtils.is_array_shape(sh)
+                    return _linear_expansion_recurse(lex, a * b)
+                end
+                if sh isa SymbolicUtils.Unknown
+                    return (COMMON_ZERO, t, false)
+                end
+                sh = sh::SymbolicUtils.ShapeVecT
+                add_buffer = SymbolicUtils.ArgsT{VartypeT}()
+                sizehint!(add_buffer, length(a))
+                for i in SymbolicUtils.stable_eachindex(a)
+                    push!(add_buffer, LinearAlgebra.dot(a[i], b[i]))
+                end
+                res = SymbolicUtils.add_worker(VartypeT, add_buffer)
+                return _linear_expansion_recurse(lex, res)
+            else
+                newargs = args
+                dirty = false
+                for (i, arg) in enumerate(args)
+                    _linear_expansion_predicate(lex, arg) && return (COMMON_ZERO, COMMON_ZERO, false)
+                    a, b, islin = _linear_expansion_recurse(lex, arg)
+                    (_iszero(a) && islin) || return (COMMON_ZERO, COMMON_ZERO, false)
+                    # Keep rewritten arguments so the opaque call remainder is x-free.
+                    if need_remainder && !isequal(b, arg)
+                        if !dirty
+                            newargs = copy(args)
+                            dirty = true
+                        end
+                        newargs[i] = b
+                    end
+                end
+                if dirty
+                    t = BSImpl.Term{VartypeT}(
+                        f, newargs; metadata = metadata(t), type = symtype(t), shape = shape(t))
+                end
+                return (COMMON_ZERO, t, true)
+            end
         end
-        return (a₁, b₁, true)
-    elseif op === (-)
-        @assert length(args) == 1
-        a, b, islinear = linear_expansion(args[1], x)
-        return (-a, -b, islinear)
-    elseif op === (*)
-        # (a₁ x + b₁) (a₂ x + b₂) = a₁ a₂ x² + (a₁ b₂ + a₂ b₁) x + b₁ b₂
-        a₁ = 0
-        b₁ = 1
-        islinear = true
-        for (i, arg) in enumerate(args)
-            a₂, b₂, islinear = linear_expansion(arg, x)
-            (islinear && _iszero(a₁ * a₂)) || return (a₁, b₁, false)
-            a₁ = a₁ * b₂ + a₂ * b₁
-            b₁ *= b₂
+        BSImpl.Div(; num, den, type, shape) => begin
+            if _linear_expansion_occursin(lex, den)
+                return (COMMON_ZERO, COMMON_ZERO, false)
+            end
+            a, b, islin = _linear_expansion_recurse(lex, num)
+            islin || return (COMMON_ZERO, COMMON_ZERO, false)
+            a = SymbolicUtils.Div{VartypeT}(a, den, false; type, shape)
+            b = SymbolicUtils.Div{VartypeT}(b, den, false; type, shape)
+            return a, b, true
         end
-        return (a₁, b₁, true)
-    elseif op === (^)
-        # (a₁ x + b₁)^(a₂ x + b₂) is linear => a₂ = 0 && (b₂ == 1 || a₁ == 0)
-        a₂, b₂, islinear = linear_expansion(args[2], x)
-        (islinear && _iszero(a₂)) || return (0, 0, false)
-        a₁, b₁, islinear = linear_expansion(args[1], x)
-        _isone(b₂) && return (a₁, b₁, islinear)
-        (islinear && _iszero(a₁)) || return (0, 0, false)
-        return (0, b₁^b₂, islinear)
-    elseif op === (/)
-        # (a₁ x + b₁)/(a₂ x + b₂) is linear => a₂ = 0
-        a₂, b₂, islinear = linear_expansion(args[2], x)
-        (islinear && _iszero(a₂)) || return (0, 0, false)
-        a₁, b₁, islinear = linear_expansion(args[1], x)
-        # (a₁ x + b₁)/b₂
-        return islinear ? (a₁ / b₂, b₁ / b₂, islinear) : (0, 0, false)
-    else
-        for (i, arg) in enumerate(args)
-            a, b, islinear = linear_expansion(arg, x)
-            (_iszero(a) && islinear) || return (0, 0, false)
+        BSImpl.ArrayOp(; output_idx) => begin
+            if isempty(output_idx)
+                # is scalar
+                scal = SymbolicUtils.scalarize(t, Val{true}())::SymbolicT
+                return _linear_expansion_recurse(lex, scal)
+            else
+                # TODO: call `_linear_expansion(t.expr, x)` and parse the result
+                return COMMON_ZERO, COMMON_ZERO, false
+            end
         end
-        return (0, t, true)
     end
 end
 
@@ -326,7 +574,6 @@ end
 ###
 
 # Pretty much just copy-pasted from stdlib
-SparseArrays.SparseMatrixCSC{Tv,Ti}(M::StridedMatrix) where {Tv<:RCNum,Ti} = _sparse(Tv,  Ti, M)
 function _sparse(::Type{Tv}, ::Type{Ti}, M) where {Tv, Ti}
     nz = count(!_iszero, M)
     colptr = zeros(Ti, size(M, 2) + 1)
