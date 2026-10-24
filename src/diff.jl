@@ -114,8 +114,6 @@ Base.:(==)(a::NormalDerivative, b::NormalDerivative) = isequal(a, b)
 Base.isequal(a::NormalDerivative, b::NormalDerivative) = isequal(a.piece, b.piece)
 Base.hash(a::NormalDerivative, h::UInt) = hash(a.piece, hash(NormalDerivative, h))
 
-(::SymbolicUtils.Substituter)(x::NormalDerivative) = x
-
 function Base.show(io::IO, Dn::NormalDerivative)
     label = hasproperty(Dn.piece, :name) ? Dn.piece.name : Dn.piece
     return print(io, "Dn_", label)
@@ -676,6 +674,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 base, exp = args
                 prod_args = (exp, (base ^ Const{VartypeT}(exp - 1))::BasicSymbolic{VartypeT}, executediff(D, base; simplify, throw_no_derivative))
                 return SymbolicUtils.mul_worker(VartypeT, prod_args)
+            elseif f isa NormalDerivative # not constant in D.x, so stay unevaluated rather than 0
+                return D(arg)
             elseif f isa SymbolicUtils.Operator # operator applications return a new variable
                 return differential_zero(arg)
             else

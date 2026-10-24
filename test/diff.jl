@@ -964,6 +964,10 @@ end
         @test isequal(expand_derivatives(ex), ex)
         ex2 = 2 * Dn(u(t, Γ)) + u(t, Γ)
         @test isequal(expand_derivatives(ex2), ex2)
+        # a normal derivative is not constant: derivatives of it stay unevaluated, never 0
+        Dt = Differential(t)
+        @test isequal(expand_derivatives(Dt(ex)), Dt(ex))
+        @test isequal(expand_derivatives(Dt(2 * ex)), 2 * Dt(ex))
     end
 
     @testset "mismatched pieces are not an error here" begin
@@ -983,6 +987,10 @@ end
         dd = Dt(u(t, x))
         @test isequal(substitute(dd, u(t, x) => v(t, x)), dd)
         @test isequal(Symbolics.substitute_in_deriv(dd, u(t, x) => v(t, x)), Dt(v(t, x)))
+        # explicit rules for the operator itself are honored
+        Dn_other = NormalDerivative(TestPiece(:other))
+        @test isequal(substitute(Dn, Dict(Dn => Dn_other)), Dn_other)
+        @test isequal(Symbolics.substitute_in_deriv(Dn(u(t, Γ)), Dict(Dn => Dn_other)), Dn_other(u(t, Γ)))
         # nested operators
         nested = Dt(Dn(u(t, Γ)))
         @test isequal(substitute(nested, rule), nested)
