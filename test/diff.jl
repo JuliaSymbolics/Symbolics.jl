@@ -977,4 +977,11 @@ let
     @variables c[1:3]
     @test_throws DimensionMismatch LinearAlgebra.cross(Nabla([c[1], c[2]]), Nabla(c))
     @test_throws DimensionMismatch LinearAlgebra.cross(Nabla(c), Nabla([c[1], c[2]]))
+    f = a^2 + b^2
+    grad = Nabla([a, b])(f)
+    @test grad isa Vector{Num}
+    @test isequal(expand_derivatives.(grad), [2a, 2b])
+    lap = Laplacian([a, b])(f)
+    @test lap isa Num
+    @test isequal(expand_derivatives(lap), 4)
 end
