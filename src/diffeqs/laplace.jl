@@ -43,18 +43,23 @@ function transform_rules(f, t, F, s; trig_reduce=false)
     # parameter slots (~a, ~b, ~c) must be free of t, otherwise the associative-commutative
     # matcher can bind them to t-containing factors (e.g. sin(cos(t)*t)), leaking t into s.
     is_c = Base.Fix2(is_free_of, t)
+    # segment-slot guard: every factor of a coefficient-of-t must be free of t. A segment slot
+    # (~~a) absorbs *all* the non-t factors of a flat product (e.g. 2*a*t -> ~~a = [2, a]),
+    # so the coefficient is prod(~~a). This generalizes the single-factor ~a*t rules to
+    # coefficients with any number of factors (sin(2a*t), exp(-a*t), sin(a*b*t), ...).
+    all_c = xs -> all(is_c, xs)
     return Symbolics.Chain([
     @rule 1 => 1/s
     @rule exp(t) => 1/(s - 1)
-    @rule exp((~a::is_c) * t) => 1/(-~a + s)
+    @rule exp((~~a::all_c) * t) => 1/(-prod(~~a) + s)
     @rule t => 1/s^2
     @rule t^(~n::_is_nonneg_int) => factorial(~n)/s^(~n + 1)
     @rule sqrt(t) => term(sqrt, pi)/(2 * s^(3/2))
     @rule t^(~n::_is_frac_power) => term(gamma, ~n + 1)/s^(~n + 1)
     @rule sin(t) => 1/(1 + s^2)
-    @rule sin((~a::is_c) * t) => ~a/((~a)^2 + s^2)
+    @rule sin((~~a::all_c) * t) => (c = prod(~~a); c/(c^2 + s^2))
     @rule cos(t) => s/(1 + s^2)
-    @rule cos((~a::is_c) * t) => s/((~a)^2 + s^2)
+    @rule cos((~~a::all_c) * t) => (c = prod(~~a); s/(c^2 + s^2))
     @rule t*sin(t) => 2s/(1 + s^2)^2
     @rule t*sin((~a::is_c) * t) => 2*~a*s / ((~a)^2 + s^2)^2
     @rule t*cos(t) => (s^2 - 1) / (1 + s^2)^2
@@ -67,8 +72,8 @@ function transform_rules(f, t, F, s; trig_reduce=false)
     @rule cos((~a::is_c)*t) + (~a::is_c)*t*sin((~a::is_c)*t) => s*(s^2 + 3*(~a)^2) / ((~a)^2 + s^2)^2
     @rule sin((~b::is_c) + (~a::is_c)*t) => (s*sin(~b) + ~a*cos(~b)) / ((~a)^2 + s^2)
     @rule cos((~b::is_c) + (~a::is_c)*t) => (s*cos(~b) - ~a*sin(~b)) / ((~a)^2 + s^2)
-    @rule sinh((~a::is_c) * t) => ~a/(-(~a)^2 + s^2)
-    @rule cosh((~a::is_c) * t) => s/(-(~a)^2 + s^2)
+    @rule sinh((~~a::all_c) * t) => (c = prod(~~a); c/(-c^2 + s^2))
+    @rule cosh((~~a::all_c) * t) => (c = prod(~~a); s/(-c^2 + s^2))
     @rule exp((~a::is_c)*t) * sin((~b::is_c) * t) => ~b / ((~b)^2 + (-~a+s)^2)
     @rule exp((~a::is_c)*t) * cos((~b::is_c) * t) => (-~a+s) / ((~b)^2 + (-~a+s)^2)
     @rule exp((~a::is_c)*t) * sinh((~b::is_c) * t) => ~b / (-(~b)^2 + (-~a+s)^2)
@@ -77,8 +82,10 @@ function transform_rules(f, t, F, s; trig_reduce=false)
     @rule t*exp((~a::is_c) * t) => 1 / (-~a + s)^(2)
     @rule t^(~n::_is_nonneg_int) * exp(t) => factorial(~n) / (s - 1)^(~n + 1)
     @rule t*exp(t) => 1 / (s - 1)^(2)
-    @rule exp((~!c::is_c)*t) * ~g => laplace(~g, f, t, F, s - ~c; trig_reduce=trig_reduce) # s-shift rule
-    @rule exp((~!c::is_c)*t) / ~g => laplace(1/~g, f, t, F, s - ~c; trig_reduce=trig_reduce) # s-shift rule, negative powers are stored as quotients
+    @rule exp((~~c::all_c)*t) * ~g => laplace(~g, f, t, F, s - prod(~~c); trig_reduce=trig_reduce) # s-shift rule (coefficient has >= 1 factor)
+    @rule exp(t) * ~g => laplace(~g, f, t, F, s - 1; trig_reduce=trig_reduce) # s-shift rule, coefficient-free exp(t)
+    @rule exp((~~c::all_c)*t) / ~g => laplace(1/~g, f, t, F, s - prod(~~c); trig_reduce=trig_reduce) # s-shift rule, negative powers are stored as quotients
+    @rule exp(t) / ~g => laplace(1/~g, f, t, F, s - 1; trig_reduce=trig_reduce) # s-shift rule, coefficient-free exp(t)
     @rule f(t)*t => -Differential(s)(F(s)) # s-derivative rule
     @rule f(t)*t^(~n::_is_nonneg_int) => (-1)^(~n) * (Differential(s)^~n)(F(s)) # s-derivative rule
     @rule f((~a::is_c) + t) => exp(~a*s)*F(s) # t-shift rule

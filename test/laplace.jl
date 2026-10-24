@@ -57,6 +57,16 @@ import Nemo, Groebner
 @test isequal(laplace(a*cos(omega*t), f, t, F, s), a*s/(omega^2 + s^2))
 @test isequal(laplace(a*t^2, f, t, F, s), 2a/s^3)
 @test isequal(laplace(sin(omega*t), f, t, F, s), omega/(omega^2 + s^2))
+# multi-factor coefficients of t (e.g. 2a*t is stored flat as *(2, a, t)); the coefficient
+# is any number of t-free factors and must still be matched (values verified against SymPy)
+@test isequal(laplace(sin(2a*t), f, t, F, s), 2a/(4a^2 + s^2))
+@test isequal(laplace(cos(2a*t), f, t, F, s), s/(4a^2 + s^2))
+@test isequal(laplace(sin(a*b*t), f, t, F, s), a*b/(a^2*b^2 + s^2))
+@test isequal(laplace(exp(2a*t), f, t, F, s), 1/(s - 2a))
+@test isequal(laplace(exp(-a*t), f, t, F, s), 1/(s + a))
+@test isequal(laplace(sinh(2a*t), f, t, F, s), 2a/(s^2 - 4a^2))
+@test isequal(laplace(exp(-a*t)*cos(b*t), f, t, F, s), (s + a)/((s + a)^2 + b^2))
+@test isequal(laplace(exp(2a*t)*sin(b*t), f, t, F, s), b/((s - 2a)^2 + b^2))
 
 # opt-in trig_reduce for products and powers of trig/hyperbolic functions (values verified against SymPy)
 @test isequal(laplace(2cos(t)*sin(t), f, t, F, s; trig_reduce=true), 2/(s^2 + 4))
