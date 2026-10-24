@@ -38,32 +38,36 @@ function is_free_of(@nospecialize(expr), @nospecialize(var))::Bool
     return true
 end
 
+# coefficient of `var` in a homogeneous-linear multiple of `var`, i.e. simplified `expr/var`
+_coef_of_t(expr, var) = simplify(unwrap(expr) / unwrap(var))
+
 # from https://tutorial.math.lamar.edu/Classes/DE/Laplace_Table.aspx
 function transform_rules(f, t, F, s; trig_reduce=false)
     # parameter slots (~a, ~b, ~c) must be free of t, otherwise the associative-commutative
     # matcher can bind them to t-containing factors (e.g. sin(cos(t)*t)), leaking t into s.
     is_c = Base.Fix2(is_free_of, t)
-    # segment-slot guard: every factor of a coefficient-of-t must be free of t. A segment slot
-    # (~~a) absorbs *all* the non-t factors of a flat product (e.g. 2*a*t -> ~~a = [2, a]),
-    # so the coefficient is prod(~~a). This generalizes the single-factor ~a*t rules to
-    # coefficients with any number of factors (sin(2a*t), exp(-a*t), sin(a*b*t), ...).
+    # `lin_t` matches a primitive argument that is a nonzero linear multiple of t (arg/t free
+    # of t), so sin/cos/exp handle a product (2a*t), a sum (a*t + b*t), or a bare t uniformly;
+    # `coef` is that multiple. A t-leak like cos(t)*t is rejected since (cos(t)*t)/t = cos(t).
+    lin_t = x -> (!is_c(x) && is_c(_coef_of_t(x, t)))
+    coef = x -> _coef_of_t(x, t)
     all_c = xs -> all(is_c, xs)
     return Symbolics.Chain([
     @rule 1 => 1/s
-    @rule exp(t) => 1/(s - 1)
-    @rule exp((~~a::all_c) * t) => 1/(-prod(~~a) + s)
     @rule t => 1/s^2
     @rule t^(~n::_is_nonneg_int) => factorial(~n)/s^(~n + 1)
     @rule sqrt(t) => term(sqrt, pi)/(2 * s^(3/2))
     @rule t^(~n::_is_frac_power) => term(gamma, ~n + 1)/s^(~n + 1)
-    @rule sin(t) => 1/(1 + s^2)
-    @rule sin((~~a::all_c) * t) => (c = prod(~~a); c/(c^2 + s^2))
-    @rule cos(t) => s/(1 + s^2)
-    @rule cos((~~a::all_c) * t) => (c = prod(~~a); s/(c^2 + s^2))
+    @rule exp(~x::lin_t) => (c = coef(~x); 1/(-c + s))
+    @rule (exp(~u))^(~n::_is_nonneg_int) => laplace(exp(~n * ~u), f, t, F, s; trig_reduce=trig_reduce) # exp(u)^n = exp(n*u)
+    @rule sin(~x::lin_t) => (c = coef(~x); c/(c^2 + s^2))
+    @rule cos(~x::lin_t) => (c = coef(~x); s/(c^2 + s^2))
+    @rule sinh(~x::lin_t) => (c = coef(~x); c/(-c^2 + s^2))
+    @rule cosh(~x::lin_t) => (c = coef(~x); s/(-c^2 + s^2))
     @rule t*sin(t) => 2s/(1 + s^2)^2
-    @rule t*sin((~a::is_c) * t) => 2*~a*s / ((~a)^2 + s^2)^2
+    @rule t*sin(~x::lin_t) => (c = coef(~x); 2*c*s / (c^2 + s^2)^2)
     @rule t*cos(t) => (s^2 - 1) / (1 + s^2)^2
-    @rule t*cos((~a::is_c) * t) => (-(~a)^2 + s^2) / ((~a)^2 + s^2)^2
+    @rule t*cos(~x::lin_t) => (c = coef(~x); (-c^2 + s^2) / (c^2 + s^2)^2)
     @rule sin(t) - t*cos(t) => 2 / (1 + s^2)^2
     @rule sin((~a::is_c)*t) - (~a::is_c)*t*cos((~a::is_c)*t) => 2*(~a)^3 / ((~a)^2 + s^2)^2
     @rule sin(t) + t*cos(t) => 2s^2 / (1 + s^2)^2
@@ -72,8 +76,6 @@ function transform_rules(f, t, F, s; trig_reduce=false)
     @rule cos((~a::is_c)*t) + (~a::is_c)*t*sin((~a::is_c)*t) => s*(s^2 + 3*(~a)^2) / ((~a)^2 + s^2)^2
     @rule sin((~b::is_c) + (~a::is_c)*t) => (s*sin(~b) + ~a*cos(~b)) / ((~a)^2 + s^2)
     @rule cos((~b::is_c) + (~a::is_c)*t) => (s*cos(~b) - ~a*sin(~b)) / ((~a)^2 + s^2)
-    @rule sinh((~~a::all_c) * t) => (c = prod(~~a); c/(-c^2 + s^2))
-    @rule cosh((~~a::all_c) * t) => (c = prod(~~a); s/(-c^2 + s^2))
     @rule exp((~a::is_c)*t) * sin((~b::is_c) * t) => ~b / ((~b)^2 + (-~a+s)^2)
     @rule exp((~a::is_c)*t) * cos((~b::is_c) * t) => (-~a+s) / ((~b)^2 + (-~a+s)^2)
     @rule exp((~a::is_c)*t) * sinh((~b::is_c) * t) => ~b / (-(~b)^2 + (-~a+s)^2)
@@ -86,8 +88,16 @@ function transform_rules(f, t, F, s; trig_reduce=false)
     @rule exp(t) * ~g => laplace(~g, f, t, F, s - 1; trig_reduce=trig_reduce) # s-shift rule, coefficient-free exp(t)
     @rule exp((~~c::all_c)*t) / ~g => laplace(1/~g, f, t, F, s - prod(~~c); trig_reduce=trig_reduce) # s-shift rule, negative powers are stored as quotients
     @rule exp(t) / ~g => laplace(1/~g, f, t, F, s - 1; trig_reduce=trig_reduce) # s-shift rule, coefficient-free exp(t)
-    @rule f(t)*t => -Differential(s)(F(s)) # s-derivative rule
-    @rule f(t)*t^(~n::_is_nonneg_int) => (-1)^(~n) * (Differential(s)^~n)(F(s)) # s-derivative rule
+    # general frequency-differentiation combinator: L{t^n * g(t)} = (-1)^n d^n/ds^n L{g(t)}.
+    # Fires only when g transforms to a closed form, which also stops it looping on untransformable g.
+    @rule (t^(~n::_is_pos_int)) * ~g => begin
+        G = laplace(~g, f, t, F, s; trig_reduce=trig_reduce)
+        _has_integral(G) ? nothing : expand_derivatives((-1)^(~n) * (Differential(s)^(~n))(G))
+    end
+    @rule t * ~g => begin
+        G = laplace(~g, f, t, F, s; trig_reduce=trig_reduce)
+        _has_integral(G) ? nothing : expand_derivatives(-(Differential(s))(G))
+    end
     @rule f((~a::is_c) + t) => exp(~a*s)*F(s) # t-shift rule
     @rule f(t) => F(s)
 ])
@@ -185,7 +195,9 @@ function laplace(expr, f, t, F, s; rules=nothing, trig_reduce=false)
         if trig_reduce
             reduced = SymbolicUtils.trig_reduce(unwrap(expr); vars = [unwrap(t)])
             if !isequal(reduced, unwrap(expr))
-                transformed = laplace(wrap(reduced), f, t, F, s, rules=rules, trig_reduce=true)
+                # one-shot: transform the reduced form with trig_reduce=false. Re-reducing its
+                # own output can recurse forever (a reduced term may keep an unmatchable sum arg).
+                transformed = laplace(wrap(reduced), f, t, F, s, rules=rules, trig_reduce=false)
                 if !_has_integral(transformed)
                     return transformed
                 end

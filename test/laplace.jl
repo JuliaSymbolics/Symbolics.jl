@@ -68,6 +68,31 @@ import Nemo, Groebner
 @test isequal(laplace(exp(-a*t)*cos(b*t), f, t, F, s), (s + a)/((s + a)^2 + b^2))
 @test isequal(laplace(exp(2a*t)*sin(b*t), f, t, F, s), b/((s - 2a)^2 + b^2))
 
+# sum-argument coefficients: (a+b)*t is stored expanded as a*t + b*t; the argument is still a
+# homogeneous-linear multiple of t, so arg/t = a+b is the frequency/rate (verified against SymPy)
+@test isequal(laplace(sin((a+b)*t), f, t, F, s), (a+b)/((a+b)^2 + s^2))
+@test isequal(laplace(cos((a+b)*t), f, t, F, s), s/((a+b)^2 + s^2))
+@test isequal(laplace(exp((a+b)*t), f, t, F, s), 1/(s - (a+b)))
+@test isequal(laplace(sinh((a+b)*t), f, t, F, s), (a+b)/(s^2 - (a+b)^2))
+
+# powers of exponentials: exp(t)^n is stored as a power, not exp(n*t); fold to exp(n*t)
+@test isequal(laplace(exp(t)^2, f, t, F, s), 1/(s - 2))
+@test isequal(laplace(exp(t)^3, f, t, F, s), 1/(s - 3))
+@test isequal(laplace(exp(a*t)^2, f, t, F, s), 1/(s - 2a))
+
+# general frequency-differentiation combinator L{t^n g} = (-1)^n d^n/ds^n L{g}
+# covers t^n*trig for n >= 2 and multi-factor/sum coefficients (values verified against SymPy)
+@test isequal(laplace(t*sin((a+b)*t), f, t, F, s), 2*(a+b)*s/((a+b)^2 + s^2)^2)
+@test isequal(laplace(t*cos((a+b)*t), f, t, F, s), (s^2 - (a+b)^2)/((a+b)^2 + s^2)^2)
+# numeric cross-check for the messier higher-order forms (SymPy values at s=5)
+_lapval(ex, sval) = Float64(Symbolics.value(substitute(laplace(ex, f, t, F, s), Dict(s => sval))))
+@test _lapval(t^2*sin(2t), 5) ≈ 0.011644593874287588
+@test _lapval(t^3*cos(2t), 5) ≈ 0.0003478108418012077
+@test _lapval(t^2*sin(t), 5) ≈ 2*(3*25 - 1)/(1 + 25)^3   # 2(3s^2-1)/(1+s^2)^3 at s=5
+# the uninterpreted-function s-derivative still works via the same combinator
+@test isequal(laplace(t^2*f(t), f, t, F, s), (Differential(s)^2)(F(s)))
+@test isequal(laplace(t*f(t), f, t, F, s), -Differential(s)(F(s)))
+
 # opt-in trig_reduce for products and powers of trig/hyperbolic functions (values verified against SymPy)
 @test isequal(laplace(2cos(t)*sin(t), f, t, F, s; trig_reduce=true), 2/(s^2 + 4))
 @test isequal(laplace(sin(t)^2, f, t, F, s; trig_reduce=true), -(1//2)*s/(s^2 + 4) + (1//2)/s)
@@ -80,6 +105,13 @@ import Nemo, Groebner
 # off by default; when on, a term trig_reduce cannot make transformable keeps the original fallback
 @test Symbolics._has_integral(laplace(2cos(t)*sin(t), f, t, F, s))
 @test isequal(laplace(tan(t)^2, f, t, F, s; trig_reduce=true), laplace(tan(t)^2, f, t, F, s))
+# symbolic frequencies with trig_reduce: must not recurse without end (regression for a
+# stack overflow when a reduced term kept a sum argument like cos(a*t - b*t))
+@test isequal(laplace(sin(a*t)*sin(b*t), f, t, F, s; trig_reduce=true), -(1//2)*s/((a+b)^2 + s^2) + (1//2)*s/((a-b)^2 + s^2))
+@test isequal(laplace(sin(a*t)*cos(b*t), f, t, F, s; trig_reduce=true), (1//2)*(a+b)/((a+b)^2 + s^2) + (1//2)*(a-b)/((a-b)^2 + s^2))
+# exp(t)^n as a factor needs trig_reduce to fold into the product; off by default it falls back
+@test Symbolics._has_integral(laplace(exp(t)^2*sin(t), f, t, F, s))
+@test isequal(laplace(exp(t)^2*sin(t), f, t, F, s; trig_reduce=true), 1/((s-2)^2 + 1))
 
 # https://www.math.lsu.edu/~adkins/m2065/2065s08review2a.pdf
 @test isequal(inverse_laplace(7/(s+3)^3, F, s, f, t), (7//2)t^2 * exp(-3t))
