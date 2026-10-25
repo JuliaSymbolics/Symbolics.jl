@@ -106,9 +106,16 @@ _lapval(ex, sval) = Float64(Symbolics.value(substitute(laplace(ex, f, t, F, s), 
 @test Symbolics._has_integral(laplace(2cos(t)*sin(t), f, t, F, s))
 @test isequal(laplace(tan(t)^2, f, t, F, s; trig_reduce=true), laplace(tan(t)^2, f, t, F, s))
 # symbolic frequencies with trig_reduce: must not recurse without end (regression for a
-# stack overflow when a reduced term kept a sum argument like cos(a*t - b*t))
-@test isequal(laplace(sin(a*t)*sin(b*t), f, t, F, s; trig_reduce=true), -(1//2)*s/((a+b)^2 + s^2) + (1//2)*s/((a-b)^2 + s^2))
-@test isequal(laplace(sin(a*t)*cos(b*t), f, t, F, s; trig_reduce=true), (1//2)*(a+b)/((a+b)^2 + s^2) + (1//2)*(a-b)/((a-b)^2 + s^2))
+# stack overflow when a reduced term kept a sum argument like cos(a*t - b*t)).
+# Compared numerically at sample (a,b,s) because the symbolic result's term ordering
+# (e.g. (a-b)^2 vs (-a+b)^2) is not stable across SymbolicUtils versions/platforms.
+_subval(ex, d) = Float64(Symbolics.value(substitute(ex, d)))
+let d = Dict(a => 2, b => 3, s => 5)
+    @test _subval(laplace(sin(a*t)*sin(b*t), f, t, F, s; trig_reduce=true), d) ≈
+          _subval(-(1//2)*s/((a+b)^2 + s^2) + (1//2)*s/((a-b)^2 + s^2), d)
+    @test _subval(laplace(sin(a*t)*cos(b*t), f, t, F, s; trig_reduce=true), d) ≈
+          _subval((1//2)*(a+b)/((a+b)^2 + s^2) + (1//2)*(a-b)/((a-b)^2 + s^2), d)
+end
 # exp(t)^n as a factor needs trig_reduce to fold into the product; off by default it falls back
 @test Symbolics._has_integral(laplace(exp(t)^2*sin(t), f, t, F, s))
 @test isequal(laplace(exp(t)^2*sin(t), f, t, F, s; trig_reduce=true), 1/((s-2)^2 + 1))
