@@ -46,3 +46,21 @@ end
     J = Symbolics.jacobian([offset(Mp, u[1])], collect(u))
     @test isequal(J[1, 1], 1) && all(iszero, J[1, 2:end])
 end
+
+@register_array_symbolic foo(x) begin
+    size = (2,)
+    eltype = Real
+    ndims = 1
+end
+foo(x) = [x, 2x]
+
+@testset "explicit element dependencies and unrelated elements" begin
+    @variables v[1:2]
+    J = Symbolics.jacobian([foo(v[1])[1]], collect(v))
+    @test !iszero(J[1, 1]) && iszero(J[1, 2])
+    @test Symbolics.jacobian_sparsity([foo(v[1])[1]], collect(v)) == sparse([1], [1], true, 1, 2)
+    # `Mp * u[2]` does not depend on `u[1]`
+    @test iszero(Symbolics.jacobian([Mp * u[2]], [u[1]])[1, 1])
+    @test nnz(Symbolics.jacobian_sparsity([Mp * u[2]], [u[1]])) == 0
+    @test_throws ArgumentError Symbolics.jacobian([Mp * u[2]], [u[2]])
+end
