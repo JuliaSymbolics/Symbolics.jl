@@ -26,13 +26,14 @@ _has_integral(x) = (y = unwrap(x); y isa SymbolicT && SU.query(z -> iscall(z) &&
 # whether `expr` is free of the variable `var` (treats symbolic parameters as constants
 # with respect to `var`). Used to guard parameter slots in the rule tables so that, e.g.,
 # eg: rule for sin(~a*t) only matches when ~a does not contain t (preventing t from leaking into the s-domain).
-function is_free_of(@nospecialize(expr), @nospecialize(var))::Bool
-    uexpr = unwrap(expr)
-    uvar = unwrap(var)
-    isequal(uexpr, uvar) && return false
-    if iscall(uexpr)
-        for arg in arguments(uexpr)
-            is_free_of(arg, uvar) || return false
+function _is_free_of(@nospecialize(expr), @nospecialize(var))::Bool
+    var = unwrap(var)::SymbolicT
+    expr = unwrap(expr)
+    expr isa SymbolicT || return true
+    isequal(expr, var) && return false
+    if iscall(expr)
+        for arg in arguments(expr)
+            _is_free_of(arg, var) || return false
         end
     end
     return true
@@ -45,7 +46,7 @@ _coef_of_t(expr, var) = simplify(unwrap(expr) / unwrap(var))
 function transform_rules(f, t, F, s; trig_reduce=false)
     # parameter slots (~a, ~b, ~c) must be free of t, otherwise the associative-commutative
     # matcher can bind them to t-containing factors (e.g. sin(cos(t)*t)), leaking t into s.
-    is_c = Base.Fix2(is_free_of, t)
+    is_c = Base.Fix2(_is_free_of, t)
     # `lin_t` matches a primitive argument that is a nonzero linear multiple of t (arg/t free
     # of t), so sin/cos/exp handle a product (2a*t), a sum (a*t + b*t), or a bare t uniformly;
     # `coef` is that multiple. A t-leak like cos(t)*t is rejected since (cos(t)*t)/t = cos(t).
@@ -188,7 +189,7 @@ function laplace(expr, f, t, F, s; rules=nothing, trig_reduce=false)
     result = 0
 
     # unable to apply linearity, so return based on definition
-    if length(terms) == 1 && length(filter(x->is_free_of(x, t), _true_factors(terms[1]))) == 0
+    if length(terms) == 1 && length(filter(x->_is_free_of(x, t), _true_factors(terms[1]))) == 0
         # opt-in last resort: rewrite products and powers of trigonometric/hyperbolic functions
         # of t as sums of single harmonics, which the rules handle (e.g. 2cos(t)sin(t) -> sin(2t));
         # only a fully transformed result is accepted, otherwise the fallback is unchanged
@@ -209,7 +210,7 @@ function laplace(expr, f, t, F, s; rules=nothing, trig_reduce=false)
     # apply linearity by splitting into terms and factoring out constants
     for term in terms
         factors = _true_factors(term)
-        constant = filter(x -> is_free_of(x, t), factors)
+        constant = filter(x -> _is_free_of(x, t), factors)
         if !isempty(constant)
             result += laplace(term / constant[1], f, t, F, s, rules=rules, trig_reduce=trig_reduce) * constant[1]
         else 
@@ -270,14 +271,14 @@ function _inverse_quadratic(expr, s, t)
     d1 = expand(Symbolics.derivative(den, s))
     c1 = substitute(d1, Dict(s => 0))
     c2 = expand(Symbolics.derivative(d1, s) / 2)
-    (is_free_of(c0, s) && is_free_of(c1, s) && is_free_of(c2, s)) || return nothing
+    (_is_free_of(c0, s) && _is_free_of(c1, s) && _is_free_of(c2, s)) || return nothing
     isequal(c2, 0) && return nothing
     isequal(expand(den - (c2*s^2 + c1*s + c0)), 0) || return nothing
 
     # numerator must be at most degree 1 in s
     b0 = substitute(num, Dict(s => 0))
     b1 = substitute(expand(Symbolics.derivative(num, s)), Dict(s => 0))
-    (is_free_of(b0, s) && is_free_of(b1, s)) || return nothing
+    (_is_free_of(b0, s) && _is_free_of(b1, s)) || return nothing
     isequal(expand(num - (b1*s + b0)), 0) || return nothing
 
     # complete the square: den = c2*((s + α)^2 + β)
@@ -362,7 +363,7 @@ function inverse_laplace(expr, F, s, f, t; rules=nothing, warns=true)
     _terms = terms(numerator(expr)) ./ denominator(expr)
     
     result = 0
-    if length(_terms) == 1 && length(filter(x -> is_free_of(x, s), _true_factors(_terms[1]))) == 0
+    if length(_terms) == 1 && length(filter(x -> _is_free_of(x, s), _true_factors(_terms[1]))) == 0
         # try completing the square for irreducible/unfactored quadratic denominators
         quad = _inverse_quadratic(expr, s, t)
         quad !== nothing && return quad
@@ -373,8 +374,8 @@ function inverse_laplace(expr, F, s, f, t; rules=nothing, warns=true)
     # apply linearity by splitting into terms and factoring out constants
     for term in _terms
         factors = _true_factors(term)
-        constant = filter(x -> is_free_of(x, s), factors)
-        non_constant = filter(x -> !is_free_of(x, s), factors)
+        constant = filter(x -> _is_free_of(x, s), factors)
+        non_constant = filter(x -> !_is_free_of(x, s), factors)
         if !isempty(constant)
             transformed_term = inverse_laplace(prod(non_constant), F, s, f, t, rules=rules, warns=warns)
             isnothing(transformed_term) && return nothing
