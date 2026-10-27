@@ -185,17 +185,20 @@ occursin_info(x::BasicSymbolic{VartypeT}, expr, fail::Bool = true) = false
     end
 end
 
-# Whether the array `arr` occurs in `expr` other than as the indexee of a literal-index
-# `arr[k]`, which is only an element access.
-function _occurs_as_whole_array(arr::SymbolicT, expr::SymbolicT)
-    isequal(arr, expr) && return true
+# Whether `x` occurs anywhere in `expr`: as the term itself, or, for a scalar-indexed
+# `x = arr[k]`, as the whole array `arr`. A literal `arr[k']` is an element access, so its
+# indexee `arr` is not a whole-array occurrence.
+function _occurs_in(x::SymbolicT, expr::SymbolicT)
+    isequal(x, expr) && return true
+    parent = is_scalar_indexed(x) ? arguments(x)[1] : nothing
+    parent !== nothing && isequal(parent, expr) && return true
     iscall(expr) || return false
     args = arguments(expr)
     literal_idx = operation(expr) === getindex && length(args) > 1 &&
         all(_is_scalar_literal, Iterators.drop(args, 1))
     for (k, a) in enumerate(args)
-        literal_idx && k == 1 && isequal(a, arr) && continue
-        a isa SymbolicT && _occurs_as_whole_array(arr, a) && return true
+        literal_idx && k == 1 && parent !== nothing && isequal(a, parent) && continue
+        a isa SymbolicT && _occurs_in(x, a) && return true
     end
     return false
 end
@@ -244,10 +247,7 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
         if isix
             # `f(.., arr, ..)[k]` depends on every element of `arr`
             indexee = arguments(expr)[1]
-            return iscall(indexee) && (
-                SymbolicUtils.query(isequal(x), indexee) ||
-                    _occurs_as_whole_array(arguments(x)[1], indexee)
-            )
+            return iscall(indexee) && _occurs_in(x, indexee)
         end
         return SymbolicUtils.query(isequal(x), expr)
     end
@@ -594,9 +594,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                         continue
                     elseif der === nothing && SymbolicUtils.is_array_shape(shape(a))
                         # an array-valued argument holding `D.x` has no partial derivative to chain
-                        holds_x = is_scalar_indexed(D.x) ? _occurs_as_whole_array(arguments(D.x)[1], a) :
-                            SymbolicUtils.query(isequal(D.x), a)
-                        holds_x || continue
+                        _occurs_in(D.x, a) || continue
                         throw_no_derivative && throw(DerivativeNotDefinedError(arr, i))
                         return D(arg)
                     elseif !SymbolicUtils.is_array_shape(shape(a)) && !occursin_info(D.x, a, false)
@@ -921,7 +919,7 @@ function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
         literal_idx = operation(ex) === getindex && length(args) > 1 &&
             all(_is_scalar_literal, Iterators.drop(args, 1))
         for (k, a) in enumerate(args)
-            literal_idx && k == 1 && !iscall(a) && continue
+            literal_idx && k == 1 && a in arrset && continue
             a isa SymbolicT && _depends_checking_array_symbols(a, varset, arrset, seen) && (depends = true)
         end
         if depends && operation(ex) in (+, -, *, /, ^)

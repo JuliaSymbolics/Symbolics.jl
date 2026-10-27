@@ -64,3 +64,26 @@ foo(x) = [x, 2x]
     @test nnz(Symbolics.jacobian_sparsity([Mp * u[2]], [u[1]])) == 0
     @test_throws ArgumentError Symbolics.jacobian([Mp * u[2]], [u[2]])
 end
+
+@register_array_symbolic bar(x::AbstractVector) begin
+    size = (2,)
+    eltype = Real
+    ndims = 1
+end
+bar(x::AbstractVector) = x
+
+@testset "nested opaque calls, element arguments and call-valued arrays" begin
+    @variables v[1:2] t w(t)[1:2]
+    nested = bar(foo(v[1]))[1]
+    @test !iszero(Symbolics.jacobian([nested], collect(v))[1, 1])
+    @test iszero(Symbolics.jacobian([nested], collect(v))[1, 2])
+    @test is_derivative(unwrap(expand_derivatives(Differential(v[1])(nested))))
+    @test iszero(expand_derivatives(Differential(v[2])(nested)))
+    @test Symbolics.jacobian_sparsity([nested], collect(v)) == sparse([1], [1], true, 1, 2)
+    @test !iszero(Symbolics.jacobian([bar(v)[1]], collect(v))[1, 2])
+    # distinct elements of u(t)[1:2] are independent
+    @test iszero(Symbolics.jacobian([Mp * w[2]], [w[1]])[1, 1])
+    @test nnz(Symbolics.jacobian_sparsity([Mp * w[2]], [w[1]])) == 0
+    @test_throws ArgumentError Symbolics.jacobian([Mp * w[2]], [w[2]])
+    @test_throws ArgumentError Symbolics.jacobian_sparsity([Mp * w[1]], collect(w))
+end
