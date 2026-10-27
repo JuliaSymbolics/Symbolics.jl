@@ -154,9 +154,9 @@ function codegen_function(
     end
     rewrites[:sort_addmul] = sort_addmul
     rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
-    rewrites[:fuse_broadcasts] = fuse_broadcasts
-    rewrites[:fuse_unalias] = fuse_unalias
-    rewrites[:fuse_output_eltype] = fuse_output_eltype
+    rewrites[Code.FUSE_BROADCASTS_KEY] = fuse_broadcasts
+    rewrites[Code.FUSE_UNALIAS_KEY] = fuse_unalias
+    rewrites[Code.FUSE_OUTPUT_ELTYPE_KEY] = fuse_output_eltype
     rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
@@ -220,9 +220,9 @@ function codegen_function(
     end
     rewrites[:sort_addmul] = sort_addmul
     rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
-    rewrites[:fuse_broadcasts] = fuse_broadcasts
-    rewrites[:fuse_unalias] = fuse_unalias
-    rewrites[:fuse_output_eltype] = fuse_output_eltype
+    rewrites[Code.FUSE_BROADCASTS_KEY] = fuse_broadcasts
+    rewrites[Code.FUSE_UNALIAS_KEY] = fuse_unalias
+    rewrites[Code.FUSE_OUTPUT_ELTYPE_KEY] = fuse_output_eltype
     rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
 
     expr = _recursive_unwrap(expr)
