@@ -880,19 +880,6 @@ function gradient(O, vars::AbstractVector; simplify=false, kwargs...)
     Num[Num(expand_derivatives(Differential(vars[vi])(unwrap(O)),simplify; kwargs...)) for vi in eachindex(vars)]
 end
 
-"""
-$(SIGNATURES)
-
-A helper function for computing the Jacobian of an array of expressions with respect to
-an array of variable expressions.
-
-# Keyword Arguments
-
-- `simplify=false`: The simplify argument of `expand_derivatives`.
-- `scalarize=true`: Whether to scalarize `ops` and `vars` before computing the jacobian.
-
-All other keyword arguments are forwarded to `expand_derivatives`.
-"""
 # An array-typed symbol that has a scalar shape (e.g. `@variables A::SparseMatrixCSC`) is
 # opaque: arithmetic on it is not scalar arithmetic, so a Jacobian or sparsity pattern that
 # treats it as a scalar coefficient is wrong. Throws if such a symbol is an operand of
@@ -933,6 +920,19 @@ function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
     end
 end
 
+"""
+$(SIGNATURES)
+
+A helper function for computing the Jacobian of an array of expressions with respect to
+an array of variable expressions.
+
+# Keyword Arguments
+
+- `simplify=false`: The simplify argument of `expand_derivatives`.
+- `scalarize=true`: Whether to scalarize `ops` and `vars` before computing the jacobian.
+
+All other keyword arguments are forwarded to `expand_derivatives`.
+"""
 function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
                   simplify=false, scalarize::Union{Val{true}, Val{false}}=Val(true), kwargs...)
     if scalarize isa Val{true}
