@@ -84,6 +84,9 @@ Fields:
   regions, such as literals, are converted to the output's element type once per call, so a
   `Float32` output is computed in `Float32` arithmetic. This rounds them to that type, so it
   is off by default.
+- `use_literal_pow`: Whether to lower `x ^ n` for a constant literal `n` to
+  `Base.literal_pow(^, x, Val(n))`. This improves the runtime performance of the generated code,
+  but may be incompatible with symbolic tracing. Defaults to `true`.
 """
 struct CodegenFunctionOptions
     nanmath::Bool
@@ -99,6 +102,7 @@ struct CodegenFunctionOptions
     fuse_broadcasts::Bool
     fuse_unalias::Bool
     fuse_output_eltype::Bool
+    use_literal_pow::Bool
 end
 
 function CodegenFunctionOptions(;
@@ -107,12 +111,12 @@ function CodegenFunctionOptions(;
         sort_addmul = false, optimize = nothing, similarto = nothing,
         outputidxs = nothing, skipzeros = false, scalarize_single_element_regions = true,
         fuse_broadcasts = false, fuse_unalias = true,
-        fuse_output_eltype = false, kwargs...
+        fuse_output_eltype = false, use_literal_pow = true, kwargs...
     )
     return CodegenFunctionOptions(
         nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
         similarto, outputidxs, skipzeros, scalarize_single_element_regions, fuse_broadcasts,
-        fuse_unalias, fuse_output_eltype
+        fuse_unalias, fuse_output_eltype, use_literal_pow
     )
 end
 
@@ -142,7 +146,7 @@ function codegen_function(
     )
     (; nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
         scalarize_single_element_regions, fuse_broadcasts, fuse_unalias,
-        fuse_output_eltype) = opts
+        fuse_output_eltype, use_literal_pow) = opts
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
     if nanmath
@@ -150,9 +154,10 @@ function codegen_function(
     end
     rewrites[:sort_addmul] = sort_addmul
     rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
-    rewrites[:fuse_broadcasts] = fuse_broadcasts
-    rewrites[:fuse_unalias] = fuse_unalias
-    rewrites[:fuse_output_eltype] = fuse_output_eltype
+    rewrites[Code.FUSE_BROADCASTS_KEY] = fuse_broadcasts
+    rewrites[Code.FUSE_UNALIAS_KEY] = fuse_unalias
+    rewrites[Code.FUSE_OUTPUT_ELTYPE_KEY] = fuse_output_eltype
+    rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
 
@@ -207,7 +212,7 @@ function codegen_function(
     )
     (; similarto, nanmath, wrap_code, iip_config, outputidxs, skipzeros, checkbounds,
         optimize, sort_addmul, scalarize_single_element_regions, fuse_broadcasts, fuse_unalias,
-        fuse_output_eltype) = opts
+        fuse_output_eltype, use_literal_pow) = opts
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
     if nanmath
@@ -215,9 +220,10 @@ function codegen_function(
     end
     rewrites[:sort_addmul] = sort_addmul
     rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
-    rewrites[:fuse_broadcasts] = fuse_broadcasts
-    rewrites[:fuse_unalias] = fuse_unalias
-    rewrites[:fuse_output_eltype] = fuse_output_eltype
+    rewrites[Code.FUSE_BROADCASTS_KEY] = fuse_broadcasts
+    rewrites[Code.FUSE_UNALIAS_KEY] = fuse_unalias
+    rewrites[Code.FUSE_OUTPUT_ELTYPE_KEY] = fuse_output_eltype
+    rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
 
     expr = _recursive_unwrap(expr)
 
