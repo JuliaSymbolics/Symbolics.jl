@@ -185,6 +185,24 @@ occursin_info(x::BasicSymbolic{VartypeT}, expr, fail::Bool = true) = false
     end
 end
 
+# Whether `x` occurs anywhere in `expr`: as the term itself, or, for a scalar-indexed
+# `x = arr[k]`, as the whole array `arr`. A literal `arr[k']` is an element access, so its
+# indexee `arr` is not a whole-array occurrence.
+function _occurs_in(x::SymbolicT, expr::SymbolicT)
+    isequal(x, expr) && return true
+    parent = is_scalar_indexed(x) ? arguments(x)[1] : nothing
+    parent !== nothing && isequal(parent, expr) && return true
+    iscall(expr) || return false
+    args = arguments(expr)
+    literal_idx = operation(expr) === getindex && length(args) > 1 &&
+        all(_is_scalar_literal, Iterators.drop(args, 1))
+    for (k, a) in enumerate(args)
+        literal_idx && k == 1 && parent !== nothing && isequal(a, parent) && continue
+        a isa SymbolicT && _occurs_in(x, a) && return true
+    end
+    return false
+end
+
 # `idx` is a literal scalar index like the `Const`-wrapped `2` in `arr[2]`,
 # as opposed to a symbolic index or a range.
 @inline _is_scalar_literal(idx::Integer) = true
@@ -226,7 +244,11 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
         _ => nothing
     end
     if isie
-        isix && return false
+        if isix
+            # `f(.., arr, ..)[k]` depends on every element of `arr`
+            indexee = arguments(expr)[1]
+            return iscall(indexee) && _occurs_in(x, indexee)
+        end
         return SymbolicUtils.query(isequal(x), expr)
     end
 
@@ -570,6 +592,13 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                         der === nothing && return D(arg)
                         push!(summed_args, der[idx])
                         continue
+                    elseif der === nothing && SymbolicUtils.is_array_shape(shape(a))
+                        # an array-valued argument holding `D.x` has no partial derivative to chain
+                        _occurs_in(D.x, a) || continue
+                        throw_no_derivative && throw(DerivativeNotDefinedError(arr, i))
+                        return D(arg)
+                    elseif !SymbolicUtils.is_array_shape(shape(a)) && !occursin_info(D.x, a, false)
+                        continue
                     elseif der === nothing
                         push!(summed_args, Differential(a)(arg) * executediff(D, a))
                     else
@@ -851,6 +880,46 @@ function gradient(O, vars::AbstractVector; simplify=false, kwargs...)
     Num[Num(expand_derivatives(Differential(vars[vi])(unwrap(O)),simplify; kwargs...)) for vi in eachindex(vars)]
 end
 
+# An array-typed symbol that has a scalar shape (e.g. `@variables A::SparseMatrixCSC`) is
+# opaque: arithmetic on it is not scalar arithmetic, so a Jacobian or sparsity pattern that
+# treats it as a scalar coefficient is wrong. Throws if such a symbol is an operand of
+# arithmetic that depends on `vars`.
+function _check_no_array_symbol_operands(exprs, vars)
+    varset = Set{SymbolicT}(vars)
+    arrset = Set{SymbolicT}()
+    for v in vars
+        is_scalar_indexed(v) && push!(arrset, arguments(v)[1])
+    end
+    seen = Dict{SymbolicT, Bool}()
+    for ex in exprs
+        ex isa SymbolicT && _depends_checking_array_symbols(ex, varset, arrset, seen)
+    end
+    return nothing
+end
+
+function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
+    return get!(seen, ex) do
+        depends = ex in varset || ex in arrset
+        iscall(ex) || return depends
+        args = arguments(ex)
+        # a literal `arr[k]` is an element access: it depends on `arr` only through `varset`
+        literal_idx = operation(ex) === getindex && length(args) > 1 &&
+            all(_is_scalar_literal, Iterators.drop(args, 1))
+        for (k, a) in enumerate(args)
+            literal_idx && k == 1 && a in arrset && continue
+            a isa SymbolicT && _depends_checking_array_symbols(a, varset, arrset, seen) && (depends = true)
+        end
+        if depends && operation(ex) in (+, -, *, /, ^)
+            for a in args
+                a isa SymbolicT && !iscall(a) && symtype(a) <: AbstractArray &&
+                    !SymbolicUtils.is_array_shape(shape(a)) &&
+                    throw(ArgumentError("The array-typed symbol `$a` is an operand of `$ex`, which depends on the differentiation variables. Array-typed symbols with a scalar shape are opaque, so the Jacobian or sparsity cannot treat them as scalar coefficients; wrap them in a registered function with a derivative rule."))
+            end
+        end
+        depends
+    end
+end
+
 """
 $(SIGNATURES)
 
@@ -870,6 +939,7 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
+    _check_no_array_symbol_operands(ops, vars)
     # Pre-compute variable sets to skip differentiating trivially zero Jacobian entries.
     op_varsets = map(op -> _augment_with_call_args!(SymbolicUtils.search_variables(op)), ops)
     result = fill(COMMON_ZERO, length(ops), length(vars))
@@ -1015,6 +1085,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
         u = vars
     end
     dict = Dict(zip(u, 1:length(u)))
+    _check_no_array_symbol_operands(du, u)
 
     # `arrdict[arr]` maps a lazy array to the columns of its element vars
     # `arr[k]`, since occurrences of `arr`/`arr[i]` mark all of them.
