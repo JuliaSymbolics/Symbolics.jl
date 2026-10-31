@@ -125,7 +125,9 @@ include("wrapper-types.jl")
     include("num.jl")
 end
 function (s::SymbolicUtils.Substituter)(x::Num)
-    Num(s(unwrap(x)))
+    res = s(unwrap(x))
+    symtype(res) <: Complex && return wrap(res)
+    return Num(res)
 end
 
 
