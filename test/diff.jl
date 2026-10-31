@@ -3,6 +3,7 @@ using SymbolicUtils
 using Test
 using LinearAlgebra, SparseArrays
 using Symbolics: value, unwrap
+using SymbolicUtils: unwrap_const
 
 # Derivatives
 @variables t σ ρ β
@@ -908,4 +909,91 @@ struct NoRuleCallable end
     @test isequal(expand_derivatives(Dx(a(x))), Dx(a(x)))
     @test isequal(expand_derivatives(Dx(h(f(x)))), Differential(f(x))(h(f(x))) * dscaledsquare(fs, x))
     @test isequal(expand_derivatives(Dt(z)), Dt(z))
+end
+
+@testset "NormalDerivative" begin
+    struct TestPiece <: Symbolics.DomainSets.Domain{Float64}
+        name::Symbol
+    end
+    Base.show(io::IO, p::TestPiece) = print(io, "Γ_", p.name)
+
+    @variables t x u(..) v(..)
+    @variables w(..)[1:2]
+    Γ = TestPiece(:wall)
+    Dn = NormalDerivative(Γ)
+    Dx = Differential(x)
+
+    @testset "construction, printing and recovery" begin
+        tr = u(t, Γ)
+        ex = Dn(tr)
+        @test ex isa Num
+        @test operation(unwrap(ex)) isa NormalDerivative
+        @test isequal(only(arguments(unwrap(ex))), unwrap(tr))
+        @test repr(ex) == "Dn_wall(u(t, Γ_wall))"
+        @test repr(Dn) == "Dn_wall"
+        # fall back to printing the piece when it has no name
+        @test repr(NormalDerivative(Symbolics.DomainSets.UnitInterval())) ==
+            "Dn_" * repr(Symbolics.DomainSets.UnitInterval())
+
+        # piece recovery from the term, for both operator and trace
+        @test operation(unwrap(ex)).piece === Γ
+        @test unwrap_const(last(arguments(only(arguments(unwrap(ex)))))) === Γ
+
+        # array-valued traces
+        arr = Dn(w(t, Γ))
+        @test arr isa Symbolics.Arr
+        @test operation(unwrap(arr)) isa NormalDerivative
+        @test size(arr) == (2,)
+    end
+
+    @testset "equality and hashing" begin
+        Dn2 = NormalDerivative(TestPiece(:wall))
+        @test isequal(Dn, Dn2)
+        @test hash(Dn) == hash(Dn2)
+        @test !isequal(Dn, NormalDerivative(TestPiece(:other)))
+        a = Dn(u(t, Γ))
+        b = Dn2(u(t, TestPiece(:wall)))
+        @test isequal(a, b)
+        @test hash(a) == hash(b)
+        @test !isequal(a, NormalDerivative(TestPiece(:other))(u(t, Γ)))
+        @test isequal(2 * a + a, 3 * b)
+    end
+
+    @testset "expand_derivatives leaves it untouched" begin
+        ex = Dn(u(t, Γ))
+        @test isequal(expand_derivatives(ex), ex)
+        ex2 = 2 * Dn(u(t, Γ)) + u(t, Γ)
+        @test isequal(expand_derivatives(ex2), ex2)
+        # a normal derivative is not constant: derivatives of it stay unevaluated, never 0
+        Dt = Differential(t)
+        @test isequal(expand_derivatives(Dt(ex)), Dt(ex))
+        @test isequal(expand_derivatives(Dt(2 * ex)), 2 * Dt(ex))
+    end
+
+    @testset "mismatched pieces are not an error here" begin
+        ex = NormalDerivative(TestPiece(:a))(u(t, TestPiece(:b)))
+        @test operation(unwrap(ex)).piece == TestPiece(:a)
+        @test unwrap_const(last(arguments(only(arguments(unwrap(ex)))))) == TestPiece(:b)
+    end
+
+    @testset "substitution through operators" begin
+        Dt = Differential(t)
+        rule = u(t, Γ) => u(t, x)
+        dn = Dn(u(t, Γ))
+        @test isequal(substitute(dn, rule), dn)
+        @test isequal(Symbolics.substitute_in_deriv(dn, rule), Dn(u(t, x)))
+        @test isequal(Symbolics.substitute_in_deriv(2 * dn + 1, rule), 2 * Dn(u(t, x)) + 1)
+        # Differential behaviour is unchanged by the filter extension
+        dd = Dt(u(t, x))
+        @test isequal(substitute(dd, u(t, x) => v(t, x)), dd)
+        @test isequal(Symbolics.substitute_in_deriv(dd, u(t, x) => v(t, x)), Dt(v(t, x)))
+        # explicit rules for the operator itself are honored
+        Dn_other = NormalDerivative(TestPiece(:other))
+        @test isequal(substitute(Dn, Dict(Dn => Dn_other)), Dn_other)
+        @test isequal(Symbolics.substitute_in_deriv(Dn(u(t, Γ)), Dict(Dn => Dn_other)), Dn_other(u(t, Γ)))
+        # nested operators
+        nested = Dt(Dn(u(t, Γ)))
+        @test isequal(substitute(nested, rule), nested)
+        @test isequal(Symbolics.substitute_in_deriv(nested, rule), Dt(Dn(u(t, x))))
+    end
 end

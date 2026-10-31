@@ -208,7 +208,7 @@ using SpecialFunctions: airyai, airyaiprime, airybi, airybiprime, besselj0, bess
 include("linearity.jl")
 
 
-export Differential, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
+export Differential, NormalDerivative, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
 include("register_derivatives.jl")
 include("diff.jl")
 

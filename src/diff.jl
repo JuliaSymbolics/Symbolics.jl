@@ -66,6 +66,60 @@ function SymbolicUtils.operator_to_term(::Differential, ex::BasicSymbolic{Vartyp
 end
 
 """
+$(TYPEDEF)
+
+Represents the normal derivative operator on a boundary piece `Γ`. `Dn = NormalDerivative(Γ)`
+applied to a trace `u(t, Γ)` (a call of a dependent variable whose spatial arguments are
+replaced by the domain `Γ`) gives `Dn(u(t, Γ))`, printed as `Dn_Γ(u(t, Γ))`: the trace of the
+normal derivative. That is, differentiate `u` along the outward normal of `Γ`, then evaluate
+on `Γ`.
+
+Like [`Differential`](@ref), applying a `NormalDerivative` only builds a symbolic term, with
+the operator as its operation and the trace as its single argument. The term is left alone
+by [`expand_derivatives`](@ref), and [`Symbolics.substitute_in_deriv`](@ref) descends into
+it. This type does not check that the piece of the operator matches the piece in the trace;
+that is up to the consumer. Both are recoverable from the term: the operator's piece is
+`operation(term).piece`, and the trace's is among `arguments(only(arguments(term)))`.
+
+# Fields
+$(FIELDS)
+
+# Examples
+
+```jldoctest
+julia> using Symbolics, DomainSets
+
+julia> @variables t u(..);
+
+julia> Γ = 0 .. 1; # any `DomainSets.Domain`; typically a named boundary piece
+
+julia> Dn = NormalDerivative(Γ);
+
+julia> Dn(u(t, Γ))
+Dn_0 .. 1(u(t, 0 .. 1))
+```
+"""
+struct NormalDerivative{D <: Domain} <: Operator
+    """The boundary piece whose outward normal the derivative is taken along."""
+    piece::D
+end
+function (Dn::NormalDerivative)(x::BasicSymbolic{VartypeT})
+    return BSImpl.Term{VartypeT}(Dn, SArgsT((x,)); type = symtype(x), shape = shape(x))
+end
+(Dn::NormalDerivative)(x::Num) = Num(Dn(unwrap(x)))
+(Dn::NormalDerivative)(x::Arr{T, N}) where {T, N} = Arr{T, N}(Dn(unwrap(x)))
+SymbolicUtils.isbinop(::NormalDerivative) = false
+
+Base.:(==)(a::NormalDerivative, b::NormalDerivative) = isequal(a, b)
+Base.isequal(a::NormalDerivative, b::NormalDerivative) = isequal(a.piece, b.piece)
+Base.hash(a::NormalDerivative, h::UInt) = hash(a.piece, hash(NormalDerivative, h))
+
+function Base.show(io::IO, Dn::NormalDerivative)
+    label = hasproperty(Dn.piece, :name) ? Dn.piece.name : Dn.piece
+    return print(io, "Dn_", label)
+end
+
+"""
     is_derivative(x)
 
 Return `true` if `x` is an unapplied derivative term, i.e. a symbolic expression whose
@@ -323,7 +377,7 @@ end
 
 function symdiff_substitute_filter(ex::BasicSymbolic{T}) where {T}
     SymbolicUtils.default_substitute_filter(ex) || @match ex begin
-        BSImpl.Term(; f) && if f isa Differential end => true
+        BSImpl.Term(; f) && if f isa Operator end => true
         _ => false
     end
 end
@@ -331,8 +385,8 @@ end
 """
     $(TYPEDSIGNATURES)
 
-Identical to `substitute` except it also substitutes inside `Differential` operator
-applications.
+Identical to `substitute` except it also substitutes inside operator applications such as
+`Differential` and [`NormalDerivative`](@ref).
 """
 function substitute_in_deriv(ex, rules; kw...)
     substitute(ex, rules; kw..., filterer = symdiff_substitute_filter)
@@ -340,7 +394,7 @@ end
 
 function deriv_and_depvar_substitute_filter(ex::SymbolicT)
     SymbolicUtils.default_substitute_filter(ex) || @match ex begin
-        BSImpl.Term(; f) && if f isa Differential end => true
+        BSImpl.Term(; f) && if f isa Operator end => true
         BSImpl.Term(; f) && if f isa SymbolicT end => true
         _ => false
     end
@@ -349,8 +403,8 @@ end
 """
     $(TYPEDSIGNATURES)
 
-Identical to `substitute` except it also substitutes inside `Differential` operator
-applications and dependent variables.
+Identical to `substitute` except it also substitutes inside operator applications such as
+`Differential` and [`NormalDerivative`](@ref), and inside dependent variables.
 """
 function substitute_in_deriv_and_depvar(ex, rules; kw...)
     substitute(ex, rules; kw..., filterer = deriv_and_depvar_substitute_filter)
@@ -620,6 +674,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 base, exp = args
                 prod_args = (exp, (base ^ Const{VartypeT}(exp - 1))::BasicSymbolic{VartypeT}, executediff(D, base; simplify, throw_no_derivative))
                 return SymbolicUtils.mul_worker(VartypeT, prod_args)
+            elseif f isa NormalDerivative # not constant in D.x, so stay unevaluated rather than 0
+                return D(arg)
             elseif f isa SymbolicUtils.Operator # operator applications return a new variable
                 return differential_zero(arg)
             else

@@ -12,6 +12,7 @@ the differentials down to basic one-variable expressions.
 
 ```@docs
 Differential
+NormalDerivative
 expand_derivatives
 is_derivative
 ```
