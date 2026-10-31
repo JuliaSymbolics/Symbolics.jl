@@ -174,17 +174,17 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
     impl_name = Symbol(fname,"_", hash(string(args)*string(kwargs)))
 
     function kwargname(kwarg)
-        if kwarg isa Expr && kwarg.head == :kw
-            kwarg.args[1]
-        elseif kwarg isa Expr && kwarg.head == :(...)
-            kwarg.args[1]
+        return if kwarg isa Expr && kwarg.head in (:kw, :(...), :(::))
+            kwargname(kwarg.args[1])
         else
             kwarg
         end
     end
 
     function argname(arg)
-        if arg isa Expr && (arg.head == :(::) || arg.head == :(...))
+        return if arg isa Expr && arg.head == :(...)
+            throw(ArgumentError("@wrapped does not support varargs arguments; got `$arg` in the definition of `$fname`"))
+        elseif arg isa Expr && arg.head == :(::)
             arg.args[1]
         elseif arg isa Expr
             error("$arg not supported as an argument")
@@ -193,7 +193,8 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
         end
     end
 
-    names = vcat(argname.(args), kwargname.(kwargs))
+    names = argname.(args)
+    kwnames = kwargname.(kwargs)
 
     function type_options(arg)
         # for every argument find the types that
@@ -228,9 +229,6 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
                 end
             end
             Ts
-        elseif arg isa Expr && arg.head == :(...)
-            Ts = type_options(arg.args[1])
-            map(x->Vararg{x},Ts)
         else
             (Any,)
         end
@@ -238,9 +236,11 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
 
     types = map(type_options, args)
 
-    impl = :(function $impl_name($self, $(names...))
-        $body
-    end)
+    impl = :(
+        function $impl_name($self, $(names...), $(kwnames...))
+            $body
+        end
+    )
 
     function is_wrapped_array_eltype(T)
         T <: AbstractArray || return false
@@ -298,7 +298,7 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
                 name
             end
         end
-        implcall = :($impl_name($self, $(impl_args...)))
+        implcall = :($impl_name($self, $(impl_args...), $(kwnames...)))
         if any_wrapper
             implcall = :($wrap($implcall))
         end
@@ -366,7 +366,8 @@ call rather than a wrong answer downstream. A symbolic function whose `symtype` 
 `FnType{A, R, T}` matches an annotation `T`, since it stands for a callable of type `T`.
 
 Keyword arguments are forwarded as declared and are not expanded over; only positional
-arguments participate in the product.
+arguments participate in the product. Varargs arguments (`xs...`) are not supported and
+throw an `ArgumentError` at macro-expansion time.
 
 The optional trailing argument (default `true`) controls whether array-typed arguments are
 expanded over their symbolic-array and wrapped-array options. Pass `false` to suppress
