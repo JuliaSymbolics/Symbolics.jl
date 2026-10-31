@@ -1363,3 +1363,109 @@ function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::Abst
     end
     exprs
 end
+
+#######################################################################################################################
+# Vector Calculus
+#######################################################################################################################
+
+"""
+    ArrayDifferentialOperator
+
+A vector differential operator such as `∇`, built from one scalar operator per variable.
+Construct it with `Nabla` (alias `Grad`), and use `Div`, `Curl` and `Laplacian` for
+the common compositions. Applying it to a vector `x` of the same length as `vars`
+gives `[differentials[i](x[i]) for i in eachindex(vars)]`.
+"""
+struct ArrayDifferentialOperator <: Operator
+    """The variables to differentiate with respect to."""
+    vars::Vector{Any}
+    """The differentials, can be other functions if composite"""
+    differentials::Vector{Any}
+    """name"""
+    name::String
+end
+function Nabla(vars)
+    scalar_vars = collect(Any, scalarize(vars))
+    return ArrayDifferentialOperator(scalar_vars, Any[Differential(v) for v in scalar_vars], "∇")
+end
+const Grad = Nabla
+Div(vars) = x -> LinearAlgebra.dot(Nabla(vars), x)
+Curl(vars) = x -> LinearAlgebra.cross(Nabla(vars), x)
+Laplacian(vars) = LinearAlgebra.dot(Nabla(vars), Nabla(vars))
+
+function check_operator_length(D::ArrayDifferentialOperator, x)
+    return length(D.vars) == length(x) || throw(DimensionMismatch("Vector must be same length as vars in Operator $(D.name)."))
+end
+
+function check_composable(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
+    length(D1.vars) == length(D1.differentials) == length(D2.vars) == length(D2.differentials) ||
+        throw(DimensionMismatch("Operators have different numbers of components and cannot be composed."))
+    all(isequal.(D1.vars, D2.vars)) || throw(ArgumentError("Operators have different variables and cannot be composed."))
+    return nothing
+end
+
+function (D::ArrayDifferentialOperator)(x::AbstractVector)
+    check_operator_length(D, x)
+    return Num[D.differentials[i](x[i]) for i in eachindex(x)]
+end
+
+(D::ArrayDifferentialOperator)(x::Union{Num, AbstractFloat, Integer}) = Num[d(x) for d in D.differentials]
+
+function (D1::ArrayDifferentialOperator)(D2::ArrayDifferentialOperator)
+    all(v -> any(isequal(v), D2.vars), D1.vars) || throw(ArgumentError("Operators have different variables and cannot be composed."))
+    length(D1.vars) == length(D1.differentials) == length(D2.vars) == length(D2.differentials) ||
+        throw(DimensionMismatch("Operators have different numbers of components and cannot be composed."))
+    return ArrayDifferentialOperator(D1.vars, Any[d1 ∘ d2 for (d1, d2) in zip(D1.differentials, D2.differentials)], "(" * D1.name * "∘" * D2.name * ")")
+end
+
+function LinearAlgebra.dot(D::ArrayDifferentialOperator, x::AbstractVector)
+    return sum(D(x))
+end
+
+function LinearAlgebra.dot(x::AbstractVector, D::ArrayDifferentialOperator)
+    check_operator_length(D, x)
+    directional(y) = sum(x[i] * D.differentials[i](y) for i in eachindex(x))
+    return y -> y isa AbstractVector ? Num[directional(yj) for yj in scalarize(y)] : directional(y)
+end
+
+function LinearAlgebra.dot(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
+    check_composable(D1, D2)
+    laplacian(x) = sum((D1.differentials[i] ∘ D2.differentials[i])(x) for i in eachindex(D1.vars))
+    return x -> x isa AbstractVector ? Num[laplacian(xj) for xj in scalarize(x)] : laplacian(x)
+end
+
+function crosscompose(a, b)
+    v1 = x -> (a[2] ∘ b[3])(x) - (a[3] ∘ b[2])(x)
+    v2 = x -> (a[3] ∘ b[1])(x) - (a[1] ∘ b[3])(x)
+    v3 = x -> (a[1] ∘ b[2])(x) - (a[2] ∘ b[1])(x)
+    return [v1, v2, v3]
+end
+
+function crosscall(a, b)
+    v1 = a[2](b[3]) - a[3](b[2])
+    v2 = a[3](b[1]) - a[1](b[3])
+    v3 = a[1](b[2]) - a[2](b[1])
+    return Num[v1, v2, v3]
+end
+
+function LinearAlgebra.cross(D::ArrayDifferentialOperator, x::AbstractVector)
+    length(D.vars) == length(x) == 3 || throw(DimensionMismatch("Cross product is only defined in 3 dimensions."))
+    return crosscall(D.differentials, x)
+end
+
+function LinearAlgebra.cross(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
+    length(D1.vars) == length(D2.vars) == 3 || throw(DimensionMismatch("Cross product is only defined in 3 dimensions."))
+    check_composable(D1, D2)
+    return ArrayDifferentialOperator(D1.vars, crosscompose(D1.differentials, D2.differentials), "(" * D1.name * "×" * D2.name * ")")
+end
+
+Base.show(io::IO, D::ArrayDifferentialOperator) = print(io, D.name)
+Base.nameof(D::ArrayDifferentialOperator) = Symbol(D.name)
+
+function Base.:(==)(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
+    length(D1.vars) == length(D2.vars) || return false
+    all(isequal.(D1.vars, D2.vars)) || return false
+    @variables x[1:length(D1.vars)]
+    return all(isequal.(D1(collect(x)), D2(collect(x))))
+end
+Base.hash(D::ArrayDifferentialOperator, u::UInt) = hash(length(D.vars), hash(D.vars, u))

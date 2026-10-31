@@ -2,7 +2,7 @@ using Symbolics
 using SymbolicUtils
 using Test
 using LinearAlgebra, SparseArrays
-using Symbolics: value, unwrap
+using Symbolics: value, unwrap, scalarize, Nabla, Div, Curl, Laplacian
 
 # Derivatives
 @variables t σ ρ β
@@ -908,4 +908,86 @@ struct NoRuleCallable end
     @test isequal(expand_derivatives(Dx(a(x))), Dx(a(x)))
     @test isequal(expand_derivatives(Dx(h(f(x)))), Differential(f(x))(h(f(x))) * dscaledsquare(fs, x))
     @test isequal(expand_derivatives(Dt(z)), Dt(z))
+end
+
+## Vector Calculus
+let
+    @variables x[1:3] y[1:3]
+
+    ∇ = Nabla(x)
+
+    out = ∇(y)
+    @test all(isequal.(scalarize(out), [Differential(x[1])(y[1]), Differential(x[2])(y[2]), Differential(x[3])(y[3])]))
+
+
+    out = ∇ ⋅ y
+    @test isequal(out, Div(x)(y))
+    @test isequal(out, Differential(x[1])(y[1]) + Differential(x[2])(y[2]) + Differential(x[3])(y[3]))
+
+    out = ∇ × y
+    @test isequal(out, Curl(x)(y))
+    @test all(
+        isequal.(
+            scalarize(out), [
+                Differential(x[2])(y[3]) - Differential(x[3])(y[2]),
+                Differential(x[3])(y[1]) - Differential(x[1])(y[3]),
+                Differential(x[1])(y[2]) - Differential(x[2])(y[1]),
+            ]
+        )
+    )
+
+
+    out = (∇ ⋅ ∇)(y)
+    @test all(isequal.(scalarize(out), scalarize(Laplacian(x)(y))))
+    @test all(
+        isequal.(
+            scalarize(out),
+            [
+                Differential(x[1])(Differential(x[1])(y[1])) + Differential(x[2])(Differential(x[2])(y[1])) + Differential(x[3])(Differential(x[3])(y[1])),
+                Differential(x[1])(Differential(x[1])(y[2])) + Differential(x[2])(Differential(x[2])(y[2])) + Differential(x[3])(Differential(x[3])(y[2])),
+                Differential(x[1])(Differential(x[1])(y[3])) + Differential(x[2])(Differential(x[2])(y[3])) + Differential(x[3])(Differential(x[3])(y[3])),
+            ],
+        ),
+    )
+
+
+    out = (∇ × ∇)(y)
+
+    @test_broken isequal(out, Curl(x)(Curl(x)(y)))
+    @test all(
+        isequal.(
+            scalarize(out),
+            [
+                Differential(x[2])(Differential(x[3])(y[1])) - Differential(x[3])(Differential(x[2])(y[1])),
+                Differential(x[3])(Differential(x[1])(y[2])) - Differential(x[1])(Differential(x[3])(y[2])),
+                Differential(x[1])(Differential(x[2])(y[3])) - Differential(x[2])(Differential(x[1])(y[3])),
+            ],
+        ),
+    )
+
+    @variables a b
+    D = Nabla([a, b])
+    @test D(D)(D) == D(D(D))
+    @test hash(D(D)(D)) == hash(D(D(D)))
+    @test get(Dict(D(D)(D) => 1), D(D(D)), :missing) == 1
+    @test_throws DimensionMismatch Nabla([a])(Nabla([a, b]))
+    @test_throws DimensionMismatch Nabla([a, a])(Nabla([a]))
+    @test_throws DimensionMismatch LinearAlgebra.dot(Nabla([a]), Nabla([a, a]))
+    @test_throws DimensionMismatch LinearAlgebra.dot(Nabla([a, a]), Nabla([a]))
+    @variables c[1:3]
+    @test_throws DimensionMismatch LinearAlgebra.cross(Nabla([c[1], c[2]]), Nabla(c))
+    @test_throws DimensionMismatch LinearAlgebra.cross(Nabla(c), Nabla([c[1], c[2]]))
+    f = a^2 + b^2
+    grad = Nabla([a, b])(f)
+    @test grad isa Vector{Num}
+    @test isequal(expand_derivatives.(grad), [2a, 2b])
+    lap = Laplacian([a, b])(f)
+    @test lap isa Num
+    @test isequal(expand_derivatives(lap), 4)
+    @test isequal(Nabla([a, b])(1), [0, 0])
+    @test isequal(Nabla([a, b])(2.5), [0, 0])
+    @test isequal(expand_derivatives(Laplacian([a, b])(1)), 0)
+    directional = LinearAlgebra.dot([1, 2], Nabla([a, b]))
+    @test isequal(expand_derivatives.(directional([a^2, b^2])), [2a, 4b])
+    @test isequal(expand_derivatives(directional(a^2 + b^2)), 2a + 4b)
 end
