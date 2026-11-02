@@ -69,6 +69,29 @@ eqs = [x^2 + y + z - 1, x + y^2 + z - 1, x + y + z^2 - 1]
 Symbolics.symbolic_solve(eqs, [x,y,z])
 ```
 
+#### Assumptions made while solving
+
+Some solutions only hold under a condition the solver had to assume. For the
+parametric quartic below it divides by `A4 / A1`, so it assumes that quantity is
+not zero, and a periodic solution such as `θ + 2πn` needs `n` to be an integer.
+By default these conditions are logged. Pass `return_assumptions = true` to get
+them back instead, as the second element of a tuple:
+
+```@example solver
+@variables A1 A4;
+roots, assumptions = Symbolics.symbolic_solve(A1^2 * x^4 + A4^2, x; return_assumptions = true)
+assumptions
+```
+
+```@example solver
+roots, assumptions = Symbolics.symbolic_solve(cos(x) ~ 1//2, x; return_assumptions = true)
+assumptions
+```
+
+Each condition is a symbolic boolean expression and is listed once; the vector
+is empty when no assumption was needed. Only the assumptions made by the task
+that calls `symbolic_solve` are collected.
+
 ### SymPy Integration
 
 SymPy also includes solves as well, and the SymPy.jl extensions allow for automatically converting

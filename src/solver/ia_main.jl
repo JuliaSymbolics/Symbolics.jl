@@ -139,7 +139,9 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                     sol -> invop(sol) +
                            *(period, new_var),
                     rhs)
-                @info string(new_var) * " ϵ" * " Ζ"
+                record_assumption(
+                    SymbolicUtils.term(isinteger, unwrap(new_var); type = Bool),
+                    string(new_var) * " ϵ" * " Ζ")
             else
                 rhs = map(sol -> invop(sol), rhs)
             end
