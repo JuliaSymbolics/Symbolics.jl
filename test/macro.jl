@@ -166,6 +166,33 @@ end
 # @test foo(x, wrap(1)) isa Num
 # @test foo(x, wrap(6)) isa String
 
+@wrapped function wrapped_kw(x::Real; scale = 2, offset::Int = 0, rest...)
+    scale * x + offset + length(rest)
+end
+
+@testset "@wrapped keyword arguments" begin
+    @variables a
+    @test wrapped_kw(a) isa Num
+    @test isequal(wrapped_kw(a), 2a)
+    @test isequal(wrapped_kw(a; scale = 3, offset = 1), 3a + 1)
+    @test isequal(wrapped_kw(a; p = 1, q = 2), 2a + 2)
+    @test isequal(wrapped_kw(unwrap(a); scale = 5), unwrap(5a))
+    @test !(wrapped_kw(unwrap(a)) isa Num)
+end
+
+@testset "@wrapped rejects varargs" begin
+    for ex in (
+            :(
+                @wrapped function wrapped_va(x::Real, ys::Real...)
+                    x
+                end
+            ),
+            :(@wrapped wrapped_va(x::Real, ys...) = x),
+        )
+        @test_throws ArgumentError macroexpand(@__MODULE__, ex)
+    end
+end
+
 
 let
     vars = @variables t a b(a) c(..) x[1:2] y(t)[1:3] z(..)[1:2]
@@ -254,6 +281,24 @@ yyy = yy(t)
 @test !isequal(yyy, y)
 @variables y(::Real)
 @test isequal(yyy, y(t))
+
+@variables x
+incomplete_fntype_err = try
+    Symbolics.variable(:f, T = FnType)
+    error("expected ArgumentError")
+catch err
+    err
+end
+@test incomplete_fntype_err isa ArgumentError
+@test occursin("fully parameterized FnType", incomplete_fntype_err.msg)
+@test occursin("FnType{Tuple, Real, Nothing}", incomplete_fntype_err.msg)
+@test_throws ArgumentError Symbolics.variable(:f, T = FnType{Tuple, Real})
+@test_throws ArgumentError Symbolics.variable(:f, T = FnType{Tuple{Real}, Real})
+f = Symbolics.variable(:f, T = FnType{Tuple, Real, Nothing})
+@test f isa Symbolics.CallAndWrap{Num}
+@test symtype(unwrap(f)) === FnType{Tuple, Real, Nothing}
+@test 2f(x) isa Num
+@test 2f(x, x) isa Num
 
 spam(x) = 2x
 @register_symbolic spam(x::AbstractArray)
@@ -650,3 +695,5 @@ end
     # The generic hook leaves other keys alone.
     @test Symbolics.normalize_metadata_value(VariableFoo, 42) === 42
 end
+
+include("registration_signatures.jl")
