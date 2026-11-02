@@ -122,6 +122,9 @@ for pred in [:isequal, :(==)]
     end
 end
 
+Base.floor(d::Dual{T, Num}) where {T} = floor(value(d))
+Base.ceil(d::Dual{T, Num}) where {T} = ceil(value(d))
+
 ###################################
 # General Mathematical Operations #
 ###################################

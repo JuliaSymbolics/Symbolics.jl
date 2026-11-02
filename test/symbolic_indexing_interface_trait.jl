@@ -2,7 +2,7 @@ using Symbolics
 using SymbolicUtils
 using SymbolicIndexingInterface
 
-@test all(symbolic_type.([SymbolicUtils.BasicSymbolic, Symbolics.Num, Symbolics.CallAndWrap]) .==
+@test all(symbolic_type.([SymbolicUtils.BasicSymbolic, Symbolics.Num, Complex{Symbolics.Num}, Symbolics.CallAndWrap]) .==
           (ScalarSymbolic(),))
 @test symbolic_type(Symbolics.Arr) == ArraySymbolic()
 @variables x
@@ -14,6 +14,10 @@ using SymbolicIndexingInterface
 @test symbolic_type(Symbolics.unwrap(y .* y)) == ArraySymbolic()
 @variables z(..)
 @test symbolic_type(z) == ScalarSymbolic()
+@variables xc::Complex{Real}
+@test symbolic_type(xc) == ScalarSymbolic()
+@variables (yc::Complex{Real})[1:3]
+@test symbolic_type(yc) == ArraySymbolic()
 
 @variables x y z
 subs = Dict(x => 0.1, y => 2z)

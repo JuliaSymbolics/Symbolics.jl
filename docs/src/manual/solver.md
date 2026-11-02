@@ -14,6 +14,13 @@ One other symbolic solver is `symbolic_linear_solve` which is limited compared t
 Symbolics.symbolic_linear_solve
 ```
 
+`symbolic_linear_solve` was previously called `solve_for`, which is still exported but
+deprecated.
+
+```@docs
+Symbolics.solve_for
+```
+
 `symbolic_solve` only supports symbolic, i.e. non-floating point computations, and thus prefers equations
 where the coefficients are integer, rational, or symbolic. Floating point coefficients are transformed into
 rational values and BigInt values are used internally with a potential performance loss, and thus it is recommended
@@ -35,7 +42,6 @@ and the user wants the answer in terms of a single variable. Say `log(x) - a == 
 
 ```@docs
 Symbolics.solve_univar
-Symbolics.solve_multivar
 Symbolics.ia_solve
 Symbolics.ia_conditions!
 Symbolics.is_periodic
@@ -71,6 +77,8 @@ Symbolics expressions for use in its solvers.
 ```@docs
 Symbolics.sympy_linear_solve
 Symbolics.sympy_algebraic_solve
+Symbolics.sympy_pythoncall_linear_solve
+Symbolics.sympy_pythoncall_algebraic_solve
 ```
 
 ### Feature completeness
@@ -100,4 +108,4 @@ Out[3]= {{x -> (I \[Pi] + Log[3])/ProductLog[I \[Pi] + Log[3]]}}
 # References
 
 [^1]: [Rouillier, F. Solving Zero-Dimensional Systems Through the Rational Univariate Representation. AAECC 9, 433–461 (1999).](https://doi.org/10.1007/s002000050114)
-[^2]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
+[^2]: [R. W. Hamming, *Coding and Information Theory*, 1980](https://books.google.com/books/about/Coding_and_information_theory.html?hl=en&id=0d5QAAAAMAAJ).

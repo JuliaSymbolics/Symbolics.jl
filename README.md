@@ -1,7 +1,6 @@
 # Symbolics.jl
 
 [![Github Action CI](https://github.com/JuliaSymbolics/Symbolics.jl/workflows/CI/badge.svg)](https://github.com/JuliaSymbolics/Symbolics.jl/actions)
-[![codecov](https://codecov.io/gh/JuliaSymbolics/Symbolics.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/JuliaSymbolics/Symbolics.jl)
 [![Build Status](https://github.com/JuliaSymbolics/Symbolics.jl/workflows/CI/badge.svg)](https://github.com/JuliaSymbolics/Symbolics.jl/actions?query=workflow%3ACI)
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://docs.sciml.ai/Symbolics/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://docs.sciml.ai/Symbolics/dev/)
@@ -78,8 +77,7 @@ julia> substitute.(B, (Dict(x => 2.0, y => 3.0, t => 4.0),))
 
 ## Citation
 
-If you use Symbolics.jl, please [cite this paper](https://dl.acm.org/doi/10.1145/3511528.3511535) 
-(or see the free [arxiv version](https://arxiv.org/abs/2105.03949))
+If you use Symbolics.jl, please [cite this paper (free arXiv version)](https://arxiv.org/abs/2105.03949).
 
 ```bib
 @article{10.1145/3511528.3511535,

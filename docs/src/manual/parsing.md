@@ -14,5 +14,5 @@ the parsing.
 
 ```@docs
 parse_expr_to_symbolic
-@parse_expr_to_symbolic
+Symbolics.@parse_expr_to_symbolic
 ```

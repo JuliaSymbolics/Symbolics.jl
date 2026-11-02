@@ -43,6 +43,16 @@ Symbolics.solve_symbolic_IVP
 Symbolics.solve_linear_ode_system
 ```
 
+### Laplace Transform
+
+The Laplace transform can be used to solve ODEs by transforming the whole equation, solving algebraically, then applying the inverse transform. The Laplace transform and inverse transform functionality is currently based on a rule table and applying linearity, so this method is limited in what expressions are able to be transformed and inverse transformed.
+
+```@docs
+Symbolics.laplace
+Symbolics.inverse_laplace
+Symbolics.laplace_solve_ode
+```
+
 ### SymPy 
 
 ```@docs

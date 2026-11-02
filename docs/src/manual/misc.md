@@ -13,4 +13,16 @@ Symbolics.NAMESPACE_SEPARATOR
 ```@docs
 Symbolics.linear_expansion
 Symbolics.LinearExpander
+Symbolics._toexpr_metadata
+Symbolics._toexpr_op
+```
+
+## Deprecated
+
+These names are still exported so that existing code keeps working, but each one warns on
+use and will be removed in the next breaking release.
+
+```@docs
+Symbolics.infimum
+Symbolics.supremum
 ```

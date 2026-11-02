@@ -109,6 +109,8 @@ function n_func_occ(expr, var)
                         n += n_func_occ(sub_arg, var)
                     end
                 end
+            elseif oper_arg !== (^)
+                n += n_func_occ(arg, var)
             end
 
         end

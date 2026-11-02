@@ -1,5 +1,6 @@
 SymbolicUtils.promote_symtype(::typeof(imag), ::Type{Complex{T}}) where {T} = T
 Base.promote_rule(::Type{Complex{T}}, ::Type{S}) where {T<:Real, S<:Num} =  Complex{S} # 283
+Base.promote_rule(::Type{Complex{T}}, ::Type{Num}) where {T <: Real} = Complex{Num}
 
 is_wrapper_type(::Type{Complex{Num}}) = true
 has_symwrapper(::Type{<:Complex{T}}) where {T<:Real} = true

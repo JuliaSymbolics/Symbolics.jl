@@ -125,3 +125,9 @@ end
     @variables y
     @test ForwardDiff.derivative(x -> promote(x, y)[1], 1) === Num(1)
 end
+
+@testset "symbolic rounding discontinuities" begin
+    @variables y
+    @test iszero(ForwardDiff.derivative(floor, y))
+    @test iszero(ForwardDiff.derivative(ceil, y))
+end

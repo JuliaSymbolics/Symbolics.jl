@@ -7,13 +7,16 @@ Symbolics.jl provides a metadata system for attaching additional information to 
 Metadata can be attached to variables when they are created with the `@variables` macro. Common metadata includes default values and other annotations:
 
 ```julia
-using Symbolics
+using Symbolics, Latexify
 
 # Variable with default value
 @variables x=1.0 y=2.0
 
 # Variables with custom metadata (once registered)
 @variables z [description="Temperature in Kelvin"]
+
+# Per-variable LaTeX rendering (see also the Latexification section in I/O)
+@variables w0 [latexwrapper = s -> raw"\omega_{0}"]
 ```
 
 ## Extending Metadata
@@ -38,7 +41,8 @@ Symbolics.option_to_metadata_type(::Val{:my_custom}) = MyCustomMetadata
 ```@docs
 Symbolics.VariableDefaultValue
 Symbolics.VariableSource
-Symbolics.CallWithMetadata
-Symbolics.Unknown
 Symbolics.option_to_metadata_type
 ```
+
+`Symbolics.Unknown` is reexported from
+[SymbolicUtils](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.Unknown).

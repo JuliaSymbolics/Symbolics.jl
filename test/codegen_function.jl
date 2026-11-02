@@ -13,7 +13,7 @@ RuntimeGeneratedFunctions.init(@__MODULE__)
 ir = IRStructure{SymReal}()
 
 @testset "NaNMath" begin
-    oop, iip = Symbolics.codegen_function(ir, [sqrt(a), sin(b)], [[a, b]]; nanmath = true)
+    oop, iip = Symbolics.codegen_function(ir, [sqrt(a), sin(b)], [[a, b]]; nanmath = true, sort_addmul = true)
     oop = eval(oop)
     @test all(isnan, @invokelatest oop([-1, Inf]))
     out = [0, 0.0]
@@ -37,17 +37,17 @@ end
         out .= [a[1] + b[1] + c[1] + c[2], c[3] + d[1] + e[1] + g[1], 0]
     end
 
-    h_str = Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]])
-    h_str2 = Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]])
+    h_str = Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]]; sort_addmul = true)
+    h_str2 = Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]]; sort_addmul = true)
     @test h_str[1] == h_str2[1]
     @test h_str[2] == h_str2[2]
 
     h_oop = eval(h_str[1])
-    h_str_3 = Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]]; iip_config = (false, true))
-    h_str_4 = Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]]; iip_config = (true, false))
+    h_str_3 = Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]]; iip_config = (false, true), sort_addmul = true)
+    h_str_4 = Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]]; iip_config = (true, false), sort_addmul = true)
 
     h_ip! = eval(h_str[2])
-    h_ip_skip! = eval(Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]], skipzeros = true)[2])
+    h_ip_skip! = eval(Symbolics.codegen_function(ir, h, [[a], [b], [c1, c2, c3], [d], [e], [g]], skipzeros = true, sort_addmul = true)[2])
 
     h3_oop = let f = eval(h_str_3[1])
         (args...) -> @invokelatest f(args...)
@@ -89,7 +89,7 @@ end
         out .= [a[1] + b[1] + c[1]; c[2] + c[3] + g[1]]
     end
 
-    h_str_skip = Symbolics.codegen_function(ir, h_skip, [[a], [b], [c1, c2, c3], [], [], [g]]; checkbounds = true)
+    h_str_skip = Symbolics.codegen_function(ir, h_skip, [[a], [b], [c1, c2, c3], [], [], [g]]; checkbounds = true, sort_addmul = true)
     h_oop_skip = let f = eval(h_str_skip[1])
         (args...) -> @invokelatest f(args...)
     end
@@ -118,8 +118,8 @@ end
 @testset "Multiple input scalar result" begin
     h_scalar = a + b + c1 + c2 + c3 + d + e + g
     h_julia_scalar(a, b, c, d, e, g) = a[1] + b[1] + c[1] + c[2] + c[3] + d[1] + e[1] + g[1]
-    h_str_scalar, _ = Symbolics.codegen_function(ir, h_scalar, [[a], [b], [c1, c2, c3], [d], [e], [g]])
-    h_str_scalar2, _ = Symbolics.codegen_function(ir, h_scalar, [[a], [b], [c1, c2, c3], [d], [e], [g]])
+    h_str_scalar, _ = Symbolics.codegen_function(ir, h_scalar, [[a], [b], [c1, c2, c3], [d], [e], [g]]; sort_addmul = true)
+    h_str_scalar2, _ = Symbolics.codegen_function(ir, h_scalar, [[a], [b], [c1, c2, c3], [d], [e], [g]]; sort_addmul = true)
     @test h_str_scalar == h_str_scalar2
 
     h_oop_scalar = let f = eval(h_str_scalar)
@@ -131,24 +131,24 @@ end
 
 @testset "Dependent variable arguments" begin
     @variables t x(t) y(t) k
-    f = let _f = eval(Symbolics.codegen_function(ir, (x + y) / k, [[x, y, k]])[1])
+    f = let _f = eval(Symbolics.codegen_function(ir, (x + y) / k, [[x, y, k]]; sort_addmul = true)[1])
         (args...) -> @invokelatest _f(args...)
     end
     @test f([1, 1, 2]) == 1
 
-    f = let _f = eval(Symbolics.codegen_function(ir, [(x + y) / k], [[x, y, k]])[1])
+    f = let _f = eval(Symbolics.codegen_function(ir, [(x + y) / k], [[x, y, k]]; sort_addmul = true)[1])
         (args...) -> @invokelatest _f(args...)
     end
     @test f([1, 1, 2]) == [1]
 
-    f = let _f = eval(Symbolics.codegen_function(ir, [(x + y) / k], [[x, y, k]])[2])
+    f = let _f = eval(Symbolics.codegen_function(ir, [(x + y) / k], [[x, y, k]]; sort_addmul = true)[2])
         (args...) -> @invokelatest _f(args...)
     end
     z = [0.0]
     f(z, [1, 1, 2])
     @test z == [1]
 
-    f = let _f = eval(Symbolics.codegen_function(ir, sparse([1], [1], [(x + y) / k], 10, 10), [[x, y, k]])[1])
+    f = let _f = eval(Symbolics.codegen_function(ir, sparse([1], [1], [(x + y) / k], 10, 10), [[x, y, k]]; sort_addmul = true)[1])
         (args...) -> @invokelatest _f(args...)
     end
 
@@ -161,7 +161,7 @@ end
     @variables a b c
 
     x = reshape(sparse([0 a 0; 0 b c]), 3, 2)
-    f1, f2 = Symbolics.codegen_function(ir, x, [[a, b, c]])
+    f1, f2 = Symbolics.codegen_function(ir, x, [[a, b, c]]; sort_addmul = true)
     f1 = @RuntimeGeneratedFunction(f1)
     f2 = @RuntimeGeneratedFunction(f2)
     y = f1([1, 2, 3])
@@ -170,7 +170,7 @@ end
     @test y.parent.rowval == x.parent.rowval
     @test y == [0 2; 0 0; 1 3]
 
-    f1, f2 = Symbolics.codegen_function(ir, @views(x[2:3, 1:2]), [[a, b, c]])
+    f1, f2 = Symbolics.codegen_function(ir, @views(x[2:3, 1:2]), [[a, b, c]]; sort_addmul = true)
     f1 = @RuntimeGeneratedFunction(f1)
     f2 = @RuntimeGeneratedFunction(f2)
     y = f1([1, 2, 3])
@@ -182,7 +182,7 @@ end
     @variables x
     y = sparse(1:3, 1:3, x)
 
-    f1, f2 = Symbolics.codegen_function(ir, y, [x])
+    f1, f2 = Symbolics.codegen_function(ir, y, [x]; sort_addmul = true)
     sf1, sf2 = string(f1), string(f2)
     @test !contains(sf1, "CartesianIndex")
     @test !contains(sf2, "CartesianIndex")
@@ -203,7 +203,7 @@ end
 
     sj = Symbolics.sparsejacobian(F(z), z)
 
-    f_expr = Symbolics.codegen_function(ir, sj, [z])
+    f_expr = Symbolics.codegen_function(ir, sj, [z]; sort_addmul = true)
     myf = eval(first(f_expr))
     J = @invokelatest myf(rand(N))
 
@@ -227,7 +227,7 @@ end
     end
     f, _ = Symbolics.codegen_function(
         ir, ex, [[unwrap(x)], unwrap(t), [unwrap(p)]];
-        wrap_code = (header, identity)
+        wrap_code = (header, identity), sort_addmul = true
     )
     f = @RuntimeGeneratedFunction(f)
     p = (a = 10, p = [2])
@@ -236,16 +236,16 @@ end
 
 @testset "Issue#658" begin
     @variables a, X1[1:3], X2[1:3]
-    k = eval(Symbolics.codegen_function(ir, a * X1 + X2, [X1, X2, a])[1])
+    k = eval(Symbolics.codegen_function(ir, a * X1 + X2, [X1, X2, a]; sort_addmul = true)[1])
     @test @invokelatest(k(ones(3), ones(3), 1.5)) == [2.5, 2.5, 2.5]
 end
 
 @testset "`similarto`" begin
     @variables x[1:2]
     T = collect(unwrap(x .^ 2))
-    fn = @RuntimeGeneratedFunction(Symbolics.codegen_function(ir, T, [collect(x)])[1])
+    fn = @RuntimeGeneratedFunction(Symbolics.codegen_function(ir, T, [collect(x)]; sort_addmul = true)[1])
     @test_throws MethodError fn((1.0, 2.0))
-    fn = @RuntimeGeneratedFunction(Symbolics.codegen_function(ir, T, [collect(x)]; similarto = Array)[1])
+    fn = @RuntimeGeneratedFunction(Symbolics.codegen_function(ir, T, [collect(x)]; similarto = Array, sort_addmul = true)[1])
     @test fn((1.0, 2.0)) ≈ [1.0, 4.0]
 end
 
@@ -263,7 +263,7 @@ end
     f_test(J, u)
     up_J = UpperTriangular(J - Diagonal(J))
 
-    out, fjac_upper_expr = Symbolics.codegen_function(ir, up_J, [u]; skipzeros = true)
+    out, fjac_upper_expr = Symbolics.codegen_function(ir, up_J, [u]; skipzeros = true, sort_addmul = true)
     fjac_upper_expr = @RuntimeGeneratedFunction(fjac_upper_expr)
     Jtmp = UpperTriangular(zeros(2, 2))
     utmp = rand(2)
@@ -278,7 +278,7 @@ end
     oopexprs = Expr[]
     iipexprs = Expr[]
     for i in 1:10
-        foop, fiip = Symbolics.codegen_function(ir, expr, args)
+        foop, fiip = Symbolics.codegen_function(ir, expr, args; sort_addmul = true)
         push!(oopexprs, foop)
         push!(iipexprs, fiip)
     end
@@ -286,3 +286,225 @@ end
     @test allequal(iipexprs)
 end
 
+
+@testset "Issue#1999: out-of-place codegen over multiple sparse matrices" begin
+    @variables x1999 y1999
+    vals = [2.0, 3.0]
+    # different nonzero counts
+    mats_diff = [
+        sparse([1, 2], [1, 2], [x1999, y1999], 2, 2),
+        sparse([1], [1], [x1999 + y1999], 2, 2),
+    ]
+    expected_diff = [sparse([2.0 0.0; 0.0 3.0]), sparse([5.0 0.0; 0.0 0.0])]
+    # equal nonzero counts but different sparsity patterns
+    mats_same = [
+        sparse([1], [1], [x1999], 2, 2),
+        sparse([2], [2], [y1999], 2, 2),
+    ]
+    expected_same = [sparse([2.0 0.0; 0.0 0.0]), sparse([0.0 0.0; 0.0 3.0])]
+    for (name, mats, expected) in (("different nonzero counts", mats_diff, expected_diff),
+            ("equal nonzero counts, different patterns", mats_same, expected_same))
+        @testset "$name" begin
+            f_bf = let _f = eval(Symbolics.build_function(mats, [x1999, y1999])[1])
+                (args...) -> @invokelatest _f(args...)
+            end
+            f_cg = let _f = eval(Symbolics.codegen_function(ir, mats, [[x1999, y1999]]; sort_addmul = true)[1])
+                (args...) -> @invokelatest _f(args...)
+            end
+            for f in (f_bf, f_cg)
+                got = f(vals)
+                @test length(got) == length(expected)
+                for (g, e) in zip(got, expected)
+                    @test g isa SparseMatrixCSC
+                    @test Matrix(g) == Matrix(e)
+                    @test g.rowval == e.rowval
+                    @test g.colptr == e.colptr
+                end
+            end
+        end
+    end
+end
+
+@testset "`CodegenFunctionOptions` struct interface" begin
+    @variables a b c1 c2 c3 d e g
+    @test (@doc Symbolics.CodegenFunctionOptions) !== nothing
+    @test (@doc Symbolics.codegen_function) !== nothing
+    @static if VERSION >= v"1.11"
+        @test Base.ispublic(Symbolics, :CodegenFunctionOptions)
+        @test Base.ispublic(Symbolics, :codegen_function)
+    end
+    # `CodegenFunctionOptions` is a single concrete type regardless of which options are set, so
+    # functions that thread it through do not recompile per option-combination.
+    @test isconcretetype(Symbolics.CodegenFunctionOptions)
+    o1 = Symbolics.CodegenFunctionOptions(; nanmath = true)
+    o2 = Symbolics.CodegenFunctionOptions(;
+        nanmath = false, wrap_code = (x -> x, x -> x), checkbounds = true,
+        iip_config = (true, false), sort_addmul = true, skipzeros = true, optimize = nothing)
+    @test typeof(o1) === typeof(o2) === Symbolics.CodegenFunctionOptions
+
+    # scalar/vector path: keyword form and struct form are identical
+    kw = Symbolics.codegen_function(ir, [sqrt(a), sin(b)], [[a, b]]; nanmath = true, sort_addmul = true)
+    st = Symbolics.codegen_function(ir, [sqrt(a), sin(b)], [[a, b]],
+        Symbolics.CodegenFunctionOptions(; nanmath = true, sort_addmul = true))
+    @test string(kw) == string(st)
+
+    # array path: keyword form and struct form are identical
+    h = [a + b, c1 * c2, d / e]
+    args = [[a], [b], [c1, c2, c3], [d], [e], [g]]
+    kw2 = Symbolics.codegen_function(ir, h, args; skipzeros = true, checkbounds = true, sort_addmul = true)
+    st2 = Symbolics.codegen_function(ir, h, args,
+        Symbolics.CodegenFunctionOptions(; skipzeros = true, checkbounds = true, sort_addmul = true))
+    @test string(kw2) == string(st2)
+
+    # unknown keyword arguments are dropped (backwards compatible with the old `kwargs...` sink)
+    with_bogus = Symbolics.codegen_function(ir, [sqrt(a)], [[a]]; nanmath = true, sort_addmul = true, bogus = 42)
+    without = Symbolics.codegen_function(ir, [sqrt(a)], [[a]]; nanmath = true, sort_addmul = true)
+    @test string(with_bogus) == string(without)
+end
+
+# Records the `rewrites` that `codegen_function` hands to SymbolicUtils' code generation.
+struct RewritesProbe end
+const PROBED_REWRITES = Dict{Any, Any}()
+function SymbolicUtils.Code.codegen_function!(
+        ::RewritesProbe, cs::SymbolicUtils.Code.CodegenState{T},
+        expr::SymbolicUtils.BasicSymbolic{T}, expr_idx::Integer
+    ) where {T}
+    merge!(PROBED_REWRITES, cs.rewrites)
+    return SymbolicUtils.Code.codegen!(cs, expr_idx, cs(only(arguments(expr))))
+end
+
+@testset "`scalarize_single_element_regions`" begin
+    @test Symbolics.CodegenFunctionOptions().scalarize_single_element_regions
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    # Both `codegen_function` methods: a symbolic expression and an array of them.
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; scalarize_single_element_regions = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:scalarize_single_element_regions] === something(setting, true)
+    end
+
+    # Longer than `SymbolicUtils.Code.FILL_ARR_LIMIT`, so the output is not scalarized as a whole.
+    @variables p[1:20] q[1:20]
+    regions = [[1:19], [20:20]]
+    values = [unwrap(p[1:19] .+ q[1:19]), unwrap(p[20:20] .- q[1:1])]
+    maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(regions, values)
+    _, iip = Symbolics.codegen_function(ir, maker, [p, q])
+    @test occursin("batched_setindex!", string(iip))
+    # SymbolicUtils honours the rewrite from the first release after 4.50.0
+    # (JuliaSymbolics/SymbolicUtils.jl#1154).
+    if pkgversion(SymbolicUtils) > v"4.50.0"
+        _, iip = Symbolics.codegen_function(ir, maker, [p, q]; scalarize_single_element_regions = false)
+        @test !occursin("batched_setindex!", string(iip))
+        f! = eval(iip)
+        out = zeros(20)
+        Base.invokelatest(f!, out, collect(1.0:20), collect(10.0:10:200))
+        @test out ≈ [collect(1.0:19) .+ collect(10.0:10:190); 20.0 - 10.0]
+    end
+end
+
+@testset "`fuse_broadcasts`" begin
+    @test !Symbolics.CodegenFunctionOptions().fuse_broadcasts
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; fuse_broadcasts = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:fuse_broadcasts] === something(setting, false)
+    end
+
+    # SymbolicUtils fuses from the release that adds `Code.FUSE_BROADCASTS_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_BROADCASTS_KEY)
+        @variables p[1:20] q[1:20]
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(
+            [[1:19], [20:20]], [unwrap(p[2:20] .- 2 .* q[1:19]), unwrap(p[1:1] .+ q[20:20])]
+        )
+        _, iip = Symbolics.codegen_function(ir, maker, [p, q]; fuse_broadcasts = true)
+        @test occursin("fused_materialize!", string(iip))
+        f! = eval(iip)
+        out = zeros(20)
+        pv, qv = collect(1.0:20), collect(10.0:10:200)
+        Base.invokelatest(f!, out, pv, qv)
+        @test out == [pv[2:20] .- 2 .* qv[1:19]; pv[1] + qv[20]]
+    end
+end
+
+@testset "`fuse_unalias`" begin
+    @test Symbolics.CodegenFunctionOptions().fuse_unalias
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]]))
+        empty!(PROBED_REWRITES)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args)
+        @test PROBED_REWRITES[:fuse_unalias] === true
+        empty!(PROBED_REWRITES)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; fuse_unalias = false)
+        @test PROBED_REWRITES[:fuse_unalias] === false
+    end
+
+    # SymbolicUtils updates in place from the release that adds `Code.FUSE_UNALIAS_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_UNALIAS_KEY)
+        @variables p[1:20] q[1:20] dt
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(
+            [[1:10], [11:20]],
+            [unwrap(p[1:10] .+ dt .* q[1:10]), unwrap(p[11:20] .- dt .* q[11:20])]
+        )
+        _, iip = Symbolics.codegen_function(
+            ir, maker, [p, q, dt];
+            fuse_broadcasts = true, fuse_unalias = false
+        )
+        @test occursin("fused_materialize_noalias!", string(iip))
+        @test !occursin("unalias(", replace(string(iip), "noalias" => ""))
+        f! = eval(iip)
+        pv, qv = collect(1.0:20), collect(10.0:10:200)
+        expected = [pv[1:10] .+ 0.5 .* qv[1:10]; pv[11:20] .- 0.5 .* qv[11:20]]
+        Base.invokelatest(f!, pv, pv, qv, 0.5)
+        @test pv == expected
+    end
+end
+
+@testset "`fuse_output_eltype`" begin
+    @test !Symbolics.CodegenFunctionOptions().fuse_output_eltype
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; fuse_output_eltype = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:fuse_output_eltype] === something(setting, false)
+    end
+
+    # SymbolicUtils converts from the release that adds `Code.FUSE_OUTPUT_ELTYPE_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_OUTPUT_ELTYPE_KEY)
+        @variables p[1:20] q[1:20]
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}([[1:20]], [unwrap(p .+ 0.1 .* q)])
+        _, iip = Symbolics.codegen_function(
+            ir, maker, [p, q]; fuse_broadcasts = true, fuse_output_eltype = true
+        )
+        f! = eval(iip)
+        pv, qv = Float32.(1:20) ./ 3, Float32.(20:-1:1) ./ 7
+        out = zeros(Float32, 20)
+        Base.invokelatest(f!, out, pv, qv)
+        @test out == pv .+ 0.1f0 .* qv
+    end
+end
+
+@testset "`use_literal_pow`" begin
+    @test Symbolics.CodegenFunctionOptions().use_literal_pow
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; use_literal_pow = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:use_literal_pow] === something(setting, true)
+    end
+
+    # SymbolicUtils honours the rewrite from the release that adds `Code.USE_LITERAL_POW_KEY`.
+    if isdefined(SymbolicUtils.Code, :USE_LITERAL_POW_KEY)
+        @variables xlp
+        oop, _ = Symbolics.codegen_function(ir, xlp^3, [[xlp]])
+        @test occursin("literal_pow", string(oop))
+        @test @invokelatest(eval(oop)([2])) == 8
+        oop, _ = Symbolics.codegen_function(ir, xlp^3, [[xlp]]; use_literal_pow = false)
+        @test !occursin("literal_pow", string(oop))
+        @test @invokelatest(eval(oop)([2])) == 8
+    end
+end

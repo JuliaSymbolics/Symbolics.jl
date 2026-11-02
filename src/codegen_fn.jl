@@ -37,16 +37,129 @@ function canonicalize_args(args::Vector, inbounds::Bool)
     end
 end
 
-function codegen_function(
-        ir::IRStructure{VartypeT}, expr, args::Vector;
+"""
+    CodegenFunctionOptions(; kwargs...)
+
+Bundle of options controlling code generation in [`codegen_function`](@ref).
+
+Historically `codegen_function` accepted these as a `kwargs...` splat. Threading a
+`kwargs...` bundle means every function that forwards codegen options gets specialized (and
+recompiled) once per distinct *set* of keyword arguments, even when the values it forwards
+are irrelevant to it. `CodegenFunctionOptions` is a single, non-parametric concrete type: no matter
+which options are set, its type is always `CodegenFunctionOptions`, so functions that thread it
+through only need to be compiled once.
+
+The keyword constructor mirrors the historical keyword arguments of `codegen_function`
+exactly, including their defaults. Unknown keyword arguments are ignored (as they were
+previously silently dropped by `codegen_function`), preserving backwards compatibility.
+
+Fields:
+
+- `nanmath`: rewrite math functions to their `NaN`-safe variants.
+- `wrap_code`: a 2-tuple of transformations applied to the out-of-place and in-place
+  `Func`s respectively.
+- `checkbounds`: emit bounds checks (when `false`, generated code is wrapped in
+  `@inbounds`).
+- `iip_config`: a 2-tuple of `Bool`s indicating whether to generate the out-of-place and
+  in-place functions respectively.
+- `sort_addmul`: sort the arguments of `+`/`*` for deterministic codegen.
+- `optimize`: optimization rules to apply, or `nothing`.
+- `similarto`: the array type (or name) to generate for array outputs, or `nothing` to
+  infer it.
+- `outputidxs`: explicit output indices for in-place array codegen, or `nothing`.
+- `skipzeros`: skip writing structural zeros in in-place array codegen.
+- `scalarize_single_element_regions`: when `false`, a single-element region of an
+  `ArrayMaker` output that holds an array expression is written through a view of the
+  output instead of being scalarized. Arrays that disallow scalar indexing, such as GPU
+  arrays, need `false`.
+- `fuse_broadcasts`: when `true`, each elementwise array expression is generated as one
+  fused broadcast, slices of arguments are read through views, and `ArrayMaker` regions are
+  written in place, so a GPU array takes one kernel per region rather than one per
+  operation. Each fused expression is compiled separately, so this is off by default.
+- `fuse_unalias`: when `false`, fused `ArrayMaker` regions do not copy inputs that might
+  share memory with the output. Set it only when no region reads memory that a region
+  writes, except elements read at the same index they are written, as in an in-place
+  update `u[r] .= u[r] .+ dt .* f`.
+- `fuse_output_eltype`: when `true`, floating-point scalar arguments of fused `ArrayMaker`
+  regions, such as literals, are converted to the output's element type once per call, so a
+  `Float32` output is computed in `Float32` arithmetic. This rounds them to that type, so it
+  is off by default.
+- `use_literal_pow`: Whether to lower `x ^ n` for a constant literal `n` to
+  `Base.literal_pow(^, x, Val(n))`. This improves the runtime performance of the generated code,
+  but may be incompatible with symbolic tracing. Defaults to `true`.
+"""
+struct CodegenFunctionOptions
+    nanmath::Bool
+    wrap_code::Tuple
+    checkbounds::Bool
+    iip_config::NTuple{2, Bool}
+    sort_addmul::Bool
+    optimize::Any
+    similarto::Any
+    outputidxs::Any
+    skipzeros::Bool
+    scalarize_single_element_regions::Bool
+    fuse_broadcasts::Bool
+    fuse_unalias::Bool
+    fuse_output_eltype::Bool
+    use_literal_pow::Bool
+end
+
+function CodegenFunctionOptions(;
         nanmath::Bool = true, wrap_code::Tuple = (identity, identity),
-        checkbounds = false, iip_config::NTuple{2, Bool} = (true, true), kwargs...
+        checkbounds = false, iip_config::NTuple{2, Bool} = (true, true),
+        sort_addmul = false, optimize = nothing, similarto = nothing,
+        outputidxs = nothing, skipzeros = false, scalarize_single_element_regions = true,
+        fuse_broadcasts = false, fuse_unalias = true,
+        fuse_output_eltype = false, use_literal_pow = true, kwargs...
     )
+    return CodegenFunctionOptions(
+        nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
+        similarto, outputidxs, skipzeros, scalarize_single_element_regions, fuse_broadcasts,
+        fuse_unalias, fuse_output_eltype, use_literal_pow
+    )
+end
+
+"""
+    codegen_function(ir, expr, args[, options])
+    codegen_function(ir, expr, args; kwargs...)
+
+Generate out-of-place and in-place Julia function expressions for `expr` using a
+`SymbolicUtils.IRStructure`. `args` is a vector whose elements describe each generated function
+argument as either a scalar symbolic value or a collection of symbolic values.
+
+Pass a [`CodegenFunctionOptions`](@ref) as `options`, or pass the same settings as keyword
+arguments. The result is a 2-tuple containing the out-of-place and in-place function
+expressions. The requested `iip_config` and the shape of `expr` determine which variants are
+implemented.
+
+This is the low-level code-generation interface for consumers that already maintain a
+`SymbolicUtils.IRStructure`. Prefer [`build_function`](@ref) when starting from ordinary symbolic
+expressions.
+"""
+function codegen_function(ir::IRStructure{VartypeT}, expr, args::Vector; kwargs...)
+    return codegen_function(ir, expr, args, CodegenFunctionOptions(; kwargs...))
+end
+
+function codegen_function(
+        ir::IRStructure{VartypeT}, expr, args::Vector, opts::CodegenFunctionOptions
+    )
+    (; nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
+        scalarize_single_element_regions, fuse_broadcasts, fuse_unalias,
+        fuse_output_eltype, use_literal_pow) = opts
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
     if nanmath
         rewrites[:nanmath] = true
     end
+    rewrites[:sort_addmul] = sort_addmul
+    rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
+    rewrites[Code.FUSE_BROADCASTS_KEY] = fuse_broadcasts
+    rewrites[Code.FUSE_UNALIAS_KEY] = fuse_unalias
+    rewrites[Code.FUSE_OUTPUT_ELTYPE_KEY] = fuse_output_eltype
+    rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
+
+    ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
 
     if iip_config[1]
         oopfn = wrap_code[1](Func(args, [], expr))
@@ -88,24 +201,33 @@ end
 
 function codegen_function(
         ir::IRStructure{VartypeT}, expr::Union{Arr, Num, CallAndWrap, SymStruct},
-        args::Vector; kwargs...
+        args::Vector, opts::CodegenFunctionOptions
     )
-    return codegen_function(ir, unwrap(expr), args; kwargs...)
+    return codegen_function(ir, unwrap(expr), args, opts)
 end
 
 function codegen_function(
-        ir::IRStructure{VartypeT}, expr::AbstractArray, args::Vector;
-        similarto = nothing, nanmath::Bool = true, wrap_code::Tuple = (identity, identity),
-        iip_config::NTuple{2, Bool} = (true, true), outputidxs = nothing,
-        skipzeros = false, checkbounds = false, kwargs...
+        ir::IRStructure{VartypeT}, expr::AbstractArray, args::Vector,
+        opts::CodegenFunctionOptions
     )
+    (; similarto, nanmath, wrap_code, iip_config, outputidxs, skipzeros, checkbounds,
+        optimize, sort_addmul, scalarize_single_element_regions, fuse_broadcasts, fuse_unalias,
+        fuse_output_eltype, use_literal_pow) = opts
     args = canonicalize_args(args, !checkbounds)
     rewrites = Dict()
     if nanmath
         rewrites[:nanmath] = true
     end
+    rewrites[:sort_addmul] = sort_addmul
+    rewrites[:scalarize_single_element_regions] = scalarize_single_element_regions
+    rewrites[Code.FUSE_BROADCASTS_KEY] = fuse_broadcasts
+    rewrites[Code.FUSE_UNALIAS_KEY] = fuse_unalias
+    rewrites[Code.FUSE_OUTPUT_ELTYPE_KEY] = fuse_output_eltype
+    rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
 
     expr = _recursive_unwrap(expr)
+
+    ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
 
     i = findfirst(x -> x isa DestructuredArgs, args)
     if similarto === nothing

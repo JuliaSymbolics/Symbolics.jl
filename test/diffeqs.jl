@@ -60,10 +60,10 @@ C = Symbolics.variables(:C, 1:5)
 ## resonant response formula
 @test isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [9, -6], 4exp(3t))), C[1]*exp(3t) + C[2]*t*exp(3t) + 2(t^2)*exp(3t))
 ### trig functions
-@test isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [6, 5], 2exp(-t)*cos(t))), C[1]*exp(-2//1 * t) + C[2]*exp(-3//1 * t) + (1//5)*exp(-t)*cos(t)+(3//5)*exp(-t)*sin(t))
+@test isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [6, 5], 2exp(-t)*cos(t))), C[1]*exp(-3//1 * t) + C[2]*exp(-2//1 * t) + (1//5)*exp(-t)*cos(t)+(3//5)*exp(-t)*sin(t))
 
 ## undetermined coefficients
-@test isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5)), C[1]exp(t) + C[2]exp(-3t) - (2//3)t + 11//9)
+@test isequal(symbolic_solve_ode(SymbolicLinearODE(x, t, [-3, 2], 2t - 5)), C[1]exp(-3t) + C[2]exp(t) - (2//3)t + 11//9)
 @test isequal(find_particular_solution(SymbolicLinearODE(x, t, [1, 0], t^2)), t^2 - 2)
 
 # Parsing

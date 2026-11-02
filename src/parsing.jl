@@ -121,6 +121,13 @@ function parse_expr_to_symbolic(ex::Expr, mod::Union{Module,AbstractDict})
             return Term{VartypeT}(x, parsed_args; type = Real)
         end
     elseif ex.head == :ref
+        # Prefer an explicit dict entry for indexed names (e.g. Symbol("a[1]")).
+        if mod isa AbstractDict
+            fullname = Symbol(string(ex))
+            if haskey(mod, fullname)
+                return mod[fullname]
+            end
+        end
         arr = parse_expr_to_symbolic(ex.args[1], mod)
         indices = parse_expr_to_symbolic.(ex.args[2:end], Ref(mod))
         return arr[indices...]
