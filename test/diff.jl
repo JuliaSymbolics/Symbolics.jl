@@ -952,8 +952,6 @@ let
 
 
     out = (∇ × ∇)(y)
-
-    @test_broken isequal(out, Curl(x)(Curl(x)(y)))
     @test all(
         isequal.(
             scalarize(out),
@@ -964,6 +962,16 @@ let
             ],
         ),
     )
+
+    # Mixed partials are not reordered symbolically, so check the identities on concrete
+    # fields: ∇×∇ vanishes, and ∇×(∇×v) == ∇(∇⋅v) - Δv.
+    @variables p q r
+    ∇pqr = Nabla([p, q, r])
+    v = [p^2 * q * r, p * q^3 + sin(r), cos(p) * r^2]
+    @test all(iszero, expand_derivatives.((∇pqr × ∇pqr)(v)))
+    curlcurl = expand_derivatives.(Curl([p, q, r])(Curl([p, q, r])(v)))
+    graddiv_minus_lap = expand_derivatives.(∇pqr(Div([p, q, r])(v)) .- Laplacian([p, q, r])(v))
+    @test all(iszero, simplify.(curlcurl .- graddiv_minus_lap))
 
     @variables a b
     D = Nabla([a, b])
