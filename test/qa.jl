@@ -23,7 +23,8 @@ run_qa(
     ),
     ei_kwargs = (;
         # These are upstream names used for compatibility with Base, LinearAlgebra,
-        # DiffRules, MacroTools, and NaNMath; those owners do not declare them public.
+        # DiffRules, MacroTools, and NaNMath, plus the SymbolicUtils.Code rewrite keys;
+        # those owners do not declare them public.
         all_qualified_accesses_are_public = (;
             ignore = (
                 :BlasInt, :Cartesian, :Experimental, :ParseError, :ReshapedArray,
@@ -33,6 +34,8 @@ run_qa(
                 :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractTriangular,
                 :Slice, :StaticArray, :TwicePrecision, :TypedEndpointsInterval,
                 :sin, :sqrt, :striplines, :tan,
+                :FUSE_BROADCASTS_KEY, :FUSE_UNALIAS_KEY, :FUSE_OUTPUT_ELTYPE_KEY,
+                :USE_LITERAL_POW_KEY,
             ),
         ),
     ),
