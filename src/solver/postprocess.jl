@@ -30,7 +30,18 @@ end
 function _postprocess_root(x::SymbolicUtils.BasicSymbolic)
     !iscall(x) && return x
 
-    x = maketerm(BasicSymbolic{VartypeT}, operation(x), map(_postprocess_root, arguments(x)), nothing)
+    oper = operation(x)
+    new_args = map(_postprocess_root, arguments(x))
+    # Avoid maketerm folding π/e constants into Float64 (e.g. π/3 → 1.047…).
+    has_math_const_arg = any(new_args) do a
+        v = value(Symbolics.unwrap(a))
+        v === Base.MathConstants.pi || v === Base.MathConstants.e
+    end
+    if has_math_const_arg
+        x = Symbolics.term(oper, new_args...; type = SymbolicUtils.symtype(x))
+    else
+        x = maketerm(BasicSymbolic{VartypeT}, oper, new_args, nothing)
+    end
     iscall(x) || return x
     oper = operation(x)
 
@@ -167,7 +178,8 @@ inv_exacts = [0, Symbolics.term(*, pi),
         Symbolics.term(/, Symbolics.term(*, 2, pi), 3),
         Symbolics.term(/, pi, 6),
         Symbolics.term(/, Symbolics.term(*, 5, pi), 6),
-        Symbolics.term(/, pi, 4)
+        Symbolics.term(/, pi, 4),
+        Symbolics.term(/, Symbolics.term(*, 3, pi), 4)
 ]
 inv_evald = Symbolics.symbolic_to_float.(inv_exacts)
 

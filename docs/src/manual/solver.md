@@ -91,6 +91,33 @@ Symbolics.sympy_pythoncall_algebraic_solve
 - [x] Systems of polynomial equations with parameters and positive dimensional systems
 - [ ] Inequalities
 
+### Exact results for transcendental equations
+
+When `symbolic_solve` inverts `sin`, `cos` or `tan` and the principal value is a
+multiple of `π/6` or `π/4`, the root is returned in exact form: both the
+principal value and the period multiplying the integer parameter are written in
+terms of `π` rather than as floating-point numbers:
+
+```julia
+julia> using Symbolics
+
+julia> @variables x;
+
+julia> Symbolics.symbolic_solve(cos(x) ~ 1//2, x)
+[ Info: var"##N" ϵ Ζ
+1-element Vector{…}:
+ π / 3 + var"##N"*(2*π)
+```
+
+The fresh symbolic variable introduced by the solver (shown as `var"##N"`
+above) ranges over the integers, and the `@info` message announces it each time
+a periodic family is returned. The exact angle is found by comparing the
+evaluated inverse with the table of canonical angles up to floating-point
+tolerance, so a right-hand side within that tolerance of a canonical value
+(e.g. `0.5 + 1e-9`) also returns the canonical angle. Other right-hand sides
+keep the inverse unevaluated: `cos(x) ~ 1//3` returns
+`acos(1//3) + var"##N"*(2*π)`.
+
 ### Expressions we can not solve (but aim to)
 ```
 # Mathematica

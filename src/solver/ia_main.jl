@@ -2,6 +2,18 @@ using Symbolics
 
 const SAFE_ALTERNATIVES = Dict(log => slog, sqrt => ssqrt, cbrt => scbrt)
 
+# Inverse trig ops that `convert_consts` can rewrite to exact π forms.
+# Custom helpers (e.g. acosbypi → acos(x)/π) must expand into ordinary
+# differentiable expressions instead of being left as opaque terms.
+const EXACT_INV_TRIG = (asin, acos, atan, NaNMath.asin, NaNMath.acos)
+
+function apply_isolate_inverse(invop, sol)
+    if any(isequal(invop, o) for o in EXACT_INV_TRIG)
+        return Symbolics.term(invop, sol; type = Real)
+    end
+    return invop(sol)
+end
+
 function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, periodic_roots = true)
     rhs = Vector{Any}([0])
     original_lhs = deepcopy(lhs)
@@ -103,7 +115,7 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                     for i in eachindex(rhs)
                         for k in 0:(a2 - 1)
                             r = ^(rhs[i], (1 // power))
-                            c = *(2 * (k), pi) * im / power
+                            c = *(2 * (k), Symbolics.term(*, Base.MathConstants.pi)) * im / power
                             root = r * Base.MathConstants.e^c
                             push!(new_roots, root)
                         end
@@ -136,12 +148,12 @@ function isolate(lhs, var; warns=true, conditions=[], complex_roots = true, peri
                 new_var = (@variables $new_var)[1]
                 period = fundamental_period(oper)
                 rhs = map(
-                    sol -> invop(sol) +
+                    sol -> apply_isolate_inverse(invop, sol) +
                            *(period, new_var),
                     rhs)
                 @info string(new_var) * " ϵ" * " Ζ"
             else
-                rhs = map(sol -> invop(sol), rhs)
+                rhs = map(sol -> apply_isolate_inverse(invop, sol), rhs)
             end
         end
 
