@@ -1,3 +1,16 @@
+## 7.43.0
+
+### Behavior changes
+
+- `≲` and `≳` accept array operands and return one array-valued `Inequality`: two arrays
+  of the same size, or an array and a scalar that bounds every element. Previously an array
+  and a scalar threw, and two symbolic arrays gave an `Arr` of scalar inequalities (arrays
+  of different shapes were broadcast against each other). `scalarize(x ≲ y)` still returns
+  the array of scalar inequalities; code that indexed or `collect`ed `x ≲ y` should use
+  `x .≲ y`. Arrays of different sizes, including Julia `Array`s, now throw an
+  `ArgumentError`.
+- `leq` and `geq`, the relational operators of an `Inequality`, are public.
+
 ## 7.37.0
 
 ### Behavior changes
