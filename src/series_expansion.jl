@@ -372,42 +372,29 @@ function _series_leading_exponent(expr, x)
     elseif SymbolicUtils.isterm(u) && operation(u) === sqrt
         return (1//2) * _series_leading_exponent(only(arguments(u)), x)
     end
-    # add / transcendental / unknown: probe a short series and read its valuation.
-    s = _nseries_noleadfix(expr, x, 8//1)
-    return series_valuation(s)
+    # add / transcendental / unknown: probe a series and read its valuation. A fixed
+    # order can under-probe two ways — high-order cancellation (e.g. sin(x^3)-x^3 leads at
+    # x^9) and pole×polynomial precision clamping inside the probe — so double the probe
+    # order (`PROBE_START`, 2×, 4×, …) until a non-empty series appears or the cap
+    # `PROBE_MAX` is reached. Using the real `_nseries` (not a flat-order variant) lets
+    # internal products/poles budget their own precision. This terminates: the fallback
+    # only fires when `expr` is an isadd/transcendental node, and `_nseries` recurses into
+    # _series_leading_exponent only on strictly smaller subtrees (child factors of an inner
+    # Mul), never on `expr` itself.
+    PROBE_START = 4//1
+    PROBE_MAX   = 256//1   # ≥ this ⇒ treat as vanishing to that order (leading exp = order)
+    probe_order = PROBE_START
+    while probe_order <= PROBE_MAX
+        s = _nseries(expr, x, probe_order)
+        isempty(s) || return series_valuation(s)
+        probe_order *= 2
+    end
+    # Exhausted the cap without a nonzero term: the expression is zero (or vanishes
+    # faster than PROBE_MAX). Report the deepest probed order as the leading exponent.
+    return PROBE_MAX
 end
 
 # a version of _nseries that does NOT consult _series_leading_exponent for Mul,
-# to break the mutual recursion when probing (uses a flat generous order instead).
-function _nseries_noleadfix(expr, x, order::Rational{Int})
-    u = unwrap(expr); ux = unwrap(x)
-    isequal(u, ux) && return series_monomial(1, 1, order)
-    _series_has_var(u, ux) || return series_monomial(value(u), 0, order)
-    if SymbolicUtils.isadd(u)
-        acc = TruncatedSeries(SeriesDict(), order)
-        for arg in arguments(u); acc = acc + _nseries_noleadfix(arg, x, order); end
-        return acc
-    elseif SymbolicUtils.ismul(u)
-        acc = series_monomial(1, 0, order)
-        for arg in arguments(u); acc = acc * _nseries_noleadfix(arg, x, order); end
-        return acc
-    elseif SymbolicUtils.isdiv(u)
-        num, den = arguments(u); return _nseries_div(num, den, x, order)
-    elseif SymbolicUtils.ispow(u)
-        base, expo = arguments(u); e = value(expo)
-        (e isa Integer || e isa Rational) && return _nseries_pow(base, Rational{Int}(e), x, order)
-        return _nseries_noleadfix(exp(expo*log(base)), x, order)
-    elseif SymbolicUtils.isterm(u)
-        op = operation(u); a = only(arguments(u))
-        op === sqrt && return _nseries_pow(a, 1//2, x, order)
-        op === exp  && return _nseries_exp(a, x, order)
-        op === sin  && return _nseries_trig(a, x, order, :sin)
-        op === cos  && return _nseries_trig(a, x, order, :cos)
-        op === log  && return _nseries_log(a, x, order)
-    end
-    return _nseries_diff_fallback(expr, x, order)
-end
-
 # num / den: series(num) * (1/den). 1/den via reciprocal of the denominator's unit.
 function _nseries_div(num, den, x, order::Rational{Int})
     dv = _series_leading_exponent(den, x)          # denominator leading exponent
