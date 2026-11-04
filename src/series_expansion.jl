@@ -573,8 +573,10 @@ end
 
 # sin/cos of `arg`, dispatched on the argument's leading exponent e0:
 #   e0 < 0  -> pole inside the function: essential singularity, rejected.
-#   e0 == 0 -> argument finite & nonzero at 0 (e.g. sin(x+1)): analytic, use the
-#              differentiation fallback on the whole call.
+#   e0 == 0 -> argument finite & nonzero at 0 (e.g. sin(x+1), sin(1+√x)): factor
+#              arg = c0 + δ with v(δ) > 0 and use the angle-addition identities so the
+#              δ part expands as a vanishing series (works even when arg is non-analytic,
+#              e.g. 1+√x, whose derivative blows up at 0).
 #   e0 > 0  -> argument vanishes (e.g. sin(x), sin(x^2)): expand via the Taylor series
 #              of sin/cos composed with the argument series.
 function _nseries_trig(arg, x, order::Rational{Int}, which::Symbol)
@@ -586,15 +588,38 @@ function _nseries_trig(arg, x, order::Rational{Int}, which::Symbol)
         "$(which) of an expression with a pole (leading x^$e0) is an essential singularity " *
         "at $x = 0 and has no Laurent/Puiseux series expansion"))
     if e0 == 0
-        # inner finite & nonzero at 0 (e.g. sin(x+1)) -> analytic; differentiation fallback
-        f = which === :sin ? sin(arg) : cos(arg)
-        return _nseries_diff_fallback(f, x, order)
+        # arg finite & nonzero at 0. Factor arg = c0 + δ, v(δ) > 0, and use angle addition
+        #   sin(c0+δ) = sin(c0)cos(δ) + cos(c0)sin(δ)
+        #   cos(c0+δ) = cos(c0)cos(δ) − sin(c0)sin(δ)
+        # keeping sin(c0)/cos(c0) SYMBOLIC (sin(1) must not collapse to 0.841…). The δ
+        # series is vanishing, so _trig_vanishing expands it directly — this handles
+        # non-analytic args like 1+√x that the differentiation fallback cannot.
+        arg_s = _nseries(arg, x, order)
+        c0 = series_coeff_at(arg_s, 0)
+        delta = _nseries(arg - c0, x, order)
+        sin_d = _trig_vanishing(delta, order, :sin)
+        cos_d = _trig_vanishing(delta, order, :cos)
+        sc0 = _sym_call(sin, c0)
+        cc0 = _sym_call(cos, c0)
+        return which === :sin ?
+            series_scale(sc0, cos_d) + series_scale(cc0, sin_d) :
+            series_scale(cc0, cos_d) + series_scale(-sc0, sin_d)
     end
-    s = _nseries(arg, x, order)
+    return _trig_vanishing(_nseries(arg, x, order), order, which)
+end
+
+# sin/cos of a series `s` whose valuation is > 0 (δ vanishes at 0), via the Taylor series
+# Σ ±s^k/k!. Shared by the e0>0 path and the angle-addition e0==0 path.
+function _trig_vanishing(s::TruncatedSeries, order::Rational{Int}, which::Symbol)
+    if isempty(s)
+        # δ ≡ 0: sin(0)=0, cos(0)=1
+        return which === :sin ? TruncatedSeries(SeriesDict(), order) : series_monomial(1, 0, order)
+    end
     v = series_valuation(s)
+    v <= 0 && error("_trig_vanishing expects a vanishing argument, got valuation $v")
     maxk = Int(ceil(order / v))
     acc = TruncatedSeries(SeriesDict(), order)
-    spow = series_monomial(1, 0, order)  # arg^0
+    spow = series_monomial(1, 0, order)  # s^0
     fact = 1
     for k in 0:maxk
         k > 0 && (fact *= k; spow = spow * s)
