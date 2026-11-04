@@ -1,34 +1,13 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# TruncatedSeries: a sparse Laurent/Puiseux series core.
-#
-# Represents  Σ_{e < order} coeffs[e] * x^e  +  O(x^order)  around x = 0.
-#
-# Exponents `e` and the truncation `order` are `Rational{Int}` so the same type
-# covers ordinary Taylor series (nonneg integer exponents), Laurent series
-# (negative integer exponents, i.e. poles) and Puiseux series (fractional
-# exponents, i.e. branch points such as sqrt). Coefficients are stored as
-# plain Julia numbers where possible and `BasicSymbolic` otherwise (free
-# parameters, irrational constants), so the implementation is agnostic to the field.
-#
-# EXACTNESS RULE (JuliaSymbolics/Symbolics.jl#1299): coefficients are kept exact by
-# building them with rational `//` (via `_ts_div`/`_ts_inv`) in the recurrences, and in
-# the diff fallback by substituting derivatives at 0 with `fold=Val(false)` (keeping
-# `exp(0)`, `sin(1)` symbolic) then collapsing only EXACT numeric calls via
-# `_fold_exact_numeric`. We never derive coefficients from `fold=Val(true)` arithmetic,
-# which leaks `Float64` (`cos(0)==1.0` ⇒ `(1//2)*1.0==0.5`), and we never `rationalize`,
-# so irrational coefficients (`sin(1)`, `√2`) are preserved symbolically rather than
-# approximated. See `_nseries_diff_fallback` / `_fold_exact_numeric` for details.
-#
-# This is the data structure, its arithmetic (+, *, valuation), the `_nseries`
-# expansion machinery, and the public `expand_series`.
-# ─────────────────────────────────────────────────────────────────────────────
+# TruncatedSeries: a sparse Laurent/Puiseux series `Σ_{e<order} coeffs[e]*x^e + O(x^order)`
+# about x = 0. Exponents and `order` are `Rational{Int}`, so one type covers Taylor
+# (nonneg integer exponents), Laurent (negative integers, poles) and Puiseux (fractional
+# exponents, branch points). Coefficients stay exact (see `_fold_exact_numeric` for the
+# #1299 rule). This file holds the type, its arithmetic, the `_nseries` expansion, and the
+# public `expand_series`.
 
-# A series coefficient is an exact integer, an exact rational, or a symbolic value
-# (a free parameter, or an irrational constant kept symbolic such as `sqrt(2)`,
-# `exp(1)`). These three concrete types are the only ones the recurrences in this
-# file ever produce (verified empirically), so a closed `Union` captures the full
-# coefficient type without resorting to `Any` while still allowing the deliberate
-# mix of exact-numeric and symbolic coefficients within a single series.
+# A series coefficient is an exact Int, an exact Rational{Int}, or a symbolic value (free
+# parameter or irrational constant kept symbolic, e.g. sqrt(2)). The recurrences here only
+# ever produce these three, so a closed Union captures them without falling back to `Any`.
 const SeriesCoeff = Union{Int, Rational{Int}, SymbolicUtils.BasicSymbolic}
 const SeriesDict = Dict{Rational{Int}, SeriesCoeff}
 
@@ -37,42 +16,35 @@ const SeriesDict = Dict{Rational{Int}, SeriesCoeff}
 
 A truncated power/Laurent/Puiseux series `Σ coeffs[e] * x^e + O(x^order)` about `x = 0`.
 
-`coeffs` maps an exponent `e` (a `Rational{Int}`) to its coefficient (a
-[`SeriesCoeff`](@ref): an `Int`, a `Rational{Int}`, or a symbolic value); only exponents
-strictly less than `order` are retained and zero coefficients are dropped. Use the
-constructor `truncated_series` to build one with cleaning applied.
-
-Supports `+`, `*`, and `series_valuation`. Immutable: arithmetic returns new
-values and never mutates `coeffs`.
+`coeffs` maps an exponent `e` (`Rational{Int}`) to its coefficient (an `Int`, a
+`Rational{Int}`, or a symbolic value); only exponents below `order` are kept and zero
+coefficients are dropped. Immutable: arithmetic (`+`, `*`) returns new values.
 """
 struct TruncatedSeries
     coeffs::SeriesDict
     order::Rational{Int}
 end
 
-# ── coefficient zero-test that works for numbers AND symbolics, without simplify ──
-# We deliberately avoid `simplify` here: on mixed rational/symbolic coefficients it is
-# both expensive and can crash inside `simplify_fractions`. A
-# structural `isequal(value(c), 0)` is enough for the bookkeeping here;
-# genuine cancellation is handled where it matters (Add leadterm), not on every insert.
+# Coefficient zero-test for numbers and symbolics. We avoid `simplify` (expensive, and can
+# crash in `simplify_fractions`); a structural `isequal(value(c), 0)` suffices for the
+# bookkeeping here — genuine cancellation is handled at the Add leadterm, not on every insert.
 _ts_iszero(c::Number) = iszero(c)
 _ts_iszero(c) = isequal(value(c), 0)
 
-# Normalize a coefficient to the closed `SeriesCoeff` type before it is stored.
-# User-facing coefficients may arrive as `Num` (the wrapper); unwrap them to the
-# underlying `BasicSymbolic`. A `Num` wrapping an exact number collapses to that
-# number. Everything else (Int, Rational{Int}, BasicSymbolic) passes through.
+# Normalize a coefficient to the closed `SeriesCoeff` type before storing: unwrap `Num`,
+# narrow wide Integer/Rational to `Int`/`Rational{Int}`. Anything else is a bug — the final
+# `::SeriesCoeff` asserts loudly rather than silently widening.
 _ts_coeff(c::Int) = c
 _ts_coeff(c::Rational{Int}) = c
 _ts_coeff(c::Integer) = Int(c)
 _ts_coeff(c::Rational) = Rational{Int}(c)
 _ts_coeff(c::SymbolicUtils.BasicSymbolic) = c
 function _ts_coeff(c)
-    u = value(c)                       # unwrap Num -> BasicSymbolic or a plain number
+    u = value(c)
     u isa SeriesCoeff && return u
     u isa Integer && return Int(u)
     u isa Rational && return Rational{Int}(u)
-    return u::SeriesCoeff              # anything else is a bug; surface it loudly
+    return u::SeriesCoeff
 end
 
 # Rational-preserving division: keep exact rationals for Int/Rational operands
@@ -98,13 +70,12 @@ function _ts_clean(d, order::Rational{Int})
 end
 
 """
-    truncated_series(pairs, order)
+    _truncated_series(pairs, order)
 
-Construct a `TruncatedSeries` from an iterable of `exponent => coefficient`
-pairs (or a `Dict`), applying truncation at `order` and dropping zero coefficients.
-`order` and exponents are converted to `Rational{Int}`.
+Build a `TruncatedSeries` from `exponent => coefficient` pairs (or a `Dict`), truncating
+at `order`, dropping zeros, and converting exponents/order to `Rational{Int}`.
 """
-function truncated_series(pairs, order)
+function _truncated_series(pairs, order)
     o = Rational{Int}(order)
     d = SeriesDict()
     for (e, c) in pairs
@@ -113,29 +84,23 @@ function truncated_series(pairs, order)
     return TruncatedSeries(_ts_clean(d, o), o)
 end
 
-truncated_series(d::Dict, order) = TruncatedSeries(_ts_clean(d, Rational{Int}(order)), Rational{Int}(order))
+_truncated_series(d::Dict, order) = TruncatedSeries(_ts_clean(d, Rational{Int}(order)), Rational{Int}(order))
 
 # A single monomial  c * x^e  known exactly to `order`.
-function series_monomial(c, e, order)
+function _series_monomial(c, e, order)
     o = Rational{Int}(order)
     er = Rational{Int}(e)
     d = (er < o && !_ts_iszero(c)) ? SeriesDict(er => _ts_coeff(c)) : SeriesDict()
     return TruncatedSeries(d, o)
 end
 
-"""
-    series_valuation(s::TruncatedSeries)
-
-The valuation of `s`: the smallest exponent with a nonzero coefficient. For an
-empty series (everything truncated/zero) this is the truncation `order` (the series is
-`O(x^order)` with no known terms).
-"""
-series_valuation(s::TruncatedSeries) = isempty(s.coeffs) ? s.order : minimum(keys(s.coeffs))
+# Valuation: smallest exponent with a nonzero coefficient; for an empty series, `order`.
+_series_valuation(s::TruncatedSeries) = isempty(s.coeffs) ? s.order : minimum(keys(s.coeffs))
 
 Base.isempty(s::TruncatedSeries) = isempty(s.coeffs)
 
 # Coefficient of x^e (zero if absent).
-series_coeff_at(s::TruncatedSeries, e) = get(s.coeffs, Rational{Int}(e), 0)
+_series_coeff_at(s::TruncatedSeries, e) = get(s.coeffs, Rational{Int}(e), 0)
 
 # ── addition: O(x^min(order1, order2)) ──
 function Base.:+(a::TruncatedSeries, b::TruncatedSeries)
@@ -155,8 +120,8 @@ end
 # Absolute precision of the product is limited by cross terms of each factor's known
 # part with the other factor's O(x^order) tail: order = min(order_a + val_b, order_b + val_a).
 function Base.:*(a::TruncatedSeries, b::TruncatedSeries)
-    va = series_valuation(a)
-    vb = series_valuation(b)
+    va = _series_valuation(a)
+    vb = _series_valuation(b)
     o = min(a.order + vb, b.order + va)
     d = SeriesDict()
     for (e1, c1) in a.coeffs, (e2, c2) in b.coeffs
@@ -169,7 +134,7 @@ function Base.:*(a::TruncatedSeries, b::TruncatedSeries)
 end
 
 # Scalar multiply (constant * series): shifts nothing, scales coefficients.
-function series_scale(c, s::TruncatedSeries)
+function _series_scale(c, s::TruncatedSeries)
     _ts_iszero(c) && return TruncatedSeries(SeriesDict(), s.order)
     d = SeriesDict(e => c * cc for (e, cc) in s.coeffs)
     return TruncatedSeries(_ts_clean(d, s.order), s.order)
@@ -239,21 +204,17 @@ function Base.show(io::IO, s::TruncatedSeries)
     print(io, String(take!(io2)))
 end
 
-# ─────────────────────────────────────────────────────────────────────────────
-# _nseries(expr, x, order): expand `expr` into a TruncatedSeries about x = 0,
-# keeping terms with exponent < `order`. Handles Laurent (poles via isdiv) and
-# Puiseux (fractional powers via ^ with rational exponent).
-#
-# Dispatch is on the real BasicSymbolic structure (verified empirically):
-#   issym(x)             -> the variable: x^1
-#   isconst / !has_x     -> constant: c*x^0
-#   isadd                -> sum of sub-series (subtraction is +(-a) already)
-#   ismul                -> product of sub-series (numeric factors appear as consts)
-#   ispow (op ^)         -> base^exponent; integer/rational exponent handled
-#   isdiv (op /)         -> num/den via reciprocal of the denominator's unit part
-#   isterm exp/sin/cos/log with arg -> composition series
-#   else                 -> differentiation fallback (analytic only)
-# ─────────────────────────────────────────────────────────────────────────────
+# _nseries(expr, x, order): expand `expr` into a TruncatedSeries about x = 0, keeping terms
+# with exponent < `order`. Handles Laurent (poles via isdiv) and Puiseux (fractional powers
+# via ^ with rational exponent). Dispatch is on the BasicSymbolic structure:
+#   issym           -> the variable: x^1
+#   isconst/!has_x  -> constant: c*x^0
+#   isadd           -> sum of sub-series
+#   ismul           -> product of sub-series
+#   ispow           -> base^exponent (integer/rational exponent)
+#   isdiv           -> num/den via reciprocal of the denominator's unit
+#   isterm exp/sin/cos/log/sqrt -> composition series
+#   else            -> differentiation fallback (analytic only)
 
 # does `expr` contain the expansion variable `x`?
 function _series_has_var(expr, x)
@@ -270,7 +231,7 @@ function _nseries(expr, x, order::Rational{Int})
     ux = unwrap(x)
 
     # the variable itself
-    isequal(u, ux) && return series_monomial(1, 1, order)
+    isequal(u, ux) && return _series_monomial(1, 1, order)
 
     # a constant w.r.t. x (number, parameter, or any x-free subtree)
     if !_series_has_var(u, ux)
@@ -282,7 +243,7 @@ function _nseries(expr, x, order::Rational{Int})
                 "series expansion is only supported for real expressions, but found a " *
                 "complex constant $cval in the expression"))
         end
-        return series_monomial(cval, 0, order)
+        return _series_monomial(cval, 0, order)
     end
 
     if SymbolicUtils.isadd(u)
@@ -300,7 +261,7 @@ function _nseries(expr, x, order::Rational{Int})
         lead = [_series_leading_exponent(a, x) for a in args]
         n0 = sum(lead)
         # Start from the series `1` (= 1 + O(x^order)); each `*` narrows precision correctly.
-        acc = series_monomial(1, 0, order)
+        acc = _series_monomial(1, 0, order)
         # expand factor j to order:  order - (n0 - lead[j])   (so product reaches `order`)
         for (j, arg) in enumerate(args)
             fj = _nseries(arg, x, order - n0 + lead[j])
@@ -372,21 +333,17 @@ function _series_leading_exponent(expr, x)
     elseif SymbolicUtils.isterm(u) && operation(u) === sqrt
         return (1//2) * _series_leading_exponent(only(arguments(u)), x)
     end
-    # add / transcendental / unknown: probe a series and read its valuation. A fixed
-    # order can under-probe two ways — high-order cancellation (e.g. sin(x^3)-x^3 leads at
-    # x^9) and pole×polynomial precision clamping inside the probe — so double the probe
-    # order (`PROBE_START`, 2×, 4×, …) until a non-empty series appears or the cap
-    # `PROBE_MAX` is reached. Using the real `_nseries` (not a flat-order variant) lets
-    # internal products/poles budget their own precision. This terminates: the fallback
-    # only fires when `expr` is an isadd/transcendental node, and `_nseries` recurses into
-    # _series_leading_exponent only on strictly smaller subtrees (child factors of an inner
-    # Mul), never on `expr` itself.
+    # add / transcendental / unknown: probe with a doubling order until a nonzero term
+    # appears. A fixed order under-probes high-order cancellations (sin(x^3)-x^3 leads at
+    # x^9) and clamps pole×polynomial precision. Terminates: the fallback fires only on
+    # isadd/transcendental nodes, and _nseries recurses here only on strictly smaller
+    # subtrees (inner Mul factors), never on `expr` itself.
     PROBE_START = 4//1
     PROBE_MAX   = 256//1   # ≥ this ⇒ treat as vanishing to that order (leading exp = order)
     probe_order = PROBE_START
     while probe_order <= PROBE_MAX
         s = _nseries(expr, x, probe_order)
-        isempty(s) || return series_valuation(s)
+        isempty(s) || return _series_valuation(s)
         probe_order *= 2
     end
     # Exhausted the cap without a nonzero term: the expression is zero (or vanishes
@@ -394,7 +351,6 @@ function _series_leading_exponent(expr, x)
     return PROBE_MAX
 end
 
-# a version of _nseries that does NOT consult _series_leading_exponent for Mul,
 # num / den: series(num) * (1/den). 1/den via reciprocal of the denominator's unit.
 function _nseries_div(num, den, x, order::Rational{Int})
     dv = _series_leading_exponent(den, x)          # denominator leading exponent
@@ -407,26 +363,20 @@ end
 # reciprocal series of `den` to absolute `order`, given leading exponent `dv`.
 function _nseries_reciprocal(den, x, order::Rational{Int}, dv::Rational{Int})
     # Expand den to enough orders, then invert the unit via the standard recurrence.
-    rel_order = order + dv     # we need unit coeffs through this many relative orders
+    rel_order = order + dv     # need unit coeffs through this many relative orders
     den_s = _nseries(den, x, dv + rel_order)
-    # We want every reciprocal term with absolute exponent < order, i.e. relative
-    # exponent p satisfying p − dv < order ⟺ p < order + dv = rel_order. The relative
-    # precision `rel_order` is kept (NOT floor(order)): that dropped `dv` terms whenever
-    # the denominator had a pole, dv > 0 — e.g. 1/(x²(1+x)) lost its x¹ term.
+    # Keep the full `rel_order` relative precision (NOT floor(order)): truncating earlier
+    # dropped `dv` terms when the denominator had a pole, e.g. 1/(x²(1+x)) lost its x¹ term.
     rel_order <= 0 && return TruncatedSeries(SeriesDict(), order)
-    u0 = series_coeff_at(den_s, dv)
+    u0 = _series_coeff_at(den_s, dv)
     _ts_iszero(u0) && error("reciprocal: denominator leading coefficient is zero (bad valuation $dv)")
 
-    # Relative unit coefficients u[e] = coeff of x^(dv+e) in den_s, for e ≥ 0. These may
-    # live on a *fractional* (Puiseux) grid, e.g. e ∈ {0, 1//2, 1, 3//2, …} for 1+√x, so
-    # the recurrence must step on the actual exponent grid rather than integer offsets.
-    # The reachable relative exponents are the additive semigroup generated by the unit's
-    # positive exponents; we walk the lcm grid 0, 1/D, 2/D, … < rel_order with D = lcm of
-    # the denominators of those exponents.
+    # Relative unit exponents may live on a fractional (Puiseux) grid, e.g. {1//2, 1, …}
+    # for 1+√x, so step the recurrence on the actual lcm grid 0, 1/D, 2/D, … not integers.
     uexps = sort!(Rational{Int}[e - dv for e in keys(den_s.coeffs) if e - dv > 0])
     D = isempty(uexps) ? 1 : foldl(lcm, (denominator(e) for e in uexps); init = 1)
 
-    # reciprocal of unit on the grid: r[0] = 1/u0; r[e] = -(1/u0) Σ_{0<f≤e} u[f]·r[e−f]
+    # r[0] = 1/u0; r[e] = -(1/u0) Σ_{0<f≤e} u[f]·r[e−f]
     r = SeriesDict()
     r[0//1] = _ts_inv(u0)
     nmax = Int(ceil(rel_order * D)) - 1
@@ -438,7 +388,7 @@ function _nseries_reciprocal(den, x, order::Rational{Int}, dv::Rational{Int})
             f > e && break
             rem = e - f
             haskey(r, rem) || continue
-            s = s + series_coeff_at(den_s, dv + f) * r[rem]
+            s = s + _series_coeff_at(den_s, dv + f) * r[rem]
         end
         _ts_iszero(s) || (r[e] = _ts_coeff(-_ts_div(s, u0)))
     end
@@ -454,7 +404,7 @@ end
 # base^q for rational q, via c0^q * x^(e0 q) * (1+g)^q binomial series.
 function _nseries_pow(base, q::Rational{Int}, x, order::Rational{Int})
     if q == 0
-        return series_monomial(1, 0, order)
+        return _series_monomial(1, 0, order)
     end
     if q > 0 && denominator(q) == 1
         # positive integer power: repeated multiply (keeps exactness, avoids binomial on polynomials)
@@ -468,28 +418,28 @@ function _nseries_pow(base, q::Rational{Int}, x, order::Rational{Int})
     end
     e0 = _series_leading_exponent(base, x)
     base_s = _nseries(base, x, e0 + (order - e0 * q))
-    c0 = series_coeff_at(base_s, e0)
+    c0 = _series_coeff_at(base_s, e0)
     _ts_iszero(c0) && error("_nseries_pow: base leading coefficient zero")
     # g = base/(c0 x^e0) - 1
     rel = order - e0 * q
-    rel <= 0 && return series_monomial(_pow_const(c0, q), e0 * q, order)
+    rel <= 0 && return _series_monomial(_pow_const(c0, q), e0 * q, order)
     g = SeriesDict()
     for (e, c) in base_s.coeffs
         e > e0 && (g[e - e0] = _ts_div(c, c0))
     end
     gts = TruncatedSeries(_ts_clean(g, rel), rel)
     if isempty(gts)
-        return series_monomial(_pow_const(c0, q), e0 * q, order)
+        return _series_monomial(_pow_const(c0, q), e0 * q, order)
     end
-    vg = series_valuation(gts)
+    vg = _series_valuation(gts)
     maxk = Int(ceil(rel / vg))
-    acc = series_monomial(1, 0, rel)
-    gpow = series_monomial(1, 0, rel)
+    acc = _series_monomial(1, 0, rel)
+    gpow = _series_monomial(1, 0, rel)
     binom = 1 // 1
     for k in 1:maxk
         binom = binom * (q - (k - 1)) // k
         gpow = gpow * gts
-        acc = acc + series_scale(binom, gpow)
+        acc = acc + _series_scale(binom, gpow)
     end
     pref = _pow_const(c0, q)
     shifted = SeriesDict()
@@ -535,13 +485,13 @@ function _nseries_exp(arg, x, order::Rational{Int})
         "exp of an expression with a pole (leading x^$e0) is an essential singularity at " *
         "$x = 0 and has no Laurent/Puiseux series expansion"))
     arg_s = _nseries(arg, x, order)
-    c0 = e0 <= 0 ? series_coeff_at(arg_s, 0) : 0
+    c0 = e0 <= 0 ? _series_coeff_at(arg_s, 0) : 0
     if !_ts_iszero(c0)
         # factor out exp(c0): keep exp(c0) SYMBOLIC (exp(1) must not collapse to 2.718);
         # _sym_call builds the symbolic call and folds it only if the result is exact.
         shifted = _nseries(arg - c0, x, order)
         inner = _exp_vanishing(shifted, order)
-        return series_scale(_sym_call(exp, c0), inner)
+        return _series_scale(_sym_call(exp, c0), inner)
     end
     return _exp_vanishing(arg_s, order)
 end
@@ -557,16 +507,16 @@ end
 
 # exp of a series whose valuation is > 0
 function _exp_vanishing(s::TruncatedSeries, order::Rational{Int})
-    v = series_valuation(s)
+    v = _series_valuation(s)
     v <= 0 && !isempty(s) && error("_exp_vanishing expects a vanishing argument, got valuation $v")
     maxk = isempty(s) ? 0 : Int(ceil(order / v))
-    acc = series_monomial(1, 0, order)
-    spow = series_monomial(1, 0, order)
+    acc = _series_monomial(1, 0, order)
+    spow = _series_monomial(1, 0, order)
     fact = 1
     for k in 1:maxk
         fact *= k
         spow = spow * s
-        acc = acc + series_scale(1 // fact, spow)
+        acc = acc + _series_scale(1 // fact, spow)
     end
     return acc
 end
@@ -595,15 +545,15 @@ function _nseries_trig(arg, x, order::Rational{Int}, which::Symbol)
         # series is vanishing, so _trig_vanishing expands it directly — this handles
         # non-analytic args like 1+√x that the differentiation fallback cannot.
         arg_s = _nseries(arg, x, order)
-        c0 = series_coeff_at(arg_s, 0)
+        c0 = _series_coeff_at(arg_s, 0)
         delta = _nseries(arg - c0, x, order)
         sin_d = _trig_vanishing(delta, order, :sin)
         cos_d = _trig_vanishing(delta, order, :cos)
         sc0 = _sym_call(sin, c0)
         cc0 = _sym_call(cos, c0)
         return which === :sin ?
-            series_scale(sc0, cos_d) + series_scale(cc0, sin_d) :
-            series_scale(cc0, cos_d) + series_scale(-sc0, sin_d)
+            _series_scale(sc0, cos_d) + _series_scale(cc0, sin_d) :
+            _series_scale(cc0, cos_d) + _series_scale(-sc0, sin_d)
     end
     return _trig_vanishing(_nseries(arg, x, order), order, which)
 end
@@ -613,13 +563,13 @@ end
 function _trig_vanishing(s::TruncatedSeries, order::Rational{Int}, which::Symbol)
     if isempty(s)
         # δ ≡ 0: sin(0)=0, cos(0)=1
-        return which === :sin ? TruncatedSeries(SeriesDict(), order) : series_monomial(1, 0, order)
+        return which === :sin ? TruncatedSeries(SeriesDict(), order) : _series_monomial(1, 0, order)
     end
-    v = series_valuation(s)
+    v = _series_valuation(s)
     v <= 0 && error("_trig_vanishing expects a vanishing argument, got valuation $v")
     maxk = Int(ceil(order / v))
     acc = TruncatedSeries(SeriesDict(), order)
-    spow = series_monomial(1, 0, order)  # s^0
+    spow = _series_monomial(1, 0, order)  # s^0
     fact = 1
     for k in 0:maxk
         k > 0 && (fact *= k; spow = spow * s)
@@ -628,7 +578,7 @@ function _trig_vanishing(s::TruncatedSeries, order::Rational{Int}, which::Symbol
         else
             iseven(k) ? (((k ÷ 2) % 2 == 0) ? 1 // fact : -1 // fact) : 0 // 1
         end
-        iszero(coeff) || (acc = acc + series_scale(coeff, spow))
+        iszero(coeff) || (acc = acc + _series_scale(coeff, spow))
     end
     return acc
 end
@@ -646,7 +596,7 @@ function _nseries_log(arg, x, order::Rational{Int})
         "log of an expression with leading x^$e0 at $x = 0 has a log(x) term and is not a " *
         "Laurent/Puiseux series"))
     arg_s = _nseries(arg, x, order)
-    c0 = series_coeff_at(arg_s, 0)
+    c0 = _series_coeff_at(arg_s, 0)
     _ts_iszero(c0) && error("_nseries_log: zero constant term")
     # g = arg/c0 - 1
     g = SeriesDict()
@@ -656,15 +606,15 @@ function _nseries_log(arg, x, order::Rational{Int})
     gts = TruncatedSeries(_ts_clean(g, order), order)
     acc = TruncatedSeries(SeriesDict(), order)
     const_term = _ts_iszero(c0 - 1) ? 0 : _sym_call(log, c0)
-    _ts_iszero(const_term) || (acc = acc + series_monomial(const_term, 0, order))
+    _ts_iszero(const_term) || (acc = acc + _series_monomial(const_term, 0, order))
     if !isempty(gts)
-        vg = series_valuation(gts)
+        vg = _series_valuation(gts)
         maxk = Int(ceil(order / vg))
-        gpow = series_monomial(1, 0, order)
+        gpow = _series_monomial(1, 0, order)
         for k in 1:maxk
             gpow = gpow * gts
             sign = isodd(k) ? (1 // k) : (-1 // k)
-            acc = acc + series_scale(sign, gpow)
+            acc = acc + _series_scale(sign, gpow)
         end
     end
     return acc
@@ -745,9 +695,7 @@ function _fold_exact_numeric(ex)
     return maketerm(typeof(u), op, sym_args, metadata(u))
 end
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Public series-expansion API.
-# ─────────────────────────────────────────────────────────────────────────────
 
 """
     expand_series(expr, x, order; x0 = 0)
@@ -766,9 +714,8 @@ Coefficients are kept **exact**, including irrational ones (`sqrt(2)`, `sin(1)` 
 symbolic rather than being approximated as floats). Complex-valued expressions are not
 supported and raise an `ArgumentError`.
 
-Index the result with `series_coeff_at` or read its `series_valuation`.
-
-# Examples
+Examples
+========
 
 ```jldoctest
 julia> using Symbolics

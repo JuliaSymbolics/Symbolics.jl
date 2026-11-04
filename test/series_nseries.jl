@@ -2,19 +2,19 @@
 # taylor_coeff (analytic parts) and against hand-known Laurent/Puiseux series.
 
 using Symbolics
-using Symbolics: _nseries, series_coeff_at, series_valuation, value
+using Symbolics: _nseries, _series_coeff_at, _series_valuation, value
 using Test
 
 @variables x a
 
 # extract coeff of x^e from _nseries result as a plain value
-nc(expr, e, order) = value(series_coeff_at(_nseries(expr, x, order), Rational{Int}(e)))
+nc(expr, e, order) = value(_series_coeff_at(_nseries(expr, x, order), Rational{Int}(e)))
 
 # compare _nseries coefficients 0..hi against taylor_coeff (analytic only)
 function matches_taylor(expr, hi)
     s = _nseries(expr, x, hi + 1)
     tc = Symbolics.taylor_coeff(expr, x, 0:hi; rationalize=true)
-    all(isequal(value(series_coeff_at(s, k)), value(tc[k+1])) for k in 0:hi)
+    all(isequal(value(_series_coeff_at(s, k)), value(tc[k+1])) for k in 0:hi)
 end
 
 @testset "_nseries series expansion" begin
@@ -48,7 +48,7 @@ end
         @test matches_taylor(sqrt(1 + x), 6)      # (1+x)^(1/2), analytic at 0
         # sqrt(x) itself is Puiseux: leading x^(1/2)
         @test nc(sqrt(x), 1//2, 3) == 1
-        @test series_valuation(_nseries(sqrt(x), x, 3)) == 1//2
+        @test _series_valuation(_nseries(sqrt(x), x, 3)) == 1//2
     end
 
     @testset "Laurent poles (true poles, where taylor_coeff errors)" begin
@@ -57,7 +57,7 @@ end
         @test nc(exp(x)/x, 0, 3) == 1
         @test nc(exp(x)/x, 1, 3) == 1//2
         @test nc(exp(x)/x, 2, 3) == 1//6
-        @test series_valuation(_nseries(exp(x)/x, x, 3)) == -1
+        @test _series_valuation(_nseries(exp(x)/x, x, 3)) == -1
 
         # exp(x)/x^2 = x^-2 + x^-1 + 1/2 + ...
         @test nc(exp(x)/x^2, -2, 2) == 1
@@ -106,10 +106,10 @@ end
         # (b) a symbolic call whose string is the expected symbolic form, and (c) matches
         # the known numeric value when evaluated.
         s = _nseries(sin(x+1), x, 4)
-        c0 = series_coeff_at(s, 0//1)
-        c1 = series_coeff_at(s, 1//1)
-        c2 = series_coeff_at(s, 2//1)
-        c3 = series_coeff_at(s, 3//1)
+        c0 = _series_coeff_at(s, 0//1)
+        c1 = _series_coeff_at(s, 1//1)
+        c2 = _series_coeff_at(s, 2//1)
+        c3 = _series_coeff_at(s, 3//1)
         # not floats (the #1299 guarantee)
         for c in (c0, c1, c2, c3)
             @test !(c isa AbstractFloat)
@@ -128,7 +128,7 @@ end
         @test nc(1/(1+sqrt(x)), 1//2, 2) == -1
         @test nc(1/(1+sqrt(x)), 1, 2) == 1
         @test nc(1/(1+sqrt(x)), 3//2, 2) == -1
-        @test series_valuation(_nseries(1/(1+sqrt(x)), x, 2)) == 0//1
+        @test _series_valuation(_nseries(1/(1+sqrt(x)), x, 2)) == 0//1
         # cube-root grid: 1/(1+x^(1/3)) = 1 - x^(1/3) + x^(2/3) - ...
         cbrt_x = Symbolics.term(^, Symbolics.unwrap(x), 1//3)
         @test nc(1/(1+cbrt_x), 1//3, 1) == -1
@@ -144,15 +144,15 @@ end
         # 1/(sin(x^3)-x^3): denominator leads at x^9 (= -x^9/6), so 1/den leads at x^-9.
         # Previously errored 'bad valuation 8//1' from a fixed-order probe.
         @test nc(1/(sin(x^3)-x^3), -9, -7) == -6
-        @test series_valuation(_nseries(1/(sin(x^3)-x^3), x, -7)) == -9//1
+        @test _series_valuation(_nseries(1/(sin(x^3)-x^3), x, -7)) == -9//1
     end
 
     @testset "regression: trig of non-analytic finite argument (1//0 leak)" begin
         # sin(1+sqrt(x)) via angle addition: sin(1) + cos(1) x^(1/2) - sin(1)/2 x - ...
         # Previously emitted a (1//0) coefficient. Coefficients stay exact-symbolic.
         s = _nseries(sin(1+sqrt(x)), x, 2)
-        c_h = series_coeff_at(s, 1//2)   # cos(1)
-        c_1 = series_coeff_at(s, 1//1)   # -sin(1)/2
+        c_h = _series_coeff_at(s, 1//2)   # cos(1)
+        c_1 = _series_coeff_at(s, 1//1)   # -sin(1)/2
         @test !(value(c_h) isa AbstractFloat)
         @test occursin("cos(1)", string(c_h))
         @test occursin("sin(1)", string(c_1)) && occursin("1//2", string(c_1))
@@ -164,8 +164,8 @@ end
         # (a+b)x - a x - b x + x^2 must collapse the x^1 coefficient to a true zero and
         # report leading exponent 2 (not a phantom (a+b-a-b) at x^1).
         e = (a + b)*x - a*x - b*x + x^2
-        @test series_valuation(_nseries(e, x, 3)) == 2//1
+        @test _series_valuation(_nseries(e, x, 3)) == 2//1
         @test nc(e, 2, 3) == 1
-        @test value(series_coeff_at(_nseries(e, x, 3), 1//1)) == 0
+        @test value(_series_coeff_at(_nseries(e, x, 3), 1//1)) == 0
     end
 end
