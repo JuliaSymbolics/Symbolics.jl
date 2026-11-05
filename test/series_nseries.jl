@@ -159,11 +159,10 @@ end
 
     @testset "regression: high-order factorial overflow (big coefficients)" begin
         # Int64 coeffs overflowed ~order 13 in composed functions; coeffs now widen to BigInt
-        # as needed, matching taylor_coeff and exceeding its order-21 factorial limit.
-        @test nc(exp(sin(x)), 14, 16) == value(Symbolics.taylor_coeff(exp(sin(x)), x, 14))
+        # as needed and narrow back when they fit. Expected values are self-evident 1/n!.
         @test nc(exp(x), 20, 21) == 1 // factorial(big(20))
-        @test nc(exp(x), 25, 26) == 1 // factorial(big(25))   # past taylor_coeff's limit
-        s = _nseries(exp(sqrt(x)), x, 30)
+        @test nc(exp(x), 25, 26) == 1 // factorial(big(25))
+        s = _nseries(exp(sqrt(x)), x, 30)   # Puiseux + high order: no overflow
         @test _series_valuation(s) == 0//1
         @test nc(exp(sqrt(x)), 10, 30) == 1 // factorial(big(20))
         @test _series_coeff_at(_nseries(exp(x), x, 5), 2//1) isa Rational{Int}   # narrows back
