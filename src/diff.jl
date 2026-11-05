@@ -700,7 +700,9 @@ $(SIGNATURES)
 Expands derivatives within a symbolic expression `O`.
 
 This function recursively traverses a symbolic expression, applying the chain rule
-and other derivative rules to expand any derivatives it encounters.
+and other derivative rules to expand any derivatives it encounters. This includes
+the lazy applications built by the vector calculus operators [`Grad`](@ref),
+[`Divergence`](@ref), [`Curl`](@ref) and [`Laplacian`](@ref).
 
 # Arguments
 - `O::BasicSymbolic`: The symbolic expression to expand.
@@ -1386,6 +1388,28 @@ function _multivariate_der_op_check(x::AbstractVector)
     end
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+The multivariate gradient operator `∇` with respect to the independent
+variables `vars`.
+
+Applying `Grad` to a scalar field `f` produces the vector of partial
+derivatives `[Differential(vars[i])(f) for i in eachindex(vars)]`. With
+`check = true` (default), `vars` are validated to be non-constant symbolic
+scalars of numeric symtype.
+
+The expansion parameter `E` controls evaluation. `Grad{false}` — the default,
+constructed by `Grad(vars)` — produces a lazy symbolic term with the operator
+as the head so the structure of the expression is retained;
+[`expand_derivatives`](@ref) expands it to `Differential`s on demand.
+`Grad{true}` expands eagerly at application, returning a `Vector{Num}`.
+
+`Grad` composes through `LinearAlgebra`: `∇ ⋅ v` produces a
+[`Divergence`](@ref), `∇ × v` a [`Curl`](@ref), `∇ ⋅ ∇` a [`Laplacian`](@ref)
+and `v ⋅ ∇` a directional derivative which applies componentwise to vector
+fields.
+"""
 struct Grad{E}
     vars::SArgsT
 
@@ -1401,6 +1425,11 @@ function Grad{E}(vars::Arr{T, 1}; check = true) where {E, T}
     return Grad{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Alias for `Grad{false}(vars)`.
+"""
 Grad(vars; check = true) = Grad{false}(vars; check)
 
 SU.promote_symtype(::Grad, T::SU.TypeT) = Vector{T}
@@ -1432,6 +1461,20 @@ function (g::Grad)(x::AbstractArray)
     throw(ArgumentError(lazy"`Grad` only applies to scalars. Got $x. Use `LinearAlgebra.dot($g, $x)` instead"))
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+The divergence operator `∇⋅` with respect to the independent variables `vars`.
+
+Applying `Divergence` to a vector field `v` with as many components as `vars`
+produces the scalar `sum(Differential(vars[i])(v[i]) for i in eachindex(vars))`.
+`Divergence` is also produced by `LinearAlgebra.dot(∇, v)` for a
+[`Grad`](@ref) `∇`, and composing it with `Grad` (`∇ ⋅ ∇`) produces a
+[`Laplacian`](@ref). Constant vector fields have zero divergence.
+
+See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
+interaction with [`expand_derivatives`](@ref).
+"""
 struct Divergence{E}
     vars::SArgsT
 
@@ -1447,6 +1490,11 @@ function Divergence{E}(vars::Arr{T, 1}; check = true) where {E, T}
     return Divergence{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Alias for `Divergence{false}(vars)`.
+"""
 Divergence(vars; check = true) = Divergence{false}(vars; check)
 
 SU.promote_symtype(::Divergence, T::SU.TypeT) = eltype(T)::SU.TypeT
@@ -1516,11 +1564,40 @@ function LinearAlgebra.cross(g::Grad{E}, x::Union{Grad, SymbolicT, Num, Abstract
     return Curl{E}(g.vars; check = false)(x)
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+The Laplacian operator `∇ ⋅ ∇` with respect to the independent variables
+`vars`.
+
+`Laplacian{E}(vars)` constructs `Divergence{E}(vars) ∘ Grad{E}(vars)` and is
+also produced by `LinearAlgebra.dot(∇, ∇)`. Applied to a scalar field it
+produces the sum of second partial derivatives; broadcast it over a vector
+field for a componentwise Laplacian.
+
+See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
+interaction with [`expand_derivatives`](@ref).
+"""
 abstract type Laplacian{E} end
 
 Laplacian{E}(vars; check = true) where {E} = Divergence{E}(vars; check)(Grad{E}(vars; check))
 Laplacian(vars; check = true) = Laplacian{false}(vars; check)
 
+"""
+$(TYPEDSIGNATURES)
+
+The curl operator `∇×` with respect to three independent variables `vars`.
+
+Applying `Curl` to a 3-component vector field `v` produces the vector
+`[D(vars[2])(v[3]) - D(vars[3])(v[2]), D(vars[3])(v[1]) - D(vars[1])(v[3]),
+D(vars[1])(v[2]) - D(vars[2])(v[1])]` where `D = Differential`. `Curl` is
+also produced by `LinearAlgebra.cross(∇, v)` for a [`Grad`](@ref) `∇`, and
+composing `Curl` with `Grad` (`∇ × ∇`) produces an operator whose application
+to any scalar field vanishes.
+
+See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
+interaction with [`expand_derivatives`](@ref).
+"""
 struct Curl{E}
     vars::SArgsT
 
@@ -1537,6 +1614,11 @@ function Curl{E}(vars::Arr{T, 1}; check = true) where {E, T}
     return Curl{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Alias for `Curl{false}(vars)`.
+"""
 Curl(vars; check = true) = Curl{false}(vars; check)
 
 SU.promote_symtype(::Curl, T::SU.TypeT) = T
