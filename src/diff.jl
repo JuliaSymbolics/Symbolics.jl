@@ -1386,7 +1386,7 @@ function _multivariate_der_op_check(x::AbstractVector)
     end
 end
 
-struct Grad{E} <: Operator
+struct Grad{E}
     vars::SArgsT
 
     function Grad{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
@@ -1432,7 +1432,7 @@ function (g::Grad)(x::AbstractArray)
     throw(ArgumentError(lazy"`Grad` only applies to scalars. Got $x. Use `LinearAlgebra.dot($g, $x)` instead"))
 end
 
-struct Divergence{E} <: Operator
+struct Divergence{E}
     vars::SArgsT
 
     function Divergence{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
@@ -1506,7 +1506,7 @@ abstract type Laplacian{E} end
 Laplacian{E}(vars; check = true) where {E} = Divergence{E}(vars; check)(Grad{E}(vars; check))
 Laplacian(vars; check = true) = Laplacian{false}(vars; check)
 
-struct Curl{E} <: Operator
+struct Curl{E}
     vars::SArgsT
 
     function Curl{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
