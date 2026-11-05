@@ -4,7 +4,7 @@ using Symbolics
 using Symbolics: _nseries, _series_coeff_at, _series_valuation, value
 using Test
 
-@variables x a
+@variables x a b
 
 # coeff of x^e from _nseries, as a plain value
 nc(expr, e, order) = value(_series_coeff_at(_nseries(expr, x, order), Rational{Int}(e)))
