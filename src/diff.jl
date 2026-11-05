@@ -1396,6 +1396,11 @@ struct Grad{E} <: Operator
     end
 end
 
+function Grad{E}(vars::Arr{T, 1}; check = true) where {E, T}
+    vars = unwrap(vars)
+    return Grad{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
+end
+
 Grad(vars; check = true) = Grad{false}(vars; check)
 
 SU.promote_symtype(::Grad, T::SU.TypeT) = Vector{T}
@@ -1422,6 +1427,7 @@ function (g::Grad{true})(x::SymbolicT)
     return res
 end
 (g::Grad{true})(x::Num) = Num.(g(unwrap(x)))
+(g::Grad)(x::Number) = g(Num(x))
 function (g::Grad)(x::AbstractArray)
     throw(ArgumentError(lazy"`Grad` only applies to scalars. Got $x. Use `LinearAlgebra.dot($g, $x)` instead"))
 end
@@ -1434,6 +1440,11 @@ struct Divergence{E} <: Operator
         _multivariate_der_op_check(vars)
         return new{E}(SArgsT(unwrap.(vars)))
     end
+end
+
+function Divergence{E}(vars::Arr{T, 1}; check = true) where {E, T}
+    vars = unwrap(vars)
+    return Divergence{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
 end
 
 Divergence(vars; check = true) = Divergence{false}(vars; check)
@@ -1463,6 +1474,8 @@ function (d::Divergence{true})(x::SymbolicT)
     return SU.add_worker(VartypeT, buffer)
 end
 (d::Divergence)(x::Arr{T}) where {T} = T(d(unwrap(x)))
+(d::Divergence)(x::Num) = d(unwrap(x))
+(d::Divergence)(x::Number) = d(SConst(x))
 function (d::Divergence{E})(arr::AbstractArray) where {E}
     # Derivative of a constant is zero
     any(Base.Fix2(isa, SymbolicT) ∘ unwrap, arr) || return COMMON_ZERO
@@ -1504,6 +1517,11 @@ struct Curl{E} <: Operator
     end
 end
 
+function Curl{E}(vars::Arr{T, 1}; check = true) where {E, T}
+    vars = unwrap(vars)
+    return Curl{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
+end
+
 Curl(vars; check = true) = Curl{false}(vars; check)
 
 SU.promote_symtype(::Curl, T::SU.TypeT) = T
@@ -1537,6 +1555,8 @@ function (c::Curl{true})(x::SymbolicT)
 end
 (c::Curl{false})(x::Arr{T, 1}) where {T} = Arr{T, 1}(c(unwrap(x)))
 (c::Curl{true})(x::Arr{T, 1}) where {T} = T.(c(unwrap(x)))
+(c::Curl)(x::Num) = c(unwrap(x))
+(c::Curl)(x::Number) = c(SConst(x))
 
 const CURL_ZERO_3VEC = SConst(fill(COMMON_ZERO, 3))
 function (c::Curl{E})(arr::AbstractVector) where {E}
@@ -1564,3 +1584,10 @@ function (c::Curl{E})(arr::AbstractVector) where {E}
 
     return res
 end
+
+Base.:(==)(a::Grad{E}, b::Grad{E}) where {E} = isequal(a.vars, b.vars)
+Base.hash(a::Grad{E}, u::UInt) where {E} = hash(a.vars, u)
+Base.:(==)(a::Divergence{E}, b::Divergence{E}) where {E} = isequal(a.vars, b.vars)
+Base.hash(a::Divergence{E}, u::UInt) where {E} = hash(a.vars, u)
+Base.:(==)(a::Curl{E}, b::Curl{E}) where {E} = isequal(a.vars, b.vars)
+Base.hash(a::Curl{E}, u::UInt) where {E} = hash(a.vars, u)
