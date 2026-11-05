@@ -6,9 +6,11 @@
 # public `expand_series`.
 
 # A series coefficient is an exact Int, an exact Rational{Int}, or a symbolic value (free
-# parameter or irrational constant kept symbolic, e.g. sqrt(2)). The recurrences here only
-# ever produce these three, so a closed Union captures them without falling back to `Any`.
-const SeriesCoeff = Union{Int, Rational{Int}, SymbolicUtils.BasicSymbolic}
+# parameter or irrational constant kept symbolic, e.g. sqrt(2)). Integer/rational
+# coefficients are normally `Int`/`Rational{Int}`, but may widen to `BigInt`/`Rational{BigInt}`
+# when high-order factorial denominators would overflow `Int64` (e.g. exp(sin(x)) past order
+# ~12); `_narrow_coeff` shrinks them back to the small types whenever they fit.
+const SeriesCoeff = Union{Int, Rational{Int}, BigInt, Rational{BigInt}, SymbolicUtils.BasicSymbolic}
 const SeriesDict = Dict{Rational{Int}, SeriesCoeff}
 
 """
@@ -31,19 +33,20 @@ end
 _ts_iszero(c::Number) = iszero(c)
 _ts_iszero(c) = isequal(value(c), 0)
 
-# Normalize a coefficient to the closed `SeriesCoeff` type before storing: unwrap `Num`,
-# narrow wide Integer/Rational to `Int`/`Rational{Int}`. Anything else is a bug — the final
-# `::SeriesCoeff` asserts loudly rather than silently widening.
+# Normalize a coefficient to the `SeriesCoeff` type before storing: unwrap `Num`, and
+# narrow BigInt/Rational{BigInt} down to Int/Rational{Int} when they fit (via `_narrow_coeff`),
+# keeping the big type only when a value genuinely exceeds Int64. Anything outside the union
+# is a bug — the final `::SeriesCoeff` asserts loudly rather than silently widening.
 _ts_coeff(c::Int) = c
 _ts_coeff(c::Rational{Int}) = c
-_ts_coeff(c::Integer) = Int(c)
-_ts_coeff(c::Rational) = Rational{Int}(c)
+_ts_coeff(c::Integer) = _narrow_coeff(c)
+_ts_coeff(c::Rational) = _narrow_coeff(c)
 _ts_coeff(c::SymbolicUtils.BasicSymbolic) = c
 function _ts_coeff(c)
     u = value(c)
-    u isa SeriesCoeff && return u
-    u isa Integer && return Int(u)
-    u isa Rational && return Rational{Int}(u)
+    u isa SeriesCoeff && return _narrow_coeff(u)
+    u isa Integer && return _narrow_coeff(u)
+    u isa Rational && return _narrow_coeff(u)
     return u::SeriesCoeff
 end
 
@@ -52,6 +55,18 @@ end
 _ts_div(a::Integer, b::Integer) = a // b
 _ts_div(a::Union{Integer,Rational}, b::Union{Integer,Rational}) = a // b
 _ts_div(a, b) = a / b
+
+# Overflow-safe coefficient multiply. Numeric Int/Rational operands are promoted to BigInt
+# first so the Cauchy product never overflows at high order (e.g. the compounded factorial
+# denominators in exp(sin(x))); `_ts_coeff`/`_narrow_coeff` shrink the result back when it
+# fits. Symbolic operands multiply as-is.
+_ts_mul(a::Union{Integer,Rational}, b::Union{Integer,Rational}) = (big(a) * big(b))
+_ts_mul(a, b) = a * b
+
+# Overflow-safe coefficient addition: promote numeric Int/Rational operands to BigInt so
+# the common-denominator computation in rational `+` cannot overflow at high order.
+_ts_add(a::Union{Integer,Rational}, b::Union{Integer,Rational}) = (big(a) + big(b))
+_ts_add(a, b) = a + b
 
 # Rational-preserving reciprocal of an integer/rational, else symbolic inverse.
 _ts_inv(b::Union{Integer,Rational}) = one(b) // b
@@ -111,7 +126,7 @@ function Base.:+(a::TruncatedSeries, b::TruncatedSeries)
     end
     for (e, c) in b.coeffs
         e < o || continue
-        d[e] = haskey(d, e) ? d[e] + c : c
+        d[e] = haskey(d, e) ? _ts_add(d[e], c) : c
     end
     return TruncatedSeries(_ts_clean(d, o), o)
 end
@@ -127,8 +142,8 @@ function Base.:*(a::TruncatedSeries, b::TruncatedSeries)
     for (e1, c1) in a.coeffs, (e2, c2) in b.coeffs
         e = e1 + e2
         e < o || continue
-        prod = c1 * c2
-        d[e] = haskey(d, e) ? d[e] + prod : prod
+        prod = _ts_mul(c1, c2)
+        d[e] = haskey(d, e) ? _ts_add(d[e], prod) : prod
     end
     return TruncatedSeries(_ts_clean(d, o), o)
 end
@@ -136,7 +151,7 @@ end
 # Scalar multiply (constant * series): shifts nothing, scales coefficients.
 function _series_scale(c, s::TruncatedSeries)
     _ts_iszero(c) && return TruncatedSeries(SeriesDict(), s.order)
-    d = SeriesDict(e => c * cc for (e, cc) in s.coeffs)
+    d = SeriesDict(e => _ts_mul(c, cc) for (e, cc) in s.coeffs)
     return TruncatedSeries(_ts_clean(d, s.order), s.order)
 end
 
@@ -512,11 +527,11 @@ function _exp_vanishing(s::TruncatedSeries, order::Rational{Int})
     maxk = isempty(s) ? 0 : Int(ceil(order / v))
     acc = _series_monomial(1, 0, order)
     spow = _series_monomial(1, 0, order)
-    fact = 1
+    fact = big(1)                       # big-integer factorial: overflow-safe to high order
     for k in 1:maxk
         fact *= k
         spow = spow * s
-        acc = acc + _series_scale(1 // fact, spow)
+        acc = acc + _series_scale(_narrow_coeff(1 // fact), spow)
     end
     return acc
 end
@@ -570,15 +585,15 @@ function _trig_vanishing(s::TruncatedSeries, order::Rational{Int}, which::Symbol
     maxk = Int(ceil(order / v))
     acc = TruncatedSeries(SeriesDict(), order)
     spow = _series_monomial(1, 0, order)  # s^0
-    fact = 1
+    fact = big(1)                         # big-integer factorial: overflow-safe to high order
     for k in 0:maxk
         k > 0 && (fact *= k; spow = spow * s)
         coeff = if which === :sin
-            isodd(k) ? ((((k - 1) ÷ 2) % 2 == 0) ? 1 // fact : -1 // fact) : 0 // 1
+            isodd(k) ? ((((k - 1) ÷ 2) % 2 == 0) ? 1 // fact : -1 // fact) : big(0) // 1
         else
-            iseven(k) ? (((k ÷ 2) % 2 == 0) ? 1 // fact : -1 // fact) : 0 // 1
+            iseven(k) ? (((k ÷ 2) % 2 == 0) ? 1 // fact : -1 // fact) : big(0) // 1
         end
-        iszero(coeff) || (acc = acc + _series_scale(coeff, spow))
+        iszero(coeff) || (acc = acc + _series_scale(_narrow_coeff(coeff), spow))
     end
     return acc
 end
@@ -649,12 +664,17 @@ function _nseries_diff_fallback(expr, x, order::Rational{Int})
     return TruncatedSeries(_ts_clean(d, order), order)
 end
 
-# Narrow a Rational{BigInt} back to Rational{Int} / Int when it fits (factorial(big)
-# keeps us overflow-safe but we prefer small types in the output coefficients).
+# Narrow a BigInt / Rational{BigInt} back to Int / Rational{Int} when it fits (we compute
+# with big integers to stay overflow-safe at high order, but prefer small types in output).
+# A rational that is integer-valued collapses to the integer.
+_fits_int(n) = typemin(Int) <= n <= typemax(Int)
 function _narrow_coeff(c)
-    if c isa Rational && typemin(Int) <= numerator(c) <= typemax(Int) &&
-                         typemin(Int) <= denominator(c) <= typemax(Int)
-        return Rational{Int}(c)
+    if c isa Integer
+        return _fits_int(c) ? Int(c) : c
+    elseif c isa Rational
+        n, d = numerator(c), denominator(c)
+        d == 1 && return _fits_int(n) ? Int(n) : big(n)
+        return (_fits_int(n) && _fits_int(d)) ? Rational{Int}(c) : c
     end
     return c
 end

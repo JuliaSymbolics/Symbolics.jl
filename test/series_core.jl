@@ -1,5 +1,4 @@
-# Unit tests for the TruncatedSeries core (Task 2). Hand-built series only; no
-# expression expansion yet (that is _nseries, a later task).
+# Unit tests for the TruncatedSeries core: hand-built series, no expression expansion.
 
 using Symbolics
 using Symbolics: TruncatedSeries, _truncated_series, _series_monomial, _series_valuation,
@@ -8,17 +7,16 @@ using Test
 
 @variables a b
 
-# tolerant zero check for symbolic cancellation result
+# tolerant zero check for symbolic cancellation
 _ts_or_zero(c) = (c == 0) || isequal(Symbolics.value(c), 0)
 
 @testset "TruncatedSeries core" begin
     @testset "construction + cleaning" begin
         s = _truncated_series([0 => 1, 1 => 2, 2 => 0, 3 => 4], 3)
-        # order 3 drops the x^3 term; zero coeff at x^2 dropped
         @test _series_coeff_at(s, 0) == 1
         @test _series_coeff_at(s, 1) == 2
-        @test _series_coeff_at(s, 2) == 0   # absent
-        @test _series_coeff_at(s, 3) == 0   # truncated
+        @test _series_coeff_at(s, 2) == 0   # zero coeff dropped
+        @test _series_coeff_at(s, 3) == 0   # truncated at order 3
         @test s.order == 3
     end
 
@@ -38,57 +36,47 @@ _ts_or_zero(c) = (c == 0) || isequal(Symbolics.value(c), 0)
         @test _series_coeff_at(s, 2) == 3
         @test s.order == 4
 
-        # cancellation drops the term
         s3 = _truncated_series([0 => 1, 1 => 5], 4)
         s4 = _truncated_series([0 => -1, 1 => 5], 4)
         sc = s3 + s4
-        @test _series_coeff_at(sc, 0) == 0   # cancelled, absent
+        @test _series_coeff_at(sc, 0) == 0   # cancelled
         @test _series_coeff_at(sc, 1) == 10
 
-        # order is the min of the two
         lo = _truncated_series([0 => 1, 1 => 1, 2 => 1], 2)
         hi = _truncated_series([0 => 1, 1 => 1, 2 => 1], 5)
-        @test (lo + hi).order == 2
-        @test _series_coeff_at(lo + hi, 2) == 0  # beyond order 2
+        @test (lo + hi).order == 2   # order is the min
+        @test _series_coeff_at(lo + hi, 2) == 0
     end
 
     @testset "multiplication" begin
-        # (1 + x)(1 + x) = 1 + 2x + x^2
         s = _truncated_series([0 => 1, 1 => 1], 3) * _truncated_series([0 => 1, 1 => 1], 3)
-        @test _series_coeff_at(s, 0) == 1
+        @test _series_coeff_at(s, 0) == 1   # (1+x)^2 = 1 + 2x + x^2
         @test _series_coeff_at(s, 1) == 2
         @test _series_coeff_at(s, 2) == 1
 
-        # Laurent * Taylor: (x^-1)(1 + x + x^2) = x^-1 + 1 + x
-        lau = _series_monomial(1, -1, 3)
+        lau = _series_monomial(1, -1, 3)    # (x^-1)(1+x+x^2) = x^-1 + 1 + x
         tay = _truncated_series([0 => 1, 1 => 1, 2 => 1], 3)
         p = lau * tay
         @test _series_coeff_at(p, -1) == 1
         @test _series_coeff_at(p, 0) == 1
         @test _series_coeff_at(p, 1) == 1
         @test _series_valuation(p) == -1
+        @test p.order == 2   # min(3+0, 3+(-1))
 
-        # precision bookkeeping: val(lau) = -1, so order = min(3 + 0, 3 + (-1)) = 2
-        @test p.order == 2
-
-        # Puiseux * Puiseux: x^(1/2) * x^(1/2) = x^1
-        ph = _series_monomial(1, 1//2, 2)
+        ph = _series_monomial(1, 1//2, 2)   # x^(1/2) * x^(1/2) = x
         sq = ph * ph
         @test _series_coeff_at(sq, 1) == 1
         @test _series_valuation(sq) == 1
     end
 
     @testset "symbolic coefficients" begin
-        # (a + x)(b + x) = a*b + (a+b)x + x^2, coefficients are symbolic
         s = _truncated_series([0 => a, 1 => 1], 3) * _truncated_series([0 => b, 1 => 1], 3)
         @test isequal(Symbolics.value(_series_coeff_at(s, 0)), Symbolics.value(a * b))
         @test isequal(Symbolics.value(_series_coeff_at(s, 1) - (a + b)), 0)
         @test _series_coeff_at(s, 2) == 1
 
-        # symbolic cancellation: (a)x^0 + (-a)x^0 should drop (structural)
         z = _truncated_series([0 => a], 2) + _truncated_series([0 => -a], 2)
-        # -a + a is structurally 0 after value() in most cases; accept either absent or zero
-        @test _ts_or_zero(_series_coeff_at(z, 0))
+        @test _ts_or_zero(_series_coeff_at(z, 0))   # a + (-a) drops
     end
 
     @testset "_series_scale" begin
