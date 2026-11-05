@@ -1609,3 +1609,21 @@ Base.:(==)(a::Divergence{E}, b::Divergence{E}) where {E} = isequal(a.vars, b.var
 Base.hash(a::Divergence{E}, u::UInt) where {E} = hash(a.vars, u)
 Base.:(==)(a::Curl{E}, b::Curl{E}) where {E} = isequal(a.vars, b.vars)
 Base.hash(a::Curl{E}, u::UInt) where {E} = hash(a.vars, u)
+
+function Base.show(io::IO, ::Grad)
+    warn_load_latexify()
+    print(io, "∇")
+end
+Base.nameof(::Grad) = :∇
+
+function Base.show(io::IO, ::Divergence)
+    warn_load_latexify()
+    print(io, "∇⋅")
+end
+Base.nameof(::Divergence) = Symbol("∇⋅")
+
+function Base.show(io::IO, ::Curl)
+    warn_load_latexify()
+    print(io, "∇×")
+end
+Base.nameof(::Curl) = Symbol("∇×")
