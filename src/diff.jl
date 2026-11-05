@@ -1489,7 +1489,7 @@ function (d::Divergence{E})(arr::AbstractArray) where {E}
     buffer = SArgsT()
     resize!(buffer, length(d.vars))
     for (i, xidx) in zip(eachindex(buffer), eachindex(arr))
-        buffer[i] = Differential(d.vars[i])(arr[xidx])
+        buffer[i] = unwrap(Differential(d.vars[i])(arr[xidx]))
     end
     return SU.add_worker(VartypeT, buffer)
 end
@@ -1593,12 +1593,12 @@ function (c::Curl{E})(arr::AbstractVector) where {E}
     d1 = Differential(c.vars[1])
     d2 = Differential(c.vars[2])
     d3 = Differential(c.vars[3])
-    x1 = arr[1]
-    x2 = arr[2]
-    x3 = arr[3]
-    res[1] = d2(x3) - d3(x2)
-    res[2] = -d1(x3) + d3(x1)
-    res[3] = d1(x2) - d2(x1)
+    x1 = unwrap(arr[1])
+    x2 = unwrap(arr[2])
+    x3 = unwrap(arr[3])
+    res[1] = unwrap(d2(x3) - d3(x2))
+    res[2] = unwrap(-d1(x3) + d3(x1))
+    res[3] = unwrap(d1(x2) - d2(x1))
 
     return res
 end
