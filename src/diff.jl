@@ -1368,104 +1368,199 @@ end
 # Vector Calculus
 #######################################################################################################################
 
-"""
-    ArrayDifferentialOperator
+_check_der_wrt_const(x::Num) = _check_der_wrt_const(unwrap(x))
+_check_der_wrt_const(x::SymbolicT) = SU.isconst(x) && throw(ArgumentError(lazy"Cannot take derivative w.r.t constant $x"))
 
-A vector differential operator such as `∇`, built from one scalar operator per variable.
-Construct it with `Nabla` (alias `Grad`), and use `Div`, `Curl` and `Laplacian` for
-the common compositions. Applying it to a vector `x` of the same length as `vars`
-gives `[differentials[i](x[i]) for i in eachindex(vars)]`.
-"""
-struct ArrayDifferentialOperator <: Operator
-    """The variables to differentiate with respect to."""
-    vars::Vector{Any}
-    """The differentials, can be other functions if composite"""
-    differentials::Vector{Any}
-    """name"""
-    name::String
-end
-function Nabla(vars)
-    scalar_vars = collect(Any, scalarize(vars))
-    return ArrayDifferentialOperator(scalar_vars, Any[Differential(v) for v in scalar_vars], "∇")
-end
-const Grad = Nabla
-Div(vars) = x -> LinearAlgebra.dot(Nabla(vars), x)
-Curl(vars) = x -> LinearAlgebra.cross(Nabla(vars), x)
-Laplacian(vars) = LinearAlgebra.dot(Nabla(vars), Nabla(vars))
-
-function check_operator_length(D::ArrayDifferentialOperator, x)
-    return length(D.vars) == length(x) || throw(DimensionMismatch("Vector must be same length as vars in Operator $(D.name)."))
-end
-
-function check_composable(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
-    length(D1.vars) == length(D1.differentials) == length(D2.vars) == length(D2.differentials) ||
-        throw(DimensionMismatch("Operators have different numbers of components and cannot be composed."))
-    all(isequal.(D1.vars, D2.vars)) || throw(ArgumentError("Operators have different variables and cannot be composed."))
+# Num validates for us
+_check_der_wrt_number(x::Num) = nothing
+function _check_der_wrt_number(x::SymbolicT)
+    T = symtype(x)
+    T <: Number || throw(ArgumentError(lazy"Cannot take derivative w.r.t non-numeric variable $x with symtype $T"))
     return nothing
 end
 
-function (D::ArrayDifferentialOperator)(x::AbstractVector)
-    check_operator_length(D, x)
-    return Num[D.differentials[i](x[i]) for i in eachindex(x)]
+function _multivariate_der_op_check(x::AbstractVector)
+    for var in vars
+        _check_der_wrt_const(var)
+        _check_der_wrt_number(var)
+    end
 end
 
-(D::ArrayDifferentialOperator)(x::Union{Num, AbstractFloat, Integer}) = Num[d(x) for d in D.differentials]
+struct Grad{E} <: Operator
+    vars::SArgsT
 
-function (D1::ArrayDifferentialOperator)(D2::ArrayDifferentialOperator)
-    all(v -> any(isequal(v), D2.vars), D1.vars) || throw(ArgumentError("Operators have different variables and cannot be composed."))
-    length(D1.vars) == length(D1.differentials) == length(D2.vars) == length(D2.differentials) ||
-        throw(DimensionMismatch("Operators have different numbers of components and cannot be composed."))
-    return ArrayDifferentialOperator(D1.vars, Any[d1 ∘ d2 for (d1, d2) in zip(D1.differentials, D2.differentials)], "(" * D1.name * "∘" * D2.name * ")")
+    function Grad{E}(vars::AbstractVector{T}; check = true) where {T <: Union{Num, SymbolicT}}
+        check || return new(vars)
+        _multivariate_der_op_check(vars)
+        return new{E}(vars)
+    end
 end
 
-function LinearAlgebra.dot(D::ArrayDifferentialOperator, x::AbstractVector)
-    return sum(D(x))
+Grad(vars; check = true) = Grad{false}(vars; check)
+
+SU.promote_symtype(::Grad, T::SU.TypeT) = Vector{T}
+function SU.promote_shape(g::Grad, @nospecialize(sh::SU.ShapeT))
+    if SU.is_array_shape(sh)
+        throw(ArgumentError(lazy"`Grad` only applies to scalars. Got expression with shape $sh. Use `LinearAlgebra.dot($g, u)` instead"))
+    end
+    return SU.ShapeVecT((1:length(g.vars),))
 end
 
-function LinearAlgebra.dot(x::AbstractVector, D::ArrayDifferentialOperator)
-    check_operator_length(D, x)
-    directional(y) = sum(x[i] * D.differentials[i](y) for i in eachindex(x))
-    return y -> y isa AbstractVector ? Num[directional(yj) for yj in scalarize(y)] : directional(y)
+function (g::Grad{false})(x::SymbolicT)
+    return STerm(g, SArgsT((x,)); type = symtype(x), shape = SU.promote_shape(g, SU.shape(x)))
+end
+(g::Grad{false})(x::Num) = Arr{Num, 1}(g(unwrap(x)))
+function (g::Grad{true})(x::SymbolicT)
+    # For validation
+    SU.promote_shape(g, SU.shape(x))
+
+    res = SArgsT()
+    resize!(res, length(g.vars))
+    for i in eachindex(res)
+        res[i] = Differential(g.vars[i])(x)
+    end
+    return res
+end
+(g::Grad{true})(x::Num) = Num.(g(unwrap(x)))
+function (g::Grad)(x::AbstractArray)
+    throw(ArgumentError(lazy"`Grad` only applies to scalars. Got $x. Use `LinearAlgebra.dot($g, $x)` instead"))
 end
 
-function LinearAlgebra.dot(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
-    check_composable(D1, D2)
-    laplacian(x) = sum((D1.differentials[i] ∘ D2.differentials[i])(x) for i in eachindex(D1.vars))
-    return x -> x isa AbstractVector ? Num[laplacian(xj) for xj in scalarize(x)] : laplacian(x)
+struct Divergence{E} <: Operator
+    vars::SArgsT
+
+    function Divergence{E}(vars::AbstractVector{T}; check = true) where {T <: Union{Num, SymbolicT}}
+        check || return new(vars)
+        _multivariate_der_op_check(vars)
+        return new{E}(vars)
+    end
 end
 
-function crosscompose(a, b)
-    v1 = x -> (a[2] ∘ b[3])(x) - (a[3] ∘ b[2])(x)
-    v2 = x -> (a[3] ∘ b[1])(x) - (a[1] ∘ b[3])(x)
-    v3 = x -> (a[1] ∘ b[2])(x) - (a[2] ∘ b[1])(x)
-    return [v1, v2, v3]
+Divergence(vars; check = true) = Divergence{false}(vars; check)
+
+SU.promote_symtype(::Divergence, T::SU.TypeT) = eltype(T)::SU.TypeT
+function SU.promote_shape(div::Divergence, @nospecialize(sh::SU.ShapeT))
+    if sh isa SU.Unknown
+        isone(sh.ndims) || throw(ArgumentError(lazy"`Divergence` requires the argument to be a vector. Got shape $sh."))
+        return SU.ShapeVecT()
+    end
+    sh = sh::SU.ShapeVecT
+    isempty(sh) || throw(ArgumentError(lazy"`Divergence` requires the argument to be a vector. Got shape $sh."))
+    len = prod(sh; init = 1)
+    length(div.vars) == len || throw(ArgumentError(lazy"`Divergence` requires the argument to have the same number of elements as the independent variables. Got shape $sh."))
+    return SU.ShapeVecT()
 end
 
-function crosscall(a, b)
-    v1 = a[2](b[3]) - a[3](b[2])
-    v2 = a[3](b[1]) - a[1](b[3])
-    v3 = a[1](b[2]) - a[2](b[1])
-    return Num[v1, v2, v3]
+(d::Divergence{false})(x::SymbolicT) = STerm(d, SArgsT((x,)); type = SU.promote_symtype(d, symtype(x)), shape = SU.promote_shape(d, SU.shape(x)))
+function (d::Divergence{true})(x::SymbolicT)
+    # For validation
+    SU.promote_shape(d, SU.shape(x))
+    buffer = SArgsT()
+    resize!(buffer, length(d.vars))
+    for (i, xidx) in zip(eachindex(buffer), SU.stable_eachindex(x))
+        buffer[i] = Differential(d.vars[i])(x[xidx])
+    end
+    return SU.add_worker(VartypeT, buffer)
+end
+(d::Divergence)(x::Arr{T}) where {T} = T(d(unwrap(x)))
+function (d::Divergence{E})(arr::AbstractArray) where {E}
+    # Derivative of a constant is zero
+    any(Base.Fix2(isa, SymbolicT) ∘ unwrap, arr) || return COMMON_ZERO
+
+    sh = SU.shape(arr)
+    # Avoid hashconsing `arr` if the promotion throws
+    SU.promote_shape(d, sh)
+    E || return d(SConst(arr))
+    
+    # Duplication, but avoids hashconsing `arr` if `E`
+    buffer = SArgsT()
+    resize!(buffer, length(d.vars))
+    for (i, xidx) in zip(eachindex(buffer), eachindex(arr))
+        buffer[i] = Differential(d.vars[i])(arr[xidx])
+    end
+    return SU.add_worker(VartypeT, buffer)
 end
 
-function LinearAlgebra.cross(D::ArrayDifferentialOperator, x::AbstractVector)
-    length(D.vars) == length(x) == 3 || throw(DimensionMismatch("Cross product is only defined in 3 dimensions."))
-    return crosscall(D.differentials, x)
+# Compose them for Laplacian
+(d::Divergence)(g::Grad) = d ∘ g
+
+function LinearAlgebra.dot(g1::Grad{E}, x::Union{Grad, SymbolicT, AbstractArray}) where {E}
+    return Divergence{E}(g1.vars; check = false)(x)
 end
 
-function LinearAlgebra.cross(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
-    length(D1.vars) == length(D2.vars) == 3 || throw(DimensionMismatch("Cross product is only defined in 3 dimensions."))
-    check_composable(D1, D2)
-    return ArrayDifferentialOperator(D1.vars, crosscompose(D1.differentials, D2.differentials), "(" * D1.name * "×" * D2.name * ")")
+abstract type Laplacian{E} end
+
+Laplacian{E}(vars; check = true) where {E} = Divergence{E}(vars; check)(Grad{E}(vars; check))
+Laplacian(vars; check = true) = Laplacian{false}(vars; check)
+
+struct Curl{E} <: Operator
+    vars::SArgsT
+
+    function Curl{E}(vars::AbstractVector{T}; check = true) where {T <: Union{Num, SymbolicT}}
+        check || return new(vars)
+        length(vars) == 3 || throw(ArgumentError(lazy"`Curl` is only defined for 3 independent variables. Got $(length(vars))"))
+        _multivariate_der_op_check(vars)
+        return new{E}(vars)
+    end
 end
 
-Base.show(io::IO, D::ArrayDifferentialOperator) = print(io, D.name)
-Base.nameof(D::ArrayDifferentialOperator) = Symbol(D.name)
+Curl(vars; check = true) = Curl{false}(vars; check)
 
-function Base.:(==)(D1::ArrayDifferentialOperator, D2::ArrayDifferentialOperator)
-    length(D1.vars) == length(D2.vars) || return false
-    all(isequal.(D1.vars, D2.vars)) || return false
-    @variables x[1:length(D1.vars)]
-    return all(isequal.(D1(collect(x)), D2(collect(x))))
+SU.promote_symtype(::Curl, T::SU.TypeT) = T
+function SU.promote_shape(::Curl, @nospecialize(sh::SU.ShapeT))
+    if sh isa SU.Unknown
+        sh.ndims == 1 || throw(ArgumentError(lazy"`Curl` is only defined on vector arguments. Got shape $sh."))
+        return SU.ShapeVecT((1:3,))
+    end
+    sh = sh::SU.ShapeVecT
+    length(sh) == 1 && length(sh[1]) == 3 || throw(ArgumentError(lazy"`Curl` is only defined on 3-vector arguments. Got shape $sh."))
+    return SU.ShapeVecT((1:3,))
 end
-Base.hash(D::ArrayDifferentialOperator, u::UInt) = hash(length(D.vars), hash(D.vars, u))
+
+function (c::Curl{false})(x::SymbolicT)
+    return BSImpl.Term(c, SArgsT((x,)); type = symtype(x), shape = SU.promote_shape(c, SU.shape(x)))
+end
+function (c::Curl{true})(x::SymbolicT)
+    SU.promote_shape(c, SU.shape(x))
+    res = SArgsT()
+    resize!(res, 3)
+    d1 = Differential(c.vars[1])
+    d2 = Differential(c.vars[2])
+    d3 = Differential(c.vars[3])
+    x1 = x[1]
+    x2 = x[2]
+    x3 = x[3]
+    res[1] = d2(x3) - d3(x2)
+    res[2] = -d1(x3) + d3(x1)
+    res[3] = d1(x2) - d2(x1)
+    return res
+end
+(c::Curl{false})(x::Arr{T, 1}) where {T} = Arr{T, 1}(c(unwrap(x)))
+(c::Curl{true})(x::Arr{T, 1}) where {T} = T.(c(unwrap(x)))
+
+const CURL_ZERO_3VEC = SConst(fill(COMMON_ZERO, 3))
+function (c::Curl{E})(arr::AbstractVector) where {E}
+    if !any(Base.Fix2(isa, SymbolicT) ∘ unwrap, arr)
+        E || return CURL_ZERO_3VEC
+        return SArgsT((COMMON_ZERO, COMMON_ZERO, COMMON_ZERO))
+    end
+    
+    sh = SU.shape(arr)
+    # Avoid hashconsing `arr` if the promotion throws
+    SU.promote_shape(c, sh)
+    E || return c(SConst(arr))
+
+    res = SArgsT()
+    resize!(res, 3)
+    d1 = Differential(c.vars[1])
+    d2 = Differential(c.vars[2])
+    d3 = Differential(c.vars[3])
+    x1 = arr[1]
+    x2 = arr[2]
+    x3 = arr[3]
+    res[1] = d2(x3) - d3(x2)
+    res[2] = -d1(x3) + d3(x1)
+    res[3] = d1(x2) - d2(x1)
+
+    return res
+end
