@@ -2,7 +2,7 @@ using Symbolics
 using SymbolicUtils
 using Test
 using LinearAlgebra, SparseArrays
-using Symbolics: value, unwrap, scalarize, Nabla, Div, Curl, Laplacian
+using Symbolics: value, unwrap, scalarize, Arr, Grad, Divergence, Curl, Laplacian
 
 # Derivatives
 @variables t σ ρ β
@@ -914,21 +914,36 @@ end
 let
     @variables x[1:3] y[1:3]
 
-    ∇ = Nabla(x)
+    # `E = false` (default) builds a lazy term headed by the operator;
+    # `E = true` expands the operator into `Differential`s at application.
+    @variables f
+    gf = Grad{false}(x)(f)
+    @test gf isa Arr{Num, 1}
+    @test operation(unwrap(gf)) isa Grad{false}
+    @test all(isequal.(
+        Grad{true}(x)(f),
+        [Differential(x[1])(f), Differential(x[2])(f), Differential(x[3])(f)],
+    ))
+    @test isequal(
+        scalarize(expand_derivatives(gf)),
+        scalarize(expand_derivatives.(Grad{true}(x)(f))),
+    )
 
-    out = ∇(y)
-    @test all(isequal.(scalarize(out), [Differential(x[1])(y[1]), Differential(x[2])(y[2]), Differential(x[3])(y[3])]))
-
+    ∇ = Grad{false}(x)
+    ∇e = Grad{true}(x)
 
     out = ∇ ⋅ y
-    @test isequal(out, Div(x)(y))
-    @test isequal(out, Differential(x[1])(y[1]) + Differential(x[2])(y[2]) + Differential(x[3])(y[3]))
+    @test isequal(out, Divergence{false}(x)(y))
+    @test isequal(
+        Divergence{true}(x)(y),
+        Differential(x[1])(y[1]) + Differential(x[2])(y[2]) + Differential(x[3])(y[3]),
+    )
 
     out = ∇ × y
-    @test isequal(out, Curl(x)(y))
+    @test isequal(out, Curl{false}(x)(y))
     @test all(
         isequal.(
-            scalarize(out), [
+            Curl{true}(x)(y), [
                 Differential(x[2])(y[3]) - Differential(x[3])(y[2]),
                 Differential(x[3])(y[1]) - Differential(x[1])(y[3]),
                 Differential(x[1])(y[2]) - Differential(x[2])(y[1]),
@@ -937,11 +952,10 @@ let
     )
 
 
-    out = (∇ ⋅ ∇)(y)
-    @test all(isequal.(scalarize(out), scalarize(Laplacian(x)(y))))
+    out = (∇e ⋅ ∇e).(scalarize(y))
     @test all(
         isequal.(
-            scalarize(out),
+            out,
             [
                 Differential(x[1])(Differential(x[1])(y[1])) + Differential(x[2])(Differential(x[2])(y[1])) + Differential(x[3])(Differential(x[3])(y[1])),
                 Differential(x[1])(Differential(x[1])(y[2])) + Differential(x[2])(Differential(x[2])(y[2])) + Differential(x[3])(Differential(x[3])(y[2])),
@@ -951,14 +965,16 @@ let
     )
 
 
-    out = (∇ × ∇)(y)
+    out = (∇e × ∇e).(scalarize(y))
     @test all(
         isequal.(
-            scalarize(out),
+            out,
             [
-                Differential(x[2])(Differential(x[3])(y[1])) - Differential(x[3])(Differential(x[2])(y[1])),
-                Differential(x[3])(Differential(x[1])(y[2])) - Differential(x[1])(Differential(x[3])(y[2])),
-                Differential(x[1])(Differential(x[2])(y[3])) - Differential(x[2])(Differential(x[1])(y[3])),
+                [
+                    Differential(x[2])(Differential(x[3])(y[i])) - Differential(x[3])(Differential(x[2])(y[i])),
+                    Differential(x[3])(Differential(x[1])(y[i])) - Differential(x[1])(Differential(x[3])(y[i])),
+                    Differential(x[1])(Differential(x[2])(y[i])) - Differential(x[2])(Differential(x[1])(y[i])),
+                ] for i in 1:3
             ],
         ),
     )
@@ -966,36 +982,48 @@ let
     # Mixed partials are not reordered symbolically, so check the identities on concrete
     # fields: ∇×∇ vanishes, and ∇×(∇×v) == ∇(∇⋅v) - Δv.
     @variables p q r
-    ∇pqr = Nabla([p, q, r])
+    ∇pqr = Grad{false}([p, q, r])
     v = [p^2 * q * r, p * q^3 + sin(r), cos(p) * r^2]
-    @test all(iszero, expand_derivatives.((∇pqr × ∇pqr)(v)))
-    curlcurl = expand_derivatives.(Curl([p, q, r])(Curl([p, q, r])(v)))
-    graddiv_minus_lap = expand_derivatives.(∇pqr(Div([p, q, r])(v)) .- Laplacian([p, q, r])(v))
-    @test all(iszero, simplify.(curlcurl .- graddiv_minus_lap))
+    cg = ∇pqr × ∇pqr
+    @test all(iszero, reduce(vcat, scalarize.(expand_derivatives.(cg.(v)))))
+    curlcurl = expand_derivatives.(scalarize(Curl{false}([p, q, r])(Curl{false}([p, q, r])(v))))
+    graddiv_minus_lap = scalarize(expand_derivatives(Grad{false}([p, q, r])(Divergence{false}([p, q, r])(v)))) .-
+        expand_derivatives.(Laplacian{false}([p, q, r]).(v))
+    @test all(iszero, simplify.(Num.(curlcurl .- graddiv_minus_lap)))
 
     @variables a b
-    D = Nabla([a, b])
-    @test D(D)(D) == D(D(D))
-    @test hash(D(D)(D)) == hash(D(D(D)))
-    @test get(Dict(D(D)(D) => 1), D(D(D)), :missing) == 1
-    @test_throws DimensionMismatch Nabla([a])(Nabla([a, b]))
-    @test_throws DimensionMismatch Nabla([a, a])(Nabla([a]))
-    @test_throws DimensionMismatch LinearAlgebra.dot(Nabla([a]), Nabla([a, a]))
-    @test_throws DimensionMismatch LinearAlgebra.dot(Nabla([a, a]), Nabla([a]))
+    D = Grad{false}([a, b])
+    @test D == Grad{false}([a, b])
+    @test D != Grad{true}([a, b])
+    @test hash(D) == hash(Grad{false}([a, b]))
+    @test get(Dict(D => 1), Grad{false}([a, b]), :missing) == 1
+    @test isequal(Divergence{false}(x)(y), LinearAlgebra.dot(∇, y))
+    @test_throws MethodError Grad{false}([a])(Grad{false}([a, b]))
+    @test_throws ArgumentError LinearAlgebra.dot(Grad{false}([a]), Grad{false}([a, a]))(1)
+    @test_throws ArgumentError LinearAlgebra.dot(Grad{false}([a, a]), Grad{false}([a]))(1)
     @variables c[1:3]
-    @test_throws DimensionMismatch LinearAlgebra.cross(Nabla([c[1], c[2]]), Nabla(c))
-    @test_throws DimensionMismatch LinearAlgebra.cross(Nabla(c), Nabla([c[1], c[2]]))
+    @test_throws DimensionMismatch LinearAlgebra.cross(Grad{false}([c[1], c[2]]), Grad{false}(c))
+    @test_throws ArgumentError LinearAlgebra.cross(Grad{false}(c), Grad{false}([c[1], c[2]]))(1)
+    @test_throws ArgumentError Curl{false}([c[1], c[2]])
+    @test_throws ArgumentError Grad{false}([a, b])([a, b])
+    @test_throws ArgumentError Divergence{false}([a, b])(a)
+    @test_throws ArgumentError Divergence{false}([a, b])(c)
     f = a^2 + b^2
-    grad = Nabla([a, b])(f)
-    @test grad isa Vector{Num}
-    @test isequal(expand_derivatives.(grad), [2a, 2b])
-    lap = Laplacian([a, b])(f)
+    grad = Grad{false}([a, b])(f)
+    @test grad isa Arr{Num, 1}
+    @test isequal(expand_derivatives.(scalarize(grad)), Num[2a, 2b])
+    lap = Laplacian{false}([a, b])(f)
     @test lap isa Num
     @test isequal(expand_derivatives(lap), 4)
-    @test isequal(Nabla([a, b])(1), [0, 0])
-    @test isequal(Nabla([a, b])(2.5), [0, 0])
-    @test isequal(expand_derivatives(Laplacian([a, b])(1)), 0)
-    directional = LinearAlgebra.dot([1, 2], Nabla([a, b]))
-    @test isequal(expand_derivatives.(directional([a^2, b^2])), [2a, 4b])
+    @test isequal(expand_derivatives.(scalarize(Grad{false}([a, b])(1))), Num[0, 0])
+    @test isequal(expand_derivatives.(scalarize(Grad{false}([a, b])(2.5))), Num[0, 0])
+    @test isequal(expand_derivatives(Laplacian{false}([a, b])(1)), 0)
+    directional = LinearAlgebra.dot([1, 2], Grad{false}([a, b]))
+    @test isequal(expand_derivatives.(directional([a^2, b^2])), Num[2a, 4b])
     @test isequal(expand_derivatives(directional(a^2 + b^2)), 2a + 4b)
+    @test_throws DimensionMismatch LinearAlgebra.dot([1, 2, 3], Grad{false}([a, b]))
+    @test sprint(show, Grad{false}([a, b])) == "∇"
+    @test sprint(show, Divergence{false}(x)(y)) == "∇⋅(y)"
+    @test occursin("∇(a^2 + b^2)", sprint(show, grad))
+    @test occursin("∇×(y)", sprint(show, ∇ × y))
 end
