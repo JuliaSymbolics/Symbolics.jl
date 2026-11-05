@@ -1380,7 +1380,7 @@ function _check_der_wrt_number(x::SymbolicT)
 end
 
 function _multivariate_der_op_check(x::AbstractVector)
-    for var in vars
+    for var in x
         _check_der_wrt_const(var)
         _check_der_wrt_number(var)
     end
@@ -1389,10 +1389,10 @@ end
 struct Grad{E} <: Operator
     vars::SArgsT
 
-    function Grad{E}(vars::AbstractVector{T}; check = true) where {T <: Union{Num, SymbolicT}}
-        check || return new(vars)
+    function Grad{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
+        check || return new{E}(SArgsT(unwrap.(vars)))
         _multivariate_der_op_check(vars)
-        return new{E}(vars)
+        return new{E}(SArgsT(unwrap.(vars)))
     end
 end
 
@@ -1407,7 +1407,7 @@ function SU.promote_shape(g::Grad, @nospecialize(sh::SU.ShapeT))
 end
 
 function (g::Grad{false})(x::SymbolicT)
-    return STerm(g, SArgsT((x,)); type = symtype(x), shape = SU.promote_shape(g, SU.shape(x)))
+    return STerm(g, SArgsT((x,)); type = SU.promote_symtype(g, symtype(x)), shape = SU.promote_shape(g, SU.shape(x)))
 end
 (g::Grad{false})(x::Num) = Arr{Num, 1}(g(unwrap(x)))
 function (g::Grad{true})(x::SymbolicT)
@@ -1429,10 +1429,10 @@ end
 struct Divergence{E} <: Operator
     vars::SArgsT
 
-    function Divergence{E}(vars::AbstractVector{T}; check = true) where {T <: Union{Num, SymbolicT}}
-        check || return new(vars)
+    function Divergence{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
+        check || return new{E}(SArgsT(unwrap.(vars)))
         _multivariate_der_op_check(vars)
-        return new{E}(vars)
+        return new{E}(SArgsT(unwrap.(vars)))
     end
 end
 
@@ -1445,8 +1445,8 @@ function SU.promote_shape(div::Divergence, @nospecialize(sh::SU.ShapeT))
         return SU.ShapeVecT()
     end
     sh = sh::SU.ShapeVecT
-    isempty(sh) || throw(ArgumentError(lazy"`Divergence` requires the argument to be a vector. Got shape $sh."))
-    len = prod(sh; init = 1)
+    isone(length(sh)) || throw(ArgumentError(lazy"`Divergence` requires the argument to be a vector. Got shape $sh."))
+    len = prod(length, sh; init = 1)
     length(div.vars) == len || throw(ArgumentError(lazy"`Divergence` requires the argument to have the same number of elements as the independent variables. Got shape $sh."))
     return SU.ShapeVecT()
 end
@@ -1496,11 +1496,11 @@ Laplacian(vars; check = true) = Laplacian{false}(vars; check)
 struct Curl{E} <: Operator
     vars::SArgsT
 
-    function Curl{E}(vars::AbstractVector{T}; check = true) where {T <: Union{Num, SymbolicT}}
-        check || return new(vars)
+    function Curl{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
+        check || return new{E}(SArgsT(unwrap.(vars)))
         length(vars) == 3 || throw(ArgumentError(lazy"`Curl` is only defined for 3 independent variables. Got $(length(vars))"))
         _multivariate_der_op_check(vars)
-        return new{E}(vars)
+        return new{E}(SArgsT(unwrap.(vars)))
     end
 end
 
@@ -1518,7 +1518,7 @@ function SU.promote_shape(::Curl, @nospecialize(sh::SU.ShapeT))
 end
 
 function (c::Curl{false})(x::SymbolicT)
-    return BSImpl.Term(c, SArgsT((x,)); type = symtype(x), shape = SU.promote_shape(c, SU.shape(x)))
+    return STerm(c, SArgsT((x,)); type = SU.promote_symtype(c, symtype(x)), shape = SU.promote_shape(c, SU.shape(x)))
 end
 function (c::Curl{true})(x::SymbolicT)
     SU.promote_shape(c, SU.shape(x))
