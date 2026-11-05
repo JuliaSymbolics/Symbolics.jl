@@ -1497,8 +1497,23 @@ end
 # Compose them for Laplacian
 (d::Divergence)(g::Grad) = d ∘ g
 
-function LinearAlgebra.dot(g1::Grad{E}, x::Union{Grad, SymbolicT, AbstractArray}) where {E}
+function LinearAlgebra.dot(g1::Grad{E}, x::Union{Grad, SymbolicT, Num, AbstractArray}) where {E}
     return Divergence{E}(g1.vars; check = false)(x)
+end
+
+# To apply this to a vector variable, broadcast/`map` it.
+function LinearAlgebra.dot(v::AbstractVector, g::Grad{E}) where {E}
+    if length(v) != length(g.vars)
+        throw(DimensionMismatch(lazy"`LinearAlgebra.dot` requires the vector to have as many components as `Grad` has variables. Got $(length(v)) and $(length(g.vars))."))
+    end
+    return Base.Fix1(LinearAlgebra.dot, v) ∘ g
+end
+
+function LinearAlgebra.cross(g::Grad{E}, x::Union{Grad, SymbolicT, Num, AbstractArray}) where {E}
+    if length(g.vars) != 3
+        throw(DimensionMismatch(lazy"`LinearAlgebra.cross` requires 3 independent variables. Got $(length(g.vars))."))
+    end
+    return Curl{E}(g.vars; check = false)(x)
 end
 
 abstract type Laplacian{E} end
@@ -1557,6 +1572,9 @@ end
 (c::Curl{true})(x::Arr{T, 1}) where {T} = T.(c(unwrap(x)))
 (c::Curl)(x::Num) = c(unwrap(x))
 (c::Curl)(x::Number) = c(SConst(x))
+
+# Compose them for `∇ × ∇`
+(c::Curl)(g::Grad) = c ∘ g
 
 const CURL_ZERO_3VEC = SConst(fill(COMMON_ZERO, 3))
 function (c::Curl{E})(arr::AbstractVector) where {E}
