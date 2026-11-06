@@ -1725,7 +1725,9 @@ single `SymbolicT`.
 function executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
     res = _expanded_der_op(op)(arg)
     res isa AbstractVector || return expand_derivatives(res, simplify; throw_no_derivative)
-    res = SymbolicT[expand_derivatives(el, simplify; throw_no_derivative) for el in res]
+    for i in eachindex(res)
+        res[i] = expand_derivatives(res[i], simplify; throw_no_derivative)
+    end
     return SConst(res)
 end
 
