@@ -397,7 +397,7 @@ function Num(q::AbstractIrrational)
 end
 
 for T in (Integer, Rational)
-    @eval Base.:(^)(n::Num, i::$T) = Num(value(n)^i)
+    @eval Base.:(^)(n::Num, i::$T) = Num(unwrap(n)^i)
 end
 
 macro num_method(f, expr, Ts = nothing)

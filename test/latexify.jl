@@ -6,7 +6,7 @@ using ReferenceTests
 import SymbolicUtils as SU
 using Symbolics: VartypeT
 
-using DomainSets: Interval
+using DomainSets: Interval, ClosedInterval
 
 const LatexifyExt = Base.get_extension(Symbolics, :SymbolicsLatexifyExt)
 const _toexpr = LatexifyExt._toexpr
@@ -23,9 +23,9 @@ Dy = Differential(y)
 
 @test_reference "latexify_refs/inverse.txt" latexify(x^-1)
 
-@test_reference "latexify_refs/integral1.txt" latexify(Integral(dx in Interval(0, 1))(x))
-@test_reference "latexify_refs/integral2.txt" latexify(Integral(dx in Interval(-Inf, Inf))(u^2))
-@test_reference "latexify_refs/integral3.txt" latexify(Integral(dx in Interval(-z, u))(x^2))
+@test_reference "latexify_refs/integral1.txt" latexify(Integral(y in Interval(0, 1))(x))
+@test_reference "latexify_refs/integral2.txt" latexify(Integral(y in Interval(-Inf, Inf))(u^2))
+@test_reference "latexify_refs/integral3.txt" latexify(Integral(y in Interval(-z, u))(x^2))
 
 @test_reference "latexify_refs/frac1.txt" latexify((z + x * y^-1) / sin(z))
 @test_reference "latexify_refs/frac2.txt"  latexify((3x - 7y * z^23) * (z - z^2) / x)
@@ -57,24 +57,53 @@ Dy = Differential(y)
     Dx = Differential(x)
     I = Integral(x in Interval(0, 1))
 
-    # Compound integrand: default mult_symbol stays "~"; product stays grouped.
+    # Compound integrand: differential after integrand; product stays grouped.
     @test latexify(I(x * y); env = :raw).s ==
-        "\\int_{0}^{1} ~ x ~ \\left( x ~ y \\right)"
+        "\\int_{0}^{1} ~ \\left( x ~ y \\right) ~ \\mathrm{d}x"
     # Sum integrand stays parenthesised (not flattened to ∫x + y).
     @test latexify(I(x + y); env = :raw).s ==
-        "\\int_{0}^{1} ~ x ~ \\left( x + y \\right)"
+        "\\int_{0}^{1} ~ \\left( x + y \\right) ~ \\mathrm{d}x"
     # Indexed variable keeps recipe index=:subscript; no redundant merge parens.
     @test latexify(I(a[1]); env = :raw).s ==
-        "\\int_{0}^{1} ~ x ~ a_{1}"
+        "\\int_{0}^{1} ~ a_{1} ~ \\mathrm{d}x"
     # Float coefficient keeps FancyNumberFormatter(5) rounding.
     @test latexify(I(0.123456789 * x); env = :raw).s ==
-        "\\int_{0}^{1} ~ x ~ \\left( 0.12346 ~ x \\right)"
+        "\\int_{0}^{1} ~ \\left( 0.12346 ~ x \\right) ~ \\mathrm{d}x"
     # Power of an operator-form derivative keeps the derivative parenthesised as base.
     @test latexify((Dx(x + y))^2; env = :raw).s ==
         "\\left( \\frac{\\mathrm{d}}{\\mathrm{d}x} ~ \\left( x + y \\right) \\right)^{2}"
     # Integral upper limit closes with `}` (not `)`), and mult_symbol does not leak.
     @test latexify(I(y); env = :raw, mult_symbol = "\\cdot").s ==
-        "\\int_{0}^{1} ~ x ~ y"
+        "\\int_{0}^{1} ~ y ~ \\mathrm{d}x"
+end
+
+# issue #1694: bare Integral recipe and differential form.
+@testset "latexify bare Integral (#1694)" begin
+    @variables x a b y
+    I1 = Integral(x in ClosedInterval(a, b))
+    @test latexify(I1; env = :raw).s == "\\int_{a}^{b} ~ \\mathrm{d}x"
+    @test latexify(I1(x^2 + 2 * x + 1); env = :raw).s ==
+        "\\int_{a}^{b} ~ \\left( 1 + 2 ~ x + x^{2} \\right) ~ \\mathrm{d}x"
+    @test latexify(y ~ I1(x^2 + 2 * x + 1); env = :raw).s ==
+        "y = \\int_{a}^{b} ~ \\left( 1 + 2 \\cdot x + x^{2} \\right) ~ \\mathrm{d}x"
+end
+
+# issue #1694: integration variable keeps recipe formatting (indexed, mathtt, latexwrapper).
+@testset "latexify Integral variable formatting (#1694)" begin
+    @variables y x_long a[1:3]
+    @variables wrapped [latexwrapper = s -> "\\mathbf{" * s * "}"]
+    @test latexify(Integral(x_long in ClosedInterval(0, 1))(y); env = :raw).s ==
+        "\\int_{0}^{1} ~ y ~ \\mathrm{d}\\mathtt{x\\_long}"
+    @test latexify(Integral(x_long in ClosedInterval(0, 1)); env = :raw).s ==
+        "\\int_{0}^{1} ~ \\mathrm{d}\\mathtt{x\\_long}"
+    @test latexify(Integral(a[1] in ClosedInterval(0, 1))(y); env = :raw).s ==
+        "\\int_{0}^{1} ~ y ~ \\mathrm{d}a_{1}"
+    @test latexify(Integral(a[1] in ClosedInterval(0, 1)); env = :raw).s ==
+        "\\int_{0}^{1} ~ \\mathrm{d}a_{1}"
+    @test latexify(Integral(wrapped in ClosedInterval(0, 1))(y); env = :raw).s ==
+        "\\int_{0}^{1} ~ y ~ \\mathrm{d}\\mathbf{wrapped}"
+    @test latexify(Integral(wrapped in ClosedInterval(0, 1)); env = :raw).s ==
+        "\\int_{0}^{1} ~ \\mathrm{d}\\mathbf{wrapped}"
 end
 
 @test_reference "latexify_refs/stable_mul_ordering1.txt" latexify(x * y)
@@ -229,4 +258,41 @@ end
         raw"\frac{\mathrm{d}f\left( x \right)}{\mathrm{d}x} ~ g\left( x \right)"
     @test String(latexify(f(x) * D(g(x)); env = :raw)) ==
         raw"\frac{\mathrm{d}g\left( x \right)}{\mathrm{d}x} ~ f\left( x \right)"
+end
+
+struct DummyConnection1311
+    systems::Vector{Symbol}
+end
+Symbolics.hide_lhs(::DummyConnection1311) = true
+@latexrecipe function f(c::DummyConnection1311)
+    index --> :subscript
+    return Expr(:call, :connect, c.systems...)
+end
+
+@testset "hidden-lhs equations render as 0 = rhs (#1311)" begin
+    @variables x y
+    plain_conn = Symbolics.Equation(DummyConnection1311(Symbol[]), x + y)
+    conn_eq = Symbolics.Equation(
+        DummyConnection1311(Symbol[]),
+        DummyConnection1311([:a_1, :b_2]),
+    )
+
+    @test String(latexify(plain_conn)) ==
+        "\\begin{equation}\n0 = x + y\n\\end{equation}\n"
+    @test String(latexify(conn_eq)) ==
+        "\\begin{equation}\n0 = \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{equation}\n"
+    @test String(latexify([plain_conn])) ==
+        "\\begin{align}\n0 &= x + y\n\\end{align}\n"
+    @test String(latexify([conn_eq])) ==
+        "\\begin{align}\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{align}\n"
+    @test String(latexify([conn_eq, x ~ y])) ==
+        "\\begin{align}\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right) \\\\\nx &= y\n\\end{align}\n"
+    @test String(latexify([x ~ y, conn_eq])) ==
+        "\\begin{align}\nx &= y \\\\\n0 &= \\mathrm{connect}\\left( a_{1}, b_{2} \\right)\n\\end{align}\n"
+    @test String(latexify([x ~ y, y ~ x])) ==
+        "\\begin{align}\nx &= y \\\\\ny &= x\n\\end{align}\n"
+
+    @variables u[1:2] v[1:2]
+    @test String(latexify([u ~ v])) ==
+        "\\begin{align}\nu &= v\n\\end{align}\n"
 end
