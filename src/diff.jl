@@ -748,9 +748,6 @@ julia> dfx = expand_derivatives(Dx(f))
 function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivative=false)
     @match O begin
         BSImpl.Term(; f, args) && if f isa Union{Differential, Grad{false}, Divergence{false}, Curl{false}} end => begin
-            # Let `executediff` see a lazy vector differential operator so it can
-            # differentiate through it; expanding it here first would produce an
-            # array expression `executediff` cannot handle.
             if f isa Differential && iscall(args[1]) &&
                operation(args[1]) isa Union{Grad{false}, Divergence{false}, Curl{false}}
                 return executediff(f, args[1]; simplify, throw_no_derivative)
@@ -1713,58 +1710,23 @@ function (c::Curl{E})(arr::AbstractVector) where {E}
     return res
 end
 
-"""
-$(TYPEDSIGNATURES)
-
-Expand the lazy gradient operator `g` applied to `arg` into the vector of
-executed partial derivatives, wrapped as an `array_literal`.
-"""
-function executediff(g::Grad{false}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
-    SU.promote_shape(g, SU.shape(arg))
-    res = SArgsT()
-    resize!(res, length(g.vars))
-    for (i, v) in enumerate(g.vars)
-        res[i] = executediff(Differential(v), arg; simplify, throw_no_derivative)
-    end
-    return SConst(collect(res))
-end
+_expanded_der_op(g::Grad{false}) = Grad{true}(g.vars; check = false)
+_expanded_der_op(d::Divergence{false}) = Divergence{true}(d.vars; check = false)
+_expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
 
 """
 $(TYPEDSIGNATURES)
 
-Expand the lazy divergence operator `d` applied to `arg` into the sum of
-executed partial derivatives of the components of `arg`.
+Expand the lazy vector differential operator `op` applied to `arg` by applying
+its `E = true` variant and expanding the `Differential`s this produces. Vector
+results (`Grad`, `Curl`) are wrapped as an `array_literal` so expansion stays a
+single `SymbolicT`.
 """
-function executediff(d::Divergence{false}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
-    SU.promote_shape(d, SU.shape(arg))
-    buffer = SArgsT()
-    resize!(buffer, length(d.vars))
-    for (i, xidx) in zip(eachindex(buffer), SU.stable_eachindex(arg))
-        buffer[i] = executediff(Differential(d.vars[i]), arg[xidx]; simplify, throw_no_derivative)
-    end
-    return SU.add_worker(VartypeT, buffer)
-end
-
-"""
-$(TYPEDSIGNATURES)
-
-Expand the lazy curl operator `c` applied to `arg` into the vector of executed
-partial derivatives of the components of `arg`, wrapped as an `array_literal`.
-"""
-function executediff(c::Curl{false}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
-    SU.promote_shape(c, SU.shape(arg))
-    d1 = Differential(c.vars[1])
-    d2 = Differential(c.vars[2])
-    d3 = Differential(c.vars[3])
-    x1 = arg[1]
-    x2 = arg[2]
-    x3 = arg[3]
-    res = SArgsT()
-    resize!(res, 3)
-    res[1] = executediff(d2, x3; simplify, throw_no_derivative) - executediff(d3, x2; simplify, throw_no_derivative)
-    res[2] = executediff(d3, x1; simplify, throw_no_derivative) - executediff(d1, x3; simplify, throw_no_derivative)
-    res[3] = executediff(d1, x2; simplify, throw_no_derivative) - executediff(d2, x1; simplify, throw_no_derivative)
-    return SConst(collect(res))
+function executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
+    res = _expanded_der_op(op)(arg)
+    res isa AbstractVector || return expand_derivatives(res, simplify; throw_no_derivative)
+    res = SymbolicT[expand_derivatives(el, simplify; throw_no_derivative) for el in res]
+    return SConst(res)
 end
 
 executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Num; kw...) = executediff(op, unwrap(arg); kw...)
