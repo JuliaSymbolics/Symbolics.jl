@@ -259,7 +259,7 @@ end
 
 Returns true if the expression or equation `O` contains [`Differential`](@ref) terms.
 """
-hasderiv(O) = recursive_hasoperator(Differential, O)
+hasderiv(O) = recursive_hasoperator(Union{Differential, Grad{false}, Divergence{false}, Curl{false}}, O)
 
 
 _recursive_hasoperator(::Type{op}, eq::Equation) where {op} = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
@@ -514,6 +514,24 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
             # Some sort of `mapreduce`
             arg = SymbolicUtils.scalarize(arg)::SymbolicT
         end
+        BSImpl.Term(; f, args) && if f isa Grad{false} end => begin
+            res = Grad{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            for (i, expr) in enumerate(res)
+                res[i] = executediff(D, expr; simplify, throw_no_derivative)
+            end
+            return SConst(res)
+        end
+        BSImpl.Term(; f, args) && if f isa Divergence{false} end => begin
+            res = Divergence{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            return executediff(D, res; simplify, throw_no_derivative)
+        end
+        BSImpl.Term(; f, args) && if f isa Curl{false} end => begin
+            res = Curl{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            for (i, expr) in enumerate(res)
+                res[i] = executediff(D, expr; simplify, throw_no_derivative)
+            end
+            return SConst(res)
+        end
         _ => nothing
     end
     occursin_info(D.x, arg) || return differential_zero(arg)
@@ -597,21 +615,6 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     BSImpl.Term(; f = finner) && if finner isa Differential end => D(arg)
                     _ => executediff(f, innerdiff; simplify, throw_no_derivative)
                 end
-            elseif f isa Grad{false}
-                res = Grad{true}(f.vars; check = false)(args[1])
-                for (i, expr) in enumerate(res)
-                    res[i] = executediff(D, expr; simplify, throw_no_derivative)
-                end
-                return SConst(res)
-            elseif f isa Divergence{false}
-                res = Divergence{true}(f.vars; check = false)(args[1])
-                return executediff(D, res; simplify, throw_no_derivative)
-            elseif f isa Curl{false}
-                res = Curl{true}(f.vars; check = false)(args[1])
-                for (i, expr) in enumerate(res)
-                    res[i] = executediff(D, expr; simplify, throw_no_derivative)
-                end
-                return SConst(res)
             elseif f isa Integral && f.domain.domain isa AbstractInterval
                 domain = f.domain.domain
                 domainvars = f.domain.variables
@@ -744,7 +747,14 @@ julia> dfx = expand_derivatives(Dx(f))
 """
 function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivative=false)
     @match O begin
-        BSImpl.Term(; f, args) && if f isa Differential end => begin
+        BSImpl.Term(; f, args) && if f isa Union{Differential, Grad{false}, Divergence{false}, Curl{false}} end => begin
+            # Let `executediff` see a lazy vector differential operator so it can
+            # differentiate through it; expanding it here first would produce an
+            # array expression `executediff` cannot handle.
+            if f isa Differential && iscall(args[1]) &&
+               operation(args[1]) isa Union{Grad{false}, Divergence{false}, Curl{false}}
+                return executediff(f, args[1]; simplify, throw_no_derivative)
+            end
             arg = expand_derivatives(args[1], false; throw_no_derivative)
             return executediff(f, arg; simplify, throw_no_derivative)
         end
@@ -764,6 +774,9 @@ function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivativ
 end
 function expand_derivatives(n::Num, simplify=false; kwargs...)
     Num(expand_derivatives(value(n), simplify; kwargs...))
+end
+function expand_derivatives(x::Arr, simplify=false; kwargs...)
+    Arr(expand_derivatives(unwrap(x), simplify; kwargs...))
 end
 function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
     re = expand_derivatives(real(n), simplify; kwargs...)
@@ -1437,7 +1450,7 @@ end
 
 function Grad{E}(vars::Arr{T, 1}; check = true) where {E, T}
     vars = unwrap(vars)
-    return Grad{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
+    return Grad{E}(map(Base.Fix1(getindex, vars), SU.stable_eachindex(vars)); check)
 end
 
 """
@@ -1502,7 +1515,7 @@ end
 
 function Divergence{E}(vars::Arr{T, 1}; check = true) where {E, T}
     vars = unwrap(vars)
-    return Divergence{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
+    return Divergence{E}(map(Base.Fix1(getindex, vars), SU.stable_eachindex(vars)); check)
 end
 
 """
@@ -1626,7 +1639,7 @@ end
 
 function Curl{E}(vars::Arr{T, 1}; check = true) where {E, T}
     vars = unwrap(vars)
-    return Curl{E}(map(Base.Fix1(getindex, vars), SU.safe_eachindex(vars)); check)
+    return Curl{E}(map(Base.Fix1(getindex, vars), SU.stable_eachindex(vars)); check)
 end
 
 """
@@ -1699,6 +1712,63 @@ function (c::Curl{E})(arr::AbstractVector) where {E}
 
     return res
 end
+
+"""
+$(TYPEDSIGNATURES)
+
+Expand the lazy gradient operator `g` applied to `arg` into the vector of
+executed partial derivatives, wrapped as an `array_literal`.
+"""
+function executediff(g::Grad{false}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
+    SU.promote_shape(g, SU.shape(arg))
+    res = SArgsT()
+    resize!(res, length(g.vars))
+    for (i, v) in enumerate(g.vars)
+        res[i] = executediff(Differential(v), arg; simplify, throw_no_derivative)
+    end
+    return SConst(collect(res))
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Expand the lazy divergence operator `d` applied to `arg` into the sum of
+executed partial derivatives of the components of `arg`.
+"""
+function executediff(d::Divergence{false}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
+    SU.promote_shape(d, SU.shape(arg))
+    buffer = SArgsT()
+    resize!(buffer, length(d.vars))
+    for (i, xidx) in zip(eachindex(buffer), SU.stable_eachindex(arg))
+        buffer[i] = executediff(Differential(d.vars[i]), arg[xidx]; simplify, throw_no_derivative)
+    end
+    return SU.add_worker(VartypeT, buffer)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Expand the lazy curl operator `c` applied to `arg` into the vector of executed
+partial derivatives of the components of `arg`, wrapped as an `array_literal`.
+"""
+function executediff(c::Curl{false}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
+    SU.promote_shape(c, SU.shape(arg))
+    d1 = Differential(c.vars[1])
+    d2 = Differential(c.vars[2])
+    d3 = Differential(c.vars[3])
+    x1 = arg[1]
+    x2 = arg[2]
+    x3 = arg[3]
+    res = SArgsT()
+    resize!(res, 3)
+    res[1] = executediff(d2, x3; simplify, throw_no_derivative) - executediff(d3, x2; simplify, throw_no_derivative)
+    res[2] = executediff(d3, x1; simplify, throw_no_derivative) - executediff(d1, x3; simplify, throw_no_derivative)
+    res[3] = executediff(d1, x2; simplify, throw_no_derivative) - executediff(d2, x1; simplify, throw_no_derivative)
+    return SConst(collect(res))
+end
+
+executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Num; kw...) = executediff(op, unwrap(arg); kw...)
+executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Number; kw...) = executediff(op, SConst(arg); kw...)
 
 Base.:(==)(a::Grad{E}, b::Grad{E}) where {E} = isequal(a.vars, b.vars)
 Base.hash(a::Grad{E}, u::UInt) where {E} = hash(a.vars, u)

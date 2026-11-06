@@ -1019,7 +1019,7 @@ let
     @test isequal(expand_derivatives.(scalarize(Grad{false}([a, b])(2.5))), Num[0, 0])
     @test isequal(expand_derivatives(Laplacian{false}([a, b])(1)), 0)
     directional = LinearAlgebra.dot([1, 2], Grad{false}([a, b]))
-    @test isequal(expand_derivatives.(directional([a^2, b^2])), Num[2a, 4b])
+    @test isequal(expand_derivatives.(directional.([a^2, b^2])), Num[2a, 4b])
     @test isequal(expand_derivatives(directional(a^2 + b^2)), 2a + 4b)
     @test_throws DimensionMismatch LinearAlgebra.dot([1, 2, 3], Grad{false}([a, b]))
     @test sprint(show, Grad{false}([a, b])) == "∇"
