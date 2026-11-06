@@ -102,3 +102,18 @@ expr_power = x^y
 sympy_expr_power = symbolics_to_sympy(expr_power)
 back_expr_power = sympy_to_symbolics(sympy_expr_power, [x, y])
 @test isequal(Symbolics.simplify(expr_power), Symbolics.simplify(back_expr_power))
+
+# Test issue #1619: Array element variables map to flat SymPy symbols
+@variables a[1:2]
+expr_arr = a[1] + a[2]
+sympy_expr_arr = symbolics_to_sympy(expr_arr)
+@test string(sympy_expr_arr) == "a[1] + a[2]"
+back_expr_arr = sympy_to_symbolics(sympy_expr_arr, collect(Symbolics.get_variables(expr_arr)))
+@test isequal(Symbolics.simplify(expr_arr), Symbolics.simplify(back_expr_arr))
+
+@variables M[1:2, 1:2]
+expr_mat = M[1, 2] + 2M[2, 1]
+sympy_expr_mat = symbolics_to_sympy(expr_mat)
+@test string(sympy_expr_mat) == "M[1, 2] + 2*M[2, 1]"
+back_expr_mat = sympy_to_symbolics(sympy_expr_mat, collect(Symbolics.get_variables(expr_mat)))
+@test isequal(Symbolics.simplify(expr_mat), Symbolics.simplify(back_expr_mat))

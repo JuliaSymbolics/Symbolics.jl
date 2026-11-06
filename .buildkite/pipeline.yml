@@ -15,5 +15,3 @@ steps:
 env:
   BENCHMARK_ONLY: "yes"
   JULIA_PKG_SERVER: "" # it often struggles with our large artifacts
-
-  # SECRET_CODECOV_TOKEN: "..."

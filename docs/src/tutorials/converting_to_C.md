@@ -23,26 +23,39 @@ du = collect(du)
 lotka_volterra!(du, u, p, t)
 du
 ```
-and then we build the function:
+and then we build the C source (the default is `expression=Val{true}`):
 
 ```@example converting_to_C
-build_function(du, u, p, t, target=Symbolics.CTarget())
+ccode = build_function(du, u, p, t, target=Symbolics.CTarget(), expression=Val{true})
 ```
 
-If we want to compile this, we do `expression=Val{false}`:
+`CTarget` returns C source as a `String`. It does not invoke a C compiler or
+return a Julia callable: `expression=Val{false}` throws an error. Compile the
+generated source yourself, load it with `Libdl`, and call it via `ccall`.
 
-```@example converting_to_C
-f = build_function(du, u, p, t, target=Symbolics.CTarget(), expression=Val{false})
-```
+!!! note
+    The following compile-and-call steps require a C compiler such as `gcc`.
+    They are shown as non-executing documentation so the docs build does not
+    depend on a compiler being present in the documentation environment.
 
-now we check it computes the same thing:
+```julia
+using Libdl
 
-```@example converting_to_C
+# Write the generated C to a temporary shared library
+libdir = mktempdir()
+libpath = joinpath(libdir, "lotka." * dlext)
+open(`gcc -fPIC -O3 -xc -shared -o $libpath -`, "w") do io
+    print(io, ccode)
+end
+
+# Call the C function (default fname is :diffeqf)
 du = rand(2); du2 = rand(2)
 u = rand(2)
 p = rand(4)
 t = rand()
-f(du, u, p, t)
+ccall((:diffeqf, libpath), Cvoid,
+      (Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Float64),
+      du, u, p, t)
 lotka_volterra!(du2, u, p, t)
 du == du2 # true!
 ```

@@ -101,8 +101,8 @@ x
 
 julia> Symbolics.symbolic_solve(x^7 - 1, x)
 2-element Vector{SymbolicUtils.BasicSymbolicImpl.var"typeof(BasicSymbolicImpl)"{SymReal}}:
- roots_of((1//1) + x + x^2 + x^3 + x^4 + x^5 + x^6, x)
  1
+ roots_of((1//1) + x + x^2 + x^3 + x^4 + x^5 + x^6, x)
 ```
 ### `solve_multivar` (uses Groebner basis and `solve_univar` to find roots)
 !!! note
@@ -217,9 +217,14 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             check_x(var)
         end
     end
-    if !(expr isa Vector)
+    if expr isa Equation
+        expr = expr.lhs - expr.rhs
+    end
+    if isarraysymbolic(expr)
+        expr = vec(scalarize(expr))
+    end
+    if !(expr isa AbstractVector)
         expr_univar = true
-        expr = expr isa Equation ? expr.lhs - expr.rhs : expr
         check_expr_validity(expr)
         isequal(expr, 0) && return []
     else

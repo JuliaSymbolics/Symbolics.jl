@@ -524,10 +524,24 @@ function (lex::LinearExpander)(t::SymbolicT; need_remainder::Bool = true)
                 res = SymbolicUtils.add_worker(VartypeT, add_buffer)
                 return _linear_expansion_recurse(lex, res)
             else
+                newargs = args
+                dirty = false
                 for (i, arg) in enumerate(args)
                     _linear_expansion_predicate(lex, arg) && return (COMMON_ZERO, COMMON_ZERO, false)
                     a, b, islin = _linear_expansion_recurse(lex, arg)
                     (_iszero(a) && islin) || return (COMMON_ZERO, COMMON_ZERO, false)
+                    # Keep rewritten arguments so the opaque call remainder is x-free.
+                    if need_remainder && !isequal(b, arg)
+                        if !dirty
+                            newargs = copy(args)
+                            dirty = true
+                        end
+                        newargs[i] = b
+                    end
+                end
+                if dirty
+                    t = BSImpl.Term{VartypeT}(
+                        f, newargs; metadata = metadata(t), type = symtype(t), shape = shape(t))
                 end
                 return (COMMON_ZERO, t, true)
             end

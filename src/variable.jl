@@ -29,21 +29,34 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 """
 struct VariableSource <: AbstractVariableMetadata end
 
+function _default_is_array_shaped(val)
+    u = unwrap(val)
+    if u isa AbstractArray
+        return ndims(u) > 0
+    elseif u isa SymbolicUtils.BasicSymbolic
+        ush = shape(u)
+        return !(ush isa SymbolicUtils.Unknown) && !isempty(ush)
+    end
+    return false
+end
+
 function setdefaultval(x, val)
     val === nothing && return x
     sh = shape(x)
     if sh isa SymbolicUtils.Unknown
-        @assert sh.ndims == -1 || ndims(val) == sh.ndims """
-        Variable $x must have default of matching `ndims`. Got $val with `ndims` \
-        $(ndims(val)).
-        """
-    else
-        @assert val === missing || isempty(sh) || symtype(x) <: FnType || size(x) == size(val) """
-        Variable $x must have default of matching size. Got $val with size \
-        $(size(val)).
-        """
+        if !(sh.ndims == -1 || ndims(val) == sh.ndims)
+            throw(ArgumentError("Variable $x must have default of matching `ndims`. Got $val with `ndims` $(ndims(val))."))
+        end
+    elseif val !== missing && !(symtype(x) <: FnType)
+        if isempty(sh)
+            if _default_is_array_shaped(val)
+                throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+            end
+        elseif size(x) != size(val)
+            throw(ArgumentError("Variable $x must have default of matching size. Got $val with size $(size(val))."))
+        end
     end
-    setmetadata(x, VariableDefaultValue, val)
+    return setmetadata(x, VariableDefaultValue, val)
 end
 
 """
@@ -367,9 +380,15 @@ for T in [LinearAlgebra.UpperTriangular, LinearAlgebra.LowerTriangular]
     end
 end
 
+for T in [LinearAlgebra.Symmetric, LinearAlgebra.Hermitian, LinearAlgebra.Diagonal]
+    @eval function _recursive_unwrap(val::$T, ::Val{eval} = Val(false)) where {eval}
+        return _recursive_unwrap(collect(val), Val{eval}())
+    end
+end
+
 function _recursive_unwrap(val, ::Val{eval} = Val(false)) where {eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
-        if parent(val) !== val
+        if parent(val) !== val && hasfield(typeof(val), :parent)
             return Setfield.@set val.parent = _recursive_unwrap(parent(val), Val{eval}())
         end
         return _recursive_unwrap.(val, Val{eval}())
@@ -596,7 +615,10 @@ end
     variable(name::Symbol, idx::Integer...; T=Real)
 
 Create a variable with the given name along with subscripted indices with the
-`symtype=T`. When `T=FnType`, it creates a symbolic function.
+`symtype=T`. When `T` is a fully parameterized `FnType` such as
+`FnType{Tuple, Real, Nothing}`, it creates a symbolic function. Incomplete
+forms (`FnType`, `FnType{Tuple, Real}`, ...) throw an `ArgumentError` asking
+for the fully parameterized type.
 
 ```jldoctest
 julia> Symbolics.variable(:x, 4, 2, 0)
@@ -608,10 +630,13 @@ x₄ˏ₂ˏ₀⋆
 
 Also see `variables`.
 """
-function variable(name, idx...; T=Real)
+function variable(name, idx...; T = Real)
     name_ij = Symbol(name, join(map_subscripts.(idx), "ˏ"))
+    if T isa UnionAll && T <: FnType
+        throw(ArgumentError("Symbolics.variable(:f; T = FnType) needs a fully parameterized FnType, e.g. FnType{Tuple, Real, Nothing} (what @variables f(..) uses)"))
+    end
     v = Sym{VartypeT}(name_ij; type = T)
-    wrap(setmetadata(v, VariableSource, (:variables, name_ij)))
+    return wrap(setmetadata(v, VariableSource, (:variables, name_ij)))
 end
 
 ##### Renaming #####
@@ -635,7 +660,7 @@ function renamed_metadata(metadata::Union{Nothing, SymbolicUtils.MetadataT}, nam
                 v = v::NTuple{2, Symbol}
                 v = (v[1], name)
             end
-            newmeta = Base.ImmutableDict{DataType, Any}(newmeta, k, v)
+            newmeta = Base.ImmutableDict(newmeta, k => v)
         end
         return newmeta
     end

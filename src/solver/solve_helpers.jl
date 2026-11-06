@@ -105,9 +105,8 @@ function check_expr_validity(expr)
         valid_type = true
     end
     iscall(unwrap(expr)) && @assert !hasderiv(unwrap(expr)) "Differential equations are not currently supported"
-    @assert valid_type "Invalid input" 
-    valid_type && return nothing
-    # @assert isequal(expr, 0) "Invalid input"
+    @assert valid_type "Invalid input of type $type_expr (symtype $st)"
+    return valid_type && return nothing
 end
 function check_x(x)
     iscall(unwrap(x)) && @assert !hasderiv(unwrap(x)) "Differential equations are not currently supported"
@@ -122,6 +121,20 @@ function check_poly_inunivar(poly, var)
 end
 
 # converts everything to BIG
+"""
+    exact_div(x, y)
+
+Exact division that also accepts symbolic operands.
+
+`//` has no method for `BasicSymbolic`, so a parametric coefficient makes the
+closed-form root formulas in `univar.jl` throw a `MethodError`. Dividing two
+symbolic expressions is exact already, since it builds a `Div`, so this routes
+through `/` unless both operands are integers or rationals — where `/` would
+return a float and lose the exactness those formulas rely on.
+"""
+exact_div(x, y) = x / y
+exact_div(x::Union{Integer, Rational}, y::Union{Integer, Rational}) = x // y
+
 function bigify(n)
     n = value(n)
     if n isa Float64 || n isa Irrational

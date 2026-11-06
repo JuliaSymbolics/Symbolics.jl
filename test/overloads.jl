@@ -37,6 +37,27 @@ vars = @variables a,b,c,d,e,f,g,h,i
 @test cospi(zcplx) isa Complex{Num}
 @test sincospi(zcplx) isa Tuple{Complex{Num}, Complex{Num}}
 
+@testset "isinf/isnan/isfinite on Num" begin
+    for v in (Inf, -Inf)
+        @test isinf(Num(v))
+        @test !isnan(Num(v))
+        @test !isfinite(Num(v))
+    end
+    @test !isinf(Num(NaN))
+    @test isnan(Num(NaN))
+    @test !isfinite(Num(NaN))
+    for v in (1.0, 0)
+        @test !isinf(Num(v))
+        @test !isnan(Num(v))
+        @test isfinite(Num(v))
+    end
+    @test !isinf(a)
+    @test !isnan(a)
+    @test isfinite(a)
+    @test isfinite(a + b)
+    @test_nowarn lu(Num[a 1; b 2], NoPivot())
+end
+
 @test substitute(a ~ b, Dict(a=>1, b=>c)) == (1 ~ c)
 
 # test hashing
