@@ -597,6 +597,21 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     BSImpl.Term(; f = finner) && if finner isa Differential end => D(arg)
                     _ => executediff(f, innerdiff; simplify, throw_no_derivative)
                 end
+            elseif f isa Grad{false}
+                res = Grad{true}(f.vars; check = false)(args[1])
+                for (i, expr) in enumerate(res)
+                    res[i] = executediff(D, expr; simplify, throw_no_derivative)
+                end
+                return SConst(res)
+            elseif f isa Divergence{false}
+                res = Divergence{true}(f.vars; check = false)(args[1])
+                return executediff(D, res; simplify, throw_no_derivative)
+            elseif f isa Curl{false}
+                res = Curl{true}(f.vars; check = false)(args[1])
+                for (i, expr) in enumerate(res)
+                    res[i] = executediff(D, expr; simplify, throw_no_derivative)
+                end
+                return SConst(res)
             elseif f isa Integral && f.domain.domain isa AbstractInterval
                 domain = f.domain.domain
                 domainvars = f.domain.variables
