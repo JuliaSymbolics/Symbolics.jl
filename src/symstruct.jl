@@ -239,15 +239,31 @@ function __record_ctors_expr(raw_T, raw_where)
                 argnames = [Symbol(:a, i) for i in 1:nf]
                 argtuple = Expr(:tuple)
                 append!(argtuple.args, argnames)
-                for mask in 1:((1 << nf) - 1)
+                body = Expr(:call, $record_literal, :RT, argtuple)
+                emit = function (argtypes)
                     call = Expr(:call, Expr(:(::), :RT, Expr(:curly, :Type, type_expr)))
                     for i in 1:nf
-                        argtype = (mask >> (i - 1)) & 1 == 1 ? $RecordLiteralArg : Any
-                        push!(call.args, Expr(:(::), argnames[i], argtype))
+                        push!(call.args, Expr(:(::), argnames[i], argtypes[i]))
                     end
                     sig = isempty(where_args) ? call : Expr(:where, call, where_args...)
-                    body = Expr(:call, $record_literal, :RT, argtuple)
                     Base.eval(@__MODULE__, Expr(:function, sig, body))
+                end
+                for mask in 1:((1 << nf) - 1)
+                    issym = [(mask >> (i - 1)) & 1 == 1 for i in 1:nf]
+                    emit([issym[i] ? $RecordLiteralArg : Any for i in 1:nf])
+
+                    # A field declared abstractly - `::Real`, say - accepts a `Num`, so
+                    # the struct's own constructor is as good a match as the one above and
+                    # neither wins. Resolve it the usual way, by also defining the method
+                    # at their intersection, which is more specific than both. Concrete
+                    # fields admit no symbolic at all, so they need none of this.
+                    ftypes = ntuple(i -> fieldtype(T, i), nf)
+                    narrowed = map(1:nf) do i
+                        issym[i] ? typeintersect($RecordLiteralArg, ftypes[i]) : ftypes[i]
+                    end
+                    any(==(Union{}), narrowed) && continue
+                    narrowed == [issym[i] ? $RecordLiteralArg : Any for i in 1:nf] && continue
+                    emit(narrowed)
                 end
             end
         end
@@ -397,7 +413,12 @@ function _literal_getproperty(sym::SymStruct{T}, ::Val{name}) where {T, name}
         val = BSImpl.Term{VartypeT}(
             SymbolicGetproperty{T, name}(), args; type = fT, shape = fShape)
     end
-    if has_symwrapper(fT)
+    # An unfilled field folds out of a literal as the sentinel marking it, and no wrapper
+    # will take that - `Num` asserts a numeric symtype, `Arr` an array one. Wrap only a
+    # value whose symtype is related to the field's, which a sentinel's is not, and hand
+    # the rest back bare: a caller reading a partially written record wants to see that
+    # the field is not yet known.
+    if has_symwrapper(fT) && (symtype(val) <: fT || fT <: symtype(val))
         return wrapper_type(fT)(val)
     else
         return val
