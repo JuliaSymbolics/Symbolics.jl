@@ -227,6 +227,10 @@ symbolic, and indexing into it does not currently fold.
 ```@docs
 @symstruct
 SymStruct
+Symbolics.record_literal
+Symbolics.is_record_literal
+Symbolics.record_literal_term
+Symbolics.RecordLiteral
 Symbolics.symbolic_zero
 Symbolics.is_zeroable
 Symbolics.SymbolicZero

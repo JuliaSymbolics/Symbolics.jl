@@ -57,6 +57,13 @@ end
 
 @variables q1 q2 q3
 
+@testset "sentinels are removed from field types" begin
+    @test Symbolics.without_sentinels(Union{Nothing, Missing, Float64}) === Float64
+    @test Symbolics.without_sentinels(Union{Nothing, Union{Missing, Float64}}) === Float64
+    @test Symbolics.without_sentinels(Union{Nothing, Missing}) === Union{}
+    @test Symbolics.without_sentinels(Int) === Int
+end
+
 @testset "construction" begin
     # Fully concrete construction is untouched.
     @test RLPair(1.0, 2.0) isa RLPair
