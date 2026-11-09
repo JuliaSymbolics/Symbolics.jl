@@ -375,21 +375,40 @@ function _nseries_pow(base, q::Rational{Int}, x, order::Rational{Int})
     return _series_shift(_series_scale(_pow_const(c0, q), acc), e0 * q, order)
 end
 
+"""
+    _iroot(n, k)
+
+The non-negative integer `r` with `r^k == n`, or `nothing` if `n` is not a perfect
+`k`-th power.
+"""
+function _iroot(n::BigInt, k::Int)
+    n < 0 && return nothing
+    r = setprecision(BigFloat, 64 + 2 * ndigits(n; base = 2)) do
+        round(BigInt, BigFloat(n)^(1 / BigFloat(k)))
+    end
+    for c in (r - 1, r, r + 1)
+        c >= 0 && c^k == n && return c
+    end
+    return nothing
+end
+
+_root_term(v, q) = q == 1//2 ? Symbolics.term(sqrt, v) : Symbolics.term(^, v, q)
+
+"""
+    _pow_const(c0, q)
+
+`c0^q` for a nonzero constant `c0`: exact when `c0` is rational and the root is
+rational, symbolic otherwise. Fractional powers of negative numbers stay symbolic.
+"""
 function _pow_const(c0, q::Rational{Int})
-    if (c0 isa Integer || c0 isa Rational) && denominator(q) == 1
-        return Rational{Int}(c0)^Int(q)
-    end
     vc = value(c0)
-    if vc isa Union{Integer, Rational}
-        exact = try
-            r = float(vc)^float(q)
-            isinteger(r) ? Integer(r) : nothing
-        catch
-            nothing
-        end
-        exact === nothing || return exact
-    end
-    return q == 1//2 ? Symbolics.term(sqrt, vc) : Symbolics.term(^, vc, q)
+    vc isa Union{Integer, Rational} || return _root_term(vc, q)
+    b = Rational{BigInt}(vc)
+    denominator(q) == 1 && return _narrow_coeff(b^numerator(q))
+    rn = _iroot(numerator(b), denominator(q))
+    rd = _iroot(denominator(b), denominator(q))
+    (rn === nothing || rd === nothing) && return _root_term(vc, q)
+    return _narrow_coeff((rn // rd)^numerator(q))
 end
 
 function _nseries_exp(arg, x, order::Rational{Int})

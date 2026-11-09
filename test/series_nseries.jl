@@ -226,6 +226,16 @@ end
         @test string(expand_series(sqrt(sin(x)) + 1, x, 0)) == "O(x^0)"
     end
 
+    @testset "regression: exact constant roots (Float64 check gave wrong values)" begin
+        @test !(nc(sqrt(10^18 + 1 + x), 0, 2) isa Number)      # was 1000000000
+        @test nc(sqrt(10^18 + x), 0, 2) == 10^9
+        @test nc(sqrt(1//4 + x), 0, 2) == 1//2 && nc(sqrt(1//4 + x), 1, 2) == 1
+        @test nc((8//27 + x)^(1//3), 1, 2) == 3//4
+        @test nc((10^10 + x)^(-3), 1, 2) == -3 // big(10)^40     # overflowed Int64
+        @test Symbolics._pow_const(big(3)^90, 1//3) == big(3)^30
+        @test !(Symbolics._pow_const(-8, 1//3) isa Number)       # principal root is complex
+    end
+
     @testset "printing: variable, expansion point, fractional exponents" begin
         @variables t
         @test string(expand_series(sin(t), t, 4)) == "t + (-1//6)*t^3 + O(t^4)"
