@@ -1,11 +1,16 @@
 # Unit tests for the TruncatedSeries core: hand-built series, no expression expansion.
 
 using Symbolics
-using Symbolics: TruncatedSeries, _truncated_series, _series_monomial, _series_valuation,
+using Symbolics: TruncatedSeries, _series_monomial, _series_valuation, _ts_clean,
                  _series_coeff_at, _series_scale, SeriesDict
 using Test
 
 @variables a b
+
+# build a series from `exponent => coefficient` pairs, truncated at `order`
+_truncated_series(pairs, order) = TruncatedSeries(
+    _ts_clean(Dict(Rational{Int}(e) => c for (e, c) in pairs), Rational{Int}(order)),
+    Rational{Int}(order))
 
 # tolerant zero check for symbolic cancellation
 _ts_or_zero(c) = (c == 0) || isequal(Symbolics.value(c), 0)

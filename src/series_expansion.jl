@@ -22,14 +22,9 @@ TruncatedSeries(coeffs::SeriesDict, order::Rational{Int}) = TruncatedSeries(coef
 
 _ts_coeff(c::Int) = c
 _ts_coeff(c::Rational{Int}) = c
-_ts_coeff(c::Integer) = _narrow_coeff(c)
-_ts_coeff(c::Rational) = _narrow_coeff(c)
-_ts_coeff(c::SymbolicT) = c
 function _ts_coeff(c)
     u = value(c)
-    u isa SeriesCoeff && return _narrow_coeff(u)
-    u isa Integer && return _narrow_coeff(u)
-    u isa Rational && return _narrow_coeff(u)
+    u isa Union{Integer, Rational} && return _narrow_coeff(u)
     return u::SeriesCoeff
 end
 
@@ -42,9 +37,6 @@ _ts_mul(a, b) = a * b
 _ts_add(a::Union{Integer,Rational}, b::Union{Integer,Rational}) = (big(a) + big(b))
 _ts_add(a, b) = a + b
 
-_ts_inv(b::Union{Integer,Rational}) = one(b) // b
-_ts_inv(b) = 1 / b
-
 function _ts_clean(d, order::Rational{Int})
     out = SeriesDict()
     for (e, c) in d
@@ -55,28 +47,16 @@ function _ts_clean(d, order::Rational{Int})
     return out
 end
 
-"""
-    _truncated_series(pairs, order)
-
-Build a `TruncatedSeries` from `exponent => coefficient` pairs (or a `Dict`), truncating
-at `order`, dropping zeros, and converting exponents/order to `Rational{Int}`.
-"""
-function _truncated_series(pairs, order)
-    o = Rational{Int}(order)
-    d = SeriesDict()
-    for (e, c) in pairs
-        d[Rational{Int}(e)] = _ts_coeff(c)
-    end
-    return TruncatedSeries(_ts_clean(d, o), o)
-end
-
 _series_zero(order) = TruncatedSeries(SeriesDict(), Rational{Int}(order))
 _series_one(order) = _series_monomial(1, 0, order)
 
-function _series_truncate(s::TruncatedSeries, order)
-    o = min(s.order, Rational{Int}(order))
-    return TruncatedSeries(_ts_clean(s.coeffs, o), o)
+function _series_shift(s::TruncatedSeries, de::Rational{Int}, order)
+    o = Rational{Int}(order)
+    d = SeriesDict(e + de => c for (e, c) in s.coeffs)
+    return TruncatedSeries(_ts_clean(d, o), o)
 end
+
+_series_truncate(s::TruncatedSeries, order) = _series_shift(s, 0//1, min(s.order, Rational{Int}(order)))
 
 function _series_monomial(c, e, order)
     o = Rational{Int}(order)
@@ -131,6 +111,45 @@ function _unit_tail(s::TruncatedSeries, e0::Rational{Int}, c0, rel::Rational{Int
     end
     return TruncatedSeries(_ts_clean(g, rel), rel)
 end
+
+function _compose_terms(delta::TruncatedSeries, order)
+    isempty(delta) && return 0
+    v = _series_valuation(delta)
+    v > 0 || error("composition needs a vanishing inner series, got valuation $v")
+    return Int(ceil(order / v))
+end
+
+"""
+    _compose(c, delta, order)
+
+`Σ_k c(k) * delta^k` truncated at `order`, for a series `delta` that vanishes at 0.
+"""
+function _compose(c, delta::TruncatedSeries, order::Rational{Int})
+    acc = _series_monomial(c(0), 0, order)
+    dpow = _series_one(order)
+    for k in 1:_compose_terms(delta, order)
+        dpow = dpow * delta
+        ck = c(k)
+        _iszero(ck) || (acc = acc + _series_scale(ck, dpow))
+    end
+    return acc
+end
+
+function _split_const(f, arg, x, order::Rational{Int})
+    e0 = _lead_exp(arg, x)
+    e0 < 0 && throw(ArgumentError(
+        "$f of an expression with a pole (leading x^$e0) has no Laurent/Puiseux series " *
+        "at $x = 0"))
+    s = _nseries(arg, x, order)
+    delta = TruncatedSeries(filter(p -> !iszero(p.first), s.coeffs), s.order)
+    return _series_coeff_at(s, 0), delta
+end
+
+_exp_coeff(k) = 1 // factorial(big(k))
+_sin_coeff(k) = isodd(k) ? (iseven(k ÷ 2) ? 1 : -1) // factorial(big(k)) : 0
+_cos_coeff(k) = iseven(k) ? (iseven(k ÷ 2) ? 1 : -1) // factorial(big(k)) : 0
+_log1p_coeff(k) = isodd(k) ? 1 // k : -1 // k
+_binom_coeff(q, k) = prod(q - j for j in 0:(k - 1); init = big(1) // 1) // factorial(big(k))
 
 _fmt_exp(e::Rational{Int}) = denominator(e) == 1 ? string(numerator(e)) : string("(", e, ")")
 
@@ -251,10 +270,8 @@ function _nseries(expr, x, order::Rational{Int})
             return _nseries_pow(a, 1//2, x, order)
         elseif op === exp
             return _nseries_exp(a, x, order)
-        elseif op === sin
-            return _nseries_trig(a, x, order, :sin)
-        elseif op === cos
-            return _nseries_trig(a, x, order, :cos)
+        elseif op === sin || op === cos
+            return _nseries_trig(op, a, x, order)
         elseif op === log
             return _nseries_log(a, x, order)
         else
@@ -301,8 +318,8 @@ end
 
 function _nseries_reciprocal(den, x, order::Rational{Int}, dv::Rational{Int})
     rel_order = order + dv
-    den_s = _nseries(den, x, dv + rel_order)
     rel_order <= 0 && return _series_zero(order)
+    den_s = _nseries(den, x, dv + rel_order)
     u0 = _series_coeff_at(den_s, dv)
     _iszero(u0) && error("reciprocal: denominator leading coefficient is zero (bad valuation $dv)")
 
@@ -310,7 +327,7 @@ function _nseries_reciprocal(den, x, order::Rational{Int}, dv::Rational{Int})
     D = isempty(uexps) ? 1 : foldl(lcm, (denominator(e) for e in uexps); init = 1)
 
     r = SeriesDict()
-    r[0//1] = _ts_inv(u0)
+    r[0//1] = _ts_div(1, u0)
     nmax = Int(ceil(rel_order * D)) - 1
     for n in 1:nmax
         e = (n // D)::Rational{Int}
@@ -320,16 +337,12 @@ function _nseries_reciprocal(den, x, order::Rational{Int}, dv::Rational{Int})
             f > e && break
             rem = e - f
             haskey(r, rem) || continue
-            s = s + _series_coeff_at(den_s, dv + f) * r[rem]
+            s = _ts_add(s, _ts_mul(_series_coeff_at(den_s, dv + f), r[rem]))
         end
         _iszero(s) || (r[e] = _ts_coeff(-_ts_div(s, u0)))
     end
 
-    d = SeriesDict()
-    for (e, c) in r
-        _iszero(c) || (d[e - dv] = c)
-    end
-    return TruncatedSeries(_ts_clean(d, order), order)
+    return _series_shift(TruncatedSeries(r, rel_order), -dv, order)
 end
 
 function _nseries_pow(base, q::Rational{Int}, x, order::Rational{Int})
@@ -353,27 +366,9 @@ function _nseries_pow(base, q::Rational{Int}, x, order::Rational{Int})
     c0 = _series_coeff_at(base_s, e0)
     _iszero(c0) && error("_nseries_pow: base leading coefficient zero")
     rel = order - e0 * q
-    rel <= 0 && return _series_monomial(_pow_const(c0, q), e0 * q, order)
-    gts = _unit_tail(base_s, e0, c0, rel)
-    if isempty(gts)
-        return _series_monomial(_pow_const(c0, q), e0 * q, order)
-    end
-    vg = _series_valuation(gts)
-    maxk = Int(ceil(rel / vg))
-    acc = _series_one(rel)
-    gpow = _series_one(rel)
-    binom = 1 // 1
-    for k in 1:maxk
-        binom = binom * (q - (k - 1)) // k
-        gpow = gpow * gts
-        acc = acc + _series_scale(binom, gpow)
-    end
-    pref = _pow_const(c0, q)
-    shifted = SeriesDict()
-    for (e, c) in acc.coeffs
-        shifted[e + e0 * q] = pref * c
-    end
-    return TruncatedSeries(_ts_clean(shifted, order), order)
+    g = _unit_tail(base_s, e0, c0, rel)
+    acc = _compose(k -> _binom_coeff(q, k), g, rel)
+    return _series_shift(_series_scale(_pow_const(c0, q), acc), e0 * q, order)
 end
 
 function _pow_const(c0, q::Rational{Int})
@@ -394,18 +389,9 @@ function _pow_const(c0, q::Rational{Int})
 end
 
 function _nseries_exp(arg, x, order::Rational{Int})
-    e0 = _lead_exp(arg, x)
-    e0 < 0 && throw(ArgumentError(
-        "exp of an expression with a pole (leading x^$e0) is an essential singularity at " *
-        "$x = 0 and has no Laurent/Puiseux series expansion"))
-    arg_s = _nseries(arg, x, order)
-    c0 = e0 <= 0 ? _series_coeff_at(arg_s, 0) : 0
-    if !_iszero(c0)
-        shifted = _nseries(arg - c0, x, order)
-        inner = _exp_vanishing(shifted, order)
-        return _series_scale(_sym_call(exp, c0), inner)
-    end
-    return _exp_vanishing(arg_s, order)
+    c0, delta = _split_const(exp, arg, x, order)
+    s = _compose(_exp_coeff, delta, order)
+    return _iszero(c0) ? s : _series_scale(_sym_call(exp, c0), s)
 end
 
 function _sym_call(op, c)
@@ -413,61 +399,16 @@ function _sym_call(op, c)
     return _fold_exact_numeric(unwrap(sc))
 end
 
-function _exp_vanishing(s::TruncatedSeries, order::Rational{Int})
-    v = _series_valuation(s)
-    v <= 0 && !isempty(s) && error("_exp_vanishing expects a vanishing argument, got valuation $v")
-    maxk = isempty(s) ? 0 : Int(ceil(order / v))
-    acc = _series_one(order)
-    spow = _series_one(order)
-    fact = big(1)
-    for k in 1:maxk
-        fact *= k
-        spow = spow * s
-        acc = acc + _series_scale(_narrow_coeff(1 // fact), spow)
+function _nseries_trig(op, arg, x, order::Rational{Int})
+    c0, delta = _split_const(op, arg, x, order)
+    if _iszero(c0)
+        return _compose(op === sin ? _sin_coeff : _cos_coeff, delta, order)
     end
-    return acc
-end
-
-function _nseries_trig(arg, x, order::Rational{Int}, which::Symbol)
-    e0 = _lead_exp(arg, x)
-    e0 < 0 && throw(ArgumentError(
-        "$(which) of an expression with a pole (leading x^$e0) is an essential singularity " *
-        "at $x = 0 and has no Laurent/Puiseux series expansion"))
-    if e0 == 0
-        arg_s = _nseries(arg, x, order)
-        c0 = _series_coeff_at(arg_s, 0)
-        delta = _nseries(arg - c0, x, order)
-        sin_d = _trig_vanishing(delta, order, :sin)
-        cos_d = _trig_vanishing(delta, order, :cos)
-        sc0 = _sym_call(sin, c0)
-        cc0 = _sym_call(cos, c0)
-        return which === :sin ?
-            _series_scale(sc0, cos_d) + _series_scale(cc0, sin_d) :
-            _series_scale(cc0, cos_d) + _series_scale(-sc0, sin_d)
-    end
-    return _trig_vanishing(_nseries(arg, x, order), order, which)
-end
-
-function _trig_vanishing(s::TruncatedSeries, order::Rational{Int}, which::Symbol)
-    if isempty(s)
-        return which === :sin ? _series_zero(order) : _series_one(order)
-    end
-    v = _series_valuation(s)
-    v <= 0 && error("_trig_vanishing expects a vanishing argument, got valuation $v")
-    maxk = Int(ceil(order / v))
-    acc = _series_zero(order)
-    spow = _series_one(order)
-    fact = big(1)
-    for k in 0:maxk
-        k > 0 && (fact *= k; spow = spow * s)
-        coeff = if which === :sin
-            isodd(k) ? ((((k - 1) ÷ 2) % 2 == 0) ? 1 // fact : -1 // fact) : big(0) // 1
-        else
-            iseven(k) ? (((k ÷ 2) % 2 == 0) ? 1 // fact : -1 // fact) : big(0) // 1
-        end
-        iszero(coeff) || (acc = acc + _series_scale(_narrow_coeff(coeff), spow))
-    end
-    return acc
+    sd = _compose(_sin_coeff, delta, order)
+    cd = _compose(_cos_coeff, delta, order)
+    s0, k0 = _sym_call(sin, c0), _sym_call(cos, c0)
+    return op === sin ? _series_scale(s0, cd) + _series_scale(k0, sd) :
+                        _series_scale(k0, cd) + _series_scale(-s0, sd)
 end
 
 function _nseries_log(arg, x, order::Rational{Int})
@@ -478,32 +419,17 @@ function _nseries_log(arg, x, order::Rational{Int})
     arg_s = _nseries(arg, x, order)
     c0 = _series_coeff_at(arg_s, 0)
     _iszero(c0) && error("_nseries_log: zero constant term")
-    gts = _unit_tail(arg_s, 0//1, c0, order)
-    acc = _series_zero(order)
-    const_term = _iszero(c0 - 1) ? 0 : _sym_call(log, c0)
-    _iszero(const_term) || (acc = acc + _series_monomial(const_term, 0, order))
-    if !isempty(gts)
-        vg = _series_valuation(gts)
-        maxk = Int(ceil(order / vg))
-        gpow = _series_one(order)
-        for k in 1:maxk
-            gpow = gpow * gts
-            sign = isodd(k) ? (1 // k) : (-1 // k)
-            acc = acc + _series_scale(sign, gpow)
-        end
-    end
-    return acc
+    g = _unit_tail(arg_s, 0//1, c0, order)
+    l0 = _iszero(c0 - 1) ? 0 : _sym_call(log, c0)
+    return _compose(k -> k == 0 ? l0 : _log1p_coeff(k), g, order)
 end
 
 function _nseries_diff(expr, x, order::Rational{Int})
     maxord = Int(floor(order)) - 1
     maxord < 0 && return _series_zero(order)
     cs = _taylor_coeffs(unwrap(expr), unwrap(x), 0, maxord)
-    d = SeriesDict()
-    for (k, c) in enumerate(cs)
-        _check_finite(c, expr, x)
-        _iszero(c) || (d[Rational{Int}(k - 1)] = c)
-    end
+    foreach(c -> _check_finite(c, expr, x), cs)
+    d = SeriesDict(Rational{Int}(k - 1) => c for (k, c) in enumerate(cs))
     return TruncatedSeries(_ts_clean(d, order), order)
 end
 
@@ -513,19 +439,22 @@ end
 Exact Taylor coefficients `[f(c0), f'(c0), f''(c0)/2!, …]` of `f` in `y` about `y = c0`,
 through order `K`. Values are kept symbolic unless exact (see `_fold_exact_numeric`).
 """
+# Not `taylor_coeff` from taylor.jl, for now: it only expands about 0, its default
+# `fold`/`rationalize` turn irrational values into approximate rationals (#1299, e.g.
+# atan(1) -> 101534659//129277943), with `fold = Val(false)` it leaves `cosh(0)/6`
+# unfolded, and its `factorial(n)` overflows for n > 20.
 function _taylor_coeffs(f, y, c0, K::Int)
     D = Differential(y)
     cur = expand_derivatives(f)
     out = SeriesCoeff[]
     for k in 0:K
         raw = value(substitute_in_deriv(cur, y => c0; fold = Val(false)))
-        push!(out, _ts_coeff(_narrow_coeff(_fold_exact_numeric((1 // factorial(big(k))) * raw))))
+        push!(out, _ts_coeff(_fold_exact_numeric((1 // factorial(big(k))) * raw)))
         k < K && (cur = expand_derivatives(D(cur)))
     end
     return out
 end
 
-_is_finite_coeff(c::Rational) = !iszero(denominator(c))
 _is_finite_coeff(c::Number) = isfinite(c)
 function _is_finite_coeff(c)
     u = unwrap(c)
@@ -555,27 +484,13 @@ end
 const _NONSMOOTH_AT_ZERO = (abs, sign, floor, ceil, round, trunc)
 
 function _nseries_unary(g, arg, x, order::Rational{Int})
-    e0 = _lead_exp(arg, x)
-    e0 < 0 && throw(ArgumentError(
-        "$(g) of an expression with a pole (leading x^$e0) is not supported: it has no " *
-        "Laurent/Puiseux series expansion at $x = 0"))
-    arg_s = _nseries(arg, x, order)
-    c0 = _series_coeff_at(arg_s, 0)
-    any(f -> g === f, _NONSMOOTH_AT_ZERO) && _iszero(c0) && throw(ArgumentError(
+    c0, delta = _split_const(g, arg, x, order)
+    g in _NONSMOOTH_AT_ZERO && _iszero(c0) && throw(ArgumentError(
         "$(g)($(arg)) is not smooth at $x = 0 and has no series expansion there"))
-    delta = _nseries(arg - c0, x, order)
-    vd = _series_valuation(delta)
-    K = isempty(delta) ? 0 : Int(ceil(order / vd))
     y = Symbolics.variable(:__series_y)
-    cs = _taylor_coeffs(g(y), unwrap(y), c0, K)
+    cs = _taylor_coeffs(g(y), unwrap(y), c0, _compose_terms(delta, order))
     foreach(c -> _check_finite(c, "$(g)($(arg))", x), cs)
-    acc = _series_monomial(cs[1], 0, order)
-    dpow = _series_one(order)
-    for k in 1:K
-        dpow = dpow * delta
-        _iszero(cs[k + 1]) || (acc = acc + _series_scale(cs[k + 1], dpow))
-    end
-    return acc
+    return _compose(k -> cs[k + 1], delta, order)
 end
 
 _fits_int(n) = typemin(Int) <= n <= typemax(Int)

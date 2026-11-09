@@ -166,6 +166,10 @@ end
         @test _series_valuation(s) == 0//1
         @test nc(exp(sqrt(x)), 10, 30) == 1 // factorial(big(20))
         @test _series_coeff_at(_nseries(exp(x), x, 5), 2//1) isa Rational{Int}   # narrows back
+        # reciprocal recurrence and binomial coefficients overflowed Int64 (SymPy values)
+        @test nc(x/sin(x), 20, 22) == 91546277357 // big(401428831349145600000)
+        @test nc((1 + x)^(1//2), 39, 40) ==
+              big(22091732848375837675) // big(18889465931478580854784)
     end
 
     @testset "regression: unary functions of non-analytic arguments (1//0 leak)" begin
