@@ -236,12 +236,13 @@ function _nseries(expr, x, order::Rational{Int})
         args = arguments(u)
         lead = [_lead_exp(a, x) for a in args]
         n0 = sum(lead)
-        acc = _series_one(order)
+        n0 >= order && return _series_zero(order)
+        acc = _series_one(order - n0)
         for (j, arg) in enumerate(args)
             fj = _nseries(arg, x, order - n0 + lead[j])
             acc = acc * fj
         end
-        return acc
+        return _series_truncate(acc, order)
 
     elseif SymbolicUtils.isdiv(u)
         num, den = arguments(u)
@@ -311,9 +312,11 @@ end
 
 function _nseries_div(num, den, x, order::Rational{Int})
     dv = _lead_exp(den, x)
-    recip = _nseries_reciprocal(den, x, order, dv)
+    nv = _lead_exp(num, x)
+    nv - dv >= order && return _series_zero(order)
+    recip = _nseries_reciprocal(den, x, order - nv, dv)
     num_s = _nseries(num, x, order + dv)
-    return num_s * recip
+    return _series_truncate(num_s * recip, order)
 end
 
 function _nseries_reciprocal(den, x, order::Rational{Int}, dv::Rational{Int})

@@ -206,6 +206,18 @@ end
         @test nc((1 + x)^1000, 9, 10) == binomial(big(1000), 9)
     end
 
+    @testset "regression: factors and numerators with poles keep the requested precision" begin
+        s = _nseries((1/x^2 + x)/(1 + x), x, 2)    # SymPy: x^-2 - 1/x + 1 + O(x^2)
+        @test s.order == 2//1 && nc((1/x^2 + x)/(1 + x), 0, 2) == 1
+        s = _nseries(exp(x)*x^-2, x, 2)            # SymPy: x^-2 + 1/x + 1/2 + x/6 + O(x^2)
+        @test s.order == 2//1 && nc(exp(x)*x^-2, 1, 2) == 1//6
+        @test nc(sin(x)*x^-3, 0, 2) == -1//6
+        @test _nseries(x^-2*sqrt(sin(x)), x, 0).order == 0//1
+        s = _nseries(x^5*sqrt(sin(x)), x, 3)       # SymPy: O(x^3)
+        @test s.order == 3//1 && isempty(s)
+        @test _nseries((sin(x)^2 + cos(x)^2 - 1)/(1 + x), x, 3).order == 3//1
+    end
+
     @testset "printing: variable, expansion point, fractional exponents" begin
         @variables t
         @test string(expand_series(sin(t), t, 4)) == "t + (-1//6)*t^3 + O(t^4)"
