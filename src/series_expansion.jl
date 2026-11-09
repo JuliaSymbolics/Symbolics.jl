@@ -365,10 +365,11 @@ function _nseries_pow(base, q::Rational{Int}, x, order::Rational{Int})
         return _series_truncate(res, order)
     end
     e0 = _lead_exp(base, x)
-    base_s = _nseries(base, x, e0 + (order - e0 * q))
+    rel = order - e0 * q
+    rel <= 0 && return _series_zero(order)
+    base_s = _nseries(base, x, e0 + rel)
     c0 = _series_coeff_at(base_s, e0)
     _iszero(c0) && error("_nseries_pow: base leading coefficient zero")
-    rel = order - e0 * q
     g = _unit_tail(base_s, e0, c0, rel)
     acc = _compose(k -> _binom_coeff(q, k), g, rel)
     return _series_shift(_series_scale(_pow_const(c0, q), acc), e0 * q, order)

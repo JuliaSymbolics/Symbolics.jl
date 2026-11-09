@@ -218,6 +218,14 @@ end
         @test _nseries((sin(x)^2 + cos(x)^2 - 1)/(1 + x), x, 3).order == 3//1
     end
 
+    @testset "regression: fractional power truncated below its leading term" begin
+        for (f, o) in ((sqrt(sin(x)), 0//1), (sqrt(sin(x)), 1//2), (x^(1//3), 1//3), (sin(x)^(-1//2), -1//1))
+            s = _nseries(f, x, o)                  # threw "base leading coefficient zero"
+            @test s.order == o && isempty(s)
+        end
+        @test string(expand_series(sqrt(sin(x)) + 1, x, 0)) == "O(x^0)"
+    end
+
     @testset "printing: variable, expansion point, fractional exponents" begin
         @variables t
         @test string(expand_series(sin(t), t, 4)) == "t + (-1//6)*t^3 + O(t^4)"
