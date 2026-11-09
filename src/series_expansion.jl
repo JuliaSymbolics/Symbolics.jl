@@ -68,6 +68,11 @@ end
 _series_zero(order) = TruncatedSeries(SeriesDict(), Rational{Int}(order))
 _series_one(order) = _series_monomial(1, 0, order)
 
+function _series_truncate(s::TruncatedSeries, order)
+    o = min(s.order, Rational{Int}(order))
+    return TruncatedSeries(_ts_clean(s.coeffs, o), o)
+end
+
 function _series_monomial(c, e, order)
     o = Rational{Int}(order)
     er = Rational{Int}(e)
@@ -325,12 +330,15 @@ function _nseries_pow(base, q::Rational{Int}, x, order::Rational{Int})
     end
     if q > 0 && denominator(q) == 1
         p = Int(q)
-        acc = _nseries(base, x, order)
-        res = acc
-        for _ in 2:p
-            res = res * acc
+        v = _lead_exp(base, x)
+        b = _nseries(base, x, max(order - (p - 1) * v, v + 1))
+        res = nothing
+        while p > 0
+            isodd(p) && (res = res === nothing ? b : res * b)
+            p >>= 1
+            p > 0 && (b = b * b)
         end
-        return p == 1 ? acc : res
+        return _series_truncate(res, order)
     end
     e0 = _lead_exp(base, x)
     base_s = _nseries(base, x, e0 + (order - e0 * q))

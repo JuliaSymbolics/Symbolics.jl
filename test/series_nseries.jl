@@ -190,4 +190,15 @@ end
         @test_throws ArgumentError _nseries(sign(x), x, 2)       # jump: was silently 0
         @test nc(abs(1 + x), 1, 3) == 1                          # smooth away from the kink
     end
+
+    @testset "regression: integer powers keep the requested precision" begin
+        s = _nseries((1/x + 1)^3, x, 3)        # was truncated at O(x^1)
+        @test s.order == 3//1 && nc((1/x + 1)^3, 0, 3) == 1 && nc((1/x + 1)^3, -3, 3) == 1
+        s = _nseries((x + x^2)^3, x, 5)        # returned terms through x^6 + O(x^7)
+        @test s.order == 5//1 && maximum(keys(s.coeffs)) == 4//1
+        @test nc((1/sin(x))^2, 2, 3) == 1//15  # SymPy: x^-2 + 1/3 + x^2/15
+        @test nc(sin(x)^2, 6, 7) == 2//45
+        @test _nseries(x^6, x, 5).order == 5//1 && isempty(_nseries(x^6, x, 5))
+        @test nc((1 + x)^1000, 9, 10) == binomial(big(1000), 9)
+    end
 end
