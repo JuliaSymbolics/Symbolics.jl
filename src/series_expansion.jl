@@ -231,7 +231,9 @@ function _nseries(expr, x, order::Rational{Int})
                 "series expansion is only supported for real expressions, but got a " *
                 "complex-valued expression: $(u)"))
         end
-        a = only(arguments(u))
+        args = arguments(u)
+        length(args) == 1 || return _nseries_diff(expr, x, order)
+        a = only(args)
         if op === sqrt
             return _nseries_pow(a, 1//2, x, order)
         elseif op === exp
@@ -243,7 +245,7 @@ function _nseries(expr, x, order::Rational{Int})
         elseif op === log
             return _nseries_log(a, x, order)
         else
-            return _nseries_diff(expr, x, order)
+            return _nseries_unary(op, a, x, order)
         end
     end
 
@@ -480,17 +482,84 @@ end
 function _nseries_diff(expr, x, order::Rational{Int})
     maxord = Int(floor(order)) - 1
     maxord < 0 && return _series_zero(order)
-    D = Differential(x)
-    cur = expand_derivatives(unwrap(expr))
+    cs = _taylor_coeffs(unwrap(expr), unwrap(x), 0, maxord)
     d = SeriesDict()
-    for k in 0:maxord
-        raw = value(substitute_in_deriv(cur, x => 0; fold = Val(false)))
-        c = _fold_exact_numeric((1 // factorial(big(k))) * raw)
-        c = _narrow_coeff(c)
-        _iszero(c) || (d[Rational{Int}(k)] = c)
-        k < maxord && (cur = expand_derivatives(D(cur)))
+    for (k, c) in enumerate(cs)
+        _check_finite(c, expr, x)
+        _iszero(c) || (d[Rational{Int}(k - 1)] = c)
     end
     return TruncatedSeries(_ts_clean(d, order), order)
+end
+
+"""
+    _taylor_coeffs(f, y, c0, K)
+
+Exact Taylor coefficients `[f(c0), f'(c0), f''(c0)/2!, …]` of `f` in `y` about `y = c0`,
+through order `K`. Values are kept symbolic unless exact (see `_fold_exact_numeric`).
+"""
+function _taylor_coeffs(f, y, c0, K::Int)
+    D = Differential(y)
+    cur = expand_derivatives(f)
+    out = SeriesCoeff[]
+    for k in 0:K
+        raw = value(substitute_in_deriv(cur, y => c0; fold = Val(false)))
+        push!(out, _ts_coeff(_narrow_coeff(_fold_exact_numeric((1 // factorial(big(k))) * raw))))
+        k < K && (cur = expand_derivatives(D(cur)))
+    end
+    return out
+end
+
+_is_finite_coeff(c::Rational) = !iszero(denominator(c))
+_is_finite_coeff(c::Number) = isfinite(c)
+function _is_finite_coeff(c)
+    u = unwrap(c)
+    u isa Number && return _is_finite_coeff(u)
+    SymbolicUtils.isconst(u) && return _is_finite_coeff(unwrap_const(u))
+    iscall(u) || return true
+    args = arguments(u)
+    all(_is_finite_coeff, args) || return false
+    if all(a -> unwrap_const(unwrap(a)) isa Number, args)
+        r = try
+            operation(u)(map(a -> unwrap_const(unwrap(a)), args)...)
+        catch
+            return false
+        end
+        return !(r isa Number) || _is_finite_coeff(r)
+    end
+    return true
+end
+
+function _check_finite(c, expr, x)
+    _is_finite_coeff(c) && return nothing
+    throw(ArgumentError(
+        "$expr is not analytic at $x = 0 (a Taylor coefficient is $c); its series " *
+        "expansion is not supported"))
+end
+
+const _NONSMOOTH_AT_ZERO = (abs, sign, floor, ceil, round, trunc)
+
+function _nseries_unary(g, arg, x, order::Rational{Int})
+    e0 = _lead_exp(arg, x)
+    e0 < 0 && throw(ArgumentError(
+        "$(g) of an expression with a pole (leading x^$e0) is not supported: it has no " *
+        "Laurent/Puiseux series expansion at $x = 0"))
+    arg_s = _nseries(arg, x, order)
+    c0 = _series_coeff_at(arg_s, 0)
+    any(f -> g === f, _NONSMOOTH_AT_ZERO) && _iszero(c0) && throw(ArgumentError(
+        "$(g)($(arg)) is not smooth at $x = 0 and has no series expansion there"))
+    delta = _nseries(arg - c0, x, order)
+    vd = _series_valuation(delta)
+    K = isempty(delta) ? 0 : Int(ceil(order / vd))
+    y = Symbolics.variable(:__series_y)
+    cs = _taylor_coeffs(g(y), unwrap(y), c0, K)
+    foreach(c -> _check_finite(c, "$(g)($(arg))", x), cs)
+    acc = _series_monomial(cs[1], 0, order)
+    dpow = _series_one(order)
+    for k in 1:K
+        dpow = dpow * delta
+        _iszero(cs[k + 1]) || (acc = acc + _series_scale(cs[k + 1], dpow))
+    end
+    return acc
 end
 
 _fits_int(n) = typemin(Int) <= n <= typemax(Int)

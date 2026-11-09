@@ -167,4 +167,27 @@ end
         @test nc(exp(sqrt(x)), 10, 30) == 1 // factorial(big(20))
         @test _series_coeff_at(_nseries(exp(x), x, 5), 2//1) isa Rational{Int}   # narrows back
     end
+
+    @testset "regression: unary functions of non-analytic arguments (1//0 leak)" begin
+        # Reference values from SymPy series(); these previously returned (1//0)*x.
+        @test nc(tan(sqrt(x)), 1//2, 2) == 1 && nc(tan(sqrt(x)), 3//2, 2) == 1//3
+        @test nc(sinh(sqrt(x)), 1//2, 2) == 1 && nc(sinh(sqrt(x)), 3//2, 2) == 1//6
+        s = _nseries(atan(1 + sqrt(x)), x, 2)   # atan(1) + x^(1/2)/2 - x/4 + x^(3/2)/12
+        @test isequal(value(_series_coeff_at(s, 0)), value(atan(Num(1))))
+        @test [value(_series_coeff_at(s, e)) for e in (1//2, 1, 3//2)] == [1//2, -1//4, 1//12]
+        @test nc(tanh(x^2), 6, 7) == -1//3
+        @test nc(asin(x/2), 3, 4) == 1//48
+        @test matches_taylor(tan(x), 6) && matches_taylor(atan(x), 6)
+        @test isequal(nc(tan(a*x), 3, 4), value((1//3) * a^3))
+        @test nc(tan(x)/x^2, -1, 3) == 1 && nc(tan(x)/x^2, 1, 3) == 1//3
+        @test nc(atan(x, 1 + x), 2, 3) == -1                    # two-argument term
+    end
+
+    @testset "regression: non-analytic unary functions are rejected" begin
+        @test_throws ArgumentError _nseries(asin(1 + x), x, 2)   # branch point of asin at 1
+        @test_throws ArgumentError _nseries(atan(1/x), x, 2)     # pole inside the function
+        @test_throws ArgumentError _nseries(abs(x), x, 2)        # kink: was silently x
+        @test_throws ArgumentError _nseries(sign(x), x, 2)       # jump: was silently 0
+        @test nc(abs(1 + x), 1, 3) == 1                          # smooth away from the kink
+    end
 end
