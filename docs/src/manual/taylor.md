@@ -37,7 +37,7 @@ julia> expand_series(exp(x)/x, x, 3)        # Laurent: simple pole at 0
 x^-1 + 1 + (1//2)*x + (1//6)*x^2 + O(x^3)
 
 julia> expand_series(sqrt(x), x, 2)         # Puiseux: branch point at 0
-x^1//2 + O(x^2)
+x^(1//2) + O(x^2)
 ```
 
 ### Limitations

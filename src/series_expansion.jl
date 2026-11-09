@@ -2,18 +2,23 @@ const SeriesCoeff = Union{Int, Rational{Int}, BigInt, Rational{BigInt}, Symbolic
 const SeriesDict = Dict{Rational{Int}, SeriesCoeff}
 
 """
-    TruncatedSeries(coeffs::SeriesDict, order::Rational{Int})
+    TruncatedSeries(coeffs::SeriesDict, order::Rational{Int}[, var])
 
-A truncated power/Laurent/Puiseux series `Σ coeffs[e] * x^e + O(x^order)` about `x = 0`.
+A truncated power/Laurent/Puiseux series `Σ coeffs[e] * var^e + O(var^order)`.
 
 `coeffs` maps an exponent `e` (`Rational{Int}`) to its coefficient (an `Int`, a
 `Rational{Int}`, or a symbolic value); only exponents below `order` are kept and zero
-coefficients are dropped. Immutable: arithmetic (`+`, `*`) returns new values.
+coefficients are dropped. `var` is only used for printing: the expansion variable, or
+`x - x0` for an expansion about `x0` (default `x`). Immutable: arithmetic (`+`, `*`)
+returns new values.
 """
 struct TruncatedSeries
     coeffs::SeriesDict
     order::Rational{Int}
+    var::String
 end
+
+TruncatedSeries(coeffs::SeriesDict, order::Rational{Int}) = TruncatedSeries(coeffs, order, "x")
 
 _ts_coeff(c::Int) = c
 _ts_coeff(c::Rational{Int}) = c
@@ -127,16 +132,18 @@ function _unit_tail(s::TruncatedSeries, e0::Rational{Int}, c0, rel::Rational{Int
     return TruncatedSeries(_ts_clean(g, rel), rel)
 end
 
-_fmt_exp(e::Rational{Int}) = denominator(e) == 1 ? string(numerator(e)) : string(e)
+_fmt_exp(e::Rational{Int}) = denominator(e) == 1 ? string(numerator(e)) : string("(", e, ")")
+
+_fmt_pow(v::String, e::Rational{Int}) = e == 1 ? v : string(v, "^", _fmt_exp(e))
 
 _coeff_is(c, v) = (c isa Number && c == v) || isequal(value(c), v)
 
-function _fmt_term(c, e::Rational{Int})
+function _fmt_term(c, e::Rational{Int}, v::String)
     cc = (c isa Rational && denominator(c) == 1) ? numerator(c) : c
     if e == 0
         return string(cc)
     end
-    xpart = e == 1 ? "x" : string("x^", _fmt_exp(e))
+    xpart = _fmt_pow(v, e)
     if _coeff_is(cc, 1)
         return xpart
     elseif _coeff_is(cc, -1)
@@ -157,15 +164,16 @@ function _fmt_coeff(c)
 end
 
 function Base.show(io::IO, s::TruncatedSeries)
+    oterm = string("O(", _fmt_pow(s.var, s.order), ")")
     if isempty(s.coeffs)
-        print(io, "O(x^", _fmt_exp(s.order), ")")
+        print(io, oterm)
         return
     end
     terms = sort(collect(keys(s.coeffs)))
     io2 = IOBuffer()
     first = true
     for e in terms
-        t = _fmt_term(s.coeffs[e], e)
+        t = _fmt_term(s.coeffs[e], e, s.var)
         if first
             print(io2, t); first = false
         elseif startswith(t, "-")
@@ -174,7 +182,7 @@ function Base.show(io::IO, s::TruncatedSeries)
             print(io2, " + ", t)
         end
     end
-    print(io2, " + O(x^", _fmt_exp(s.order), ")")
+    print(io2, " + ", oterm)
     print(io, String(take!(io2)))
 end
 
@@ -639,7 +647,7 @@ julia> expand_series(exp(x)/x, x, 3)      # Laurent: simple pole at 0
 x^-1 + 1 + (1//2)*x + (1//6)*x^2 + O(x^3)
 
 julia> expand_series(sqrt(x), x, 2)       # Puiseux: branch point at 0
-x^1//2 + O(x^2)
+x^(1//2) + O(x^2)
 
 julia> expand_series(sin(x), x, 6)        # ordinary Taylor series
 x + (-1//6)*x^3 + (1//120)*x^5 + O(x^6)
@@ -651,5 +659,13 @@ function expand_series(expr, x, order; x0 = 0)
     if !iszero(x0)
         e = substitute_in_deriv(e, xu => xu + unwrap(x0))
     end
-    return _nseries(e, x, Rational{Int}(order))
+    s = _nseries(e, x, Rational{Int}(order))
+    return TruncatedSeries(s.coeffs, s.order, _shifted_var(x, x0))
+end
+
+function _shifted_var(x, x0)
+    iszero(x0) && return string(x)
+    c = value(x0)
+    c isa Real && c < 0 && return string("(", x, " + ", -c, ")")
+    return string("(", x, " - ", c isa Number ? c : _fmt_coeff(c), ")")
 end

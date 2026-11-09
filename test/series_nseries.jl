@@ -201,4 +201,17 @@ end
         @test _nseries(x^6, x, 5).order == 5//1 && isempty(_nseries(x^6, x, 5))
         @test nc((1 + x)^1000, 9, 10) == binomial(big(1000), 9)
     end
+
+    @testset "printing: variable, expansion point, fractional exponents" begin
+        @variables t
+        @test string(expand_series(sin(t), t, 4)) == "t + (-1//6)*t^3 + O(t^4)"
+        @test string(expand_series(1/x, x, 3; x0 = 2)) ==
+              "1//2 + (-1//4)*(x - 2) + (1//8)*(x - 2)^2 + O((x - 2)^3)"
+        @test string(expand_series(exp(x), x, 2; x0 = -1)) ==
+              "exp(-1) + (exp(-1))*(x + 1) + O((x + 1)^2)"
+        @test string(expand_series(1/(1 + sqrt(x)), x, 2)) ==
+              "1 - x^(1//2) + x - x^(3//2) + O(x^2)"
+        @test string(expand_series(exp(x)/x, x, 2)) == "x^-1 + 1 + (1//2)*x + O(x^2)"
+        @test string(expand_series(sin(x), x, 0)) == "O(x^0)"
+    end
 end
