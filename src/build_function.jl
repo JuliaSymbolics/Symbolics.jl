@@ -156,6 +156,11 @@ end
 
 const DEFAULT_OUTSYM = Symbol("ˍ₋out")
 
+# A `Tuple` output is emitted as a tuple expression (nested tuples included), so the
+# generated function returns a `Tuple` of values without allocating.
+_tuple_codegen(x::Tuple) = Code.MakeTuple(map(_tuple_codegen, x))
+_tuple_codegen(x) = x
+
 # don't CSE inside operators
 SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator) = false
 # don't CSE inside `getindex` of things created via `@variables`
@@ -177,6 +182,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          nanmath = true,
                          kwargs...)
     op = _recursive_unwrap(op)
+    op isa Tuple && (op = _tuple_codegen(op))
     if symtype(op) <: AbstractArray
         if wrap_code === nothing
             wrap_code = (identity, identity)

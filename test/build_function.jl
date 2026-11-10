@@ -526,3 +526,33 @@ end
         @test success(pipeline(cmd; stdout = stdout, stderr = stderr))
     end
 end
+
+# measured in a specialized function: calls through a non-const global or an
+# unspecialized vararg method box the result (seen on Julia 1.11)
+_allocs(f::F, args::Vararg{Any, N}) where {F, N} = (f(args...); @allocated f(args...))
+
+@testset "Tuple output (#1438)" begin
+    @variables x y
+    f = build_function((x^2, x^3), x; expression = Val(false))
+    @test f(2.0) === (4.0, 8.0)
+    @test _allocs(f, 2.0) == 0
+
+    ex = build_function((x^2, x^3), x)
+    @test ex isa Expr
+    ex_f = eval(ex)
+    @test (@invokelatest ex_f(3)) === (9, 27)
+
+    g = build_function((x, (y, x * y)), x, y; expression = Val(false))
+    @test g(2.0, 3.0) === (2.0, (3.0, 6.0))
+    @test _allocs(g, 2.0, 3.0) == 0
+
+    h = build_function((x, [x, y]), x, y; expression = Val(false))
+    @test h(2.0, 3.0) == (2.0, [2.0, 3.0])
+    @test h(2.0, 3.0) isa Tuple{Float64, Vector{Float64}}
+
+    k = build_function((x^2, sin(x^2)), x; expression = Val(false), cse = true)
+    @test k(2.0) === (4.0, sin(4.0))
+
+    @test build_function((x, y), [x, y]; expression = Val(false))([1.0, 2.0]) === (1.0, 2.0)
+    @test build_function((), x; expression = Val(false))(1.0) === ()
+end

@@ -388,7 +388,7 @@ end
 
 function _recursive_unwrap(val, ::Val{eval} = Val(false)) where {eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
-        if parent(val) !== val && hasfield(typeof(val), :parent)
+        if val isa AbstractArray && parent(val) !== val && hasfield(typeof(val), :parent)
             return Setfield.@set val.parent = _recursive_unwrap(parent(val), Val{eval}())
         end
         return _recursive_unwrap.(val, Val{eval}())
