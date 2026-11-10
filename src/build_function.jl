@@ -160,7 +160,9 @@ const DEFAULT_OUTSYM = Symbol("ˍ₋out")
 
 _tuple_codegen(x::Tuple) = Code.MakeTuple(map(_tuple_codegen, x))
 _tuple_codegen(x::NamedTuple{names}) where {names} = term(NamedTuple{names}, _tuple_codegen(Tuple(x)))
+_tuple_codegen(x::AbstractArray) = _has_tuple(x) ? _make_array(x, typeof(x)) : x
 _tuple_codegen(x) = x
+_has_tuple(x) = x isa Union{Tuple, NamedTuple} || (x isa AbstractArray && any(_has_tuple, x))
 
 # don't CSE inside operators
 SymbolicUtils.Code.cse_inside_expr(sym, ::Symbolics.Operator) = false

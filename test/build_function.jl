@@ -577,4 +577,7 @@ _allocs(f::F, args::Vararg{Any, N}) where {F, N} = (f(args...); @allocated f(arg
 
     mo, _ = build_function([(x, y) (y, x); (x * y, 1.0) (0.0, x)], x, y; expression = Val(false))
     @test mo(1.0, 2.0) == [(1.0, 2.0) (2.0, 1.0); (2.0, 1.0) (0.0, 1.0)]
+
+    ta = build_function((x, [(x, y), (y, x)]), x, y; expression = Val(false))
+    @test ta(1.0, 2.0) == (1.0, [(1.0, 2.0), (2.0, 1.0)])
 end
