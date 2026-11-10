@@ -553,7 +553,7 @@ function _check_finite(c, expr, x)
         "expansion is not supported"))
 end
 
-const _NONSMOOTH_AT_ZERO = (abs, sign, floor, ceil, round, trunc)
+const _nonsmooth_at_zero = (abs, sign, floor, ceil, round, trunc)
 
 """
     _pole_rewrites
@@ -589,7 +589,7 @@ function _nseries_unary(g, arg, x, order::Rational{Int})
     k = get(_real_roots, g, nothing)
     k === nothing || _lead_exp(arg, x) == 0 || return _nseries_real_root(arg, k, x, order)
     c0, delta = _split_const(g, arg, x, order)
-    g in _NONSMOOTH_AT_ZERO && _iszero(c0) && throw(ArgumentError(
+    g in _nonsmooth_at_zero && _iszero(c0) && throw(ArgumentError(
         "$(g)($(arg)) is not smooth at $x = 0 and has no series expansion there"))
     y = Symbolics.variable(:__series_y)
     cs = _taylor_coeffs(g(y), unwrap(y), c0, _compose_terms(delta, order))
