@@ -236,6 +236,24 @@ end
         @test !(Symbolics._pow_const(-8, 1//3) isa Number)       # principal root is complex
     end
 
+    @testset "pole rewrites and real roots at a zero of the argument" begin
+        # SymPy: cot = 1/x - x/3 - x^3/45, csc = 1/x + x/6 + 7x^3/360, coth/csch alternate
+        for (f, c) in ((cot(x), (1, -1//3, -1//45)), (csc(x), (1, 1//6, 7//360)),
+                       (coth(x), (1, 1//3, -1//45)), (csch(x), (1, -1//6, 7//360)))
+            @test (nc(f, -1, 4), nc(f, 1, 4), nc(f, 3, 4)) == c
+        end
+        @test nc(cot(2x), -1, 2) == 1//2 && nc(cot(2x), 1, 2) == -2//3
+        @test nc(csc(sin(x)), 1, 2) == 1//3
+        @test nc(cot(x)^2, 0, 1) == -2//3
+        @test string(nc(cot(1 + x), 0, 2)) == "cot(1)"         # unchanged at a nonzero point
+        @test string(expand_series(cbrt(-x + x^2), x, 2)) == "-x^(1//3) + (1//3)*x^(4//3) + O(x^2)"
+        @test nc(cbrt(sin(x)), 7//3, 3) == -1//18
+        @test nc(cbrt(1/x), -1//3, 2) == 1
+        @test nc(cbrt(-8 + x), 0, 2) == -2
+        @test_throws ArgumentError expand_series(cot(1/x), x, 2)
+        @test nc(cot(0.5x), -1, 2) == 2.0 && nc(cot(0.5x), 1, 2) ≈ -1/6
+    end
+
     @testset "Float inputs (SymPy / Mathematica values)" begin
         isf(c) = value(c) isa Float64
         @test nc(exp(0.1x), 1, 3) ≈ 0.1 && nc(exp(0.1x), 2, 3) ≈ 0.005 && isf(nc(exp(0.1x), 2, 3))

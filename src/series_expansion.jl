@@ -555,13 +555,49 @@ end
 
 const _NONSMOOTH_AT_ZERO = (abs, sign, floor, ceil, round, trunc)
 
+"""
+    _pole_rewrites
+
+Functions with a pole where their argument vanishes, mapped to an equivalent quotient of
+functions that are analytic there. Used only when the Taylor coefficients of the function
+are not finite, so results at other points are unchanged.
+"""
+const _pole_rewrites = Dict{Any, Function}(
+    cot => y -> cos(y) / sin(y),
+    csc => y -> 1 / sin(y),
+    coth => y -> cosh(y) / sinh(y),
+    csch => y -> 1 / sinh(y),
+)
+
+"""
+    _real_roots
+
+Real `k`-th root functions (odd `k`), mapped to `k`. Expanded as
+`sign(c) * (sign(c) * a)^(1//k)` when the argument `a` vanishes or has a pole, where `c`
+is its leading coefficient.
+"""
+const _real_roots = Dict{Any, Int}(cbrt => 3)
+
+function _nseries_real_root(a, k::Int, x, order::Rational{Int})
+    e0 = _lead_exp(a, x)
+    c = value(_series_coeff_at(_nseries(a, x, e0 + 1), e0))
+    c isa Real && c < 0 && return _series_scale(-1, _nseries_pow(-a, 1 // k, x, order))
+    return _nseries_pow(a, 1 // k, x, order)
+end
+
 function _nseries_unary(g, arg, x, order::Rational{Int})
+    k = get(_real_roots, g, nothing)
+    k === nothing || _lead_exp(arg, x) == 0 || return _nseries_real_root(arg, k, x, order)
     c0, delta = _split_const(g, arg, x, order)
     g in _NONSMOOTH_AT_ZERO && _iszero(c0) && throw(ArgumentError(
         "$(g)($(arg)) is not smooth at $x = 0 and has no series expansion there"))
     y = Symbolics.variable(:__series_y)
     cs = _taylor_coeffs(g(y), unwrap(y), c0, _compose_terms(delta, order))
-    foreach(c -> _check_finite(c, "$(g)($(arg))", x), cs)
+    if !all(_is_finite_coeff, cs)
+        r = get(_pole_rewrites, g, nothing)
+        r === nothing || return _nseries(r(arg), x, order)
+        foreach(c -> _check_finite(c, "$(g)($(arg))", x), cs)
+    end
     return _compose(k -> cs[k + 1], delta, order)
 end
 
