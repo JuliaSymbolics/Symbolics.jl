@@ -1,4 +1,4 @@
-const SeriesCoeff = Union{Int, Rational{Int}, BigInt, Rational{BigInt}, SymbolicT}
+const SeriesCoeff = Union{Int, Rational{Int}, BigInt, Rational{BigInt}, Float64, SymbolicT}
 const SeriesDict = Dict{Rational{Int}, SeriesCoeff}
 
 """
@@ -7,7 +7,7 @@ const SeriesDict = Dict{Rational{Int}, SeriesCoeff}
 A truncated power/Laurent/Puiseux series `Σ coeffs[e] * var^e + O(var^order)`.
 
 `coeffs` maps an exponent `e` (`Rational{Int}`) to its coefficient (an `Int`, a
-`Rational{Int}`, or a symbolic value); only exponents below `order` are kept and zero
+`Rational{Int}`, a `Float64`, or a symbolic value); only exponents below `order` are kept and zero
 coefficients are dropped. `var` is only used for printing: the expansion variable, or
 `x - x0` for an expansion about `x0` (default `x`). Immutable: arithmetic (`+`, `*`)
 returns new values.
@@ -22,20 +22,52 @@ TruncatedSeries(coeffs::SeriesDict, order::Rational{Int}) = TruncatedSeries(coef
 
 _ts_coeff(c::Int) = c
 _ts_coeff(c::Rational{Int}) = c
+_ts_coeff(c::Float64) = c
 function _ts_coeff(c)
     u = value(c)
     u isa Union{Integer, Rational} && return _narrow_coeff(u)
+    u isa AbstractFloat && return Float64(u)
     return u::SeriesCoeff
 end
 
-_ts_div(a::Union{Integer,Rational}, b::Union{Integer,Rational}) = a // b
-_ts_div(a, b) = a / b
+const _Exact = Union{Integer, Rational}
+const _Real = Union{Integer, Rational, AbstractFloat}
 
-_ts_mul(a::Union{Integer,Rational}, b::Union{Integer,Rational}) = (big(a) * big(b))
-_ts_mul(a, b) = a * b
+_has_float(c::Number) = c isa AbstractFloat
+function _has_float(c)
+    u = unwrap_const(unwrap(c))
+    u isa Number && return u isa AbstractFloat
+    iscall(u) || return false
+    return any(_has_float, arguments(u))
+end
 
-_ts_add(a::Union{Integer,Rational}, b::Union{Integer,Rational}) = (big(a) + big(b))
-_ts_add(a, b) = a + b
+"""
+    _float_like(a, b)
+
+`a` for arithmetic with `b`. An exact `a` too large for `Int` becomes `Float64` when `b`
+holds a float, so float inputs never promote to `BigFloat`.
+"""
+function _float_like(a, b)
+    a isa _Exact || return a
+    n = _narrow_coeff(a)
+    n isa Union{Int, Rational{Int}} && return n
+    return _has_float(b) ? Float64(n) : n
+end
+
+_ts_div(a::_Exact, b::_Exact) = a // b
+_ts_div(a::AbstractFloat, b::_Real) = Float64(a) / Float64(b)
+_ts_div(a::_Exact, b::AbstractFloat) = Float64(a) / Float64(b)
+_ts_div(a, b) = _float_like(a, b) / _float_like(b, a)
+
+_ts_mul(a::_Exact, b::_Exact) = (big(a) * big(b))
+_ts_mul(a::AbstractFloat, b::_Real) = Float64(a) * Float64(b)
+_ts_mul(a::_Exact, b::AbstractFloat) = Float64(a) * Float64(b)
+_ts_mul(a, b) = _float_like(a, b) * _float_like(b, a)
+
+_ts_add(a::_Exact, b::_Exact) = (big(a) + big(b))
+_ts_add(a::AbstractFloat, b::_Real) = Float64(a) + Float64(b)
+_ts_add(a::_Exact, b::AbstractFloat) = Float64(a) + Float64(b)
+_ts_add(a, b) = _float_like(a, b) + _float_like(b, a)
 
 function _ts_clean(d, order::Rational{Int})
     out = SeriesDict()
@@ -155,7 +187,7 @@ _fmt_exp(e::Rational{Int}) = denominator(e) == 1 ? string(numerator(e)) : string
 
 _fmt_pow(v::String, e::Rational{Int}) = e == 1 ? v : string(v, "^", _fmt_exp(e))
 
-_coeff_is(c, v) = (c isa Number && c == v) || isequal(value(c), v)
+_coeff_is(c, v) = !(value(c) isa AbstractFloat) && ((c isa Number && c == v) || isequal(value(c), v))
 
 function _fmt_term(c, e::Rational{Int}, v::String)
     cc = (c isa Rational && denominator(c) == 1) ? numerator(c) : c
@@ -251,11 +283,10 @@ function _nseries(expr, x, order::Rational{Int})
     elseif SymbolicUtils.ispow(u)
         base, expo = arguments(u)
         e = value(expo)
-        if e isa Integer || e isa Rational
-            return _nseries_pow(base, Rational{Int}(e), x, order)
-        else
-            return _nseries(exp(expo * log(base)), x, order)
-        end
+        q = _exp_rational(e)
+        q === nothing && return _nseries(exp(expo * log(base)), x, order)
+        s = _nseries_pow(base, q, x, order)
+        return e isa AbstractFloat ? _series_float(s) : s
 
     elseif SymbolicUtils.isterm(u)
         op = operation(u)
@@ -283,6 +314,21 @@ function _nseries(expr, x, order::Rational{Int})
     return _nseries_diff(expr, x, order)
 end
 
+"""
+    _exp_rational(e)
+
+The exponent `e` as a `Rational{Int}`, or `nothing` if it is not a real number. Float
+exponents are converted with `rationalize`, so `1.5` becomes `3//2` and `0.1` becomes
+`1//10`.
+"""
+_exp_rational(e::_Exact) = Rational{Int}(e)
+_exp_rational(e::AbstractFloat) = isfinite(e) ? rationalize(Int, e) : nothing
+_exp_rational(e) = nothing
+
+_float_coeff(c) = c isa _Exact ? Float64(c) : c
+_series_float(s::TruncatedSeries) =
+    TruncatedSeries(SeriesDict(e => _float_coeff(c) for (e, c) in s.coeffs), s.order)
+
 function _lead_exp(expr, x; start = 4//1, cap = 256//1)
     u = unwrap(expr); ux = unwrap(x)
     isequal(u, ux) && return 1//1
@@ -294,10 +340,8 @@ function _lead_exp(expr, x; start = 4//1, cap = 256//1)
         return _lead_exp(num, x; start, cap) - _lead_exp(den, x; start, cap)
     elseif SymbolicUtils.ispow(u)
         base, expo = arguments(u)
-        e = value(expo)
-        if e isa Integer || e isa Rational
-            return Rational{Int}(e) * _lead_exp(base, x; start, cap)
-        end
+        q = _exp_rational(value(expo))
+        q === nothing || return q * _lead_exp(base, x; start, cap)
     elseif SymbolicUtils.isterm(u) && operation(u) === sqrt
         return (1//2) * _lead_exp(only(arguments(u)), x; start, cap)
     end
@@ -398,10 +442,15 @@ _root_term(v, q) = q == 1//2 ? Symbolics.term(sqrt, v) : Symbolics.term(^, v, q)
     _pow_const(c0, q)
 
 `c0^q` for a nonzero constant `c0`: exact when `c0` is rational and the root is
-rational, symbolic otherwise. Fractional powers of negative numbers stay symbolic.
+rational, a `Float64` when `c0` is a float, symbolic otherwise. Fractional powers of
+negative numbers stay symbolic.
 """
 function _pow_const(c0, q::Rational{Int})
     vc = value(c0)
+    if vc isa AbstractFloat
+        (vc > 0 || denominator(q) == 1) && return Float64(vc)^Float64(q)
+        return _root_term(vc, q)
+    end
     vc isa Union{Integer, Rational} || return _root_term(vc, q)
     b = Rational{BigInt}(vc)
     denominator(q) == 1 && return _narrow_coeff(b^numerator(q))
@@ -546,6 +595,8 @@ function _fold_exact_numeric(ex)
         end
         if r isa Integer || r isa Rational
             return r
+        elseif r isa AbstractFloat && isfinite(r) && any(a -> a isa AbstractFloat, nums)
+            return Float64(r)
         elseif r isa AbstractFloat && isfinite(r) && isinteger(r)
             return Integer(r)
         end
@@ -568,7 +619,9 @@ and error on singularities, `expand_series` returns the full expansion:
   * a **Puiseux** series when `expr` has a branch point (fractional exponents, e.g. `sqrt`).
 
 Coefficients are kept **exact**, including irrational ones (`sqrt(2)`, `sin(1)` stay
-symbolic rather than being approximated as floats). Complex-valued expressions are not
+symbolic rather than being approximated as floats). Float inputs give `Float64`
+coefficients wherever a float enters the computation; a float exponent is converted with
+`rationalize` (`x^0.5` is expanded as `x^(1//2)`). Complex-valued expressions are not
 supported and raise an `ArgumentError`.
 
 Examples

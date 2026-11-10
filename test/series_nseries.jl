@@ -236,6 +236,30 @@ end
         @test !(Symbolics._pow_const(-8, 1//3) isa Number)       # principal root is complex
     end
 
+    @testset "Float inputs (SymPy / Mathematica values)" begin
+        isf(c) = value(c) isa Float64
+        @test nc(exp(0.1x), 1, 3) ≈ 0.1 && nc(exp(0.1x), 2, 3) ≈ 0.005 && isf(nc(exp(0.1x), 2, 3))
+        @test nc(sin(x) + 0.5x, 1, 4) == 1.5 && nc(sin(x) + 0.5x, 3, 4) == -1//6
+        @test nc(sqrt(2.0 + x), 0, 2) ≈ sqrt(2.0) && nc(sqrt(2.0 + x), 1, 2) ≈ 0.3535533905932738
+        @test nc(log(1.5 + x), 0, 2) ≈ log(1.5) && nc(1/(2.0 + x), 2, 3) == 0.125
+        @test nc(sin(0.5 + x), 2, 3) ≈ -0.2397127693021015
+        @test nc(log(cos(0.5x)), 4, 5) ≈ -0.005208333333333334
+        @test nc(cos(0.5x)/sin(0.5x), -1, 2) == 2.0 && nc(cos(0.5x)/sin(0.5x), 1, 2) ≈ -1/6
+        @test nc(1/(2.0 + sqrt(x)), 1//2, 2) == -0.25
+        @test nc(1 + 0.5/x, -1, 3) == 0.5
+        @test nc((1 + x)^0.5, 2, 3) == -0.125                  # float exponent, rationalized
+        @test nc(x^1.5, 3//2, 3) == 1 && nc(x^0.1, 1//10, 1) == 1 && nc(sqrt(x)^3.0, 3//2, 3) == 1
+        @test nc((-2.0 + x)^3.0, 1, 2) == 12
+        @test string(expand_series(exp(x), x, 2; x0 = 0.5)) ==
+              "1.6487212707001282 + 1.6487212707001282*(x - 0.5) + O((x - 0.5)^2)"
+        for (f, o) in ((exp(0.1x), 30), (0.5a*exp(x), 25), (exp(0.5a*x), 24), (x/sin(0.5x), 24))
+            s = _nseries(f, x, o)                              # no BigFloat promotion
+            @test !any(c -> occursin("BigFloat", string(typeof(value(c)))) ||
+                            occursin(r"\d{25,}", string(c)), values(s.coeffs))
+        end
+        @test nc(Float32(0.5)*x + 1, 1, 2) === 0.5 && nc(big"0.5"*x, 1, 2) === 0.5
+    end
+
     @testset "printing: variable, expansion point, fractional exponents" begin
         @variables t
         @test string(expand_series(sin(t), t, 4)) == "t + (-1//6)*t^3 + O(t^4)"
