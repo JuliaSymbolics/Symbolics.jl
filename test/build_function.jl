@@ -555,4 +555,26 @@ _allocs(f::F, args::Vararg{Any, N}) where {F, N} = (f(args...); @allocated f(arg
 
     @test build_function((x, y), [x, y]; expression = Val(false))([1.0, 2.0]) === (1.0, 2.0)
     @test build_function((), x; expression = Val(false))(1.0) === ()
+
+    nt = build_function((a = x^2, b = (c = y, d = x * y)), x, y; expression = Val(false))
+    @test nt(2.0, 3.0) === (a = 4.0, b = (c = 3.0, d = 6.0))
+    @test _allocs(nt, 2.0, 3.0) == 0
+    ntc = build_function((a = x^2, b = sin(x^2)), x; expression = Val(false), cse = true)
+    @test ntc(2.0) === (a = 4.0, b = sin(4.0))
+
+    fo, fi = build_function([(x, x^2), (x^3, 1.0)], x; expression = Val(false))
+    @test fo(2.0) == [(2.0, 4.0), (8.0, 1.0)]
+    out = Vector{Tuple{Float64, Float64}}(undef, 2)
+    @test fi(out, 2.0) === out
+    @test out == [(2.0, 4.0), (8.0, 1.0)]
+    @test _allocs(fi, out, 2.0) == 0
+
+    go, gi = build_function([(a = x, b = y), (a = y, b = x)], x, y; expression = Val(false))
+    @test go(1.0, 2.0) == [(a = 1.0, b = 2.0), (a = 2.0, b = 1.0)]
+    outnt = Vector{@NamedTuple{a::Float64, b::Float64}}(undef, 2)
+    gi(outnt, 1.0, 2.0)
+    @test outnt == [(a = 1.0, b = 2.0), (a = 2.0, b = 1.0)]
+
+    mo, _ = build_function([(x, y) (y, x); (x * y, 1.0) (0.0, x)], x, y; expression = Val(false))
+    @test mo(1.0, 2.0) == [(1.0, 2.0) (2.0, 1.0); (2.0, 1.0) (0.0, 1.0)]
 end

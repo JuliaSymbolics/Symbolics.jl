@@ -397,6 +397,10 @@ function _recursive_unwrap(val, ::Val{eval} = Val(false)) where {eval}
     end
 end
 
+function _recursive_unwrap(val::NamedTuple, ::Val{eval} = Val(false)) where {eval}
+    return map(v -> _recursive_unwrap(v, Val{eval}()), val)
+end
+
 function _recursive_unwrap(val::StaticArraysCore.SizedVector, ::Val{eval} = Val(false)) where {eval}
     return _recursive_unwrap.(val, Val{eval}())
 end

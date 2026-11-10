@@ -82,6 +82,8 @@ Return Value:
 
 - If `ex` is a scalar, a single function `f(args...)` is returned which
   computes the value of the expression.
+- If `ex` is a `Tuple` or `NamedTuple` (possibly nested), a single out-of-place
+  function `f(args...)` is returned which computes a `Tuple` or `NamedTuple` of values.
 - If `ex` is an `AbstractArray` or an `Arr`, a 2-tuple of functions `(f, f!)`
   is returned:
     - `f(args...)`: the out-of-place function, which computes and returns the
@@ -129,7 +131,7 @@ Keyword Arguments:
   and in-place functions are generated. Defaults to `(true, true)`. A variant that
   is turned off is still returned as a stub so that the 2-tuple shape is kept, and
   calling the stub throws an `ArgumentError`. Only applies when `ex` is an array
-  (scalar `ex` returns a single function).
+  (scalar, `Tuple` or `NamedTuple` `ex` returns a single function).
 
 Note that not all build targets support the full compilation interface. Check the
 individual target documentation for details.
@@ -157,6 +159,7 @@ end
 const DEFAULT_OUTSYM = Symbol("ˍ₋out")
 
 _tuple_codegen(x::Tuple) = Code.MakeTuple(map(_tuple_codegen, x))
+_tuple_codegen(x::NamedTuple{names}) where {names} = term(NamedTuple{names}, _tuple_codegen(Tuple(x)))
 _tuple_codegen(x) = x
 
 # don't CSE inside operators
@@ -180,7 +183,7 @@ function _build_function(target::JuliaTarget, op, args...;
                          nanmath = true,
                          kwargs...)
     op = _recursive_unwrap(op)
-    op isa Tuple && (op = _tuple_codegen(op))
+    op isa Union{Tuple, NamedTuple} && (op = _tuple_codegen(op))
     if symtype(op) <: AbstractArray
         if wrap_code === nothing
             wrap_code = (identity, identity)
@@ -611,6 +614,7 @@ function _make_array(rhss::AbstractArray, similarto, output_eltype = nothing)
     end
 end
 
+_make_array(x::Union{Tuple, NamedTuple}, similarto) = _tuple_codegen(x)
 _make_array(x, similarto) = x
 
 ## In-place version
@@ -693,7 +697,7 @@ function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros
     indexes = AtIndex[]
     for (i, outi) in enumerate(outputidxs)
         if !(rhss[i] isa AbstractArray) && !(skipzeros && _iszero(rhss[i]))
-            push!(indexes, AtIndex(outi, rhss[i]))
+            push!(indexes, AtIndex(outi, _tuple_codegen(rhss[i])))
         elseif rhss[i] isa AbstractArray
             push!(indexes, AtIndex(outi, _set_array(LiteralExpr(:($out[$outi])), nothing, rhss[outi], checkbounds, skipzeros)))
         end
