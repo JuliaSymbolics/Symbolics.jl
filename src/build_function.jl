@@ -156,8 +156,6 @@ end
 
 const DEFAULT_OUTSYM = Symbol("ˍ₋out")
 
-# A `Tuple` output is emitted as a tuple expression (nested tuples included), so the
-# generated function returns a `Tuple` of values without allocating.
 _tuple_codegen(x::Tuple) = Code.MakeTuple(map(_tuple_codegen, x))
 _tuple_codegen(x) = x
 
