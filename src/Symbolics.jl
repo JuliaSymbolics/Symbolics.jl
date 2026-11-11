@@ -209,6 +209,7 @@ include("linearity.jl")
 
 
 export Differential, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
+export Grad, Divergence, Curl, Laplacian
 include("register_derivatives.jl")
 include("diff.jl")
 

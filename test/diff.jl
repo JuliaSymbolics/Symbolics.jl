@@ -2,7 +2,7 @@ using Symbolics
 using SymbolicUtils
 using Test
 using LinearAlgebra, SparseArrays
-using Symbolics: value, unwrap, scalarize, Arr, Grad, Divergence, Curl, Laplacian
+using Symbolics: value, unwrap, scalarize, Arr
 
 # Derivatives
 @variables t σ ρ β
