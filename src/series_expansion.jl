@@ -23,9 +23,16 @@ TruncatedSeries(coeffs::SeriesDict, order::Rational{Int}) = TruncatedSeries(coef
 _ts_coeff(c::Int) = c
 _ts_coeff(c::Rational{Int}) = c
 _ts_coeff(c::Float64) = c
-function _ts_coeff(c)
+function _ts_coeff(c)::SeriesCoeff
     u = value(c)
-    u isa Union{Integer, Rational} && return _narrow_coeff(u)
+    u isa SymbolicT && return u
+    u isa Int && return u
+    u isa Rational{Int} && return u
+    u isa Float64 && return u
+    u isa BigInt && return _narrow_coeff(u)
+    u isa Rational{BigInt} && return _narrow_coeff(u)
+    u isa Integer && return _narrow_coeff(BigInt(u))
+    u isa Rational && return _narrow_coeff(Rational{BigInt}(u))
     u isa AbstractFloat && return Float64(u)
     return u::SeriesCoeff
 end
@@ -602,7 +609,7 @@ function _nseries_unary(g, arg, x, order::Rational{Int})
 end
 
 _fits_int(n) = typemin(Int) <= n <= typemax(Int)
-function _narrow_coeff(c)
+function _narrow_coeff(@nospecialize(c))
     if c isa Integer
         return _fits_int(c) ? Int(c) : c
     elseif c isa Rational
