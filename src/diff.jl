@@ -1406,7 +1406,7 @@ function _check_der_wrt_number(x::SymbolicT)
     return nothing
 end
 
-function _multivariate_der_op_check(x::AbstractVector)
+function _multivariate_der_op_check(x::Union{AbstractVector, Tuple})
     for var in x
         _check_der_wrt_const(var)
         _check_der_wrt_number(var)
@@ -1622,15 +1622,30 @@ to any scalar field vanishes.
 
 See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
 interaction with [`expand_derivatives`](@ref).
+
+`Curl` stores arguments in a tuple for two reasons
+- It always stores either 2 or 3 independent variables
+- The return of `(::Curl)(x)` depends on `N` if either `E` or `x` is a wrapped type or non-symbolic array.
+
+This can make the construction of `Curl` type-unstable if it is given a vector of
+independent variables as input, but allows calling the operation to be type-stable.
 """
-struct Curl{E}
-    vars::SArgsT
+struct Curl{E, N}
+    vars::NTuple{N, SymbolicT}
+
+    function Curl{E, N}(vars::NTuple{N, SymbolicT}; check = true) where {E, N}
+        2 <= N <= 3 || throw(ArgumentError(lazy"`Curl` is only defined for 2 or 3 independent variables. Got $N."))
+        check && _multivariate_der_op_check(vars)
+        return new{E, N}(vars)
+    end
 
     function Curl{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
-        check || return new{E}(SArgsT(unwrap.(vars)))
-        length(vars) == 3 || throw(ArgumentError(lazy"`Curl` is only defined for 3 independent variables. Got $(length(vars))"))
-        _multivariate_der_op_check(vars)
-        return new{E}(SArgsT(unwrap.(vars)))
+        2 <= length(vars) <= 3 || throw(ArgumentError(lazy"`Curl` is only defined for 2 or 3 independent variables. Got $(length(vars))"))
+        if length(vars) == 2
+            return Curl{E, 2}((unwrap(vars[1]), unwrap(vars[2])); check)
+        else
+            return Curl{E, 3}((unwrap(vars[1]), unwrap(vars[2]), unwrap(vars[3])); check)
+        end
     end
 end
 
@@ -1646,37 +1661,53 @@ Alias for `Curl{false}(vars)`.
 """
 Curl(vars; check = true) = Curl{false}(vars; check)
 
-SU.promote_symtype(::Curl, T::SU.TypeT) = T
-function SU.promote_shape(::Curl, @nospecialize(sh::SU.ShapeT))
+SU.promote_symtype(::Curl{E, 2}, T::SU.TypeT) where {E} = eltype(T)::SU.TypeT
+SU.promote_symtype(::Curl{E, 3}, T::SU.TypeT) where {E} = T
+
+function SU.promote_shape(c::Curl{E, 2}, @nospecialize(sh::SU.ShapeT)) where {E}
+    if sh isa SU.Unknown
+        sh.ndims == 1 || throw(ArgumentError(lazy"`Curl` is only defined on vector arguments. Got shape $sh."))
+        return SU.ShapeVecT()
+    end
+    sh = sh::SU.ShapeVecT
+    length(sh) == 1 && length(sh[1]) == 2 || throw(ArgumentError(lazy"`Curl` requires 2-vector arguments. Got shape $sh."))
+    return SU.ShapeVecT()
+end
+function SU.promote_shape(c::Curl{E, 3}, @nospecialize(sh::SU.ShapeT)) where {E}
     if sh isa SU.Unknown
         sh.ndims == 1 || throw(ArgumentError(lazy"`Curl` is only defined on vector arguments. Got shape $sh."))
         return SU.ShapeVecT((1:3,))
     end
     sh = sh::SU.ShapeVecT
-    length(sh) == 1 && length(sh[1]) == 3 || throw(ArgumentError(lazy"`Curl` is only defined on 3-vector arguments. Got shape $sh."))
+    length(sh) == 1 && length(sh[1]) == 3 || throw(ArgumentError(lazy"`Curl` requires 3-vector arguments. Got shape $sh."))
     return SU.ShapeVecT((1:3,))
 end
 
 function (c::Curl{false})(x::SymbolicT)
     return STerm(c, SArgsT((x,)); type = SU.promote_symtype(c, symtype(x)), shape = SU.promote_shape(c, SU.shape(x)))
 end
-function (c::Curl{true})(x::SymbolicT)
+function (c::Curl{true, N})(x::SymbolicT) where {N}
     SU.promote_shape(c, SU.shape(x))
-    res = SArgsT()
-    resize!(res, 3)
     d1 = Differential(c.vars[1])
     d2 = Differential(c.vars[2])
-    d3 = Differential(c.vars[3])
     x1 = x[1]
     x2 = x[2]
+    if N == 2
+        return d1(x2) - d2(x1)
+    end
+    res = SArgsT()
+    resize!(res, 3)
+    d3 = Differential(c.vars[3])
     x3 = x[3]
     res[1] = d2(x3) - d3(x2)
     res[2] = -d1(x3) + d3(x1)
     res[3] = d1(x2) - d2(x1)
     return res
 end
-(c::Curl{false})(x::Arr{T, 1}) where {T} = Arr{T, 1}(c(unwrap(x)))
-(c::Curl{true})(x::Arr{T, 1}) where {T} = T.(c(unwrap(x)))
+(c::Curl{false, 2})(x::Arr{T, 1}) where {T} = T(c(unwrap(x)))
+(c::Curl{false, 3})(x::Arr{T, 1}) where {T} = Arr{T, 1}(c(unwrap(x)))
+(c::Curl{true, 2})(x::Arr{T, 1}) where {T} = T(c(unwrap(x)))
+(c::Curl{true, 3})(x::Arr{T, 1}) where {T} = T.(c(unwrap(x)))
 (c::Curl)(x::Num) = c(unwrap(x))
 (c::Curl)(x::Number) = c(SConst(x))
 
@@ -1684,8 +1715,9 @@ end
 (c::Curl)(g::Grad) = c ∘ g
 
 const CURL_ZERO_3VEC = SConst(fill(COMMON_ZERO, 3))
-function (c::Curl{E})(arr::AbstractVector) where {E}
+function (c::Curl{E, N})(arr::AbstractVector) where {E, N}
     if !any(Base.Fix2(isa, SymbolicT) ∘ unwrap, arr)
+        N == 2 && return COMMON_ZERO
         E || return CURL_ZERO_3VEC
         return SArgsT((COMMON_ZERO, COMMON_ZERO, COMMON_ZERO))
     end
@@ -1695,13 +1727,16 @@ function (c::Curl{E})(arr::AbstractVector) where {E}
     SU.promote_shape(c, sh)
     E || return c(SConst(arr))
 
-    res = SArgsT()
-    resize!(res, 3)
     d1 = Differential(c.vars[1])
     d2 = Differential(c.vars[2])
-    d3 = Differential(c.vars[3])
     x1 = unwrap(arr[1])
     x2 = unwrap(arr[2])
+    if N == 2
+        return d1(x2) - d2(x1)
+    end
+    res = SArgsT()
+    resize!(res, 3)
+    d3 = Differential(c.vars[3])
     x3 = unwrap(arr[3])
     res[1] = unwrap(d2(x3) - d3(x2))
     res[2] = unwrap(-d1(x3) + d3(x1))
