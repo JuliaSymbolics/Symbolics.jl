@@ -176,7 +176,8 @@ true
 ```
 
 The two sides of the sum may be matched in either order, so the result is one of two
-equivalent forms (the roles of `2^(x+1)` and `5^(x+3)` swapped), and both are accepted above.
+alternative logarithmic reductions that select opposite complex branches of `slog(-1)`
+(the roles of `2^(x+1)` and `5^(x+3)` swapped). Both are accepted above.
 """
 function attract_exponential(lhs, var)
     lhs = unwrap(lhs)
