@@ -2,6 +2,7 @@ using Symbolics
 using SymbolicUtils
 using Test
 using LinearAlgebra, SparseArrays
+using StaticArrays
 using Symbolics: value, unwrap
 
 # Derivatives
@@ -64,6 +65,31 @@ test_equal(jac[2,3], -1x)
 test_equal(jac[3,1], y)
 test_equal(jac[3,2], x)
 test_equal(jac[3,3], -1β)
+
+@testset "jacobian with SVector" begin
+    @variables a b
+    sv_ops = SVector(a^2 + b, a * b)
+    sv_vars = SVector(a, b)
+    expected = Num[2a 1; b a]
+
+    sv_jac = Symbolics.jacobian(sv_ops, sv_vars)
+    @test sv_jac isa Matrix{Num}
+    test_equal(sv_jac[1, 1], 2a)
+    test_equal(sv_jac[1, 2], 1)
+    test_equal(sv_jac[2, 1], b)
+    test_equal(sv_jac[2, 2], a)
+
+    # only vars are an SVector
+    vec_ops = [a^2 + b, a * b]
+    vars_only = Symbolics.jacobian(vec_ops, sv_vars)
+    @test vars_only isa Matrix{Num}
+    @test isequal(vars_only, expected)
+
+    # Vector{Num} ops with Vector vars (baseline path)
+    vec_jac = Symbolics.jacobian(vec_ops, [a, b])
+    @test vec_jac isa Matrix{Num}
+    @test isequal(vec_jac, expected)
+end
 
 # issue #545
 z = t + t^2
