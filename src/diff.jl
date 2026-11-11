@@ -527,6 +527,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
         BSImpl.Term(; f, args) && if f isa Curl{false} end => begin
             res = Curl{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            # 2-vector curls are scalar
+            res isa AbstractVector || return executediff(D, res; simplify, throw_no_derivative)
             for (i, expr) in enumerate(res)
                 res[i] = executediff(D, expr; simplify, throw_no_derivative)
             end
@@ -1611,12 +1613,15 @@ Laplacian(vars; check = true) = Laplacian{false}(vars; check)
 """
 $(TYPEDSIGNATURES)
 
-The curl operator `∇×` with respect to three independent variables `vars`.
+The curl operator `∇×` with respect to two or three independent variables
+`vars`.
 
 Applying `Curl` to a 3-component vector field `v` produces the vector
 `[D(vars[2])(v[3]) - D(vars[3])(v[2]), D(vars[3])(v[1]) - D(vars[1])(v[3]),
-D(vars[1])(v[2]) - D(vars[2])(v[1])]` where `D = Differential`. `Curl` is
-also produced by `LinearAlgebra.cross(∇, v)` for a [`Grad`](@ref) `∇`, and
+D(vars[1])(v[2]) - D(vars[2])(v[1])]` where `D = Differential`. Applying it
+to a 2-component vector field produces the scalar (out-of-plane) curl
+`D(vars[1])(v[2]) - D(vars[2])(v[1])`. `Curl` is also produced by
+`LinearAlgebra.cross(∇, v)` for a 3-variable [`Grad`](@ref) `∇`, and
 composing `Curl` with `Grad` (`∇ × ∇`) produces an operator whose application
 to any scalar field vanishes.
 
@@ -1648,6 +1653,8 @@ struct Curl{E, N}
         end
     end
 end
+
+Curl{E}(vars::NTuple{N, SymbolicT}; check = true) where {E, N} = Curl{E, N}(vars; check)
 
 function Curl{E}(vars::Arr{T, 1}; check = true) where {E, T}
     vars = unwrap(vars)
