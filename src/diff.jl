@@ -525,10 +525,12 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
             res = Divergence{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
             return executediff(D, res; simplify, throw_no_derivative)
         end
-        BSImpl.Term(; f, args) && if f isa Curl{false} end => begin
-            res = Curl{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
-            # 2-vector curls are scalar
-            res isa AbstractVector || return executediff(D, res; simplify, throw_no_derivative)
+        BSImpl.Term(; f, args) && if f isa Curl{false, 2} end => begin
+            res = Curl{true, 2}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            return executediff(D, res; simplify, throw_no_derivative)
+        end
+        BSImpl.Term(; f, args) && if f isa Curl{false, 3} end => begin
+            res = Curl{true, 3}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
             for (i, expr) in enumerate(res)
                 res[i] = executediff(D, expr; simplify, throw_no_derivative)
             end
