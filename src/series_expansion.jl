@@ -524,10 +524,11 @@ through order `K`. Values are kept symbolic unless exact (see `_fold_exact_numer
 # unfolded, and its `factorial(n)` overflows for n > 20.
 function _taylor_coeffs(f, y, c0, K::Int)
     D = Differential(y)
+    at_c0 = SymbolicUtils.Substituter{false}(y => c0, symdiff_substitute_filter)
     cur = expand_derivatives(f)
     out = SeriesCoeff[]
     for k in 0:K
-        raw = value(substitute_in_deriv(cur, y => c0; fold = Val(false)))
+        raw = value(at_c0(cur))
         push!(out, _ts_coeff(_fold_exact_numeric((1 // factorial(big(k))) * raw)))
         k < K && (cur = expand_derivatives(D(cur)))
     end
