@@ -1004,10 +1004,27 @@ let
     @variables c[1:3]
     @test_throws DimensionMismatch LinearAlgebra.cross(Grad{false}([c[1], c[2]]), Grad{false}(c))
     @test_throws ArgumentError LinearAlgebra.cross(Grad{false}(c), Grad{false}([c[1], c[2]]))(1)
-    @test_throws ArgumentError Curl{false}([c[1], c[2]])
+    @test_throws ArgumentError Curl{false}([c[1]])
+    @test_throws ArgumentError Curl{false}([c[1], c[2], c[3], c[3]])
     @test_throws ArgumentError Grad{false}([a, b])([a, b])
     @test_throws ArgumentError Divergence{false}([a, b])(a)
     @test_throws ArgumentError Divergence{false}([a, b])(c)
+    # `Curl` also accepts two independent variables, producing the scalar
+    # curl `D(vars[1])(v[2]) - D(vars[2])(v[1])` of a 2-vector field.
+    c2 = Curl{false}([a, b])
+    w = [a^2 * b, b^3 + a]
+    @test operation(unwrap(c2(w))) isa Curl{false}
+    @test isequal(Curl{true}([a, b])(w), Differential(a)(w[2]) - Differential(b)(w[1]))
+    @test isequal(expand_derivatives(c2(w)), 1 - a^2)
+    @test iszero(expand_derivatives(Num(c2([a, b]))))
+    @test iszero(expand_derivatives(Num((c2 ∘ Grad{false}([a, b]))(a^2 * b))))
+    @test isequal(expand_derivatives(Differential(a)(c2(w))), Differential(a, 2)(w[2]) - 2a)
+    @test c2 == Curl{false}([a, b])
+    @test hash(c2) == hash(Curl{false}([a, b]))
+    @test c2 != Curl{false}([a, b, c[1]])
+    @test_throws ArgumentError Curl{false}([a, b])([a, b, c[1]])
+    @test_throws ArgumentError Curl{false}(c)([a, b])
+    @test_throws ArgumentError Curl{false}([a, b])(a)
     f = a^2 + b^2
     grad = Grad{false}([a, b])(f)
     @test grad isa Arr{Num, 1}

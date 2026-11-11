@@ -50,7 +50,9 @@ exported and must be accessed in a namespaced way. Each is parameterized by
 term with the operator as the head, which `expand_derivatives` expands, while
 `Op{true}` expands into `Differential`s eagerly at application. `Grad`
 composes with `LinearAlgebra.dot` and `LinearAlgebra.cross` into the other
-operators:
+operators. `Curl` accepts two or three independent variables: on a
+2-component field it produces the scalar curl `D(vars[1])(v[2]) -
+D(vars[2])(v[1])`, and on a 3-component field the usual vector curl:
 
 ```julia
 julia> using Symbolics, LinearAlgebra
