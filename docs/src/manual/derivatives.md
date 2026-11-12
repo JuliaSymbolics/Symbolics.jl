@@ -41,6 +41,49 @@ Symbolics.substitute_in_deriv
 Symbolics.substitute_in_deriv_and_depvar
 ```
 
+## Vector Calculus Operators
+
+Symbolics also provides multivariate differential operators for vector
+calculus: `Grad` (`∇`), `Divergence` (`∇⋅`),
+`Curl` (`∇×`) and `Laplacian` (`∇⋅∇`). Each is parameterized by
+`E`: `Op{false}` (the default, also constructed by `Op(vars)`) builds a lazy
+term with the operator as the head, which `expand_derivatives` expands, while
+`Op{true}` expands into `Differential`s eagerly at application. `Grad`
+composes with `LinearAlgebra.dot` and `LinearAlgebra.cross` into the other
+operators. `Curl` accepts two or three independent variables: on a
+2-component field it produces the scalar curl `D(vars[1])(v[2]) -
+D(vars[2])(v[1])`, and on a 3-component field the usual vector curl:
+
+```julia
+julia> using Symbolics, LinearAlgebra
+
+julia> @variables x y z u[1:3];
+
+julia> ∇ = Grad([x, y, z]);
+
+julia> ∇(x^2 + y^2 + z^2)          # gradient, lazily
+(∇(x^2 + y^2 + z^2))[1:3]
+
+julia> expand_derivatives(ans)     # expanded
+(SymbolicUtils.array_literal((3,), 2x, 2y, 2z))[1:3]
+
+julia> ∇ ⋅ u                        # divergence
+∇⋅(u)
+
+julia> ∇ × u                        # curl
+(∇×(u))[1:3]
+
+julia> (∇ ⋅ ∇)(x^2 + y^2 + z^2)     # Laplacian
+∇⋅(∇(x^2 + y^2 + z^2))
+```
+
+```@docs
+Symbolics.Grad
+Symbolics.Divergence
+Symbolics.Curl
+Symbolics.Laplacian
+```
+
 ## Adding Analytical Derivatives
 
 There are many derivatives pre-defined by
