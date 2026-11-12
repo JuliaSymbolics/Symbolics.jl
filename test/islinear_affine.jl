@@ -21,3 +21,13 @@ using Symbolics, Test
 @test !Symbolics.isaffine(ifelse(x < 1, x, z), [x])
 
 @test !Symbolics.isaffine(ifelse(y < 2, ifelse(x < 1, 0, 1), y), [x])
+
+# max and min have zero second derivatives almost everywhere, but are not affine
+@variables p
+@test !Symbolics.isaffine(max(x, 0), [x, y])
+@test !Symbolics.isaffine(min(x, p), [x, y])
+@test !Symbolics.isaffine(max(x, y), [x, y])
+@test !Symbolics.isaffine(max(x, y, 1), [x, y])
+@test !Symbolics.islinear(max(x, 0), [x, y])
+@test Symbolics.isaffine(max(z, p) + x, [x, y])
+@test Symbolics.isaffine(x + 2y + 1, [x, y])

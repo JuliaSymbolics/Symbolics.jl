@@ -1189,7 +1189,7 @@ const linearity_rules_affine = (
 
       (@rule (~f)(~x) => isidx(~x) ? combine_terms_1(linearity_1(~f), ~x) : _scalar),
       (@rule (^)(~x::isidx, ~y) => ~y isa Number && isone(~y) ? unwrap_const(~x) : unwrap_const(~x) * unwrap_const(~x)),
-      (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2(~f), isidx(~x) ? unwrap_const(~x) : _scalar, isidx(~y) ? unwrap_const(~y) : _scalar)),
+      (@rule (~f)(~x, ~y) => combine_terms_2(linearity_2_affine(~f), isidx(~x) ? unwrap_const(~x) : _scalar, isidx(~y) ? unwrap_const(~y) : _scalar)),
 
       (@rule ~x::issym => 0),
       # if the condition is dependent on the variable, do not consider this as affine
