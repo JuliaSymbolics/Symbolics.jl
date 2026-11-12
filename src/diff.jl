@@ -377,7 +377,7 @@ end
 
 function symdiff_substitute_filter(ex::BasicSymbolic{T}) where {T}
     SymbolicUtils.default_substitute_filter(ex) || @match ex begin
-        BSImpl.Term(; f) && if f isa Operator end => true
+        BSImpl.Term(; f) && if f isa Union{Differential, NormalDerivative} end => true
         _ => false
     end
 end
@@ -394,7 +394,7 @@ end
 
 function deriv_and_depvar_substitute_filter(ex::SymbolicT)
     SymbolicUtils.default_substitute_filter(ex) || @match ex begin
-        BSImpl.Term(; f) && if f isa Operator end => true
+        BSImpl.Term(; f) && if f isa Union{Differential, NormalDerivative} end => true
         BSImpl.Term(; f) && if f isa SymbolicT end => true
         _ => false
     end

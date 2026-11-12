@@ -1009,6 +1009,10 @@ end
         Dn_other = NormalDerivative(TestPiece(:other))
         @test isequal(substitute(Dn, Dict(Dn => Dn_other)), Dn_other)
         @test isequal(Symbolics.substitute_in_deriv(Dn(u(t, Γ)), Dict(Dn => Dn_other)), Dn_other(u(t, Γ)))
+        # operators defined elsewhere stay opaque, as with plain `substitute`
+        opaque_term = Symbolics.STerm(Op(), [unwrap(x)]; type = Real, shape = UnitRange{Int}[])
+        @test isequal(Symbolics.substitute_in_deriv(opaque_term, Dict(unwrap(x) => 2)), opaque_term)
+        @test isequal(Symbolics.substitute_in_deriv_and_depvar(opaque_term, Dict(unwrap(x) => 2)), opaque_term)
         # nested operators
         nested = Dt(Dn(u(t, Γ)))
         @test isequal(substitute(nested, rule), nested)
