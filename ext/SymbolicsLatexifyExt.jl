@@ -83,6 +83,12 @@ function latexify_derivatives(ex)
                 body = Expr(:latexifymerge, body, " ~ ")
             end
             return Expr(:latexifymerge, body, _integral_diff_merge(var_of_int))
+        elseif x.args[1] === :_derop
+            return Expr(
+                :latexifymerge,
+                "$(x.args[2]) ~ ",
+                _latexify_merge_child(x.args[3])
+            )
         elseif x.args[1] == :^ && length(x.args) == 3 && _latexify_power_base_needs_parens(x.args[2])
             # `:latexifymerge` has no precedence; parenthesise a differential/integral
             # form used as a power base.
@@ -259,6 +265,13 @@ Base.show(io::IO, ::MIME"text/latex", x::AbstractArray{<:Symbolics.RCNum}) = pri
 # each context. The per-context hook (and the `Symbolics._toexpr_op` hook used below) is
 # defined in `Symbolics` so downstream packages can extend it via `import Symbolics`
 # without reaching into this extension with `Base.get_extension`.
+Symbolics._toexpr_op(::Symbolics.Grad, args; latexwrapper) =
+    Expr(:call, :_derop, "\\nabla", _toexpr(only(args); latexwrapper))
+Symbolics._toexpr_op(::Symbolics.Divergence, args; latexwrapper) =
+    Expr(:call, :_derop, "\\nabla \\cdot", _toexpr(only(args); latexwrapper))
+Symbolics._toexpr_op(::Symbolics.Curl, args; latexwrapper) =
+    Expr(:call, :_derop, "\\nabla \\times", _toexpr(only(args); latexwrapper))
+
 function Symbolics._toexpr_metadata(O; latexwrapper = default_latex_wrapper)
     md = SymbolicUtils.metadata(O)
     md isa AbstractDict || return nothing
