@@ -87,16 +87,16 @@ $(FIELDS)
 # Examples
 
 ```jldoctest
-julia> using Symbolics, DomainSets
+julia> using Symbolics
 
 julia> @variables t u(..);
 
-julia> Γ = 0 .. 1; # any `DomainSets.Domain`; typically a named boundary piece
+julia> Γ = Symbolics.DomainSets.UnitInterval(); # any `DomainSets.Domain`; typically a named boundary piece
 
 julia> Dn = NormalDerivative(Γ);
 
 julia> Dn(u(t, Γ))
-Dn_0 .. 1(u(t, 0 .. 1))
+Dn_0.0 .. 1.0 (Unit)(u(t, 0.0 .. 1.0 (Unit)))
 ```
 """
 struct NormalDerivative{D <: Domain} <: Operator
