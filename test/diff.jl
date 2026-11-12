@@ -959,6 +959,24 @@ end
         @test isequal(2 * a + a, 3 * b)
     end
 
+    @testset "symbolic boundary domains compare as Bool" begin
+        @variables a b
+        IV = Symbolics.DomainSets.ClosedInterval
+        A = NormalDerivative(IV(0.0, a))
+        A2 = NormalDerivative(IV(0.0, a))
+        B = NormalDerivative(IV(0.0, b))
+        @test isequal(A, A2) === true
+        @test A == A2
+        @test isequal(A, B) === false
+        @test (A == B) === false
+        @test hash(A) == hash(A2)
+        @test !isequal(A, NormalDerivative(Symbolics.DomainSets.OpenInterval(0.0, a)))
+        @test (isequal(A, A2) ? 1 : 2) == 1
+        @test (isequal(A, B) ? 1 : 2) == 2
+        @test isequal(NormalDerivative(IV(0.0, 1.0)), NormalDerivative(IV(0.0, 1.0)))
+        @test !isequal(NormalDerivative(IV(0.0, 1.0)), NormalDerivative(IV(0.0, 2.0)))
+    end
+
     @testset "expand_derivatives leaves it untouched" begin
         ex = Dn(u(t, Γ))
         @test isequal(expand_derivatives(ex), ex)

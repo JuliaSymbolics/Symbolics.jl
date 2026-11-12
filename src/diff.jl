@@ -111,7 +111,7 @@ end
 SymbolicUtils.isbinop(::NormalDerivative) = false
 
 Base.:(==)(a::NormalDerivative, b::NormalDerivative) = isequal(a, b)
-Base.isequal(a::NormalDerivative, b::NormalDerivative) = isequal(a.piece, b.piece)
+Base.isequal(a::NormalDerivative, b::NormalDerivative) = _isequal_integral_domain(a.piece, b.piece)
 Base.hash(a::NormalDerivative, h::UInt) = hash(a.piece, hash(NormalDerivative, h))
 
 function Base.show(io::IO, Dn::NormalDerivative)
