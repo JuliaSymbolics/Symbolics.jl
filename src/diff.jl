@@ -684,9 +684,9 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
         BSImpl.ArrayOp(; output_idx, expr, reduce, term, ranges) => begin
             if term !== nothing
-                term = executediff(D, term; simplify, throw_no_derivatives)
+                term = executediff(D, term; simplify, throw_no_derivative)
             end
-            expr = executediff(D, expr; simplify, throw_no_derivatives)
+            expr = executediff(D, expr; simplify, throw_no_derivative)
             return BSImpl.ArrayOp{VartypeT}(output_idx, expr, reduce, term, ranges; type = symtype(arg), shape = shape(arg))
         end
     end
