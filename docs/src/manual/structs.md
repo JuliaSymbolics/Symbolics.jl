@@ -231,6 +231,10 @@ Symbolics.record_literal
 Symbolics.is_record_literal
 Symbolics.record_literal_term
 Symbolics.RecordLiteral
+Symbolics.SymbolicGetproperty
+Symbolics.field_name
+Symbolics.is_symstruct_type
+Symbolics.issymstruct
 Symbolics.symbolic_zero
 Symbolics.is_zeroable
 Symbolics.SymbolicZero
