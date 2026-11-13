@@ -971,15 +971,16 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
 end
 
 function _augment_with_call_args!(vs)
-    extra = SymbolicT[]
-    for s in vs
+    worklist = collect(vs)
+    while !isempty(worklist)
+        s = pop!(worklist)
         SymbolicUtils.iscall(s) || continue
         for arg in SymbolicUtils.arguments(s)
-            push!(extra, arg)
+            if !(arg in vs)
+                push!(vs, arg)
+                push!(worklist, arg)
+            end
         end
-    end
-    for e in extra
-        push!(vs, e)
     end
     return vs
 end
