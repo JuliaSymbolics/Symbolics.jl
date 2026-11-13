@@ -165,9 +165,19 @@ julia> using Symbolics
 julia> x = (@variables x)[1]
 x
 
-julia> Symbolics.attract_exponential(2^(x+1) + 5^(x+3), x)
-slog(-1) - slog(2) + 3slog(5) + slog(5)*x - slog(2)*x
+julia> using Symbolics: slog, term
+
+julia> result = Symbolics.attract_exponential(2^(x+1) + 5^(x+3), x);
+
+julia> L, a, b = term(slog, -1), term(slog, 2), term(slog, 5);
+
+julia> isequal(result, L - a + 3b + b*x - a*x) || isequal(result, L + a - 3b + a*x - b*x)
+true
 ```
+
+The two sides of the sum may be matched in either order, so the result is one of two
+alternative logarithmic reductions that select opposite complex branches of `slog(-1)`
+(the roles of `2^(x+1)` and `5^(x+3)` swapped). Both are accepted above.
 """
 function attract_exponential(lhs, var)
     lhs = unwrap(lhs)
