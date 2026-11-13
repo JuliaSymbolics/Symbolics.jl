@@ -92,7 +92,7 @@ function get_roots_deg4(expression, x)
         end
     end
     if SymbolicUtils._iszero(m)
-        @info "Assuming $(roots_m[1] != 0)"
+        record_assumption(roots_m[1] != 0)
         m = roots_m[1]
     end
 
