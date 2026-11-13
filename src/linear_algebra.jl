@@ -110,6 +110,8 @@ function symbolic_linear_solve(eq, var; simplify=false, check=true) # scalar cas
     simplify || return x
     if x isa SymbolicT
         return SymbolicUtils.simplify(x)
+    elseif x isa Num
+        return Num(SymbolicUtils.simplify(unwrap(x)))
     end
     map!(SymbolicUtils.simplify, x, x)
     return x
