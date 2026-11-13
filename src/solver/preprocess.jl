@@ -36,18 +36,25 @@ to make the output "valid" in the eyes of `factor_use_nemo` and other Nemo funct
 
 """
 function clean_f(filtered_expr, var, subs)
-    filtered_expr = simplify_fractions(simplify(real(filtered_expr)))
+    filtered_expr = simplify_fractions(flatten_fractions(simplify(real(filtered_expr))))
     unwrapped_f = unwrap(filtered_expr)
     !iscall(unwrapped_f) && return filtered_expr
     oper = operation(unwrapped_f)
     assumptions = []
 
     if oper === (/)
-        if !all(isequal(var, x) for x in get_variables(denominator(unwrapped_f)))
-            filtered_expr = numerator(unwrapped_f)
-            push!(assumptions, substitute(denominator(unwrapped_f), subs, fold=Val(false)))
+        numerator_f = numerator(unwrapped_f)
+        denominator_f = denominator(unwrapped_f)
+        if !all(isequal(var, x) for x in get_variables(denominator_f)) ||
+                any(isequal(var, x) for x in get_variables(numerator_f))
+            filtered_expr = numerator_f
+            denominator_subs, denominator_f = _filter_poly(denominator_f, var)
+            merge!(subs, denominator_subs)
+            push!(assumptions, substitute(denominator_f, subs, fold = Val(false)))
         end
     end
+    numerator_subs, filtered_expr = _filter_poly(filtered_expr, var)
+    merge!(subs, numerator_subs)
     return filtered_expr, assumptions
 end
 

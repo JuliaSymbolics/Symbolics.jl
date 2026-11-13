@@ -187,7 +187,7 @@ function comp_rational(x, y)
         if !isequal(imag_p, 0)
             r += (Rational(imag_p) // y) * im
         end
-    elseif x isa Float64
+    elseif x isa AbstractFloat
         r = Rational{BigInt}(x) // y
     end
 
