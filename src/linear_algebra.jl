@@ -10,8 +10,22 @@ end
 nterms(t::Num) = nterms(unwrap(t))
 nterms(t::Num, cache) = nterms(unwrap(t), cache)
 
-# Soft pivoted
-function sym_lu(A::AbstractMatrix{Num}; check=true)
+"""
+    sym_lu(A; check = true)
+
+LU factorization of a matrix of [`Num`](@ref) with soft (expression-size) pivoting.
+
+At each column `k`, the pivot row is chosen as the eligible entry with the fewest
+symbolic terms (`nterms`), not the largest numeric magnitude. That keeps intermediate
+expressions smaller, but a pivot that is symbolically nonzero can still evaluate to
+zero for some substitutions, which produces `0/0`-style nested fractions and `NaN`
+after substitution. Prefer `inv(A) * b` or Cramer's rule (`det`) when you need a
+closed form that stays valid for every nonsingular numeric specialization; those
+paths use Laplace expansion and divide only by `det(A)`. Laplace cost grows
+factorially with `n`, so it is practical for small systems (roughly up through
+about `7×7`–`8×8` before build times reach tens of seconds).
+"""
+function sym_lu(A::AbstractMatrix{Num}; check = true)
     nterms_cache = Base.IdDict{SymbolicT, Int}()
     SINGULAR = typemax(Int)
     m, n = size(A)

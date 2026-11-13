@@ -147,6 +147,20 @@ M = [1 a; 0 2]
 M \ b
 M \ [1, 2]
 
+# Closed form via inv stays valid when a pivot entry is numerically zero.
+# Soft-pivoted A \ b can produce NaN/Inf for the same substitution.
+@variables M[1:2, 1:2] v[1:2]
+Ms = Symbolics.scalarize(M)
+vs = Symbolics.scalarize(v)
+sol_inv = inv(Ms) * vs
+subs_zero_pivot = Dict(
+    Ms[1, 1] => 0.0, Ms[1, 2] => 1.0, Ms[2, 1] => 1.0, Ms[2, 2] => 1.0,
+    vs[1] => 1.0, vs[2] => 2.0
+)
+ref_zero_pivot = [0.0 1.0; 1.0 1.0] \ [1.0, 2.0]
+got_inv = [Float64(Symbolics.value(substitute(sol_inv[i], subs_zero_pivot))) for i in 1:2]
+@test got_inv ≈ ref_zero_pivot
+
 # test det
 @variables X[1:4,1:4]
 d1 = det(X, laplace=true)
