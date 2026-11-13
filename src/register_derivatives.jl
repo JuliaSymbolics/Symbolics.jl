@@ -7,6 +7,7 @@ argument. Do not define this function directly. Prefer using
 [`@derivative_rule`](@ref).
 """
 function derivative_rule end
+function derivative end
 
 """
     @register_derivative fn(args...) Ith_arg derivative
@@ -123,8 +124,34 @@ macro register_derivative(f::Expr, I::Union{Symbol, Int}, body)
     return esc(Expr(:function, derhead, Expr(:block, unpack, body)))
 end
 
-# Fallback
-@register_derivative (f::Any)(args...) I nothing
+# Fallback: check for user-defined methods on Symbolics.derivative (e.g. Symbolics.derivative(::typeof(f), args::NTuple{N, Any}, ::Val{I}))
+function derivative_rule(f::Any, ::Val{Nargs}, args::ROArgsT{VartypeT}, ::Val{I}) where {Nargs, I}
+    wrapped = ntuple(i -> wrap(args[i]), Val{Nargs}())
+    if applicable(derivative, f, wrapped, Val{I}())
+        res = derivative(f, wrapped, Val{I}())
+        res === nothing && return nothing
+        unwrapped = unwrap(res)
+        return (unwrapped isa Number || (unwrapped isa AbstractArray && !(unwrapped isa BasicSymbolic || unwrapped isa Arr))) ? SConst(unwrapped) : unwrapped
+    elseif applicable(derivative, f, wrapped, I)
+        res = derivative(f, wrapped, I)
+        res === nothing && return nothing
+        unwrapped = unwrap(res)
+        return (unwrapped isa Number || (unwrapped isa AbstractArray && !(unwrapped isa BasicSymbolic || unwrapped isa Arr))) ? SConst(unwrapped) : unwrapped
+    end
+    raw = ntuple(i -> args[i], Val{Nargs}())
+    if applicable(derivative, f, raw, Val{I}())
+        res = derivative(f, raw, Val{I}())
+        res === nothing && return nothing
+        unwrapped = unwrap(res)
+        return (unwrapped isa Number || (unwrapped isa AbstractArray && !(unwrapped isa BasicSymbolic || unwrapped isa Arr))) ? SConst(unwrapped) : unwrapped
+    elseif applicable(derivative, f, raw, I)
+        res = derivative(f, raw, I)
+        res === nothing && return nothing
+        unwrapped = unwrap(res)
+        return (unwrapped isa Number || (unwrapped isa AbstractArray && !(unwrapped isa BasicSymbolic || unwrapped isa Arr))) ? SConst(unwrapped) : unwrapped
+    end
+    return nothing
+end
 
 """
     SymbolicCallable{T}

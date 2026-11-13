@@ -1154,3 +1154,30 @@ let
     @test occursin("∇(a^2 + b^2)", sprint(show, grad))
     @test occursin("∇×(y)", sprint(show, ∇ × y))
 end
+
+@testset "Legacy Symbolics.derivative method registration (#2121)" begin
+    test_custom_sq(z) = z^2
+    @register_symbolic test_custom_sq(z)
+    Symbolics.derivative(::typeof(test_custom_sq), args::NTuple{1, Any}, ::Val{1}) = 2 * args[1]
+
+    @variables z
+    dfdz = Symbolics.derivative(test_custom_sq(z), z)
+    @test isequal(dfdz, 2z)
+    fn = build_function(dfdz, z; expression = Val(false))
+    @test fn(3.0) == 6.0
+
+    test_custom_h(x, y) = x^2 + y
+    @register_symbolic test_custom_h(x, y)
+    Symbolics.derivative(::typeof(test_custom_h), args::NTuple{2, Any}, ::Val{1}) = 2args[1]
+    Symbolics.derivative(::typeof(test_custom_h), args::NTuple{2, Any}, ::Val{2}) = 1
+
+    @variables x y
+    @test isequal(Symbolics.derivative(test_custom_h(x, y) + y^2, x), 2x)
+    @test isequal(Symbolics.derivative(test_custom_h(x, y) + y^2, y), 1 + 2y)
+
+    J = Symbolics.jacobian([test_custom_sq(z)], [z])
+    @test isequal(J, reshape([2z], 1, 1))
+
+    H = Symbolics.hessian(test_custom_sq(z), [z])
+    @test isequal(H, reshape([2], 1, 1))
+end
