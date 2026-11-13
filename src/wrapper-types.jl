@@ -208,9 +208,9 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
         if arg isa Expr && arg.head == :(::)
             T = Base.eval(mod, arg.args[2])
             if has_symwrapper(T)
-                Ts = (T, SymbolicT, wrapper_type(T))
+                Ts = Any[T, SymbolicT, wrapper_type(T)]
             else
-                Ts = (T, SymbolicT)
+                Ts = Any[T, SymbolicT]
             end
             if T <: AbstractArray && wrap_arrays
                 eT = eltype(T)
@@ -223,18 +223,18 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
                     (elT) -> AbstractArray{S} where {S <: elT}
                 end
                 if has_symwrapper(eT)
-                    Ts = (Ts..., _arr_type_fn(SymbolicT), _arr_type_fn(wrapper_type(eT)))
+                    push!(Ts, _arr_type_fn(SymbolicT), _arr_type_fn(wrapper_type(eT)))
                 else
-                    Ts = (Ts..., _arr_type_fn(SymbolicT))
+                    push!(Ts, _arr_type_fn(SymbolicT))
                 end
             end
             Ts
         else
-            (Any,)
+            Any[Any]
         end
     end
 
-    types = map(type_options, args)
+    types = Any[type_options(a) for a in args]
 
     impl = :(
         function $impl_name($self, $(names...), $(kwnames...))
@@ -256,20 +256,23 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
         end
         error("Unreachable")
     end
-    # TODO: maybe don't drop first lol
     if args_list isa Union{Expr, Symbol}
         args_list = Base.eval(mod, args_list)
     end
     args_list = parse_args_list(args_list)
+    signatures = Vector{Any}[]
     if isempty(args_list)
-        it = Iterators.drop(Iterators.product(types...), 1)
+        indices = CartesianIndices(Tuple(length.(types)))
+        first_index = first(indices)
+        for index in indices
+            index == first_index && continue
+            push!(signatures, Any[types[i][index[i]] for i in eachindex(types)])
+        end
     else
-        it = map(args_list) do signature
+        for signature in args_list
             length(signature) == length(args) || throw(ArgumentError(
                 "each argument signature must match the number of positional arguments"))
-            Ts = map(signature) do T
-                T isa Type ? T : Base.eval(mod, T)
-            end
+            Ts = Any[T isa Type ? T : Base.eval(mod, T) for T in signature]
             all(T -> T isa Type, Ts) || throw(ArgumentError(
                 "argument signatures must contain types"))
             all(i -> any(U -> Ts[i] <: U, types[i]), eachindex(Ts)) ||
@@ -278,24 +281,27 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
                 (T <: AbstractArray && (T <: AbstractArray{<:SymbolicT} ||
                     is_wrapped_array_eltype(T))), Ts) || throw(ArgumentError(
                 "each argument signature must include a symbolic argument"))
-            Ts
+            push!(signatures, Ts)
         end
     end
-    methods = map(it) do Ts
-        method_args = map(names, Ts) do n, T
-            :($n::$T)
+    methods = Expr[]
+    for Ts in signatures
+        method_args = Expr[]
+        for (n, T) in zip(names, Ts)
+            push!(method_args, :($n::$T))
         end
 
         any_wrapper = false
-        impl_args = map(enumerate(names)) do (i, name)
+        impl_args = Any[]
+        for (i, name) in enumerate(names)
             if is_wrapper_type(Ts[i])
                 any_wrapper = true
-                :($unwrap($name))
+                push!(impl_args, :($unwrap($name)))
             elseif Ts[i] <: AbstractArray && is_wrapped_array_eltype(Ts[i])
                 any_wrapper = true
-                :($_recursive_unwrap($name))
+                push!(impl_args, :($_recursive_unwrap($name)))
             else
-                name
+                push!(impl_args, name)
             end
         end
         implcall = :($impl_name($self, $(impl_args...), $(kwnames...)))
@@ -314,13 +320,21 @@ function wrap_func_expr(mod, expr, wrap_arrays = true, args_list = [])
         push!(body.args, implcall)
 
         if isempty(kwargs)
-            :(function $fname($(method_args...))
-                  $body
-              end)
+            push!(
+                methods, :(
+                    function $fname($(method_args...))
+                        $body
+                    end
+                )
+            )
         else
-            :(function $fname($(method_args...); $(kwargs...))
-                  $body
-              end)
+            push!(
+                methods, :(
+                    function $fname($(method_args...); $(kwargs...))
+                        $body
+                    end
+                )
+            )
         end
     end
 
