@@ -87,3 +87,27 @@ bar(x::AbstractVector) = x
     @test_throws ArgumentError Symbolics.jacobian([Mp * w[2]], [w[2]])
     @test_throws ArgumentError Symbolics.jacobian_sparsity([Mp * w[1]], collect(w))
 end
+
+ignore_argument(A, x) = x + 1
+@register_symbolic ignore_argument(A, x)
+@register_derivative ignore_argument(A, x) 1 (x - x)
+@register_derivative ignore_argument(A, x) 2 (x - x + 1)
+
+use_argument(A, x) = x + 1
+@register_symbolic use_argument(A, x)
+@register_derivative use_argument(A, x) 1 x
+@register_derivative use_argument(A, x) 2 (x - x + 1)
+
+@testset "registered zero partial skips the opaque operand check" begin
+    ex = [ignore_argument(Mp * u[1], u[2])]
+    J = Symbolics.jacobian(ex, collect(u))
+    @test iszero(J[1, 1]) && isequal(J[1, 2], 1)
+    Jsp = Symbolics.sparsejacobian(ex, collect(u))
+    @test Jsp[1, 2] == 1 && iszero(Jsp[1, 1])
+    @test Symbolics.jacobian_sparsity(ex, collect(u))[1, 2]
+    # negative control: a nonzero partial wrt the arithmetic-array operand still throws
+    ex = [use_argument(Mp * u[1], u[2])]
+    @test_throws ArgumentError Symbolics.jacobian(ex, collect(u))
+    @test_throws ArgumentError Symbolics.sparsejacobian(ex, collect(u))
+    @test_throws ArgumentError Symbolics.jacobian_sparsity(ex, collect(u))
+end

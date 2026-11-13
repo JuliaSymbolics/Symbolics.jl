@@ -905,8 +905,12 @@ function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
         # a literal `arr[k]` is an element access: it depends on `arr` only through `varset`
         literal_idx = operation(ex) === getindex && length(args) > 1 &&
             all(_is_scalar_literal, Iterators.drop(args, 1))
+        # an argument whose registered partial is zero contributes nothing to the derivative
+        # (as in `executediff`), so it is neither descended into nor validated
+        is_call = !(operation(ex) in (+, -, *, /, ^, getindex))
         for (k, a) in enumerate(args)
             literal_idx && k == 1 && a in arrset && continue
+            is_call && _iszero_derivative(derivative_idx(ex, k)) && continue
             a isa SymbolicT && _depends_checking_array_symbols(a, varset, arrset, seen) && (depends = true)
         end
         if depends && operation(ex) in (+, -, *, /, ^)
