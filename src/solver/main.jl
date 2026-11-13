@@ -265,6 +265,7 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 
 
     if !x_univar
+        x = vec(collect(Num, x))
         for e in expr
             for var in x
                 if !check_poly_inunivar(e, var)
@@ -416,5 +417,8 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
 end
 
 function solve_multivar(eqs::Any, vars::Any; dropmultiplicity = true, warns = true)
-    throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
+    if Base.get_extension(Symbolics, :SymbolicsGroebnerExt) === nothing
+        throw("Groebner bases engine is required. Execute `using Groebner` to enable this functionality.")
+    end
+    throw(ArgumentError("solve_multivar does not support equations of type `$(typeof(eqs))` and variables of type `$(typeof(vars))`."))
 end
