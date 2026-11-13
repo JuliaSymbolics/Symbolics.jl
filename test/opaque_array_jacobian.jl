@@ -111,3 +111,26 @@ use_argument(A, x) = x + 1
     @test_throws ArgumentError Symbolics.sparsejacobian(ex, collect(u))
     @test_throws ArgumentError Symbolics.jacobian_sparsity(ex, collect(u))
 end
+
+err_partial(z) = z
+@register_symbolic err_partial(z)
+@register_derivative err_partial(z) 1 error("unsupported partial")
+
+err_partial_arr(A, x) = x
+@register_symbolic err_partial_arr(A, x)
+@register_derivative err_partial_arr(A, x) 1 error("unsupported partial")
+@register_derivative err_partial_arr(A, x) 2 (x - x + 1)
+
+@testset "registered partials are only evaluated when an opaque operand needs checking" begin
+    @variables y
+    # no opaque operand: the erroring rule is never evaluated
+    @test iszero(Symbolics.jacobian([err_partial(y)], [u[1]])[1, 1])
+    @test iszero(Symbolics.sparsejacobian([err_partial(y)], [u[1]])[1, 1])
+    @test iszero(nnz(Symbolics.jacobian_sparsity([err_partial(y)], [u[1]])))
+    @test nnz(Symbolics.jacobian_sparsity([err_partial(u[1])], [u[1]])) == 1
+    # opaque operand and an erroring rule: the original ArgumentError, not the rule's error
+    ex = [err_partial_arr(Mp * u[1], u[2])]
+    @test_throws ArgumentError Symbolics.jacobian(ex, collect(u))
+    @test_throws ArgumentError Symbolics.sparsejacobian(ex, collect(u))
+    @test_throws ArgumentError Symbolics.jacobian_sparsity(ex, collect(u))
+end

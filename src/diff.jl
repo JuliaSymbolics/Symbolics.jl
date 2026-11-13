@@ -897,6 +897,14 @@ function _check_no_array_symbol_operands(exprs, vars)
     return nothing
 end
 
+function _is_zero_partial(ex::SymbolicT, k::Int)
+    try
+        return _iszero_derivative(derivative_idx(ex, k))
+    catch
+        return false
+    end
+end
+
 function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
     return get!(seen, ex) do
         depends = ex in varset || ex in arrset
@@ -905,13 +913,22 @@ function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
         # a literal `arr[k]` is an element access: it depends on `arr` only through `varset`
         literal_idx = operation(ex) === getindex && length(args) > 1 &&
             all(_is_scalar_literal, Iterators.drop(args, 1))
-        # an argument whose registered partial is zero contributes nothing to the derivative
-        # (as in `executediff`), so it is neither descended into nor validated
         is_call = !(operation(ex) in (+, -, *, /, ^, getindex))
         for (k, a) in enumerate(args)
             literal_idx && k == 1 && a in arrset && continue
-            is_call && _iszero_derivative(derivative_idx(ex, k)) && continue
-            a isa SymbolicT && _depends_checking_array_symbols(a, varset, arrset, seen) && (depends = true)
+            a isa SymbolicT || continue
+            if is_call
+                # An argument whose registered partial is zero contributes nothing to the
+                # derivative (as in `executediff`), so a rejection inside it is dropped. The
+                # partial is only consulted once a rejection happens.
+                try
+                    _depends_checking_array_symbols(a, varset, arrset, seen) && (depends = true)
+                catch err
+                    err isa ArgumentError && _is_zero_partial(ex, k) || rethrow()
+                end
+            else
+                _depends_checking_array_symbols(a, varset, arrset, seen) && (depends = true)
+            end
         end
         if depends && operation(ex) in (+, -, *, /, ^)
             for a in args
