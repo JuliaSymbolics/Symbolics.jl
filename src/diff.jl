@@ -905,6 +905,23 @@ function _is_zero_partial(ex::SymbolicT, k::Int)
     end
 end
 
+# Whether `ex` depends on `vars` once call arguments with a zero registered partial are dropped.
+function _depends_pruned(ex::SymbolicT, varset, arrset)
+    (ex in varset || ex in arrset) && return true
+    iscall(ex) || return false
+    args = arguments(ex)
+    literal_idx = operation(ex) === getindex && length(args) > 1 &&
+        all(_is_scalar_literal, Iterators.drop(args, 1))
+    is_call = !(operation(ex) in (+, -, *, /, ^, getindex))
+    for (k, a) in enumerate(args)
+        literal_idx && k == 1 && a in arrset && continue
+        a isa SymbolicT || continue
+        is_call && _is_zero_partial(ex, k) && continue
+        _depends_pruned(a, varset, arrset) && return true
+    end
+    return false
+end
+
 function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
     return get!(seen, ex) do
         depends = ex in varset || ex in arrset
@@ -933,8 +950,11 @@ function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
         if depends && operation(ex) in (+, -, *, /, ^)
             for a in args
                 a isa SymbolicT && !iscall(a) && symtype(a) <: AbstractArray &&
-                    !SymbolicUtils.is_array_shape(shape(a)) &&
-                    throw(ArgumentError("The array-typed symbol `$a` is an operand of `$ex`, which depends on the differentiation variables. Array-typed symbols with a scalar shape are opaque, so the Jacobian or sparsity cannot treat them as scalar coefficients; wrap them in a registered function with a derivative rule."))
+                    !SymbolicUtils.is_array_shape(shape(a)) || continue
+                # Only now are registered partials consulted: with the zero-partial call
+                # arguments pruned, as in `executediff`, `ex` may not depend on `vars`.
+                _depends_pruned(ex, varset, arrset) || return false
+                throw(ArgumentError("The array-typed symbol `$a` is an operand of `$ex`, which depends on the differentiation variables. Array-typed symbols with a scalar shape are opaque, so the Jacobian or sparsity cannot treat them as scalar coefficients; wrap them in a registered function with a derivative rule."))
             end
         end
         depends

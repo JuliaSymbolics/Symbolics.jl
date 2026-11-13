@@ -134,3 +134,42 @@ err_partial_arr(A, x) = x
     @test_throws ArgumentError Symbolics.sparsejacobian(ex, collect(u))
     @test_throws ArgumentError Symbolics.jacobian_sparsity(ex, collect(u))
 end
+
+ignore_counter(A, x) = x + 1
+@register_symbolic ignore_counter(A, x)
+@register_derivative ignore_counter(A, x) 1 (x - x)
+@register_derivative ignore_counter(A, x) 2 (x - x + 1)
+
+sum_counter(A, x) = sum(A) + x
+@register_symbolic sum_counter(A, x)
+@register_derivative sum_counter(A, x) 2 (x - x + 1)
+
+@variables Mq::SparseMatrixCSC{Float64, Int} p
+
+@testset "zero-partial calls nested in every direction around opaque arithmetic" begin
+    function check(expr)
+        J = Symbolics.jacobian([expr], collect(u))
+        @test iszero(J[1, 1]) && isequal(J[1, 2], 1)
+        Jsp = Symbolics.sparsejacobian([expr], collect(u))
+        @test iszero(Jsp[1, 1]) && Jsp[1, 2] == 1
+        @test Symbolics.jacobian_sparsity([expr], collect(u))[1, 2]
+    end
+    # zero-partial call inside the opaque arithmetic
+    check(sum_counter(Mp * ignore_counter(u[1], p), u[2]))
+    # several levels of nesting
+    check(sum_counter(Mp * ignore_counter(Mq * ignore_counter(u[1], p), p), u[2]))
+    # zero-partial calls both inside and enclosing the opaque arithmetic
+    check(ignore_argument(Mp * ignore_counter(u[1], p), u[2]))
+
+    # negative controls: still rejected
+    for expr in (
+        sum_counter(Mp * use_argument(u[1], p), u[2]),
+        sum_counter(Mp * err_partial_arr(u[1], p), u[2]),
+        sum_counter(Mp * ignore_counter(u[2], u[1]), u[2]),
+        Mp * ignore_counter(u[1], p) + Mp * u[1],
+    )
+        @test_throws ArgumentError Symbolics.jacobian([expr], collect(u))
+        @test_throws ArgumentError Symbolics.sparsejacobian([expr], collect(u))
+        @test_throws ArgumentError Symbolics.jacobian_sparsity([expr], collect(u))
+    end
+end
