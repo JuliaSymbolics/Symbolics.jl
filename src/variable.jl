@@ -29,6 +29,41 @@ Symbolic metadata key for storing the macro used to create a symbolic variable.
 """
 struct VariableSource <: AbstractVariableMetadata end
 
+"""
+    $TYPEDEF
+
+Symbolic metadata key for storing the domain of a symbolic variable, that is, the set of
+values it is assumed to take. Set through the `domain` option of [`@variables`](@ref):
+
+```julia
+@variables x [domain = DomainSets.HalfLine()]   # x >= 0
+@variables y [domain = (10, Inf)]               # shorthand for `Interval(10, Inf)`
+@variables n [domain = DomainSets.Integers()]
+```
+
+The value is a DomainSets `Domain`, which is the representation
+[discussed for assumptions](https://github.com/JuliaSymbolics/Symbolics.jl/issues/98) and the
+one already used by the `x ∈ Interval(...)` pairings of `Symbolics.VarDomainPairing`,
+so the two describe domains the same way. A `(lo, hi)` tuple is accepted and converted to an
+`Interval`, matching the conversion that `∈` already performs.
+
+Nothing in Symbolics consumes this key yet; it exists so that downstream packages and
+user-written rewrite rules can read a variable's assumptions, with `in` as the single
+predicate they need.
+"""
+struct VariableDomain <: AbstractVariableMetadata end
+
+"""
+    normalize_metadata_value(key_type, value)
+
+Canonicalise the value given for a metadata key in `@variables`.
+
+The default returns `value` unchanged. A key that accepts more than one spelling of the same
+thing adds a method here, so that everything stored under it has one representation and
+consumers have one shape to handle.
+"""
+normalize_metadata_value(::Type, value) = value
+
 function _default_is_array_shaped(val)
     u = unwrap(val)
     if u isa AbstractArray
@@ -252,6 +287,7 @@ function _add_metadata(parse_result, var::Expr, default, macroname::Symbol, meta
         Meta.isexpr(ex, :(=)) || error("Metadata must of the form of `key = value`")
         key, value = ex.args
         key_type = option_to_metadata_type(Val{key}())::DataType
+        value = Expr(:call, normalize_metadata_value, key_type, value)
         var = Expr(:call, setmetadata, var, key_type, value)
     end
     return var
@@ -280,6 +316,9 @@ of `x`.
 function option_to_metadata_type(::Val{opt}) where {opt}
     throw(Base.Meta.ParseError("unknown property type $opt"))
 end
+
+option_to_metadata_type(::Val{:domain}) = VariableDomain
+
 
 # add enough additional methods that the compiler gives up on specializing this
 # and downstream definitions don't cause massive invalidation.
