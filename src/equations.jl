@@ -54,6 +54,10 @@ $(TYPEDSIGNATURES)
 Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
 `Num` and a `Number`.
 
+Broadcasting `~` over symbolic arrays (`A .~ B`) returns an `Array{Equation}` of the
+elementwise scalar equations. It is a concrete array, so it cannot be indexed with a
+symbolic index; write `A[i] ~ B[i]` for the equation at a symbolic index `i`.
+
 # Examples
 
 ```jldoctest
@@ -73,7 +77,10 @@ julia> A ~ B
 A ~ B
 
 julia> A .~ 3x
-(broadcast(~, A, 3x))[1:3,1:3]
+3×3 Matrix{Equation}:
+ A[1, 1] ~ 3x  A[1, 2] ~ 3x  A[1, 3] ~ 3x
+ A[2, 1] ~ 3x  A[2, 2] ~ 3x  A[2, 3] ~ 3x
+ A[3, 1] ~ 3x  A[3, 2] ~ 3x  A[3, 3] ~ 3x
 ```
 """
 function Base.:~(lhs, rhs)
