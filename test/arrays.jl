@@ -649,6 +649,23 @@ end
     @test transpose(Num[1, 2]) / X isa Arr
 end
 
+@testset "scalarize of array right-division" begin
+    @variables A[1:2, 1:2] B[1:2, 1:2] b[1:2]
+    B_over_A = B / A
+    s_B_over_A = scalarize(B_over_A)
+    @test size(s_B_over_A) == (2, 2)
+    @test eltype(s_B_over_A) == Num
+    @test isequal(s_B_over_A, [B_over_A[i] for i in eachindex(B_over_A)])
+
+    bT_over_A = b' / A
+    s_bT_over_A = scalarize(bT_over_A)
+    @test size(s_bT_over_A) == (1, 2)
+    @test isequal(s_bT_over_A, [bT_over_A[i] for i in eachindex(bT_over_A)])
+
+    A_ldiv_b = A \ b
+    @test isequal(scalarize(A_ldiv_b), [A_ldiv_b[i] for i in eachindex(A_ldiv_b)])
+end
+
 @testset "`getindex(::Arr, ::Num)`" begin
     @variables t x(t)[1:3] i(t)::Int
     @test_nowarn x[i]
