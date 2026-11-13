@@ -486,3 +486,25 @@ end
         @test out == pv .+ 0.1f0 .* qv
     end
 end
+
+@testset "`use_literal_pow`" begin
+    @test Symbolics.CodegenFunctionOptions().use_literal_pow
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; use_literal_pow = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:use_literal_pow] === something(setting, true)
+    end
+
+    # SymbolicUtils honours the rewrite from the release that adds `Code.USE_LITERAL_POW_KEY`.
+    if isdefined(SymbolicUtils.Code, :USE_LITERAL_POW_KEY)
+        @variables xlp
+        oop, _ = Symbolics.codegen_function(ir, xlp^3, [[xlp]])
+        @test occursin("literal_pow", string(oop))
+        @test @invokelatest(eval(oop)([2])) == 8
+        oop, _ = Symbolics.codegen_function(ir, xlp^3, [[xlp]]; use_literal_pow = false)
+        @test !occursin("literal_pow", string(oop))
+        @test @invokelatest(eval(oop)([2])) == 8
+    end
+end

@@ -388,13 +388,17 @@ end
 
 function _recursive_unwrap(val, ::Val{eval} = Val(false)) where {eval}
     if symbolic_type(val) == NotSymbolic() && val isa Union{AbstractArray, Tuple}
-        if parent(val) !== val && hasfield(typeof(val), :parent)
+        if val isa AbstractArray && parent(val) !== val && hasfield(typeof(val), :parent)
             return Setfield.@set val.parent = _recursive_unwrap(parent(val), Val{eval}())
         end
         return _recursive_unwrap.(val, Val{eval}())
     else
         return eval ? value(val) : unwrap(val)
     end
+end
+
+function _recursive_unwrap(val::NamedTuple, ::Val{eval} = Val(false)) where {eval}
+    return map(v -> _recursive_unwrap(v, Val{eval}()), val)
 end
 
 function _recursive_unwrap(val::StaticArraysCore.SizedVector, ::Val{eval} = Val(false)) where {eval}
