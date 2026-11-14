@@ -100,6 +100,17 @@ foreach(test_equal, Symbolics.jacobian([t, x, 42], [t, x]),
                   Differential(t)(x)           1
                   0  0])
 
+# issue 2133: Dense jacobian/hessian return 0 for dependencies nested under operators/calls
+let
+    @variables t
+    @variables a(..) b(..)
+    @test isequal(Symbolics.jacobian([a(b(t))], [t])[1, 1], Symbolics.derivative(a(b(t)), t))
+
+    y = Differential(t)(a(t))
+    @test isequal(Symbolics.jacobian([y], [t])[1, 1], Differential(t, 2)(a(t)))
+    @test isequal(Symbolics.hessian(a(t), [t])[1, 1], Differential(t, 2)(a(t)))
+end
+
 # issue 252
 @variables beta, alpha, delta
 @variables x1, x2, x3
