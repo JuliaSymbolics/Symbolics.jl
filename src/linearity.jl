@@ -41,6 +41,10 @@ end
 linearity_1(@nospecialize(f)) = get(linearity_map_1, f, false)
 linearity_2(@nospecialize(f)) = get(linearity_map_2, f, (false, false, false))
 
+# max and min have zero second derivatives almost everywhere, which is all that the
+# Hessian sparsity needs, but they are not affine
+linearity_2_affine(@nospecialize(f)) = f === max || f === min ? (false, false, false) : linearity_2(f)
+
 # TermCombination datastructure
 
 struct TermCombination
