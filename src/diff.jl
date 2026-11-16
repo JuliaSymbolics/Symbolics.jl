@@ -66,6 +66,60 @@ function SymbolicUtils.operator_to_term(::Differential, ex::BasicSymbolic{Vartyp
 end
 
 """
+$(TYPEDEF)
+
+Represents the normal derivative operator on a boundary piece `Γ`. `Dn = NormalDerivative(Γ)`
+applied to a trace `u(t, Γ)` (a call of a dependent variable whose spatial arguments are
+replaced by the domain `Γ`) gives `Dn(u(t, Γ))`, printed as `Dn_Γ(u(t, Γ))`: the trace of the
+normal derivative. That is, differentiate `u` along the outward normal of `Γ`, then evaluate
+on `Γ`.
+
+Like [`Differential`](@ref), applying a `NormalDerivative` only builds a symbolic term, with
+the operator as its operation and the trace as its single argument. The term is left alone
+by [`expand_derivatives`](@ref), and [`Symbolics.substitute_in_deriv`](@ref) descends into
+it. This type does not check that the piece of the operator matches the piece in the trace;
+that is up to the consumer. Both are recoverable from the term: the operator's piece is
+`operation(term).piece`, and the trace's is among `arguments(only(arguments(term)))`.
+
+# Fields
+$(FIELDS)
+
+# Examples
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables t u(..);
+
+julia> Γ = Symbolics.DomainSets.UnitInterval(); # any `DomainSets.Domain`; typically a named boundary piece
+
+julia> Dn = NormalDerivative(Γ);
+
+julia> Dn(u(t, Γ))
+Dn_0.0 .. 1.0 (Unit)(u(t, 0.0 .. 1.0 (Unit)))
+```
+"""
+struct NormalDerivative{D <: Domain} <: Operator
+    """The boundary piece whose outward normal the derivative is taken along."""
+    piece::D
+end
+function (Dn::NormalDerivative)(x::BasicSymbolic{VartypeT})
+    return BSImpl.Term{VartypeT}(Dn, SArgsT((x,)); type = symtype(x), shape = shape(x))
+end
+(Dn::NormalDerivative)(x::Num) = Num(Dn(unwrap(x)))
+(Dn::NormalDerivative)(x::Arr{T, N}) where {T, N} = Arr{T, N}(Dn(unwrap(x)))
+SymbolicUtils.isbinop(::NormalDerivative) = false
+
+Base.:(==)(a::NormalDerivative, b::NormalDerivative) = isequal(a, b)
+Base.isequal(a::NormalDerivative, b::NormalDerivative) = _isequal_integral_domain(a.piece, b.piece)
+Base.hash(a::NormalDerivative, h::UInt) = hash(a.piece, hash(NormalDerivative, h))
+
+function Base.show(io::IO, Dn::NormalDerivative)
+    label = hasproperty(Dn.piece, :name) ? Dn.piece.name : Dn.piece
+    return print(io, "Dn_", label)
+end
+
+"""
     is_derivative(x)
 
 Return `true` if `x` is an unapplied derivative term, i.e. a symbolic expression whose
@@ -259,7 +313,7 @@ end
 
 Returns true if the expression or equation `O` contains [`Differential`](@ref) terms.
 """
-hasderiv(O) = recursive_hasoperator(Differential, O)
+hasderiv(O) = recursive_hasoperator(Union{Differential, Grad{false}, Divergence{false}, Curl{false}}, O)
 
 
 _recursive_hasoperator(::Type{op}, eq::Equation) where {op} = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
@@ -323,7 +377,7 @@ end
 
 function symdiff_substitute_filter(ex::BasicSymbolic{T}) where {T}
     SymbolicUtils.default_substitute_filter(ex) || @match ex begin
-        BSImpl.Term(; f) && if f isa Differential end => true
+        BSImpl.Term(; f) && if f isa Union{Differential, NormalDerivative} end => true
         _ => false
     end
 end
@@ -331,8 +385,8 @@ end
 """
     $(TYPEDSIGNATURES)
 
-Identical to `substitute` except it also substitutes inside `Differential` operator
-applications.
+Identical to `substitute` except it also substitutes inside operator applications such as
+`Differential` and [`NormalDerivative`](@ref).
 """
 function substitute_in_deriv(ex, rules; kw...)
     substitute(ex, rules; kw..., filterer = symdiff_substitute_filter)
@@ -340,7 +394,7 @@ end
 
 function deriv_and_depvar_substitute_filter(ex::SymbolicT)
     SymbolicUtils.default_substitute_filter(ex) || @match ex begin
-        BSImpl.Term(; f) && if f isa Differential end => true
+        BSImpl.Term(; f) && if f isa Union{Differential, NormalDerivative} end => true
         BSImpl.Term(; f) && if f isa SymbolicT end => true
         _ => false
     end
@@ -349,8 +403,8 @@ end
 """
     $(TYPEDSIGNATURES)
 
-Identical to `substitute` except it also substitutes inside `Differential` operator
-applications and dependent variables.
+Identical to `substitute` except it also substitutes inside operator applications such as
+`Differential` and [`NormalDerivative`](@ref), and inside dependent variables.
 """
 function substitute_in_deriv_and_depvar(ex, rules; kw...)
     substitute(ex, rules; kw..., filterer = deriv_and_depvar_substitute_filter)
@@ -514,6 +568,28 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
             # Some sort of `mapreduce`
             arg = SymbolicUtils.scalarize(arg)::SymbolicT
         end
+        BSImpl.Term(; f, args) && if f isa Grad{false} end => begin
+            res = Grad{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            for (i, expr) in enumerate(res)
+                res[i] = executediff(D, expr; simplify, throw_no_derivative)
+            end
+            return SConst(res)
+        end
+        BSImpl.Term(; f, args) && if f isa Divergence{false} end => begin
+            res = Divergence{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            return executediff(D, res; simplify, throw_no_derivative)
+        end
+        BSImpl.Term(; f, args) && if f isa Curl{false, 2} end => begin
+            res = Curl{true, 2}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            return executediff(D, res; simplify, throw_no_derivative)
+        end
+        BSImpl.Term(; f, args) && if f isa Curl{false, 3} end => begin
+            res = Curl{true, 3}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
+            for (i, expr) in enumerate(res)
+                res[i] = executediff(D, expr; simplify, throw_no_derivative)
+            end
+            return SConst(res)
+        end
         _ => nothing
     end
     occursin_info(D.x, arg) || return differential_zero(arg)
@@ -620,6 +696,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 base, exp = args
                 prod_args = (exp, (base ^ Const{VartypeT}(exp - 1))::BasicSymbolic{VartypeT}, executediff(D, base; simplify, throw_no_derivative))
                 return SymbolicUtils.mul_worker(VartypeT, prod_args)
+            elseif f isa NormalDerivative # not constant in D.x, so stay unevaluated rather than 0
+                return D(arg)
             elseif f isa SymbolicUtils.Operator # operator applications return a new variable
                 return differential_zero(arg)
             else
@@ -684,9 +762,9 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
         BSImpl.ArrayOp(; output_idx, expr, reduce, term, ranges) => begin
             if term !== nothing
-                term = executediff(D, term; simplify, throw_no_derivatives)
+                term = executediff(D, term; simplify, throw_no_derivative)
             end
-            expr = executediff(D, expr; simplify, throw_no_derivatives)
+            expr = executediff(D, expr; simplify, throw_no_derivative)
             return BSImpl.ArrayOp{VartypeT}(output_idx, expr, reduce, term, ranges; type = symtype(arg), shape = shape(arg))
         end
     end
@@ -700,7 +778,9 @@ $(SIGNATURES)
 Expands derivatives within a symbolic expression `O`.
 
 This function recursively traverses a symbolic expression, applying the chain rule
-and other derivative rules to expand any derivatives it encounters.
+and other derivative rules to expand any derivatives it encounters. This includes
+the lazy applications built by the vector calculus operators [`Grad`](@ref),
+[`Divergence`](@ref), [`Curl`](@ref) and [`Laplacian`](@ref).
 
 # Arguments
 - `O::BasicSymbolic`: The symbolic expression to expand.
@@ -727,7 +807,11 @@ julia> dfx = expand_derivatives(Dx(f))
 """
 function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivative=false)
     @match O begin
-        BSImpl.Term(; f, args) && if f isa Differential end => begin
+        BSImpl.Term(; f, args) && if f isa Union{Differential, Grad{false}, Divergence{false}, Curl{false}} end => begin
+            if f isa Differential && iscall(args[1]) &&
+               operation(args[1]) isa Union{Grad{false}, Divergence{false}, Curl{false}}
+                return executediff(f, args[1]; simplify, throw_no_derivative)
+            end
             arg = expand_derivatives(args[1], false; throw_no_derivative)
             return executediff(f, arg; simplify, throw_no_derivative)
         end
@@ -747,6 +831,9 @@ function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivativ
 end
 function expand_derivatives(n::Num, simplify=false; kwargs...)
     Num(expand_derivatives(value(n), simplify; kwargs...))
+end
+function expand_derivatives(x::Arr, simplify=false; kwargs...)
+    Arr(expand_derivatives(unwrap(x), simplify; kwargs...))
 end
 function expand_derivatives(n::Complex{Num}, simplify=false; kwargs...)
     re = expand_derivatives(real(n), simplify; kwargs...)
@@ -1363,3 +1450,411 @@ function sparsehessian_vals(op, vars::AbstractVector, I::AbstractVector, J::Abst
     end
     exprs
 end
+
+#######################################################################################################################
+# Vector Calculus
+#######################################################################################################################
+
+_check_der_wrt_const(x::Num) = _check_der_wrt_const(unwrap(x))
+_check_der_wrt_const(x::SymbolicT) = SU.isconst(x) && throw(ArgumentError(lazy"Cannot take derivative w.r.t constant $x"))
+
+# Num validates for us
+_check_der_wrt_number(x::Num) = nothing
+function _check_der_wrt_number(x::SymbolicT)
+    T = symtype(x)
+    T <: Number || throw(ArgumentError(lazy"Cannot take derivative w.r.t non-numeric variable $x with symtype $T"))
+    return nothing
+end
+
+function _multivariate_der_op_check(x::Union{AbstractVector, Tuple})
+    for var in x
+        _check_der_wrt_const(var)
+        _check_der_wrt_number(var)
+    end
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The multivariate gradient operator `∇` with respect to the independent
+variables `vars`.
+
+Applying `Grad` to a scalar field `f` produces the vector of partial
+derivatives `[Differential(vars[i])(f) for i in eachindex(vars)]`. With
+`check = true` (default), `vars` are validated to be non-constant symbolic
+scalars of numeric symtype.
+
+The expansion parameter `E` controls evaluation. `Grad{false}` — the default,
+constructed by `Grad(vars)` — produces a lazy symbolic term with the operator
+as the head so the structure of the expression is retained;
+[`expand_derivatives`](@ref) expands it to `Differential`s on demand.
+`Grad{true}` expands eagerly at application, returning a `Vector{Num}`.
+
+`Grad` composes through `LinearAlgebra`: `∇ ⋅ v` produces a
+[`Divergence`](@ref), `∇ × v` a [`Curl`](@ref), `∇ ⋅ ∇` a [`Laplacian`](@ref)
+and `v ⋅ ∇` a directional derivative which applies componentwise to vector
+fields.
+"""
+struct Grad{E}
+    vars::SArgsT
+
+    function Grad{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
+        check || return new{E}(SArgsT(unwrap.(vars)))
+        _multivariate_der_op_check(vars)
+        return new{E}(SArgsT(unwrap.(vars)))
+    end
+end
+
+function Grad{E}(vars::Arr{T, 1}; check = true) where {E, T}
+    vars = unwrap(vars)
+    return Grad{E}(map(Base.Fix1(getindex, vars), SU.stable_eachindex(vars)); check)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Alias for `Grad{false}(vars)`.
+"""
+Grad(vars; check = true) = Grad{false}(vars; check)
+
+SU.promote_symtype(::Grad, T::SU.TypeT) = Vector{T}
+function SU.promote_shape(g::Grad, @nospecialize(sh::SU.ShapeT))
+    if SU.is_array_shape(sh)
+        throw(ArgumentError(lazy"`Grad` only applies to scalars. Got expression with shape $sh. Use `LinearAlgebra.dot($g, u)` instead"))
+    end
+    return SU.ShapeVecT((1:length(g.vars),))
+end
+
+function (g::Grad{false})(x::SymbolicT)
+    return STerm(g, SArgsT((x,)); type = SU.promote_symtype(g, symtype(x)), shape = SU.promote_shape(g, SU.shape(x)))
+end
+(g::Grad{false})(x::Num) = Arr{Num, 1}(g(unwrap(x)))
+function (g::Grad{true})(x::SymbolicT)
+    # For validation
+    SU.promote_shape(g, SU.shape(x))
+
+    res = SArgsT()
+    resize!(res, length(g.vars))
+    for i in eachindex(res)
+        res[i] = Differential(g.vars[i])(x)
+    end
+    return res
+end
+(g::Grad{true})(x::Num) = Num.(g(unwrap(x)))
+(g::Grad)(x::Number) = g(Num(x))
+function (g::Grad)(x::AbstractArray)
+    throw(ArgumentError(lazy"`Grad` only applies to scalars. Got $x. Use `LinearAlgebra.dot($g, $x)` instead"))
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The divergence operator `∇⋅` with respect to the independent variables `vars`.
+
+Applying `Divergence` to a vector field `v` with as many components as `vars`
+produces the scalar `sum(Differential(vars[i])(v[i]) for i in eachindex(vars))`.
+`Divergence` is also produced by `LinearAlgebra.dot(∇, v)` for a
+[`Grad`](@ref) `∇`, and composing it with `Grad` (`∇ ⋅ ∇`) produces a
+[`Laplacian`](@ref). Constant vector fields have zero divergence.
+
+See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
+interaction with [`expand_derivatives`](@ref).
+"""
+struct Divergence{E}
+    vars::SArgsT
+
+    function Divergence{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
+        check || return new{E}(SArgsT(unwrap.(vars)))
+        _multivariate_der_op_check(vars)
+        return new{E}(SArgsT(unwrap.(vars)))
+    end
+end
+
+function Divergence{E}(vars::Arr{T, 1}; check = true) where {E, T}
+    vars = unwrap(vars)
+    return Divergence{E}(map(Base.Fix1(getindex, vars), SU.stable_eachindex(vars)); check)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Alias for `Divergence{false}(vars)`.
+"""
+Divergence(vars; check = true) = Divergence{false}(vars; check)
+
+SU.promote_symtype(::Divergence, T::SU.TypeT) = eltype(T)::SU.TypeT
+function SU.promote_shape(div::Divergence, @nospecialize(sh::SU.ShapeT))
+    if sh isa SU.Unknown
+        isone(sh.ndims) || throw(ArgumentError(lazy"`Divergence` requires the argument to be a vector. Got shape $sh."))
+        return SU.ShapeVecT()
+    end
+    sh = sh::SU.ShapeVecT
+    isone(length(sh)) || throw(ArgumentError(lazy"`Divergence` requires the argument to be a vector. Got shape $sh."))
+    len = prod(length, sh; init = 1)
+    length(div.vars) == len || throw(ArgumentError(lazy"`Divergence` requires the argument to have the same number of elements as the independent variables. Got shape $sh."))
+    return SU.ShapeVecT()
+end
+
+(d::Divergence{false})(x::SymbolicT) = STerm(d, SArgsT((x,)); type = SU.promote_symtype(d, symtype(x)), shape = SU.promote_shape(d, SU.shape(x)))
+function (d::Divergence{true})(x::SymbolicT)
+    # For validation
+    SU.promote_shape(d, SU.shape(x))
+    buffer = SArgsT()
+    resize!(buffer, length(d.vars))
+    for (i, xidx) in zip(eachindex(buffer), SU.stable_eachindex(x))
+        buffer[i] = Differential(d.vars[i])(x[xidx])
+    end
+    return SU.add_worker(VartypeT, buffer)
+end
+(d::Divergence)(x::Arr{T}) where {T} = T(d(unwrap(x)))
+(d::Divergence)(x::Num) = d(unwrap(x))
+(d::Divergence)(x::Number) = d(SConst(x))
+function (d::Divergence{E})(arr::AbstractArray) where {E}
+    # Derivative of a constant is zero
+    any(Base.Fix2(isa, SymbolicT) ∘ unwrap, arr) || return COMMON_ZERO
+
+    sh = SU.shape(arr)
+    # Avoid hashconsing `arr` if the promotion throws
+    SU.promote_shape(d, sh)
+    E || return d(SConst(arr))
+    
+    # Duplication, but avoids hashconsing `arr` if `E`
+    buffer = SArgsT()
+    resize!(buffer, length(d.vars))
+    for (i, xidx) in zip(eachindex(buffer), eachindex(arr))
+        buffer[i] = unwrap(Differential(d.vars[i])(arr[xidx]))
+    end
+    return SU.add_worker(VartypeT, buffer)
+end
+
+# Compose them for Laplacian
+(d::Divergence)(g::Grad) = d ∘ g
+
+function LinearAlgebra.dot(g1::Grad{E}, x::Union{Grad, SymbolicT, Num, AbstractArray}) where {E}
+    return Divergence{E}(g1.vars; check = false)(x)
+end
+
+# To apply this to a vector variable, broadcast/`map` it.
+function LinearAlgebra.dot(v::AbstractVector, g::Grad{E}) where {E}
+    if length(v) != length(g.vars)
+        throw(DimensionMismatch(lazy"`LinearAlgebra.dot` requires the vector to have as many components as `Grad` has variables. Got $(length(v)) and $(length(g.vars))."))
+    end
+    return Base.Fix1(LinearAlgebra.dot, v) ∘ g
+end
+
+function LinearAlgebra.cross(g::Grad{E}, x::Union{Grad, SymbolicT, Num, AbstractArray}) where {E}
+    if length(g.vars) != 3
+        throw(DimensionMismatch(lazy"`LinearAlgebra.cross` requires 3 independent variables. Got $(length(g.vars))."))
+    end
+    return Curl{E}(g.vars; check = false)(x)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+The Laplacian operator `∇ ⋅ ∇` with respect to the independent variables
+`vars`.
+
+`Laplacian{E}(vars)` constructs `Divergence{E}(vars) ∘ Grad{E}(vars)` and is
+also produced by `LinearAlgebra.dot(∇, ∇)`. Applied to a scalar field it
+produces the sum of second partial derivatives; broadcast it over a vector
+field for a componentwise Laplacian.
+
+See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
+interaction with [`expand_derivatives`](@ref).
+"""
+abstract type Laplacian{E} end
+
+Laplacian{E}(vars; check = true) where {E} = Divergence{E}(vars; check)(Grad{E}(vars; check))
+Laplacian(vars; check = true) = Laplacian{false}(vars; check)
+
+"""
+$(TYPEDSIGNATURES)
+
+The curl operator `∇×` with respect to two or three independent variables
+`vars`.
+
+Applying `Curl` to a 3-component vector field `v` produces the vector
+`[D(vars[2])(v[3]) - D(vars[3])(v[2]), D(vars[3])(v[1]) - D(vars[1])(v[3]),
+D(vars[1])(v[2]) - D(vars[2])(v[1])]` where `D = Differential`. Applying it
+to a 2-component vector field produces the scalar (out-of-plane) curl
+`D(vars[1])(v[2]) - D(vars[2])(v[1])`. `Curl` is also produced by
+`LinearAlgebra.cross(∇, v)` for a 3-variable [`Grad`](@ref) `∇`, and
+composing `Curl` with `Grad` (`∇ × ∇`) produces an operator whose application
+to any scalar field vanishes.
+
+See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
+interaction with [`expand_derivatives`](@ref).
+
+`Curl` stores arguments in a tuple for two reasons
+- It always stores either 2 or 3 independent variables
+- The return of `(::Curl)(x)` depends on `N` if either `E` or `x` is a wrapped type or non-symbolic array.
+
+This can make the construction of `Curl` type-unstable if it is given a vector of
+independent variables as input, but allows calling the operation to be type-stable.
+"""
+struct Curl{E, N}
+    vars::NTuple{N, SymbolicT}
+
+    function Curl{E, N}(vars::NTuple{N, SymbolicT}; check = true) where {E, N}
+        2 <= N <= 3 || throw(ArgumentError(lazy"`Curl` is only defined for 2 or 3 independent variables. Got $N."))
+        check && _multivariate_der_op_check(vars)
+        return new{E, N}(vars)
+    end
+
+    function Curl{E}(vars::AbstractVector{T}; check = true) where {E, T <: Union{Num, SymbolicT}}
+        2 <= length(vars) <= 3 || throw(ArgumentError(lazy"`Curl` is only defined for 2 or 3 independent variables. Got $(length(vars))"))
+        if length(vars) == 2
+            return Curl{E, 2}((unwrap(vars[1]), unwrap(vars[2])); check)
+        else
+            return Curl{E, 3}((unwrap(vars[1]), unwrap(vars[2]), unwrap(vars[3])); check)
+        end
+    end
+end
+
+Curl{E}(vars::NTuple{N, SymbolicT}; check = true) where {E, N} = Curl{E, N}(vars; check)
+
+function Curl{E}(vars::Arr{T, 1}; check = true) where {E, T}
+    vars = unwrap(vars)
+    return Curl{E}(map(Base.Fix1(getindex, vars), SU.stable_eachindex(vars)); check)
+end
+
+"""
+$(TYPEDSIGNATURES)
+
+Alias for `Curl{false}(vars)`.
+"""
+Curl(vars; check = true) = Curl{false}(vars; check)
+
+SU.promote_symtype(::Curl{E, 2}, T::SU.TypeT) where {E} = eltype(T)::SU.TypeT
+SU.promote_symtype(::Curl{E, 3}, T::SU.TypeT) where {E} = T
+
+function SU.promote_shape(c::Curl{E, 2}, @nospecialize(sh::SU.ShapeT)) where {E}
+    if sh isa SU.Unknown
+        sh.ndims == 1 || throw(ArgumentError(lazy"`Curl` is only defined on vector arguments. Got shape $sh."))
+        return SU.ShapeVecT()
+    end
+    sh = sh::SU.ShapeVecT
+    length(sh) == 1 && length(sh[1]) == 2 || throw(ArgumentError(lazy"`Curl` requires 2-vector arguments. Got shape $sh."))
+    return SU.ShapeVecT()
+end
+function SU.promote_shape(c::Curl{E, 3}, @nospecialize(sh::SU.ShapeT)) where {E}
+    if sh isa SU.Unknown
+        sh.ndims == 1 || throw(ArgumentError(lazy"`Curl` is only defined on vector arguments. Got shape $sh."))
+        return SU.ShapeVecT((1:3,))
+    end
+    sh = sh::SU.ShapeVecT
+    length(sh) == 1 && length(sh[1]) == 3 || throw(ArgumentError(lazy"`Curl` requires 3-vector arguments. Got shape $sh."))
+    return SU.ShapeVecT((1:3,))
+end
+
+function (c::Curl{false})(x::SymbolicT)
+    return STerm(c, SArgsT((x,)); type = SU.promote_symtype(c, symtype(x)), shape = SU.promote_shape(c, SU.shape(x)))
+end
+function (c::Curl{true, N})(x::SymbolicT) where {N}
+    SU.promote_shape(c, SU.shape(x))
+    d1 = Differential(c.vars[1])
+    d2 = Differential(c.vars[2])
+    x1 = x[1]
+    x2 = x[2]
+    if N == 2
+        return d1(x2) - d2(x1)
+    end
+    res = SArgsT()
+    resize!(res, 3)
+    d3 = Differential(c.vars[3])
+    x3 = x[3]
+    res[1] = d2(x3) - d3(x2)
+    res[2] = -d1(x3) + d3(x1)
+    res[3] = d1(x2) - d2(x1)
+    return res
+end
+(c::Curl{false, 2})(x::Arr{T, 1}) where {T} = T(c(unwrap(x)))
+(c::Curl{false, 3})(x::Arr{T, 1}) where {T} = Arr{T, 1}(c(unwrap(x)))
+(c::Curl{true, 2})(x::Arr{T, 1}) where {T} = T(c(unwrap(x)))
+(c::Curl{true, 3})(x::Arr{T, 1}) where {T} = T.(c(unwrap(x)))
+(c::Curl)(x::Num) = c(unwrap(x))
+(c::Curl)(x::Number) = c(SConst(x))
+
+# Compose them for `∇ × ∇`
+(c::Curl)(g::Grad) = c ∘ g
+
+const CURL_ZERO_3VEC = SConst(fill(COMMON_ZERO, 3))
+function (c::Curl{E, N})(arr::AbstractVector) where {E, N}
+    if !any(Base.Fix2(isa, SymbolicT) ∘ unwrap, arr)
+        N == 2 && return COMMON_ZERO
+        E || return CURL_ZERO_3VEC
+        return SArgsT((COMMON_ZERO, COMMON_ZERO, COMMON_ZERO))
+    end
+    
+    sh = SU.shape(arr)
+    # Avoid hashconsing `arr` if the promotion throws
+    SU.promote_shape(c, sh)
+    E || return c(SConst(arr))
+
+    d1 = Differential(c.vars[1])
+    d2 = Differential(c.vars[2])
+    x1 = unwrap(arr[1])
+    x2 = unwrap(arr[2])
+    if N == 2
+        return d1(x2) - d2(x1)
+    end
+    res = SArgsT()
+    resize!(res, 3)
+    d3 = Differential(c.vars[3])
+    x3 = unwrap(arr[3])
+    res[1] = unwrap(d2(x3) - d3(x2))
+    res[2] = unwrap(-d1(x3) + d3(x1))
+    res[3] = unwrap(d1(x2) - d2(x1))
+
+    return res
+end
+
+_expanded_der_op(g::Grad{false}) = Grad{true}(g.vars; check = false)
+_expanded_der_op(d::Divergence{false}) = Divergence{true}(d.vars; check = false)
+_expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
+
+"""
+$(TYPEDSIGNATURES)
+
+Expand the lazy vector differential operator `op` applied to `arg` by applying
+its `E = true` variant and expanding the `Differential`s this produces. Vector
+results (`Grad`, `Curl`) are wrapped as an `array_literal` so expansion stays a
+single `SymbolicT`.
+"""
+function executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
+    res = _expanded_der_op(op)(arg)
+    res isa AbstractVector || return expand_derivatives(res, simplify; throw_no_derivative)
+    for i in eachindex(res)
+        res[i] = expand_derivatives(res[i], simplify; throw_no_derivative)
+    end
+    return SConst(res)
+end
+
+executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Num; kw...) = executediff(op, unwrap(arg); kw...)
+executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Number; kw...) = executediff(op, SConst(arg); kw...)
+
+Base.:(==)(a::Grad{E}, b::Grad{E}) where {E} = isequal(a.vars, b.vars)
+Base.hash(a::Grad{E}, u::UInt) where {E} = hash(a.vars, u)
+Base.:(==)(a::Divergence{E}, b::Divergence{E}) where {E} = isequal(a.vars, b.vars)
+Base.hash(a::Divergence{E}, u::UInt) where {E} = hash(a.vars, u)
+Base.:(==)(a::Curl{E}, b::Curl{E}) where {E} = isequal(a.vars, b.vars)
+Base.hash(a::Curl{E}, u::UInt) where {E} = hash(a.vars, u)
+
+function Base.show(io::IO, ::Grad)
+    warn_load_latexify()
+    print(io, "∇")
+end
+Base.nameof(::Grad) = :∇
+
+function Base.show(io::IO, ::Divergence)
+    warn_load_latexify()
+    print(io, "∇⋅")
+end
+Base.nameof(::Divergence) = Symbol("∇⋅")
+
+function Base.show(io::IO, ::Curl)
+    warn_load_latexify()
+    print(io, "∇×")
+end
+Base.nameof(::Curl) = Symbol("∇×")

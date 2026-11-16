@@ -208,7 +208,8 @@ using SpecialFunctions: airyai, airyaiprime, airybi, airybiprime, besselj0, bess
 include("linearity.jl")
 
 
-export Differential, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
+export Differential, NormalDerivative, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
+export Grad, Divergence, Curl, Laplacian
 include("register_derivatives.jl")
 include("diff.jl")
 
@@ -240,6 +241,7 @@ export expand_series
 
 export SymStruct, @symstruct
 @public record_literal, is_record_literal, RecordLiteral, record_literal_term
+@public SymbolicGetproperty, field_name, is_symstruct_type, issymstruct
 include("symstruct.jl")
 include("recordliteral.jl")
 include("symzero.jl")
