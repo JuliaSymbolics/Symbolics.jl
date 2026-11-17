@@ -9,6 +9,8 @@ pos(s, v) = s
 @register_symbolic pos(s, v)
 @register_derivative pos(s, v) 1 Symbolics.SConst(1)
 @register_derivative pos(s, v) 2 Symbolics.SConst(0)
+arrfun(w::AbstractVector) = sum(w)
+@register_symbolic arrfun(w::AbstractVector)
 
 @variables time
 @testset "Total derivative hook" begin
@@ -24,6 +26,9 @@ pos(s, v) = s
     @test isequal(expand_derivatives(expr), cos(pos(s, v)) * v)
     @test isequal(Symbolics.jacobian([pos(s, v)], [time]), reshape([v], 1, 1))
     @test isequal(Symbolics.jacobian([pos(s, v)], [s, v]), [1 0])
+    @test isequal(Matrix(Symbolics.sparsejacobian([pos(s, v)], [time, s])), Symbolics.jacobian([pos(s, v)], [time, s]))
+    @variables w[1:2]
+    @test isequal(Symbolics.jacobian([arrfun(w), pos(s, v)], [time]), reshape([0, v], 2, 1))
 end
 
 # Derivatives
