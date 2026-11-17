@@ -82,6 +82,8 @@ Symbolics.Grad
 Symbolics.Divergence
 Symbolics.Curl
 Symbolics.Laplacian
+Symbolics.is_vector_operator
+Symbolics.is_laplacian
 ```
 
 ## Adding Analytical Derivatives

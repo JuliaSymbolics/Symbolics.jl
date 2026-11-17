@@ -1154,3 +1154,121 @@ let
     @test occursin("∇(a^2 + b^2)", sprint(show, grad))
     @test occursin("∇×(y)", sprint(show, ∇ × y))
 end
+
+@testset "Lazy vector operators of array-valued arguments" begin
+    @variables a b c k(a, b, c) u(a, b, c)
+    Dd(v, f) = Differential(v)(f)
+    for vars in ([a, b], [a, b, c])
+        G = Grad{false}(vars)
+        n = length(vars)
+        K = k
+        # hand-written expanded forms
+        gradu = [Dd(vi, u) for vi in vars]
+        div_k_gradu = sum(Dd(vi, K * Dd(vi, u)) for vi in vars)
+        @test isequal(expand_derivatives(Divergence{false}(vars)(K * G(u))), expand_derivatives(div_k_gradu))
+        @test isequal(expand_derivatives(Divergence{false}(vars)(2 * G(u))), expand_derivatives(sum(2 * Dd(vi, Dd(vi, u)) for vi in vars)))
+        @test isequal(expand_derivatives(Divergence{false}(vars)(G(u) + G(u))), expand_derivatives(sum(2 * Dd(vi, Dd(vi, u)) for vi in vars)))
+        # Grad of the scalar result, and the eager operator on the same input, still agree
+        lazy = scalarize(expand_derivatives(G(Divergence{false}(vars)(K * G(u)))))
+        @test isequal(lazy, expand_derivatives.([Dd(vi, div_k_gradu) for vi in vars]))
+        # previously working forms are unchanged
+        d = Divergence{false}(vars)
+        @test isequal(expand_derivatives(d(K .* G(u))), expand_derivatives(div_k_gradu))
+        @test isequal(expand_derivatives(d(-G(u))), expand_derivatives(-sum(Dd(vi, Dd(vi, u)) for vi in vars)))
+        @test isequal(expand_derivatives(d(G(u) .+ G(u))), expand_derivatives(sum(2 * Dd(vi, Dd(vi, u)) for vi in vars)))
+    end
+    # Curl: 3D curl of k∇u is ∇k × ∇u, and the 2D scalar curl likewise
+    C3 = Curl{false}([a, b, c])
+    ∇3 = Grad{false}([a, b, c])
+    curl_k_gradu = [
+        Dd(b, k * Dd(c, u)) - Dd(c, k * Dd(b, u)),
+        Dd(c, k * Dd(a, u)) - Dd(a, k * Dd(c, u)),
+        Dd(a, k * Dd(b, u)) - Dd(b, k * Dd(a, u)),
+    ]
+    @test isequal(scalarize(expand_derivatives(C3(k * ∇3(u)))), expand_derivatives.(curl_k_gradu))
+    @test isequal(
+        expand_derivatives(Curl{false}([a, b])(k * Grad{false}([a, b])(u))),
+        expand_derivatives(Dd(a, k * Dd(b, u)) - Dd(b, k * Dd(a, u))),
+    )
+    # Grad of a lazy vector operator application whose argument is array-shaped
+    @test isequal(
+        scalarize(expand_derivatives(Grad{false}([a, b])(Divergence{false}([a, b])(2 * Grad{false}([a, b])(u))))),
+        expand_derivatives.([2 * Dd(a, Dd(a, Dd(a, u))) + 2 * Dd(a, Dd(b, Dd(b, u))), 2 * Dd(b, Dd(a, Dd(a, u))) + 2 * Dd(b, Dd(b, Dd(b, u)))]),
+    )
+end
+
+@testset "Vector Laplacian" begin
+    @variables a b c w(..)[1:3] s(..)[1:2]
+    for (vars, field) in (([a, b, c], w(a, b, c)), ([a, b], s(a, b)))
+        n = length(vars)
+        Dd2(v, f) = Differential(v)(Differential(v)(f))
+        expected = [sum(Dd2(vi, field[i]) for vi in vars) for i in 1:n]
+        for E in (false, true)
+            L = Laplacian{E}(vars)
+            for input in (field, collect(field))
+                res = L(input)
+                E ? (@test res isa Vector) : (@test res isa Arr{Num, 1})
+                @test length(res) == n
+                @test isequal(scalarize(expand_derivatives.(scalarize(res))), expand_derivatives.(L.(collect(field))))
+                @test isequal(expand_derivatives.(scalarize(res)), expand_derivatives.(expected))
+            end
+        end
+    end
+    # scalar behaviour is unchanged
+    @test Laplacian{false}([a, b])(a^2 + b^2) isa Num
+    @test isequal(expand_derivatives(Laplacian{false}([a, b])(a^2 + b^2)), 4)
+    @test isequal(Laplacian{true}([a, b])(a^2), Differential(a)(Differential(a)(a^2)) + Differential(b)(Differential(b)(a^2)))
+end
+
+@testset "`is_vector_operator` and `is_laplacian`" begin
+    @variables a b c f(a, b) g(..)[1:3] h(..)
+    vars = [a, b]
+    ∇ = Grad{false}(vars)
+    div = Divergence{false}(vars)
+    lap = Laplacian{false}(vars)
+    grad_f = unwrap(∇(f))
+    div_g = unwrap(div(Num[f, f]))
+    curl2 = Curl{false}(vars)(Num[f, f])
+    curl3 = unwrap(Curl{false}([a, b, c])(g(a, b, c)))
+    lap_f = unwrap(lap(f))
+    cases = [
+        (grad_f, true, false),
+        (div_g, true, false),
+        (curl2, true, false),
+        (curl3, true, false),
+        (lap_f, true, true),
+        (unwrap(div(∇(f))), true, true),
+        # eager results are ordinary expressions
+        (Divergence{true}(vars)(Num[f, f]), false, false),
+        (unwrap(Laplacian{true}(vars)(f)), false, false),
+        (unwrap(Grad{true}(vars)(f)[1]), false, false),
+        # unrelated terms
+        (unwrap(Differential(a)(f)), false, false),
+        (unwrap(sin(f)), false, false),
+        (unwrap(h(a)), false, false),
+        (unwrap(a), false, false),
+        (unwrap(a + b), false, false),
+        (SymbolicUtils.Const{SymbolicUtils.SymReal}(1), false, false),
+    ]
+    for (term, vec_op, is_lap) in cases
+        @test Symbolics.is_vector_operator(term) === vec_op
+        @test Symbolics.is_laplacian(term) === is_lap
+    end
+    # Num and plain numbers
+    @test Symbolics.is_vector_operator(lap(f)) && Symbolics.is_laplacian(lap(f))
+    @test Symbolics.is_vector_operator(Num(curl2))
+    @test !Symbolics.is_laplacian(Num(curl2))
+    @test !Symbolics.is_vector_operator(1) && !Symbolics.is_laplacian(1)
+    @test !Symbolics.is_vector_operator(a) && !Symbolics.is_laplacian(a)
+    # Divergence of a Grad over different variables is not a Laplacian
+    mixed = Divergence{false}([a, c])(Grad{false}([a, b])(f))
+    @test Symbolics.is_vector_operator(mixed) && !Symbolics.is_laplacian(mixed)
+    # `is_derivative` keeps its meaning
+    @test !is_derivative(grad_f) && !is_derivative(lap_f)
+    @test is_derivative(Differential(a)(f)) && !Symbolics.is_vector_operator(Differential(a)(f))
+    # terms nested in an equation
+    eq = Differential(a)(f) ~ lap(f)
+    @test Symbolics.is_laplacian(eq.rhs) && !Symbolics.is_vector_operator(eq.lhs)
+    @test Symbolics.hasnode(Symbolics.is_laplacian, eq.rhs + 1)
+    @test Symbolics.hasnode(Symbolics.is_vector_operator, 2 * ∇(f)[1] + f)
+end
