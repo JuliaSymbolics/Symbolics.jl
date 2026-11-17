@@ -634,15 +634,14 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 return SymbolicUtils.add_worker(VartypeT, summed_args)
             elseif f === getindex
                 arr = arguments(arg)[1]
-                if iscall(arr) && operation(arr) in (ifelse, ifelse_eager, ifelse_branching)
+                if iscall(arr) && (operation(arr) === ifelse || operation(arr) === ifelse_eager ||
+                    operation(arr) === ifelse_branching)
                     # Index each branch before differentiating, so the scalar chain rule
                     # never attempts to differentiate an entire array-valued branch.
                     cond, iftrue, iffalse = arguments(arr)
                     idxs = map(unwrap_const, @view arguments(arg)[2:end])
-                    dtrue = executediff(D, iftrue[idxs...]; simplify, throw_no_derivative)
-                    dfalse = executediff(D, iffalse[idxs...]; simplify, throw_no_derivative)
-                    isequal(dtrue, dfalse) && return dtrue
-                    return operation(arr)(cond, dtrue, dfalse)
+                    return executediff(D, operation(arr)(cond, iftrue[idxs...], iffalse[idxs...]);
+                        simplify, throw_no_derivative)
                 elseif iscall(arr) && operation(arr) === SymbolicUtils.array_literal
                     # A symbolic index cannot select a literal element yet. Differentiate
                     # the elements and retain the index on the resulting literal array.
@@ -650,6 +649,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     der = map(SymbolicUtils.scalarize(arr)) do a
                         executediff(D, a; simplify, throw_no_derivative)
                     end
+                    all(_iszero_derivative, der) && return COMMON_ZERO
                     return SConst(der)[idxs...]
                 end
                 inner_args = arguments(arguments(arg)[1])
@@ -675,10 +675,9 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 inner_args = arguments(arg)
                 dtrue = executediff(D, inner_args[2]; throw_no_derivative)
                 dfalse = executediff(D, inner_args[3]; throw_no_derivative)
-                args = SymbolicUtils.ArgsT{VartypeT}((inner_args[1], dtrue, dfalse))
                 # Preserve the conditional variant so the derivative keeps the same
                 # eager/branching lowering behaviour as the primal.
-                return BSImpl.Term{VartypeT}(f, args; type = symtype(arg), shape = shape(arg))
+                return f(inner_args[1], dtrue, dfalse)
             elseif f isa Differential
                 # The recursive expand_derivatives was not able to remove
                 # a nested Differential. We can attempt to differentiate the
