@@ -633,6 +633,40 @@ let
     @test !iszero(Symbolics.simplify(only(Symbolics.hessian(expr, [x]))))
 end
 
+@testset "Indexed array conditionals" begin
+    @variables c::Bool a b x y i::Int
+    for op in (ifelse, Symbolics.ifelse_eager, Symbolics.ifelse_branching)
+        arr = op(c, [a, b], [x, y])
+        nested = op(c, [a^2, b], op(c, [x, y], [x^2, y^2]))
+        @test isequal(Symbolics.derivative(nested[1], a), op(c, 2a, 0))
+        matrix = op(c, [a b; x y], [x y; a b])
+        @test isequal(Symbolics.derivative(matrix[1, 2], b), op(c, 1, 0))
+        @test isequal(Symbolics.derivative(matrix[2, 1], a), op(c, 0, 1))
+        for strict in (false, true)
+            @test isequal(Symbolics.derivative(arr[1], a; throw_no_derivative = strict), op(c, 1, 0))
+            @test iszero(Symbolics.derivative(arr[2], a; throw_no_derivative = strict))
+            @test isequal(Symbolics.derivative(arr[2], b; throw_no_derivative = strict), op(c, 1, 0))
+            @test isequal(Symbolics.derivative(arr[1], x; throw_no_derivative = strict), op(c, 0, 1))
+            expr = sin(arr[1]) * a
+            expected = sin(arr[1]) + a * cos(arr[1]) * op(c, 1, 0)
+            @test isequal(Symbolics.derivative(expr, a; throw_no_derivative = strict), expected)
+            indexed = Symbolics.Arr(arr)[i]
+            der = Symbolics.derivative(indexed, a; throw_no_derivative = strict)
+            @test !Symbolics.hasderiv(der)
+            composed = Symbolics.derivative(sin(indexed) * a, a; throw_no_derivative = strict)
+            @test !Symbolics.hasderiv(composed)
+            for cond in (false, true), index in (1, 2)
+                vals = Dict(c => cond, i => index, a => 0.7, b => 0.4, x => 0.2, y => 0.9)
+                evalat(ex) = unwrap_const(unwrap(substitute(ex, vals; fold = Val(true))))
+                primal = cond ? (index == 1 ? 0.7 : 0.4) : (index == 1 ? 0.2 : 0.9)
+                d = cond && index == 1 ? 1 : 0
+                @test evalat(der) == d
+                @test evalat(composed) ≈ sin(primal) + 0.7 * cos(primal) * d
+            end
+        end
+    end
+end
+
 @testset "`throw_no_derivative`" begin
     @variables t x(t) y::Bool z(..)
     D = Differential(t)

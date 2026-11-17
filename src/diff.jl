@@ -634,6 +634,24 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 return SymbolicUtils.add_worker(VartypeT, summed_args)
             elseif f === getindex
                 arr = arguments(arg)[1]
+                if iscall(arr) && operation(arr) in (ifelse, ifelse_eager, ifelse_branching)
+                    # Index each branch before differentiating, so the scalar chain rule
+                    # never attempts to differentiate an entire array-valued branch.
+                    cond, iftrue, iffalse = arguments(arr)
+                    idxs = map(unwrap_const, @view arguments(arg)[2:end])
+                    dtrue = executediff(D, iftrue[idxs...]; simplify, throw_no_derivative)
+                    dfalse = executediff(D, iffalse[idxs...]; simplify, throw_no_derivative)
+                    isequal(dtrue, dfalse) && return dtrue
+                    return operation(arr)(cond, dtrue, dfalse)
+                elseif iscall(arr) && operation(arr) === SymbolicUtils.array_literal
+                    # A symbolic index cannot select a literal element yet. Differentiate
+                    # the elements and retain the index on the resulting literal array.
+                    idxs = map(unwrap_const, @view arguments(arg)[2:end])
+                    der = map(SymbolicUtils.scalarize(arr)) do a
+                        executediff(D, a; simplify, throw_no_derivative)
+                    end
+                    return SConst(der)[idxs...]
+                end
                 inner_args = arguments(arguments(arg)[1])
                 idx = SymbolicUtils.StableIndex(@views arguments(arg)[2:end])
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
