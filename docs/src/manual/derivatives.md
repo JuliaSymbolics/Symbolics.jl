@@ -122,3 +122,38 @@ For example, `sin(t)`'s derivative (by `t`) is given by the following:
 ```
 
 For more information see [`@register_derivative`](@ref).
+
+## Declaring Total Derivatives
+
+An opaque function can declare a total derivative independently of its partial
+derivatives by specializing [`Symbolics.total_derivative`](@ref) on its own function
+type. For example, a position function can have partial derivatives `1` and `0`,
+while declaring velocity as its time derivative:
+
+```@example derivatives
+@variables time s(time) v(time)
+pos(s, v) = s
+@register_symbolic pos(s, v)
+@register_derivative pos(s, v) 1 Symbolics.SConst(1)
+@register_derivative pos(s, v) 2 Symbolics.SConst(0)
+
+function Symbolics.total_derivative(::typeof(pos), args, D)
+    isequal(D.x, Symbolics.unwrap(time)) || return nothing
+    return args[2]
+end
+
+Dt = Differential(time)
+expand_derivatives(Dt(pos(s, v))) # v
+Symbolics.jacobian([pos(s, v)], [s, v]) # [1 0]
+```
+
+The hook receives read-only, unwrapped arguments and a first-order `Differential`.
+Return `nothing` for other differentiation variables to retain the usual chain
+rule and registered partial derivatives. The hook also works inside products and
+nonlinear expressions. Higher-order and mixed derivatives differentiate the returned
+expression normally; the declared derivative need not equal the chain rule applied
+to the registered partials.
+
+```@docs
+Symbolics.total_derivative
+```

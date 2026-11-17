@@ -5,6 +5,77 @@ using LinearAlgebra, SparseArrays
 using Symbolics: value, unwrap, scalarize, Arr
 using SymbolicUtils: unwrap_const
 
+pos(s, v) = s
+@register_symbolic pos(s, v)
+@register_derivative pos(s, v) 1 Symbolics.SConst(1)
+@register_derivative pos(s, v) 2 Symbolics.SConst(0)
+
+function Symbolics.total_derivative(::typeof(pos), args, D)
+    @variables time
+    isequal(D.x, unwrap(time)) || return nothing
+    return args[2]
+end
+
+plain_pos(s, v) = s
+@register_symbolic plain_pos(s, v)
+@register_derivative plain_pos(s, v) 1 Symbolics.SConst(1)
+@register_derivative plain_pos(s, v) 2 Symbolics.SConst(0)
+
+opaque(x) = x
+@register_symbolic opaque(x)
+
+declared_rate(x) = x
+@register_symbolic declared_rate(x)
+Symbolics.total_derivative(::typeof(declared_rate), args, D) = Num(D(args[1]^2))
+
+constant_rate(x) = x
+@register_symbolic constant_rate(x)
+Symbolics.total_derivative(::typeof(constant_rate), args, D) = 2
+
+late_rate(x) = x
+@register_symbolic late_rate(x)
+
+@testset "Total derivative hook" begin
+    @variables time q s v velocity(time)
+    Dt = Differential(time)
+    Dq = Differential(q)
+
+    @test isequal(Symbolics.jacobian([pos(s, v)], [s, v]), [1 0])
+    @test isequal(expand_derivatives(Dt(pos(s, v))), v)
+    @test isequal(expand_derivatives(Dt(pos(s, v)); throw_no_derivative = true), v)
+    @test isequal(expand_derivatives((Dt^2)(pos(s, velocity))), Dt(velocity))
+    @test isequal(expand_derivatives((Dt^2)(pos(s, time^2))), 2time)
+    @test isequal(expand_derivatives(Dt(Dt(pos(s, velocity)))), Dt(velocity))
+    @test isequal(expand_derivatives(Dt(sin(pos(s, v)))), cos(pos(s, v)) * v)
+    @test isequal(expand_derivatives(Dt(time * pos(s, v))), pos(s, v) + time * v)
+    @test isequal(expand_derivatives(Dt(pos(s, v)^2)), 2pos(s, v) * v)
+    @test isequal(expand_derivatives(Dt(pos(s, v) * sin(pos(s, v)))),
+        v * sin(pos(s, v)) + pos(s, v) * cos(pos(s, v)) * v)
+    @test isequal(expand_derivatives(Dt(pos(s, velocity))), velocity)
+    @test isequal(expand_derivatives(Dq(Dt(pos(s, q^2)))), 2q)
+    @test isequal(expand_derivatives(Dq(pos(q^2, v))), 2q)
+    @test iszero(expand_derivatives(Dq(pos(s, v))))
+
+    @test Symbolics.total_derivative(plain_pos, [s, v], Dt) === nothing
+    @test isequal(expand_derivatives(Dt(plain_pos(time^2, v))), 2time)
+    @test isequal(expand_derivatives(Dt(sin(time^2)), true), 2time * cos(time^2))
+    @test isequal(expand_derivatives(Dt(opaque(time))), Dt(opaque(time)))
+    @test_throws Symbolics.DerivativeNotDefinedError expand_derivatives(
+        Dt(opaque(time)); throw_no_derivative = true)
+
+    # Returned wrapped differentials are expanded, and numeric results compose.
+    @test isequal(expand_derivatives(Dt(declared_rate(time))), 2time)
+    @test isequal(expand_derivatives((Dt^2)(declared_rate(time))), 2)
+    @test isequal(expand_derivatives(Dt(sin(constant_rate(time)))), 2cos(constant_rate(time)))
+    @test iszero(expand_derivatives((Dt^2)(constant_rate(time))))
+
+    # A newly loaded method must also affect expressions in the occurrence cache.
+    expr = Dt(sin(late_rate(s)))
+    @test iszero(expand_derivatives(expr))
+    @eval Symbolics.total_derivative(::typeof(late_rate), args, D) = args[1]
+    @test isequal(expand_derivatives(expr), cos(late_rate(s)) * s)
+end
+
 # Derivatives
 @variables t σ ρ β
 @variables x y z
