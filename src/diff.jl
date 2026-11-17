@@ -527,14 +527,38 @@ depends on `D.x` and before applying the chain rule. Derivatives in the returned
 expression are expanded recursively; higher-order and mixed derivatives then
 differentiate that expression normally. Partial derivative rules registered with
 [`@register_derivative`](@ref) remain available when the hook returns `nothing`.
+
+Every `Differential(t)` consults the hook, including uses intended as a partial
+derivative with respect to `t`: `jacobian([f(args...)], [t])` and ModelingToolkit's
+`tgrad` use the declared value too. Define hooks only where these semantics are
+intended. Mixed derivatives need not commute when a hook is used.
+
+Do not return `D(f(args...))` for the same call: recursively expanding that result
+invokes the hook again and recurses forever.
 """
 @inline total_derivative(f, args, D) = nothing
+
+# Cache the method-table check until the world changes. Once an extension exists,
+# keep checking expressions, including ones cached before that extension loaded.
+# A monotonic atomic update also makes concurrent first checks safe.
+const TOTAL_DERIVATIVE_WORLD = Threads.Atomic{UInt}(0)
+
+@inline function has_total_derivative_methods()
+    checked_world = TOTAL_DERIVATIVE_WORLD[]
+    checked_world == typemax(UInt) && return true
+    world = Base.get_world_counter()
+    checked_world == world && return false
+    enabled = length(methods(total_derivative)) > 1
+    Threads.atomic_max!(TOTAL_DERIVATIVE_WORLD, enabled ? typemax(UInt) : world)
+    return enabled
+end
 
 # A declared derivative can introduce dependence absent from the call's arguments.
 # Keep this check outside the structural occurrence cache so newly loaded methods
 # also apply to expressions which have already been differentiated.
 @inline function derivative_depends_on(D::Differential, arg::SymbolicT)
-    return occursin_info(D.x, arg) || has_total_derivative(D, arg)
+    return occursin_info(D.x, arg) ||
+           (has_total_derivative_methods() && has_total_derivative(D, arg))
 end
 
 @inline function has_total_derivative(D::Differential, arg::SymbolicT)
@@ -1000,19 +1024,22 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
-                  simplify=false, scalarize::Union{Val{true}, Val{false}}=Val(true), kwargs...)
+        simplify = false, scalarize::Union{Val{true}, Val{false}} = Val(true), kwargs...)
     if scalarize isa Val{true}
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
     # Pre-compute variable sets to skip differentiating trivially zero Jacobian entries.
     op_varsets = map(op -> _augment_with_call_args!(SymbolicUtils.search_variables(op)), ops)
+    # Declared derivatives can depend on variables absent from these structural sets.
+    has_declared_derivatives = has_total_derivative_methods()
     result = fill(COMMON_ZERO, length(ops), length(vars))
     for i in eachindex(ops), j in eachindex(vars)
+
         v = vars[j]
         # `arr[k]` also occurs when the lazy array `arr` is in the variable set.
-        (v in op_varsets[i] ||
-            (is_scalar_indexed(v) && (arguments(v)[1] in op_varsets[i]))) || continue
+        (has_declared_derivatives || v in op_varsets[i] ||
+         (is_scalar_indexed(v) && (arguments(v)[1] in op_varsets[i]))) || continue
         result[i, j] = executediff(Differential(v), ops[i]; simplify, kwargs...)
     end
     return result

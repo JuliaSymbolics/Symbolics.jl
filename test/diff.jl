@@ -10,10 +10,16 @@ pos(s, v) = s
 @register_derivative pos(s, v) 1 Symbolics.SConst(1)
 @register_derivative pos(s, v) 2 Symbolics.SConst(0)
 
-function Symbolics.total_derivative(::typeof(pos), args, D)
-    @variables time
-    isequal(D.x, unwrap(time)) || return nothing
-    return args[2]
+@variables time
+@testset "First total derivative hook after cached expansion" begin
+    @variables s v
+    expr = Differential(time)(sin(pos(s, v)))
+    @test iszero(expand_derivatives(expr))
+    @eval function Symbolics.total_derivative(::typeof(pos), args, D)
+        isequal(D.x, unwrap(time)) || return nothing
+        return args[2]
+    end
+    @test isequal(expand_derivatives(expr), cos(pos(s, v)) * v)
 end
 
 plain_pos(s, v) = s
@@ -41,6 +47,7 @@ late_rate(x) = x
     Dq = Differential(q)
 
     @test isequal(Symbolics.jacobian([pos(s, v)], [s, v]), [1 0])
+    @test isequal(Symbolics.jacobian([pos(s, v)], [time]), reshape([v], 1, 1))
     @test isequal(expand_derivatives(Dt(pos(s, v))), v)
     @test isequal(expand_derivatives(Dt(pos(s, v)); throw_no_derivative = true), v)
     @test isequal(expand_derivatives((Dt^2)(pos(s, velocity))), Dt(velocity))
@@ -53,6 +60,7 @@ late_rate(x) = x
         v * sin(pos(s, v)) + pos(s, v) * cos(pos(s, v)) * v)
     @test isequal(expand_derivatives(Dt(pos(s, velocity))), velocity)
     @test isequal(expand_derivatives(Dq(Dt(pos(s, q^2)))), 2q)
+    @test iszero(expand_derivatives(Dt(Dq(pos(s, q^2)))))
     @test isequal(expand_derivatives(Dq(pos(q^2, v))), 2q)
     @test iszero(expand_derivatives(Dq(pos(s, v))))
 
