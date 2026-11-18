@@ -102,13 +102,22 @@ foreach(test_equal, Symbolics.jacobian([t, x, 42], [t, x]),
 
 # issue 2133: Dense jacobian/hessian return 0 for dependencies nested under operators/calls
 let
-    @variables t
-    @variables a(..) b(..)
+    @variables t x
+    @variables a(..) b(..) w(..)
     @test isequal(Symbolics.jacobian([a(b(t))], [t])[1, 1], Symbolics.derivative(a(b(t)), t))
+    @test isequal(Symbolics.hessian(a(b(t)), [t])[1, 1], Symbolics.derivative(Symbolics.derivative(a(b(t)), t), t))
 
     y = Differential(t)(a(t))
     @test isequal(Symbolics.jacobian([y], [t])[1, 1], Differential(t, 2)(a(t)))
     @test isequal(Symbolics.hessian(a(t), [t])[1, 1], Differential(t, 2)(a(t)))
+
+    op2 = Differential(t)(Differential(x)(w(t, x)))
+    J_op2 = Symbolics.jacobian([op2], [t, x])
+    @test isequal(J_op2[1, 1], Differential(t)(op2))
+    @test isequal(J_op2[1, 2], Differential(x)(op2))
+
+    s = sin(Differential(t)(a(t)))
+    @test isequal(Symbolics.jacobian([s], [t])[1, 1], Symbolics.derivative(s, t))
 end
 
 # issue 252
