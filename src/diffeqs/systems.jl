@@ -35,8 +35,8 @@ julia> solve_linear_ode_system([1 0; 0 -1], [1, -1], t)
 
 julia> solve_linear_ode_system([-3 4; -2 3], [7, 2], t)
 2-element Vector{Num}:
- -(3//1)*exp(t) + (10//1)*exp(-t)
-  -(3//1)*exp(t) + (5//1)*exp(-t)
+ -3exp(t) + 10exp(-t)
+  -3exp(t) + 5exp(-t)
 ```
 """
 function solve_linear_ode_system(A::Matrix{<:Number}, x0::Vector{<:Number}, t::Num)
