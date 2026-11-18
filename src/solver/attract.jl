@@ -146,14 +146,27 @@ function attract_logs(lhs, var)
     return lhs, [(condition_x, >), (condition_y, >)]
 end
 
-# Apply a rule for a two-term sum to the terms of `t` taken in their canonical
-# order (`sorted_arguments`). `@acrule` tries them in the order of the sum's
-# internal term dictionary, which depends on how that sum was first built, so
-# the same input could bind `~b` to either base. Like `@acrule`, the terms the
-# rule does not consume are kept.
+# A key that depends only on the structure of `t`: the arguments of `+` and
+# `*` are themselves ordered by their key, so no internal term order leaks in.
+# `sorted_arguments` is not enough, because its order ties distinct terms
+# such as `2^(x+1)` and `2^(2x-1)` and then keeps the internal order.
+function structural_key(t)
+    t = unwrap(t)
+    iscall(t) || return string(t)
+    op = operation(t)
+    keys = map(structural_key, arguments(t))
+    (op === (+) || op === (*)) && sort!(keys)
+    return string(op, "(", join(keys, ","), ")")
+end
+
+# Apply a rule for a two-term sum to the terms of `t` taken in the order of
+# `structural_key`. `@acrule` tries them in the order of the sum's internal
+# term dictionary, which depends on how that sum was first built, so the same
+# input could bind `~b` to either base and return a different root. Like
+# `@acrule`, the terms the rule does not consume are kept.
 function apply_to_sorted_pairs(rule, t)
     (iscall(t) && operation(t) === (+)) || return nothing
-    args = sorted_arguments(t)
+    args = sort(collect(arguments(t)); by = structural_key)
     n = length(args)
     for i in 1:n, j in 1:n
         i == j && continue

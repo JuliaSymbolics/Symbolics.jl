@@ -794,3 +794,29 @@ end
     @test abs(r(root)) < 1e-12
     @test abs(2.0^(root + 1) + 5.0^(root + 3)) < 1e-12
 end
+
+@testset "symbolic_solve on two exponentials does not depend on the internal term order" begin
+    @variables x
+    # `sorted_arguments` ranks these two terms equally (same base, exponent
+    # constants of equal magnitude), so the internal order used to decide
+    # which of two conjugate roots was returned.
+    t1 = value(2^(x + 1))
+    t2 = value(2^(2x - 1))
+    function sum_with_capacity(n)
+        d = SymbolicUtils.ACDict{SymbolicUtils.SymReal}()
+        sizehint!(d, n)
+        d[t1] = 1
+        d[t2] = 1
+        # `unsafe` skips hash-consing, which would return one shared object.
+        return SymbolicUtils.Add{SymbolicUtils.SymReal}(0, d; type = Real, unsafe = true)
+    end
+    sums = [sum_with_capacity(2^k) for k in 0:12]
+    @test all(s -> isequal(s, sums[1]), sums)
+    @test length(unique(collect.(SymbolicUtils.arguments.(sums)))) > 1
+
+    roots = [symbolic_solve(Symbolics.Num(s), x) for s in sums]
+    @test all(r -> isequal(r, roots[1]), roots)
+    @test length(roots[1]) == 1
+    z = Symbolics.symbolic_to_float(only(roots[1]))
+    @test abs(2.0^(z + 1) + 2.0^(2z - 1)) < 1e-12
+end
