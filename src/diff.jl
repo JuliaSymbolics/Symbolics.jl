@@ -1667,7 +1667,7 @@ acts componentwise, returning an `Arr{Num, 1}` when `E = false` and a `Vector` w
 See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
 interaction with [`expand_derivatives`](@ref).
 """
-struct Laplacian{E}
+struct Laplacian{E} <: Function
     grad::Grad{E}
     div::Divergence{E}
 end
@@ -1826,23 +1826,41 @@ _expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
 # cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
 # of components. Every other argument (including plain symbolic vectors) is returned unchanged
 # and indexed by the caller.
-# Operands keep their own (possibly offset) axes, so components are paired by position.
-function _positional_components(arg::SymbolicT)
+# Operands keep their own (possibly offset) axes, so components are paired by position. An operand
+# of unknown shape inside a sum or product of known length `n` is indexed from 1.
+function _positional_components(arg::SymbolicT, n::Int)
+    SU.shape(arg) isa SU.ShapeVecT || return SymbolicT[arg[i] for i in 1:n]
     components = _scalarized(arg)
     components isa SymbolicT || return components
     return SymbolicT[components[i] for i in SU.stable_eachindex(components)]
 end
 
+# The eager operators only accept scalar or vector arguments. The argument `k * ∇u` or `∇u + ∇u`
+# cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
+# of components. Every other argument (including plain symbolic vectors) is returned unchanged
+# and indexed by the caller.
+# Operands keep their own (possibly offset) axes, so components are paired by position.
+# Returns `nothing` for operands whose shape is not known.
+function _positional_components(arg::SymbolicT)
+    SU.shape(arg) isa SU.ShapeVecT || return nothing
+    components = _scalarized(arg)
+    components isa SymbolicT || return components
+    return SymbolicT[components[i] for i in SU.stable_eachindex(components)]
+end
+
+# The eager operators only accept scalar or vector arguments. The argument `k * ∇u` or `∇u + ∇u`
+# cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
+# of components. Every other argument (including plain symbolic vectors) is returned unchanged and indexed by the caller.
 function _scalarized(arg::SymbolicT)
     shape = SU.shape(arg)
-    (shape isa SU.ShapeVecT && SU.is_array_shape(shape) && iscall(arg)) || return arg
+    (shape isa SU.ShapeVecT && isone(length(shape)) && iscall(arg)) || return arg
     f = operation(arg)
     args = arguments(arg)
-    if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1])) &&
-       SU.shape(args[2]) isa SU.ShapeVecT && SU.is_array_shape(SU.shape(args[2]))
-        return SymbolicT[args[1] * c for c in _positional_components(args[2])]
+    if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1]))
+        components = _positional_components(args[2], length(shape[1]))
+        return SymbolicT[args[1] * c for c in components]
     elseif f === (+)
-        parts = map(_positional_components, args)
+        parts = [_positional_components(a, length(shape[1])) for a in args]
         return SymbolicT[SU.add_worker(VartypeT, SArgsT([part[i] for part in parts])) for i in eachindex(parts[1])]
     end
     return arg
@@ -1869,6 +1887,7 @@ executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Num; kw
 executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Number; kw...) = executediff(op, SConst(arg); kw...)
 
 (lap::Laplacian)(x) = lap.div(lap.grad(x))
+Base.:*(lap::Laplacian, D::Differential) = lap ∘ D
 
 # Vector fields are handled componentwise
 function _components(x::SymbolicT)

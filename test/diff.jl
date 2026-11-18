@@ -1430,8 +1430,29 @@ end
         expand_derivatives(Divergence{true}([x, y])(unwrap(k * p + q))),
         expand_derivatives(Dd(x, k * p[1] + q[1]) + Dd(y, k * p[2] + q[2])),
     )
-    # like `Grad`, `Divergence` and `Curl`, `Laplacian` is not a `Function`; broadcasting with it works
     L = Laplacian([x, y])
-    @test !(L isa Function)
     @test isequal(L.([x^2, y^2]), map(L, [x^2, y^2]))
+end
+
+@testset "Unknown-length operands and Laplacian as a Function" begin
+    @variables x y k(x, y) v::Vector{Real} w(..)[1:2] u(x, y)
+    Dd(s, f) = Differential(s)(f)
+    W = w(x, y)
+    @test isequal(
+        expand_derivatives(Divergence([x, y])(v + W)),
+        expand_derivatives(Dd(x, v[1] + W[1]) + Dd(y, v[2] + W[2])),
+    )
+    @test isequal(
+        expand_derivatives(Divergence([x, y])(k * (v + W))),
+        expand_derivatives(Dd(x, k * (v[1] + W[1])) + Dd(y, k * (v[2] + W[2]))),
+    )
+    @test isequal(Symbolics._scalarized(unwrap(v + W)), unwrap.([v[1] + W[1], v[2] + W[2]]))
+    # `Laplacian` is a `Function`, as it was when it was a composition
+    L = Laplacian([x, y])
+    @test L isa Function
+    @test isequal(L.([x^2, y^2]), map(L, [x^2, y^2]))
+    @test isequal(replace(L, [x^2, y^2]), [L(x^2), L(y^2)])
+    Dx = Differential(x)
+    @test isequal(expand_derivatives((L * Dx)(u)), expand_derivatives(L(Dx(u))))
+    @test isequal(expand_derivatives((Dx * L)(u)), expand_derivatives(Dx(L(u))))
 end
