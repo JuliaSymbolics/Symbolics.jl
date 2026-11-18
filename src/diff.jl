@@ -1645,8 +1645,8 @@ function LinearAlgebra.dot(v::AbstractVector, g::Grad{E}) where {E}
 end
 
 function LinearAlgebra.cross(g::Grad{E}, x::Union{Grad, SymbolicT, Num, AbstractArray}) where {E}
-    if length(g.vars) != 3
-        throw(DimensionMismatch(lazy"`LinearAlgebra.cross` requires 3 independent variables. Got $(length(g.vars))."))
+    if !(2 <= length(g.vars) <= 3)
+        throw(DimensionMismatch(lazy"`LinearAlgebra.cross` requires 2 or 3 independent variables. Got $(length(g.vars))."))
     end
     return Curl{E}(g.vars; check = false)(x)
 end
@@ -1686,7 +1686,7 @@ Applying `Curl` to a 3-component vector field `v` produces the vector
 D(vars[1])(v[2]) - D(vars[2])(v[1])]` where `D = Differential`. Applying it
 to a 2-component vector field produces the scalar (out-of-plane) curl
 `D(vars[1])(v[2]) - D(vars[2])(v[1])`. `Curl` is also produced by
-`LinearAlgebra.cross(∇, v)` for a 3-variable [`Grad`](@ref) `∇`, and
+`LinearAlgebra.cross(∇, v)` (or `∇ × v`) for a 2- or 3-variable [`Grad`](@ref) `∇`, and
 composing `Curl` with `Grad` (`∇ × ∇`) produces an operator whose application
 to any scalar field vanishes.
 
