@@ -1826,16 +1826,19 @@ _expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
 # cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
 # of components. Every other argument (including plain symbolic vectors) is returned unchanged
 # and indexed by the caller.
-# Atomic arrays (array symbols, array variable calls such as `w(x, y)` and slices) are indexed directly;
+# Atomic arrays (array symbols, array variable calls such as `w(x, y)` and slices of atomic arrays) are indexed directly;
 # every other array-shaped call (`A * w`, `k .* v`, `-v`, `∇u`, an `array_literal`) is an expression that
 # must be scalarized before the eager operators can differentiate its components.
 function _is_atomic_array(arg::SymbolicT)
     iscall(arg) || return true
     f = operation(arg)
-    return f isa SymbolicT || f === getindex
+    f === getindex && return _is_atomic_array(arguments(arg)[1])
+    return f isa SymbolicT
 end
 
-_symbolic_component(x) = (x = unwrap(x); x isa SymbolicT ? x : SConst(x))
+# Scalarizing a slice of an expression leaves each component indexing the unscalarized parent, so the
+# components are scalarized once more.
+_symbolic_component(x) = (x = unwrap(x); x isa SymbolicT ? SU.scalarize(x)::SymbolicT : SConst(x))
 
 # Components of a known-shape array expression, or `nothing` if `scalarize` cannot produce them.
 function _expression_components(arg::SymbolicT)

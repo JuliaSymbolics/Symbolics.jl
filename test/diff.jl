@@ -1472,3 +1472,28 @@ end
     @test Symbolics._scalarized(unwrap(W)) === unwrap(W)
     @test Symbolics._scalarized(unwrap(A * W)) isa Vector{Symbolics.SymbolicT}
 end
+
+@testset "Slices of computed and atomic arrays" begin
+    @variables x y A[1:2, 1:2] u(x, y) p[1:2] o[0:1] w(..)[1:3]
+    L = Laplacian([x, y])
+    G = Grad([x, y])
+    # scalarizing a slice of an expression leaves it indexing the parent, so scalarize the components again
+    components(v) = [SymbolicUtils.scalarize(unwrap(c)) for c in scalarize(v)]
+    for v in ((A * G(u))[1:2], (A * G(u))[:], ((A * G(u))[1:2])[1:2], (2 * G(u))[1:2], (A * w(x, y)[1:2])[1:2])
+        ref = expand_derivatives.(L.(components(v)))
+        @test isequal(scalarize(expand_derivatives(L(v))), ref)
+        @test isequal(
+            expand_derivatives(Divergence{true}([x, y])(unwrap(v))),
+            expand_derivatives(Divergence{true}([x, y])(components(v))),
+        )
+        @test isequal(
+            expand_derivatives(Divergence{false}([x, y])(v)),
+            expand_derivatives(Divergence{true}([x, y])(components(v))),
+        )
+    end
+    # slices of atomic arrays keep the indexed path
+    for atomic in (p[1:2], o[0:1], w(x, y)[2:3], p[:])
+        @test Symbolics._scalarized(unwrap(atomic)) === unwrap(atomic)
+    end
+    @test Symbolics._scalarized(unwrap((A * G(u))[1:2])) isa Vector{Symbolics.SymbolicT}
+end
