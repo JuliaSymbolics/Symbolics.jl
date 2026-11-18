@@ -761,3 +761,36 @@ end
     expected = sort_roots([-sqrt(2.0), -1.0, 1.0, sqrt(2.0)])
     @test all(isapprox.(numeric, expected; atol = 1.0e-6))
 end
+
+@testset "attract_exponential does not depend on the internal term order" begin
+    @variables x
+    t2 = value(2^(x + 1))
+    t5 = value(5^(x + 3))
+    # Sums equal to 2^(x+1) + 5^(x+3) whose term dictionaries differ only in
+    # capacity. Hash-consing can hand back such a sum, built earlier in the
+    # session, and the dictionary's capacity decides its iteration order.
+    function sum_with_capacity(n)
+        d = SymbolicUtils.ACDict{SymbolicUtils.SymReal}()
+        sizehint!(d, n)
+        d[t2] = 1
+        d[t5] = 1
+        # `unsafe` skips hash-consing, which would return one shared object.
+        return SymbolicUtils.Add{SymbolicUtils.SymReal}(0, d; type = Real, unsafe = true)
+    end
+    sums = [sum_with_capacity(2^k) for k in 0:12]
+    @test all(s -> isequal(s, sums[1]), sums)
+    # Precondition: the internal orders do differ, or the test proves nothing.
+    @test length(unique(collect.(SymbolicUtils.arguments.(sums)))) > 1
+
+    results = [Symbolics.attract_exponential(s, x) for s in sums]
+    @test all(r -> isequal(r, results[1]), results)
+    @test isequal(Symbolics.attract_exponential(2^(x + 1) + 5^(x + 3), x), results[1])
+    @test isequal(Symbolics.attract_exponential(5^(x + 3) + 2^(x + 1), x), results[1])
+
+    # The result is linear in x; its root solves 2^(x+1) + 5^(x+3) = 0.
+    r = build_function(results[1], x; expression = Val(false))
+    a, b = r(0.0 + 0im), r(1.0 + 0im) - r(0.0 + 0im)
+    root = -a / b
+    @test abs(r(root)) < 1e-12
+    @test abs(2.0^(root + 1) + 5.0^(root + 3)) < 1e-12
+end

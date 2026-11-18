@@ -146,6 +146,25 @@ function attract_logs(lhs, var)
     return lhs, [(condition_x, >), (condition_y, >)]
 end
 
+# Apply a rule for a two-term sum to the terms of `t` taken in their canonical
+# order (`sorted_arguments`). `@acrule` tries them in the order of the sum's
+# internal term dictionary, which depends on how that sum was first built, so
+# the same input could bind `~b` to either base. Like `@acrule`, the terms the
+# rule does not consume are kept.
+function apply_to_sorted_pairs(rule, t)
+    (iscall(t) && operation(t) === (+)) || return nothing
+    args = sorted_arguments(t)
+    n = length(args)
+    for i in 1:n, j in 1:n
+        i == j && continue
+        res = rule(term(+, args[i], args[j]))
+        res === nothing && continue
+        rest = [args[k] for k in 1:n if k != i && k != j]
+        return isempty(rest) ? res : +(res, rest...)
+    end
+    return nothing
+end
+
 """
     attract_exponential(lhs, var)
 
@@ -166,7 +185,7 @@ julia> x = (@variables x)[1]
 x
 
 julia> Symbolics.attract_exponential(2^(x+1) + 5^(x+3), x)
-slog(-1) - slog(2) + 3slog(5) + slog(5)*x - slog(2)*x
+slog(-1) + slog(2) - 3slog(5) + slog(2)*x - slog(5)*x
 ```
 """
 function attract_exponential(lhs, var)
@@ -176,10 +195,11 @@ function attract_exponential(lhs, var)
     r_addexpon = Vector{Any}()
 
     #! format: off
-    push!(r_addexpon, @acrule (~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -1))
-    push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -~a))
-    push!(r_addexpon, @acrule (~a)*(~b)^(~f::(contains_var)) + (~c)*(~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -(~a)//(~c)))
+    push!(r_addexpon, @rule (~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -1))
+    push!(r_addexpon, @rule (~a)*(~b)^(~f::(contains_var)) + (~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -~a))
+    push!(r_addexpon, @rule (~a)*(~b)^(~f::(contains_var)) + (~c)*(~d)^(~g::(contains_var)) => ~f*term(slog, ~b) - ~g*term(slog, ~d) + term(slog, -(~a)//(~c)))
     #! format: on
+    r_addexpon = [t -> apply_to_sorted_pairs(r, t) for r in r_addexpon]
 
     lhs = expand(simplify(
         lhs, rewriter = SymbolicUtils.Postwalk(SymbolicUtils.Chain(r_addexpon))))
