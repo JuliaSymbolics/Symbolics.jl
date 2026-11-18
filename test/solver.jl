@@ -797,26 +797,37 @@ end
 
 @testset "symbolic_solve on two exponentials does not depend on the internal term order" begin
     @variables x
-    # `sorted_arguments` ranks these two terms equally (same base, exponent
-    # constants of equal magnitude), so the internal order used to decide
-    # which of two conjugate roots was returned.
-    t1 = value(2^(x + 1))
-    t2 = value(2^(2x - 1))
-    function sum_with_capacity(n)
-        d = SymbolicUtils.ACDict{SymbolicUtils.SymReal}()
-        sizehint!(d, n)
-        d[t1] = 1
-        d[t2] = 1
-        # `unsafe` skips hash-consing, which would return one shared object.
-        return SymbolicUtils.Add{SymbolicUtils.SymReal}(0, d; type = Real, unsafe = true)
-    end
-    sums = [sum_with_capacity(2^k) for k in 0:12]
-    @test all(s -> isequal(s, sums[1]), sums)
-    @test length(unique(collect.(SymbolicUtils.arguments.(sums)))) > 1
+    # Pairs of distinct terms that are easy to rank equally: `sorted_arguments`
+    # ties the first pair (same base, exponent constants of equal magnitude),
+    # and the bases of the second pair print the same (`0.1`) although they
+    # differ. Ranking them equally lets the internal order decide which of two
+    # conjugate roots is returned.
+    # The residual is not checked for the mixed-precision pair:
+    # `symbolic_to_float` evaluates `slog(Float16(0.1))` in Float16, whose
+    # rounding error (~1e-3) swamps log(Float16(0.1)) - log(0.1) ≈ 2.4e-4.
+    pairs = [(2^(x + 1), 2^(2x - 1), true), (Float16(0.1)^(x + 1), 0.1^(x + 1), false)]
+    @testset "$(p[1]) + $(p[2])" for p in pairs
+        t1, t2 = value(p[1]), value(p[2])
+        check_residual = p[3]
+        function sum_with_capacity(n)
+            d = SymbolicUtils.ACDict{SymbolicUtils.SymReal}()
+            sizehint!(d, n)
+            d[t1] = 1
+            d[t2] = 1
+            # `unsafe` skips hash-consing, which would return one shared object.
+            return SymbolicUtils.Add{SymbolicUtils.SymReal}(0, d; type = Real, unsafe = true)
+        end
+        sums = [sum_with_capacity(2^k) for k in 0:12]
+        @test all(s -> isequal(s, sums[1]), sums)
+        @test length(unique(collect.(SymbolicUtils.arguments.(sums)))) > 1
 
-    roots = [symbolic_solve(Symbolics.Num(s), x) for s in sums]
-    @test all(r -> isequal(r, roots[1]), roots)
-    @test length(roots[1]) == 1
-    z = Symbolics.symbolic_to_float(only(roots[1]))
-    @test abs(2.0^(z + 1) + 2.0^(2z - 1)) < 1e-12
+        roots = [symbolic_solve(Symbolics.Num(s), x) for s in sums]
+        @test all(r -> isequal(r, roots[1]), roots)
+        @test length(roots[1]) == 1
+        if check_residual
+            z = Symbolics.symbolic_to_float(only(roots[1]))
+            f = build_function(Symbolics.Num(sums[1]), x; expression = Val(false))
+            @test abs(f(complex(z))) < 1e-10
+        end
+    end
 end

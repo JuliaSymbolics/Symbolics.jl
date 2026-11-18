@@ -149,15 +149,27 @@ end
 # A key that depends only on the structure of `t`: the arguments of `+` and
 # `*` are themselves ordered by their key, so no internal term order leaks in.
 # `sorted_arguments` is not enough, because its order ties distinct terms
-# such as `2^(x+1)` and `2^(2x-1)` and then keeps the internal order.
+# such as `2^(x+1)` and `2^(2x-1)` and then keeps the internal order. Leaves
+# carry their type and an exact representation, so that values which print
+# the same, such as `Float16(0.1)` and `0.1`, still get different keys.
 function structural_key(t)
     t = unwrap(t)
-    iscall(t) || return string(t)
+    iscall(t) || return leaf_key(SymbolicUtils.unwrap_const(t))
     op = operation(t)
     keys = map(structural_key, arguments(t))
     (op === (+) || op === (*)) && sort!(keys)
-    return string(op, "(", join(keys, ","), ")")
+    return string(op_key(op), "(", join(keys, ","), ")")
 end
+
+# Qualified by module: `Base.log` and `NaNMath.log` both print as `log`.
+op_key(op::Function) = string(parentmodule(op), ".", nameof(op))
+op_key(op) = string(typeof(op), ":", repr(op))
+
+# `repr` round-trips the machine floats exactly; a `BigFloat` also needs its
+# precision, and a symbol its symbolic type.
+leaf_key(v::BasicSymbolic) = string("sym:", v, "::", symtype(v))
+leaf_key(v::BigFloat) = string("BigFloat@", precision(v), ":", repr(v))
+leaf_key(v) = string(typeof(v), ":", repr(v))
 
 # Apply a rule for a two-term sum to the terms of `t` taken in the order of
 # `structural_key`. `@acrule` tries them in the order of the sum's internal
