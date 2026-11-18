@@ -4,6 +4,7 @@ using Test
 using LinearAlgebra, SparseArrays
 using Symbolics: value, unwrap, scalarize, Arr
 using SymbolicUtils: unwrap_const
+using Symbolics: SymbolicT
 
 # Derivatives
 @variables t σ ρ β
@@ -1384,4 +1385,31 @@ end
         @test isequal(expand_derivatives.(L.(collect(e))), expected)
     end
     @test isequal(scalarize(expand_derivatives(Laplacian{false}(vars)(e))), scalarize(expand_derivatives(Laplacian{false}(vars)(collect(e)))))
+end
+
+@testset "Eager operators and vector Laplacian: unscalarizable and unusual arguments" begin
+    @variables a b v::Vector{Real} z[1:2] vv[1:2] M[1:2, 1:2]
+    # symbolic vector of unknown length: indexed, not scalarized
+    @test isequal(
+        Curl{true}([a, b])(unwrap(v)), unwrap(Differential(a)(v[2]) - Differential(b)(v[1])),
+    )
+    @test iszero(expand_derivatives(Curl([a, b])(v)))
+    # numeric components
+    @test Curl{true}([a, b])(unwrap((_ -> 1).(z))) isa SymbolicT
+    # plain symbolic vectors are returned unchanged by `_scalarized`
+    @test Symbolics._scalarized(unwrap(vv)) === unwrap(vv)
+    # raw array-shaped `SymbolicT`
+    for E in (false, true)
+        L = Laplacian{E}([a, b])
+        raw = L(unwrap(vv))
+        @test typeof(raw) == typeof(L(vv))
+        @test isequal(
+            expand_derivatives.(scalarize(raw)), expand_derivatives.(scalarize(L(vv))),
+        )
+        # non-vector array fields are rejected with one clear error
+        @test_throws ArgumentError L([a b; b a])
+        @test_throws ArgumentError L(M)
+        @test_throws ArgumentError L(unwrap(M))
+        @test_throws ArgumentError L(unwrap(v))
+    end
 end

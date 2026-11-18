@@ -1602,7 +1602,7 @@ function (d::Divergence{true})(x::SymbolicT)
     x = _scalarized(x)
     buffer = SArgsT()
     resize!(buffer, length(d.vars))
-    for (i, xidx) in zip(eachindex(buffer), eachindex(x))
+    for (i, xidx) in zip(eachindex(buffer), x isa Vector ? eachindex(x) : SU.stable_eachindex(x))
         buffer[i] = Differential(d.vars[i])(x[xidx])
     end
     return SU.add_worker(VartypeT, buffer)
@@ -1822,23 +1822,24 @@ _expanded_der_op(g::Grad{false}) = Grad{true}(g.vars; check = false)
 _expanded_der_op(d::Divergence{false}) = Divergence{true}(d.vars; check = false)
 _expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
 
-# The eager operators only accept scalar or vector arguments. An array-shaped symbolic argument such as
-# `k * ∇u` or `∇u + ∇u` is turned into a `Vector` of its components, scalarizing the common
-# `scalar * array` and sum forms directly.
+# The eager operators only accept scalar or vector arguments. The argument `k * ∇u` or `∇u + ∇u`
+# cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
+# of components. Every other argument (including plain symbolic vectors) is returned unchanged
+# and indexed by the caller.
 function _scalarized(arg::SymbolicT)
-    SU.is_array_shape(SU.shape(arg)) || return arg
-    if iscall(arg)
-        f = operation(arg)
-        args = arguments(arg)
-        if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1])) &&
-           SU.is_array_shape(SU.shape(args[2]))
-            return SymbolicT[args[1] * component for component in _scalarized(args[2])::Vector{SymbolicT}]
-        elseif f === (+)
-            parts = map(_scalarized, args)
-            return SymbolicT[SU.add_worker(VartypeT, SArgsT([part[i] for part in parts])) for i in eachindex(parts[1])]
-        end
+    shape = SU.shape(arg)
+    (shape isa SU.ShapeVecT && SU.is_array_shape(shape) && iscall(arg)) || return arg
+    f = operation(arg)
+    args = arguments(arg)
+    if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1])) &&
+       SU.shape(args[2]) isa SU.ShapeVecT && SU.is_array_shape(SU.shape(args[2]))
+        inner = _scalarized(args[2])
+        return SymbolicT[args[1] * inner[i] for i in SU.stable_eachindex(args[2])]
+    elseif f === (+)
+        parts = map(_scalarized, args)
+        return SymbolicT[SU.add_worker(VartypeT, SArgsT([part[i] for part in parts])) for i in SU.stable_eachindex(arg)]
     end
-    return SU.scalarize(arg)::Vector{SymbolicT}
+    return arg
 end
 
 """
@@ -1864,10 +1865,25 @@ executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Number;
 (lap::Laplacian)(x) = lap.div(lap.grad(x))
 
 # Vector fields are handled componentwise
-_components(x::Arr) = _scalarized(unwrap(x))
-_components(x::AbstractArray) = x
-(lap::Laplacian{false})(x::AbstractArray) = Arr{Num, 1}(SConst(SymbolicT[unwrap(lap(c)) for c in _components(x)]))
-(lap::Laplacian{true})(x::AbstractArray) = [lap(c) for c in _components(x)]
+function _components(x::SymbolicT)
+    shape = SU.shape(x)
+    (shape isa SU.ShapeVecT && isone(length(shape))) ||
+        throw(ArgumentError(lazy"Laplacian of an array field requires a vector field of known length. Got an expression with shape $shape."))
+    components = _scalarized(x)
+    return components isa SymbolicT ? SU.scalarize(x) : components
+end
+function _components(x::AbstractArray)
+    isone(ndims(x)) ||
+        throw(ArgumentError(lazy"Laplacian of an array field requires a vector field. Got an array with size $(size(x))."))
+    return x isa Arr ? _components(unwrap(x)) : x
+end
+function (lap::Laplacian)(x::SymbolicT)
+    SU.is_array_shape(SU.shape(x)) || return lap.div(lap.grad(x))
+    return _vector_laplacian(lap, x)
+end
+(lap::Laplacian)(x::AbstractArray) = _vector_laplacian(lap, x)
+_vector_laplacian(lap::Laplacian{false}, x) = Arr{Num, 1}(SConst(SymbolicT[unwrap(lap(c)) for c in _components(x)]))
+_vector_laplacian(lap::Laplacian{true}, x) = [lap(c) for c in _components(x)]
 
 """
 $(TYPEDSIGNATURES)
