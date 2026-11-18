@@ -177,8 +177,8 @@ true
 
 The two sides of the sum may be matched in either order, so the result is one of two
 alternative logarithmic reductions (the roles of `2^(x+1)` and `5^(x+3)` swapped); their
-zero sets are the two conjugate branches of the solution of the exponential equation.
-Both are accepted above.
+zero sets are a conjugate pair of the (infinitely many) complex solutions of the exponential
+equation. Both are accepted above.
 """
 function attract_exponential(lhs, var)
     lhs = unwrap(lhs)
