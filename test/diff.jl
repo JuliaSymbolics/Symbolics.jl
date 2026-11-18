@@ -1272,3 +1272,88 @@ end
     @test Symbolics.hasnode(Symbolics.is_laplacian, eq.rhs + 1)
     @test Symbolics.hasnode(Symbolics.is_vector_operator, 2 * ∇(f)[1] + f)
 end
+
+@testset "Eager operators scalarize array-valued arguments" begin
+    @variables a b c k(a, b, c) u(a, b, c)
+    Dd(v, f) = Differential(v)(f)
+    for vars in ([a, b], [a, b, c])
+        G = Grad{false}(vars)
+        grad_u = [Dd(vi, u) for vi in vars]
+        for (arg, comps) in (
+            (k * G(u), k .* grad_u),
+            (2 * G(u), 2 .* grad_u),
+            (G(u) + G(u), 2 .* grad_u),
+            (k * G(u) + G(u), k .* grad_u .+ grad_u),
+            (G(u) * k, k .* grad_u),
+        )
+            @test isequal(
+                expand_derivatives(Divergence{true}(vars)(unwrap(arg))),
+                expand_derivatives(Divergence{true}(vars)(comps)),
+            )
+            @test isequal(
+                expand_derivatives(Divergence{true}(vars)(unwrap(arg))),
+                expand_derivatives(Divergence{false}(vars)(arg)),
+            )
+        end
+    end
+    # specialised `scalar * array` path gives exactly the hand-written components
+    comps = Symbolics._scalarized(unwrap(k * Grad{false}([a, b])(u)))
+    @test comps isa Vector{Symbolics.SymbolicT}
+    @test isequal(expand_derivatives.(comps), [unwrap(k * Differential(a)(u)), unwrap(k * Differential(b)(u))])
+    sumcomps = Symbolics._scalarized(unwrap(k * Grad{false}([a, b])(u) + Grad{false}([a, b])(u)))
+    @test isequal(
+        expand_derivatives.(sumcomps),
+        [unwrap(k * Differential(a)(u) + Differential(a)(u)), unwrap(k * Differential(b)(u) + Differential(b)(u))],
+    )
+    @test Symbolics._scalarized(unwrap(a)) === unwrap(a)
+    # 3D curl, eager and lazy, of k∇u
+    ∇3 = Grad{false}([a, b, c])
+    for arg in (k * ∇3(u), 3 * ∇3(u), ∇3(u) + ∇3(u))
+        @test isequal(
+            expand_derivatives.(Curl{true}([a, b, c])(unwrap(arg))),
+            scalarize(expand_derivatives(Curl{false}([a, b, c])(arg))),
+        )
+    end
+    @test isequal(
+        expand_derivatives(Curl{true}([a, b])(unwrap(k * Grad{false}([a, b])(u)))),
+        expand_derivatives(Curl{false}([a, b])(k * Grad{false}([a, b])(u))),
+    )
+end
+
+@testset "Laplacian is its own operator" begin
+    @variables a b c w(..)[1:3]
+    for E in (false, true)
+        L = Laplacian{E}([a, b])
+        @test L isa Laplacian{E}
+        @test L.grad == Grad{E}([a, b]) && L.div == Divergence{E}([a, b])
+        @test !(L isa ComposedFunction)
+        @test isequal(
+            expand_derivatives(L(a^2 * b)), expand_derivatives(Divergence{E}([a, b])(Grad{E}([a, b])(a^2 * b))),
+        )
+        @test sprint(show, L) == "∇⋅∇"
+    end
+    # `∇ ⋅ ∇` with equal variables is a Laplacian, with different variables stays a composition
+    @test dot(Grad{false}([a, b]), Grad{false}([a, b])) isa Laplacian{false}
+    @test dot(Grad{false}([a, b]), Grad{false}([a, c])) isa ComposedFunction
+    @test isequal(
+        expand_derivatives((Grad{false}([a, b]) ⋅ Grad{false}([a, b]))(a^2 + b^2)), 4,
+    )
+    @test_throws ArgumentError Laplacian{false}([a, 1])
+    @test_throws ArgumentError Laplacian{true}([a, 1])
+    @test Laplacian{false}([a, 1]; check = false) isa Laplacian{false}
+    @test Laplacian([a, b]) isa Laplacian{false}
+    # no methods were added on `ComposedFunction` for this
+    @test all(m -> m.module !== Symbolics, methods(ComposedFunction(sin, cos)))
+    # lazy vector Laplacian expands, as a whole and through broadcasting
+    vars = [a, b, c]
+    e = w(a, b, c)
+    for E in (false, true)
+        L = Laplacian{E}(vars)
+        expected = [sum(Differential(v)(Differential(v)(e[i])) for v in vars) for i in 1:3]
+        res = L(e)
+        res isa Arr ? @test(isequal(scalarize(expand_derivatives(res)), expected)) :
+            @test(isequal(expand_derivatives.(res), expected))
+        @test isequal(expand_derivatives.(L.(collect(e))), expected)
+    end
+    @test isequal(scalarize(expand_derivatives(Laplacian{false}(vars)(e))), scalarize(expand_derivatives(Laplacian{false}(vars)(collect(e)))))
+end

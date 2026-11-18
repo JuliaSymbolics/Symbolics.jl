@@ -569,22 +569,22 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
             arg = SymbolicUtils.scalarize(arg)::SymbolicT
         end
         BSImpl.Term(; f, args) && if f isa Grad{false} end => begin
-            res = Grad{true}(f.vars; check = false)(_scalarized(expand_derivatives(args[1]; throw_no_derivative)))
+            res = Grad{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
             for (i, expr) in enumerate(res)
                 res[i] = executediff(D, expr; simplify, throw_no_derivative)
             end
             return SConst(res)
         end
         BSImpl.Term(; f, args) && if f isa Divergence{false} end => begin
-            res = Divergence{true}(f.vars; check = false)(_scalarized(expand_derivatives(args[1]; throw_no_derivative)))
+            res = Divergence{true}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
             return executediff(D, res; simplify, throw_no_derivative)
         end
         BSImpl.Term(; f, args) && if f isa Curl{false, 2} end => begin
-            res = Curl{true, 2}(f.vars; check = false)(_scalarized(expand_derivatives(args[1]; throw_no_derivative)))
+            res = Curl{true, 2}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
             return executediff(D, res; simplify, throw_no_derivative)
         end
         BSImpl.Term(; f, args) && if f isa Curl{false, 3} end => begin
-            res = Curl{true, 3}(f.vars; check = false)(_scalarized(expand_derivatives(args[1]; throw_no_derivative)))
+            res = Curl{true, 3}(f.vars; check = false)(expand_derivatives(args[1]; throw_no_derivative))
             for (i, expr) in enumerate(res)
                 res[i] = executediff(D, expr; simplify, throw_no_derivative)
             end
@@ -1599,9 +1599,10 @@ end
 function (d::Divergence{true})(x::SymbolicT)
     # For validation
     SU.promote_shape(d, SU.shape(x))
+    x = _scalarized(x)
     buffer = SArgsT()
     resize!(buffer, length(d.vars))
-    for (i, xidx) in zip(eachindex(buffer), SU.stable_eachindex(x))
+    for (i, xidx) in zip(eachindex(buffer), eachindex(x))
         buffer[i] = Differential(d.vars[i])(x[xidx])
     end
     return SU.add_worker(VartypeT, buffer)
@@ -1627,7 +1628,8 @@ function (d::Divergence{E})(arr::AbstractArray) where {E}
     return SU.add_worker(VartypeT, buffer)
 end
 
-# Compose them for Laplacian
+# `∇ ⋅ ∇` is a `Laplacian` when both operators act on the same variables
+(d::Divergence{E})(g::Grad{E}) where {E} = isequal(d.vars, g.vars) ? Laplacian{E}(g, d) : d ∘ g
 (d::Divergence)(g::Grad) = d ∘ g
 
 function LinearAlgebra.dot(g1::Grad{E}, x::Union{Grad, SymbolicT, Num, AbstractArray}) where {E}
@@ -1655,7 +1657,8 @@ $(TYPEDSIGNATURES)
 The Laplacian operator `∇ ⋅ ∇` with respect to the independent variables
 `vars`.
 
-`Laplacian{E}(vars)` constructs `Divergence{E}(vars) ∘ Grad{E}(vars)` and is
+`Laplacian{E}(vars)` stores a `Grad{E}(vars)` and a `Divergence{E}(vars)`, applies them in
+turn and is
 also produced by `LinearAlgebra.dot(∇, ∇)`. Applied to a scalar field it
 produces the sum of second partial derivatives; applied to a vector field it
 acts componentwise, returning an `Arr{Num, 1}` when `E = false` and a `Vector` when
@@ -1664,9 +1667,12 @@ acts componentwise, returning an `Arr{Num, 1}` when `E = false` and a `Vector` w
 See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
 interaction with [`expand_derivatives`](@ref).
 """
-abstract type Laplacian{E} end
+struct Laplacian{E}
+    grad::Grad{E}
+    div::Divergence{E}
+end
 
-Laplacian{E}(vars; check = true) where {E} = Divergence{E}(vars; check)(Grad{E}(vars; check))
+Laplacian{E}(vars; check = true) where {E} = Laplacian{E}(Grad{E}(vars; check), Divergence{E}(vars; check))
 Laplacian(vars; check = true) = Laplacian{false}(vars; check)
 
 """
@@ -1754,6 +1760,7 @@ function (c::Curl{false})(x::SymbolicT)
 end
 function (c::Curl{true, N})(x::SymbolicT) where {N}
     SU.promote_shape(c, SU.shape(x))
+    x = _scalarized(x)
     d1 = Differential(c.vars[1])
     d2 = Differential(c.vars[2])
     x1 = x[1]
@@ -1815,9 +1822,24 @@ _expanded_der_op(g::Grad{false}) = Grad{true}(g.vars; check = false)
 _expanded_der_op(d::Divergence{false}) = Divergence{true}(d.vars; check = false)
 _expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
 
-# Expanding an array-shaped argument (such as `k * ∇u`) can leave it as an unscalarized array
-# expression that the eager operators cannot differentiate.
-_scalarized(arg::SymbolicT) = SU.is_array_shape(SU.shape(arg)) ? SU.scalarize(arg)::Union{SymbolicT, AbstractArray} : arg
+# The eager operators only accept scalar or vector arguments. An array-shaped symbolic argument such as
+# `k * ∇u` or `∇u + ∇u` is turned into a `Vector` of its components, scalarizing the common
+# `scalar * array` and sum forms directly.
+function _scalarized(arg::SymbolicT)
+    SU.is_array_shape(SU.shape(arg)) || return arg
+    if iscall(arg)
+        f = operation(arg)
+        args = arguments(arg)
+        if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1])) &&
+           SU.is_array_shape(SU.shape(args[2]))
+            return SymbolicT[args[1] * component for component in _scalarized(args[2])::Vector{SymbolicT}]
+        elseif f === (+)
+            parts = map(_scalarized, args)
+            return SymbolicT[SU.add_worker(VartypeT, SArgsT([part[i] for part in parts])) for i in eachindex(parts[1])]
+        end
+    end
+    return SU.scalarize(arg)::Vector{SymbolicT}
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -1828,7 +1850,7 @@ results (`Grad`, `Curl`) are wrapped as an `array_literal` so expansion stays a
 single `SymbolicT`.
 """
 function executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
-    res = _expanded_der_op(op)(_scalarized(arg))
+    res = _expanded_der_op(op)(arg)
     res isa AbstractVector || return expand_derivatives(res, simplify; throw_no_derivative)
     for i in eachindex(res)
         res[i] = expand_derivatives(res[i], simplify; throw_no_derivative)
@@ -1839,10 +1861,13 @@ end
 executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Num; kw...) = executediff(op, unwrap(arg); kw...)
 executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Number; kw...) = executediff(op, SConst(arg); kw...)
 
-# `Laplacian{E}(vars)` is a `ComposedFunction`, so make it act componentwise on vector fields.
-const _Laplacian{E} = ComposedFunction{<:Divergence{E}, <:Grad{E}}
-(L::_Laplacian{false})(x::AbstractArray) = Arr{Num, 1}(SConst(SymbolicT[unwrap(L(c)) for c in SU.scalarize(x)]))
-(L::_Laplacian{true})(x::AbstractArray) = [L(c) for c in SU.scalarize(x)]
+(lap::Laplacian)(x) = lap.div(lap.grad(x))
+
+# Vector fields are handled componentwise
+_components(x::Arr) = _scalarized(unwrap(x))
+_components(x::AbstractArray) = x
+(lap::Laplacian{false})(x::AbstractArray) = Arr{Num, 1}(SConst(SymbolicT[unwrap(lap(c)) for c in _components(x)]))
+(lap::Laplacian{true})(x::AbstractArray) = [lap(c) for c in _components(x)]
 
 """
 $(TYPEDSIGNATURES)
@@ -1903,6 +1928,7 @@ function Base.show(io::IO, ::Divergence)
     print(io, "∇⋅")
 end
 Base.nameof(::Divergence) = Symbol("∇⋅")
+Base.show(io::IO, ::Laplacian) = print(io, "∇⋅∇")
 
 function Base.show(io::IO, ::Curl)
     warn_load_latexify()
