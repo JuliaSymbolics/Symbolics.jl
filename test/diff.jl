@@ -1413,3 +1413,25 @@ end
         @test_throws ArgumentError L(unwrap(v))
     end
 end
+
+@testset "Offset-indexed vectors are paired by position" begin
+    @variables x y k(x, y) v[0:1] w[0:1] p[1:2] q[1:2]
+    Dd(s, f) = Differential(s)(f)
+    expected = Dd(x, k * v[0] + w[0]) + Dd(y, k * v[1] + w[1])
+    @test isequal(expand_derivatives(Divergence{true}([x, y])(unwrap(k * v + w))), expand_derivatives(expected))
+    @test isequal(expand_derivatives(Divergence{true}([x, y])(unwrap(k * v))), expand_derivatives(Dd(x, k * v[0]) + Dd(y, k * v[1])))
+    @test isequal(expand_derivatives(Divergence{true}([x, y])(unwrap(v + w))), expand_derivatives(Dd(x, v[0] + w[0]) + Dd(y, v[1] + w[1])))
+    @test isequal(
+        expand_derivatives(Curl{true}([x, y])(unwrap(k * v + w))),
+        expand_derivatives(Dd(x, k * v[1] + w[1]) - Dd(y, k * v[0] + w[0])),
+    )
+    # unshifted vectors keep working
+    @test isequal(
+        expand_derivatives(Divergence{true}([x, y])(unwrap(k * p + q))),
+        expand_derivatives(Dd(x, k * p[1] + q[1]) + Dd(y, k * p[2] + q[2])),
+    )
+    # like `Grad`, `Divergence` and `Curl`, `Laplacian` is not a `Function`; broadcasting with it works
+    L = Laplacian([x, y])
+    @test !(L isa Function)
+    @test isequal(L.([x^2, y^2]), map(L, [x^2, y^2]))
+end

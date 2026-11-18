@@ -1826,6 +1826,13 @@ _expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
 # cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
 # of components. Every other argument (including plain symbolic vectors) is returned unchanged
 # and indexed by the caller.
+# Operands keep their own (possibly offset) axes, so components are paired by position.
+function _positional_components(arg::SymbolicT)
+    components = _scalarized(arg)
+    components isa SymbolicT || return components
+    return SymbolicT[components[i] for i in SU.stable_eachindex(components)]
+end
+
 function _scalarized(arg::SymbolicT)
     shape = SU.shape(arg)
     (shape isa SU.ShapeVecT && SU.is_array_shape(shape) && iscall(arg)) || return arg
@@ -1833,11 +1840,10 @@ function _scalarized(arg::SymbolicT)
     args = arguments(arg)
     if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1])) &&
        SU.shape(args[2]) isa SU.ShapeVecT && SU.is_array_shape(SU.shape(args[2]))
-        inner = _scalarized(args[2])
-        return SymbolicT[args[1] * inner[i] for i in SU.stable_eachindex(args[2])]
+        return SymbolicT[args[1] * c for c in _positional_components(args[2])]
     elseif f === (+)
-        parts = map(_scalarized, args)
-        return SymbolicT[SU.add_worker(VartypeT, SArgsT([part[i] for part in parts])) for i in SU.stable_eachindex(arg)]
+        parts = map(_positional_components, args)
+        return SymbolicT[SU.add_worker(VartypeT, SArgsT([part[i] for part in parts])) for i in eachindex(parts[1])]
     end
     return arg
 end
