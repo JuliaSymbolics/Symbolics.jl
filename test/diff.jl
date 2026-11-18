@@ -1456,3 +1456,19 @@ end
     @test isequal(expand_derivatives((L * Dx)(u)), expand_derivatives(L(Dx(u))))
     @test isequal(expand_derivatives((Dx * L)(u)), expand_derivatives(Dx(L(u))))
 end
+
+@testset "Matrix-vector products and other array expressions" begin
+    @variables x y A[1:2, 1:2] w(..)[1:2] v[1:2] k(x, y) u(x, y)
+    W = w(x, y)
+    L = Laplacian([x, y])
+    ref(e) = expand_derivatives.(L.(scalarize(e)))
+    for e in (A * W + W, A * W, k * (A * W + W), W + A * W + v)
+        @test isequal(scalarize(expand_derivatives(L(e))), ref(e))
+        @test isequal(expand_derivatives(Divergence{true}([x, y])(unwrap(e))), expand_derivatives(Divergence{true}([x, y])(unwrap.(scalarize(e)))))
+        @test isequal(expand_derivatives(Divergence{false}([x, y])(e)), expand_derivatives(Divergence{true}([x, y])(unwrap.(scalarize(e)))))
+    end
+    # atomic arrays are not scalarized
+    @test Symbolics._scalarized(unwrap(v)) === unwrap(v)
+    @test Symbolics._scalarized(unwrap(W)) === unwrap(W)
+    @test Symbolics._scalarized(unwrap(A * W)) isa Vector{Symbolics.SymbolicT}
+end

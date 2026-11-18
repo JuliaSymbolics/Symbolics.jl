@@ -1826,6 +1826,24 @@ _expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
 # cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
 # of components. Every other argument (including plain symbolic vectors) is returned unchanged
 # and indexed by the caller.
+# Atomic arrays (array symbols, array variable calls such as `w(x, y)` and slices) are indexed directly;
+# every other array-shaped call (`A * w`, `k .* v`, `-v`, `∇u`, an `array_literal`) is an expression that
+# must be scalarized before the eager operators can differentiate its components.
+function _is_atomic_array(arg::SymbolicT)
+    iscall(arg) || return true
+    f = operation(arg)
+    return f isa SymbolicT || f === getindex
+end
+
+_symbolic_component(x) = (x = unwrap(x); x isa SymbolicT ? x : SConst(x))
+
+# Components of a known-shape array expression, or `nothing` if `scalarize` cannot produce them.
+function _expression_components(arg::SymbolicT)
+    components = SU.scalarize(arg)
+    components isa AbstractVector || return nothing
+    return SymbolicT[_symbolic_component(c) for c in components]
+end
+
 # Operands keep their own (possibly offset) axes, so components are paired by position. An operand
 # of unknown shape inside a sum or product of known length `n` is indexed from 1.
 function _positional_components(arg::SymbolicT, n::Int)
@@ -1835,22 +1853,11 @@ function _positional_components(arg::SymbolicT, n::Int)
     return SymbolicT[components[i] for i in SU.stable_eachindex(components)]
 end
 
-# The eager operators only accept scalar or vector arguments. The argument `k * ∇u` or `∇u + ∇u`
-# cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
-# of components. Every other argument (including plain symbolic vectors) is returned unchanged
-# and indexed by the caller.
-# Operands keep their own (possibly offset) axes, so components are paired by position.
-# Returns `nothing` for operands whose shape is not known.
-function _positional_components(arg::SymbolicT)
-    SU.shape(arg) isa SU.ShapeVecT || return nothing
-    components = _scalarized(arg)
-    components isa SymbolicT || return components
-    return SymbolicT[components[i] for i in SU.stable_eachindex(components)]
-end
-
-# The eager operators only accept scalar or vector arguments. The argument `k * ∇u` or `∇u + ∇u`
-# cannot be indexed into by `Differentiation`, so these two common forms are turned into a `Vector`
-# of components. Every other argument (including plain symbolic vectors) is returned unchanged and indexed by the caller.
+# The eager operators only accept scalar or vector arguments. Array-shaped expressions such as
+# `k * ∇u`, `∇u + ∇u` or `A * w` cannot be indexed into by `Differentiation`, so they are turned
+# into a `Vector` of components (with direct paths for `scalar * array` and sums). Atomic arrays,
+# including plain symbolic vectors and vectors of unknown length, are returned unchanged and indexed
+# by the caller.
 function _scalarized(arg::SymbolicT)
     shape = SU.shape(arg)
     (shape isa SU.ShapeVecT && isone(length(shape)) && iscall(arg)) || return arg
@@ -1863,7 +1870,9 @@ function _scalarized(arg::SymbolicT)
         parts = [_positional_components(a, length(shape[1])) for a in args]
         return SymbolicT[SU.add_worker(VartypeT, SArgsT([part[i] for part in parts])) for i in eachindex(parts[1])]
     end
-    return arg
+    _is_atomic_array(arg) && return arg
+    components = _expression_components(arg)
+    return components === nothing ? arg : components
 end
 
 """
