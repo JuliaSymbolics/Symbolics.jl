@@ -508,3 +508,24 @@ end
         @test @invokelatest(eval(oop)([2])) == 8
     end
 end
+
+@testset "`optimize` rule that returns one array node" begin
+    @variables x[1:3]
+    xs = unwrap.(collect(x))
+    ir = IRStructure{SymReal}()
+    exprs = sin.(xs)
+    foreach(e -> SymbolicUtils.populate_ir!(ir, e), exprs)
+    detector(ir, expr) = expr isa AbstractVector ? true : nothing
+    function transformer(ir, expr, _)
+        new = SymbolicUtils.ArrayMaker{SymReal}([[1:3]], [Symbolics.SConst(collect(expr))]; shape = SymbolicUtils.ShapeVecT((1:3,)))
+        SymbolicUtils.populate_ir!(ir, new)
+        return ir, new
+    end
+    rule = Code.OptimizationRule("array", detector, transformer, 1)
+    oop, iip = Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule])
+    u = [1.0, 2.0, 3.0]
+    out = fill(NaN, 3)
+    @invokelatest eval(iip)(out, u)
+    @test out == sin.(u)
+    @test @invokelatest(eval(oop)(u)) == sin.(u)
+end

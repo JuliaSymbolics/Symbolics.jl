@@ -228,6 +228,9 @@ function codegen_function(
     expr = _recursive_unwrap(expr)
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
+    if expr isa SymbolicT && SU.is_array_shape(SU.shape(expr)) && outputidxs === nothing && !skipzeros
+        return codegen_function(ir, expr, args, Setfield.@set opts.optimize = nothing)
+    end
 
     i = findfirst(x -> x isa DestructuredArgs, args)
     if similarto === nothing
