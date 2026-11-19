@@ -228,9 +228,9 @@ function codegen_function(
     expr = _recursive_unwrap(expr)
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
-    if expr isa SymbolicT && SU.is_array_shape(SU.shape(expr)) && outputidxs === nothing && !skipzeros
-        return codegen_function(ir, expr, args, Setfield.@set opts.optimize = nothing)
-    end
+    array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr))
+    array_node && iip_config[2] && (outputidxs !== nothing || skipzeros) &&
+        throw(ArgumentError("`optimize` returned an array-valued expression, which cannot be written with `outputidxs` or `skipzeros`"))
 
     i = findfirst(x -> x isa DestructuredArgs, args)
     if similarto === nothing
@@ -251,19 +251,12 @@ function codegen_function(
     end
 
     if iip_config[2]
-        iipfn = wrap_code[2](
-            Func(
-                [IIP_OUTSYM; args], [], set_array(
-                    nothing,
-                    args,
-                    IIP_OUTSYM,
-                    outputidxs,
-                    expr,
-                    checkbounds,
-                    skipzeros
-                )
-            )
-        )
+        iipbody = if array_node
+            SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, expr)); type = SU.symtype(expr), shape = SU.shape(expr))
+        else
+            set_array(nothing, args, IIP_OUTSYM, outputidxs, expr, checkbounds, skipzeros)
+        end
+        iipfn = wrap_code[2](Func([IIP_OUTSYM; args], [], iipbody))
         iip = Code.fast_toexpr(iipfn, ir, rewrites)
         if !checkbounds
             @assert Meta.isexpr(iip, :function)

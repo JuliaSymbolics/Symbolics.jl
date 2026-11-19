@@ -528,4 +528,23 @@ end
     @invokelatest eval(iip)(out, u)
     @test out == sin.(u)
     @test @invokelatest(eval(oop)(u)) == sin.(u)
+    @test_throws ArgumentError Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule], outputidxs = [3, 2, 1])
+
+    sx = unwrap(x)
+    shifted = SymbolicUtils.@arrayop (i,) sx[i] + 2
+    SymbolicUtils.populate_ir!(ir, shifted)
+    shift = Code.OptimizationRule("shift", detector, (ir, expr, _) -> (ir, shifted), 1)
+    _, iip = Symbolics.codegen_function(ir, xs .+ 2, [sx]; optimize = [shift])
+    out = fill(100.0, 3)
+    @invokelatest eval(iip)(out, u)
+    @invokelatest eval(iip)(out, u)
+    @test out == u .+ 2
+
+    swapped = SymbolicUtils.ArrayMaker{SymReal}([[1:2], [3:3]], [sx[2:3], sx[1:1]]; shape = SymbolicUtils.ShapeVecT((1:3,)))
+    SymbolicUtils.populate_ir!(ir, swapped)
+    swap = Code.OptimizationRule("swap", detector, (ir, expr, _) -> (ir, swapped), 1)
+    _, iip = Symbolics.codegen_function(ir, xs, [sx]; optimize = [swap])
+    v = copy(u)
+    @invokelatest eval(iip)(v, v)
+    @test v == [2.0, 3.0, 1.0]
 end
