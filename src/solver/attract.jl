@@ -161,9 +161,16 @@ function structural_key(t)
     return string(op_key(op), "(", join(keys, ","), ")")
 end
 
-# Qualified by module: `Base.log` and `NaNMath.log` both print as `log`.
-op_key(op::Function) = string(parentmodule(op), ".", nameof(op))
-op_key(op) = string(typeof(op), ":", repr(op))
+# Qualified by module: `Base.log` and `NaNMath.log` both print as `log`. A
+# callable object with fields also carries their values, since two instances
+# of one type are different operations.
+function op_key(op)
+    T = typeof(op)
+    name = op isa Function && Base.issingletontype(T) ?
+        string(parentmodule(op), ".", nameof(op)) : string(parentmodule(T), ".", T)
+    nfields(op) == 0 && return name
+    return string(name, "{", join((leaf_key(getfield(op, i)) for i in 1:nfields(op)), ","), "}")
+end
 
 # `repr` round-trips the machine floats exactly; a `BigFloat` also needs its
 # precision, and a symbol its symbolic type.
@@ -171,14 +178,17 @@ leaf_key(v::BasicSymbolic) = string("sym:", v, "::", symtype(v))
 leaf_key(v::BigFloat) = string("BigFloat@", precision(v), ":", repr(v))
 leaf_key(v) = string(typeof(v), ":", repr(v))
 
-# Apply a rule for a two-term sum to the terms of `t` taken in the order of
-# `structural_key`. `@acrule` tries them in the order of the sum's internal
-# term dictionary, which depends on how that sum was first built, so the same
-# input could bind `~b` to either base and return a different root. Like
-# `@acrule`, the terms the rule does not consume are kept.
+# Apply a rule for a two-term sum to the terms of `t` in an order that depends
+# only on the terms themselves. `@acrule` tries them in the order of the sum's
+# internal term dictionary, which depends on how that sum was first built, so
+# the same input could bind `~b` to either base and return a different root.
+# `structural_key` gives a readable, stable order; any two distinct terms it
+# still ranks equally are separated by their hash, which is a function of the
+# term's value, so equal inputs always get the same order. Like `@acrule`, the
+# terms the rule does not consume are kept.
 function apply_to_sorted_pairs(rule, t)
     (iscall(t) && operation(t) === (+)) || return nothing
-    args = sort(collect(arguments(t)); by = structural_key)
+    args = sort(collect(arguments(t)); by = a -> (structural_key(a), hash(a)))
     n = length(args)
     for i in 1:n, j in 1:n
         i == j && continue

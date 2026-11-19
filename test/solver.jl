@@ -795,20 +795,44 @@ end
     @test abs(2.0^(root + 1) + 5.0^(root + 3)) < 1e-12
 end
 
+# A callable object with state, used as the base of an exponential below.
+struct AttractScaleBy <: Function
+    k::Int
+end
+(s::AttractScaleBy)(v) = s.k * v
+
+# Value of a constant symbolic expression, with its real number leaves
+# promoted to `BigFloat` so that the evaluation does not lose the precision
+# the comparison needs.
+function big_value(ex)
+    promote = SymbolicUtils.Postwalk(function (n)
+        v = SymbolicUtils.unwrap_const(n)
+        v isa Real && !(v isa Bool) ? SymbolicUtils.Const{SymbolicUtils.SymReal}(big(v)) : n
+    end)
+    return eval(Symbolics.toexpr(promote(Symbolics.unwrap(ex))))
+end
+
 @testset "symbolic_solve on two exponentials does not depend on the internal term order" begin
     @variables x
-    # Pairs of distinct terms that are easy to rank equally: `sorted_arguments`
-    # ties the first pair (same base, exponent constants of equal magnitude),
-    # and the bases of the second pair print the same (`0.1`) although they
-    # differ. Ranking them equally lets the internal order decide which of two
-    # conjugate roots is returned.
-    # The residual is not checked for the mixed-precision pair:
-    # `symbolic_to_float` evaluates `slog(Float16(0.1))` in Float16, whose
-    # rounding error (~1e-3) swamps log(Float16(0.1)) - log(0.1) ≈ 2.4e-4.
-    pairs = [(2^(x + 1), 2^(2x - 1), true), (Float16(0.1)^(x + 1), 0.1^(x + 1), false)]
+    # Pairs of distinct terms that are easy to rank equally:
+    # - `sorted_arguments` ties the first pair (same base, exponent constants
+    #   of equal magnitude);
+    # - the bases of the second pair print the same (`0.1`) although they differ;
+    # - the bases of the third pair are calls of two callable objects of one
+    #   type that differ only in their stored field.
+    # Ranking a pair equally lets the internal order decide which of two
+    # conjugate roots is returned. Each residual is computed at 256 bits.
+    scalar_call(f) = Symbolics.Num(SymbolicUtils.term(f, 1; type = Real, shape = SymbolicUtils.ShapeVecT()))
+    a1, a2 = scalar_call(AttractScaleBy(2)), scalar_call(AttractScaleBy(5))
+    pairs = [
+        (2^(x + 1), 2^(2x - 1), z -> big(2)^(z + 1) + big(2)^(2z - 1)),
+        (Float16(0.1)^(x + 1), 0.1^(x + 1),
+            z -> big(Float16(0.1))^(z + 1) + big(0.1)^(z + 1)),
+        (a1^x, a2^x, z -> big(2)^z + big(5)^z),
+    ]
     @testset "$(p[1]) + $(p[2])" for p in pairs
         t1, t2 = value(p[1]), value(p[2])
-        check_residual = p[3]
+        residual = p[3]
         function sum_with_capacity(n)
             d = SymbolicUtils.ACDict{SymbolicUtils.SymReal}()
             sizehint!(d, n)
@@ -824,10 +848,9 @@ end
         roots = [symbolic_solve(Symbolics.Num(s), x) for s in sums]
         @test all(r -> isequal(r, roots[1]), roots)
         @test length(roots[1]) == 1
-        if check_residual
-            z = Symbolics.symbolic_to_float(only(roots[1]))
-            f = build_function(Symbolics.Num(sums[1]), x; expression = Val(false))
-            @test abs(f(complex(z))) < 1e-10
+        setprecision(BigFloat, 256) do
+            z = big_value(only(roots[1]))
+            @test abs(residual(z)) < 1e-60
         end
     end
 end
