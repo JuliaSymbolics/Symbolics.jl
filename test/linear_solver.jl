@@ -19,6 +19,8 @@ a, b, islinear = Symbolics.linear_expansion(expr, p)
 @test eltype((a, b)) <: Num
 @test isequal((a, b, islinear), (-(x - y), -y, true))
 @test isequal(unwrap_const(unwrap(Symbolics.symbolic_linear_solve(x * p ~ 0, p))), 0)
+@variables er mp
+@test isequal(Symbolics.symbolic_linear_solve(8 * (1 - mp) ~ 2er, er; simplify=true), 4 * (1 - mp))
 @test_throws Any Symbolics.symbolic_linear_solve(1/x + p * p/x ~ 0, p)
 @test isequal(Symbolics.symbolic_linear_solve(x * y ~ p, x), p / y)
 @test isequal(Symbolics.symbolic_linear_solve(x * -y ~ p, y), -p / x)
