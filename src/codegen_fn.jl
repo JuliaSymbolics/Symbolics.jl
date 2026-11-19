@@ -23,6 +23,12 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
     type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
 )
 
+function rule_output_buffer(out, sz, own_eltype::Bool)
+    T = eltype(out)
+    T = own_eltype && T <: AbstractFloat ? T : T <: Number ? promote_type(T, Float64) : Float64
+    return zeros(T, sz)
+end
+
 function canonicalize_args(args::Vector, inbounds::Bool)
     return map(enumerate(args)) do (i, arg)
         if arg isa Arr
@@ -229,8 +235,8 @@ function codegen_function(
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
     array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr))
-    array_node && iip_config[2] && (outputidxs !== nothing || skipzeros) &&
-        throw(ArgumentError("`optimize` returned an array-valued expression, which cannot be written with `outputidxs` or `skipzeros`"))
+    array_node && iip_config[2] && skipzeros &&
+        throw(ArgumentError("`optimize` returned an array-valued expression, which cannot be written with `skipzeros`"))
 
     i = findfirst(x -> x isa DestructuredArgs, args)
     if similarto === nothing
@@ -252,7 +258,14 @@ function codegen_function(
 
     if iip_config[2]
         iipbody = if array_node
-            SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, expr)); type = SU.symtype(expr), shape = SU.shape(expr))
+            buffer = SU.Term{VartypeT}(
+                rule_output_buffer, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(fuse_output_eltype)));
+                type = Any
+            )
+            value = Code.supports_with_allocator(expr) ?
+                Code.with_allocator(SU.Term{VartypeT}(Returns, SArgsT((buffer,)); type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()), expr) : expr
+            dest = outputidxs === nothing ? IIP_OUTSYM : SU.Term{VartypeT}(view, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(outputidxs))); type = Any)
+            SU.Term{VartypeT}(copyto!, SArgsT((dest, value)); type = SU.symtype(expr), shape = SU.shape(expr))
         else
             set_array(nothing, args, IIP_OUTSYM, outputidxs, expr, checkbounds, skipzeros)
         end

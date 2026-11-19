@@ -528,7 +528,10 @@ end
     @invokelatest eval(iip)(out, u)
     @test out == sin.(u)
     @test @invokelatest(eval(oop)(u)) == sin.(u)
-    @test_throws ArgumentError Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule], outputidxs = [3, 2, 1])
+    _, iip = Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule], outputidxs = [5, 1, 3])
+    out = fill(100.0, 5)
+    @invokelatest eval(iip)(out, u)
+    @test out == [sin(u[2]), 100.0, sin(u[3]), 100.0, sin(u[1])]
     @test_throws ArgumentError Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule], skipzeros = true)
 
     sx = unwrap(x)
@@ -558,19 +561,20 @@ end
 
     @variables p[1:20] q[1:20]
     sp, sq = unwrap(p), unwrap(q)
-    diff = SymbolicUtils.ArrayMaker{SymReal}([[1:20]], [sp .- 0.1 .* sq]; shape = SymbolicUtils.ShapeVecT((1:20,)))
-    SymbolicUtils.populate_ir!(ir, diff)
-    fused = Code.OptimizationRule("fused", detector, (ir, expr, _) -> (ir, diff), 1)
-    oop, iip = Symbolics.codegen_function(ir, collect(unwrap.(collect(p)) .- 0.1 .* unwrap.(collect(q))), [sp, sq]; optimize = [fused], fuse_broadcasts = true, fuse_output_eltype = true)
+    pq = SymbolicUtils.ArrayMaker{SymReal}([[1:20]], [sp .- 0.1 .* sq]; shape = SymbolicUtils.ShapeVecT((1:20,)))
+    SymbolicUtils.populate_ir!(ir, pq)
+    fused = Code.OptimizationRule("fused", detector, (ir, expr, _) -> (ir, pq), 1)
+    _, iip = Symbolics.codegen_function(ir, collect(unwrap.(collect(p)) .- 0.1 .* unwrap.(collect(q))), [sp, sq]; optimize = [fused], iip_config = (false, true), fuse_broadcasts = true, fuse_output_eltype = true)
     out = fill(1.0f0, 20)
     @invokelatest eval(iip)(out, fill(0.1f0, 20), fill(1.0f0, 20))
-    @test out == @invokelatest(eval(oop)(fill(0.1f0, 20), fill(1.0f0, 20)))
+    @test all(iszero, out)
 
-    _, iip = Symbolics.codegen_function(ir, xs, [sx]; optimize = [Code.OptimizationRule("maker", detector, as_maker, 1)], iip_config = (false, true))
-    big_int = [9007199254740993, 2, 3]
-    out = zeros(Int, 3)
-    @invokelatest eval(iip)(out, big_int)
-    @test out == big_int
+    tail = SymbolicUtils.ArrayMaker{SymReal}([[11:20]], [sp[11:20]]; shape = SymbolicUtils.ShapeVecT((1:20,)))
+    SymbolicUtils.populate_ir!(ir, tail)
+    oop, iip = Symbolics.codegen_function(ir, unwrap.(collect(p)), [sp]; optimize = [Code.OptimizationRule("tail", detector, (ir, expr, _) -> (ir, tail), 1)])
+    out = fill(100.0, 20)
+    @invokelatest eval(iip)(out, collect(1.0:20.0))
+    @test out == @invokelatest(eval(oop)(collect(1.0:20.0))) == [zeros(10); 11.0:20.0]
 
     _, iip = Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule])
     out = fill(100.0, 5)
