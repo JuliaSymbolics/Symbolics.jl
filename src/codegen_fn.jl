@@ -228,7 +228,7 @@ function codegen_function(
     expr = _recursive_unwrap(expr)
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
-    array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr))
+    array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr)) && !SU.query(isequal(IIP_OUTSYM), expr)
     array_node && iip_config[2] && (outputidxs !== nothing || skipzeros) &&
         throw(ArgumentError("`optimize` returned an array-valued expression, which cannot be written with `outputidxs` or `skipzeros`"))
 
