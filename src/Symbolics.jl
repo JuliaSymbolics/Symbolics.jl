@@ -611,6 +611,7 @@ export symbolics_to_sympy_pythoncall, sympy_pythoncall_to_symbolics
 export sympy_pythoncall_linear_solve, sympy_pythoncall_algebraic_solve, sympy_pythoncall_integrate, sympy_pythoncall_limit, sympy_pythoncall_simplify, sympy_pythoncall_ode_solve
 
 function __init__()
+    reset_total_derivative_hooks!()
     Base.Experimental.register_error_hint(TypeError) do io, exc
         if exc.expected == Bool && exc.got isa Num
             println(io,
@@ -646,6 +647,7 @@ include("despecialize.jl")
 
 @public Arr, NAMESPACE_SEPARATOR, VariableDefaultValue, VariableSource
 @public _parse_vars, derivative, gradient, jacobian, sparsejacobian, hessian, sparsehessian
+@public total_derivative
 @public get_variables, get_variables!, get_differential_vars, option_to_metadata_type
 @public variable, wrap, linear_expansion, LinearExpander
 @public _toexpr_metadata, _toexpr_op

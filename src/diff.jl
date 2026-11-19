@@ -221,7 +221,7 @@ Return a collection of all functions involved in derivative computation
 that are cached.
 """
 function cached_derivative_functions() # public
-    (occursin_info, recursive_hasoperator)
+    (occursin_info, recursive_hasoperator, contains_hooked_call, depends_with_hooks)
 end
 
 SymbolicUtils.@cache limit = 500_000 function occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT}, fail::Bool = true)::Bool
@@ -426,7 +426,7 @@ end
 function symbolic_callable_diff(D::Differential, arg::BasicSymbolic{VartypeT}, inner_args::SymbolicUtils.ROArgsT{VartypeT}; kw...)
     partials = Union{Nothing, SymbolicT}[derivative_idx(arg, i) for i in eachindex(inner_args)]
     for (t, a) in zip(partials, inner_args)
-        t === nothing && occursin_info(D.x, a) && return nothing
+        t === nothing && derivative_depends_on(D, a) && return nothing
     end
     summed_args = SymbolicUtils.ArgsT{VartypeT}()
     sizehint!(summed_args, length(inner_args))
@@ -511,6 +511,221 @@ alike here.
 _iszero_derivative(x) = _iszero(x) || is_symbolic_zero(x)
 
 """
+    total_derivative(f, args, D::Differential)
+
+Return the declared total derivative of the call `f(args...)` with respect to `D.x`,
+or `nothing` to use the usual derivative rules. The default is `nothing`.
+
+Packages may specialize this function on their own function or callable type. `args`
+is a read-only collection of unwrapped symbolic arguments and `D` is first-order.
+Return a symbolic expression (optionally wrapped in `Num`) or a number. Return
+`nothing` for differentiation variables the method does not handle. Methods should
+be pure: expansion may consult them more than once. For an array-valued `f`, return
+the array of derivatives; an indexed call `f(args...)[i]` uses its element `i`.
+
+[`expand_derivatives`](@ref) consults this hook before checking whether the call
+depends on `D.x` and before applying the chain rule. Derivatives in the returned
+expression are expanded recursively; higher-order and mixed derivatives then
+differentiate that expression normally. Partial derivative rules registered with
+[`@register_derivative`](@ref) remain available when the hook returns `nothing`.
+
+Every `Differential(t)` consults the hook, including uses intended as a partial
+derivative with respect to `t`: `jacobian([f(args...)], [t])`, `sparsejacobian`,
+`jacobian_sparsity` and ModelingToolkit's `tgrad` use the declared value too. Define
+hooks only where these semantics are intended. Mixed derivatives need not commute when
+a hook is used.
+
+Do not return `D(f(args...))` for the same call: recursively expanding that result
+invokes the hook again and recurses forever.
+"""
+@inline total_derivative(f, args, D) = nothing
+
+# Which callable types have a `total_derivative` method. Derivative code consults
+# hooks only for calls whose function type may match a non-fallback method, so
+# expressions without such calls cost a world-counter check and a type comparison.
+#
+# A snapshot is valid for the world it was built in. When the world changes, the
+# non-fallback methods are listed again; `epoch` changes only if that list changed,
+# and keys the per-expression caches below. Methods on one concrete callable type
+# (the usual `::typeof(f)`) are matched by `===` against `exact`. Any other method
+# sets `inexact`, and types are then matched by intersection and memoized in `types`.
+# Snapshots are never mutated after publication; a miss in `types` publishes a copy.
+# Mutable with `const` fields so the atomic field below holds a pointer: an inline
+# immutable struct would need a lock for each atomic load.
+mutable struct TotalDerivativeHooks
+    const world::UInt
+    const epoch::UInt
+    const methods::Vector{Method}
+    const exact::Vector{Any}
+    const inexact::Bool
+    const types::IdDict{Any, Bool}
+end
+
+function TotalDerivativeHooks(world::UInt, epoch::UInt, ms::Vector{Method})
+    exact = Any[]
+    inexact = false
+    for m in ms
+        sig = m.sig
+        T = sig isa DataType && length(sig.parameters) == 4 ? sig.parameters[2] : nothing
+        if T isa DataType && isconcretetype(T) && !(T <: Type)
+            push!(exact, T)
+        else
+            inexact = true
+        end
+    end
+    return TotalDerivativeHooks(world, epoch, ms, exact, inexact, IdDict{Any, Bool}())
+end
+
+mutable struct TotalDerivativeHookState
+    @atomic hooks::TotalDerivativeHooks
+end
+
+const TOTAL_DERIVATIVE_EPOCH = Threads.Atomic{UInt}(0)
+
+# `typemax(UInt)` never matches a world, so the first use lists the methods.
+empty_total_derivative_hooks() = TotalDerivativeHooks(typemax(UInt), UInt(0), Method[])
+
+const TOTAL_DERIVATIVE_HOOKS = TotalDerivativeHookState(empty_total_derivative_hooks())
+
+# World counters and methods cached during precompilation belong to that process.
+reset_total_derivative_hooks!() =
+    @atomic TOTAL_DERIVATIVE_HOOKS.hooks = empty_total_derivative_hooks()
+
+@inline function total_derivative_hooks()
+    hooks = @atomic :acquire TOTAL_DERIVATIVE_HOOKS.hooks
+    hooks.world == Base.get_world_counter() && return hooks
+    return refresh_total_derivative_hooks(hooks)
+end
+
+@noinline function refresh_total_derivative_hooks(old::TotalDerivativeHooks)
+    world = Base.get_world_counter()
+    fallback = Tuple{typeof(total_derivative), Any, Any, Any}
+    ms = Method[m for m in methods(total_derivative) if m.sig != fallback]
+    hooks = if length(ms) == length(old.methods) && all(m -> any(o -> o === m, old.methods), ms)
+        TotalDerivativeHooks(world, old.epoch, old.methods, old.exact, old.inexact, old.types)
+    else
+        epoch = Threads.atomic_add!(TOTAL_DERIVATIVE_EPOCH, UInt(1)) + UInt(1)
+        TotalDerivativeHooks(world, epoch, ms)
+    end
+    @atomic :release TOTAL_DERIVATIVE_HOOKS.hooks = hooks
+    return hooks
+end
+
+@inline has_hooks(hooks::TotalDerivativeHooks) = !isempty(hooks.methods)
+
+# Whether a non-fallback `total_derivative` method may apply to calls of `f`.
+@inline function has_hook(hooks::TotalDerivativeHooks, f)
+    has_hooks(hooks) || return false
+    T = Core.Typeof(f)
+    for E in hooks.exact
+        E === T && return true
+    end
+    hooks.inexact || return false
+    known = get(hooks.types, T, nothing)
+    known === nothing || return known::Bool
+    return add_hook_type!(hooks, T)
+end
+
+@noinline function add_hook_type!(hooks::TotalDerivativeHooks, @nospecialize(T))
+    sig = Tuple{typeof(total_derivative), T, Any, Any}
+    found = any(m -> typeintersect(m.sig, sig) !== Union{}, hooks.methods)
+    types = copy(hooks.types)
+    types[T] = found
+    new = TotalDerivativeHooks(hooks.world, hooks.epoch, hooks.methods, hooks.exact,
+        hooks.inexact, types)
+    # If another snapshot was published meanwhile, drop this entry; it is recomputed.
+    @atomicreplace TOTAL_DERIVATIVE_HOOKS.hooks hooks => new
+    return found
+end
+
+# Whether `expr` contains a call to a function with a `total_derivative` method.
+# `epoch` keys out entries computed for an older set of hook methods.
+SymbolicUtils.@cache function contains_hooked_call(expr::BasicSymbolic{VartypeT}, epoch::UInt)::Bool
+    _contains_hooked_call(expr, epoch)
+end
+
+function _contains_hooked_call(expr::BasicSymbolic{VartypeT}, epoch::UInt)
+    iscall(expr) || return false
+    @match expr begin
+        BSImpl.Term(; f) => has_hook(total_derivative_hooks(), f) && return true
+        _ => nothing
+    end
+    for a in arguments(expr)
+        a isa BasicSymbolic{VartypeT} && contains_hooked_call(a, epoch) && return true
+    end
+    return false
+end
+
+# The declared derivative of `arg` if it is a hooked call, or an element of an
+# array-valued hooked call. Returns `nothing` otherwise. The result is converted to
+# `SymbolicT` here so that defining a hook does not widen `executediff`'s inferred type.
+function declared_derivative(hooks::TotalDerivativeHooks, D::Differential, arg::SymbolicT)
+    has_hooks(hooks) || return nothing
+    @match arg begin
+        BSImpl.Term(; f, args) && if has_hook(hooks, f) end => begin
+            der = total_derivative(f, args, D)
+            der === nothing || return SConst(unwrap(der))::SymbolicT
+        end
+        BSImpl.Term(; f, args) && if f === getindex end => begin
+            @match args[1] begin
+                BSImpl.Term(; f = g, args = gargs) && if has_hook(hooks, g) end => begin
+                    der = total_derivative(g, gargs, D)
+                    der === nothing && return nothing
+                    der = unwrap(der)
+                    idxs = @view args[2:end]
+                    der isa SymbolicT && return der[SymbolicUtils.StableIndex(idxs)]::SymbolicT
+                    return SConst(unwrap(der[map(unwrap_const, idxs)...]))::SymbolicT
+                end
+                _ => nothing
+            end
+        end
+        _ => nothing
+    end
+    return nothing
+end
+
+# A declared derivative can introduce dependence absent from the call's arguments.
+# Hook methods may be added after `occursin_info` cached an expression, so the
+# combined check is cached separately, keyed by the hook epoch. `D` is first-order
+# here, so `D.x` determines it.
+@inline function derivative_depends_on(hooks::TotalDerivativeHooks, D::Differential, arg::SymbolicT)
+    (has_hooks(hooks) && iscall(arg)) || return occursin_info(D.x, arg)
+    return depends_with_hooks(D.x, arg, hooks.epoch)
+end
+@inline derivative_depends_on(D::Differential, arg::SymbolicT) =
+    derivative_depends_on(total_derivative_hooks(), D, arg)
+
+SymbolicUtils.@cache limit = 500_000 function depends_with_hooks(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT}, epoch::UInt)::Bool
+    hooks = total_derivative_hooks()
+    D = Differential(x)
+    # Checked before `occursin_info`, which rejects array-valued calls such as an
+    # array-valued hooked call.
+    @match expr begin
+        BSImpl.Term(; f, args) && if has_hook(hooks, f) end => begin
+            total_derivative(f, args, D) === nothing || return true
+        end
+        _ => nothing
+    end
+    return occursin_info(x, expr) || has_declared_dependence(hooks, D, expr)
+end
+
+# Whether a hooked call inside `arg` declares a derivative with respect to `D.x`.
+# Only subtrees containing hooked calls are visited.
+function has_declared_dependence(hooks::TotalDerivativeHooks, D::Differential, arg::SymbolicT)
+    iscall(arg) && contains_hooked_call(arg, hooks.epoch) || return false
+    @match arg begin
+        BSImpl.Term(; f, args) && if has_hook(hooks, f) end => begin
+            total_derivative(f, args, D) === nothing || return true
+        end
+        _ => nothing
+    end
+    for a in arguments(arg)
+        a isa SymbolicT && has_declared_dependence(hooks, D, a) && return true
+    end
+    return false
+end
+
+"""
     executediff(D, arg; simplify=false, occurrences=nothing)
 
 Apply the passed Differential D on the passed argument.
@@ -592,7 +807,12 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
         end
         _ => nothing
     end
-    occursin_info(D.x, arg) || return differential_zero(arg)
+    hooks = total_derivative_hooks()
+    derivative_depends_on(hooks, D, arg) || return differential_zero(arg)
+    # A hook returning a derivative makes `derivative_depends_on` true, so it is
+    # consulted here, before the chain rule.
+    der = declared_derivative(hooks, D, arg)
+    der === nothing || return expand_derivatives(der, simplify; throw_no_derivative)::SymbolicT
 
     # We can safely assume `arg` is scalar, else `occursin_info` would have errored.
     @match arg begin
@@ -705,7 +925,7 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
 
                 for (i, iarg) in enumerate(inner_args)
-                    occursin_info(D.x, iarg) || continue #skip if inner arg doesn't need this var
+                    derivative_depends_on(hooks, D, iarg) || continue #skip if inner arg doesn't need this var
                     t2 = executediff(D, iarg; simplify, throw_no_derivative)::SymbolicT
                     _iszero_derivative(t2) && continue
                     t = derivative_idx(arg, i)::Union{Nothing, SymbolicT}
@@ -952,19 +1172,24 @@ an array of variable expressions.
 All other keyword arguments are forwarded to `expand_derivatives`.
 """
 function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
-                  simplify=false, scalarize::Union{Val{true}, Val{false}}=Val(true), kwargs...)
+        simplify = false, scalarize::Union{Val{true}, Val{false}} = Val(true), kwargs...)
     if scalarize isa Val{true}
         ops = Symbolics.scalarize(ops)
         vars = Symbolics.scalarize(vars)
     end
     # Pre-compute variable sets to skip differentiating trivially zero Jacobian entries.
     op_varsets = map(op -> _augment_with_call_args!(SymbolicUtils.search_variables(op)), ops)
+    # Declared derivatives can depend on variables absent from these structural sets.
+    hooks = total_derivative_hooks()
+    op_hooked = map(op -> op isa SymbolicT && has_hooks(hooks) &&
+        contains_hooked_call(op, hooks.epoch), ops)
     result = fill(COMMON_ZERO, length(ops), length(vars))
     for i in eachindex(ops), j in eachindex(vars)
         v = vars[j]
         # `arr[k]` also occurs when the lazy array `arr` is in the variable set.
         (v in op_varsets[i] ||
-            (is_scalar_indexed(v) && (arguments(v)[1] in op_varsets[i]))) || continue
+         (is_scalar_indexed(v) && (arguments(v)[1] in op_varsets[i])) ||
+         (op_hooked[i] && has_declared_dependence(hooks, Differential(v), ops[i]))) || continue
         result[i, j] = executediff(Differential(v), ops[i]; simplify, kwargs...)
     end
     return result
@@ -1162,6 +1387,21 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     for ii = 1:length(du)
         i[] = ii
         r(du[ii])
+    end
+
+    # Entries declared by `total_derivative` hooks, matching `jacobian`.
+    hooks = total_derivative_hooks()
+    if has_hooks(hooks)
+        for (ii, ex) in enumerate(du)
+            ex isa SymbolicT && contains_hooked_call(ex, hooks.epoch) || continue
+            for (j, v) in enumerate(u)
+                v isa SymbolicT || continue
+                if has_declared_dependence(hooks, Differential(v), ex)
+                    push!(I, ii)
+                    push!(J, j)
+                end
+            end
+        end
     end
 
     sparse(I, J, true, length(du), length(u))
