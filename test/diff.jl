@@ -1182,3 +1182,146 @@ let
     @test occursin("∇(a^2 + b^2)", sprint(show, grad))
     @test occursin("∇×(y)", sprint(show, ∇ × y))
 end
+
+@testset "Lazy and eager vector operators of array-valued arguments" begin
+    @variables a b c k(a, b, c) u(a, b, c)
+    Dd(v, f) = Differential(v)(f)
+    for vars in ([a, b], [a, b, c])
+        G = Grad{false}(vars)
+        d = Divergence{false}(vars)
+        div_k_gradu = sum(Dd(vi, k * Dd(vi, u)) for vi in vars)
+        twice = sum(2 * Dd(vi, Dd(vi, u)) for vi in vars)
+        for (arg, expected) in ((k * G(u), div_k_gradu), (2 * G(u), twice), (G(u) + G(u), twice))
+            @test isequal(expand_derivatives(d(arg)), expand_derivatives(expected))
+            @test isequal(expand_derivatives(Divergence{true}(vars)(unwrap(arg))), expand_derivatives(expected))
+        end
+    end
+    # 3D and 2D curl of k∇u, eager and lazy
+    ∇3 = Grad{false}([a, b, c])
+    curl_k_gradu = [
+        Dd(b, k * Dd(c, u)) - Dd(c, k * Dd(b, u)),
+        Dd(c, k * Dd(a, u)) - Dd(a, k * Dd(c, u)),
+        Dd(a, k * Dd(b, u)) - Dd(b, k * Dd(a, u)),
+    ]
+    @test isequal(scalarize(expand_derivatives(Curl{false}([a, b, c])(k * ∇3(u)))), expand_derivatives.(curl_k_gradu))
+    @test isequal(expand_derivatives.(Curl{true}([a, b, c])(unwrap(k * ∇3(u)))), expand_derivatives.(curl_k_gradu))
+    curl2 = expand_derivatives(Dd(a, k * Dd(b, u)) - Dd(b, k * Dd(a, u)))
+    ∇2 = Grad{false}([a, b])
+    @test isequal(expand_derivatives(Curl{false}([a, b])(k * ∇2(u))), curl2)
+    @test isequal(expand_derivatives(Curl{true}([a, b])(unwrap(k * ∇2(u)))), curl2)
+    # unknown-length vectors are indexed rather than scalarized, numeric components are accepted
+    @variables v::Vector{Real} z[1:2]
+    @test isequal(Curl{true}([a, b])(unwrap(v)), unwrap(Dd(a, v[2]) - Dd(b, v[1])))
+    @test isequal(Symbolics._scalarized(unwrap(v)), unwrap(v))
+    @test Curl{true}([a, b])(unwrap((_ -> 1).(z))) isa Symbolics.SymbolicT
+    @test Symbolics._scalarized(unwrap((_ -> 1).(z))) isa Vector{Symbolics.SymbolicT}
+end
+
+@testset "Vector Laplacian" begin
+    @variables a b c w(..)[1:3] s(..)[1:2]
+    for (vars, field) in (([a, b, c], w(a, b, c)), ([a, b], s(a, b)))
+        n = length(vars)
+        Dd2(v, f) = Differential(v)(Differential(v)(f))
+        expected = [sum(Dd2(vi, field[i]) for vi in vars) for i in 1:n]
+        for E in (false, true)
+            L = Laplacian{E}(vars)
+            for input in (field, collect(field))
+                res = L(input)
+                if input isa Arr
+                    E ? (@test res isa Vector{Num}) : (@test res isa Arr{Num, 1})
+                else
+                    @test res isa Vector{Num}
+                end
+                @test isequal(expand_derivatives.(scalarize(res)), expand_derivatives.(expected))
+                (E || !(input isa Arr)) || @test isequal(scalarize(expand_derivatives(res)), expand_derivatives.(expected))
+            end
+        end
+    end
+    # scalar behaviour
+    @test Laplacian{false}([a, b])(a^2 + b^2) isa Num
+    @test isequal(expand_derivatives(Laplacian{false}([a, b])(a^2 + b^2)), 4)
+    @test isequal(Laplacian{true}([a, b])(a^2), Differential(a)(Differential(a)(a^2)) + Differential(b)(Differential(b)(a^2)))
+    # non-vector fields
+    @variables M[1:2, 1:2] v::Vector{Real}
+    for E in (false, true)
+        L = Laplacian{E}([a, b])
+        @test_throws ArgumentError L(M)
+        @test_throws ArgumentError L(unwrap(M))
+        @test_throws ArgumentError L([a b; b a])
+        @test_throws ArgumentError L(unwrap(v))
+    end
+end
+
+@testset "Laplacian is its own operator" begin
+    @variables a b c f(a, b) g(..)[1:3] h(..)
+    vars = [a, b]
+    for E in (false, true)
+        L = Laplacian{E}(vars)
+        @test L isa Laplacian{E}
+        @test L.grad == Grad{E}(vars) && L.div == Divergence{E}(vars)
+        @test sprint(show, L) == "∇⋅∇"
+        @test nameof(L) == Symbol("∇⋅∇")
+    end
+    @test dot(Grad{false}(vars), Grad{false}(vars)) isa Laplacian{false}
+    @test Laplacian(vars) isa Laplacian{false}
+    @test Divergence{false}(vars)(Grad{false}([a, c])) isa Laplacian{false}
+    # hash and equality
+    @test Laplacian(vars) == Laplacian(vars) && hash(Laplacian(vars)) == hash(Laplacian(vars))
+    @test Laplacian(vars) != Laplacian([a, c])
+    @test Laplacian{false}(vars) != Laplacian{true}(vars)
+    # constructor validation
+    @test_throws ArgumentError Laplacian{false}([a, 1])
+    @test_throws ArgumentError Laplacian{true}([a, 1])
+    @test Laplacian{false}([a, 1]; check = false) isa Laplacian{false}
+    # lazy terms
+    lap_f = unwrap(Laplacian(vars)(f))
+    @test iscall(lap_f) && operation(lap_f) isa Laplacian{false}
+    @test SymbolicUtils.symtype(lap_f) == Real && isempty(SymbolicUtils.shape(lap_f))
+    @test isequal(expand_derivatives(Laplacian(vars)(f)), expand_derivatives(Differential(a)(Differential(a)(f)) + Differential(b)(Differential(b)(f))))
+    @test isequal(
+        expand_derivatives(Differential(a)(Laplacian(vars)(f))),
+        expand_derivatives(Differential(a)(Differential(a)(Differential(a)(f)) + Differential(b)(Differential(b)(f)))),
+    )
+    @test isequal(expand_derivatives(Laplacian{false}([a, b, c])(g(a, b, c))), expand_derivatives(Laplacian{false}([a, b, c])(g(a, b, c))))
+    # `substitute` rebuilds the lazy term, so a field substitution works
+    @variables x y uxy(..)
+    sub = substitute(Laplacian([x, y])(uxy(x, y)), Dict(uxy(x, y) => x^2 * y))
+    @test isequal(expand_derivatives(sub), 2y)
+end
+
+@testset "`is_vector_operator` and `is_laplacian`" begin
+    @variables a b c f(a, b) g(..)[1:3] h(..)
+    vars = [a, b]
+    ∇ = Grad{false}(vars)
+    div = Divergence{false}(vars)
+    lap = Laplacian{false}(vars)
+    curl2 = Curl{false}(vars)(Num[f, f])
+    cases = [
+        (unwrap(∇(f)), true, false),
+        (unwrap(div(Num[f, f])), true, false),
+        (curl2, true, false),
+        (unwrap(Curl{false}([a, b, c])(g(a, b, c))), true, false),
+        (unwrap(lap(f)), true, true),
+        # a lazy divergence of a lazy gradient is not a `Laplacian`
+        (unwrap(div(∇(f))), true, false),
+        # eager results are ordinary expressions
+        (Divergence{true}(vars)(Num[f, f]), false, false),
+        (unwrap(Laplacian{true}(vars)(f)), false, false),
+        (unwrap(Differential(a)(f)), false, false),
+        (unwrap(sin(f)), false, false),
+        (unwrap(a), false, false),
+        (SymbolicUtils.Const{SymbolicUtils.SymReal}(1), false, false),
+    ]
+    for (term, vec_op, is_lap) in cases
+        @test Symbolics.is_vector_operator(term) === vec_op
+        @test Symbolics.is_laplacian(term) === is_lap
+    end
+    # Num and plain numbers
+    @test Symbolics.is_vector_operator(lap(f)) && Symbolics.is_laplacian(lap(f))
+    @test Symbolics.is_vector_operator(Num(curl2)) && !Symbolics.is_laplacian(Num(curl2))
+    @test !Symbolics.is_vector_operator(1) && !Symbolics.is_laplacian(1)
+    @test !is_derivative(unwrap(lap(f))) && is_derivative(Differential(a)(f))
+    eq = Differential(a)(f) ~ lap(f)
+    @test Symbolics.is_laplacian(eq.rhs) && !Symbolics.is_vector_operator(eq.lhs)
+    @test Symbolics.hasnode(Symbolics.is_laplacian, eq.rhs + 1)
+end

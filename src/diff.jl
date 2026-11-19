@@ -313,7 +313,7 @@ end
 
 Returns true if the expression or equation `O` contains [`Differential`](@ref) terms.
 """
-hasderiv(O) = recursive_hasoperator(Union{Differential, Grad{false}, Divergence{false}, Curl{false}}, O)
+hasderiv(O) = recursive_hasoperator(Union{Differential, LazyVectorOperator}, O)
 
 
 _recursive_hasoperator(::Type{op}, eq::Equation) where {op} = recursive_hasoperator(op, eq.lhs) || recursive_hasoperator(op, eq.rhs)
@@ -590,6 +590,10 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
             end
             return SConst(res)
         end
+        BSImpl.Term(; f, args) && if f isa Laplacian{false} end => begin
+            res = _expanded_der_op(f)(expand_derivatives(args[1]; throw_no_derivative))
+            return executediff(D, res; simplify, throw_no_derivative)
+        end
         _ => nothing
     end
     occursin_info(D.x, arg) || return differential_zero(arg)
@@ -807,9 +811,8 @@ julia> dfx = expand_derivatives(Dx(f))
 """
 function expand_derivatives(O::BasicSymbolic, simplify=false; throw_no_derivative=false)
     @match O begin
-        BSImpl.Term(; f, args) && if f isa Union{Differential, Grad{false}, Divergence{false}, Curl{false}} end => begin
-            if f isa Differential && iscall(args[1]) &&
-               operation(args[1]) isa Union{Grad{false}, Divergence{false}, Curl{false}}
+        BSImpl.Term(; f, args) && if f isa Union{Differential, LazyVectorOperator} end => begin
+            if f isa Differential && iscall(args[1]) && operation(args[1]) isa LazyVectorOperator
                 return executediff(f, args[1]; simplify, throw_no_derivative)
             end
             arg = expand_derivatives(args[1], false; throw_no_derivative)
@@ -1599,10 +1602,17 @@ end
 function (d::Divergence{true})(x::SymbolicT)
     # For validation
     SU.promote_shape(d, SU.shape(x))
+    x = _scalarized(x)
     buffer = SArgsT()
     resize!(buffer, length(d.vars))
-    for (i, xidx) in zip(eachindex(buffer), SU.stable_eachindex(x))
-        buffer[i] = Differential(d.vars[i])(x[xidx])
+    if x isa Vector
+        for i in eachindex(buffer)
+            buffer[i] = Differential(d.vars[i])(x[i])
+        end
+    else
+        for (i, xidx) in zip(eachindex(buffer), SU.stable_eachindex(x))
+            buffer[i] = Differential(d.vars[i])(x[xidx])
+        end
     end
     return SU.add_worker(VartypeT, buffer)
 end
@@ -1628,6 +1638,7 @@ function (d::Divergence{E})(arr::AbstractArray) where {E}
 end
 
 # Compose them for Laplacian
+(d::Divergence{E})(g::Grad{E}) where {E} = Laplacian{E}(g, d)
 (d::Divergence)(g::Grad) = d ∘ g
 
 function LinearAlgebra.dot(g1::Grad{E}, x::Union{Grad, SymbolicT, Num, AbstractArray}) where {E}
@@ -1655,18 +1666,43 @@ $(TYPEDSIGNATURES)
 The Laplacian operator `∇ ⋅ ∇` with respect to the independent variables
 `vars`.
 
-`Laplacian{E}(vars)` constructs `Divergence{E}(vars) ∘ Grad{E}(vars)` and is
-also produced by `LinearAlgebra.dot(∇, ∇)`. Applied to a scalar field it
-produces the sum of second partial derivatives; broadcast it over a vector
-field for a componentwise Laplacian.
+`Laplacian{E}(vars)` stores a `Grad{E}(vars)` and a `Divergence{E}(vars)` and is also
+produced by `LinearAlgebra.dot(∇, ∇)`. Applied to a scalar field it produces the sum of
+second partial derivatives; applied to a vector field it acts componentwise.
 
 See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
 interaction with [`expand_derivatives`](@ref).
 """
-abstract type Laplacian{E} end
+struct Laplacian{E}
+    grad::Grad{E}
+    div::Divergence{E}
+end
 
-Laplacian{E}(vars; check = true) where {E} = Divergence{E}(vars; check)(Grad{E}(vars; check))
+Laplacian{E}(vars; check = true) where {E} = Laplacian{E}(Grad{E}(vars; check), Divergence{E}(vars; check))
 Laplacian(vars; check = true) = Laplacian{false}(vars; check)
+
+SU.promote_symtype(lap::Laplacian, T::SU.TypeT) = SU.promote_symtype(lap.div, SU.promote_symtype(lap.grad, T))
+SU.promote_shape(lap::Laplacian, @nospecialize(sh::SU.ShapeT)) = SU.promote_shape(lap.div, SU.promote_shape(lap.grad, sh))
+
+function (lap::Laplacian{E})(x::SymbolicT) where {E}
+    shape = SU.shape(x)
+    if SU.is_array_shape(shape)
+        (shape isa SU.ShapeVecT && isone(length(shape))) ||
+            throw(ArgumentError(lazy"`Laplacian` of an array field requires a vector field of known length. Got shape $shape."))
+        components = map(lap, _scalarized(x))::Vector{SymbolicT}
+        return E ? components : SConst(components)
+    end
+    E && return lap.div(lap.grad(x))
+    return STerm(lap, SArgsT((x,)); type = SU.promote_symtype(lap, symtype(x)), shape = SU.promote_shape(lap, shape))
+end
+(lap::Laplacian)(x::Num) = Num(lap(unwrap(x)))
+(lap::Laplacian)(x::Number) = lap(Num(x))
+(lap::Laplacian{false})(x::Arr{T, 1}) where {T} = Arr{T, 1}(lap(unwrap(x)))
+(lap::Laplacian{true})(x::Arr{T, 1}) where {T} = T.(lap(unwrap(x)))
+function (lap::Laplacian)(x::AbstractArray)
+    isone(ndims(x)) || throw(ArgumentError(lazy"`Laplacian` of an array field requires a vector field. Got an array with size $(size(x))."))
+    return map(lap, x)
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -1753,6 +1789,7 @@ function (c::Curl{false})(x::SymbolicT)
 end
 function (c::Curl{true, N})(x::SymbolicT) where {N}
     SU.promote_shape(c, SU.shape(x))
+    x = _scalarized(x)
     d1 = Differential(c.vars[1])
     d2 = Differential(c.vars[2])
     x1 = x[1]
@@ -1810,9 +1847,30 @@ function (c::Curl{E, N})(arr::AbstractVector) where {E, N}
     return res
 end
 
+const LazyVectorOperator = Union{Grad{false}, Divergence{false}, Curl{false}, Laplacian{false}}
+
 _expanded_der_op(g::Grad{false}) = Grad{true}(g.vars; check = false)
 _expanded_der_op(d::Divergence{false}) = Divergence{true}(d.vars; check = false)
 _expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
+_expanded_der_op(l::Laplacian{false}) = Laplacian{true}(_expanded_der_op(l.grad), _expanded_der_op(l.div))
+
+# The eager operators index their argument, which `scalarize` does for any array of known vector
+# shape. `scalar * array` is by far the most common array-shaped argument, so it is scalarized directly.
+# Scalars and arrays of unknown length are returned unchanged.
+function _scalarized(arg::SymbolicT)
+    shape = SU.shape(arg)
+    (shape isa SU.ShapeVecT && SU.is_array_shape(shape)) || return arg
+    @match arg begin
+        BSImpl.Term(; f, args) && if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1])) end => begin
+            buffer = SymbolicT[]
+            for idx in SU.stable_eachindex(args[2])
+                push!(buffer, args[1] * args[2][idx])
+            end
+            return buffer
+        end
+        _ => return SymbolicT[SConst(c) for c in SU.scalarize(arg)]
+    end
+end
 
 """
 $(TYPEDSIGNATURES)
@@ -1822,7 +1880,7 @@ its `E = true` variant and expanding the `Differential`s this produces. Vector
 results (`Grad`, `Curl`) are wrapped as an `array_literal` so expansion stays a
 single `SymbolicT`.
 """
-function executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::SymbolicT; simplify = false, throw_no_derivative = false)
+function executediff(op::LazyVectorOperator, arg::SymbolicT; simplify = false, throw_no_derivative = false)
     res = _expanded_der_op(op)(arg)
     res isa AbstractVector || return expand_derivatives(res, simplify; throw_no_derivative)
     for i in eachindex(res)
@@ -1831,8 +1889,45 @@ function executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg
     return SConst(res)
 end
 
-executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Num; kw...) = executediff(op, unwrap(arg); kw...)
-executediff(op::Union{Grad{false}, Divergence{false}, Curl{false}}, arg::Number; kw...) = executediff(op, SConst(arg); kw...)
+executediff(op::LazyVectorOperator, arg::Num; kw...) = executediff(op, unwrap(arg); kw...)
+executediff(op::LazyVectorOperator, arg::Number; kw...) = executediff(op, SConst(arg); kw...)
+
+"""
+$(TYPEDSIGNATURES)
+
+Return `true` if `t` is a symbolic term whose operation is a lazy [`Grad`](@ref),
+[`Divergence`](@ref), [`Curl`](@ref) or [`Laplacian`](@ref) (`E = false`), such as
+`Grad(vars)(u)`. Wrapped values such as `Num` are unwrapped first. Eager (`E = true`)
+results are plain expressions and `Differential`s, so this is `false` for them and for
+[`is_derivative`](@ref) terms. Only the top-level operation of `t` is checked; use
+[`Symbolics.hasnode`](@ref) to search subexpressions.
+
+See also: [`is_laplacian`](@ref), [`is_derivative`](@ref).
+"""
+function is_vector_operator(t::SymbolicT)
+    @match t begin
+        BSImpl.Term(; f) && if f isa LazyVectorOperator end => true
+        _ => false
+    end
+end
+is_vector_operator(t) = iswrapped(t) && is_vector_operator(unwrap(t))
+
+"""
+$(TYPEDSIGNATURES)
+
+Return `true` if `t` is a symbolic term whose operation is a lazy [`Laplacian`](@ref),
+such as `Laplacian(vars)(u)`. Wrapped values such as `Num` are unwrapped first. A lazy
+[`Divergence`](@ref) applied to a lazy [`Grad`](@ref) term is not a `Laplacian`.
+
+See also: [`is_vector_operator`](@ref).
+"""
+function is_laplacian(t::SymbolicT)
+    @match t begin
+        BSImpl.Term(; f) && if f isa Laplacian{false} end => true
+        _ => false
+    end
+end
+is_laplacian(t) = iswrapped(t) && is_laplacian(unwrap(t))
 
 Base.:(==)(a::Grad{E}, b::Grad{E}) where {E} = isequal(a.vars, b.vars)
 Base.hash(a::Grad{E}, u::UInt) where {E} = hash(a.vars, u)
@@ -1840,6 +1935,8 @@ Base.:(==)(a::Divergence{E}, b::Divergence{E}) where {E} = isequal(a.vars, b.var
 Base.hash(a::Divergence{E}, u::UInt) where {E} = hash(a.vars, u)
 Base.:(==)(a::Curl{E}, b::Curl{E}) where {E} = isequal(a.vars, b.vars)
 Base.hash(a::Curl{E}, u::UInt) where {E} = hash(a.vars, u)
+Base.:(==)(a::Laplacian{E}, b::Laplacian{E}) where {E} = a.grad == b.grad && a.div == b.div
+Base.hash(a::Laplacian{E}, u::UInt) where {E} = hash(a.div, hash(a.grad, u))
 
 function Base.show(io::IO, ::Grad)
     warn_load_latexify()
@@ -1852,6 +1949,12 @@ function Base.show(io::IO, ::Divergence)
     print(io, "∇⋅")
 end
 Base.nameof(::Divergence) = Symbol("∇⋅")
+
+function Base.show(io::IO, ::Laplacian)
+    warn_load_latexify()
+    print(io, "∇⋅∇")
+end
+Base.nameof(::Laplacian) = Symbol("∇⋅∇")
 
 function Base.show(io::IO, ::Curl)
     warn_load_latexify()
