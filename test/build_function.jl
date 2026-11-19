@@ -441,6 +441,48 @@ end
     end
 end
 
+@testset "in-place `build_function` with sparse wrappers" begin
+    @variables a b c d
+    vals = [2.0, 3.0, 5.0, 1.0]
+    for (M, numeric) in (
+            ([a b; c d], [2.0 3.0; 5.0 1.0]),
+            ([a 0 b; 0 c d], [2.0 0.0 3.0; 0.0 5.0 1.0]),
+        )
+        @testset "$(size(M)), $wrap" for wrap in (identity, transpose, adjoint, x -> reshape(x, length(x)))
+            expected = wrap(sparse(numeric))
+            f_oop, f_iip = build_function(wrap(sparse(M)), [a, b, c, d]; expression = Val{false})
+            result = f_oop(vals)
+            @test result == expected
+            storage = similar(sparse(numeric), Float64)
+            fill!(nonzeros(storage), NaN)
+            for out in (similar(result, Float64), wrap(storage))
+                f_iip(out, vals)
+                @test out == expected
+            end
+        end
+        f_oop, f_iip = build_function(M, [a, b, c, d]; expression = Val{false})
+        @test f_oop(vals) == numeric
+        out = similar(numeric)
+        f_iip(out, vals)
+        @test out == numeric
+    end
+    @testset "complex adjoint" begin
+        @variables z1::Complex z2::Complex
+        vals = [1.0 + 2.0im, 3.0 - 1.0im]
+        M = sparse([vals[1] vals[2]; 0 vals[1]])
+        expected = copy(adjoint(M))
+        f_oop, f_iip = build_function(adjoint(sparse([z1 z2; 0 z1])), [z1, z2]; expression = Val{false})
+        result = f_oop(vals)
+        @test result == expected
+        storage = similar(M, ComplexF64)
+        fill!(nonzeros(storage), Complex(NaN, NaN))
+        for out in (similar(result, ComplexF64), adjoint(storage))
+            f_iip(out, vals)
+            @test out == expected
+        end
+    end
+end
+
 @testset "MultithreadedForm expressions can be written to a file and included" begin
     @variables x y
     A = [
