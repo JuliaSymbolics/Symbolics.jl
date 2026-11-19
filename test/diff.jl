@@ -1514,3 +1514,24 @@ end
         expand_derivatives.([L(2 * o[0]), L(2 * o[1])]),
     )
 end
+
+@testset "Short slices of huge parents and unknown-length scalar*array operands" begin
+    @variables x y u(x, y) w(..)[1:2] v::Vector{Real} big[1:1_000_000]
+    Dd(s, f) = Differential(s)(f)
+    W = w(x, y)
+    # components of the slice are taken from the parent without materialising it
+    short = unwrap((2 * big)[1:2])
+    Symbolics._scalarized(short)
+    @test (@elapsed Symbolics._scalarized(short)) < 1
+    @test isequal(Symbolics._scalarized(short), unwrap.([2 * big[1], 2 * big[2]]))
+    @test isequal(Symbolics._scalarized(unwrap((2 * big + big)[2:3])), unwrap.([2 * big[2] + big[2], 2 * big[3] + big[3]]))
+    # unknown-length `scalar * array` operand inside a sum of known length
+    @test isequal(
+        expand_derivatives(Divergence([x, y])(u * v + W)),
+        expand_derivatives(Dd(x, u * v[1] + W[1]) + Dd(y, u * v[2] + W[2])),
+    )
+    @test isequal(
+        expand_derivatives(Divergence{true}([x, y])(unwrap(u * v + v + W))),
+        expand_derivatives(Dd(x, u * v[1] + v[1] + W[1]) + Dd(y, u * v[2] + v[2] + W[2])),
+    )
+end

@@ -1838,9 +1838,41 @@ end
 
 _symbolic_component(x) = (x = unwrap(x); x isa SymbolicT ? x : SConst(x))
 
+# Whether components of `arg` can be taken one at a time by `_component_at`, without materialising the
+# whole array: atomic arrays, arrays of unknown shape and `scalar * array` or sums of such arrays.
+function _has_direct_components(arg::SymbolicT)
+    SU.shape(arg) isa SU.ShapeVecT || return true
+    iscall(arg) || return true
+    f = operation(arg)
+    args = arguments(arg)
+    if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1]))
+        return _has_direct_components(args[2])
+    elseif f === (+)
+        return all(_has_direct_components, args)
+    end
+    return _is_atomic_array(arg)
+end
+
+# The `position`-th (1-based) component of an array with `_has_direct_components`, or of an operand of
+# unknown shape inside a `scalar * array` or sum.
+function _component_at(arg::SymbolicT, position::Int)
+    if iscall(arg)
+        f = operation(arg)
+        args = arguments(arg)
+        if f === (*) && length(args) == 2 && !SU.is_array_shape(SU.shape(args[1]))
+            return args[1] * _component_at(args[2], position)
+        elseif f === (+)
+            return SU.add_worker(VartypeT, SArgsT([_component_at(a, position) for a in args]))
+        end
+    end
+    shape = SU.shape(arg)
+    return arg[shape isa SU.ShapeVecT ? first(shape[1]) + position - 1 : position]
+end
+
 # Components of a known-shape array expression, or `nothing` if `scalarize` cannot produce them.
 # Scalarizing a slice of an expression leaves every component indexing the unscalarized parent, so
-# the parent is scalarized once and the components are taken from it by position.
+# the components are taken from the parent: directly when it has direct components, and otherwise
+# from the parent scalarized once.
 function _expression_components(arg::SymbolicT)
     components = SU.scalarize(arg)
     components isa AbstractVector || return nothing
@@ -1848,9 +1880,13 @@ function _expression_components(arg::SymbolicT)
         parent = arguments(arg)[1]
         parent_shape = SU.shape(parent)
         if parent_shape isa SU.ShapeVecT && isone(length(parent_shape))
+            offset = first(parent_shape[1])
+            if _has_direct_components(parent)
+                return SymbolicT[_parent_component(c, parent, offset, nothing) for c in components]
+            end
             parent_components = _expression_components(parent)
             parent_components === nothing || return SymbolicT[
-                _parent_component(c, parent, first(parent_shape[1]), parent_components) for c in components
+                _parent_component(c, parent, offset, parent_components) for c in components
             ]
         end
     end
@@ -1861,7 +1897,10 @@ function _parent_component(c, parent::SymbolicT, offset, parent_components)
     c = unwrap(c)
     if c isa SymbolicT && iscall(c) && operation(c) === getindex && isequal(arguments(c)[1], parent)
         index = SU.unwrap_const(arguments(c)[2])
-        index isa Integer && return parent_components[index - offset + 1]
+        if index isa Integer
+            position = index - offset + 1
+            return parent_components === nothing ? _component_at(parent, position) : parent_components[position]
+        end
     end
     return _symbolic_component(c isa SymbolicT ? SU.scalarize(c) : c)
 end
@@ -1869,7 +1908,7 @@ end
 # Operands keep their own (possibly offset) axes, so components are paired by position. An operand
 # of unknown shape inside a sum or product of known length `n` is indexed from 1.
 function _positional_components(arg::SymbolicT, n::Int)
-    SU.shape(arg) isa SU.ShapeVecT || return SymbolicT[arg[i] for i in 1:n]
+    SU.shape(arg) isa SU.ShapeVecT || return SymbolicT[_component_at(arg, i) for i in 1:n]
     components = _scalarized(arg)
     components isa SymbolicT || return components
     return SymbolicT[components[i] for i in SU.stable_eachindex(components)]
