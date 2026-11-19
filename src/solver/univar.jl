@@ -51,8 +51,15 @@ function get_roots_deg3(expression, x)
     Q = (((3 * a * c) - b^2)) / (9a^2)
     R = ((9 * a * b * c - ((27 * (a^2) * d) + 2b^3))) / (54a^3)
 
-    S = term(scbrt, (R + term(ssqrt, (Q^3 + R^2))))
-    T = term(scbrt, (R - term(ssqrt, (Q^3 + R^2))))
+    if Q isa Real && R isa Real
+        S = term(scbrt, (R + term(ssqrt, (Q^3 + R^2))))
+        T = term(scbrt, (R - term(ssqrt, (Q^3 + R^2))))
+    else
+        # Independent principal cube roots break `S * T == -Q` for complex values,
+        # including complex values substituted for symbolic coefficients later.
+        S = term(cardano_cbrt, Q, R, 1)
+        T = term(cardano_cbrt, Q, R, 2)
+    end
 
     root1 = S + T - (b / (3 * a))
     root2 = -((S + T) / 2) - exact_div(b, 3 * a) + (im * (term(ssqrt, 3)) / 2) * (S - T)
