@@ -970,57 +970,52 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
     return result
 end
 
-function _augment_with_call_args!(vs)
-    visited = Set{Tuple{Any, Set{Any}}}()
-    worklist = Tuple{Any, Set{Any}}[(s, Set{Any}()) for s in vs]
-    for item in worklist
-        push!(visited, item)
+function _get_free_dependencies!(ex, memo)
+    if haskey(memo, ex)
+        return memo[ex]
     end
-    while !isempty(worklist)
-        s, bound_vars = pop!(worklist)
-        SymbolicUtils.iscall(s) || continue
-        op = SymbolicUtils.operation(s)
-        if op isa Integral
-            bvars = op.domain.variables isa Union{Tuple, AbstractVector} ? op.domain.variables : (op.domain.variables,)
-            next_bvars = union(bound_vars, bvars)
-            for arg in SymbolicUtils.arguments(s)
-                (arg in next_bvars) && continue
-                push!(vs, arg)
-                if !((arg, next_bvars) in visited)
-                    push!(visited, (arg, next_bvars))
-                    push!(worklist, (arg, next_bvars))
-                end
-            end
-        elseif is_scalar_indexed(s)
-            args = SymbolicUtils.arguments(s)
-            if all(_is_scalar_literal, @view args[2:end])
-                indexed_expr = args[1]
-                if SymbolicUtils.iscall(indexed_expr)
-                    if !((indexed_expr, bound_vars) in visited)
-                        push!(visited, (indexed_expr, bound_vars))
-                        push!(worklist, (indexed_expr, bound_vars))
-                    end
-                end
-            else
-                for arg in args
-                    (arg in bound_vars) && continue
-                    push!(vs, arg)
-                    if !((arg, bound_vars) in visited)
-                        push!(visited, (arg, bound_vars))
-                        push!(worklist, (arg, bound_vars))
-                    end
-                end
-            end
-        else
-            for arg in SymbolicUtils.arguments(s)
-                (arg in bound_vars) && continue
-                push!(vs, arg)
-                if !((arg, bound_vars) in visited)
-                    push!(visited, (arg, bound_vars))
-                    push!(worklist, (arg, bound_vars))
+    res = Set{SymbolicT}()
+    push!(res, ex)
+    if !SymbolicUtils.iscall(ex)
+        memo[ex] = res
+        return res
+    end
+    op = SymbolicUtils.operation(ex)
+    if op isa Integral
+        bvars = op.domain.variables isa Union{Tuple, AbstractVector} ? Set{Any}(op.domain.variables) : Set{Any}((op.domain.variables,))
+        for arg in SymbolicUtils.arguments(ex)
+            arg_vars = _get_free_dependencies!(arg, memo)
+            for v in arg_vars
+                if !(v in bvars)
+                    push!(res, v)
                 end
             end
         end
+    elseif is_scalar_indexed(ex)
+        args = SymbolicUtils.arguments(ex)
+        if all(_is_scalar_literal, @view args[2:end])
+            indexed_expr = args[1]
+            if SymbolicUtils.iscall(indexed_expr)
+                union!(res, _get_free_dependencies!(indexed_expr, memo))
+            end
+        else
+            for arg in args
+                union!(res, _get_free_dependencies!(arg, memo))
+            end
+        end
+    else
+        for arg in SymbolicUtils.arguments(ex)
+            union!(res, _get_free_dependencies!(arg, memo))
+        end
+    end
+    memo[ex] = res
+    return res
+end
+
+function _augment_with_call_args!(vs)
+    memo = Dict{Any, Set{SymbolicT}}()
+    for s in collect(vs)
+        union!(vs, _get_free_dependencies!(s, memo))
     end
     return vs
 end

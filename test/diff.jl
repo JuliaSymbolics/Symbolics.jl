@@ -141,6 +141,19 @@ let
     @test isequal(Symbolics.jacobian([e_order2], [t])[1, 1], Symbolics.derivative(e_order2, t))
     @test isequal(Symbolics.hessian(e_order1, [t])[1, 1], Symbolics.derivative(Symbolics.derivative(e_order1, t), t))
     @test isequal(Symbolics.hessian(e_order2, [t])[1, 1], Symbolics.derivative(Symbolics.derivative(e_order2, t), t))
+
+    # Scaling regression for shared subexpressions across integration scopes
+    let
+        n_sc = 14
+        @variables q_sc t_sc[1:n_sc] f_sc(..) g_sc(..)
+        e_sc = g_sc(t_sc...)
+        for k in 1:n_sc
+            I_k = Integral(t_sc[k] in Symbolics.DomainSets.ClosedInterval(0, 1))
+            e_sc = f_sc(e_sc, I_k(e_sc))
+        end
+        ops_sc, vars_sc = [e_sc], [q_sc]
+        @test isequal(only(Symbolics.jacobian(ops_sc, vars_sc)), 0)
+    end
 end
 
 # issue 252
