@@ -162,22 +162,39 @@ function structural_key(t)
 end
 
 # Qualified by module: `Base.log` and `NaNMath.log` both print as `log`. A
-# callable object with fields also carries their values, since two instances
+# callable object with fields also carries their contents, since two instances
 # of one type are different operations.
 function op_key(op)
     T = typeof(op)
-    name = op isa Function && Base.issingletontype(T) ?
-        string(parentmodule(op), ".", nameof(op)) : string(parentmodule(T), ".", T)
-    nfields(op) == 0 && return name
-    fields = (isdefined(op, i) ? leaf_key(getfield(op, i)) : "#undef" for i in 1:nfields(op))
-    return string(name, "{", join(fields, ","), "}")
+    op isa Function && Base.issingletontype(T) && return string(parentmodule(op), ".", nameof(op))
+    return value_key(op, KEY_DEPTH)
 end
 
 # `repr` round-trips the machine floats exactly; a `BigFloat` also needs its
 # precision, and a symbol its symbolic type.
 leaf_key(v::BasicSymbolic) = string("sym:", v, "::", symtype(v))
-leaf_key(v::BigFloat) = string("BigFloat@", precision(v), ":", repr(v))
-leaf_key(v) = string(typeof(v), ":", repr(v))
+leaf_key(v) = value_key(v, KEY_DEPTH)
+
+# How deep `value_key` follows fields, which also stops on cyclic objects.
+const KEY_DEPTH = 8
+
+# Key of a non-symbolic value from its contents rather than its display, which
+# a custom `show` can make ambiguous: fields are followed recursively, so two
+# values that differ in any (nested) field get different keys.
+value_key(v::BigFloat, depth) = string("BigFloat@", precision(v), ":", repr(v))
+const REPR_EXACT = Union{Base.BitInteger, BigInt, Bool, Base.IEEEFloat, Rational, Complex, AbstractIrrational, AbstractString, Symbol, Char}
+value_key(v::REPR_EXACT, depth) = string(typeof(v), ":", repr(v))
+function value_key(v::AbstractArray, depth)
+    depth == 0 && return string(typeof(v), size(v), "[…]")
+    return string(typeof(v), size(v), "[", join((value_key(e, depth - 1) for e in v), ","), "]")
+end
+function value_key(v, depth)
+    T = typeof(v)
+    name = string(parentmodule(T), ".", T)
+    (nfields(v) == 0 || depth == 0) && return string(name, ":", repr(v))
+    fields = (isdefined(v, i) ? value_key(getfield(v, i), depth - 1) : "#undef" for i in 1:nfields(v))
+    return string(name, "{", join(fields, ","), "}")
+end
 
 # Apply a rule for a two-term sum to the terms of `t` in an order that depends
 # only on the terms themselves. `@acrule` tries them in the order of the sum's
@@ -187,7 +204,10 @@ leaf_key(v) = string(typeof(v), ":", repr(v))
 # are separated by their hash, which is a function of the term's value. Two
 # distinct terms that still tie cannot be ordered independently of the
 # internal order, so such a sum is left alone rather than given a root picked
-# by that order. Like `@acrule`, the terms the rule does not consume are kept.
+# by that order. Since the key follows the contents of every leaf and callable,
+# such terms have bases and exponents with equal contents, and for pure
+# callables `b^f + b^f = 0` has no solution, so nothing valid is lost. Like
+# `@acrule`, the terms the rule does not consume are kept.
 function apply_to_sorted_pairs(rule, t)
     (iscall(t) && operation(t) === (+)) || return nothing
     args = collect(arguments(t))

@@ -796,9 +796,9 @@ end
 end
 
 # Callable objects used as the bases of exponentials below: one with state,
-# one with an uninitialised reference field, and one that is deliberately
-# indistinguishable from another instance by `show` and `hash`. The first two
-# also share one `hash` across instances: the default hash of a struct can
+# one with an uninitialised reference field, one whose state sits in a nested
+# field hidden by `show`, and a mutable one. All share one `hash` across
+# instances: the default hash of a struct can
 # vary between processes, and a collision makes the iteration order of a sum
 # follow the insertion order, which the fixture varies, so both orders are
 # exercised in every process.
@@ -825,6 +825,12 @@ struct AttractHidden <: Function
 end
 (s::AttractHidden)(v) = s.h.k * v
 Base.hash(::AttractHidden, h::UInt) = hash(:AttractHidden, h)
+
+mutable struct AttractBox <: Function
+    k::Int
+end
+(s::AttractBox)(v) = s.k * v
+Base.hash(::AttractBox, h::UInt) = hash(:AttractBox, h)
 
 # Value of a constant symbolic expression, with its real number leaves
 # promoted to `BigFloat` so that the evaluation does not lose the precision
@@ -860,9 +866,9 @@ end
     # - `sorted_arguments` ties the first pair (same base, exponent constants
     #   of equal magnitude);
     # - the bases of the second pair print the same (`0.1`) although they differ;
-    # - the bases of the third and fourth pairs are calls of two callable
-    #   objects of one type that differ only in a field (with, in the fourth,
-    #   an uninitialised reference field next to it).
+    # - the bases of the other pairs are calls of two callable objects of one
+    #   type that differ only in a field: plain, next to an uninitialised
+    #   reference field, or nested in a field whose `show` hides it.
     # Ranking a pair equally lets the internal order decide which of two
     # conjugate roots is returned. Each residual is computed at 256 bits,
     # relative to the size of the two terms.
@@ -873,6 +879,9 @@ end
         (scalar_call(AttractScaleBy(2))^x, scalar_call(AttractScaleBy(5))^x,
             z -> (big(2)^z, big(5)^z)),
         (scalar_call(AttractCached(2))^x, scalar_call(AttractCached(5))^x,
+            z -> (big(2)^z, big(5)^z)),
+        (scalar_call(AttractHidden(AttractHiddenFactor(2)))^x,
+            scalar_call(AttractHidden(AttractHiddenFactor(5)))^x,
             z -> (big(2)^z, big(5)^z)),
     ]
     @testset "$(p[1]) + $(p[2])" for p in pairs
@@ -889,12 +898,14 @@ end
         end
     end
 
-    # Two distinct terms that no deterministic key separates: `show` and `hash`
-    # of the two bases agree. No order of them can be chosen independently of
-    # the internal order, so the sum is left as it is, for every order.
+    # Two distinct terms that no deterministic key separates: two distinct
+    # mutable callables with equal contents and colliding hashes. No order of
+    # them is independent of the internal order, so the sum is left as it is,
+    # for every order. Their sum is 2·2^x, which has no root, so declining
+    # loses no solution.
     @testset "terms that cannot be ordered are left alone" begin
-        t1 = value(scalar_call(AttractHidden(AttractHiddenFactor(2)))^x)
-        t2 = value(scalar_call(AttractHidden(AttractHiddenFactor(5)))^x)
+        t1 = value(scalar_call(AttractBox(2))^x)
+        t2 = value(scalar_call(AttractBox(2))^x)
         @test !isequal(t1, t2)
         @test hash(t1) == hash(t2)
         sums = sums_with_capacities(t1, t2)
