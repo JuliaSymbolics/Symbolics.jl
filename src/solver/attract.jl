@@ -169,7 +169,8 @@ function op_key(op)
     name = op isa Function && Base.issingletontype(T) ?
         string(parentmodule(op), ".", nameof(op)) : string(parentmodule(T), ".", T)
     nfields(op) == 0 && return name
-    return string(name, "{", join((leaf_key(getfield(op, i)) for i in 1:nfields(op)), ","), "}")
+    fields = (isdefined(op, i) ? leaf_key(getfield(op, i)) : "#undef" for i in 1:nfields(op))
+    return string(name, "{", join(fields, ","), "}")
 end
 
 # `repr` round-trips the machine floats exactly; a `BigFloat` also needs its
@@ -182,14 +183,20 @@ leaf_key(v) = string(typeof(v), ":", repr(v))
 # only on the terms themselves. `@acrule` tries them in the order of the sum's
 # internal term dictionary, which depends on how that sum was first built, so
 # the same input could bind `~b` to either base and return a different root.
-# `structural_key` gives a readable, stable order; any two distinct terms it
-# still ranks equally are separated by their hash, which is a function of the
-# term's value, so equal inputs always get the same order. Like `@acrule`, the
-# terms the rule does not consume are kept.
+# `structural_key` gives a readable, stable order, and terms it ranks equally
+# are separated by their hash, which is a function of the term's value. Two
+# distinct terms that still tie cannot be ordered independently of the
+# internal order, so such a sum is left alone rather than given a root picked
+# by that order. Like `@acrule`, the terms the rule does not consume are kept.
 function apply_to_sorted_pairs(rule, t)
     (iscall(t) && operation(t) === (+)) || return nothing
-    args = sort(collect(arguments(t)); by = a -> (structural_key(a), hash(a)))
+    args = collect(arguments(t))
+    order_keys = [(structural_key(a), hash(a)) for a in args]
+    perm = sortperm(order_keys)
+    args, order_keys = args[perm], order_keys[perm]
     n = length(args)
+    # The terms of a sum are distinct, so equal keys are an unresolved tie.
+    any(i -> order_keys[i] == order_keys[i + 1], 1:(n - 1)) && return nothing
     for i in 1:n, j in 1:n
         i == j && continue
         res = rule(term(+, args[i], args[j]))

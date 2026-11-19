@@ -795,11 +795,30 @@ end
     @test abs(2.0^(root + 1) + 5.0^(root + 3)) < 1e-12
 end
 
-# A callable object with state, used as the base of an exponential below.
+# Callable objects used as the bases of exponentials below: one with state,
+# one with an uninitialised reference field, and one that is deliberately
+# indistinguishable from another instance by `show` and `hash`.
 struct AttractScaleBy <: Function
     k::Int
 end
 (s::AttractScaleBy)(v) = s.k * v
+
+struct AttractCached <: Function
+    k::Int
+    cache::Vector{Int}
+    AttractCached(k) = new(k)
+end
+(s::AttractCached)(v) = s.k * v
+
+struct AttractHiddenFactor
+    k::Int
+end
+Base.show(io::IO, ::AttractHiddenFactor) = print(io, "AttractHiddenFactor(?)")
+struct AttractHidden <: Function
+    h::AttractHiddenFactor
+end
+(s::AttractHidden)(v) = s.h.k * v
+Base.hash(::AttractHidden, h::UInt) = hash(:AttractHidden, h)
 
 # Value of a constant symbolic expression, with its real number leaves
 # promoted to `BigFloat` so that the evaluation does not lose the precision
@@ -812,36 +831,46 @@ function big_value(ex)
     return eval(Symbolics.toexpr(promote(Symbolics.unwrap(ex))))
 end
 
+scalar_call(f) = Symbolics.Num(SymbolicUtils.term(f, 1; type = Real, shape = SymbolicUtils.ShapeVecT()))
+
+# Sums equal to t1 + t2 whose term dictionaries differ in capacity and in
+# insertion order, hence in iteration order (insertion order matters when the
+# two hashes collide). `unsafe` skips hash-consing, which would return one
+# shared object.
+function sums_with_capacities(t1, t2)
+    map(0:25) do i
+        d = SymbolicUtils.ACDict{SymbolicUtils.SymReal}()
+        sizehint!(d, 2^(i ÷ 2))
+        first, second = iseven(i) ? (t1, t2) : (t2, t1)
+        d[first] = 1
+        d[second] = 1
+        SymbolicUtils.Add{SymbolicUtils.SymReal}(0, d; type = Real, unsafe = true)
+    end
+end
+
 @testset "symbolic_solve on two exponentials does not depend on the internal term order" begin
     @variables x
     # Pairs of distinct terms that are easy to rank equally:
     # - `sorted_arguments` ties the first pair (same base, exponent constants
     #   of equal magnitude);
     # - the bases of the second pair print the same (`0.1`) although they differ;
-    # - the bases of the third pair are calls of two callable objects of one
-    #   type that differ only in their stored field.
+    # - the bases of the third and fourth pairs are calls of two callable
+    #   objects of one type that differ only in a field (with, in the fourth,
+    #   an uninitialised reference field next to it).
     # Ranking a pair equally lets the internal order decide which of two
-    # conjugate roots is returned. Each residual is computed at 256 bits.
-    scalar_call(f) = Symbolics.Num(SymbolicUtils.term(f, 1; type = Real, shape = SymbolicUtils.ShapeVecT()))
-    a1, a2 = scalar_call(AttractScaleBy(2)), scalar_call(AttractScaleBy(5))
+    # conjugate roots is returned. Each residual is computed at 256 bits,
+    # relative to the size of the two terms.
     pairs = [
-        (2^(x + 1), 2^(2x - 1), z -> big(2)^(z + 1) + big(2)^(2z - 1)),
+        (2^(x + 1), 2^(2x - 1), z -> (big(2)^(z + 1), big(2)^(2z - 1))),
         (Float16(0.1)^(x + 1), 0.1^(x + 1),
-            z -> big(Float16(0.1))^(z + 1) + big(0.1)^(z + 1)),
-        (a1^x, a2^x, z -> big(2)^z + big(5)^z),
+            z -> (big(Float16(0.1))^(z + 1), big(0.1)^(z + 1))),
+        (scalar_call(AttractScaleBy(2))^x, scalar_call(AttractScaleBy(5))^x,
+            z -> (big(2)^z, big(5)^z)),
+        (scalar_call(AttractCached(2))^x, scalar_call(AttractCached(5))^x,
+            z -> (big(2)^z, big(5)^z)),
     ]
     @testset "$(p[1]) + $(p[2])" for p in pairs
-        t1, t2 = value(p[1]), value(p[2])
-        residual = p[3]
-        function sum_with_capacity(n)
-            d = SymbolicUtils.ACDict{SymbolicUtils.SymReal}()
-            sizehint!(d, n)
-            d[t1] = 1
-            d[t2] = 1
-            # `unsafe` skips hash-consing, which would return one shared object.
-            return SymbolicUtils.Add{SymbolicUtils.SymReal}(0, d; type = Real, unsafe = true)
-        end
-        sums = [sum_with_capacity(2^k) for k in 0:12]
+        sums = sums_with_capacities(value(p[1]), value(p[2]))
         @test all(s -> isequal(s, sums[1]), sums)
         @test length(unique(collect.(SymbolicUtils.arguments.(sums)))) > 1
 
@@ -849,8 +878,22 @@ end
         @test all(r -> isequal(r, roots[1]), roots)
         @test length(roots[1]) == 1
         setprecision(BigFloat, 256) do
-            z = big_value(only(roots[1]))
-            @test abs(residual(z)) < 1e-60
+            u, v = p[3](big_value(only(roots[1])))
+            @test abs(u + v) / (abs(u) + abs(v)) < 1e-60
         end
+    end
+
+    # Two distinct terms that no deterministic key separates: `show` and `hash`
+    # of the two bases agree. No order of them can be chosen independently of
+    # the internal order, so the sum is left as it is, for every order.
+    @testset "terms that cannot be ordered are left alone" begin
+        t1 = value(scalar_call(AttractHidden(AttractHiddenFactor(2)))^x)
+        t2 = value(scalar_call(AttractHidden(AttractHiddenFactor(5)))^x)
+        @test !isequal(t1, t2)
+        @test hash(t1) == hash(t2)
+        sums = sums_with_capacities(t1, t2)
+        @test length(unique(collect.(SymbolicUtils.arguments.(sums)))) > 1
+        results = [Symbolics.attract_exponential(s, x) for s in sums]
+        @test all(r -> isequal(r, sums[1]), results)
     end
 end
