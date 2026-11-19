@@ -23,6 +23,13 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
     type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
 )
 
+function write_rule_output!(out, outputidxs, value)
+    for (i, o) in enumerate(outputidxs)
+        out[o] = value[i]
+    end
+    return out
+end
+
 function rule_output_buffer(out, sz, own_eltype::Bool)
     T = eltype(out)
     T = own_eltype && T <: AbstractFloat ? T : T <: Number ? promote_type(T, Float64) : Float64
@@ -264,8 +271,11 @@ function codegen_function(
             )
             value = Code.supports_with_allocator(expr) ?
                 Code.with_allocator(SU.Term{VartypeT}(Returns, SArgsT((buffer,)); type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()), expr) : expr
-            dest = outputidxs === nothing ? IIP_OUTSYM : SU.Term{VartypeT}(view, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(outputidxs))); type = Any)
-            SU.Term{VartypeT}(copyto!, SArgsT((dest, value)); type = SU.symtype(expr), shape = SU.shape(expr))
+            if outputidxs === nothing
+                SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, value)); type = SU.symtype(expr), shape = SU.shape(expr))
+            else
+                SU.Term{VartypeT}(write_rule_output!, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(outputidxs), value)); type = Any)
+            end
         else
             set_array(nothing, args, IIP_OUTSYM, outputidxs, expr, checkbounds, skipzeros)
         end

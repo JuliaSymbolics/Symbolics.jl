@@ -5,6 +5,7 @@ using SymbolicUtils: unwrap
 using SparseArrays
 using LinearAlgebra
 using RuntimeGeneratedFunctions
+using ForwardDiff
 
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
@@ -532,6 +533,11 @@ end
     out = fill(100.0, 5)
     @invokelatest eval(iip)(out, u)
     @test out == [sin(u[2]), 100.0, sin(u[3]), 100.0, sin(u[1])]
+    out = Dict(i => 100.0 for i in 1:5)
+    @invokelatest eval(iip)(out, u)
+    @test out == Dict(1 => sin(u[2]), 2 => 100.0, 3 => sin(u[3]), 4 => 100.0, 5 => sin(u[1]))
+    _, iip = Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule])
+    @test ForwardDiff.jacobian((y, v) -> @invokelatest(eval(iip)(y, v)), zeros(3), u) == Diagonal(cos.(u))
     @test_throws ArgumentError Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule], skipzeros = true)
 
     sx = unwrap(x)
@@ -544,13 +550,15 @@ end
     @invokelatest eval(iip)(out, u)
     @test out == u .+ 2
 
-    swapped = SymbolicUtils.ArrayMaker{SymReal}([[1:2], [3:3]], [sx[2:3], sx[1:1]]; shape = SymbolicUtils.ShapeVecT((1:3,)))
+    @variables w[1:20]
+    sw = unwrap(w)
+    swapped = SymbolicUtils.ArrayMaker{SymReal}([[1:10], [11:20]], [sw[11:20], sw[1:10]]; shape = SymbolicUtils.ShapeVecT((1:20,)))
     SymbolicUtils.populate_ir!(ir, swapped)
     swap = Code.OptimizationRule("swap", detector, (ir, expr, _) -> (ir, swapped), 1)
-    _, iip = Symbolics.codegen_function(ir, xs, [sx]; optimize = [swap])
-    v = copy(u)
+    _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [swap])
+    v = collect(1.0:20.0)
     @invokelatest eval(iip)(v, v)
-    @test v == [2.0, 3.0, 1.0]
+    @test v == [11.0:20.0; 1.0:10.0]
 
     reads_out = [SymbolicUtils.Term{SymReal}(getindex, SymbolicUtils.ArgsT{SymReal}((Symbolics.IIP_OUTSYM, SymbolicUtils.Const{SymReal}(i))); type = Real) for i in 1:3] .+ xs
     as_maker(ir, expr, _) = (new = SymbolicUtils.ArrayMaker{SymReal}([[1:3]], [Symbolics.SConst(collect(expr))]; shape = SymbolicUtils.ShapeVecT((1:3,))); SymbolicUtils.populate_ir!(ir, new); (ir, new))
