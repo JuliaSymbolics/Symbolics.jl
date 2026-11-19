@@ -971,14 +971,46 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
 end
 
 function _augment_with_call_args!(vs)
-    worklist = collect(vs)
+    worklist = Tuple{Any, Set{Any}}[(s, Set{Any}()) for s in vs]
     while !isempty(worklist)
-        s = pop!(worklist)
+        s, bound_vars = pop!(worklist)
         SymbolicUtils.iscall(s) || continue
-        for arg in SymbolicUtils.arguments(s)
-            if !(arg in vs)
-                push!(vs, arg)
-                push!(worklist, arg)
+        op = SymbolicUtils.operation(s)
+        if op isa Integral
+            bvars = op.domain.variables isa Union{Tuple, AbstractVector} ? op.domain.variables : (op.domain.variables,)
+            next_bvars = union(bound_vars, bvars)
+            for arg in SymbolicUtils.arguments(s)
+                arg in next_bvars && continue
+                if !(arg in vs)
+                    push!(vs, arg)
+                    push!(worklist, (arg, next_bvars))
+                end
+            end
+        elseif is_scalar_indexed(s)
+            args = SymbolicUtils.arguments(s)
+            if all(_is_scalar_literal, @view args[2:end])
+                indexed_expr = args[1]
+                if SymbolicUtils.iscall(indexed_expr)
+                    if !(indexed_expr in vs)
+                        push!(worklist, (indexed_expr, bound_vars))
+                    end
+                end
+            else
+                for arg in args
+                    arg in bound_vars && continue
+                    if !(arg in vs)
+                        push!(vs, arg)
+                        push!(worklist, (arg, bound_vars))
+                    end
+                end
+            end
+        else
+            for arg in SymbolicUtils.arguments(s)
+                arg in bound_vars && continue
+                if !(arg in vs)
+                    push!(vs, arg)
+                    push!(worklist, (arg, bound_vars))
+                end
             end
         end
     end

@@ -118,6 +118,18 @@ let
 
     s = sin(Differential(t)(a(t)))
     @test isequal(Symbolics.jacobian([s], [t])[1, 1], Symbolics.derivative(s, t))
+
+    # Literal element access vs whole-array use
+    @variables p[1:2] q[1:2] f(..) g(..)
+    expr1 = f(q, p[2])
+    @test isequal(Symbolics.jacobian([expr1], [p[1]])[1, 1], 0)
+    @test isequal(Symbolics.hessian(expr1, [p[1]])[1, 1], 0)
+    @test_throws ErrorException Symbolics.jacobian([f(p)], [p[1]])
+
+    # Respect integration scope for bound variables in integrand
+    expr2 = f(q, g(Integral(t in Symbolics.DomainSets.ClosedInterval(0, 1))(t)))
+    @test isequal(Symbolics.jacobian([expr2], [t])[1, 1], 0)
+    @test isequal(Symbolics.hessian(expr2, [t])[1, 1], 0)
 end
 
 # issue 252
