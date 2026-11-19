@@ -761,3 +761,87 @@ end
     expected = sort_roots([-sqrt(2.0), -1.0, 1.0, sqrt(2.0)])
     @test all(isapprox.(numeric, expected; atol = 1.0e-6))
 end
+
+@testset "symbolic_solve can return its assumptions" begin
+    @variables x A1 A4
+    key = Symbolics.SOLVE_ASSUMPTIONS_KEY
+    collecting() = haskey(task_local_storage(), key)
+    # Truth value of a symbolic condition at a point.
+    holds(c, point) = SymbolicUtils.unwrap_const(substitute(c, point; fold = Val(true)))
+
+    # A parametric quartic whose resolvent cubic only has a parametric root:
+    # the solver divides by it, so it has to assume it is not zero.
+    ex = A1^2 * x^4 + A4^2
+
+    @testset "default keeps the vector return and logs the assumption" begin
+        roots = @test_logs (:info, r"Assuming") match_mode = :any symbolic_solve(ex, x)
+        @test roots isa AbstractVector
+        @test length(roots) == 4
+    end
+
+    @testset "return_assumptions = true returns the condition instead" begin
+        roots = symbolic_solve(ex, x)
+        sols, assumptions = @test_logs symbolic_solve(ex, x; return_assumptions = true)
+        @test isequal(sols, roots)
+        @test length(assumptions) == 1
+        c = only(assumptions)
+        @test !(c isa Bool)
+        @test holds(c, Dict(A1 => 2, A4 => 3)) === true
+        @test holds(c, Dict(A1 => 2, A4 => 0)) === false
+    end
+
+    @testset "an input without assumptions gives an empty list" begin
+        sols, assumptions = symbolic_solve(x^2 - 4, x; return_assumptions = true)
+        @test length(sols) == 2
+        @test isempty(assumptions)
+    end
+
+    @testset "the integer of a periodic solution is an assumption" begin
+        roots = @test_logs (:info, r"Ζ") match_mode = :any symbolic_solve(cos(x) ~ 1 // 2, x)
+        sols, assumptions = @test_logs symbolic_solve(cos(x) ~ 1 // 2, x; return_assumptions = true)
+        @test length(sols) == length(roots)
+        @test !isempty(assumptions)
+        @test all(c -> SymbolicUtils.iscall(c) && SymbolicUtils.operation(c) === isinteger, assumptions)
+        # Each integer named in the solutions is declared, once.
+        extra = setdiff(Set(v for s in sols for v in Symbolics.get_variables(s)), Set([value(x)]))
+        declared = Set(only(SymbolicUtils.arguments(c)) for c in assumptions)
+        @test isequal(extra, declared)
+        @test length(declared) == length(assumptions)
+    end
+
+    @testset "consecutive calls do not accumulate" begin
+        _, first = symbolic_solve(ex, x; return_assumptions = true)
+        _, second = symbolic_solve(ex, x; return_assumptions = true)
+        @test length(first) == length(second) == 1
+        @test first !== second
+        @test !collecting()
+    end
+
+    @testset "the collector is removed when the solver throws" begin
+        @test_throws AssertionError symbolic_solve(x, x^2; return_assumptions = true)
+        @test !collecting()
+        # and the next call logs again rather than collecting into nothing
+        @test_logs (:info, r"Assuming") match_mode = :any symbolic_solve(ex, x)
+    end
+
+    @testset "a repeated assumption is recorded once" begin
+        collected = Any[]
+        task_local_storage(key, collected) do
+            Symbolics.record_assumption(value(A1) != 0)
+            Symbolics.record_assumption(value(A1) != 0)
+            Symbolics.record_assumption(value(A4) != 0)
+        end
+        @test length(collected) == 2
+    end
+
+    @testset "concurrent tasks keep their own list" begin
+        tasks = [Threads.@spawn(symbolic_solve(ex, x; return_assumptions = true)) for _ in 1:4]
+        results = fetch.(tasks)
+        @test all(r -> length(r[2]) == 1, results)
+        # A task spawned during a collecting call does not see its collector.
+        seen = task_local_storage(key, Any[]) do
+            fetch(Threads.@spawn haskey(task_local_storage(), key))
+        end
+        @test seen === false
+    end
+end

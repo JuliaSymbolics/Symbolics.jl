@@ -22,7 +22,7 @@ function lt_roots(a, b)
 end
 
 """
-    symbolic_solve(expr, x; dropmultiplicity=true, warns=true)
+    symbolic_solve(expr, x; dropmultiplicity=true, warns=true, return_assumptions=false)
 
 `symbolic_solve` is a function which attempts to solve input equations/expressions symbolically using various methods.
 
@@ -34,6 +34,8 @@ end
 - dropmultiplicity (optional): Should the output be printed `n` times where `n` is the number of occurrence of the root? Say we have `(x+1)^2`, we then have 2 roots `x = -1`, by default the output is `[-1]`, If dropmultiplicity is inputted as false, then the output is `[-1, -1]`.
 
 - warns (optional): When invalid expressions or cases are inputted, should the solver warn you of such cases before returning nothing? if this is set to false, the solver returns nothing. By default, warns are set to true.
+
+- return_assumptions (optional): Some solutions only hold under a condition the solver had to assume, for example that a parametric quantity it divides by is not zero, or that the `n` in a periodic solution `θ + 2πn` is an integer. By default (`false`) these are logged with `@info` and the solutions are returned alone. With `true`, nothing is logged and `symbolic_solve` returns a tuple `(solutions, assumptions)`, where `assumptions` is a vector of symbolic boolean conditions such as `(A4 / A1) != 0` or `isinteger(n)`, each listed once, and empty when none was needed. Only the assumptions made by the calling task are collected.
 
 ## Supported input
 The base solver (`symbolic_solve`) has multiple solvers which chooses from depending on the the type of input
@@ -205,7 +207,37 @@ julia> length(Symbolics.symbolic_to_float.(roots))
 1
 ```
 """
-function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where {T}
+function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true, return_assumptions = false) where {T}
+    return_assumptions || return _symbolic_solve(expr, x; dropmultiplicity, warns)
+    assumptions = Any[]
+    sols = task_local_storage(SOLVE_ASSUMPTIONS_KEY, assumptions) do
+        _symbolic_solve(expr, x; dropmultiplicity, warns)
+    end
+    return (sols, assumptions)
+end
+
+# Task-local key under which `symbolic_solve(...; return_assumptions = true)`
+# keeps the list that `record_assumption` fills.
+const SOLVE_ASSUMPTIONS_KEY = :symbolic_solve_assumptions
+
+"""
+    record_assumption(condition, message = "Assuming \$condition")
+
+State an assumption the solver had to make. Inside
+`symbolic_solve(...; return_assumptions = true)` the `condition` is added to the
+returned list, once; otherwise `message` is logged at the `info` level.
+"""
+function record_assumption(condition, message = "Assuming $condition")
+    collected = get(task_local_storage(), SOLVE_ASSUMPTIONS_KEY, nothing)
+    if collected === nothing
+        @info message
+    elseif !any(c -> isequal(c, condition), collected)
+        push!(collected, condition)
+    end
+    return nothing
+end
+
+function _symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where {T}
     expr_univar = false
     x_univar = false
 
