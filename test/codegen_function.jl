@@ -561,10 +561,16 @@ end
     diff = SymbolicUtils.ArrayMaker{SymReal}([[1:20]], [sp .- 0.1 .* sq]; shape = SymbolicUtils.ShapeVecT((1:20,)))
     SymbolicUtils.populate_ir!(ir, diff)
     fused = Code.OptimizationRule("fused", detector, (ir, expr, _) -> (ir, diff), 1)
-    _, iip = Symbolics.codegen_function(ir, collect(unwrap.(collect(p)) .- 0.1 .* unwrap.(collect(q))), [sp, sq]; optimize = [fused], iip_config = (false, true), fuse_broadcasts = true, fuse_output_eltype = true)
+    oop, iip = Symbolics.codegen_function(ir, collect(unwrap.(collect(p)) .- 0.1 .* unwrap.(collect(q))), [sp, sq]; optimize = [fused], fuse_broadcasts = true, fuse_output_eltype = true)
     out = fill(1.0f0, 20)
     @invokelatest eval(iip)(out, fill(0.1f0, 20), fill(1.0f0, 20))
-    @test all(iszero, out)
+    @test out == @invokelatest(eval(oop)(fill(0.1f0, 20), fill(1.0f0, 20)))
+
+    _, iip = Symbolics.codegen_function(ir, xs, [sx]; optimize = [Code.OptimizationRule("maker", detector, as_maker, 1)], iip_config = (false, true))
+    big_int = [9007199254740993, 2, 3]
+    out = zeros(Int, 3)
+    @invokelatest eval(iip)(out, big_int)
+    @test out == big_int
 
     _, iip = Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule])
     out = fill(100.0, 5)
