@@ -797,11 +797,16 @@ end
 
 # Callable objects used as the bases of exponentials below: one with state,
 # one with an uninitialised reference field, and one that is deliberately
-# indistinguishable from another instance by `show` and `hash`.
+# indistinguishable from another instance by `show` and `hash`. The first two
+# also share one `hash` across instances: the default hash of a struct can
+# vary between processes, and a collision makes the iteration order of a sum
+# follow the insertion order, which the fixture varies, so both orders are
+# exercised in every process.
 struct AttractScaleBy <: Function
     k::Int
 end
 (s::AttractScaleBy)(v) = s.k * v
+Base.hash(::AttractScaleBy, h::UInt) = hash(:AttractScaleBy, h)
 
 struct AttractCached <: Function
     k::Int
@@ -809,6 +814,7 @@ struct AttractCached <: Function
     AttractCached(k) = new(k)
 end
 (s::AttractCached)(v) = s.k * v
+Base.hash(::AttractCached, h::UInt) = hash(:AttractCached, h)
 
 struct AttractHiddenFactor
     k::Int
