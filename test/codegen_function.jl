@@ -565,4 +565,22 @@ end
     out = fill(1.0f0, 20)
     @invokelatest eval(iip)(out, fill(0.1f0, 20), fill(1.0f0, 20))
     @test all(iszero, out)
+
+    _, iip = Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule])
+    out = fill(100.0, 5)
+    @invokelatest eval(iip)(out, u)
+    @test out == [sin.(u); 100.0; 100.0]
+    out = Real[100, 100, 100]
+    @invokelatest eval(iip)(out, u)
+    @test out == sin.(u)
+
+    @variables A[1:2, 1:2]
+    sA = unwrap(A)
+    rows = SymbolicUtils.@arrayop (i,) sA[i, j]
+    SymbolicUtils.populate_ir!(ir, rows)
+    rowsum = Code.OptimizationRule("rows", detector, (ir, expr, _) -> (ir, rows), 1)
+    _, iip = Symbolics.codegen_function(ir, [sA[1, 1] + sA[1, 2], sA[2, 1] + sA[2, 2]], [sA]; optimize = [rowsum], iip_config = (false, true))
+    out = zeros(Int, 2)
+    @invokelatest eval(iip)(out, [0.5 0.5; 1.5 0.5])
+    @test out == [1, 2]
 end

@@ -22,10 +22,12 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
     Returns, SArgsT((IIP_OUTSYM,));
     type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
 )
-const IIP_ZERO_ALLOCATOR = SU.Term{VartypeT}(
-    Returns, SArgsT((SU.Term{VartypeT}(zero, SArgsT((IIP_OUTSYM,)); type = Any),));
-    type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
-)
+
+function rule_output_buffer(out, sz, own_eltype::Bool)
+    T = eltype(out)
+    T = own_eltype && T <: AbstractFloat ? T : T <: Number ? promote_type(T, Float64) : Float64
+    return zeros(T, sz)
+end
 
 function canonicalize_args(args::Vector, inbounds::Bool)
     return map(enumerate(args)) do (i, arg)
@@ -256,7 +258,12 @@ function codegen_function(
 
     if iip_config[2]
         iipbody = if array_node
-            value = Code.supports_with_allocator(expr) ? Code.with_allocator(IIP_ZERO_ALLOCATOR, expr) : expr
+            buffer = SU.Term{VartypeT}(
+                rule_output_buffer, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(fuse_output_eltype)));
+                type = Any
+            )
+            value = Code.supports_with_allocator(expr) ?
+                Code.with_allocator(SU.Term{VartypeT}(Returns, SArgsT((buffer,)); type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()), expr) : expr
             SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, value)); type = SU.symtype(expr), shape = SU.shape(expr))
         else
             set_array(nothing, args, IIP_OUTSYM, outputidxs, expr, checkbounds, skipzeros)
