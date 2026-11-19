@@ -239,7 +239,17 @@ function LinearAlgebra.norm(v::AbstractVector{<:Num}, p::Real = 2)
 end
 
 function SymbolicUtils.scalarize(x::Arr{T, N}, ::Val{toplevel}) where {toplevel, T, N}
-    scal = SymbolicUtils.scalarize(unwrap(x), Val{toplevel}())::(AbstractArray{_T, N} where {_T})
+    u = unwrap(x)
+    # Array/array `/`: keep indexed terms (like `\`) instead of eager Matrix{BasicSymbolic} /.
+    if iscall(u) && operation(u) === (/) &&
+            SymbolicUtils.is_array_shape(shape(arguments(u)[2]))
+        scal = [u[i] for i in eachindex(u)]
+        if is_wrapper_type(T)
+            scal = map(T, scal)
+        end
+        return scal::(AbstractArray{_T, N} where {_T})
+    end
+    scal = SymbolicUtils.scalarize(u, Val{toplevel}())::(AbstractArray{_T, N} where {_T})
     if is_wrapper_type(T)
         scal = map(T, scal)
     end
