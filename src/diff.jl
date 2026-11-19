@@ -971,7 +971,11 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
 end
 
 function _augment_with_call_args!(vs)
+    visited = Set{Tuple{Any, Set{Any}}}()
     worklist = Tuple{Any, Set{Any}}[(s, Set{Any}()) for s in vs]
+    for item in worklist
+        push!(visited, item)
+    end
     while !isempty(worklist)
         s, bound_vars = pop!(worklist)
         SymbolicUtils.iscall(s) || continue
@@ -980,9 +984,10 @@ function _augment_with_call_args!(vs)
             bvars = op.domain.variables isa Union{Tuple, AbstractVector} ? op.domain.variables : (op.domain.variables,)
             next_bvars = union(bound_vars, bvars)
             for arg in SymbolicUtils.arguments(s)
-                arg in next_bvars && continue
-                if !(arg in vs)
-                    push!(vs, arg)
+                (arg in next_bvars) && continue
+                push!(vs, arg)
+                if !((arg, next_bvars) in visited)
+                    push!(visited, (arg, next_bvars))
                     push!(worklist, (arg, next_bvars))
                 end
             end
@@ -991,24 +996,27 @@ function _augment_with_call_args!(vs)
             if all(_is_scalar_literal, @view args[2:end])
                 indexed_expr = args[1]
                 if SymbolicUtils.iscall(indexed_expr)
-                    if !(indexed_expr in vs)
+                    if !((indexed_expr, bound_vars) in visited)
+                        push!(visited, (indexed_expr, bound_vars))
                         push!(worklist, (indexed_expr, bound_vars))
                     end
                 end
             else
                 for arg in args
-                    arg in bound_vars && continue
-                    if !(arg in vs)
-                        push!(vs, arg)
+                    (arg in bound_vars) && continue
+                    push!(vs, arg)
+                    if !((arg, bound_vars) in visited)
+                        push!(visited, (arg, bound_vars))
                         push!(worklist, (arg, bound_vars))
                     end
                 end
             end
         else
             for arg in SymbolicUtils.arguments(s)
-                arg in bound_vars && continue
-                if !(arg in vs)
-                    push!(vs, arg)
+                (arg in bound_vars) && continue
+                push!(vs, arg)
+                if !((arg, bound_vars) in visited)
+                    push!(visited, (arg, bound_vars))
                     push!(worklist, (arg, bound_vars))
                 end
             end

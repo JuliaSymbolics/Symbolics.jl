@@ -124,12 +124,23 @@ let
     expr1 = f(q, p[2])
     @test isequal(Symbolics.jacobian([expr1], [p[1]])[1, 1], 0)
     @test isequal(Symbolics.hessian(expr1, [p[1]])[1, 1], 0)
-    @test_throws ErrorException Symbolics.jacobian([f(p)], [p[1]])
+    @test_throws "Differentiation with array expressions is not yet supported" Symbolics.jacobian([f(p)], [p[1]])
 
     # Respect integration scope for bound variables in integrand
     expr2 = f(q, g(Integral(t in Symbolics.DomainSets.ClosedInterval(0, 1))(t)))
     @test isequal(Symbolics.jacobian([expr2], [t])[1, 1], 0)
     @test isequal(Symbolics.hessian(expr2, [t])[1, 1], 0)
+
+    # Shared subexpression across integration scopes in both argument orders
+    @variables h(..)
+    I_op = Integral(t in Symbolics.DomainSets.ClosedInterval(0, 1))
+    s_sub = g(t)
+    e_order1 = f(h(s_sub), I_op(s_sub))
+    e_order2 = f(I_op(s_sub), h(s_sub))
+    @test isequal(Symbolics.jacobian([e_order1], [t])[1, 1], Symbolics.derivative(e_order1, t))
+    @test isequal(Symbolics.jacobian([e_order2], [t])[1, 1], Symbolics.derivative(e_order2, t))
+    @test isequal(Symbolics.hessian(e_order1, [t])[1, 1], Symbolics.derivative(Symbolics.derivative(e_order1, t), t))
+    @test isequal(Symbolics.hessian(e_order2, [t])[1, 1], Symbolics.derivative(Symbolics.derivative(e_order2, t), t))
 end
 
 # issue 252
