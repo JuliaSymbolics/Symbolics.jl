@@ -365,38 +365,46 @@ function solve_univar(expression, x; dropmultiplicity=true, strict=true)
         end
     end
 
-    subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions=true)
-    if !strict && !check_polynomial(filtered_expr, strict=false)
-        return [RootsOf(wrap(expression), wrap(x))]
-    end
-    coeffs, constant = polynomial_coeffs(filtered_expr, [x])
-    degree = sdegree(coeffs, x)
-
-    u, factors = factor_use_nemo(wrap(filtered_expr))
-    factors = convert(Vector{Any}, factors)
-
-    factors_subbed = map(factor -> ssubs(factor, subs), factors)
+    subs, filtered_expr, assumptions = filter_poly(expression, x, assumptions = true)
     arr_roots = []
-    is_unfactored = length(factors_subbed) == 1 &&
-        isequal(u * first(factors_subbed), wrap(expression))
+    direct_roots = false
 
-    if degree < 5 && is_unfactored
+    if !check_polynomial(filtered_expr, strict = false)
+        !strict && return [RootsOf(wrap(expression), wrap(x))]
+        coeffs, constant = polynomial_coeffs(filtered_expr, [x])
+        degree = sdegree(coeffs, x)
+        degree >= 5 && return [RootsOf(wrap(expression), wrap(x))]
         arr_roots = get_roots(expression, x)
+        direct_roots = true
+    else
+        coeffs, constant = polynomial_coeffs(filtered_expr, [x])
+        degree = sdegree(coeffs, x)
 
-        # multiplicities (repeated roots)
-        if !dropmultiplicity
-            og_arr_roots = copy(arr_roots)
-            for i in 1:(mult_n - 1)
-                append!(arr_roots, og_arr_roots)
+        u, factors = factor_use_nemo(wrap(filtered_expr))
+        factors = convert(Vector{Any}, factors)
+
+        factors_subbed = map(factor -> ssubs(factor, subs), factors)
+        is_unfactored = length(factors_subbed) == 1 &&
+            isequal(u * first(factors_subbed), wrap(expression))
+
+        if degree < 5 && is_unfactored
+            arr_roots = get_roots(expression, x)
+            direct_roots = true
+        elseif !is_unfactored
+            for i in eachindex(factors_subbed)
+                if !any(isequal(x, var) for var in get_variables(factors[i]))
+                    continue
+                end
+                roots = solve_univar(factors_subbed[i], x, dropmultiplicity = dropmultiplicity)
+                append!(arr_roots, roots)
             end
         end
-    elseif !is_unfactored
-        for i in eachindex(factors_subbed) 
-            if !any(isequal(x, var) for var in get_variables(factors[i]))
-                continue
-            end
-            roots = solve_univar(factors_subbed[i], x, dropmultiplicity = dropmultiplicity)
-            append!(arr_roots, roots)
+    end
+
+    if direct_roots && !dropmultiplicity
+        og_arr_roots = copy(arr_roots)
+        for i in 1:(mult_n - 1)
+            append!(arr_roots, og_arr_roots)
         end
     end
 
