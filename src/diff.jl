@@ -1836,15 +1836,34 @@ function _is_atomic_array(arg::SymbolicT)
     return f isa SymbolicT
 end
 
-# Scalarizing a slice of an expression leaves each component indexing the unscalarized parent, so the
-# components are scalarized once more.
-_symbolic_component(x) = (x = unwrap(x); x isa SymbolicT ? SU.scalarize(x)::SymbolicT : SConst(x))
+_symbolic_component(x) = (x = unwrap(x); x isa SymbolicT ? x : SConst(x))
 
 # Components of a known-shape array expression, or `nothing` if `scalarize` cannot produce them.
+# Scalarizing a slice of an expression leaves every component indexing the unscalarized parent, so
+# the parent is scalarized once and the components are taken from it by position.
 function _expression_components(arg::SymbolicT)
     components = SU.scalarize(arg)
     components isa AbstractVector || return nothing
+    if iscall(arg) && operation(arg) === getindex
+        parent = arguments(arg)[1]
+        parent_shape = SU.shape(parent)
+        if parent_shape isa SU.ShapeVecT && isone(length(parent_shape))
+            parent_components = _expression_components(parent)
+            parent_components === nothing || return SymbolicT[
+                _parent_component(c, parent, first(parent_shape[1]), parent_components) for c in components
+            ]
+        end
+    end
     return SymbolicT[_symbolic_component(c) for c in components]
+end
+
+function _parent_component(c, parent::SymbolicT, offset, parent_components)
+    c = unwrap(c)
+    if c isa SymbolicT && iscall(c) && operation(c) === getindex && isequal(arguments(c)[1], parent)
+        index = SU.unwrap_const(arguments(c)[2])
+        index isa Integer && return parent_components[index - offset + 1]
+    end
+    return _symbolic_component(c isa SymbolicT ? SU.scalarize(c) : c)
 end
 
 # Operands keep their own (possibly offset) axes, so components are paired by position. An operand

@@ -1497,3 +1497,20 @@ end
     end
     @test Symbolics._scalarized(unwrap((A * G(u))[1:2])) isa Vector{Symbolics.SymbolicT}
 end
+
+@testset "Slices of large computed vectors" begin
+    @variables x y q[1:1001] o[0:2]
+    L = Laplacian([x, y])
+    n = 1000
+    comps = Symbolics._scalarized(unwrap((2 * q)[1:n]))
+    @test length(comps) == n
+    @test isequal(comps[7], unwrap(2 * q[7]))
+    @test isequal(comps[n], unwrap(2 * q[n]))
+    @test isequal(Symbolics._scalarized(unwrap((2 * q)[3:4])), unwrap.([2 * q[3], 2 * q[4]]))
+    # offset-axes parent: components are taken by position
+    @test isequal(Symbolics._scalarized(unwrap((2 * o)[1:2])), unwrap.([2 * o[1], 2 * o[2]]))
+    @test isequal(
+        scalarize(expand_derivatives(L((2 * o)[0:1]))),
+        expand_derivatives.([L(2 * o[0]), L(2 * o[1])]),
+    )
+end
