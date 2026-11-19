@@ -250,17 +250,198 @@ end
 When `islinear`, return `a` and `b` such that `a * x + b == t`. Instead of calling
 `linear_expansion` multiple times with the same `x`, prefer using
 [`Symbolics.LinearExpander`](@ref).
+
+For arrays of unknowns, array expressions and equations are scalarized to return a
+coefficient matrix and a remainder vector. An unwrapped symbolic array used as a
+single unknown retains the scalar coefficient form when `LinearExpander` succeeds.
+If that form is not linear, array-shaped expressions can instead be expanded with
+respect to its scalar entries. If neither form is linear, the single-unknown result
+is returned.
+Scalar expressions against an unwrapped array unknown retain the single-unknown result.
 """
 function linear_expansion(t, x::Num)
     a, b, islin = linear_expansion(t, unwrap(x))
     Num(a), Num(b), islin
 end
 
+function linear_expansion(t::SymbolicT, x::Arr)
+    return linear_expansion(_linear_expansion_scalarize_expr(t), scalarize(x))
+end
+
+function linear_expansion(t::Equation, x::Arr)
+    return linear_expansion(scalarize(t), scalarize(x))
+end
+
 @inline function linear_expansion(t, x::SymbolicT)
-    return LinearExpander(x)(unwrap(t))
+    result = LinearExpander(x)(unwrap(t))
+    (result[3] || !(symtype(x) <: AbstractArray)) && return result
+    isarray = if t isa Equation
+        symtype(t.lhs) <: AbstractArray || symtype(t.rhs) <: AbstractArray
+    else
+        symtype(unwrap(t)) <: AbstractArray
+    end
+    isarray || return result
+    expanded = linear_expansion(_linear_expansion_scalarize_expr(t), scalarize(x))
+    return expanded[3] ? expanded : result
+end
+
+function _linear_expansion_scalarize_expr(t)
+    if t isa Equation
+        return scalarize(t)
+    elseif t isa AbstractArray
+        return t
+    else
+        return scalarize(unwrap(t))
+    end
+end
+
+function _linear_expansion_occursin_xs(t::SymbolicT, x_to_j::Dict{SymbolicT, Int}, parents::Set{SymbolicT})
+    haskey(x_to_j, t) && return true
+    t in parents && return true
+    iscall(t) || return false
+    return any(arguments(t)) do arg
+        arg isa SymbolicT && _linear_expansion_occursin_xs(arg, x_to_j, parents)
+    end
+end
+
+function _classify_linear_monomial(k::SymbolicT, x_to_j::Dict{SymbolicT, Int}, parents::Set{SymbolicT})
+    j = get(x_to_j, k, 0)
+    j > 0 && return (j, COMMON_ONE)
+
+    return @match k begin
+        BSImpl.AddMul(; coeff, dict, variant, type, shape) &&
+            if variant === SymbolicUtils.AddMulVariant.MUL
+        end => begin
+            found_j = 0
+            found_base = k
+            for (base, exp) in dict
+                bj = get(x_to_j, base, 0)
+                if bj > 0
+                    (found_j == 0 && _isone(exp)) || return :fallback
+                    found_j = bj
+                    found_base = base
+                elseif _linear_expansion_occursin_xs(base, x_to_j, parents)
+                    return :fallback
+                end
+            end
+            found_j == 0 && return :constant
+            newdict = copy(dict)
+            delete!(newdict, found_base)
+            a = SymbolicUtils.Mul{VartypeT}(coeff, newdict; type, shape)
+            return (found_j, a)
+        end
+        _ => begin
+            _linear_expansion_occursin_xs(k, x_to_j, parents) && return :fallback
+            return :constant
+        end
+    end
+end
+
+function _linear_expansion_fast_row!(
+        A::AbstractMatrix{SymbolicT}, bvec::Vector{SymbolicT},
+        i::Int, t::SymbolicT, x_to_j::Dict{SymbolicT, Int},
+        parents::Set{SymbolicT}, xs::AbstractArray
+    )
+    j = get(x_to_j, t, 0)
+    if j > 0
+        A[i, j] = COMMON_ONE
+        bvec[i] = COMMON_ZERO
+        return true
+    end
+    return @match t begin
+        BSImpl.AddMul(; coeff, dict, variant, type, shape) &&
+            if variant === SymbolicUtils.AddMulVariant.ADD
+        end => begin
+            b_dict = dict
+            b_dirty = false
+            last_j = 0
+            last_dict = empty(dict)
+            for (k, v) in dict
+                class = _classify_linear_monomial(k, x_to_j, parents)
+                if class === :constant
+                    continue
+                elseif class === :fallback
+                    return :fallback
+                else
+                    j, a = class
+                    if j > last_j
+                        last_j = j
+                        empty!(last_dict)
+                    end
+                    j == last_j && (last_dict[k] = v)
+                    if !b_dirty
+                        b_dict = copy(dict)
+                        b_dirty = true
+                    end
+                    delete!(b_dict, k)
+                    contrib = a * v
+                    prev = A[i, j]
+                    A[i, j] = _iszero(prev) ? contrib : (prev + contrib)
+                end
+            end
+            if !b_dirty
+                bvec[i] = t
+            else
+                bvec[i] = SymbolicUtils.Add{VartypeT}(coeff, b_dict; type, shape)
+                if _iszero(bvec[i])
+                    # The last extraction determines the zero remainder's numeric type.
+                    last_t = SymbolicUtils.Add{VartypeT}(coeff, last_dict; type, shape)
+                    _, bvec[i], islin = LinearExpander(unwrap(xs[last_j]))(last_t)
+                    islin || return :fallback
+                end
+            end
+            return true
+        end
+        _ => begin
+            class = _classify_linear_monomial(t, x_to_j, parents)
+            if class === :constant
+                bvec[i] = t
+                return true
+            elseif class === :fallback
+                return :fallback
+            else
+                j, a = class
+                A[i, j] = a
+                bvec[i] = COMMON_ZERO * a
+                return true
+            end
+        end
+    end
 end
 
 function linear_expansion(ts::AbstractArray{T}, xs::AbstractArray{S}) where {T <: Union{Num, SymbolicT, Equation}, S <: Union{SymbolicT, Num}}
+    ts = vec(ts)
+    xs = vec(xs)
+    x_to_j = Dict{SymbolicT, Int}()
+    sizehint!(x_to_j, length(xs))
+    parents = Set{SymbolicT}()
+    for (j, x) in enumerate(xs)
+        ux = unwrap(x)::SymbolicT
+        haskey(x_to_j, ux) && return _linear_expansion_slow(ts, xs)
+        if !issym(ux)
+            plain_index = @match ux begin
+                BSImpl.Term(; f, args) && if f === getindex
+                end => begin
+                    issym(args[1]) && all(SymbolicUtils.isconst, args[2:end])
+                end
+                _ => false
+            end
+            plain_index || return _linear_expansion_slow(ts, xs)
+            push!(parents, arguments(ux)[1])
+        end
+        x_to_j[ux] = j
+    end
+    A = fill(COMMON_ZERO, length(ts), length(xs))
+    bvec = Vector{SymbolicT}(undef, length(ts))
+    for (i, t) in enumerate(ts)
+        resid = t isa Equation ? unwrap(t.rhs - t.lhs) : unwrap(t)
+        status = _linear_expansion_fast_row!(A, bvec, i, resid, x_to_j, parents, xs)
+        status === :fallback && return _linear_expansion_slow(ts, xs)
+    end
+    return A, bvec, true
+end
+
+function _linear_expansion_slow(ts::AbstractArray{T}, xs::AbstractArray{S}) where {T <: Union{Num, SymbolicT, Equation}, S <: Union{SymbolicT, Num}}
     ts = vec(ts)
     xs = vec(xs)
     A = Matrix{SymbolicT}(undef, length(ts), length(xs))
