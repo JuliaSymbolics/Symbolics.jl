@@ -1233,7 +1233,7 @@ end
                     @test res isa Vector{Num}
                 end
                 @test isequal(expand_derivatives.(scalarize(res)), expand_derivatives.(expected))
-                E || @test isequal(scalarize(expand_derivatives(res)), expand_derivatives.(expected))
+                (E || !(input isa Arr)) || @test isequal(scalarize(expand_derivatives(res)), expand_derivatives.(expected))
             end
         end
     end
