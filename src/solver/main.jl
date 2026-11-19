@@ -260,13 +260,35 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             return solve_interms_ofvar(expr, diff_vars[1], dropmultiplicity=dropmultiplicity, warns=warns)
         end
 
-        expr = [expr]
+        expr = [wrap(expr)]
     end
 
 
     if !x_univar
-        for e in expr
-            for var in x
+        solve_expr = similar(expr)
+        assumptions = []
+        for i in eachindex(expr)
+            if isempty(get_variables(expr[i]))
+                solve_expr[i] = expr[i]
+                continue
+            end
+            subs, solve_expr[i], expr_assumptions = filter_poly(expr[i], x; assumptions = true)
+            solve_expr[i] = ssubs(solve_expr[i], subs)
+            append!(assumptions, expr_assumptions)
+        end
+
+        auxiliary_vars = Num[]
+        for denominator in assumptions
+            auxiliary = gensym(:_t)
+            auxiliary = only(@variables $auxiliary)
+            push!(auxiliary_vars, auxiliary)
+            push!(solve_expr, auxiliary * denominator - 1)
+        end
+        # Eliminate inverse variables first so free parameters remain original variables.
+        solve_vars = vcat(auxiliary_vars, x)
+
+        for e in solve_expr
+            for var in solve_vars
                 if !check_poly_inunivar(e, var)
                     warns && @warn("This system can not be currently solved by `symbolic_solve`.")
                     return nothing
@@ -274,10 +296,18 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
             end
         end
 
-        sols = solve_multivar(expr, x, dropmultiplicity=dropmultiplicity, warns=warns)
+        if !isempty(auxiliary_vars)
+            solve_expr = wrap.(groebner_basis(solve_expr))
+            any(e -> isempty(get_variables(e)) && !isequal(e, 0), solve_expr) && return []
+        end
+
+        sols = solve_multivar(solve_expr, solve_vars, dropmultiplicity = dropmultiplicity, warns = warns)
         isequal(sols, nothing) && return nothing
         sols = convert(Vector{Any}, sols)
         for i in eachindex(sols)
+            for var in auxiliary_vars
+                delete!(sols[i], var)
+            end
             for var in x
                 sols[i][var] = postprocess_root(sols[i][var])
             end
