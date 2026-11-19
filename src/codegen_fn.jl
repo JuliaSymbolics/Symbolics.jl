@@ -22,6 +22,10 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
     Returns, SArgsT((IIP_OUTSYM,));
     type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
 )
+const IIP_ZERO_ALLOCATOR = SU.Term{VartypeT}(
+    Returns, SArgsT((SU.Term{VartypeT}(zero, SArgsT((IIP_OUTSYM,)); type = Any),));
+    type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
+)
 
 function canonicalize_args(args::Vector, inbounds::Bool)
     return map(enumerate(args)) do (i, arg)
@@ -228,7 +232,7 @@ function codegen_function(
     expr = _recursive_unwrap(expr)
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
-    array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr)) && !SU.query(isequal(IIP_OUTSYM), expr)
+    array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr))
     array_node && iip_config[2] && (outputidxs !== nothing || skipzeros) &&
         throw(ArgumentError("`optimize` returned an array-valued expression, which cannot be written with `outputidxs` or `skipzeros`"))
 
@@ -252,7 +256,8 @@ function codegen_function(
 
     if iip_config[2]
         iipbody = if array_node
-            SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, expr)); type = SU.symtype(expr), shape = SU.shape(expr))
+            value = Code.supports_with_allocator(expr) ? Code.with_allocator(IIP_ZERO_ALLOCATOR, expr) : expr
+            SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, value)); type = SU.symtype(expr), shape = SU.shape(expr))
         else
             set_array(nothing, args, IIP_OUTSYM, outputidxs, expr, checkbounds, skipzeros)
         end
