@@ -48,7 +48,7 @@ journal = {ACM Commun. Comput. Algebra},
 month = {jan},
 pages = {92–96},
 numpages = {5}
-}</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSymbolics/Symbolics.jl/blob/b156d0b6319f815f182c9a67ce6d2a7c9d22c628/src/Symbolics.jl#L1">source</a></section></details></article><p>Symbolics.jl is a fast and modern Computer Algebra System (CAS) for a fast and modern programming language (Julia). The goal is to have a high-performance and parallelized symbolic algebra system that is directly extendable in the same language as that of the users.</p><h2 id="Installation"><a class="docs-heading-anchor" href="#Installation">Installation</a><a id="Installation-1"></a><a class="docs-heading-anchor-permalink" href="#Installation" title="Permalink"></a></h2><p>To install Symbolics.jl, use the Julia package manager:</p><pre><code class="language-julia hljs">using Pkg
+}</code></pre></div><a class="docs-sourcelink" target="_blank" href="https://github.com/JuliaSymbolics/Symbolics.jl/blob/f2f48985aaa7bc682c9994da5cef8c02ea689f8e/src/Symbolics.jl#L1">source</a></section></details></article><p>Symbolics.jl is a fast and modern Computer Algebra System (CAS) for a fast and modern programming language (Julia). The goal is to have a high-performance and parallelized symbolic algebra system that is directly extendable in the same language as that of the users.</p><h2 id="Installation"><a class="docs-heading-anchor" href="#Installation">Installation</a><a id="Installation-1"></a><a class="docs-heading-anchor-permalink" href="#Installation" title="Permalink"></a></h2><p>To install Symbolics.jl, use the Julia package manager:</p><pre><code class="language-julia hljs">using Pkg
 Pkg.add(&quot;Symbolics&quot;)</code></pre><h2 id="Citation"><a class="docs-heading-anchor" href="#Citation">Citation</a><a id="Citation-1"></a><a class="docs-heading-anchor-permalink" href="#Citation" title="Permalink"></a></h2><p>If you use Symbolics.jl, please <a href="https://arxiv.org/abs/2105.03949">cite this paper</a></p><pre><code class="nohighlight hljs">@article{gowda2021high,
   title={High-performance symbolic-numerics via multiple dispatch},
   author={Gowda, Shashi and Ma, Yingbo and Cheli, Alessandro and Gwozdz, Maja and Shah, Viral B and Edelman, Alan and Rackauckas, Christopher},
@@ -60,21 +60,21 @@ Pkg.add(&quot;Symbolics&quot;)</code></pre><h2 id="Citation"><a class="docs-head
   [0b43b601] Groebner v0.10.11
   [23fbe1c1] Latexify v0.16.12
 ⌅ [2edaba10] Nemo v0.56.2
-  [91a5bcdd] Plots v1.41.7
+  [91a5bcdd] Plots v1.41.8
   [90137ffa] StaticArrays v1.9.25
   [24249f21] SymPy v2.3.4
   [a0d8a0e1] SymbolicSMT v1.4.1
   [d1185830] SymbolicUtils v4.56.1
   [0c5d862f] Symbolics v7.49.0 `~/work/Symbolics.jl/Symbolics.jl`
-Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated`</code></pre></details><details><summary>and using this machine and Julia version.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Julia Version 1.13.3
-Commit 67ac47b9cd8 (2026-10-25 15:28 UTC)
+Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated`</code></pre></details><details><summary>and using this machine and Julia version.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Julia Version 1.13.4
+Commit c1ac32ab733 (2026-11-13 17:30 UTC)
 Build Info:
   Official https://julialang.org release
 Platform Info:
   OS: Linux (x86_64-linux-gnu)
-  CPU: 4 × AMD EPYC 9V45 96-Core Processor
+  CPU: 4 × AMD EPYC 9V74 80-Core Processor
   WORD_SIZE: 64
-  LLVM: libLLVM-20.1.8 (ORCJIT, znver5)
+  LLVM: libLLVM-20.1.8 (ORCJIT, znver4)
   GC: Built with stock GC
 Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></details><details><summary>A more complete overview of all dependencies and their versions is also provided.</summary><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Status `~/work/Symbolics.jl/Symbolics.jl/docs/Manifest.toml`
   [47edcb42] ADTypes v1.24.0
@@ -95,7 +95,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [944b1d66] CodecZlib v0.7.9
   [35d6a980] ColorSchemes v3.32.0
   [3da002f7] ColorTypes v0.12.5
-  [c3611d14] ColorVectorSpace v0.11.2
+  [c3611d14] ColorVectorSpace v0.11.3
   [5ae59095] Colors v0.13.4
 ⌅ [861a8166] Combinatorics v1.0.2
   [3709ef60] CommonEq v0.2.1
@@ -110,10 +110,10 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [adafc99b] CpuId v0.3.3
   [a8cc5b0e] Crayons v4.2.0
   [9a962f9c] DataAPI v1.16.0
-  [864edb3b] DataStructures v0.19.6
+  [864edb3b] DataStructures v0.19.7
   [e2d170a0] DataValueInterfaces v1.0.0
   [8bb1440f] DelimitedFiles v1.9.1
-  [b552c78f] DiffRules v1.17.1
+  [b552c78f] DiffRules v1.18.0
 ⌅ [ffbed154] DocStringExtensions v0.9.5
   [e30172f5] Documenter v1.20.0
   [5b8099bc] DomainSets v0.8.3
@@ -122,7 +122,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [e2ba6199] ExprTools v0.1.11
   [55351af7] ExproniconLite v0.10.16
   [c87230d0] FFMPEG v0.4.6
-⌅ [53c48c17] FixedPointNumbers v0.8.6
+  [53c48c17] FixedPointNumbers v0.9.3
   [1fa38f19] Format v1.3.7
   [a85aefff] FunctionMaps v0.1.2
   [28b8d3ca] GR v0.73.27
@@ -141,7 +141,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [692b3bcd] JLLWrappers v1.8.0
   [682c06a0] JSON v1.13.4
   [ae98c720] Jieko v0.2.1
-  [929cbde3] LLVM v10.4.3
+  [929cbde3] LLVM v10.5.1
   [b964fa9f] LaTeXStrings v1.4.1
   [23fbe1c1] Latexify v0.16.12
   [0e77f7df] LazilyInitializedFields v1.3.0
@@ -152,14 +152,14 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [e1d29d7a] Missings v1.2.1
   [2e0e35c7] Moshi v0.3.13
 ⌅ [102ac46a] MultivariatePolynomials v0.5.20
-  [d8a4904e] MutableArithmetics v1.9.4
+  [d8a4904e] MutableArithmetics v1.9.5
   [77ba4419] NaNMath v1.1.5
 ⌅ [2edaba10] Nemo v0.56.2
   [bac558e1] OrderedCollections v2.0.3
   [69de0a69] Parsers v3.0.6
   [ccf2f8ad] PlotThemes v3.3.0
   [995b91a9] PlotUtils v1.5.1
-  [91a5bcdd] Plots v1.41.7
+  [91a5bcdd] Plots v1.41.8
   [aea7be01] PrecompileTools v1.4.0
   [21216c6a] Preferences v1.6.1
   [08abe8d2] PrettyTables v3.5.1
@@ -235,7 +235,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [aacddb02] JpegTurbo_jll v3.2.1+0
   [c1c5ebd0] LAME_jll v3.100.3+0
   [88015f11] LERC_jll v4.3.0+0
-  [dad2f222] LLVMExtra_jll v0.0.56+0
+  [dad2f222] LLVMExtra_jll v0.0.57+0
   [1d63c593] LLVMOpenMP_jll v23.1.1+0
 ⌅ [e9f186c6] Libffi_jll v3.4.7+0
   [7e76a0d4] Libglvnd_jll v1.7.1+1
@@ -286,7 +286,7 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
 ⌅ [214eeab7] fzf_jll v0.61.1+0
   [a4ae2306] libaom_jll v3.15.3+0
   [0ac62f75] libass_jll v0.17.5+0
-  [3eaa8342] libcxxwrap_julia_jll v0.14.12+0
+  [3eaa8342] libcxxwrap_julia_jll v0.14.13+0
   [1183f4f0] libdecor_jll v0.2.2+0
   [8e53e030] libdrm_jll v2.4.134+0
   [2db6ffa8] libevdev_jll v1.13.4+0
@@ -337,9 +337,9 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [deac9b47] LibCURL_jll v8.22.0+0
   [e37daf67] LibGit2_jll v1.9.7+0
   [29816b5a] LibSSH2_jll v1.11.104+0
-  [3a97d323] MPFR_jll v4.2.2+0
-  [14a3606d] MozillaCACerts_jll v2026.10.20
-  [4536629a] OpenBLAS_jll v0.3.30+0
+  [3a97d323] MPFR_jll v4.2.2+2
+  [14a3606d] MozillaCACerts_jll v2026.11.5
+  [4536629a] OpenBLAS_jll v0.3.30+1
   [05823500] OpenLibm_jll v0.8.7+0
   [458c3c95] OpenSSL_jll v3.5.8+0
   [efcefdf7] PCRE2_jll v10.47.0+0
@@ -348,5 +348,5 @@ Threads: 1 default, 1 interactive, 1 GC (on 4 virtual cores)</code></pre></detai
   [3161d3a3] Zstd_jll v1.5.7+1
   [8e850b90] libblastrampoline_jll v5.15.0+0
   [8e850ede] nghttp2_jll v1.70.0+0
-  [3f19e933] p7zip_jll v17.8.3+0
-Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v7.49.0/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v7.49.0/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Friday 13 November 2026 20:06">Friday 13 November 2026</span>. Using Julia version 1.13.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+  [3f19e933] p7zip_jll v17.8.5+0
+Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading. To see why use `status --outdated -m`</code></pre></details><p>You can also download the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v7.49.0/assets/Manifest.toml">manifest</a> file and the <a href="https://github.com/SciML/Symbolics.jl/tree/gh-pages/v7.49.0/assets/Project.toml">project</a> file.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="getting_started/">Getting Started with Symbolics.jl »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.20.0 on <span class="colophon-date" title="Thursday 19 November 2026 13:46">Thursday 19 November 2026</span>. Using Julia version 1.13.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
