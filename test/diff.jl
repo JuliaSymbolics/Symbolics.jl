@@ -1522,7 +1522,7 @@ end
     # components of the slice are taken from the parent without materialising it
     short = unwrap((2 * big)[1:2])
     Symbolics._scalarized(short)
-    @test (@elapsed Symbolics._scalarized(short)) < 1
+    @test (@allocated Symbolics._scalarized(short)) < 5_000_000
     @test isequal(Symbolics._scalarized(short), unwrap.([2 * big[1], 2 * big[2]]))
     @test isequal(Symbolics._scalarized(unwrap((2 * big + big)[2:3])), unwrap.([2 * big[2] + big[2], 2 * big[3] + big[3]]))
     # unknown-length `scalar * array` operand inside a sum of known length
@@ -1534,4 +1534,13 @@ end
         expand_derivatives(Divergence{true}([x, y])(unwrap(u * v + v + W))),
         expand_derivatives(Dd(x, u * v[1] + v[1] + W[1]) + Dd(y, u * v[2] + v[2] + W[2])),
     )
+end
+
+@testset "Lazy vector Laplacian of complex fields" begin
+    @variables x y (z[1:2])::Complex
+    L = Laplacian([x, y])
+    @test L(z) isa Arr{Complex{Num}, 1}
+    @test L(unwrap(z)) isa Arr{Complex{Num}, 1}
+    @test length(scalarize(expand_derivatives(L(z)))) == 2
+    @test Laplacian{true}([x, y])(z) isa Vector
 end

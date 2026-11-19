@@ -1977,7 +1977,12 @@ function (lap::Laplacian)(x::SymbolicT)
     return _vector_laplacian(lap, x)
 end
 (lap::Laplacian)(x::AbstractArray) = _vector_laplacian(lap, x)
-_vector_laplacian(lap::Laplacian{false}, x) = Arr{Num, 1}(SConst(SymbolicT[unwrap(lap(c)) for c in _components(x)]))
+_field_eltype(x::Arr) = eltype(x)
+_field_eltype(x::SymbolicT) = SU.symtype(x) <: AbstractArray{<:Complex} ? Complex{Num} : Num
+_field_eltype(x) = Num
+function _vector_laplacian(lap::Laplacian{false}, x)
+    return Arr{_field_eltype(x), 1}(SConst(SymbolicT[unwrap(lap(c)) for c in _components(x)]))
+end
 _vector_laplacian(lap::Laplacian{true}, x) = [lap(c) for c in _components(x)]
 
 """
