@@ -100,6 +100,93 @@ foreach(test_equal, Symbolics.jacobian([t, x, 42], [t, x]),
                   Differential(t)(x)           1
                   0  0])
 
+# issue 2133: Dense jacobian/hessian return 0 for dependencies nested under operators/calls
+let
+    @variables t x
+    @variables a(..) b(..) w(..)
+    @test isequal(Symbolics.jacobian([a(b(t))], [t])[1, 1], Symbolics.derivative(a(b(t)), t))
+    @test isequal(Symbolics.hessian(a(b(t)), [t])[1, 1], Symbolics.derivative(Symbolics.derivative(a(b(t)), t), t))
+
+    y = Differential(t)(a(t))
+    @test isequal(Symbolics.jacobian([y], [t])[1, 1], Differential(t, 2)(a(t)))
+    @test isequal(Symbolics.hessian(a(t), [t])[1, 1], Differential(t, 2)(a(t)))
+
+    op2 = Differential(t)(Differential(x)(w(t, x)))
+    J_op2 = Symbolics.jacobian([op2], [t, x])
+    @test isequal(J_op2[1, 1], Differential(t)(op2))
+    @test isequal(J_op2[1, 2], Differential(x)(op2))
+
+    s = sin(Differential(t)(a(t)))
+    @test isequal(Symbolics.jacobian([s], [t])[1, 1], Symbolics.derivative(s, t))
+
+    # Literal element access vs whole-array use
+    @variables p[1:2] q[1:2] f(..) g(..)
+    expr1 = f(q, p[2])
+    @test isequal(Symbolics.jacobian([expr1], [p[1]])[1, 1], 0)
+    @test isequal(Symbolics.hessian(expr1, [p[1]])[1, 1], 0)
+    @test_throws "Differentiation with array expressions is not yet supported" Symbolics.jacobian([f(p)], [p[1]])
+
+    # Literal element access of dependent array p(t)
+    @variables t_arr p_arr(t_arr)[1:2]
+    expr1_dep = f(q, p_arr[2])
+    @test isequal(Symbolics.jacobian([expr1_dep], [p_arr[1]])[1, 1], 0)
+    @test isequal(Symbolics.hessian(expr1_dep, [p_arr[1]])[1, 1], 0)
+
+    # Respect integration scope for bound variables in integrand
+    expr2 = f(q, g(Integral(t in Symbolics.DomainSets.ClosedInterval(0, 1))(t)))
+    @test isequal(Symbolics.jacobian([expr2], [t])[1, 1], 0)
+    @test isequal(Symbolics.hessian(expr2, [t])[1, 1], 0)
+
+    # Compound binder in Integral and unbound occurrence retention
+    @variables s_cb x_cb(s_cb) a_cb(..)
+    e_cb = a_cb(Integral(x_cb in Symbolics.DomainSets.ClosedInterval(0, 1))(x_cb))
+    @test isequal(Symbolics.jacobian([e_cb], [s_cb])[1, 1], 0)
+    @test isequal(Symbolics.hessian(e_cb, [s_cb])[1, 1], 0)
+    e_cb_unbound = a_cb(s_cb, Integral(x_cb in Symbolics.DomainSets.ClosedInterval(0, 1))(x_cb))
+    @test isequal(Symbolics.jacobian([e_cb_unbound], [s_cb])[1, 1], Symbolics.derivative(e_cb_unbound, s_cb))
+
+    # Shared subexpression across integration scopes in both argument orders
+    @variables h(..)
+    I_op = Integral(t in Symbolics.DomainSets.ClosedInterval(0, 1))
+    s_sub = g(t)
+    e_order1 = f(h(s_sub), I_op(s_sub))
+    e_order2 = f(I_op(s_sub), h(s_sub))
+    @test isequal(Symbolics.jacobian([e_order1], [t])[1, 1], Symbolics.derivative(e_order1, t))
+    @test isequal(Symbolics.jacobian([e_order2], [t])[1, 1], Symbolics.derivative(e_order2, t))
+    @test isequal(Symbolics.hessian(e_order1, [t])[1, 1], Symbolics.derivative(Symbolics.derivative(e_order1, t), t))
+    @test isequal(Symbolics.hessian(e_order2, [t])[1, 1], Symbolics.derivative(Symbolics.derivative(e_order2, t), t))
+
+    # Scaling regression for shared subexpressions across integration scopes
+    let
+        n_sc = 14
+        @variables q_sc t_sc[1:n_sc] f_sc(..) g_sc(..)
+        e_sc = g_sc(t_sc...)
+        for k in 1:n_sc
+            I_k = Integral(t_sc[k] in Symbolics.DomainSets.ClosedInterval(0, 1))
+            e_sc = f_sc(e_sc, I_k(e_sc))
+        end
+        ops_sc, vars_sc = [e_sc], [q_sc]
+        @test isequal(only(Symbolics.jacobian(ops_sc, vars_sc)), 0)
+        # Warmed allocation check: linear/DAG traversal allocates < 500 KB (actual ~16 KB),
+        # while exponential/unshared traversal allocates > 120 MB at depth 14.
+        alloc_sc = @allocated Symbolics.jacobian(ops_sc, vars_sc)
+        @test alloc_sc < 500_000
+    end
+
+    # Unshared binder-free call chain allocation growth assertion
+    let
+        @variables t_ch s_ch f_ch(..)
+        e_ch = t_ch
+        for _ in 1:1000
+            e_ch = f_ch(e_ch)
+        end
+        Symbolics.jacobian([f_ch(t_ch)], [s_ch]) # warm up
+        alloc_ch = @allocated Symbolics.jacobian([e_ch], [s_ch])
+        @test isequal(only(Symbolics.jacobian([e_ch], [s_ch])), 0)
+        @test alloc_ch < 500_000 # O(N) traversal allocates ~100 KB; O(N^2) allocates > 10 MB
+    end
+end
+
 # issue 252
 @variables beta, alpha, delta
 @variables x1, x2, x3
