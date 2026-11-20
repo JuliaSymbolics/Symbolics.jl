@@ -539,6 +539,11 @@ end
     _, iip = Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule])
     @test ForwardDiff.jacobian((y, v) -> @invokelatest(eval(iip)(y, v)), zeros(3), u) == Diagonal(cos.(u))
     @test_throws ArgumentError Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule], skipzeros = true)
+    whole = Code.OptimizationRule("whole", detector, (ir, expr, _) -> (SymbolicUtils.populate_ir!(ir, unwrap(x)); (ir, unwrap(x))), 1)
+    _, iip = Symbolics.codegen_function(ir, xs, [unwrap(x)]; optimize = [whole], outputidxs = [3, 2, 1], checkbounds = true)
+    v = copy(u)
+    @invokelatest eval(iip)(v, v)
+    @test v == reverse(u)
 
     sx = unwrap(x)
     shifted = SymbolicUtils.@arrayop (i,) sx[i] + 2

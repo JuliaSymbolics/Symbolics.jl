@@ -24,6 +24,7 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
 )
 
 function write_rule_output!(out, outputidxs, value)
+    value = Base.mightalias(out, value) ? copy(value) : value
     for (i, o) in enumerate(outputidxs)
         out[o] = value[i]
     end
