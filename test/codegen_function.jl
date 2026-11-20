@@ -676,6 +676,25 @@ end
     @invokelatest eval(iip)(out, collect(1.0:20.0))
     @test out == 1:20
 
+    mixed = SymbolicUtils.ArrayMaker{SymReal}(
+        [[1:20], [21:40]], [crows, SymbolicUtils.@arrayop((i,), sw[i] + 1)]; shape = SymbolicUtils.ShapeVecT((1:40,))
+    )
+    SymbolicUtils.populate_ir!(ir, mixed)
+    mixer = Code.OptimizationRule("mixed", detector, (ir, expr, _) -> (ir, mixed), 1)
+    mixed_exprs = [[sum(sC[i, :]) for i in 1:20]; unwrap.(collect(w)) .+ 1]
+    _, iip = Symbolics.codegen_function(ir, mixed_exprs, [sC, sw]; optimize = [mixer], iip_config = (false, true))
+    out = zeros(Float32, 40)
+    @invokelatest eval(iip)(out, repeat([2.0^24 1 -2.0^24], 20), ones(Float32, 20))
+    @test out == [ones(20); fill(2, 20)]
+
+    nullary = SymbolicUtils.Term{SymReal}(Returns(2.0), SymbolicUtils.ArgsT{SymReal}(()); type = Real)
+    plus_nullary = SymbolicUtils.@arrayop (i,) sx[i] + nullary
+    SymbolicUtils.populate_ir!(ir, plus_nullary)
+    _, iip = Symbolics.codegen_function(ir, xs .+ 2, [sx]; optimize = [Code.OptimizationRule("nullary", detector, (ir, expr, _) -> (ir, plus_nullary), 1)])
+    out = zeros(3)
+    @invokelatest eval(iip)(out, u)
+    @test out == u .+ 2
+
     for (T, reduces, S) in ((Float32, false, Float32), (Float32, true, Float64), (ComplexF64, false, ComplexF64), (Int, false, Number))
         @test eltype(Symbolics.rule_output_buffer(zeros(T, 2), (2,), reduces)) === S
     end

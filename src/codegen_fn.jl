@@ -41,14 +41,12 @@ function rule_output_buffer(out, sz, reduces::Bool)
     return fill!(Array{T}(undef, sz), false)
 end
 
-is_loop_index(x) = iscall(x) && isequal(arguments(x)[1], SU.idxs_for_arrayop(VartypeT))
-
 function has_reduction(x)
     ops = Set{SymbolicT}()
     SU.search_variables!(ops, x; is_atomic = SU.isarrayop)
     return any(ops) do op
         used = Set{SymbolicT}()
-        SU.search_variables!(used, op.expr; is_atomic = is_loop_index)
+        SU.search_variables!(used, op.expr; is_atomic = SU._is_index_variable)
         any(u -> !any(o -> isequal(o, u), op.output_idx), used)
     end
 end
