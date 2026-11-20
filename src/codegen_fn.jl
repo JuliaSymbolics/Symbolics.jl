@@ -25,20 +25,23 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
 
 function write_rule_output!(out, outputidxs, value)
     value = Base.mightalias(out, value) ? copy(value) : value
-    outputidxs = outputidxs isa AbstractArray && !Base.mightalias(out, outputidxs) ? outputidxs : collect(outputidxs)
     for (i, o) in enumerate(outputidxs)
         out[o] = value[i]
     end
     return out
 end
 
-function rule_output_buffer(out, sz, own_eltype::Bool)
+function rule_output_buffer(out, sz, reduces::Bool)
     T = eltype(out)
-    T = T <: AbstractFloat ? (own_eltype ? T : promote_type(T, Float64)) : T <: Number && promote_type(T, Float64) === T ? T : Number
+    T = if T <: AbstractFloat
+        reduces ? promote_type(T, Float64) : T
+    else
+        T <: Number && promote_type(T, Float64) === T ? T : Number
+    end
     return fill!(Array{T}(undef, sz), false)
 end
 
-is_loop_index(x) = iscall(x) && operation(x) === getindex && isequal(arguments(x)[1], SU.idxs_for_arrayop(VartypeT))
+is_loop_index(x) = iscall(x) && isequal(arguments(x)[1], SU.idxs_for_arrayop(VartypeT))
 
 function has_reduction(x)
     ops = Set{SymbolicT}()
@@ -46,7 +49,7 @@ function has_reduction(x)
     return any(ops) do op
         used = Set{SymbolicT}()
         SU.search_variables!(used, op.expr; is_atomic = is_loop_index)
-        any(u -> !any(o -> isequal(o, u), op.output_idx), used) || has_reduction(op.expr)
+        any(u -> !any(o -> isequal(o, u), op.output_idx), used)
     end
 end
 
@@ -279,16 +282,17 @@ function codegen_function(
 
     if iip_config[2]
         iipbody = if array_node
-            buffer = SU.Term{VartypeT}(
-                rule_output_buffer, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(fuse_output_eltype && fuse_broadcasts && SU.isarraymaker(expr) && !has_reduction(expr))));
-                type = Any
+            sz, reduces = SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(has_reduction(expr))
+            buffer = SU.Term{VartypeT}(rule_output_buffer, SArgsT((IIP_OUTSYM, sz, reduces)); type = Any)
+            allocator = SU.Term{VartypeT}(
+                Returns, SArgsT((buffer,)); type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
             )
-            value = Code.supports_with_allocator(expr) ?
-                Code.with_allocator(SU.Term{VartypeT}(Returns, SArgsT((buffer,)); type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()), expr) : expr
+            value = Code.supports_with_allocator(expr) ? Code.with_allocator(allocator, expr) : expr
             if outputidxs === nothing
                 SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, value)); type = SU.symtype(expr), shape = SU.shape(expr))
             else
-                SU.Term{VartypeT}(write_rule_output!, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(outputidxs), value)); type = Any)
+                idxs = SU.Const{VartypeT}(collect(outputidxs))
+                SU.Term{VartypeT}(write_rule_output!, SArgsT((IIP_OUTSYM, idxs, value)); type = Any)
             end
         else
             set_array(nothing, args, IIP_OUTSYM, outputidxs, expr, checkbounds, skipzeros)

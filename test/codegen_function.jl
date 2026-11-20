@@ -668,4 +668,15 @@ end
     out = fill(100.0, 3)
     @invokelatest eval(iip)(out, [1.0, 2.0, 3.0])
     @test out == fill(100.0, 3)
+
+    idx = collect(1:20)
+    _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [copier], outputidxs = idx)
+    reverse!(idx)
+    out = zeros(20)
+    @invokelatest eval(iip)(out, collect(1.0:20.0))
+    @test out == 1:20
+
+    for (T, reduces, S) in ((Float32, false, Float32), (Float32, true, Float64), (ComplexF64, false, ComplexF64), (Int, false, Number))
+        @test eltype(Symbolics.rule_output_buffer(zeros(T, 2), (2,), reduces)) === S
+    end
 end
