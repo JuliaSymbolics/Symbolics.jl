@@ -606,4 +606,26 @@ end
     out = zeros(Int, 2)
     @invokelatest eval(iip)(out, [0.5 0.5; 1.5 0.5])
     @test out == [1, 2]
+
+    @variables B[1:2, 1:3]
+    sB = unwrap(B)
+    brows = SymbolicUtils.@arrayop (i,) sB[i, j]
+    SymbolicUtils.populate_ir!(ir, brows)
+    brow = Code.OptimizationRule("brows", detector, (ir, expr, _) -> (ir, brows), 1)
+    _, iip = Symbolics.codegen_function(ir, [sum(sB[1, :]), sum(sB[2, :])], [sB]; optimize = [brow], iip_config = (false, true), fuse_output_eltype = true)
+    out = zeros(Float32, 2)
+    @invokelatest eval(iip)(out, [2.0^24 1 -2.0^24; 2.0^24 3 -2.0^24])
+    @test out == [1, 3]
+
+    ident = SymbolicUtils.ArrayMaker{SymReal}([[1:20]], [sw]; shape = SymbolicUtils.ShapeVecT((1:20,)))
+    SymbolicUtils.populate_ir!(ir, ident)
+    copier = Code.OptimizationRule("ident", detector, (ir, expr, _) -> (ir, ident), 1)
+    out = [2; 3; 1; 4:20]
+    _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [copier], outputidxs = view(out, :))
+    @invokelatest eval(iip)(out, collect(1:20))
+    @test out == [3; 1; 2; 4:20]
+    _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [copier], outputidxs = 20:-1:1)
+    out = zeros(Int, 20)
+    @invokelatest eval(iip)(out, 2^53 .+ (1:20))
+    @test out == reverse(2^53 .+ (1:20))
 end

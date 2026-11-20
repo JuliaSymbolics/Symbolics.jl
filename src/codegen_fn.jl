@@ -25,6 +25,7 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
 
 function write_rule_output!(out, outputidxs, value)
     value = Base.mightalias(out, value) ? copy(value) : value
+    outputidxs = Base.mightalias(out, outputidxs) ? copy(outputidxs) : outputidxs
     for (i, o) in enumerate(outputidxs)
         out[o] = value[i]
     end
@@ -33,8 +34,8 @@ end
 
 function rule_output_buffer(out, sz, own_eltype::Bool)
     T = eltype(out)
-    T = own_eltype && T <: AbstractFloat ? T : T <: Number ? promote_type(T, Float64) : Float64
-    return zeros(T, sz)
+    T = T <: AbstractFloat ? (own_eltype ? T : promote_type(T, Float64)) : promote_type(T, Float64) === T ? T : Any
+    return fill!(Array{T}(undef, sz), false)
 end
 
 function canonicalize_args(args::Vector, inbounds::Bool)
@@ -267,7 +268,7 @@ function codegen_function(
     if iip_config[2]
         iipbody = if array_node
             buffer = SU.Term{VartypeT}(
-                rule_output_buffer, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(fuse_output_eltype)));
+                rule_output_buffer, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(fuse_output_eltype && fuse_broadcasts && SU.isarraymaker(expr))));
                 type = Any
             )
             value = Code.supports_with_allocator(expr) ?
