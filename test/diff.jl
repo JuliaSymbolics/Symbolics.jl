@@ -126,10 +126,24 @@ let
     @test isequal(Symbolics.hessian(expr1, [p[1]])[1, 1], 0)
     @test_throws "Differentiation with array expressions is not yet supported" Symbolics.jacobian([f(p)], [p[1]])
 
+    # Literal element access of dependent array p(t)
+    @variables t_arr p_arr(t_arr)[1:2]
+    expr1_dep = f(q, p_arr[2])
+    @test isequal(Symbolics.jacobian([expr1_dep], [p_arr[1]])[1, 1], 0)
+    @test isequal(Symbolics.hessian(expr1_dep, [p_arr[1]])[1, 1], 0)
+
     # Respect integration scope for bound variables in integrand
     expr2 = f(q, g(Integral(t in Symbolics.DomainSets.ClosedInterval(0, 1))(t)))
     @test isequal(Symbolics.jacobian([expr2], [t])[1, 1], 0)
     @test isequal(Symbolics.hessian(expr2, [t])[1, 1], 0)
+
+    # Compound binder in Integral and unbound occurrence retention
+    @variables s_cb x_cb(s_cb) a_cb(..)
+    e_cb = a_cb(Integral(x_cb in Symbolics.DomainSets.ClosedInterval(0, 1))(x_cb))
+    @test isequal(Symbolics.jacobian([e_cb], [s_cb])[1, 1], 0)
+    @test isequal(Symbolics.hessian(e_cb, [s_cb])[1, 1], 0)
+    e_cb_unbound = a_cb(s_cb, Integral(x_cb in Symbolics.DomainSets.ClosedInterval(0, 1))(x_cb))
+    @test isequal(Symbolics.jacobian([e_cb_unbound], [s_cb])[1, 1], Symbolics.derivative(e_cb_unbound, s_cb))
 
     # Shared subexpression across integration scopes in both argument orders
     @variables h(..)
@@ -153,6 +167,23 @@ let
         end
         ops_sc, vars_sc = [e_sc], [q_sc]
         @test isequal(only(Symbolics.jacobian(ops_sc, vars_sc)), 0)
+        # Warmed allocation check: linear/DAG traversal allocates < 500 KB (actual ~16 KB),
+        # while exponential/unshared traversal allocates > 120 MB at depth 14.
+        alloc_sc = @allocated Symbolics.jacobian(ops_sc, vars_sc)
+        @test alloc_sc < 500_000
+    end
+
+    # Unshared binder-free call chain allocation growth assertion
+    let
+        @variables t_ch s_ch f_ch(..)
+        e_ch = t_ch
+        for _ in 1:1000
+            e_ch = f_ch(e_ch)
+        end
+        Symbolics.jacobian([f_ch(t_ch)], [s_ch]) # warm up
+        alloc_ch = @allocated Symbolics.jacobian([e_ch], [s_ch])
+        @test isequal(only(Symbolics.jacobian([e_ch], [s_ch])), 0)
+        @test alloc_ch < 500_000 # O(N) traversal allocates ~100 KB; O(N^2) allocates > 10 MB
     end
 end
 
