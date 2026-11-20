@@ -628,4 +628,44 @@ end
     out = zeros(Int, 20)
     @invokelatest eval(iip)(out, 2^53 .+ (1:20))
     @test out == reverse(2^53 .+ (1:20))
+
+    unit = SymbolicUtils.ArrayMaker{SymReal}([[1:1], [2:20]], [Symbolics.SConst([1]), sw[2:20]]; shape = SymbolicUtils.ShapeVecT((1:20,)))
+    SymbolicUtils.populate_ir!(ir, unit)
+    _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [Code.OptimizationRule("unit", detector, (ir, expr, _) -> (ir, unit), 1)])
+    for out in (zeros(Int, 20), Vector{Real}(zeros(20)), Vector{Any}(zeros(20)))
+        @invokelatest eval(iip)(out, collect(1:20))
+        @test out == 1:20
+    end
+
+    out = Dict(i => i for i in 1:20)
+    ks = collect(keys(out))
+    out[ks[1]], out[ks[2]], out[ks[3]] = ks[2], ks[3], ks[1]
+    expected = copy(out)
+    foreach(((i, o),) -> expected[o] = i, enumerate(collect(values(out))))
+    _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [copier], outputidxs = values(out))
+    @invokelatest eval(iip)(out, collect(1:20))
+    @test out == expected
+
+    @variables C[1:20, 1:3]
+    sC = unwrap(C)
+    crows = SymbolicUtils.@arrayop (i,) sC[i, j]
+    cmaker = SymbolicUtils.ArrayMaker{SymReal}([[1:20]], [crows]; shape = SymbolicUtils.ShapeVecT((1:20,)))
+    foreach(e -> SymbolicUtils.populate_ir!(ir, e), (crows, cmaker))
+    for (node, fb, fe) in ((cmaker, true, true), (cmaker, true, false), (cmaker, false, true), (crows, true, true))
+        _, iip = Symbolics.codegen_function(ir, [sum(sC[i, :]) for i in 1:20], [sC]; optimize = [Code.OptimizationRule("crows", detector, (ir, expr, _) -> (ir, node), 1)], iip_config = (false, true), fuse_broadcasts = fb, fuse_output_eltype = fe)
+        out = zeros(Float32, 20)
+        @invokelatest eval(iip)(out, repeat([2.0^24 1 -2.0^24], 20))
+        @test out == ones(20)
+    end
+
+    oop, _ = Symbolics.codegen_function(ir, exprs, [xs]; optimize = [rule], iip_config = (true, false), skipzeros = true)
+    @test @invokelatest(eval(oop)(u)) == sin.(u)
+
+    @variables z[1:3]
+    zs = unwrap.(collect(z))
+    scalar = Code.OptimizationRule("scalar", detector, (ir, expr, _) -> (SymbolicUtils.populate_ir!(ir, zs[1]); (ir, zs[1])), 1)
+    _, iip = Symbolics.codegen_function(ir, zs, [unwrap(z)]; optimize = [scalar], iip_config = (false, true))
+    out = fill(100.0, 3)
+    @invokelatest eval(iip)(out, [1.0, 2.0, 3.0])
+    @test out == fill(100.0, 3)
 end

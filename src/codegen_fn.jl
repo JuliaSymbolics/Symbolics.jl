@@ -25,7 +25,7 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
 
 function write_rule_output!(out, outputidxs, value)
     value = Base.mightalias(out, value) ? copy(value) : value
-    outputidxs = Base.mightalias(out, outputidxs) ? copy(outputidxs) : outputidxs
+    outputidxs = outputidxs isa AbstractArray && !Base.mightalias(out, outputidxs) ? outputidxs : collect(outputidxs)
     for (i, o) in enumerate(outputidxs)
         out[o] = value[i]
     end
@@ -34,8 +34,20 @@ end
 
 function rule_output_buffer(out, sz, own_eltype::Bool)
     T = eltype(out)
-    T = T <: AbstractFloat ? (own_eltype ? T : promote_type(T, Float64)) : promote_type(T, Float64) === T ? T : Any
+    T = T <: AbstractFloat ? (own_eltype ? T : promote_type(T, Float64)) : T <: Number && promote_type(T, Float64) === T ? T : Number
     return fill!(Array{T}(undef, sz), false)
+end
+
+is_loop_index(x) = iscall(x) && operation(x) === getindex && isequal(arguments(x)[1], SU.idxs_for_arrayop(VartypeT))
+
+function has_reduction(x)
+    ops = Set{SymbolicT}()
+    SU.search_variables!(ops, x; is_atomic = SU.isarrayop)
+    return any(ops) do op
+        used = Set{SymbolicT}()
+        SU.search_variables!(used, op.expr; is_atomic = is_loop_index)
+        any(u -> !any(o -> isequal(o, u), op.output_idx), used) || has_reduction(op.expr)
+    end
 end
 
 function canonicalize_args(args::Vector, inbounds::Bool)
@@ -268,7 +280,7 @@ function codegen_function(
     if iip_config[2]
         iipbody = if array_node
             buffer = SU.Term{VartypeT}(
-                rule_output_buffer, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(fuse_output_eltype && fuse_broadcasts && SU.isarraymaker(expr))));
+                rule_output_buffer, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(fuse_output_eltype && fuse_broadcasts && SU.isarraymaker(expr) && !has_reduction(expr))));
                 type = Any
             )
             value = Code.supports_with_allocator(expr) ?
