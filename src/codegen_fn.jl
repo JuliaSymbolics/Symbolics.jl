@@ -60,7 +60,7 @@ function reduces(op)
 end
 
 owns_buffer(x) = SU.isarrayop(x) && Code.supports_with_allocator(x) && reduces(x)
-has_allocator(x) = iscall(x) && operation(x) === Code.with_allocator
+has_allocator(x) = operation(x) === Code.with_allocator
 
 function isolate_arrayops(x::SymbolicT)
     ops = Set{SymbolicT}()
