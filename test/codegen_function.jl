@@ -767,6 +767,24 @@ end
     @invokelatest eval(iip)(out, zeros(20))
     @test out == 20:-1:1
 
+    @variables E[1:20, 1:3]
+    sE = unwrap(E)
+    erows = SymbolicUtils.@arrayop (i,) sE[i, j]
+    owned = Code.with_allocator(sz -> zeros(Int, sz), erows)
+    eexprs = [sum(sE[i, :]) for i in 1:20]
+    for (node, n) in ((vecmaker([[1:20]], [owned], 20), 20), (vecmaker([[1:20], [21:40]], [owned, erows], 40), 40))
+        _, iip = Symbolics.codegen_function(ir, n == 20 ? eexprs : [eexprs; eexprs], [sE]; optimize = node_rule(node), iip_config = (false, true))
+        out = fill(100, n)
+        @invokelatest eval(iip)(out, repeat([1 2 3], 20))
+        @test out == fill(6, n)
+    end
+
+    doubled = vecmaker([[1:20]], [SymbolicUtils.@arrayop((i,), sw[i] * 2)], 20)
+    _, iip = Symbolics.codegen_function(ir, ws .* 2, [sw]; optimize = node_rule(doubled), iip_config = (false, true))
+    @test !occursin("arrayop_buffer", string(iip))
+    _, iip = Symbolics.codegen_function(ir, cexprs, [sC]; optimize = node_rule(vecmaker([[1:20]], [crows], 20)), iip_config = (false, true))
+    @test occursin("arrayop_buffer", string(iip))
+
     for (out, S) in ((zeros(Float32, 2), Float32), (zeros(Int, 2), Int), (Real[0, 0], Real), (Any[0, 0], Number), (Dict(1 => 0.0), Number))
         @test eltype(Symbolics.rule_output_buffer(out, (2,))) === S
     end

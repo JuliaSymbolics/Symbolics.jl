@@ -53,17 +53,24 @@ function rule_allocator(buffer)
     )
 end
 
-owns_buffer(x) = SU.isarrayop(x) && Code.supports_with_allocator(x)
+function reduces(op)
+    used = Set{SymbolicT}()
+    SU.search_variables!(used, op.expr; is_atomic = SU._is_index_variable)
+    return any(u -> !any(o -> isequal(o, u), op.output_idx), used)
+end
+
+owns_buffer(x) = SU.isarrayop(x) && Code.supports_with_allocator(x) && reduces(x)
+has_allocator(x) = iscall(x) && operation(x) === Code.with_allocator
 
 function isolate_arrayops(x::SymbolicT)
     ops = Set{SymbolicT}()
-    SU.search_variables!(ops, x; is_atomic = owns_buffer)
+    SU.search_variables!(ops, x; is_atomic = y -> owns_buffer(y) || has_allocator(y))
     rules = Dict{SymbolicT, SymbolicT}()
-    for op in ops
+    for op in Iterators.filter(owns_buffer, ops)
         own = Code.with_allocator(rule_allocator(arrayop_buffer), op)
         rules[op] = SU.Term{VartypeT}(identity, SArgsT((own,)); type = SU.symtype(op), shape = SU.shape(op))
     end
-    return SU.substitute(x, rules)
+    return SU.substitute(x, rules; filterer = y -> !has_allocator(y) && SU.default_substitute_filter(y))
 end
 
 function canonicalize_args(args::Vector, inbounds::Bool)
