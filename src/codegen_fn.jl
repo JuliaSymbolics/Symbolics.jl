@@ -24,7 +24,6 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
 )
 
 function write_rule_output!(out, outputidxs, value)
-    value = Base.mightalias(out, value) ? copy(value) : value
     for (i, o) in enumerate(outputidxs)
         out[o] = value[i]
     end
@@ -36,43 +35,10 @@ function rule_output_buffer(out, sz)
     return fill!(Array{T <: Number ? T : Number}(undef, sz), false)
 end
 
-function arrayop_buffer(out, sz)
-    T = eltype(out)
-    T = if T <: AbstractFloat
-        promote_type(T, Float64)
-    else
-        T <: Number && promote_type(T, Float64) === T ? T : Number
-    end
-    return fill!(Array{T}(undef, sz), false)
-end
-
-function rule_allocator(buffer)
-    return SU.Term{VartypeT}(
-        Base.Fix1, SArgsT((SU.Const{VartypeT}(buffer), IIP_OUTSYM));
-        type = FnType{Tuple, Any, Base.Fix1}, shape = SU.ShapeVecT()
-    )
-end
-
-function reduces(op)
-    used = Set{SymbolicT}()
-    SU.search_variables!(used, op.expr; is_atomic = SU._is_index_variable, recurse = y -> iscall(y) && !SU.isarrayop(y))
-    union!(used, keys(op.ranges))
-    return any(u -> !any(o -> isequal(o, u), op.output_idx), used)
-end
-
-owns_buffer(x) = SU.isarrayop(x) && Code.supports_with_allocator(x) && reduces(x)
-has_allocator(x) = operation(x) === Code.with_allocator
-
-function isolate_arrayops(x::SymbolicT)
-    ops = Set{SymbolicT}()
-    SU.search_variables!(ops, x; is_atomic = owns_buffer)
-    rules = Dict{SymbolicT, SymbolicT}()
-    for op in Iterators.filter(owns_buffer, ops)
-        own = Code.with_allocator(rule_allocator(arrayop_buffer), op)
-        rules[op] = SU.Term{VartypeT}(identity, SArgsT((own,)); type = SU.symtype(op), shape = SU.shape(op))
-    end
-    return SU.substitute(x, rules; filterer = y -> !has_allocator(y) && SU.default_substitute_filter(y))
-end
+const RULE_ALLOCATOR = SU.Term{VartypeT}(
+    Base.Fix1, SArgsT((SU.Const{VartypeT}(rule_output_buffer), IIP_OUTSYM));
+    type = FnType{Tuple, Any, Base.Fix1}, shape = SU.ShapeVecT()
+)
 
 function canonicalize_args(args::Vector, inbounds::Bool)
     return map(enumerate(args)) do (i, arg)
@@ -277,11 +243,21 @@ function codegen_function(
     rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
 
     expr = _recursive_unwrap(expr)
+    scalar_expr = expr
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
     array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr))
-    array_node && iip_config[2] && skipzeros &&
-        throw(ArgumentError("`optimize` returned an array-valued expression, which cannot be written with `skipzeros`"))
+    idxs = !array_node ? nothing : outputidxs === nothing ? eachindex(scalar_expr) : collect(outputidxs)
+    # The in-place function copies the rules' array node into `out` only without `skipzeros`,
+    # with an `outputidxs` that selects every expression, with numeric expressions, and with no
+    # `@arrayop` loop in the node (including a full reduction to a scalar), which would
+    # accumulate in the element type of its buffer instead of the operands' type. Otherwise it
+    # writes the scalar expressions.
+    copy_node = array_node && !skipzeros && length(idxs) == length(scalar_expr) &&
+        all(x -> SU.symtype(x) <: Number, scalar_expr) &&
+        !SU.query(expr) do x
+            SU.isarrayop(x) && (Code.supports_with_allocator(x) || !SU.is_array_shape(SU.shape(x)))
+        end
 
     i = findfirst(x -> x isa DestructuredArgs, args)
     if similarto === nothing
@@ -302,19 +278,16 @@ function codegen_function(
     end
 
     if iip_config[2]
-        iipbody = if array_node
-            value = isolate_arrayops(expr)
-            if Code.supports_with_allocator(value)
-                value = Code.with_allocator(rule_allocator(rule_output_buffer), value)
-            end
-            if outputidxs === nothing
-                SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, value)); type = SU.symtype(expr), shape = SU.shape(expr))
+        iipbody = if copy_node
+            # A node computed in a fresh buffer cannot alias `out`; any other may be an input.
+            value = if Code.supports_with_allocator(expr)
+                Code.with_allocator(RULE_ALLOCATOR, expr)
             else
-                idxs = SU.Const{VartypeT}(collect(outputidxs))
-                SU.Term{VartypeT}(write_rule_output!, SArgsT((IIP_OUTSYM, idxs, value)); type = Any)
+                SU.Term{VartypeT}(copy, SArgsT((expr,)); type = SU.symtype(expr), shape = SU.shape(expr))
             end
+            SU.Term{VartypeT}(write_rule_output!, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(idxs), value)); type = Any)
         else
-            set_array(nothing, args, IIP_OUTSYM, outputidxs, expr, checkbounds, skipzeros)
+            set_array(nothing, args, IIP_OUTSYM, outputidxs, expr isa AbstractArray ? expr : scalar_expr, checkbounds, skipzeros)
         end
         iipfn = wrap_code[2](Func([IIP_OUTSYM; args], [], iipbody))
         iip = Code.fast_toexpr(iipfn, ir, rewrites)
