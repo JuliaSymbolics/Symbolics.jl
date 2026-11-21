@@ -64,7 +64,7 @@ has_allocator(x) = iscall(x) && operation(x) === Code.with_allocator
 
 function isolate_arrayops(x::SymbolicT)
     ops = Set{SymbolicT}()
-    SU.search_variables!(ops, x; is_atomic = y -> owns_buffer(y) || has_allocator(y))
+    SU.search_variables!(ops, x; is_atomic = owns_buffer)
     rules = Dict{SymbolicT, SymbolicT}()
     for op in Iterators.filter(owns_buffer, ops)
         own = Code.with_allocator(rule_allocator(arrayop_buffer), op)

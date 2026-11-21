@@ -779,6 +779,10 @@ end
         @test out == fill(6, n)
     end
 
+    @variables τ
+    under_operator = SymbolicUtils.Term{SymReal}(Differential(unwrap(τ)), SymbolicUtils.ArgsT{SymReal}((crows,)); type = SymbolicUtils.symtype(crows), shape = SymbolicUtils.shape(crows))
+    @test isequal(Symbolics.isolate_arrayops(under_operator), under_operator)
+
     doubled = vecmaker([[1:20]], [SymbolicUtils.@arrayop((i,), sw[i] * 2)], 20)
     _, iip = Symbolics.codegen_function(ir, ws .* 2, [sw]; optimize = node_rule(doubled), iip_config = (false, true))
     @test !occursin("arrayop_buffer", string(iip))

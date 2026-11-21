@@ -32,7 +32,7 @@ run_qa(
                 :log2, :max, :min, :nocolor, :power_by_squaring, :register_error_hint,
                 :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractTriangular,
                 :Slice, :StaticArray, :TwicePrecision, :TypedEndpointsInterval,
-                :sin, :sqrt, :striplines, :tan,
+                :sin, :sqrt, :striplines, :tan, :mightalias, :_is_index_variable,
             ),
         ),
     ),
