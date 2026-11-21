@@ -56,6 +56,7 @@ end
 function reduces(op)
     used = Set{SymbolicT}()
     SU.search_variables!(used, op.expr; is_atomic = SU._is_index_variable, recurse = y -> iscall(y) && !SU.isarrayop(y))
+    union!(used, keys(op.ranges))
     return any(u -> !any(o -> isequal(o, u), op.output_idx), used)
 end
 

@@ -791,6 +791,19 @@ end
     @invokelatest eval(iip)(out, repeat([2^53 1 2], 20))
     @test out == fill(2^53 + 3, 20)
 
+    hidden = SymbolicUtils.@arrayop (i,) sw[i] + 0 * sw[j] j in 1:20
+    _, iip = Symbolics.codegen_function(ir, 20 .* ws, [sw]; optimize = node_rule(hidden), iip_config = (false, true))
+    out = zeros(Float32, 20)
+    @invokelatest eval(iip)(out, fill(0.1, 20))
+    @test out == fill(Float32(sum(fill(0.1, 20))), 20)
+    @test !Symbolics.reduces(SymbolicUtils.@arrayop((i, j), sB[i, j] * 0.1))
+    @test Symbolics.reduces(crows)
+    bsums = unwrap(sum(B; dims = 2))
+    _, iip = Symbolics.codegen_function(ir, reshape([sum(sB[1, :]), sum(sB[2, :])], 2, 1), [sB]; optimize = node_rule(bsums), iip_config = (false, true))
+    out = zeros(2, 1)
+    @invokelatest eval(iip)(out, ones(2, 3))
+    @test out == fill(3.0, 2, 1)
+
     doubled = vecmaker([[1:20]], [SymbolicUtils.@arrayop((i,), sw[i] * 2)], 20)
     _, iip = Symbolics.codegen_function(ir, ws .* 2, [sw]; optimize = node_rule(doubled), iip_config = (false, true))
     @test !occursin("arrayop_buffer", string(iip))
