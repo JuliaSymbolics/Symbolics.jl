@@ -783,6 +783,14 @@ end
     under_operator = SymbolicUtils.Term{SymReal}(Differential(unwrap(τ)), SymbolicUtils.ArgsT{SymReal}((crows,)); type = SymbolicUtils.symtype(crows), shape = SymbolicUtils.shape(crows))
     @test isequal(Symbolics.isolate_arrayops(under_operator), under_operator)
 
+    kidx = SymbolicUtils.idxs_for_arrayop(SymReal)[1]
+    kept = SymbolicUtils.Term{SymReal}(getindex, SymbolicUtils.ArgsT{SymReal}((crows, kidx)); type = Real)
+    pointwise_parent = SymbolicUtils.ArrayOp{SymReal}(SymbolicUtils.OutIdxT{SymReal}((kidx,)), kept, +, nothing, SymbolicUtils.RangesT{SymReal}())
+    _, iip = Symbolics.codegen_function(ir, cexprs, [sC]; optimize = node_rule(pointwise_parent), iip_config = (false, true))
+    out = zeros(Int, 20)
+    @invokelatest eval(iip)(out, repeat([2^53 1 2], 20))
+    @test out == fill(2^53 + 3, 20)
+
     doubled = vecmaker([[1:20]], [SymbolicUtils.@arrayop((i,), sw[i] * 2)], 20)
     _, iip = Symbolics.codegen_function(ir, ws .* 2, [sw]; optimize = node_rule(doubled), iip_config = (false, true))
     @test !occursin("arrayop_buffer", string(iip))
