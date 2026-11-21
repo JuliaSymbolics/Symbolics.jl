@@ -800,7 +800,44 @@ end
     @invokelatest eval(iip)(out, ones(2, 3))
     @test out == fill(3.0, 2, 1)
 
-    for (out, S) in ((zeros(Float32, 2), Float32), (zeros(Int, 2), Int), (Real[0, 0], Real), (Any[0, 0], Number), (Dict(1 => 0.0), Number))
+    rewired_ir = IRStructure{SymReal}()
+    rewired = SymbolicUtils.ArrayMaker{SymReal}([[1:20]], [sp]; shape = SymbolicUtils.ShapeVecT((1:20,)))
+    SymbolicUtils.populate_ir!(rewired_ir, rewired)
+    SymbolicUtils.replace_node!(rewired_ir, sp, crows)
+    _, iip = Symbolics.codegen_function(rewired_ir, [sum(sC[i, :]) for i in 1:20], [sC]; optimize = [Code.OptimizationRule("rewired", detector, (ir, expr, _) -> (ir, rewired), 1)], iip_config = (false, true))
+    out = zeros(Float32, 20)
+    @invokelatest eval(iip)(out, repeat([2.0^24 1 -2.0^24], 20))
+    @test out == ones(20)
+    out = Union{Int, Float32}[77 for _ in 1:20]
+    _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [copier])
+    @invokelatest eval(iip)(out, collect(1:20))
+    @test out == 1:20
+    smap = Iterators.Stateful([2, 1])
+    Symbolics.codegen_function(ir, ws[1:2], [sw]; outputidxs = smap, iip_config = (true, false))
+    _, iip = Symbolics.codegen_function(ir, ws[1:2], [sw]; outputidxs = smap, iip_config = (false, true))
+    out = [77, 88]
+    @invokelatest eval(iip)(out, collect(10:10:200))
+    @test out == [20, 10]
+    flipped = Code.OptimizationRule("flip", (ir, expr) -> expr isa AbstractVector ? true : nothing, (ir, expr, _) -> (ir, reverse(expr)), 1)
+    _, iip = Symbolics.codegen_function(ir, ws[1:2], [sw]; optimize = [flipped], iip_config = (false, true))
+    out = [77, 88]
+    @invokelatest eval(iip)(out, collect(10:10:200))
+    @test out == [20, 10]
+    @variables Bt[1:3, 1:2]
+    sBt = unwrap(Bt)
+    tnode = SymbolicUtils.ArrayMaker{SymReal}([[1:2, 1:3]], [unwrap(transpose(Bt))]; shape = SymbolicUtils.ShapeVecT((1:2, 1:3)))
+    SymbolicUtils.populate_ir!(ir, tnode)
+    texprs = transpose(unwrap.(collect(Bt)))
+    M = [1 2; 3 4; 5 6]
+    _, iip = Symbolics.codegen_function(ir, texprs, [sBt]; optimize = [Code.OptimizationRule("tnode", (ir, expr) -> true, (ir, expr, _) -> (ir, tnode), 1)], iip_config = (false, true))
+    out = Dict{CartesianIndex{2}, Int}()
+    @invokelatest eval(iip)(out, M)
+    @test all(out[CartesianIndex(i, j)] == M[j, i] for i in 1:2, j in 1:3)
+    _, iip = Symbolics.codegen_function(ir, texprs, [sBt]; optimize = [Code.OptimizationRule("tnode", (ir, expr) -> true, (ir, expr, _) -> (ir, tnode), 1)], iip_config = (false, true), skipzeros = true)
+    out = Dict{Int, Int}()
+    @invokelatest eval(iip)(out, M)
+    @test [out[k] for k in 1:6] == vec(permutedims(M))
+    for (out, S) in ((zeros(Float32, 2), Float32), (zeros(Int, 2), Int), (Real[0, 0], Number), (Any[0, 0], Number), (Dict(1 => 0.0), Number), (Union{Int, Float32}[0, 0], Number))
         @test eltype(Symbolics.rule_output_buffer(out, (2,))) === S
     end
 

@@ -24,15 +24,15 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
 )
 
 function write_rule_output!(out, outputidxs, value)
-    for (i, o) in enumerate(outputidxs)
-        out[o] = value[i]
+    for (o, v) in zip(outputidxs, value)
+        out[o] = v
     end
     return out
 end
 
 function rule_output_buffer(out, sz)
     T = eltype(out)
-    return fill!(Array{T <: Number ? T : Number}(undef, sz), false)
+    return fill!(Array{isconcretetype(T) && T <: Number ? T : Number}(undef, sz), false)
 end
 
 const RULE_ALLOCATOR = SU.Term{VartypeT}(
@@ -247,10 +247,11 @@ function codegen_function(
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
     array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr))
-    idxs = outputidxs === nothing ? (array_node ? eachindex(scalar_expr) : nothing) : collect(outputidxs)
-    copy_node = array_node && !skipzeros && length(idxs) == length(scalar_expr) &&
+    array_node && SU.populate_ir!(ir, expr)
+    idxs = !iip_config[2] ? nothing : outputidxs === nothing ? (array_node ? eachindex(scalar_expr) : nothing) : collect(outputidxs)
+    copy_node = iip_config[2] && array_node && !skipzeros && length(idxs) == length(scalar_expr) &&
         all(x -> SU.symtype(x) <: Number, scalar_expr) &&
-        !SU.query(expr) do x
+        !SU.query(ir, expr) do x
             SU.isarrayop(x) && (Code.supports_with_allocator(x) || !SU.is_array_shape(SU.shape(x)))
         end
 
