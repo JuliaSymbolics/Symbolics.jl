@@ -695,7 +695,82 @@ end
     @invokelatest eval(iip)(out, u)
     @test out == u .+ 2
 
-    for (T, reduces, S) in ((Float32, false, Float32), (Float32, true, Float64), (ComplexF64, false, ComplexF64), (Int, false, Number))
-        @test eltype(Symbolics.rule_output_buffer(zeros(T, 2), (2,), reduces)) === S
+    node_rule(node) = [Code.OptimizationRule("node", detector, (ir, expr, _) -> (SymbolicUtils.populate_ir!(ir, node); (ir, node)), 1)]
+    vecmaker(regions, vals, n) = SymbolicUtils.ArrayMaker{SymReal}(regions, vals; shape = SymbolicUtils.ShapeVecT((1:n,)))
+    fusion = (; iip_config = (false, true), fuse_broadcasts = true, fuse_output_eltype = true)
+    ws = unwrap.(collect(w))
+    cexprs = [sum(sC[i, :]) for i in 1:20]
+    pqexprs = collect(unwrap.(collect(p)) .- 0.1 .* unwrap.(collect(q)))
+    Cv = repeat([2.0^24 1 -2.0^24], 20)
+    pf, qf = fill(0.1f0, 20), fill(1.0f0, 20)
+
+    mixedf = vecmaker([[1:20], [21:40]], [crows, sp .- 0.1 .* sq], 40)
+    _, iip = Symbolics.codegen_function(ir, [cexprs; pqexprs], [sC, sp, sq]; optimize = node_rule(mixedf), fusion...)
+    out = fill(7.0f0, 40)
+    @invokelatest eval(iip)(out, Cv, pf, qf)
+    @test out[1:20] == ones(20)
+    @test all(iszero, out[21:40])
+    J = ForwardDiff.jacobian((y, v) -> @invokelatest(eval(iip)(y, v, fill(0.1, 20), fill(1.0, 20))), zeros(40), Cv)
+    @test J == [repeat(Matrix(1.0I, 20, 20), 1, 3); zeros(20, 60)]
+    _, iip = Symbolics.codegen_function(ir, [cexprs; pqexprs], [sC, sp, sq]; optimize = node_rule(mixedf), fusion..., outputidxs = 40:-1:1)
+    out = fill(7.0f0, 40)
+    @invokelatest eval(iip)(out, Cv, pf, qf)
+    @test out[21:40] == ones(20)
+    @test all(iszero, out[1:20])
+
+    nested = vecmaker([[1:40], [41:60]], [mixedf, sw], 60)
+    _, iip = Symbolics.codegen_function(ir, [cexprs; pqexprs; ws], [sC, sp, sq, sw]; optimize = node_rule(nested), fusion...)
+    out = fill(7.0f0, 60)
+    @invokelatest eval(iip)(out, Cv, pf, qf, collect(1.0f0:20))
+    @test out == [ones(20); zeros(20); 1:20]
+
+    @variables D[1:20, 1:3]
+    sD = unwrap(D)
+    two = vecmaker([[1:20], [21:40]], [crows, SymbolicUtils.@arrayop((i,), sD[i, j])], 40)
+    _, iip = Symbolics.codegen_function(ir, [cexprs; [sum(sD[i, :]) for i in 1:20]], [sC, sD]; optimize = node_rule(two), fusion...)
+    out = fill(7.0f0, 40)
+    @invokelatest eval(iip)(out, Cv, 2 .* Cv)
+    @test out == [ones(20); fill(2, 20)]
+
+    scaled = vecmaker([[1:20], [21:40]], [2 .* crows, sp .- 0.1 .* sq], 40)
+    _, iip = Symbolics.codegen_function(ir, [2 .* cexprs; pqexprs], [sC, sp, sq]; optimize = node_rule(scaled), fusion...)
+    out = fill(7.0f0, 40)
+    @invokelatest eval(iip)(out, Cv, pf, qf)
+    @test out == [fill(2, 20); zeros(20)]
+    J = ForwardDiff.jacobian((y, v) -> @invokelatest(eval(iip)(y, v, fill(0.1, 20), fill(1.0, 20))), zeros(40), Cv)
+    @test J == [repeat(Matrix(2.0I, 20, 20), 1, 3); zeros(20, 60)]
+
+    pointwise = vecmaker([[1:20], [21:40]], [SymbolicUtils.@arrayop((i,), sw[i] * 0.1), sp .- 0.1 .* sq], 40)
+    _, iip = Symbolics.codegen_function(ir, [ws .* 0.1; pqexprs], [sw, sp, sq]; optimize = node_rule(pointwise), fusion...)
+    out = fill(7.0f0, 40)
+    @invokelatest eval(iip)(out, fill(3.0f0, 20), pf, qf)
+    @test out == [fill(Float32(3.0f0 * 0.1), 20); zeros(20)]
+
+    exact = vecmaker([[1:20], [21:40]], [crows, sw], 40)
+    _, iip = Symbolics.codegen_function(ir, [cexprs; ws], [sC, sw]; optimize = node_rule(exact), iip_config = (false, true))
+    out = zeros(Int, 40)
+    @invokelatest eval(iip)(out, repeat([2^53 1 2], 20), 2^53 .+ (1:20))
+    @test out == [fill(2^53 + 3, 20); 2^53 .+ (1:20)]
+    out = Vector{Any}(zeros(40))
+    @invokelatest eval(iip)(out, Cv, collect(1:20))
+    @test out == [ones(20); 1:20]
+
+    halves = vecmaker([[1:20]], [sp .- 0.5 .* sq], 20)
+    _, iip = Symbolics.codegen_function(ir, collect(unwrap.(collect(p)) .- 0.5 .* unwrap.(collect(q))), [sp, sq]; optimize = node_rule(halves), fusion...)
+    out = zeros(Int, 20)
+    @invokelatest eval(iip)(out, fill(5, 20), fill(4, 20))
+    @test out == fill(3, 20)
+
+    out = collect(1.0:20.0)
+    captured = vecmaker([[1:20]], [SymbolicUtils.@arrayop((i,), sw[i] + Symbolics.SConst(out)[21 - i])], 20)
+    _, iip = Symbolics.codegen_function(ir, ws, [sw]; optimize = node_rule(captured), iip_config = (false, true))
+    @invokelatest eval(iip)(out, zeros(20))
+    @test out == 20:-1:1
+
+    for (out, S) in ((zeros(Float32, 2), Float32), (zeros(Int, 2), Int), (Real[0, 0], Real), (Any[0, 0], Number), (Dict(1 => 0.0), Number))
+        @test eltype(Symbolics.rule_output_buffer(out, (2,))) === S
+    end
+    for (out, S) in ((zeros(Float32, 2), Float64), (zeros(ComplexF64, 2), ComplexF64), (zeros(BigFloat, 2), BigFloat), (zeros(Int, 2), Number), (Any[0, 0], Number))
+        @test eltype(Symbolics.arrayop_buffer(out, (2,))) === S
     end
 end

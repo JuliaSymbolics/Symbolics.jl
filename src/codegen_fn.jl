@@ -31,24 +31,39 @@ function write_rule_output!(out, outputidxs, value)
     return out
 end
 
-function rule_output_buffer(out, sz, reduces::Bool)
+function rule_output_buffer(out, sz)
+    T = eltype(out)
+    return fill!(Array{T <: Number ? T : Number}(undef, sz), false)
+end
+
+function arrayop_buffer(out, sz)
     T = eltype(out)
     T = if T <: AbstractFloat
-        reduces ? promote_type(T, Float64) : T
+        promote_type(T, Float64)
     else
         T <: Number && promote_type(T, Float64) === T ? T : Number
     end
     return fill!(Array{T}(undef, sz), false)
 end
 
-function has_reduction(x)
+function rule_allocator(buffer)
+    return SU.Term{VartypeT}(
+        Base.Fix1, SArgsT((SU.Const{VartypeT}(buffer), IIP_OUTSYM));
+        type = FnType{Tuple, Any, Base.Fix1}, shape = SU.ShapeVecT()
+    )
+end
+
+owns_buffer(x) = SU.isarrayop(x) && Code.supports_with_allocator(x)
+
+function isolate_arrayops(x::SymbolicT)
     ops = Set{SymbolicT}()
-    SU.search_variables!(ops, x; is_atomic = SU.isarrayop)
-    return any(ops) do op
-        used = Set{SymbolicT}()
-        SU.search_variables!(used, op.expr; is_atomic = SU._is_index_variable)
-        any(u -> !any(o -> isequal(o, u), op.output_idx), used)
+    SU.search_variables!(ops, x; is_atomic = owns_buffer)
+    rules = Dict{SymbolicT, SymbolicT}()
+    for op in ops
+        own = Code.with_allocator(rule_allocator(arrayop_buffer), op)
+        rules[op] = SU.Term{VartypeT}(identity, SArgsT((own,)); type = SU.symtype(op), shape = SU.shape(op))
     end
+    return SU.substitute(x, rules)
 end
 
 function canonicalize_args(args::Vector, inbounds::Bool)
@@ -280,12 +295,10 @@ function codegen_function(
 
     if iip_config[2]
         iipbody = if array_node
-            sz, reduces = SU.Const{VartypeT}(size(expr)), SU.Const{VartypeT}(has_reduction(expr))
-            buffer = SU.Term{VartypeT}(rule_output_buffer, SArgsT((IIP_OUTSYM, sz, reduces)); type = Any)
-            allocator = SU.Term{VartypeT}(
-                Returns, SArgsT((buffer,)); type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
-            )
-            value = Code.supports_with_allocator(expr) ? Code.with_allocator(allocator, expr) : expr
+            value = isolate_arrayops(expr)
+            if Code.supports_with_allocator(value)
+                value = Code.with_allocator(rule_allocator(rule_output_buffer), value)
+            end
             if outputidxs === nothing
                 SU.Term{VartypeT}(copyto!, SArgsT((IIP_OUTSYM, value)); type = SU.symtype(expr), shape = SU.shape(expr))
             else
