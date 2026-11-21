@@ -247,12 +247,7 @@ function codegen_function(
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
     array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr))
-    idxs = !array_node ? nothing : outputidxs === nothing ? eachindex(scalar_expr) : collect(outputidxs)
-    # The in-place function copies the rules' array node into `out` only without `skipzeros`,
-    # with an `outputidxs` that selects every expression, with numeric expressions, and with no
-    # `@arrayop` loop in the node (including a full reduction to a scalar), which would
-    # accumulate in the element type of its buffer instead of the operands' type. Otherwise it
-    # writes the scalar expressions.
+    idxs = outputidxs === nothing ? (array_node ? eachindex(scalar_expr) : nothing) : collect(outputidxs)
     copy_node = array_node && !skipzeros && length(idxs) == length(scalar_expr) &&
         all(x -> SU.symtype(x) <: Number, scalar_expr) &&
         !SU.query(expr) do x
@@ -279,7 +274,6 @@ function codegen_function(
 
     if iip_config[2]
         iipbody = if copy_node
-            # A node computed in a fresh buffer cannot alias `out`; any other may be an input.
             value = if Code.supports_with_allocator(expr)
                 Code.with_allocator(RULE_ALLOCATOR, expr)
             else
@@ -287,7 +281,7 @@ function codegen_function(
             end
             SU.Term{VartypeT}(write_rule_output!, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(idxs), value)); type = Any)
         else
-            set_array(nothing, args, IIP_OUTSYM, outputidxs, expr isa AbstractArray ? expr : scalar_expr, checkbounds, skipzeros)
+            set_array(nothing, args, IIP_OUTSYM, outputidxs === nothing ? nothing : idxs, expr isa AbstractArray ? expr : scalar_expr, checkbounds, skipzeros)
         end
         iipfn = wrap_code[2](Func([IIP_OUTSYM; args], [], iipbody))
         iip = Code.fast_toexpr(iipfn, ir, rewrites)

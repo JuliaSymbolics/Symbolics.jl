@@ -627,6 +627,10 @@ end
     _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [copier], outputidxs = view(out, :))
     @invokelatest eval(iip)(out, collect(1:20))
     @test out == [3; 1; 2; 4:20]
+    _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [copier], outputidxs = Iterators.Stateful([2, 1]))
+    out = [77, 88]
+    @invokelatest eval(iip)(out, collect(1:20))
+    @test out == [2, 1]
     _, iip = Symbolics.codegen_function(ir, unwrap.(collect(w)), [sw]; optimize = [copier], outputidxs = 20:-1:1)
     out = zeros(Int64, 20)
     @invokelatest eval(iip)(out, Int64(2)^53 .+ (1:20))
