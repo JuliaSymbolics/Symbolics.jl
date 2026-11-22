@@ -259,7 +259,7 @@ function codegen_function(
                     args,
                     IIP_OUTSYM,
                     outputidxs,
-                    expr isa AbstractArray ? expr : scalar_expr,
+                    expr isa SymbolicT ? scalar_expr : expr,
                     checkbounds,
                     skipzeros
                 )

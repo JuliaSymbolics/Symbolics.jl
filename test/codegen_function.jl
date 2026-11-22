@@ -517,8 +517,7 @@ end
     u = [1.0, 2.0, 3.0]
     function rule_codegen(exprs, node, args; kw...)
         ir = IRStructure{SymReal}()
-        foreach(e -> SymbolicUtils.populate_ir!(ir, e), exprs)
-        SymbolicUtils.populate_ir!(ir, node)
+        foreach(e -> SymbolicUtils.populate_ir!(ir, e), [exprs; node])
         detector(ir, expr) = expr isa AbstractVector ? true : nothing
         rule = Code.OptimizationRule("node", detector, (ir, expr, _) -> (ir, node), 1)
         return eval.(Symbolics.codegen_function(ir, exprs, args; optimize = [rule], kw...))
@@ -543,4 +542,13 @@ end
 
     _, iip = rule_codegen([sin(xs[1]), 0 * xs[2], sin(xs[3])], maker, [xs]; skipzeros = true)
     @test iip_twice(iip, fill(100.0, 3), u) == [sin(u[1]), 100.0, sin(u[3])]
+
+    _, iip = rule_codegen(sin.(xs), cos.(xs), [xs]; outputidxs = [3, 2, 1])
+    @test iip_twice(iip, fill(100.0, 3), u) == reverse(cos.(u))
+
+    @variables A[1:2, 1:3]
+    sA = unwrap(A)
+    M = [1.0 2 3; 4 5 6]
+    _, iip = rule_codegen([sum(sA[1, :]), sum(sA[2, :])], SymbolicUtils.@arrayop((i,), sA[i, j]), [sA])
+    @test iip_twice(iip, fill(100.0, 2), M) == [6.0, 15.0]
 end
