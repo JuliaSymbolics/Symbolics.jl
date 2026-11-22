@@ -1112,13 +1112,41 @@ let
     @test_throws ArgumentError LinearAlgebra.dot(Grad{false}([a]), Grad{false}([a, a]))(1)
     @test_throws ArgumentError LinearAlgebra.dot(Grad{false}([a, a]), Grad{false}([a]))(1)
     @variables c[1:3]
-    @test_throws DimensionMismatch LinearAlgebra.cross(Grad{false}([c[1], c[2]]), Grad{false}(c))
+    @test_throws ArgumentError LinearAlgebra.cross(Grad{false}([c[1], c[2]]), Grad{false}(c))(1)
+    @variables d4[1:4]
+    for vars in ([c[1]], collect(d4))
+        err = try
+            LinearAlgebra.cross(Grad{false}(vars), [a, b])
+        catch e
+            e
+        end
+        @test err isa DimensionMismatch
+        @test occursin("2 or 3", err.msg)
+    end
     @test_throws ArgumentError LinearAlgebra.cross(Grad{false}(c), Grad{false}([c[1], c[2]]))(1)
     @test_throws ArgumentError Curl{false}([c[1]])
     @test_throws ArgumentError Curl{false}([c[1], c[2], c[3], c[3]])
     @test_throws ArgumentError Grad{false}([a, b])([a, b])
     @test_throws ArgumentError Divergence{false}([a, b])(a)
     @test_throws ArgumentError Divergence{false}([a, b])(c)
+    # `∇ × v` over two variables is the scalar curl, sharing `Curl`'s definition.
+    @variables w2[1:2]
+    for E in (false, true)
+        ∇ab = Grad{E}([a, b])
+        v2 = [a^2 * b, b^3 + a]
+        for field in (v2, Num.(v2), unwrap.(v2), w2)
+            @test isequal(LinearAlgebra.cross(∇ab, field), Curl{E}([a, b])(field))
+            @test isequal(∇ab × field, Curl{E}([a, b])(field))
+        end
+        @test typeof(∇ab × v2) == typeof(Curl{E}([a, b])(v2))
+        @test isequal(expand_derivatives(∇ab × v2), 1 - a^2)
+        @test iszero(expand_derivatives(Num(∇ab × Num[a, b])))
+        # Mixed partials are not reordered symbolically, but `∇ × ∇` vanishes on expansion.
+        cg2 = ∇ab × ∇ab
+        @test cg2 == Curl{E}([a, b]) ∘ ∇ab
+        @test iszero(expand_derivatives(Num(cg2(a^2 * b))))
+    end
+    @test operation(unwrap(Grad{false}([a, b]) × [a, b])) isa Curl{false, 2}
     # `Curl` also accepts two independent variables, producing the scalar
     # curl `D(vars[1])(v[2]) - D(vars[2])(v[1])` of a 2-vector field.
     c2 = Curl{false}([a, b])
