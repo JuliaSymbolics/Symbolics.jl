@@ -30,6 +30,36 @@ end
     @test !Symbolics.islinear(sum(A * x) * y, [xs; y])
 end
 
+@testset "Lazy reductions as coordinates" begin
+    @variables x[1:2] y
+    s = sum(x)
+    @test Matrix(Symbolics.hessian_sparsity(s^2, [s])) == [true;;]
+    @test Matrix(Symbolics.hessian_sparsity(s * y, [s, y])) == [false true; true false]
+    @test !Symbolics.isaffine(s^2, [s])
+    @test Symbolics.islinear(s, [s])
+    @test Symbolics.islinear(s + 1, [s + 1])
+
+    vars = [s, y, x[1], x[2]]
+    expected = [false true false false; true false false false; false false true false; false false false true]
+    @test Matrix(Symbolics.hessian_sparsity(s * y + sum(abs2, x), vars)) == expected
+end
+
+function independent_reduction_derivative(n)
+    @variables x[1:n] a[1:n] y
+    expr = sqrt(sum(abs2, x .- a))
+    bytes = @allocated result = Symbolics.derivative(expr, y)
+    return result, bytes
+end
+
+@testset "Derivative of an independent lazy reduction" begin
+    independent_reduction_derivative(4)
+    for n in (256, 2048)
+        result, bytes = independent_reduction_derivative(n)
+        @test iszero(result)
+        @test bytes < 64 * 1024
+    end
+end
+
 @testset "Reductions over arrays of unknown size" begin
     @variables u::Vector{Real} x[1:2] y
     xs = collect(x)

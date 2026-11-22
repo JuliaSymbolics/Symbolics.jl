@@ -268,6 +268,23 @@ end
     SymbolicUtils.isconst(idx) && unwrap_const(idx) isa Integer
 @inline _is_scalar_literal(idx) = false
 
+function reduction_may_depend_on(x, reduction)
+    dependency = is_scalar_indexed(x) ? arguments(x)[1] : x
+    issym(dependency) || return true
+
+    # Stateful callables can carry dependencies outside the term's arguments.
+    function depends_on(ex)
+        isequal(ex, dependency) && return true
+        return @match ex begin
+            BSImpl.ArrayOp(; expr, reduce) =>
+                fieldcount(typeof(reduce)) != 0 || SU.query(depends_on, expr; recurse = !SU.isarrayop)
+            BSImpl.Term(; f) => fieldcount(typeof(f)) != 0
+            _ => false
+        end
+    end
+    return SU.query(depends_on, reduction; recurse = !SU.isarrayop)
+end
+
 function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT}, fail::Bool = true)
     shexpr = shape(expr)
     isix = is_scalar_indexed(x)
@@ -294,6 +311,7 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
         BSImpl.ArrayOp(; output_idx, expr = body, term) && if isempty(output_idx) end => begin
             # Scalar reductions must expose element dependencies before the chain rule.
             if !has_unknown_shape(expr)
+                reduction_may_depend_on(x, expr) || return false
                 return occursin_info(x, SymbolicUtils.scalarize(expr)::SymbolicT, fail)
             elseif term === nothing
                 aop_pred = let x = x, isix = isix
@@ -1326,6 +1344,30 @@ const linearity_rules_affine = (
 const linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules); maketerm=basic_mkterm))
 const affine_linearity_propagator = Fixpoint(Postwalk(Chain(linearity_rules_affine); maketerm=basic_mkterm))
 
+function scalarize_linearity_expression(expr, vars::AbstractVector)
+    coordinates = Dict(value(v) => i for (i, v) in enumerate(vars))
+    aliases = Dict{SymbolicT, SymbolicT}()
+    for v in keys(coordinates)
+        v isa SymbolicT && iscall(v) || continue
+        op = operation(v)
+        (op isa SymbolicT || op isa Operator) && continue
+        sh = shape(v)
+        (sh isa Unknown || !isempty(sh)) && continue
+        if is_scalar_indexed(v)
+            args = arguments(v)
+            issym(args[1]) && all(_is_scalar_literal, @view(args[2:end])) && continue
+        end
+        aliases[v] = Sym{VartypeT}(gensym(); type = symtype(v))
+    end
+
+    # Mask exact matches before scalarization and keep coordinates it exposes.
+    expr = scalarize_known_shapes(substitute(value(expr), aliases; filterer = Returns(true)))
+    for (v, alias) in aliases
+        coordinates[alias] = coordinates[v]
+    end
+    return expr, coordinates
+end
+
 """
 $(TYPEDSIGNATURES)
 
@@ -1352,19 +1394,21 @@ julia> Symbolics.hessian_sparsity(expr, vars)
 """
 function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity_propagator = linearity_propagator)
     @assert !(expr isa AbstractArray)
-    expr = scalarize_known_shapes(value(expr))
-    u = map(value, vars)
+    expr, coordinates = scalarize_linearity_expression(expr, vars)
+    S = _hessian_sparsity(expr, coordinates, length(vars), linearity_propagator)
+    return full ? S : tril(S)
+end
+
+function _hessian_sparsity(expr, coordinates, nvars, propagator)
     # element vars inside lazy array expressions are invisible to the linearity
     # analysis; `occursin_info` throws for those rather than returning a
     # silently wrong pattern
-    for ui in u
+    for ui in keys(coordinates)
         ui isa SymbolicT && is_scalar_indexed(ui) && occursin_info(ui, expr)
     end
-    dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
-    f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
-    lp = unwrap_const(linearity_propagator(f))
-    S = _sparse(lp, length(u))
-    S = full ? S : tril(S)
+    dict = Dict(ui => TermCombination(Set([Dict(i => 1)])) for (ui, i) in coordinates)
+    f = Rewriters.Prewalk(x -> get(dict, x, x); maketerm = basic_mkterm)(expr)
+    return _sparse(unwrap_const(propagator(f)), nvars)
 end
 
 """
@@ -1411,8 +1455,10 @@ $(SIGNATURES)
 Check if an expression is linear with respect to a list of variable expressions.
 """
 function islinear(ex, u)
-    ex = scalarize_known_shapes(value(ex))
-    isaffine(ex, u) && iszero(Num(substitute(ex, Dict(u .=> 0))))
+    @assert !(value(ex) isa AbstractArray)
+    ex, coordinates = scalarize_linearity_expression(ex, u)
+    isempty(_hessian_sparsity(ex, coordinates, length(u), affine_linearity_propagator).nzval) || return false
+    return iszero(Num(substitute(ex, Dict(v => 0 for v in keys(coordinates)))))
 end
 
 """
