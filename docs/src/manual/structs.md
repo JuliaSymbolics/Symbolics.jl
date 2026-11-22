@@ -234,4 +234,8 @@ Symbolics.RecordLiteral
 Symbolics.symbolic_zero
 Symbolics.is_zeroable
 Symbolics.SymbolicZero
+Symbolics.SymbolicGetproperty
+Symbolics.field_name
+Symbolics.is_symstruct_type
+Symbolics.issymstruct
 ```
