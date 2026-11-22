@@ -273,6 +273,11 @@ const KNOWN_REDUCTION_OPERATORS = let x = SSym(:x; type = Vector{Real})
     (operation(sum(x)).reduce, operation(prod(x)).reduce, +, *, min, max)
 end
 
+const KNOWN_REDUCTION_TERM_OPERATORS = (
+    getindex, identity, abs, abs2, +, -, *, /, ^, min, max,
+    sin, cos, tan, exp, log, sqrt,
+)
+
 function reduction_may_depend_on(x, reduction)
     dependency = is_scalar_indexed(x) ? arguments(x)[1] : x
     issym(dependency) || return true
@@ -286,7 +291,7 @@ function reduction_may_depend_on(x, reduction)
                 SU.query(depends_on, expr; recurse = !SU.isarrayop)
             end
             BSImpl.Term(; f) =>
-                !(f isa SymbolicT || any(op -> op === f, (getindex, identity, abs, abs2, +, -, *, /, ^, min, max)))
+                !(f isa SymbolicT || any(op -> op === f, KNOWN_REDUCTION_TERM_OPERATORS))
             _ => false
         end
     end

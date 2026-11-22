@@ -67,25 +67,45 @@ end
     @test Matrix(Symbolics.hessian_sparsity(s * y + sum(abs2, x), vars)) == expected
 end
 
-function independent_reduction_derivative(n, time_dependent)
-    @variables t y
-    if time_dependent
-        @variables x(t)[1:n] a(t)[1:n]
-    else
-        @variables x[1:n] a[1:n]
+@testset "Nested trigonometric reductions" begin
+    @variables x[1:0] z[1:2] y
+    @test iszero(Symbolics.derivative(2sum(sin.(x)), y))
+    @test iszero(Symbolics.derivative(2sum(sin, x; init = 0), y))
+
+    for expr in (2sum(sin.(z)), 2sum(sin, z))
+        @test isequal(Symbolics.derivative(expr, z[1]), 2cos(z[1]))
     end
-    expr = sqrt(sum(abs2, x .- a))
+end
+
+function independent_reduction_derivative(build_expr, n, time_dependent)
+    @variables t y
+    x_name, a_name = gensym(:x), gensym(:a)
+    x, a = if time_dependent
+        @variables $x_name(t)[1:n] $a_name(t)[1:n]
+    else
+        @variables $x_name[1:n] $a_name[1:n]
+    end
+    expr = build_expr(x, a)
+    Symbolics.clear_derivative_caches!()
     bytes = @allocated result = Symbolics.derivative(expr, y)
     return result, bytes
 end
 
 @testset "Derivative of an independent lazy reduction" begin
-    for time_dependent in (false, true)
-        independent_reduction_derivative(4, time_dependent)
-        for n in (256, 2048)
-            result, bytes = independent_reduction_derivative(n, time_dependent)
-            @test iszero(result)
-            @test bytes < 64 * 1024
+    sum_of_squares(x, a) = sqrt(sum(abs2, x .- a))
+    mapped_sine(x, _) = 2sum(sin, x)
+    broadcast_sine(x, _) = 2sum(sin.(x))
+    for (build_expr, time_dependent) in (
+            (sum_of_squares, false), (sum_of_squares, true),
+            (mapped_sine, false), (broadcast_sine, false),
+        )
+        @testset "$build_expr (time-dependent = $time_dependent)" begin
+            independent_reduction_derivative(build_expr, 4, time_dependent)
+            for n in (256, 2048)
+                result, bytes = independent_reduction_derivative(build_expr, n, time_dependent)
+                @test iszero(result)
+                @test bytes < 64 * 1024
+            end
         end
     end
 end
