@@ -268,17 +268,25 @@ end
     SymbolicUtils.isconst(idx) && unwrap_const(idx) isa Integer
 @inline _is_scalar_literal(idx) = false
 
+# The reducer identities used by sum and prod are implementation details of Base.
+const KNOWN_REDUCTION_OPERATORS = let x = SSym(:x; type = Vector{Real})
+    (operation(sum(x)).reduce, operation(prod(x)).reduce, +, *, min, max)
+end
+
 function reduction_may_depend_on(x, reduction)
     dependency = is_scalar_indexed(x) ? arguments(x)[1] : x
     issym(dependency) || return true
 
-    # Stateful callables can carry dependencies outside the term's arguments.
+    # Arbitrary callables can introduce dependencies during scalarization.
     function depends_on(ex)
         isequal(ex, dependency) && return true
         return @match ex begin
-            BSImpl.ArrayOp(; expr, reduce) =>
-                fieldcount(typeof(reduce)) != 0 || SU.query(depends_on, expr; recurse = !SU.isarrayop)
-            BSImpl.Term(; f) => fieldcount(typeof(f)) != 0
+            BSImpl.ArrayOp(; expr, reduce) => begin
+                any(op -> op === reduce, KNOWN_REDUCTION_OPERATORS) || return true
+                SU.query(depends_on, expr; recurse = !SU.isarrayop)
+            end
+            BSImpl.Term(; f) =>
+                !(f isa SymbolicT || any(op -> op === f, (getindex, identity, abs, abs2, +, -, *, /, ^, min, max)))
             _ => false
         end
     end
