@@ -551,6 +551,8 @@ function nzmap(f, x::Union{Base.ReshapedArray, LinearAlgebra.Transpose})
     Setfield.@set x.parent = nzmap(f, x.parent)
 end
 
+nzmap(f, x::LinearAlgebra.Adjoint{<:Any, <:AbstractSparseArray}) = nzmap(f, sparse(x))
+
 function nzmap(f, x::SubArray)
     unview = copy(x)
     if unview isa Union{SparseMatrixCSC, SparseVector}

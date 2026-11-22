@@ -456,6 +456,7 @@ end
             storage = similar(sparse(numeric), Float64)
             fill!(nonzeros(storage), NaN)
             for out in (similar(result, Float64), wrap(storage))
+                out isa AbstractSparseArray && fill!(nonzeros(out), NaN)
                 f_iip(out, vals)
                 @test out == expected
             end
@@ -474,9 +475,11 @@ end
         f_oop, f_iip = build_function(adjoint(sparse([z1 z2; 0 z1])), [z1, z2]; expression = Val{false})
         result = f_oop(vals)
         @test result == expected
+        @test nnz(result) == nnz(expected)
         storage = similar(M, ComplexF64)
         fill!(nonzeros(storage), Complex(NaN, NaN))
         for out in (similar(result, ComplexF64), adjoint(storage))
+            out isa AbstractSparseArray && fill!(nonzeros(out), Complex(NaN, NaN))
             f_iip(out, vals)
             @test out == expected
         end
