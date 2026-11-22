@@ -23,23 +23,6 @@ const IIP_ALLOCATOR = SU.Term{VartypeT}(
     type = FnType{Tuple, Any, Returns{Any}}, shape = SU.ShapeVecT()
 )
 
-function write_rule_output!(out, outputidxs, value)
-    for (o, v) in zip(outputidxs, value)
-        out[o] = v
-    end
-    return out
-end
-
-function rule_output_buffer(out, sz)
-    T = eltype(out)
-    return fill!(Array{isconcretetype(T) && T <: Number ? T : Number}(undef, sz), false)
-end
-
-const RULE_ALLOCATOR = SU.Term{VartypeT}(
-    Base.Fix1, SArgsT((SU.Const{VartypeT}(rule_output_buffer), IIP_OUTSYM));
-    type = FnType{Tuple, Any, Base.Fix1}, shape = SU.ShapeVecT()
-)
-
 function canonicalize_args(args::Vector, inbounds::Bool)
     return map(enumerate(args)) do (i, arg)
         if arg isa Arr
@@ -246,14 +229,9 @@ function codegen_function(
     scalar_expr = expr
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
-    array_node = expr isa SymbolicT && SU.is_array_shape(SU.shape(expr))
-    array_node && SU.populate_ir!(ir, expr)
-    idxs = !iip_config[2] ? nothing : outputidxs === nothing ? (array_node ? eachindex(scalar_expr) : nothing) : collect(outputidxs)
-    copy_node = iip_config[2] && array_node && !skipzeros && length(idxs) == length(scalar_expr) &&
-        all(x -> SU.symtype(x) <: Number, scalar_expr) &&
-        !SU.query(ir, expr) do x
-            SU.isarrayop(x) && (Code.supports_with_allocator(x) || !SU.is_array_shape(SU.shape(x)))
-        end
+    if expr isa SymbolicT && outputidxs === nothing && !skipzeros
+        return codegen_function(ir, expr, args, Setfield.@set opts.optimize = nothing)
+    end
 
     i = findfirst(x -> x isa DestructuredArgs, args)
     if similarto === nothing
@@ -274,17 +252,19 @@ function codegen_function(
     end
 
     if iip_config[2]
-        iipbody = if copy_node
-            value = if Code.supports_with_allocator(expr)
-                Code.with_allocator(RULE_ALLOCATOR, expr)
-            else
-                SU.Term{VartypeT}(copy, SArgsT((expr,)); type = SU.symtype(expr), shape = SU.shape(expr))
-            end
-            SU.Term{VartypeT}(write_rule_output!, SArgsT((IIP_OUTSYM, SU.Const{VartypeT}(idxs), value)); type = Any)
-        else
-            set_array(nothing, args, IIP_OUTSYM, outputidxs === nothing ? nothing : idxs, expr isa AbstractArray ? expr : scalar_expr, checkbounds, skipzeros)
-        end
-        iipfn = wrap_code[2](Func([IIP_OUTSYM; args], [], iipbody))
+        iipfn = wrap_code[2](
+            Func(
+                [IIP_OUTSYM; args], [], set_array(
+                    nothing,
+                    args,
+                    IIP_OUTSYM,
+                    outputidxs,
+                    expr isa AbstractArray ? expr : scalar_expr,
+                    checkbounds,
+                    skipzeros
+                )
+            )
+        )
         iip = Code.fast_toexpr(iipfn, ir, rewrites)
         if !checkbounds
             @assert Meta.isexpr(iip, :function)
