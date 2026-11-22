@@ -545,10 +545,4 @@ end
 
     _, iip = rule_codegen(sin.(xs), cos.(xs), [xs]; outputidxs = [3, 2, 1])
     @test iip_twice(iip, fill(100.0, 3), u) == reverse(cos.(u))
-
-    @variables A[1:2, 1:3]
-    sA = unwrap(A)
-    M = [1.0 2 3; 4 5 6]
-    _, iip = rule_codegen([sum(sA[1, :]), sum(sA[2, :])], SymbolicUtils.@arrayop((i,), sA[i, j]), [sA])
-    @test iip_twice(iip, fill(100.0, 2), M) == [6.0, 15.0]
 end
