@@ -26,6 +26,21 @@ end
 @register_symbolic Base.rand(x)
 @register_symbolic Base.randn(x)
 
+for (T1, T2, T3) in Iterators.product(Iterators.repeated((Num, Real), 3)...)
+    T1 == T2 == T3 == Real && continue
+    @eval function Base.fma(a::$T1, b::$T2, c::$T3)
+        args = map(x -> unwrap_const(unwrap(x)), (a, b, c))
+        if any(x -> x isa BasicSymbolic, args)
+            return Num(SymbolicUtils.term(fma, args...; type = Real, shape = SymbolicUtils.ShapeVecT()))
+        end
+        return Num(fma(args...))
+    end
+end
+
+@register_derivative fma(x, y, z) 1 y
+@register_derivative fma(x, y, z) 2 x
+@register_derivative fma(x, y, z) 3 COMMON_ONE
+
 for (T1, T2, T3) in Iterators.product(Iterators.repeated((Num, BasicSymbolic{VartypeT}, Number), 3)...)
     if T1 != Num && T2 != Num && T3 != Num
         continue

@@ -97,7 +97,7 @@ end
 # https://github.com/JuliaDiff/ForwardDiff.jl/blob/d3002093beb88ff0b98ed178377961dfd55c1247/src/dual.jl#L599
 # and
 # https://github.com/JuliaDiff/ForwardDiff.jl/blob/d3002093beb88ff0b98ed178377961dfd55c1247/src/dual.jl#L683
-for f ∈ (hypot, muladd)
+for f ∈ (hypot, muladd, fma)
     fun = eval(:(ξ ->($f)(ξ, 2.0, 3.0)))
 
     fd = @invokelatest ForwardDiff.derivative(fun, 5.0)
@@ -106,7 +106,33 @@ for f ∈ (hypot, muladd)
     @test Num(fd) ≈ substitute(sym, Dict(x => 5.0); fold = Val(true)) atol=1e-15
 end
 
-# fma is not defined for Symbolics.Num
+@testset "fma and muladd on Num" begin
+    @variables a b c
+    vars = (a, b, c)
+    for f in (fma, muladd), T in (Int, Float32, Float64, BigFloat)
+
+        values = T.((2, 3, 4))
+        for mask in 1:7
+            args = ntuple(i -> iszero(mask & (1 << (i - 1))) ? values[i] : vars[i], 3)
+            result = f(args...)
+            @test result isa Num
+            @test isequal(substitute(result, Dict(vars .=> values); fold = Val(true)), f(values...))
+
+            wrapped = ntuple(
+                i -> iszero(mask & (1 << (i - 1))) ? values[i] :
+                     Num(values[i]), 3)
+            numeric = f(wrapped...)
+            @test numeric isa Num
+            @test isequal(unwrap_const(unwrap(numeric)), f(values...))
+        end
+        @test isequal(Symbolics.derivative(f(a, b, c), a), b)
+        @test isequal(Symbolics.derivative(f(a, b, c), b), a)
+        @test isequal(Symbolics.derivative(f(a, b, c), c), 1)
+    end
+    args = (1.0 + eps(), 1.0 - eps(), -1.0)
+    @test !iszero(fma(args...))
+    @test isequal(unwrap_const(unwrap(fma(Num.(args)...))), fma(args...))
+end
 
 # https://github.com/JuliaSymbolics/Symbolics.jl/issues/1246
 @testset "isequal type ambiguity" begin
