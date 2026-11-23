@@ -6,6 +6,10 @@ using Test
 
 @variables x a b
 
+# 1.0 at 0 in floating point, but not exactly 1
+_near_one(y) = 1 + 1e-20 * cos(y)
+@register_symbolic _near_one(y)
+
 # coeff of x^e from _nseries, as a plain value
 nc(expr, e, order) = value(_series_coeff_at(_nseries(expr, x, order), Rational{Int}(e)))
 
@@ -39,6 +43,8 @@ end
         @test matches_taylor(log(1 + x), 7)
         @test matches_taylor(log(1 - x), 7)
         @test matches_taylor(log(1 + x^2), 7)
+        @test isempty(_nseries(log(1 + x), x, 0))
+        @test isequal(nc(log2(1 + x), 1, 3), value(1 / Symbolics.term(log, 2)))  # exact, no Float64
     end
 
     @testset "integer powers / sqrt (Puiseux) vs taylor_coeff" begin
@@ -110,12 +116,15 @@ end
         end
         @test occursin("sin(1)", string(c0))
         @test occursin("cos(1)", string(c1))
-        @test occursin("sin(1)", string(c2)) && occursin("1//2", string(c2))
-        @test occursin("cos(1)", string(c3)) && occursin("1//6", string(c3))
+        @test isequal(c2, -Symbolics.term(sin, 1) / 2)
+        @test isequal(c3, -Symbolics.term(cos, 1) / 6)
+        @test !(nc(cos(x + 1//10^10), 0, 2) isa Number)          # below 1, not the integer 1
+        @test !(nc(exp(x + 1//10^17), 0, 2) isa Number)
+        @test !(nc(_near_one(x), 0, 1) isa Number)                # only known identities fold
     end
 
-    @testset "regression: Puiseux reciprocal (integer-grid bug)" begin
-        # 1/(1+sqrt(x)) = 1 - x^(1/2) + x - x^(3/2) + …  (was silently 1)
+    @testset "Puiseux reciprocal" begin
+        # 1/(1+sqrt(x)) = 1 - x^(1/2) + x - x^(3/2) + …
         @test nc(1/(1+sqrt(x)), 0, 2) == 1
         @test nc(1/(1+sqrt(x)), 1//2, 2) == -1
         @test nc(1/(1+sqrt(x)), 1, 2) == 1
@@ -125,31 +134,35 @@ end
         cbrt_x = Symbolics.term(^, Symbolics.unwrap(x), 1//3)
         @test nc(1/(1+cbrt_x), 1//3, 1) == -1
         @test nc(1/(1+cbrt_x), 2//3, 1) == 1
-        # precision-budget fix: 1/(x^2(1+x)) keeps its top terms
+        # 1/(x^2(1+x)) keeps all terms below the cutoff
         @test nc(1/(x^2*(1+x)), -2, 2) == 1
         @test nc(1/(x^2*(1+x)), -1, 2) == -1
         @test nc(1/(x^2*(1+x)), 0, 2) == 1
         @test nc(1/(x^2*(1+x)), 1, 2) == -1
+        @test string(expand_series(1/(1 + x^(999999//1000000)), x, 2)) ==
+              "1 - x^(999999//1000000) + x^(999999//500000) + O(x^2)"
     end
 
-    @testset "regression: adaptive leading-exponent probe (fixed-8 bug)" begin
-        # 1/(sin(x^3)-x^3): den leads at x^9, so 1/den leads at x^-9 (was 'bad valuation 8//1')
+    @testset "leading exponent found by probing" begin
+        # 1/(sin(x^3)-x^3): den leads at x^9, so 1/den leads at x^-9
         @test nc(1/(sin(x^3)-x^3), -9, -7) == -6
         @test _series_valuation(_nseries(1/(sin(x^3)-x^3), x, -7)) == -9//1
+        @test nc(1/(sin(x^85)-x^85), -255, -254) == -6
+        @test_throws ArgumentError _nseries(1/(sin(x^86)-x^86), x, -257)  # x^258: beyond the probe
     end
 
-    @testset "regression: trig of non-analytic finite argument (1//0 leak)" begin
-        # sin(1+sqrt(x)) via angle addition (was (1//0)*x); coeffs stay exact-symbolic
+    @testset "trig of a non-analytic argument with a nonzero constant" begin
+        # sin(1+sqrt(x)) via angle addition; coeffs stay exact-symbolic
         s = _nseries(sin(1+sqrt(x)), x, 2)
         c_h = _series_coeff_at(s, 1//2)   # cos(1)
         c_1 = _series_coeff_at(s, 1//1)   # -sin(1)/2
         @test !(value(c_h) isa AbstractFloat)
         @test occursin("cos(1)", string(c_h))
-        @test occursin("sin(1)", string(c_1)) && occursin("1//2", string(c_1))
+        @test isequal(c_1, -Symbolics.term(sin, 1) / 2)
         @test !any(occursin("1//0", string(value(c))) for c in values(s.coeffs))
     end
 
-    @testset "regression: parameter cancellation leaves no phantom zero (Bug 3 guard)" begin
+    @testset "parameter cancellation gives an exact zero" begin
         # x^1 coefficient must collapse to a true zero; leading exponent is 2, not a phantom
         e = (a + b)*x - a*x - b*x + x^2
         @test _series_valuation(_nseries(e, x, 3)) == 2//1
@@ -157,23 +170,22 @@ end
         @test value(_series_coeff_at(_nseries(e, x, 3), 1//1)) == 0
     end
 
-    @testset "regression: high-order factorial overflow (big coefficients)" begin
-        # Int64 coeffs overflowed ~order 13 in composed functions; coeffs now widen to BigInt
-        # as needed and narrow back when they fit. Expected values are self-evident 1/n!.
+    @testset "high-order coefficients beyond Int64" begin
+        # Coefficients widen to BigInt as needed and narrow back when they fit.
         @test nc(exp(x), 20, 21) == 1 // factorial(big(20))
         @test nc(exp(x), 25, 26) == 1 // factorial(big(25))
         s = _nseries(exp(sqrt(x)), x, 30)   # Puiseux + high order: no overflow
         @test _series_valuation(s) == 0//1
         @test nc(exp(sqrt(x)), 10, 30) == 1 // factorial(big(20))
         @test _series_coeff_at(_nseries(exp(x), x, 5), 2//1) isa Rational{Int}   # narrows back
-        # reciprocal recurrence and binomial coefficients overflowed Int64 (SymPy values)
+        # reciprocal recurrence and binomial coefficients (SymPy values)
         @test nc(x/sin(x), 20, 22) == 91546277357 // big(401428831349145600000)
         @test nc((1 + x)^(1//2), 39, 40) ==
               big(22091732848375837675) // big(18889465931478580854784)
     end
 
-    @testset "regression: unary functions of non-analytic arguments (1//0 leak)" begin
-        # Reference values from SymPy series(); these previously returned (1//0)*x.
+    @testset "unary functions of non-analytic arguments" begin
+        # Reference values from SymPy series().
         @test nc(tan(sqrt(x)), 1//2, 2) == 1 && nc(tan(sqrt(x)), 3//2, 2) == 1//3
         @test nc(sinh(sqrt(x)), 1//2, 2) == 1 && nc(sinh(sqrt(x)), 3//2, 2) == 1//6
         s = _nseries(atan(1 + sqrt(x)), x, 2)   # atan(1) + x^(1/2)/2 - x/4 + x^(3/2)/12
@@ -185,20 +197,29 @@ end
         @test isequal(nc(tan(a*x), 3, 4), value((1//3) * a^3))
         @test nc(tan(x)/x^2, -1, 3) == 1 && nc(tan(x)/x^2, 1, 3) == 1//3
         @test nc(atan(x, 1 + x), 2, 3) == -1                    # two-argument term
+        @test nc(atan(x, 1 + x), 1, 3//2) == 1                  # fractional cutoff
+        @test string(nc(atan(1 + x, 1 + x^2), 0, 1//2)) == "atan(1, 1)"
     end
 
-    @testset "regression: non-analytic unary functions are rejected" begin
+    @testset "non-analytic and non-real expansions are rejected" begin
         @test_throws ArgumentError _nseries(asin(1 + x), x, 2)   # branch point of asin at 1
         @test_throws ArgumentError _nseries(atan(1/x), x, 2)     # pole inside the function
-        @test_throws ArgumentError _nseries(abs(x), x, 2)        # kink: was silently x
-        @test_throws ArgumentError _nseries(sign(x), x, 2)       # jump: was silently 0
+        @test_throws ArgumentError _nseries(abs(x), x, 2)        # kink
+        @test_throws ArgumentError _nseries(sign(x), x, 2)       # jump
         @test nc(abs(1 + x), 1, 3) == 1                          # smooth away from the kink
+        for f in (floor(1 + x), ceil(1 + x), max(x, -x), sqrt(-1 + x), sqrt(-2x), log(-1 + x))
+            @test_throws ArgumentError _nseries(f, x, 2)         # jump, kink, or not real
+        end
+        @test nc(max(x, 1 + x), 0, 2) == 1
+        @test_throws ArgumentError _nseries(1/(x - x), x, 2)     # not finite
+        @test_throws ArgumentError expand_series(sin(x), x + 1, 2)
+        @test_throws ArgumentError expand_series(sin(x), x, 2; x0 = x)
     end
 
-    @testset "regression: integer powers keep the requested precision" begin
-        s = _nseries((1/x + 1)^3, x, 3)        # was truncated at O(x^1)
+    @testset "integer powers keep the requested precision" begin
+        s = _nseries((1/x + 1)^3, x, 3)
         @test s.order == 3//1 && nc((1/x + 1)^3, 0, 3) == 1 && nc((1/x + 1)^3, -3, 3) == 1
-        s = _nseries((x + x^2)^3, x, 5)        # returned terms through x^6 + O(x^7)
+        s = _nseries((x + x^2)^3, x, 5)
         @test s.order == 5//1 && maximum(keys(s.coeffs)) == 4//1
         @test nc((1/sin(x))^2, 2, 3) == 1//15  # SymPy: x^-2 + 1/3 + x^2/15
         @test nc(sin(x)^2, 6, 7) == 2//45
@@ -206,7 +227,7 @@ end
         @test nc((1 + x)^1000, 9, 10) == binomial(big(1000), 9)
     end
 
-    @testset "regression: factors and numerators with poles keep the requested precision" begin
+    @testset "factors and numerators with poles keep the requested precision" begin
         s = _nseries((1/x^2 + x)/(1 + x), x, 2)    # SymPy: x^-2 - 1/x + 1 + O(x^2)
         @test s.order == 2//1 && nc((1/x^2 + x)/(1 + x), 0, 2) == 1
         s = _nseries(exp(x)*x^-2, x, 2)            # SymPy: x^-2 + 1/x + 1/2 + x/6 + O(x^2)
@@ -218,22 +239,25 @@ end
         @test _nseries((sin(x)^2 + cos(x)^2 - 1)/(1 + x), x, 3).order == 3//1
     end
 
-    @testset "regression: fractional power truncated below its leading term" begin
+    @testset "fractional power truncated below its leading term" begin
         for (f, o) in ((sqrt(sin(x)), 0//1), (sqrt(sin(x)), 1//2), (x^(1//3), 1//3), (sin(x)^(-1//2), -1//1))
-            s = _nseries(f, x, o)                  # threw "base leading coefficient zero"
+            s = _nseries(f, x, o)
             @test s.order == o && isempty(s)
         end
         @test string(expand_series(sqrt(sin(x)) + 1, x, 0)) == "O(x^0)"
     end
 
-    @testset "regression: exact constant roots (Float64 check gave wrong values)" begin
-        @test !(nc(sqrt(big(10)^18 + 1 + x), 0, 2) isa Number)      # was 1000000000
+    @testset "exact constant roots" begin
+        @test !(nc(sqrt(big(10)^18 + 1 + x), 0, 2) isa Number)      # not a perfect square
         @test nc(sqrt(big(10)^18 + x), 0, 2) == 10^9
         @test nc(sqrt(1//4 + x), 0, 2) == 1//2 && nc(sqrt(1//4 + x), 1, 2) == 1
         @test nc((8//27 + x)^(1//3), 1, 2) == 3//4
-        @test nc((big(10)^10 + x)^(-3), 1, 2) == -3 // big(10)^40     # Int64 overflow
+        @test nc((big(10)^10 + x)^(-3), 1, 2) == -3 // big(10)^40     # beyond Int64
         @test Symbolics._pow_const(big(3)^90, 1//3) == big(3)^30
-        @test !(Symbolics._pow_const(-8, 1//3) isa Number)       # principal root is complex
+        @test_throws ArgumentError Symbolics._pow_const(-8, 1//3)  # principal root is complex
+        m = 10^10
+        @test nc(sqrt(1//m + m*x), 0, 2) == 1//100000 && nc(sqrt(1//m + m*x), 1, 2) == 500000000000000
+        @test Symbolics._iroot(big(3)^700, 7) == big(3)^100 && Symbolics._iroot(big(10)^1000 + 1, 2) === nothing
     end
 
     @testset "pole rewrites and real roots at a zero of the argument" begin
@@ -251,6 +275,14 @@ end
         @test nc(cbrt(1/x), -1//3, 2) == 1
         @test nc(cbrt(-8 + x), 0, 2) == -2
         @test_throws ArgumentError expand_series(cot(1/x), x, 2)
+        # about π (SymPy): poles of 1/sin, csc and cot, and exact sin, tan, sec
+        P = Symbolics.pi
+        @test string(expand_series(sin(x), x, 4; x0 = P)) == "-(x - π) + (1//6)*(x - π)^3 + O((x - π)^4)"
+        @test string(expand_series(1/sin(x), x, 2; x0 = P)) == "-(x - π)^-1 + (-1//6)*(x - π) + O((x - π)^2)"
+        @test string(expand_series(csc(x), x, 2; x0 = P)) == string(expand_series(1/sin(x), x, 2; x0 = P))
+        @test string(expand_series(cot(x), x, 2; x0 = P)) == "(x - π)^-1 + (-1//3)*(x - π) + O((x - π)^2)"
+        @test string(expand_series(tan(x), x, 4; x0 = P)) == "(x - π) + (1//3)*(x - π)^3 + O((x - π)^4)"
+        @test string(expand_series(sec(x), x, 3; x0 = P)) == "-1 + (-1//2)*(x - π)^2 + O((x - π)^3)"
         @test nc(cot(0.5x), -1, 2) == 2.0 && nc(cot(0.5x), 1, 2) ≈ -1/6
     end
 
@@ -289,5 +321,8 @@ end
               "1 - x^(1//2) + x - x^(3//2) + O(x^2)"
         @test string(expand_series(exp(x)/x, x, 2)) == "x^-1 + 1 + (1//2)*x + O(x^2)"
         @test string(expand_series(sin(x), x, 0)) == "O(x^0)"
+        @test string(expand_series(t, t, 2) + expand_series(t, t, 2)) == "2*t + O(t^2)"
+        @test_throws ArgumentError expand_series(x, x, 2) + expand_series(x, x, 2; x0 = 1)
+        @test string(Symbolics._series_scale(2, expand_series(sin(t), t, 2))) == "2*t + O(t^2)"
     end
 end

@@ -61,7 +61,7 @@ function _float_like(a, b)
     return _has_float(b) ? Float64(n) : n
 end
 
-_ts_div(a::_Exact, b::_Exact) = a // b
+_ts_div(a::_Exact, b::_Exact) = big(a) // big(b)
 _ts_div(a::AbstractFloat, b::_Real) = Float64(a) / Float64(b)
 _ts_div(a::_Exact, b::AbstractFloat) = Float64(a) / Float64(b)
 _ts_div(a, b) = _float_like(a, b) / _float_like(b, a)
@@ -92,7 +92,7 @@ _series_one(order) = _series_monomial(1, 0, order)
 function _series_shift(s::TruncatedSeries, de::Rational{Int}, order)
     o = Rational{Int}(order)
     d = SeriesDict(e + de => c for (e, c) in s.coeffs)
-    return TruncatedSeries(_ts_clean(d, o), o)
+    return TruncatedSeries(_ts_clean(d, o), o, s.var)
 end
 
 _series_truncate(s::TruncatedSeries, order) = _series_shift(s, 0//1, min(s.order, Rational{Int}(order)))
@@ -110,6 +110,11 @@ Base.isempty(s::TruncatedSeries) = isempty(s.coeffs)
 
 _series_coeff_at(s::TruncatedSeries, e) = get(s.coeffs, Rational{Int}(e), 0)
 
+function _series_var(a::TruncatedSeries, b::TruncatedSeries)
+    a.var == b.var || throw(ArgumentError(lazy"cannot combine a series in $(a.var) with a series in $(b.var)"))
+    return a.var
+end
+
 function Base.:+(a::TruncatedSeries, b::TruncatedSeries)
     o = min(a.order, b.order)
     d = SeriesDict()
@@ -120,13 +125,16 @@ function Base.:+(a::TruncatedSeries, b::TruncatedSeries)
         e < o || continue
         d[e] = haskey(d, e) ? _ts_add(d[e], c) : c
     end
-    return TruncatedSeries(_ts_clean(d, o), o)
+    return TruncatedSeries(_ts_clean(d, o), o, _series_var(a, b))
 end
 
-function Base.:*(a::TruncatedSeries, b::TruncatedSeries)
+Base.:*(a::TruncatedSeries, b::TruncatedSeries) = _series_mul(a, b, typemax(Int)//1)
+
+# `a * b`, truncated at `omax`
+function _series_mul(a::TruncatedSeries, b::TruncatedSeries, omax::Rational{Int})
     va = _series_valuation(a)
     vb = _series_valuation(b)
-    o = min(a.order + vb, b.order + va)
+    o = min(a.order + vb, b.order + va, omax)
     d = SeriesDict()
     for (e1, c1) in a.coeffs, (e2, c2) in b.coeffs
         e = e1 + e2
@@ -134,13 +142,13 @@ function Base.:*(a::TruncatedSeries, b::TruncatedSeries)
         prod = _ts_mul(c1, c2)
         d[e] = haskey(d, e) ? _ts_add(d[e], prod) : prod
     end
-    return TruncatedSeries(_ts_clean(d, o), o)
+    return TruncatedSeries(_ts_clean(d, o), o, _series_var(a, b))
 end
 
 function _series_scale(c, s::TruncatedSeries)
-    _iszero(c) && return _series_zero(s.order)
+    _iszero(c) && return TruncatedSeries(SeriesDict(), s.order, s.var)
     d = SeriesDict(e => _ts_mul(c, cc) for (e, cc) in s.coeffs)
-    return TruncatedSeries(_ts_clean(d, s.order), s.order)
+    return TruncatedSeries(_ts_clean(d, s.order), s.order, s.var)
 end
 
 function _unit_tail(s::TruncatedSeries, e0::Rational{Int}, c0, rel::Rational{Int})
@@ -167,7 +175,7 @@ function _compose(c, delta::TruncatedSeries, order::Rational{Int})
     acc = _series_monomial(c(0), 0, order)
     dpow = _series_one(order)
     for k in 1:_compose_terms(delta, order)
-        dpow = dpow * delta
+        dpow = _series_mul(dpow, delta, order)
         ck = c(k)
         _iszero(ck) || (acc = acc + _series_scale(ck, dpow))
     end
@@ -179,7 +187,7 @@ function _split_const(f, arg, x, order::Rational{Int})
     e0 < 0 && throw(ArgumentError(
         "$f of an expression with a pole (leading x^$e0) has no Laurent/Puiseux series " *
         "at $x = 0"))
-    s = _nseries(arg, x, order)
+    s = _nseries(arg, x, max(order, 1//1))
     delta = TruncatedSeries(filter(p -> !iszero(p.first), s.coeffs), s.order)
     return _series_coeff_at(s, 0), delta
 end
@@ -258,9 +266,9 @@ function _nseries(expr, x, order::Rational{Int})
         cval = value(u)
         if cval isa Complex && !isreal(cval)
             throw(ArgumentError(
-                "series expansion is only supported for real expressions, but found a " *
-                "complex constant $cval in the expression"))
+                "series expansion is only supported for real expressions as of now"))
         end
+        _is_finite_coeff(cval) || throw(ArgumentError("$expr is not finite"))
         return _series_monomial(cval, 0, order)
     end
 
@@ -299,11 +307,14 @@ function _nseries(expr, x, order::Rational{Int})
         op = operation(u)
         if op === complex
             throw(ArgumentError(
-                "series expansion is only supported for real expressions, but got a " *
-                "complex-valued expression: $(u)"))
+                "series expansion is only supported for real expressions as of now"))
         end
         args = arguments(u)
-        length(args) == 1 || return _nseries_diff(expr, x, order)
+        if length(args) != 1
+            op in (max, min) && _nonsmooth_at(op, [value(first(_split_const(op, a, x, order))) for a in args]) && throw(ArgumentError(
+                "$(u) is not smooth at $x = 0 and has no series expansion there"))
+            return _nseries_diff(expr, x, order)
+        end
         a = only(args)
         if op === sqrt
             return _nseries_pow(a, 1//2, x, order)
@@ -313,6 +324,8 @@ function _nseries(expr, x, order::Rational{Int})
             return _nseries_trig(op, a, x, order)
         elseif op === log
             return _nseries_log(a, x, order)
+        elseif op === log2 || op === log10
+            return _nseries(log(wrap(a)) / Symbolics.term(log, op === log2 ? 2 : 10), x, order)
         else
             return _nseries_unary(op, a, x, order)
         end
@@ -334,23 +347,25 @@ _exp_rational(e) = nothing
 
 _float_coeff(c) = c isa _Exact ? Float64(c) : c
 _series_float(s::TruncatedSeries) =
-    TruncatedSeries(SeriesDict(e => _float_coeff(c) for (e, c) in s.coeffs), s.order)
+    TruncatedSeries(SeriesDict(e => _float_coeff(c) for (e, c) in s.coeffs), s.order, s.var)
 
-function _lead_exp(expr, x; start = 4//1, cap = 256//1)
+# Leading exponent of `expr` in `x`. With no term below `x^cap` it returns `cap` as a lower
+# bound, or throws if `exact`.
+function _lead_exp(expr, x; start = 4//1, cap = 256//1, exact = false)
     u = unwrap(expr); ux = unwrap(x)
     isequal(u, ux) && return 1//1
     _series_has_var(u, ux) || return 0//1
     if SymbolicUtils.ismul(u)
-        return sum(_lead_exp(a, x; start, cap) for a in arguments(u))
+        return sum(_lead_exp(a, x; start, cap, exact) for a in arguments(u))
     elseif SymbolicUtils.isdiv(u)
         num, den = arguments(u)
-        return _lead_exp(num, x; start, cap) - _lead_exp(den, x; start, cap)
+        return _lead_exp(num, x; start, cap, exact) - _lead_exp(den, x; start, cap, exact = true)
     elseif SymbolicUtils.ispow(u)
         base, expo = arguments(u)
         q = _exp_rational(value(expo))
-        q === nothing || return q * _lead_exp(base, x; start, cap)
+        q === nothing || return q * _lead_exp(base, x; start, cap, exact = exact || q < 0)
     elseif SymbolicUtils.isterm(u) && operation(u) === sqrt
-        return (1//2) * _lead_exp(only(arguments(u)), x; start, cap)
+        return (1//2) * _lead_exp(only(arguments(u)), x; start, cap, exact)
     end
     probe = Rational{Int}(start)
     while probe <= cap
@@ -358,11 +373,12 @@ function _lead_exp(expr, x; start = 4//1, cap = 256//1)
         isempty(s) || return _series_valuation(s)
         probe *= 2
     end
+    exact && throw(ArgumentError(lazy"no nonzero term of $expr below $x^$(_fmt_exp(cap)); it may be identically zero"))
     return Rational{Int}(cap)
 end
 
 function _nseries_div(num, den, x, order::Rational{Int})
-    dv = _lead_exp(den, x)
+    dv = _lead_exp(den, x; exact = true)
     nv = _lead_exp(num, x)
     nv - dv >= order && return _series_zero(order)
     recip = _nseries_reciprocal(den, x, order - nv, dv)
@@ -378,14 +394,20 @@ function _nseries_reciprocal(den, x, order::Rational{Int}, dv::Rational{Int})
     _iszero(u0) && error("reciprocal: denominator leading coefficient is zero (bad valuation $dv)")
 
     uexps = sort!(Rational{Int}[e - dv for e in keys(den_s.coeffs) if e - dv > 0])
-    D = isempty(uexps) ? 1 : foldl(lcm, (denominator(e) for e in uexps); init = 1)
+    # The exponents of the reciprocal are the sums of exponents in `uexps` below `rel_order`
+    reach, todo = Set((0//1,)), [0//1]
+    while !isempty(todo)
+        e = pop!(todo)
+        for f in uexps
+            (ef = e + f) < rel_order || break
+            ef in reach || (push!(reach, ef); push!(todo, ef))
+        end
+    end
 
     r = SeriesDict()
     r[0//1] = _ts_div(1, u0)
-    nmax = Int(ceil(rel_order * D)) - 1
-    for n in 1:nmax
-        e = (n // D)::Rational{Int}
-        e >= rel_order && break
+    for e in sort!(collect(reach))
+        iszero(e) && continue
         s = 0
         for f in uexps
             f > e && break
@@ -415,7 +437,7 @@ function _nseries_pow(base, q::Rational{Int}, x, order::Rational{Int})
         end
         return _series_truncate(res, order)
     end
-    e0 = _lead_exp(base, x)
+    e0 = _lead_exp(base, x; exact = q < 0)
     rel = order - e0 * q
     rel <= 0 && return _series_zero(order)
     base_s = _nseries(base, x, e0 + rel)
@@ -434,13 +456,14 @@ The non-negative integer `r` with `r^k == n`, or `nothing` if `n` is not a perfe
 """
 function _iroot(n::BigInt, k::Int)
     n < 0 && return nothing
-    r = setprecision(BigFloat, 64 + 2 * ndigits(n; base = 2)) do
-        round(BigInt, BigFloat(n)^(1 / BigFloat(k)))
+    n < 2 && return n
+    r = big(2)^cld(ndigits(n; base = 2), k)  # integer Newton iteration from above
+    while true
+        s = ((k - 1) * r + n ÷ r^(k - 1)) ÷ k
+        s < r || break
+        r = s
     end
-    for c in (r - 1, r, r + 1)
-        c >= 0 && c^k == n && return c
-    end
-    return nothing
+    return r^k == n ? r : nothing
 end
 
 _root_term(v, q) = q == 1//2 ? Symbolics.term(sqrt, v) : Symbolics.term(^, v, q)
@@ -450,14 +473,13 @@ _root_term(v, q) = q == 1//2 ? Symbolics.term(sqrt, v) : Symbolics.term(^, v, q)
 
 `c0^q` for a nonzero constant `c0`: exact when `c0` is rational and the root is
 rational, a `Float64` when `c0` is a float, symbolic otherwise. Fractional powers of
-negative numbers stay symbolic.
+negative numbers throw, since their principal value is complex.
 """
 function _pow_const(c0, q::Rational{Int})
     vc = value(c0)
-    if vc isa AbstractFloat
-        (vc > 0 || denominator(q) == 1) && return Float64(vc)^Float64(q)
-        return _root_term(vc, q)
-    end
+    vc isa Real && vc < 0 && denominator(q) != 1 && throw(ArgumentError(
+        "series expansion is only supported for real expressions as of now"))
+    vc isa AbstractFloat && return Float64(vc)^Float64(q)
     vc isa Union{Integer, Rational} || return _root_term(vc, q)
     b = Rational{BigInt}(vc)
     denominator(q) == 1 && return _narrow_coeff(b^numerator(q))
@@ -495,16 +517,18 @@ function _nseries_log(arg, x, order::Rational{Int})
     e0 == 0 || throw(ArgumentError(
         "log of an expression with leading x^$e0 at $x = 0 has a log(x) term and is not a " *
         "Laurent/Puiseux series"))
-    arg_s = _nseries(arg, x, order)
+    arg_s = _nseries(arg, x, max(order, 1//1))
     c0 = _series_coeff_at(arg_s, 0)
     _iszero(c0) && error("_nseries_log: zero constant term")
+    value(c0) isa Real && c0 < 0 && throw(ArgumentError(
+        "series expansion is only supported for real expressions as of now"))
     g = _unit_tail(arg_s, 0//1, c0, order)
     l0 = _iszero(c0 - 1) ? 0 : _sym_call(log, c0)
     return _compose(k -> k == 0 ? l0 : _log1p_coeff(k), g, order)
 end
 
 function _nseries_diff(expr, x, order::Rational{Int})
-    maxord = Int(floor(order)) - 1
+    maxord = ceil(Int, order) - 1
     maxord < 0 && return _series_zero(order)
     cs = _taylor_coeffs(unwrap(expr), unwrap(x), 0, maxord)
     foreach(c -> _check_finite(c, expr, x), cs)
@@ -518,10 +542,9 @@ end
 Exact Taylor coefficients `[f(c0), f'(c0), f''(c0)/2!, …]` of `f` in `y` about `y = c0`,
 through order `K`. Values are kept symbolic unless exact (see `_fold_exact_numeric`).
 """
-# Not `taylor_coeff` from taylor.jl, for now: it only expands about 0, its default
-# `fold`/`rationalize` turn irrational values into approximate rationals (#1299, e.g.
-# atan(1) -> 101534659//129277943), with `fold = Val(false)` it leaves `cosh(0)/6`
-# unfolded, and its `factorial(n)` overflows for n > 20.
+# `taylor_coeff` from taylor.jl is not used: it expands only about 0, its default `fold`
+# approximates irrational values by rationals (#1299), and its `factorial(n)` overflows
+# for n > 20.
 function _taylor_coeffs(f, y, c0, K::Int)
     D = Differential(y)
     at_c0 = SymbolicUtils.Substituter{false}(y => c0, symdiff_substitute_filter)
@@ -561,7 +584,15 @@ function _check_finite(c, expr, x)
         "expansion is not supported"))
 end
 
-const _nonsmooth_at_zero = (abs, sign, floor, ceil, round, trunc)
+# `true` if `g` has a kink or a jump at the numeric argument values `cs`
+function _nonsmooth_at(g, cs)
+    all(c -> c isa Real, cs) || return false
+    g in (abs, sign) && return iszero(only(cs))
+    g in (floor, ceil, trunc) && return isinteger(only(cs))
+    g === round && return isinteger(only(cs) - 1//2)
+    g in (max, min) && return !allunique(cs)
+    return false
+end
 
 """
     _pole_rewrites
@@ -571,6 +602,8 @@ functions that are analytic there. Used only when the Taylor coefficients of the
 are not finite, so results at other points are unchanged.
 """
 const _pole_rewrites = Dict{Any, Function}(
+    tan => y -> sin(y) / cos(y),
+    sec => y -> 1 / cos(y),
     cot => y -> cos(y) / sin(y),
     csc => y -> 1 / sin(y),
     coth => y -> cosh(y) / sinh(y),
@@ -597,7 +630,7 @@ function _nseries_unary(g, arg, x, order::Rational{Int})
     k = get(_real_roots, g, nothing)
     k === nothing || _lead_exp(arg, x) == 0 || return _nseries_real_root(arg, k, x, order)
     c0, delta = _split_const(g, arg, x, order)
-    g in _nonsmooth_at_zero && _iszero(c0) && throw(ArgumentError(
+    _nonsmooth_at(g, (value(c0),)) && throw(ArgumentError(
         "$(g)($(arg)) is not smooth at $x = 0 and has no series expansion there"))
     y = Symbolics.variable(:__series_y)
     cs = _taylor_coeffs(g(y), unwrap(y), c0, _compose_terms(delta, order))
@@ -621,6 +654,20 @@ function _narrow_coeff(@nospecialize(c))
     return c
 end
 
+# Integer-valued floats known to be exact: elementary functions at 0, `atan(0, y)` for `y > 0`,
+# and roots whose power gives back their argument (`cbrt(-8)`)
+const _exact_at_zero = (sin, cos, tan, sec, sinh, cosh, tanh, sech, asin, atan, asinh, atanh, exp, expm1, log1p, sqrt, cbrt)
+function _exact_float(op, nums, r)
+    length(nums) == 1 || return op === atan && length(nums) == 2 && iszero(nums[1]) && nums[2] > 0
+    n = only(nums)
+    return (op in _exact_at_zero && iszero(n)) || (op === sqrt && BigInt(r)^2 == n) || (op === cbrt && BigInt(r)^3 == n)
+end
+
+# Exact values at `π`; poles are `1//0`, so they are seen as non-finite. Symbolics keeps
+# `π` as `identity(π)` so that it is not evaluated to a float.
+_is_pi(a) = a === π || (a isa SymbolicT && iscall(a) && operation(a) === identity && _is_pi(unwrap_const(only(arguments(a)))))
+const _trig_at_pi = Dict{Any, Rational{Int}}(sin => 0, cos => -1, tan => 0, cot => -1//0, sec => -1, csc => 1//0)
+
 function _fold_exact_numeric(ex)
     u = unwrap(ex)
     u isa Number && return u
@@ -631,6 +678,7 @@ function _fold_exact_numeric(ex)
     nums = map(a -> a isa Number ? a :
                     (SymbolicUtils.isconst(unwrap(a)) ? unwrap_const(unwrap(a)) : a),
                folded)
+    length(nums) == 1 && haskey(_trig_at_pi, op) && _is_pi(only(nums)) && return _trig_at_pi[op]
     if !isempty(nums) && all(a -> a isa Number, nums)
         r = try
             op(nums...)
@@ -641,8 +689,8 @@ function _fold_exact_numeric(ex)
             return r
         elseif r isa AbstractFloat && isfinite(r) && any(a -> a isa AbstractFloat, nums)
             return Float64(r)
-        elseif r isa AbstractFloat && isfinite(r) && isinteger(r)
-            return Integer(r)
+        elseif r isa AbstractFloat && isfinite(r) && isinteger(r) && _exact_float(op, nums, r)
+            return _narrow_coeff(BigInt(r))
         end
     end
     sym_args = map(a -> a isa Number ? SConst(a) : a, folded)
@@ -691,6 +739,9 @@ x + (-1//6)*x^3 + (1//120)*x^5 + O(x^6)
 function expand_series(expr, x, order; x0 = 0)
     e = unwrap(expr)
     xu = unwrap(x)
+    xu isa SymbolicT && (issym(xu) || iscall(xu) && !(operation(xu) in (+, *, /, ^))) ||
+        throw(ArgumentError("the expansion variable must be a variable, got $x"))
+    _series_has_var(x0, xu) && throw(ArgumentError("the expansion point $x0 depends on $x"))
     if !iszero(x0)
         e = substitute_in_deriv(e, xu => xu + unwrap(x0))
     end
