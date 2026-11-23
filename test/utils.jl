@@ -224,6 +224,19 @@ end
         xtt_true = diff2term(unwrap(D(D(x[1]))))
         @test isequal(xtt, xtt_true)
     end
+    @testset "array indexing" begin
+        for dims in ((4,), (3, 4))
+            @variables t x(t)[(1:n for n in dims)...]
+            D = Differential(t)
+            indices = length(dims) == 1 ?
+                ((2,), (2:3,), (1:2:3,), (:,)) :
+                ((2, 1), (2:3, 1), (1:2:3, 2), (:, 2:3), (1:2, 2:3))
+            for idx in indices
+                @test isequal(diff2term(D(x[idx...])), diff2term(D(x))[idx...])
+                @test isequal(diff2term(D(D(x[idx...]))), diff2term(D(D(x)))[idx...])
+            end
+        end
+    end
 
     @testset "diff2term rejects derivatives of non-variables" begin
         @variables t x(t) y(t)
@@ -393,7 +406,7 @@ end
     @test Symbolics.evaluate(ltr, Dict(x => 1, y => 2))
     @test !Symbolics.evaluate(ltr, Dict(x => 2, y => 1))
 
-    for val in (1, 2//3, 0.5)
+    for val in (1, 2 // 3, 0.5)
         subs = Dict(x => val, y => val)
         @test Symbolics.evaluate(gtr, subs)
         @test Symbolics.evaluate(ltr, subs)
