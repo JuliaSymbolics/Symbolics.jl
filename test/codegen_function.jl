@@ -515,34 +515,27 @@ end
     sx = unwrap(x)
     xs = unwrap.(collect(x))
     u = [1.0, 2.0, 3.0]
-    function rule_codegen(exprs, node, args; kw...)
+    function rule_functions(exprs, node, args; kw...)
         ir = IRStructure{SymReal}()
         foreach(e -> SymbolicUtils.populate_ir!(ir, e), [exprs; node])
         detector(ir, expr) = expr isa AbstractVector ? true : nothing
         rule = Code.OptimizationRule("node", detector, (ir, expr, _) -> (ir, node), 1)
         return eval.(Symbolics.codegen_function(ir, exprs, args; optimize = [rule], kw...))
     end
-    function iip_twice(iip, out, args...)
-        @invokelatest iip(out, args...)
-        @invokelatest iip(out, args...)
+    function rule_output(exprs, node, args, out; kw...)
+        _, iip = rule_functions(exprs, node, args; kw...)
+        @invokelatest iip(out, u)
         return out
     end
-
     maker = SymbolicUtils.ArrayMaker{SymReal}([[1:3]], [Symbolics.SConst(sin.(xs))]; shape = SymbolicUtils.ShapeVecT((1:3,)))
-    oop, iip = rule_codegen(sin.(xs), maker, [xs])
-    @test iip_twice(iip, fill(NaN, 3), u) == sin.(u)
+
+    @test rule_output(sin.(xs), maker, [xs], fill(NaN, 3)) == sin.(u)
+    @test rule_output(xs .+ 2, SymbolicUtils.@arrayop((i,), sx[i] + 2), [sx], zeros(3)) == u .+ 2
+    @test rule_output(sin.(xs), maker, [xs], fill(100.0, 5); outputidxs = [5, 1, 3]) == [sin(u[2]), 100.0, sin(u[3]), 100.0, sin(u[1])]
+    @test rule_output([sin(xs[1]), 0 * xs[2], sin(xs[3])], maker, [xs], fill(100.0, 3); skipzeros = true) == [sin(u[1]), 100.0, sin(u[3])]
+    @test rule_output(sin.(xs), cos.(xs), [xs], fill(100.0, 3); outputidxs = [3, 2, 1]) == reverse(cos.(u))
+
+    oop, iip = rule_functions(sin.(xs), maker, [xs])
     @test @invokelatest(oop(u)) == sin.(u)
     @test ForwardDiff.jacobian((y, v) -> @invokelatest(iip(y, v)), zeros(3), u) == Diagonal(cos.(u))
-
-    _, iip = rule_codegen(xs .+ 2, SymbolicUtils.@arrayop((i,), sx[i] + 2), [sx])
-    @test iip_twice(iip, fill(100.0, 3), u) == u .+ 2
-
-    _, iip = rule_codegen(sin.(xs), maker, [xs]; outputidxs = [5, 1, 3])
-    @test iip_twice(iip, fill(100.0, 5), u) == [sin(u[2]), 100.0, sin(u[3]), 100.0, sin(u[1])]
-
-    _, iip = rule_codegen([sin(xs[1]), 0 * xs[2], sin(xs[3])], maker, [xs]; skipzeros = true)
-    @test iip_twice(iip, fill(100.0, 3), u) == [sin(u[1]), 100.0, sin(u[3])]
-
-    _, iip = rule_codegen(sin.(xs), cos.(xs), [xs]; outputidxs = [3, 2, 1])
-    @test iip_twice(iip, fill(100.0, 3), u) == reverse(cos.(u))
 end
