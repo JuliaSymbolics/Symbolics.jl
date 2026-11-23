@@ -52,7 +52,7 @@ end
 end
 
 @testset "complex ~ still returns a plain Vector{Equation}" begin
-    @variables x y
+    @variables x y n::Number
     p = x + im * y ~ 1 + 2im
     @test p isa Vector{Equation}
     @test isequal(p, Equation[x ~ 1, y ~ 2])
@@ -60,6 +60,8 @@ end
     @test length(p) == 3
     p[1] = y ~ 4
     @test isequal(p[1], y ~ 4)
+    @test (complex(Num(n), y) ~ 0) == Equation[Num(n) ~ 0, y ~ 0]
+    @test (0 ~ complex(Num(n), y)) == Equation[0 ~ Num(n), 0 ~ y]
 end
 
 @testset "split_complex_equation returns a SplitComplexEquation" begin
@@ -118,12 +120,24 @@ end
     @test !(Equation[p_dep[1], p_dep[2]] isa SplitComplexEquation)
     @test !((Dx(ψ(t, 1)) ~ im * ψ(t, 1)) isa SplitComplexEquation)
 
-    # without a split, the result is the same single Equation as ~
-    @test isequal(split_complex_equation(x, 1 + 2im), x ~ 1 + 2im)
-    @test split_complex_equation(x, 1 + 2im) isa Equation
-    @test isequal(split_complex_equation(ψ(t), 2im), ψ(t) ~ 2im)
+    @test split_complex_equation(x, 1 + 0im) == (x ~ 1)
+    @test split_complex_equation(1 + 0im, x) == (1 ~ x)
+    @test split_complex_equation(im * x, 2im) == (x ~ 2)
+    @test split_complex_equation(2im, im * x) == (2 ~ x)
     @test isequal(split_complex_equation(x, y), x ~ y)
     @test_throws ErrorException split_complex_equation(1 + 2im, 3im)
+end
+
+@testset "split_complex_equation rejects unequal numeric parts" begin
+    @variables x
+    for (side, candidate) in ((x, 1), (im * x, 2))
+        for (lhs, rhs) in ((side, 1 + 2im), (1 + 2im, side))
+            values = Dict(x => candidate)
+            @test unwrap_const(unwrap(substitute(lhs, values))) !=
+                unwrap_const(unwrap(substitute(rhs, values)))
+            @test_throws ArgumentError split_complex_equation(lhs, rhs)
+        end
+    end
 end
 
 @testset "power and division inference" begin

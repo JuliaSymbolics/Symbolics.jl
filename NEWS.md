@@ -1,4 +1,4 @@
-## 7.49.0
+## 7.50.0
 
 ### New features
 
@@ -7,6 +7,8 @@
   `SplitComplexEquation`: a read-only two-element `AbstractVector{Equation}`
   that also records the original unsplit equation. Consumers can tell it apart
   from a user-written pair of real equations with `isa SplitComplexEquation`.
+  An unequal pair of numeric real or imaginary parts raises an `ArgumentError` when
+  the other component contains symbols.
   `lhs ~ rhs` itself still returns a `Vector{Equation}` for a complex split.
 
 ## 7.37.0

@@ -291,8 +291,8 @@ function symbolic_solve(expr, x::T; dropmultiplicity = true, warns = true) where
 end
 
 function symbolic_solve(expr; x...)
-    if expr isa Vector
-        expr = convert(Vector{Any}, expr)
+    if expr isa AbstractVector
+        expr = Vector{Any}(expr)
         for i in eachindex(expr)
             expr[i] = expr[i] isa Equation ? expr[i].lhs - expr[i].rhs : expr[i]
         end

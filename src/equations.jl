@@ -93,18 +93,40 @@ end
 Base.iterate(eqs::SplitComplexEquation, state::Int = 1) =
     state > 2 ? nothing : (eqs[state], state + 1)
 
+function complex_equation_components(a, b; check_constants)
+    ar, br = value(real(a)), value(real(b))
+    ai, bi = value(imag(a)), value(imag(b))
+    real_numeric = ar isa Number && br isa Number
+    imag_numeric = ai isa Number && bi isa Number
+    return if real_numeric && imag_numeric
+        error("Equation $a ~ $b does not contain any symbols")
+    elseif real_numeric
+        check_constants && ar != br &&
+            throw(ArgumentError("Unequal numeric real parts in equation: $ar and $br"))
+        ai ~ bi
+    elseif imag_numeric
+        check_constants && ai != bi &&
+            throw(ArgumentError("Unequal numeric imaginary parts in equation: $ai and $bi"))
+        ar ~ br
+    else
+        (ar ~ br, ai ~ bi)
+    end
+end
+
 """
     split_complex_equation(lhs, rhs)
 
-Equate `lhs` and `rhs` like `lhs ~ rhs`, but return a
-[`SplitComplexEquation`](@ref) instead of a `Vector{Equation}` when the
-equation splits into real-part and imaginary-part equations.
+Equate the real and imaginary parts of `lhs` and `rhs`. When both component
+equations contain symbols, return a [`SplitComplexEquation`](@ref) that also
+stores the original equation.
 
-When only the real parts or only the imaginary parts contain symbols, the
-result is a single [`Equation`](@ref), exactly as for `~`. The purely numeric
-part is dropped without being checked, so for a real `x`,
-`split_complex_equation(x, 1 + 2im)` returns `x ~ 1`. Throws an error when
-neither side contains symbols.
+When one component equation is purely numeric, return the symbolic
+[`Equation`](@ref) if the numeric parts are equal. Unequal numeric parts
+raise an `ArgumentError`. Throws an error when neither side contains symbols.
+
+Pass numbers or wrapped symbolic expressions such as `Num` and
+`Complex{Num}`. For an existing `Equation` named `eq`, pass
+`Symbolics.wrap(eq.lhs)` and `Symbolics.wrap(eq.rhs)`.
 
 # Examples
 
@@ -126,17 +148,8 @@ x ~ 1
 ```
 """
 function split_complex_equation(a::Number, b::Number)
-    ar, br = value(real(a)), value(real(b))
-    ai, bi = value(imag(a)), value(imag(b))
-    return if ar isa Number && br isa Number && ai isa Number && bi isa Number
-        error("Equation $a ~ $b does not contain any symbols")
-    elseif ar isa Number && br isa Number
-        ai ~ bi
-    elseif ai isa Number && bi isa Number
-        ar ~ br
-    else
-        SplitComplexEquation(ar ~ br, ai ~ bi, Equation(a, b))
-    end
+    parts = complex_equation_components(a, b; check_constants = true)
+    return parts isa Tuple ? SplitComplexEquation(parts..., Equation(a, b)) : parts
 end
 
 """
@@ -147,8 +160,8 @@ Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
 
 When either side is complex-valued and both the real and imaginary parts
 contain symbols, `~` returns a `Vector{Equation}` holding the real-part and
-imaginary-part equations. Use [`split_complex_equation`](@ref) to get the same
-pair marked as a [`SplitComplexEquation`](@ref).
+imaginary-part equations. Use [`split_complex_equation`](@ref) to get a
+[`SplitComplexEquation`](@ref) with the original equation.
 
 # Examples
 
@@ -182,8 +195,8 @@ end
 for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
     (T != :Complex && S != :Complex) && continue
     @eval function Base.:~(a::$T, b::$S)
-        eq = split_complex_equation(a, b)
-        return eq isa SplitComplexEquation ? Equation[eq.real_eq, eq.imag_eq] : eq
+        parts = complex_equation_components(a, b; check_constants = false)
+        return parts isa Tuple ? Equation[parts...] : parts
     end
 end
 
