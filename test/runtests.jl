@@ -58,6 +58,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Fuzz Arrays" begin include("fuzz-arrays.jl") end
         @safetestset "Differentiation Test" begin include("diff.jl") end
         @safetestset "D* differentiation Test" begin include("derivativegraph.jl") end
+        @safetestset "Benchmark suite" begin include("benchmark_suite.jl") end
         @safetestset "Utils Test" begin include("utils.jl") end
         @safetestset "ADTypes Test" begin include("adtypes.jl") end
         @safetestset "Degree Test" begin include("degree.jl") end

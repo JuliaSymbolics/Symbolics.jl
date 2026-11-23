@@ -175,7 +175,7 @@ for (name, roots, vars) in _DJ_WORKLOADS
     # absent when the suite is run against a base revision predating D*
     isdefined(Symbolics, :dstar_jacobian) &&
         (SUITE_DJ["$name/dstar"] = @benchmarkable Symbolics.dstar_jacobian($roots, $vars))
-    SUITE_DJ["$name/jacobian"] = @benchmarkable jacobian($roots, $vars)
+    SUITE_DJ["$name/jacobian"] = @benchmarkable Symbolics.jacobian($roots, $vars)
 end
 
 # ── linear_expansion ──────────────────────────────────────────────────────────
