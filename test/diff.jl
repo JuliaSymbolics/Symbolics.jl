@@ -31,6 +31,32 @@ arrfun(w::AbstractVector) = sum(w)
     @test isequal(Symbolics.jacobian([arrfun(w), pos(s, v)], [time]), reshape([0, v], 2, 1))
 end
 
+delayed_hook(x) = x
+@register_symbolic delayed_hook(x)
+
+@testset "Total derivative hook across world ages in one task" begin
+    @variables x
+    expr = Differential(time)(sin(delayed_hook(x)))
+    start = Channel{Nothing}(0)
+    task = @async begin
+        take!(start)
+        old_result = expand_derivatives(expr)
+        latest_result = Base.invokelatest(expand_derivatives, expr)
+        old_result, latest_result
+    end
+    yield()
+
+    @eval function Symbolics.total_derivative(::typeof(delayed_hook), args, D)
+        isequal(D.x, unwrap(time)) || return nothing
+        return args[1]
+    end
+
+    put!(start, nothing)
+    old_result, latest_result = fetch(task)
+    @test iszero(old_result)
+    @test isequal(latest_result, cos(delayed_hook(x)) * x)
+end
+
 # Derivatives
 @variables t σ ρ β
 @variables x y z
