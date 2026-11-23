@@ -77,6 +77,14 @@ julia> (∇ ⋅ ∇)(x^2 + y^2 + z^2)     # Laplacian
 ∇⋅(∇(x^2 + y^2 + z^2))
 ```
 
+With two independent variables, `∇ × v` is the scalar curl of a 2-vector field,
+identical to `Curl([x, y])(v)`:
+
+```julia
+julia> expand_derivatives(Grad([x, y]) × [x^2 * y, y^3 + x])
+1 - (x^2)
+```
+
 ```@docs
 Symbolics.Grad
 Symbolics.Divergence
