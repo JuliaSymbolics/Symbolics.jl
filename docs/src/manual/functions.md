@@ -129,6 +129,7 @@ svdsolve(A, b) = svd(A)\b
 @register_array_symbolic svdsolve(A::AbstractMatrix, b::AbstractVector) begin
     size = size(b)
     eltype = promote_type(eltype(A), eltype(b))
+    ndims = 1
 end
 ```
 
@@ -207,6 +208,22 @@ requires using the macro.
 @register_derivative (interp::AbstractInterpolation)(x) 1 begin
     # ...
 end
+```
+
+This rule applies when the interpolation object itself is the operation of the term.
+A symbolic function declared with a callable type, such as `@variables (interp::LinearInterpolation)(..)`
+(or a ModelingToolkit callable parameter), represents an interpolation whose value is not
+known symbolically. Its derivative rules are registered on [`Symbolics.SymbolicCallable`](@ref),
+and the rule receives the symbolic function as `interp.f`:
+
+```julia
+@register_derivative (interp::Symbolics.SymbolicCallable{<:AbstractInterpolation})(x) 1 begin
+    derivative(interp.f, x, 1)
+end
+```
+
+```@docs
+Symbolics.SymbolicCallable
 ```
 
 ## Inverse function registration

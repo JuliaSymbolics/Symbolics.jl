@@ -1,4 +1,4 @@
-using Symbolics, Test, SparseArrays
+using Symbolics, Test, SparseArrays, LinearAlgebra
 @variables a b c
 
 # Auxiliary Functions
@@ -214,4 +214,46 @@ h_emptyNested_ip!(out, input) # should just not fail
     @test nnz(A[1]) == 2
     @test nnz(A[2]) == 1
     @test length(A[1]) == 4
+end
+
+@testset "_recursive_unwrap structured LinearAlgebra wrappers (#1507)" begin
+    @variables x y
+
+    @test Symbolics._recursive_unwrap(Hermitian(Float64[1.0 2.0; 3.0 4.0])) ==
+        Float64[1.0 2.0; 2.0 4.0]
+    @test Symbolics._recursive_unwrap(Symmetric(Float64[1.0 2.0; 3.0 4.0], :L)) ==
+        Float64[1.0 3.0; 3.0 4.0]
+    @test Symbolics._recursive_unwrap(Diagonal(Float64[1.0, 2.0])) ==
+        Float64[1.0 0.0; 0.0 2.0]
+    Hn = Hermitian(Num[x 1; 1 x])
+    Dn = Diagonal(Num[x, y])
+    @test isequal(Symbolics._recursive_unwrap(Hn), map(Symbolics.unwrap, Matrix(Hn)))
+    @test isequal(Symbolics._recursive_unwrap(Dn), map(Symbolics.unwrap, Matrix(Dn)))
+
+    cases = (
+        (Hermitian(Float64[1.0 2.0; 3.0 4.0]), (), Float64[1.0 2.0; 2.0 4.0]),
+        (Symmetric(Float64[1.0 2.0; 3.0 4.0], :L), (), Float64[1.0 3.0; 3.0 4.0]),
+        (Diagonal(Float64[1.0, 2.0]), (), Float64[1.0 0.0; 0.0 2.0]),
+        (Diagonal(Num[x, y]), (x, y), Float64[2.0 0.0; 0.0 3.0]),
+        (Hermitian(Num[x 1; 1 x]), (x,), Float64[2.0 1.0; 1.0 2.0]),
+    )
+    for (expr, args, expected) in cases
+        f, f! = build_function(expr, args...; expression = Val{false})
+        if isempty(args)
+            @test f() == expected
+            out = fill(NaN, size(expected)...)
+            f!(out)
+            @test out == expected
+        elseif length(args) == 1
+            @test f(2.0) == expected
+            out = fill(NaN, size(expected)...)
+            f!(out, 2.0)
+            @test out == expected
+        else
+            @test f(2.0, 3.0) == expected
+            out = fill(NaN, size(expected)...)
+            f!(out, 2.0, 3.0)
+            @test out == expected
+        end
+    end
 end

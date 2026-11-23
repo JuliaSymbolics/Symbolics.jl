@@ -6,16 +6,45 @@ SymbolicUtils.promote_symtype(::typeof(imag), ::Type{Complex{T}}) where {T} = T
 Base.promote_rule(::Type{Complex{T}}, ::Type{Num}) where {T <: Real} = SymbolicNumber
 Base.promote_rule(::Type{Num}, ::Type{Complex{T}}) where {T <: Real} = SymbolicNumber
 
-# Wrapper arithmetic narrows at runtime, so inference cannot pick a concrete eltype.
-Base.promote_op(
-    ::typeof(LinearAlgebra.matprod), ::Type{SymbolicNumber}, ::Type{SymbolicNumber}
-) = SymbolicNumber
-Base.promote_op(
-    ::typeof(LinearAlgebra.matprod), ::Type{SymbolicNumber}, ::Type{T}
-) where {T <: Number} = SymbolicNumber
-Base.promote_op(
-    ::typeof(LinearAlgebra.matprod), ::Type{T}, ::Type{SymbolicNumber}
-) where {T <: Number} = SymbolicNumber
+function _symbolic_matmul(A, B::AbstractMatrix)
+    return mul!(Matrix{SymbolicNumber}(undef, size(A, 1), size(B, 2)), A, B)
+end
+
+function _symbolic_matmul(A, b::AbstractVector)
+    return mul!(Vector{SymbolicNumber}(undef, size(A, 1)), A, b)
+end
+
+Base.:*(A::StridedMatrix{SymbolicNumber}, B::StridedVecOrMat{SymbolicNumber}) = _symbolic_matmul(A, B)
+Base.:*(A::StridedMatrix{SymbolicNumber}, B::StridedVecOrMat{<:Number}) = _symbolic_matmul(A, B)
+Base.:*(A::StridedMatrix{<:Number}, B::StridedVecOrMat{SymbolicNumber}) = _symbolic_matmul(A, B)
+
+Base.:*(A::SparseArrays.SparseMatrixCSC{SymbolicNumber}, B::StridedVecOrMat{SymbolicNumber}) = _symbolic_matmul(A, B)
+Base.:*(A::SparseArrays.SparseMatrixCSC{SymbolicNumber}, B::StridedVecOrMat{<:Number}) = _symbolic_matmul(A, B)
+Base.:*(A::SparseArrays.SparseMatrixCSC{<:Number}, B::StridedVecOrMat{SymbolicNumber}) = _symbolic_matmul(A, B)
+
+function _cartesian_parts(x)
+    symtype(x) <: Real && return (x, 0)
+    if iscall(x)
+        op = operation(x)
+        if op === (+)
+            re, im_part = 0, 0
+            for arg in arguments(x)
+                ar, ai = _cartesian_parts(arg)
+                re += ar
+                im_part += ai
+            end
+            return re, im_part
+        elseif op === (*)
+            re, im_part = 1, 0
+            for arg in arguments(x)
+                ar, ai = _cartesian_parts(arg)
+                re, im_part = re * ar - im_part * ai, re * ai + im_part * ar
+            end
+            return re, im_part
+        end
+    end
+    return real(x), imag(x)
+end
 
 for C in (Complex, Complex{Bool})
     @eval begin
@@ -52,7 +81,7 @@ end
 SymbolicUtils.infer_vartype(::Type{Complex{Num}}) = VartypeT
 
 function Base.Complex{Num}(x::BasicSymbolic{VartypeT})
-    Complex{Num}(wrap(real(x)), wrap(imag(x)))
+    return Complex{Num}(wrap(real(x)), wrap(imag(x)))
 end
 
 function Base.show(io::IO, a::Complex{Num})
@@ -60,8 +89,8 @@ function Base.show(io::IO, a::Complex{Num})
     ii = unwrap(imag(a))
 
     if iscall(rr) && (operation(rr) === real) &&
-        iscall(ii) && (operation(ii) === imag) &&
-        isequal(arguments(rr)[1], arguments(ii)[1])
+            iscall(ii) && (operation(ii) === imag) &&
+            isequal(arguments(rr)[1], arguments(ii)[1])
 
         return print(io, arguments(rr)[1])
     end
@@ -70,7 +99,7 @@ function Base.show(io::IO, a::Complex{Num})
 end
 
 function (s::SymbolicUtils.Substituter)(x::Complex{Num})
-    Complex{Num}(s(real(x)), s(imag(x)))
+    return Complex{Num}(s(real(x)), s(imag(x)))
 end
 
 # Base's `Complex` methods branch on component values, which symbolic parts cannot do.
@@ -87,29 +116,17 @@ function Base.cos(z::Complex{Num})
     a, b = reim(z)
     return Complex(cos(a) * cosh(b), -sin(a) * sinh(b))
 end
-function Base.log(z::Complex{Num})
-    a, b = reim(z)
-    r = sqrt(a^2 + b^2)
-    return Complex(log(r), atan(b, a))
-end
-function Base.sqrt(z::Complex{Num})
-    a, b = reim(z)
-    r = sqrt(a^2 + b^2)
-    θ = atan(b, a) / 2
-    sr = sqrt(r)
-    return Complex(sr * cos(θ), sr * sin(θ))
+function _cartesian_call(f, z::Complex{Num}, args...)
+    raw = unwrap(z)
+    if SymbolicUtils.isconst(raw) && all(SymbolicUtils.isconst, args)
+        result = f(unwrap_const(raw), map(unwrap_const, args)...)
+        return Complex{Num}(result)
+    end
+    return Complex{Num}(term(f, raw, args...; type = Complex{Real}))
 end
 
-# Principal branch.
-function _cartesian_pow(z::Complex{Num}, p::Real)
-    a, b = reim(z)
-    r = sqrt(a^2 + b^2)
-    θ = atan(b, a)
-    rp = r^p
-    pθ = p * θ
-    return Complex(rp * cos(pθ), rp * sin(pθ))
-end
-
-Base.:^(z::Complex{Num}, p::AbstractFloat) = _cartesian_pow(z, p)
-Base.:^(z::Complex{Num}, p::Rational) = _cartesian_pow(z, p)
-Base.:^(z::Complex{Num}, p::Num) = _cartesian_pow(z, p)
+Base.log(z::Complex{Num}) = _cartesian_call(log, z)
+Base.sqrt(z::Complex{Num}) = _cartesian_call(sqrt, z)
+Base.:^(z::Complex{Num}, p::AbstractFloat) = _cartesian_call(^, z, unwrap(p))
+Base.:^(z::Complex{Num}, p::Rational) = _cartesian_call(^, z, unwrap(p))
+Base.:^(z::Complex{Num}, p::Num) = _cartesian_call(^, z, unwrap(p))

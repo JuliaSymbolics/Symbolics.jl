@@ -156,3 +156,11 @@ end
     f!(dest, 1.0 + 2.0im, 3.0 - 1.0im)
     @test dest == expected
 end
+
+@testset "power and division inference" begin
+    @test @inferred(a^2) isa Num
+    @test @inferred(a^(1 // 2)) isa Num
+    cart = Complex(a, b)
+    @test @inferred(cart / cart) isa Complex{Num}
+    @test @inferred(inv(cart)) isa Complex{Num}
+end

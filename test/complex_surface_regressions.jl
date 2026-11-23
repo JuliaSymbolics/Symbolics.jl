@@ -79,6 +79,58 @@ const SN = Symbolics.SymbolicNumber
         @test eltype(promoted) == SN
     end
 
+    @testset "real-valued complex magnitudes" begin
+        @variables z::Complex n::Number
+        for op in (abs, abs2, angle), x in (z, n, Symbolics.SymbolicNumber(1 + 2im))
+            expr = op(x)
+            @test expr isa Num
+            if x === z || x === n
+                f = build_function(expr, x; expression = Val(false))
+                @test f(1 + 2im) ≈ op(1 + 2im)
+            end
+        end
+    end
+
+    @testset "Cartesian complex operations at extreme magnitudes" begin
+        @variables a b p
+        z = Complex(a, b)
+        for op in (log, sqrt, z -> z^0.5, z -> z^(1 // 2))
+            expr = op(z)
+            @test expr isa Complex{Num}
+            f = build_function(expr, a, b; expression = Val(false))
+            for v in (1.0e200 + 0.0im, 1.0e-200 + 0.0im, complex(-1.0e200, -0.0), complex(1.0e308, 1.0e308))
+                @test isapprox(f(reim(v)...), op(v); rtol = 1.0e-12, atol = 0)
+            end
+        end
+        expr = z^p
+        @test expr isa Complex{Num}
+        f = build_function(expr, a, b, p; expression = Val(false))
+        @test isapprox(f(1.0e-200, 0.0, 0.5), (1.0e-200 + 0.0im)^0.5; rtol = 1.0e-12, atol = 0)
+    end
+
+    @testset "Cartesian square root differentiates with respect to real components" begin
+        @variables a b
+        z = 1.0 + 2.0im
+        expr = real(sqrt(Complex(a, b)))
+        for (var, partial) in ((a, 1), (b, im))
+            f = build_function(Symbolics.derivative(expr, var), a, b; expression = Val(false))
+            @test f(reim(z)...) ≈ real(partial / (2sqrt(z)))
+        end
+    end
+
+    @testset "atomic polynomial projections" begin
+        @variables x y
+        @test iszero(simplify(SN(Complex(x, y)) - (x + im * y); expand = true))
+        z = (x + im * y) * (y + im)
+        @test iszero(simplify(real(z) - (x * y - y); expand = true))
+        @test iszero(simplify(imag(z) - (x + y^2); expand = true))
+        for coefficient in (2im, complex(big"0.125", big"0.375"))
+            subs, filtered = Symbolics.filter_poly(x + coefficient, x)
+            @test Symbolics.check_polynomial(filtered)
+            @test count(==(im), values(subs)) == 1
+        end
+    end
+
     @testset "general numeric wrapper reaches high-level differentiation" begin
         @variables z::Complex w::Complex
 

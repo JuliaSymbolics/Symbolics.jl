@@ -12,9 +12,11 @@ The core compilation process of Symbolics IR is `build_function`.
 generates a compilable version of the model for numerical solvers. The form of
 this output is dependent on the `target`. By default, the target outputs
 Julia code, but other formats, such as C, Stan, and MATLAB are available.
-These can be generated as expressions which can then be evaluated into a callable
-function, or the compilers for the respective targets can be invoked to directly
-give back the function handle.
+For the default Julia target these can be generated as expressions which can then
+be evaluated into a callable function (`expression=Val{false}`), or returned as
+Julia source (`expression=Val{true}`). Non-Julia targets such as C, Stan, and
+MATLAB return source code as a `String` only (`expression=Val{true}`); they do
+not compile or return a callable.
 
 ## build_function
 

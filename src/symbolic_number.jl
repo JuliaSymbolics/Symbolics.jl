@@ -42,20 +42,22 @@ SymbolicUtils.@number_methods(
     SymbolicNumber,
     wrap(f(unwrap(a))),
     wrap(f(unwrap(a), unwrap(b))),
-    [conj, real, imag, transpose, //],
+    [conj, real, imag, abs, abs2, transpose, //],
 )
 
 Base.conj(x::SymbolicNumber) = wrap(conj(unwrap(x)))
-Base.real(x::SymbolicNumber) = wrap(real(unwrap(x)))
-Base.imag(x::SymbolicNumber) = wrap(imag(unwrap(x)))
+Base.real(x::SymbolicNumber) = first(reim(x))
+Base.imag(x::SymbolicNumber) = last(reim(x))
+Base.reim(x::SymbolicNumber) = Num.(_cartesian_parts(unwrap(x)))
 Base.transpose(x::SymbolicNumber) = wrap(transpose(unwrap(x)))
 Base.adjoint(x::SymbolicNumber) = wrap(adjoint(unwrap(x)))
-# SymbolicUtils has no real-valued `angle` rule, so the term is built with `type = Real`.
-Base.angle(x::SymbolicNumber) = Num(
-    Term{VartypeT}(
-        angle, ArgsT{VartypeT}((unwrap(x),)); type = Real, shape = SymbolicUtils.ShapeVecT()
-    )
-)
+
+for f in (abs, abs2, angle)
+    @eval function Base.$(nameof(f))(x::SymbolicNumber)
+        raw = unwrap(x)
+        return Num(SymbolicUtils.isconst(raw) ? $f(unwrap_const(raw)) : term($f, raw; type = Real))
+    end
+end
 Base.sincospi(x::SymbolicNumber) = (sinpi(x), cospi(x))
 Base.numerator(x::SymbolicNumber) = wrap(numerator(unwrap(x)))
 Base.denominator(x::SymbolicNumber) = wrap(denominator(unwrap(x)))
@@ -102,9 +104,18 @@ function Base.show(io::IO, x::SymbolicNumber)
     return show(io, unwrap_const(unwrap(x)))
 end
 
-SymbolicUtils.simplify(x::SymbolicNumber; kw...) = wrap(SymbolicUtils.simplify(unwrap(x); kw...))
+const expand_cartesian = Postwalk(@rule complex(~a, ~b) => ~a + im * ~b)
+
+function SymbolicUtils.simplify(x::SymbolicNumber; expand = false, kw...)
+    expr = unwrap(x)
+    return wrap(SymbolicUtils.simplify(expand ? expand_cartesian(expr) : expr; expand, kw...))
+end
+
 SymbolicUtils.simplify_fractions(x::SymbolicNumber; kw...) = wrap(SymbolicUtils.simplify_fractions(unwrap(x); kw...))
-SymbolicUtils.expand(x::SymbolicNumber) = wrap(SymbolicUtils.expand(unwrap(x)))
+
+function SymbolicUtils.expand(x::SymbolicNumber)
+    return wrap(SymbolicUtils.expand(expand_cartesian(unwrap(x))))
+end
 SymbolicUtils.Code.toexpr(x::SymbolicNumber) = SymbolicUtils.Code.toexpr(unwrap(x))
 SymbolicUtils.setmetadata(x::SymbolicNumber, t, v) = wrap(SymbolicUtils.setmetadata(unwrap(x), t, v))
 SymbolicUtils.getmetadata(x::SymbolicNumber, t) = SymbolicUtils.getmetadata(unwrap(x), t)

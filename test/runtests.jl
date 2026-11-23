@@ -51,6 +51,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "Macro Test" begin include("macro.jl") end
         @safetestset "Arrays" begin include("arrays.jl") end
         @safetestset "SymStruct" begin include("symstruct.jl") end
+        @safetestset "RecordLiteral" begin include("recordliteral.jl") end
         @safetestset "View-setting" begin include("stencils.jl") end
         @safetestset "Complex" begin include("complex.jl") end
         @safetestset "Complex issue regressions" begin

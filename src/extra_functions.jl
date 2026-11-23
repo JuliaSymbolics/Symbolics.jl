@@ -14,6 +14,11 @@ end
 @register_derivative min(x, y) 2 ifelse(x < y, zero(y), one(y))
 @register_derivative max(x, y) 1 ifelse(x > y, one(x), zero(x))
 @register_derivative max(x, y) 2 ifelse(x > y, zero(y), one(y))
+# `mod` and `rem` jump wherever the result is zero, so the derivative is NaN there
+@register_derivative mod(x, y) 1 ifelse(iszero(mod(x, y)), NaN, one(x))
+@register_derivative mod(x, y) 2 ifelse(iszero(mod(x, y)), NaN, -floor(x / y))
+@register_derivative rem(x, y) 1 ifelse(iszero(rem(x, y)), NaN, one(x))
+@register_derivative rem(x, y) 2 ifelse(iszero(rem(x, y)), NaN, -ifelse(x / y < 0, ceil(x / y), floor(x / y)))
 @register_derivative ceil(x) 1 COMMON_ZERO
 @register_derivative floor(x) 1 COMMON_ZERO
 @register_derivative factorial(x) 1 COMMON_ZERO

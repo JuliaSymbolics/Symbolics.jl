@@ -127,8 +127,7 @@ function _filter_poly(expr, var)
     if symtype(expr) <: Complex
         subs1, subs2 = Dict(), Dict()
         expr1, expr2 = 0, 0
-        rr = real(expr)
-        ii = imag(expr)
+        rr, ii = _cartesian_parts(expr)
         if !isequal(rr, 0)
             subs1, expr1 = _filter_poly(rr, var)
         end
@@ -145,7 +144,7 @@ function _filter_poly(expr, var)
 
         args = map(unwrap, arguments(expr))
         oper = operation(expr)
-        return subs, term(oper, args...)
+        return subs, term(oper, args...; type = Real)
     end
     subs = Dict{Any, Any}()
     for (i, arg) in enumerate(args)

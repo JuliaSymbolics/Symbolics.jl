@@ -5,6 +5,18 @@ symbolic_utils = Symbolics.SymbolicUtils
 basic_symbolic = symbolic_utils.BasicSymbolic{symbolic_utils.SymReal}
 basic_symbolic_wrapper = getfield(parentmodule(basic_symbolic), nameof(basic_symbolic))
 
+const QUALIFIED_ACCESS_IGNORE = (
+    :BlasInt, :Cartesian, :Experimental, :ParseError, :ReshapedArray,
+    :Unknown, :acos, :acosh, :alignment, :asin, :atanh, :checknonsingular,
+    :cos, :diffrule, :diffrules, :eval, :getdoc, :log, :log10, :log1p,
+    :log2, :max, :min, :nocolor, :power_by_squaring, :register_error_hint,
+    :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractTriangular,
+    :Slice, :StaticArray, :TwicePrecision, :TypedEndpointsInterval,
+    :sin, :sqrt, :striplines, :tan,
+    # Public on Julia 1.12+; ExplicitImports exception only needed on 1.11.
+    (VERSION < v"1.12" ? (:map, :parse, :require_one_based_indexing, :reverse) : ())...,
+)
+
 run_qa(
     Symbolics;
     aqua_kwargs = (;
@@ -24,19 +36,8 @@ run_qa(
     ei_kwargs = (;
         # These are upstream names used for compatibility with Base, LinearAlgebra,
         # DiffRules, MacroTools, and NaNMath; those owners do not declare them public.
-        # `promote_op(matprod, ...)` is Julia's element-type inference hook used to keep
-        # SymbolicNumber matrix products concrete.
         all_qualified_accesses_are_public = (;
-            ignore = (
-                :BlasInt, :Cartesian, :Experimental, :ParseError,
-                :ReshapedArray, :Unknown, :acos, :acosh, :alignment, :asin, :atanh,
-                :checknonsingular, :cos, :diffrule, :diffrules, :eval, :getdoc, :log,
-                :log10, :log1p, :log2, :matprod, :max, :min, :nocolor,
-                :power_by_squaring, :promote_op, :register_error_hint,
-                :AbstractCompressedVector, :AbstractSparseMatrixCSC, :AbstractTriangular,
-                :Slice, :StaticArray, :TwicePrecision, :TypedEndpointsInterval,
-                :sin, :sqrt, :striplines, :tan,
-            ),
+            ignore = QUALIFIED_ACCESS_IGNORE,
         ),
     ),
     reexports_allow = (
