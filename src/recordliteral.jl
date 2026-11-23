@@ -9,7 +9,13 @@ const RECORD_LITERAL_MAX_FIELDS = 8
 Argument types which mark a constructor call as symbolic, causing it to build a
 [`RecordLiteral`](@ref) rather than calling the struct's own constructor.
 """
-const RecordLiteralArg = Union{Num, Arr, SymStruct, SymbolicT}
+const RecordLiteralArg = Union{
+    Num, Arr, SymStruct, SymbolicT,
+    # An array of symbolics is a symbolic argument too, the same way `@register_symbolic`
+    # treats one. Without this a field written as `[1.0, q]` is taken for a concrete
+    # vector and the struct's own constructor tries to convert `q` to the field's type.
+    AbstractArray{<:Union{Num, SymbolicT, SymStruct}}
+}
 
 """
     $TYPEDEF
@@ -94,8 +100,13 @@ end
 
 The unwrapped term behind [`record_literal`](@ref), for the operation itself and anything
 else working at the level of terms rather than of wrapped symbolics.
+
+`check` governs whether the field types are checked against what is given for them. It is
+on for anything a user writes, and off for a caller assembling a record out of values it
+produced itself - those carry sentinels for fields not yet filled, which say nothing about
+the type the field will eventually hold.
 """
-function record_literal_term(::Type{T}, args) where {T}
+function record_literal_term(::Type{T}, args; check::Bool = true) where {T}
     nf = fieldcount(T)
     if length(args) != nf
         throw(ArgumentError(LazyString(
@@ -105,21 +116,44 @@ function record_literal_term(::Type{T}, args) where {T}
     cargs = ArgsT{VartypeT}()
     sizehint!(cargs, nf)
     for (i, a) in enumerate(args)
-        ua = unwrap(a)
-        check_record_field_symtype(T, i, symtype(ua))
+        # `nested_unwrap` rather than `unwrap`: an array argument holds wrapped symbolics
+        # which have to be unwrapped individually, as the wrapper is not what the term
+        # should carry.
+        ua = nested_unwrap(a)
+        check && check_record_field_symtype(T, i, symtype(ua))
         push!(cargs, BSImpl.Const{VartypeT}(ua))
     end
     return BSImpl.Term{VartypeT}(
         RecordLiteral{T}(), cargs; type = T, shape = SU.ShapeVecT())
 end
 
+function _type_without(@nospecialize(a), @nospecialize(b))
+    a <: b && return Union{}
+    if a isa Union
+        return Union{_type_without(a.a, b), _type_without(a.b, b)}
+    end
+    return a
+end
+
+"""
+    $TYPEDSIGNATURES
+
+`T` with `Nothing` and `Missing` removed, or `Union{}` if that is all it was. These mark a
+field, or an element of one, that has not been filled in, and say nothing about the type
+it will hold.
+"""
+without_sentinels(@nospecialize(T)) = _type_without(_type_without(T, Nothing), Missing)
+
 """
     $TYPEDSIGNATURES
 
 Check that a value of symtype `aT` can stand for field `i` of `T`, and throw otherwise.
 
-The two types must be related in one direction or the other, rather than `aT` being a
-subtype of the field. A symbolic variable is usually declared more loosely than the field
+`nothing` and `missing` are accepted for any field: they mark one that has not been
+filled in yet, as they do for an element of a partially written array.
+
+Otherwise the two types must be related in one direction or the other, rather than `aT`
+being a subtype of the field. A symbolic variable is usually declared more loosely than the field
 it fills - `@variables q` has symtype `Real`, which no `Float64` field would admit under a
 plain subtype test - while a value of an unrelated type is wrong in either direction.
 
@@ -128,7 +162,27 @@ in a `Float64` field builds without complaint, and only fails on field access, a
 assertion inside `getproperty` that names neither the field nor the type.
 """
 function check_record_field_symtype(::Type{T}, i::Int, aT) where {T}
+    # A field, or an element of an array field, may be unfilled. `nothing` and `missing`
+    # mark that and stand for a value of any type, so they are set aside before comparing
+    # - a partially written array widens its element type to include them.
+    aT = without_sentinels(aT)
+    aT === Union{} && return nothing
     fT = fieldtype(T, i)
+    # Array types are invariant, so `Vector{Real}` and `Vector{Float64}` are unrelated
+    # even though either can hold the other's elements. Compare what they hold instead.
+    if aT <: AbstractArray && fT <: AbstractArray
+        ae, fe = without_sentinels(eltype(aT)), eltype(fT)
+        ae === Union{} && return nothing
+        # A container of symbolics says nothing about what its elements stand for - the
+        # symtype lives on each element, not on the container - so there is nothing to
+        # check against the field. Containers of ordinary values still are checked.
+        ae <: Union{Num, SymbolicT, SymStruct} && return nothing
+        ae <: fe || fe <: ae || throw(ArgumentError(LazyString(
+            "Cannot build a symbolic literal of `", T, "`: field `", fieldname(T, i),
+            "` holds `", fe, "`, which is unrelated to the `", ae,
+            "` held by the argument given for it.")))
+        return nothing
+    end
     aT <: fT || fT <: aT || throw(ArgumentError(LazyString(
         "Cannot build a symbolic literal of `", T, "`: field `", fieldname(T, i),
         "` has type `", fT, "`, which is unrelated to the symtype `", aT,
