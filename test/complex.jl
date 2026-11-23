@@ -50,3 +50,10 @@ end
     @test !hasname(2x)
     @test !hasname(x + y)
 end
+
+@testset "power and division inference" begin
+    @test @inferred(a^2) isa Num
+    @test @inferred(a^(1 // 2)) isa Num
+    @test @inferred(z / z) isa Complex{Num}
+    @test @inferred(inv(z)) isa Complex{Num}
+end

@@ -361,3 +361,150 @@ end
     without = Symbolics.codegen_function(ir, [sqrt(a)], [[a]]; nanmath = true, sort_addmul = true)
     @test string(with_bogus) == string(without)
 end
+
+# Records the `rewrites` that `codegen_function` hands to SymbolicUtils' code generation.
+struct RewritesProbe end
+const PROBED_REWRITES = Dict{Any, Any}()
+function SymbolicUtils.Code.codegen_function!(
+        ::RewritesProbe, cs::SymbolicUtils.Code.CodegenState{T},
+        expr::SymbolicUtils.BasicSymbolic{T}, expr_idx::Integer
+    ) where {T}
+    merge!(PROBED_REWRITES, cs.rewrites)
+    return SymbolicUtils.Code.codegen!(cs, expr_idx, cs(only(arguments(expr))))
+end
+
+@testset "`scalarize_single_element_regions`" begin
+    @test Symbolics.CodegenFunctionOptions().scalarize_single_element_regions
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    # Both `codegen_function` methods: a symbolic expression and an array of them.
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; scalarize_single_element_regions = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:scalarize_single_element_regions] === something(setting, true)
+    end
+
+    # Longer than `SymbolicUtils.Code.FILL_ARR_LIMIT`, so the output is not scalarized as a whole.
+    @variables p[1:20] q[1:20]
+    regions = [[1:19], [20:20]]
+    values = [unwrap(p[1:19] .+ q[1:19]), unwrap(p[20:20] .- q[1:1])]
+    maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(regions, values)
+    _, iip = Symbolics.codegen_function(ir, maker, [p, q])
+    @test occursin("batched_setindex!", string(iip))
+    # SymbolicUtils honours the rewrite from the first release after 4.50.0
+    # (JuliaSymbolics/SymbolicUtils.jl#1154).
+    if pkgversion(SymbolicUtils) > v"4.50.0"
+        _, iip = Symbolics.codegen_function(ir, maker, [p, q]; scalarize_single_element_regions = false)
+        @test !occursin("batched_setindex!", string(iip))
+        f! = eval(iip)
+        out = zeros(20)
+        Base.invokelatest(f!, out, collect(1.0:20), collect(10.0:10:200))
+        @test out ≈ [collect(1.0:19) .+ collect(10.0:10:190); 20.0 - 10.0]
+    end
+end
+
+@testset "`fuse_broadcasts`" begin
+    @test !Symbolics.CodegenFunctionOptions().fuse_broadcasts
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; fuse_broadcasts = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:fuse_broadcasts] === something(setting, false)
+    end
+
+    # SymbolicUtils fuses from the release that adds `Code.FUSE_BROADCASTS_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_BROADCASTS_KEY)
+        @variables p[1:20] q[1:20]
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(
+            [[1:19], [20:20]], [unwrap(p[2:20] .- 2 .* q[1:19]), unwrap(p[1:1] .+ q[20:20])]
+        )
+        _, iip = Symbolics.codegen_function(ir, maker, [p, q]; fuse_broadcasts = true)
+        @test occursin("fused_materialize!", string(iip))
+        f! = eval(iip)
+        out = zeros(20)
+        pv, qv = collect(1.0:20), collect(10.0:10:200)
+        Base.invokelatest(f!, out, pv, qv)
+        @test out == [pv[2:20] .- 2 .* qv[1:19]; pv[1] + qv[20]]
+    end
+end
+
+@testset "`fuse_unalias`" begin
+    @test Symbolics.CodegenFunctionOptions().fuse_unalias
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]]))
+        empty!(PROBED_REWRITES)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args)
+        @test PROBED_REWRITES[:fuse_unalias] === true
+        empty!(PROBED_REWRITES)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; fuse_unalias = false)
+        @test PROBED_REWRITES[:fuse_unalias] === false
+    end
+
+    # SymbolicUtils updates in place from the release that adds `Code.FUSE_UNALIAS_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_UNALIAS_KEY)
+        @variables p[1:20] q[1:20] dt
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(
+            [[1:10], [11:20]],
+            [unwrap(p[1:10] .+ dt .* q[1:10]), unwrap(p[11:20] .- dt .* q[11:20])]
+        )
+        _, iip = Symbolics.codegen_function(
+            ir, maker, [p, q, dt];
+            fuse_broadcasts = true, fuse_unalias = false
+        )
+        @test occursin("fused_materialize_noalias!", string(iip))
+        @test !occursin("unalias(", replace(string(iip), "noalias" => ""))
+        f! = eval(iip)
+        pv, qv = collect(1.0:20), collect(10.0:10:200)
+        expected = [pv[1:10] .+ 0.5 .* qv[1:10]; pv[11:20] .- 0.5 .* qv[11:20]]
+        Base.invokelatest(f!, pv, pv, qv, 0.5)
+        @test pv == expected
+    end
+end
+
+@testset "`fuse_output_eltype`" begin
+    @test !Symbolics.CodegenFunctionOptions().fuse_output_eltype
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; fuse_output_eltype = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:fuse_output_eltype] === something(setting, false)
+    end
+
+    # SymbolicUtils converts from the release that adds `Code.FUSE_OUTPUT_ELTYPE_KEY`.
+    if isdefined(SymbolicUtils.Code, :FUSE_OUTPUT_ELTYPE_KEY)
+        @variables p[1:20] q[1:20]
+        maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}([[1:20]], [unwrap(p .+ 0.1 .* q)])
+        _, iip = Symbolics.codegen_function(
+            ir, maker, [p, q]; fuse_broadcasts = true, fuse_output_eltype = true
+        )
+        f! = eval(iip)
+        pv, qv = Float32.(1:20) ./ 3, Float32.(20:-1:1) ./ 7
+        out = zeros(Float32, 20)
+        Base.invokelatest(f!, out, pv, qv)
+        @test out == pv .+ 0.1f0 .* qv
+    end
+end
+
+@testset "`use_literal_pow`" begin
+    @test Symbolics.CodegenFunctionOptions().use_literal_pow
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; use_literal_pow = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:use_literal_pow] === something(setting, true)
+    end
+
+    # SymbolicUtils honours the rewrite from the release that adds `Code.USE_LITERAL_POW_KEY`.
+    if isdefined(SymbolicUtils.Code, :USE_LITERAL_POW_KEY)
+        @variables xlp
+        oop, _ = Symbolics.codegen_function(ir, xlp^3, [[xlp]])
+        @test occursin("literal_pow", string(oop))
+        @test @invokelatest(eval(oop)([2])) == 8
+        oop, _ = Symbolics.codegen_function(ir, xlp^3, [[xlp]]; use_literal_pow = false)
+        @test !occursin("literal_pow", string(oop))
+        @test @invokelatest(eval(oop)([2])) == 8
+    end
+end
