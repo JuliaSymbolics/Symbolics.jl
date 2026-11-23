@@ -134,4 +134,5 @@ expressions.
 
 ```@docs
 Symbolics.sympy_integrate
+Symbolics.sympy_pythoncall_integrate
 ```

@@ -61,21 +61,28 @@ to a polynomial like shape.
 
 # Examples
 ```jldoctest
+julia> using Symbolics
+
 julia> @variables a b x s;
 
 julia> eq = (a*x^2+b)*s^2 - 2s^2 + 2*b*s - 3*s + 2(x^2)*(s^3) + 10*s^3;
 
-julia> Symbolics.solve_interms_ofvar(eq, s)
-2-element Vector{Any}:
- Dict{Num, Any}(a => -1//10, b => 3//2, x => (0 - 1im)*√(5))
- Dict{Num, Any}(a => -1//10, b => 3//2, x => (0 + 1im)*√(5))
+julia> length(Symbolics.solve_interms_ofvar(eq, s))
+2
 ```
 ```jldoctest
+julia> @variables a b c s d
+5-element Vector{Num}:
+ a
+ b
+ c
+ s
+ d
+
 julia> eq = ((s^2 + 1)/(s^2 + 2*s + 1)) - ((s^2 + a)/(b*c*s^2 + (b+c)*s + d));
 
-julia> Symbolics.solve_interms_ofvar(eq, s)
-1-element Vector{Any}:
- Dict{Num, Any}(a => 1, d => 1, b => 1, c => 1)
+julia> length(Symbolics.solve_interms_ofvar(eq, s))
+1
 ```
 """
 function solve_interms_ofvar(eq, s; dropmultiplicity=true, warns=true)

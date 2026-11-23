@@ -1,0 +1,460 @@
+import DomainSets.ClosedInterval
+
+# exponents for which factorial(n) and Differential(s)^n are defined
+function _is_nonneg_int(@nospecialize(x))
+    x = unwrap_const(x)
+    return x isa Integer && (x >= 0)::Bool
+end
+# non-integer real exponents with a convergent transform: L{t^n} = Γ(n+1)/s^(n+1) for n > -1
+function _is_frac_power(@nospecialize(x))
+    x = unwrap_const(x)
+    return x isa Real && !(x isa Integer) && (x > -1)::Bool
+end
+# positive integer exponents n for which the inverse power rule uses factorial(n-1)
+function _is_pos_int(@nospecialize(x))
+    x = unwrap_const(x)
+    return x isa Integer && (x >= 1)::Bool
+end
+# positive non-integer real exponents n for which the inverse power rule uses gamma(n)
+function _is_pos_frac(@nospecialize(x))
+    x = unwrap_const(x)
+    return x isa Real && !(x isa Integer) && (x > 0)::Bool
+end
+# whether a transform result still contains an unevaluated integral-definition fallback
+_has_integral(x) = (y = unwrap(x); y isa SymbolicT && SU.query(z -> iscall(z) && operation(z) isa Integral, y))
+
+# whether `expr` is free of the variable `var` (treats symbolic parameters as constants
+# with respect to `var`). Used to guard parameter slots in the rule tables so that, e.g.,
+# eg: rule for sin(~a*t) only matches when ~a does not contain t (preventing t from leaking into the s-domain).
+function _is_free_of(@nospecialize(expr), @nospecialize(var))::Bool
+    var = unwrap(var)::SymbolicT
+    expr = unwrap(expr)
+    expr isa SymbolicT || return true
+    isequal(expr, var) && return false
+    if iscall(expr)
+        for arg in arguments(expr)
+            _is_free_of(arg, var) || return false
+        end
+    end
+    return true
+end
+
+# coefficient of `var` in a homogeneous-linear multiple of `var`, i.e. simplified `expr/var`
+_coef_of_t(expr, var) = simplify(unwrap(expr) / unwrap(var))
+
+# from https://tutorial.math.lamar.edu/Classes/DE/Laplace_Table.aspx
+function transform_rules(f, t, F, s; trig_reduce=false)
+    # parameter slots (~a, ~b, ~c) must be free of t, otherwise the associative-commutative
+    # matcher can bind them to t-containing factors (e.g. sin(cos(t)*t)), leaking t into s.
+    is_c = Base.Fix2(_is_free_of, t)
+    # `lin_t` matches a primitive argument that is a nonzero linear multiple of t (arg/t free
+    # of t), so sin/cos/exp handle a product (2a*t), a sum (a*t + b*t), or a bare t uniformly;
+    # `coef` is that multiple. A t-leak like cos(t)*t is rejected since (cos(t)*t)/t = cos(t).
+    lin_t = x -> (!is_c(x) && is_c(_coef_of_t(x, t)))
+    coef = x -> _coef_of_t(x, t)
+    all_c = xs -> all(is_c, xs)
+    return Symbolics.Chain([
+    @rule 1 => 1/s
+    @rule t => 1/s^2
+    @rule t^(~n::_is_nonneg_int) => factorial(~n)/s^(~n + 1)
+    @rule sqrt(t) => term(sqrt, pi)/(2 * s^(3/2))
+    @rule t^(~n::_is_frac_power) => term(gamma, ~n + 1)/s^(~n + 1)
+    @rule exp(~x::lin_t) => (c = coef(~x); 1/(-c + s))
+    @rule (exp(~u))^(~n::_is_nonneg_int) => laplace(exp(~n * ~u), f, t, F, s; trig_reduce=trig_reduce) # exp(u)^n = exp(n*u)
+    @rule sin(~x::lin_t) => (c = coef(~x); c/(c^2 + s^2))
+    @rule cos(~x::lin_t) => (c = coef(~x); s/(c^2 + s^2))
+    @rule sinh(~x::lin_t) => (c = coef(~x); c/(-c^2 + s^2))
+    @rule cosh(~x::lin_t) => (c = coef(~x); s/(-c^2 + s^2))
+    @rule t*sin(t) => 2s/(1 + s^2)^2
+    @rule t*sin(~x::lin_t) => (c = coef(~x); 2*c*s / (c^2 + s^2)^2)
+    @rule t*cos(t) => (s^2 - 1) / (1 + s^2)^2
+    @rule t*cos(~x::lin_t) => (c = coef(~x); (-c^2 + s^2) / (c^2 + s^2)^2)
+    @rule sin(t) - t*cos(t) => 2 / (1 + s^2)^2
+    @rule sin((~a::is_c)*t) - (~a::is_c)*t*cos((~a::is_c)*t) => 2*(~a)^3 / ((~a)^2 + s^2)^2
+    @rule sin(t) + t*cos(t) => 2s^2 / (1 + s^2)^2
+    @rule sin((~a::is_c)*t) + (~a::is_c)*t*cos((~a::is_c)*t) => 2*~a*s^2 / ((~a)^2 + s^2)^2
+    @rule cos((~a::is_c)*t) - (~a::is_c)*t*sin((~a::is_c)*t) => s*(-(~a)^2 + s^2) / ((~a)^2 + s^2)^2
+    @rule cos((~a::is_c)*t) + (~a::is_c)*t*sin((~a::is_c)*t) => s*(s^2 + 3*(~a)^2) / ((~a)^2 + s^2)^2
+    @rule sin((~b::is_c) + (~a::is_c)*t) => (s*sin(~b) + ~a*cos(~b)) / ((~a)^2 + s^2)
+    @rule cos((~b::is_c) + (~a::is_c)*t) => (s*cos(~b) - ~a*sin(~b)) / ((~a)^2 + s^2)
+    @rule exp((~a::is_c)*t) * sin((~b::is_c) * t) => ~b / ((~b)^2 + (-~a+s)^2)
+    @rule exp((~a::is_c)*t) * cos((~b::is_c) * t) => (-~a+s) / ((~b)^2 + (-~a+s)^2)
+    @rule exp((~a::is_c)*t) * sinh((~b::is_c) * t) => ~b / (-(~b)^2 + (-~a+s)^2)
+    @rule exp((~a::is_c)*t) * cosh((~b::is_c) * t) => (-~a+s) / (-(~b)^2 + (-~a+s)^2)
+    @rule t^(~n::_is_nonneg_int) * exp((~a::is_c) * t) => factorial(~n) / (-~a + s)^(~n + 1)
+    @rule t*exp((~a::is_c) * t) => 1 / (-~a + s)^(2)
+    @rule t^(~n::_is_nonneg_int) * exp(t) => factorial(~n) / (s - 1)^(~n + 1)
+    @rule t*exp(t) => 1 / (s - 1)^(2)
+    @rule exp((~~c::all_c)*t) * ~g => laplace(~g, f, t, F, s - prod(~~c); trig_reduce=trig_reduce) # s-shift rule (coefficient has >= 1 factor)
+    @rule exp(t) * ~g => laplace(~g, f, t, F, s - 1; trig_reduce=trig_reduce) # s-shift rule, coefficient-free exp(t)
+    @rule exp((~~c::all_c)*t) / ~g => laplace(1/~g, f, t, F, s - prod(~~c); trig_reduce=trig_reduce) # s-shift rule, negative powers are stored as quotients
+    @rule exp(t) / ~g => laplace(1/~g, f, t, F, s - 1; trig_reduce=trig_reduce) # s-shift rule, coefficient-free exp(t)
+    # general frequency-differentiation combinator: L{t^n * g(t)} = (-1)^n d^n/ds^n L{g(t)}.
+    # Fires only when g transforms to a closed form, which also stops it looping on untransformable g.
+    @rule (t^(~n::_is_pos_int)) * ~g => begin
+        G = laplace(~g, f, t, F, s; trig_reduce=trig_reduce)
+        _has_integral(G) ? nothing : expand_derivatives((-1)^(~n) * (Differential(s)^(~n))(G))
+    end
+    @rule t * ~g => begin
+        G = laplace(~g, f, t, F, s; trig_reduce=trig_reduce)
+        _has_integral(G) ? nothing : expand_derivatives(-(Differential(s))(G))
+    end
+    @rule f((~a::is_c) + t) => exp(~a*s)*F(s) # t-shift rule
+    @rule f(t) => F(s)
+])
+end
+
+"""
+    laplace(expr, f, t, F, s; trig_reduce=false)
+
+Performs the Laplace transform of `expr` with respect to the variable `t`, where `f(t)` is a function in `expr` being transformed, and `F(s)` is the Laplace transform of `f(t)`. Returns the transformed expression in terms of `s`.
+
+Note that `f(t)` and `F(s)` should be defined using `@syms`
+
+Currently relies mostly on linearity and a rules table. When the rules table does not apply, it falls back to the integral definition of the Laplace transform.
+
+With `trig_reduce=true`, terms the rules cannot transform are first rewritten with `SymbolicUtils.trig_reduce`, turning products and powers of trigonometric and hyperbolic functions of `t` into sums of single harmonics (e.g. `2cos(t)sin(t)` into `sin(2t)`). The rewritten term is used only if it can be fully transformed. This is off by default because `trig_reduce` can be expensive.
+
+# Examples
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables t, s
+2-element Vector{Num}:
+ t
+ s
+
+julia> @syms f(t)::Real F(s)::Real
+(f, F)
+
+julia> laplace(exp(4t) + 5, f, t, F, s)
+1 / (-4 + s) + 5 / s
+
+julia> laplace(10 + 4t - t^2, f, t, F, s)
+10 / s + 4 / (s^2) + -2 / (s^3)
+
+julia> laplace(exp(-2t)*cos(3t) + 5exp(-2t)*sin(3t), f, t, F, s)
+(2 + s) / (9 + (2 + s)^2) + 15 / (9 + (2 + s)^2)
+
+julia> laplace(t^2 * f(t), f, t, F, s) # s-derivative rule
+Differential(s, 2)(F(s))
+
+julia> laplace(5f(t-4), f, t, F, s) # t-shift rule
+5F(s)*exp(-4s)
+
+julia> laplace(log(t), f, t, F, s) # fallback to definition
+Integral(t, 0.0 .. Inf)(exp(-s*t)*log(t))
+
+julia> laplace(sqrt(t), f, t, F, s)
+sqrt(π) / (2(s^1.5))
+
+julia> laplace(2cos(t)*sin(t), f, t, F, s; trig_reduce=true)
+2 / (4 + s^2)
+```
+"""
+function laplace(expr, f, t, F, s; rules=nothing, trig_reduce=false)
+    expr = expand(expr)
+
+    if isequal(expr, 0)
+        return 0
+    end
+
+    Dt = Differential(t)
+
+    if rules === nothing
+        rules = transform_rules(f, t, F, s; trig_reduce=trig_reduce)
+    end
+
+    transformed = rules(expr)
+
+    # Check if transformation was successful
+    if !isequal(transformed, expr)
+        return transformed
+    end
+
+    # t-derivative rule ((Dt^n)(f(t)) -> s^n*F(s) - s^(n-1)*f(0) - s^(n-2)*f'(0) - ... - f^(n-1)(0))
+    n, expr = unwrap_der(expr, Dt)
+    if n != 0 && isequal(expr, f(t))
+        f0 = Symbolics.variables(:𝒻0, 0:(n-1))
+        transformed = s^n*F(s)
+        for i = 1:n
+            transformed -= s^(n-i)*f0[i]
+        end
+
+        return transformed
+    end
+
+    terms = Symbolics.terms(expr)
+    result = 0
+
+    # unable to apply linearity, so return based on definition
+    if length(terms) == 1 && length(filter(x->_is_free_of(x, t), _true_factors(terms[1]))) == 0
+        # opt-in last resort: rewrite products and powers of trigonometric/hyperbolic functions
+        # of t as sums of single harmonics, which the rules handle (e.g. 2cos(t)sin(t) -> sin(2t));
+        # only a fully transformed result is accepted, otherwise the fallback is unchanged
+        if trig_reduce
+            reduced = SymbolicUtils.trig_reduce(unwrap(expr); vars = [unwrap(t)])
+            if !isequal(reduced, unwrap(expr))
+                # one-shot: transform the reduced form with trig_reduce=false. Re-reducing its
+                # own output can recurse forever (a reduced term may keep an unmatchable sum arg).
+                transformed = laplace(wrap(reduced), f, t, F, s, rules=rules, trig_reduce=false)
+                if !_has_integral(transformed)
+                    return transformed
+                end
+            end
+        end
+        return Integral(t in ClosedInterval(0, Inf))(expr*exp(-s*t))
+    end
+
+    # apply linearity by splitting into terms and factoring out constants
+    for term in terms
+        factors = _true_factors(term)
+        constant = filter(x -> _is_free_of(x, t), factors)
+        if !isempty(constant)
+            result += laplace(term / constant[1], f, t, F, s, rules=rules, trig_reduce=trig_reduce) * constant[1]
+        else 
+            result += laplace(term, f, t, F, s, rules=rules, trig_reduce=trig_reduce)
+        end
+    end
+
+    return result
+end
+
+function laplace(expr::Equation, f, t, F, s; kwargs...)
+    return laplace(expr.lhs, f, t, F, s; kwargs...) ~ laplace(expr.rhs, f, t, F, s; kwargs...)
+end
+
+# postprocess_root prevents automatic evaluation of sqrt to its floating point value
+function processed_sqrt(x)
+    return postprocess_root(term(sqrt, x))
+end
+
+# F and f aren't used here, but are here for future-proofing
+inverse_transform_rules(F, s, f, t) = Symbolics.Chain([
+    @rule 1/s => 1
+    @rule 1/(~a + s) => exp(-~a * t)
+    @rule 1/s^(~n::_is_pos_int) => t^(~n-1) / factorial(~n-1)
+    @rule 1/s^(~n::_is_pos_frac) => t^(~n-1) / term(gamma, ~n)
+    @rule 1/(2 * s^(3/2)) => sqrt(t)/term(sqrt, pi)
+    @rule 1/(~a + s^2) => sin(processed_sqrt(~a) * t)/processed_sqrt(~a)
+    @rule s/(~a + s^2) => cos(processed_sqrt(~a) * t)
+    @rule s / (~a + s^2)^2 => t*sin(processed_sqrt(~a) * t)/(2*processed_sqrt(~a))
+    @rule (-~a + s^2) / (~a + s^2)^2 => t*cos(processed_sqrt(~a) * t)
+    @rule 1 / (~a + s^2)^2 => (sin(processed_sqrt(~a)*t) - processed_sqrt(~a)*t*cos(processed_sqrt(~a)*t))/ (2*processed_sqrt(~a)^3)
+    @rule s^2 / (~a + s^2)^2 => (sin(processed_sqrt(~a)*t) + processed_sqrt(~a)*t*cos(processed_sqrt(~a)*t)) / (2*processed_sqrt(~a))
+    @rule s*(-~a + s^2) / (~a + s^2)^2 => cos(processed_sqrt(~a)*t) - processed_sqrt(~a)*t*sin(processed_sqrt(~a)*t)
+    @rule s*(3*~a + s^2) / (~a + s^2)^2 => cos(processed_sqrt(~a)*t) + processed_sqrt(~a)*t*sin(processed_sqrt(~a)*t)
+    @rule (s*sin(~b) + ~a*cos(~b)) / (~a + s^2) => sin(~b + processed_sqrt(~a)*t)
+    @rule (s*cos(~b) - ~a*sin(~b)) / ((~a)^2 + s^2) => cos(~b + ~a*t)
+    @rule 1/(s^2 - (~b)^2) => sinh(~b * t)/~b
+    @rule s/(s^2 - (~b)^2) => cosh(~b * t)
+    @rule 1 / ((~c+s)^2 + (~b)^2) => exp(-~c*t) * sin(~b * t) / ~b
+    @rule (~c+s) / ((~c+s)^2 + (~b)^2) => exp(-~c*t) * cos(~b * t)
+    @rule 1 / ((~c+s)^2 - (~b)^2) => exp(-~c*t) * sinh(~b * t) / ~b
+    @rule (~c+s) / ((~c+s)^2 - (~b)^2) => exp(-~c*t) * cosh(~b * t)
+    @rule 1 / (~a + s)^(~n::_is_pos_int) => t^(~n-1) * exp(-~a * t) / factorial(~n-1)
+    @rule 1 / (~a + s)^(~n::_is_pos_frac) => t^(~n-1) * exp(-~a * t) / term(gamma, ~n)
+])
+
+# Inverse transform of a proper rational term (A*s + B)/(a*s^2 + b*s + c) with an
+# irreducible or unfactored quadratic denominator, via completing the square:
+# a*s^2 + b*s + c = a*((s + α)^2 + β), α = b/(2a), β = (4ac - b^2)/(4a^2).
+# Returns `nothing` if `expr` is not such a degree-<=1-over-degree-2 rational in `s`.
+function _inverse_quadratic(expr, s, t)
+    den = expand(denominator(expr))
+    isequal(den, 1) && return nothing
+    num = expand(numerator(expr))
+
+    # denominator must be exactly degree 2 in s
+    c0 = substitute(den, Dict(s => 0))
+    d1 = expand(Symbolics.derivative(den, s))
+    c1 = substitute(d1, Dict(s => 0))
+    c2 = expand(Symbolics.derivative(d1, s) / 2)
+    (_is_free_of(c0, s) && _is_free_of(c1, s) && _is_free_of(c2, s)) || return nothing
+    isequal(c2, 0) && return nothing
+    isequal(expand(den - (c2*s^2 + c1*s + c0)), 0) || return nothing
+
+    # numerator must be at most degree 1 in s
+    b0 = substitute(num, Dict(s => 0))
+    b1 = substitute(expand(Symbolics.derivative(num, s)), Dict(s => 0))
+    (_is_free_of(b0, s) && _is_free_of(b1, s)) || return nothing
+    isequal(expand(num - (b1*s + b0)), 0) || return nothing
+
+    # complete the square: den = c2*((s + α)^2 + β)
+    α = c1 / (2*c2)
+    β = (4*c2*c0 - c1^2) / (4*c2^2)
+
+    # rewrite numerator over u = s + α: b1*s + b0 = b1*(s + α) + (b0 - b1*α)
+    A = b1 / c2                 # coefficient of (s + α)
+    B = (b0 - b1*α) / c2        # constant
+
+    uβ = unwrap_const(β)
+    if uβ isa Real && uβ < 0
+        # distinct real roots -> hyperbolic form
+        ω = processed_sqrt(-β)
+        return exp(-α*t) * (A*cosh(ω*t) + (B/ω)*sinh(ω*t))
+    elseif uβ isa Real && iszero(uβ)
+        # repeated real root
+        return exp(-α*t) * (A + B*t)
+    else
+        # complex-conjugate roots (or symbolic β) -> damped harmonic form
+        ω = processed_sqrt(β)
+        return exp(-α*t) * (A*cos(ω*t) + (B/ω)*sin(ω*t))
+    end
+end
+
+"""
+    inverse_laplace(expr, F, s, f, t)
+
+Performs the inverse Laplace transform of `expr` with respect to the variable `s`, where `F(s)` is the Laplace transform of `f(t)`. Returns the transformed expression in terms of `t`.
+
+Note that `f(t)` and `F(s)` should be defined using `@syms`.
+
+Will perform partial fraction decomposition and linearity before applying the inverse Laplace transform rules. When unable to find a result, returns `nothing`.
+
+# Examples
+
+```jldoctest
+julia> using Symbolics
+
+julia> import Nemo, Groebner
+
+julia> @variables t, s
+2-element Vector{Num}:
+ t
+ s
+
+julia> @syms f(t)::Real F(s)::Real
+(f, F)
+
+julia> inverse_laplace(7/(s+3)^3, F, s, f, t)
+(7//2)*exp(-3t)*(t^2)
+
+julia> inverse_laplace((s+2)/(s^2 - 3s - 4), F, s, f, t)
+-(1//5)*exp(-t) + (6//5)*exp(4t)
+
+julia> inverse_laplace(1/s^4, F, s, f, t)
+(t^3) / 6
+```
+"""
+function inverse_laplace(expr, F, s, f, t; rules=nothing, warns=true)
+    if isequal(expr, 0)
+        return 0
+    end
+    
+    # check for partial fractions
+    partial_fractions = partial_frac_decomposition(expr, s, warns=warns)
+    if partial_fractions !== nothing && !isequal(partial_fractions, expr)
+        return inverse_laplace(partial_fractions, F, s, f, t, warns=warns)
+    end
+
+    if rules === nothing
+        rules = inverse_transform_rules(F, s, f, t)
+    end
+
+    transformed = rules(expr)
+
+    # Check if transformation was successful
+    if !isequal(transformed, expr)
+        return transformed
+    end
+
+    _terms = terms(numerator(expr)) ./ denominator(expr)
+    
+    result = 0
+    if length(_terms) == 1 && length(filter(x -> _is_free_of(x, s), _true_factors(_terms[1]))) == 0
+        # try completing the square for irreducible/unfactored quadratic denominators
+        quad = _inverse_quadratic(expr, s, t)
+        quad !== nothing && return quad
+        warns && @warn "Inverse laplace failed: $expr"
+        return nothing # no result
+    end
+
+    # apply linearity by splitting into terms and factoring out constants
+    for term in _terms
+        factors = _true_factors(term)
+        constant = filter(x -> _is_free_of(x, s), factors)
+        non_constant = filter(x -> !_is_free_of(x, s), factors)
+        if !isempty(constant)
+            transformed_term = inverse_laplace(prod(non_constant), F, s, f, t, rules=rules, warns=warns)
+            isnothing(transformed_term) && return nothing
+            result += transformed_term * constant[1]
+        else
+            transformed_term = inverse_laplace(term, F, s, f, t, rules=rules, warns=warns)
+            isnothing(transformed_term) && return nothing
+            result += transformed_term
+        end
+    end
+
+    return result
+end
+
+function inverse_laplace(expr::Equation, F, s, f, t; warns=true)
+    return inverse_laplace(expr.lhs, F, s, f, t, warns=warns) ~ inverse_laplace(expr.rhs, F, s, f, t, warns=warns)
+end
+
+"""
+    laplace_solve_ode(eq, f, t, f0)
+    
+Solves the ordinary differential equation `eq` for the function `f(t)` using the Laplace transform method.
+    
+    `f0` is a vector of initial conditions evaluated at `t=0` (`[f(0), f'(0), f''(0), ...]`, must be same length as order of `eq`).
+
+# Examples
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables t, s
+2-element Vector{Num}:
+ t
+ s
+
+julia> @syms f(t)::Real F(s)::Real
+(f, F)
+
+julia> Dt = Differential(t)
+Differential(t, 1)
+
+julia> laplace_solve_ode(Dt(f(t)) + 3f(t) ~ t^2*exp(-3t) + t*exp(-2t) + t, f, t, [1])
+-(1//9) - exp(-2t) + (19//9)*exp(-3t) + (1//3)*t + exp(-2t)*t + (1//3)*exp(-3t)*(t^3)
+
+julia> laplace_solve_ode((Dt^2)(f(t)) + f(t) ~ 2 + 2cos(t), f, t, [0, 0])
+(2//1) - (2//1)*cos(t) + sin(t)*t
+
+julia> laplace_solve_ode((Dt^3)(f(t)) - Dt(f(t)) ~ 6 - 3t^2, f, t, [1, 1, 1])
+exp(t) + t^3
+```
+"""
+function laplace_solve_ode(eq, f, t, f0; warns=true)
+    s = variable(:𝓈)
+    @syms 𝓕(s)
+
+    # transform equation
+    transformed_eq = laplace(eq, f, t, 𝓕, s)
+    # substitute in initial conditions
+    transformed_eq = substitute(transformed_eq, Dict(𝓕(s) => variable(:𝓕), [variable(:𝒻0, i-1) => f0[i] for i=1:length(f0)]...))
+    transformed_eq = expand(transformed_eq.lhs - transformed_eq.rhs)
+
+    # solve for/isolate F(s)
+    F_terms = 0
+    other_terms = []
+    for term in terms(transformed_eq)
+        if isempty(get_variables(term, [variable(:𝓕)]))
+            push!(other_terms, -1*term)
+        else
+            F_terms += term/variable(:𝓕) # assumes term is something times F
+        end
+    end
+
+    if isempty(other_terms)
+        other_terms = 0
+    end
+
+    # (a + b + ...)*F(s) = (c + d + ...)  ->  F(s) = (c + d + ...) / (a + b + ...)
+    transformed_soln = simplify(sum(other_terms ./ F_terms))
+
+    # perform inverse laplace transform to get f(t)
+    return expand(inverse_laplace(transformed_soln, 𝓕, s, f, t, warns=warns))
+end

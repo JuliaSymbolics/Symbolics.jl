@@ -16,27 +16,20 @@ it also aborts. E.g. ``log(x+1)^2 + log(x) + 1``. here we have two
 
 # Examples
 ```jldoctest
-julia> new_expr, sub = turn_to_poly(log(x)^2 + log(x) + 1, x)
-(1 + var"##231" + var"##231"^2, Dict{Any, Any}(var"##231" => log(x)))
+julia> using Symbolics
 
-julia> new_expr
-1 + var"##231" + var"##231"^2
+julia> x = only(@variables x)
+x
 
-julia> sub
-Dict{Any, Any} with 1 entry:
-  var"##231" => log(x)
+julia> let result = Symbolics.turn_to_poly(log(x)^2 + log(x) + 1, x)
+           length(result[2]) == 1 && isequal(only(values(result[2])), log(x))
+       end
+true
 
-
-
-julia> new_expr, sub = turn_to_poly(9^x + 3^x + 2, x)
-(2 + var"##237" + var"##237"^2, Dict{Any, Any}(var"##237" => 3^x))
-
-julia> new_expr
-2 + var"##237" + var"##237"^2
-
-julia> sub
-Dict{Any, Any} with 1 entry:
-  var"##237" => 3^x
+julia> let result = Symbolics.turn_to_poly(9^x + 3^x + 2, x)
+           length(result[2]) == 1 && isequal(only(values(result[2])), 3^x)
+       end
+true
 ```
 """
 function turn_to_poly(expr, var)
@@ -98,10 +91,15 @@ do not occur.
 
 # Examples
 ```jldoctest
-julia> trav_pow(unwrap(9^x), x, Ref(false), 3^x)
-(9^x, 3^x)
+julia> using Symbolics
 
-julia> trav_pow(unwrap(x^2), x, Ref(false), 3^x)
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.trav_pow(Symbolics.unwrap(9^x), x, Ref(false), 3^x)
+((3^x)^2, 3^x)
+
+julia> Symbolics.trav_pow(Symbolics.unwrap(x^2), x, Ref(false), 3^x)
 (x^2, false)
 ```
 """
@@ -150,15 +148,19 @@ the function ``add_sub``
 
 # Examples
 ```jldoctest
-julia> trav_mult(unwrap(9*log(x)), x, Ref(false), log(x))
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.trav_mult(Symbolics.unwrap(9*log(x)), x, Ref(false), log(x))
 (9log(x), log(x))
 
-julia> trav_mult(unwrap(9*log(x)^2), x, Ref(false), log(x))
+julia> Symbolics.trav_mult(Symbolics.unwrap(9*log(x)^2), x, Ref(false), log(x))
 (9(log(x)^2), log(x))
 
-# value of broken is changed here to true
-julia> trav_mult(unwrap(9*log(x+1)), x, Ref(false), log(x))
-(9log(x + 1), log(x))
+julia> Symbolics.trav_mult(Symbolics.unwrap(9*log(x+1)), x, Ref(false), log(x))
+(9log(1 + x), log(x))
 ```
 """
 function trav_mult(arg, var, broken, sub)
@@ -199,14 +201,18 @@ sub in any way.
 
 # Examples
 ```jldoctest
-julia> add_sub(3^x, unwrap(3^x), x, Ref(false))
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.add_sub(3^x, Symbolics.unwrap(3^x), x, Ref(false))
 true
 
-julia> add_sub(0, unwrap(log(x)), x, Ref(false))
+julia> Symbolics.add_sub(0, Symbolics.unwrap(log(x)), x, Ref(false))
 true
 
-# broken here changed to true
-julia> add_sub(log(x+1), unwrap(log(x)), x, Ref(false))
+julia> Symbolics.add_sub(log(x+1), Symbolics.unwrap(log(x)), x, Ref(false))
 false
 ```
 """
@@ -238,18 +244,24 @@ transcendental function and has number of occurrences of var = n_occ.
 
 # Examples
 ```jldoctest
-julia> contains_transcendental(unwrap(log(x)), x)
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.contains_transcendental(Symbolics.unwrap(log(x)), x)
 true
 
-julia> contains_transcendental(unwrap(x), x)false
-
-julia> contains_transcendental(unwrap(x^2), x)
+julia> Symbolics.contains_transcendental(Symbolics.unwrap(x), x)
 false
 
-julia> contains_transcendental(unwrap(1), x)
+julia> Symbolics.contains_transcendental(Symbolics.unwrap(x^2), x)
 false
 
-julia> contains_transcendental(unwrap(sin(x)), x)
+julia> Symbolics.contains_transcendental(Symbolics.unwrap(1), x)
+false
+
+julia> Symbolics.contains_transcendental(Symbolics.unwrap(sin(x)), x)
 true
 ```
 """

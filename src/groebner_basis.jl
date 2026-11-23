@@ -25,11 +25,14 @@ also available for this function. See `?Groebner.groebner`.
 ## Example
 
 ```jldoctest
-julia> using Symbolics, Groebner
+julia> using Symbolics
+
+julia> import Groebner
 
 julia> @variables x y;
 
-julia> groebner_basis([x*y^2 + x, x^2*y + y])
+julia> length(groebner_basis([x*y^2 + x, x^2*y + y]))
+3
 ```
 """
 function groebner_basis(args; kwargs...)

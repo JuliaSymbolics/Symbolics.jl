@@ -13,7 +13,12 @@ false if not.
 
 # Examples
 ```jldoctest
-julia> detect_addlogs(log(x+1) + log(x-1), x)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.detect_addlogs(log(x+1) + log(x-1), x)
 true
 ```
 """
@@ -53,7 +58,12 @@ Returns true if found, false if not.
 
 # Examples
 ```jldoctest
-julia> detect_exponential(2*3^(x+1) + 5^(x^2 + 3), x)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.detect_exponential(2*3^(x+1) + 5^(x^2 + 3), x)
 true
 ```
 """
@@ -102,8 +112,13 @@ When attracted, it returns an slog.
 
 # Examples
 ```jldoctest
-julia> RootFinding.attract_logs(log(x+1)+log(x-1), x)
-Main.RootFinding.slog(-1 + x^2)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.attract_logs(log(x+1)+log(x-1), x)[1]
+slog(-1 + x^2)
 ```
 """
 function attract_logs(lhs, var)
@@ -145,9 +160,25 @@ number of occurrences of x in the expression.
 
 # Examples
 ```jldoctest
-julia> attract_exponential(2^(x+1) + 5^(x+3), x)
-Main.RootFinding.slog(2) + log(complex(-1)) - 3Main.RootFinding.slog(5) + x*Main.RootFinding.slog(2) - x*Main.RootFinding.slog(5)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> using Symbolics: slog, term
+
+julia> result = Symbolics.attract_exponential(2^(x+1) + 5^(x+3), x);
+
+julia> L, a, b = term(slog, -1), term(slog, 2), term(slog, 5);
+
+julia> isequal(result, L - a + 3b + b*x - a*x) || isequal(result, L + a - 3b + a*x - b*x)
+true
 ```
+
+The two sides of the sum may be matched in either order, so the result is one of two
+alternative logarithmic reductions (the roles of `2^(x+1)` and `5^(x+3)` swapped); their
+zero sets are a conjugate pair of the (infinitely many) complex solutions of the exponential
+equation. Both are accepted above.
 """
 function attract_exponential(lhs, var)
     lhs = unwrap(lhs)
@@ -180,13 +211,18 @@ of x in the lhs.
 
 # Examples
 ```jldoctest
-julia> attract_trig(2sin(x)cos(x), x)
+julia> using Symbolics
+
+julia> x = (@variables x)[1]
+x
+
+julia> Symbolics.attract_trig(2sin(x)cos(x), x)
 sin(2x)
 
-julia> attract_trig(sin(x)^2 + cos(x)^2, x)
+julia> Symbolics.attract_trig(sin(x)^2 + cos(x)^2, x)
 1
 
-julia> RootFinding.attract_trig(cosh(x)^2 + sinh(x)^2, x)
+julia> Symbolics.attract_trig(cosh(x)^2 + sinh(x)^2, x)
 cosh(2x)
 """
 function attract_trig(lhs, var)

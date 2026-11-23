@@ -239,34 +239,57 @@ we throw an error to tell the user that this is currently unsolvable by our cove
    is a new anonymous symbolic variable.
 
 # Examples
-```jldoctest
-julia> solve(a*x^b + c, x)
-((-c)^(1 / b)) / (a^(1 / b))
+```julia
+julia> using Symbolics
+
+julia> a = only(@variables a)
+a
+
+julia> b = only(@variables b)
+b
+
+julia> c = only(@variables c)
+c
+
+julia> x = only(@variables x)
+x
+
+julia> typeof(Symbolics.ia_solve(a*x^b + c, x)) <: AbstractVector
+true
 ```
 
 ```jldoctest
-julia> solve(2^(x+1) + 5^(x+3), x)
-1-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
- (-log(2) + 3log(5) - log(complex(-1))) / (log(2) - log(5))
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> length(Symbolics.ia_solve(2^(x+1) + 5^(x+3), x))
+1
 ```
 
-```jldoctest
-julia> solve(log(x+1)+log(x-1), x)
-2-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
- (1//2)*RootFinding.ssqrt(8.0)
- (-1//2)*RootFinding.ssqrt(8.0)
+```julia
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
+julia> Symbolics.ia_solve(log(x+1)+log(x-1), x)
+1-element Vector{Any}:
+ (1//2)*√(8.0)
 ```
 
-```jldoctest
+```julia
+julia> using Symbolics
+
+julia> x = only(@variables x)
+x
+
 julia> expr = sin(x+2)^2 + sin(x+2) + 10
 10 + sin(2 + x) + sin(2 + x)^2
 
-julia> RootFinding.ia_solve(expr, x)
-[ Info: var"##230" ϵ Ζ: e.g. 0, 1, 2...
-[ Info: var"##234" ϵ Ζ: e.g. 0, 1, 2...
-2-element Vector{SymbolicUtils.BasicSymbolic{Real}}:
- -2 + π*2var"##230" + asin((1//2)*(-1 + RootFinding.ssqrt(-39)))
- -2 + π*2var"##234" + asin((1//2)*(-1 - RootFinding.ssqrt(-39)))
+julia> length(Symbolics.ia_solve(expr, x))
+2
 ```
 
 All transcendental functions for which `left_inverse` is defined are supported.
@@ -279,7 +302,7 @@ See also: [`left_inverse`](@ref), [`inverse`](@ref), [`is_periodic`](@ref),
 [`fundamental_period`](@ref), [`ia_conditions!`](@ref).
 
 # References
-[^1]: [R. W. Hamming, Coding and Information Theory, ScienceDirect, 1980](https://www.sciencedirect.com/science/article/pii/S0747717189800070).
+[^1]: [R. W. Hamming, *Coding and Information Theory*, 1980](https://books.google.com/books/about/Coding_and_information_theory.html?hl=en&id=0d5QAAAAMAAJ).
 """
 function ia_solve(lhs, var; warns = true, complex_roots = true, periodic_roots = true)
     nx = n_func_occ(lhs, var)

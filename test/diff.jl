@@ -2,7 +2,8 @@ using Symbolics
 using SymbolicUtils
 using Test
 using LinearAlgebra, SparseArrays
-using Symbolics: value, unwrap
+using Symbolics: value, unwrap, scalarize, Arr
+using SymbolicUtils: unwrap_const
 
 # Derivatives
 @variables t σ ρ β
@@ -143,6 +144,8 @@ canonequal(a, b) = isequal(simplify(unwrap_const(unwrap(a))), simplify(unwrap_co
     (Differential(z) * Differential(y) * Differential(x))(t),
     Differential(z)(Differential(y)(Differential(x)(t)))
 )
+@test isequal((Differential(x) * identity)(t), Differential(x)(t))
+@test_throws MethodError Differential(x) * 2
 
 @test canonequal(
                  Symbolics.derivative(sin(cos(x)), x),
@@ -323,6 +326,37 @@ let
     @test isequal(sj, Symbolics.jacobian(Symbolics.scalarize.(y), x))
 end
 
+let
+    N = 2
+    @variables u[1:N, 1:N]
+    uc = collect(u)
+    f = vec(uc .^ 2 .+ uc)
+    vu = vec(u)
+    g = sum(uc .^ 2)
+    @test vu isa Base.ReshapedArray
+    @test isequal(Symbolics.scalarize(vu), Num[u[1, 1], u[2, 1], u[1, 2], u[2, 2]])
+    spI = sparse([1, 2, 3, 4], [1, 2, 3, 4], true, 4, 4)
+    @test Symbolics.jacobian_sparsity(f, vu) == spI
+    @test Symbolics.jacobian_sparsity(f, u) == spI
+    Jdiag = Num[1 + 2u[1, 1], 1 + 2u[2, 1], 1 + 2u[1, 2], 1 + 2u[2, 2]]
+    J = Symbolics.sparsejacobian(f, vu)
+    @test isequal(J, sparse([1, 2, 3, 4], [1, 2, 3, 4], Jdiag, 4, 4))
+    @test isequal(Symbolics.jacobian(f, vu), Diagonal(Jdiag))
+    H2I = Num[2 0 0 0; 0 2 0 0; 0 0 2 0; 0 0 0 2]
+    @test isequal(Symbolics.hessian(g, vu), H2I)
+    @test isequal(
+        Symbolics.sparsehessian(g, vu),
+        sparse([1, 2, 3, 4], [1, 2, 3, 4], Num[2, 2, 2, 2], 4, 4)
+    )
+    @syms h(x::Real)::Real
+    @test isequal(map(h, vu), map(h, Num[u[1, 1], u[2, 1], u[1, 2], u[2, 2]]))
+    @test isempty(
+        filter(Test.detect_ambiguities(Symbolics)) do (m1, m2)
+            occursin("ReshapedArray", string(m1.sig)) || occursin("ReshapedArray", string(m2.sig))
+        end
+    )
+end
+
 # substituting iv of differentials
 @variables t t2 x(t)
 D = Differential(t)
@@ -397,6 +431,28 @@ let
     @test Symbolics.is_derivative(Symbolics.unwrap(D(X + 2a*Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(D(X) + D(Y)))
     @test !Symbolics.is_derivative(Symbolics.unwrap(my_f(X, D(Y))))
+
+    # Wrapper types give the same answer as the expression they wrap (#1942).
+    @test !Symbolics.is_derivative(D)
+    @test !Symbolics.is_derivative(t)
+    @test !Symbolics.is_derivative(X)
+    @test !Symbolics.is_derivative(1)
+    @test Symbolics.is_derivative(D(X))
+    @test !Symbolics.is_derivative(D(X) + 3)
+    @test Symbolics.is_derivative(D(X + 2a * Y))
+    @test !Symbolics.is_derivative(D(X) + D(Y))
+    @test !Symbolics.is_derivative(my_f(X, D(Y)))
+    @test !Symbolics.is_derivative(expand_derivatives(D(X^2)))
+
+    @variables Z(t)[1:3]
+    @test Symbolics.is_derivative(D(Z))
+    @test !Symbolics.is_derivative(Z)
+
+    # `Differential` distributes over the parts of a `Complex{Num}`, so the result is a
+    # `complex` term rather than a single derivative term.
+    @variables W(t)::Complex
+    @test !Symbolics.is_derivative(D(W))
+    @test !Symbolics.is_derivative(Symbolics.unwrap(D(W)))
 end
 
 # Zeroth derivative (#1163)
@@ -659,4 +715,470 @@ end
     
     der = Symbolics.derivative(ex[1], y)
     @test isequal(der, dfoobar1(x + 2y, y)[1] * 2 + dfoobar2(x + 2y, y)[1])
+end
+
+@testset "Derivative of x'x" begin
+    @variables x[1:3] y[1:3]
+    @test isequal(Symbolics.derivative(x'x, x[1]), 2x[1])
+    @test isequal(Symbolics.derivative(y'x, x[1]), y[1])
+    @test isequal(Symbolics.derivative(y'x, y[1]), x[1])
+end
+
+@testset "Derivative of `LinearAlgebra.dot`" begin
+    @variables x[1:3] y[1:3]
+    @test isequal(Symbolics.derivative(dot(x, x), x[1]), 2x[1])
+    @test isequal(Symbolics.derivative(dot(y, x), x[1]), y[1])
+    @test isequal(Symbolics.derivative(dot(y, x), y[1]), x[1])
+    @test isequal(Symbolics.derivative(sqrt(dot(x, x)), x[1]), x[1] / sqrt(dot(x, x)))
+    @test isequal(Symbolics.derivative(sqrt(dot(x, y)), x[1]), y[1] / 2sqrt(dot(x, y)))
+end
+
+@testset "Derivative of `mapreduce` and similar arrayops" begin
+    @variables x[1:3] y[1:3]
+    @test isequal(Symbolics.derivative(sum(x), x[1]), Symbolics.SConst(1))
+    @test isequal(Symbolics.derivative(prod(x), x[1]), x[2]*x[3])
+    ex = @arrayop () x[i] * y[i]
+    @test isequal(Symbolics.derivative(ex, x[1]), y[1])
+    @test isequal(Symbolics.derivative(sqrt(sum(x)), x[1]), 1/2sqrt(sum(x)))
+    @test isequal(Symbolics.derivative(sqrt(prod(x)), x[1]), (x[2] * x[3])/2sqrt(prod(x)))
+    @test isequal(Symbolics.derivative(sqrt(ex), x[1]), y[1] / 2sqrt(ex))
+end
+
+# Derivatives of lazy array reductions w.r.t. the elements of the reduced arrays
+# used to silently return zero; they now error instead (issue #1990).
+@testset "Derivatives of lazy reductions w.r.t. array elements" begin
+    @variables x[1:3] y a[1:3]
+    obj = sum(abs2, x .- a) + (y - 1)^2
+
+    # differentiating element vars through lazy reductions nested in scalar
+    # expressions is unsupported and must error rather than return wrong zeros
+    @test_throws ErrorException Symbolics.gradient(obj, [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.gradient(
+        sum((x .- a) .^ 2) + (y - 1)^2, [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.derivative(sqrt(sum(abs2, x .- a)), x[1])
+    @test_throws ErrorException Symbolics.jacobian([obj], [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.hessian(obj, [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.hessian_sparsity(obj, [x[1], x[2], x[3], y])
+    @test_throws ErrorException Symbolics.hessian_sparsity(
+        sum(abs2, x .- a), [x[1], x[2], x[3]])
+
+    # scalarizing first makes the same derivatives computable
+    @test isequal(Symbolics.gradient(Symbolics.scalarize(obj), [x[1], x[2], x[3], y]),
+                  Num[-2a[1] + 2x[1], -2a[2] + 2x[2], -2a[3] + 2x[3], 2(-1 + y)])
+
+    # differentiating a lazy reduction directly still works (it is expanded
+    # internally), as do bare-array arguments and literal elements
+    @test isequal(Symbolics.derivative(sum(abs2, x .- a), x[1]), -2a[1] + 2x[1])
+    @test isequal(Symbolics.derivative(x[1] * sum(x), x[2]), x[1])
+    @test isequal(Symbolics.jacobian([sum(x)], [x[1], x[2], x[3]]), Num[1 1 1])
+    @test isequal(Symbolics.jacobian([sum(abs2, x .- a)], [x[1], x[2], x[3]]),
+                  Num[-2a[1] + 2x[1] -2a[2] + 2x[2] -2a[3] + 2x[3]])
+    @test isequal(Symbolics.hessian(sum(abs2, x .- a), [x[1], x[2], x[3]]),
+                  Num[2 0 0; 0 2 0; 0 0 2])
+
+    # elements that genuinely do not occur still differentiate to zero
+    @test isequal(Symbolics.derivative(sum(a), x[1]), 0)
+    @test isequal(Symbolics.derivative(sum(y .* a), x[1]), 0)
+    @test isequal(Symbolics.derivative(sum(x), a[1]), 0)
+
+    # sparsity detection sees elements inside lazy array expressions
+    @test Symbolics.jacobian_sparsity([obj], [x[1], x[2], x[3], y]) ==
+        sparse([1, 1, 1, 1], [1, 2, 3, 4], true)
+    @test Symbolics.jacobian_sparsity([sum(x)], [x[1], x[2], x[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+    # a literal `arr[k]` occurrence must not mark the other elements
+    @test nnz(Symbolics.jacobian_sparsity([x[2]^2], [x[1]])) == 0
+    @test Symbolics.jacobian_sparsity([x[2]^2], [x[1], x[2]]) == sparse([1], [2], true)
+    # the same holds when the indexee is a symbolic call like `u(t)`
+    @variables t u(t)[1:3] k::Int
+    @test Symbolics.jacobian_sparsity([u[1] + u[2], u[3]], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 2], [1, 2, 3], true)
+    # a non-literal index or a whole-array occurrence still marks all elements
+    @test Symbolics.jacobian_sparsity([u[k]], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+    @test Symbolics.jacobian_sparsity([sum(u)], [u[1], u[2], u[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+    @test Symbolics.exprs_occur_in(
+        Symbolics.unwrap.([x[1], x[2], x[3], y]), Symbolics.unwrap(obj)) ==
+        Bool[1, 1, 1, 1]
+    @test Symbolics.exprs_occur_in(Symbolics.unwrap.([x[1], y]), Symbolics.unwrap(x[2]^2)) ==
+        Bool[0, 0]
+
+    @test isequal(Symbolics.sparsejacobian([obj], [x[1], x[2], x[3], y]),
+                  sparse([1, 1, 1, 1], [1, 2, 3, 4],
+                         Num[-2a[1] + 2x[1], -2a[2] + 2x[2], -2a[3] + 2x[3], 2(-1 + y)]))
+end
+
+struct Op <: SymbolicUtils.Operator end
+
+@testset "Derivative of non-`Differential` operators" begin
+    @variables x
+    ex = Symbolics.STerm(Op(), [x]; type = Real, shape = UnitRange{Int}[])
+    @test SymbolicUtils._iszero(Symbolics.derivative(ex, x))
+end
+
+@testset "Derivative of `LinearAlgebra.norm`" begin
+    @variables x[1:3] y[1:3, 1:3]
+    for i in 1:3
+        @test isequal(Symbolics.derivative(norm(x), x[i]), Symbolics.derivative(norm(collect(x)), x[i]))
+        @test isequal(Symbolics.derivative(norm(x) ^ 2, x[i]), (2x[i] * norm(x)) / sqrt(abs2(x[1]) + abs2(x[2]) + abs2(x[3])))
+    end
+    for i in 1:3, j in 1:3
+        @test isequal(Symbolics.derivative(norm(y), y[i, j]), Symbolics.derivative(norm(collect(y)), y[i, j]))
+    end
+end
+
+# `recursive_hasoperator` on `ArrayMaker` (issue: was not handled, always returned false)
+@testset "`recursive_hasoperator` with `ArrayMaker`" begin
+    @variables t x(t)[1:2]
+    D = Differential(t)
+
+    arr_with_deriv = @makearray arr[1:2] begin
+        arr[1:1] => Symbolics.SConst([unwrap(D(x[1]))])
+        arr[2:2] => [unwrap(x[2])]
+    end
+    @test SymbolicUtils.isarraymaker(arr_with_deriv)
+    @test Symbolics.hasderiv(arr_with_deriv)
+
+    arr_no_deriv = @makearray arr[1:2] begin
+        arr[1:1] => Symbolics.SConst([unwrap(x[1])])
+        arr[2:2] => [unwrap(x[2])]
+    end
+    @test SymbolicUtils.isarraymaker(arr_no_deriv)
+    @test !Symbolics.hasderiv(arr_no_deriv)
+end
+
+@testset "Derivatives of mod and rem" begin
+    @variables x y
+    for (f, q) in ((mod, floor), (rem, trunc))
+        dx = build_function(Symbolics.derivative(f(x, y), x), x, y; expression = Val(false))
+        dy = build_function(Symbolics.derivative(f(x, y), y), x, y; expression = Val(false))
+        @test dx(5.5, 2.0) == 1.0
+        @test dy(5.5, 2.0) == -q(5.5 / 2.0)
+        @test dy(-5.5, 2.0) == -q(-5.5 / 2.0)
+        @test isnan(dx(4.0, 2.0))
+        @test isnan(dy(4.0, 2.0))
+    end
+    @test !(Symbolics.derivative(mod(x, 1.0), x) isa Symbolics.Differential)
+    df = build_function(Symbolics.derivative(mod(x, 1.0), x), x; expression = Val(false))
+    @test df(0.5) == 1
+    @test isequal(Symbolics.derivative(mod(x, 1.0), y), 0)
+end
+
+struct ScaledSquare
+    a::Float64
+end
+(s::ScaledSquare)(x) = s.a * x^2
+dscaledsquare(s::ScaledSquare, x) = 2 * s.a * x
+@register_symbolic dscaledsquare(s::ScaledSquare, x)
+@register_derivative (s::Symbolics.SymbolicCallable{<:ScaledSquare})(x) 1 dscaledsquare(s.f, x)
+
+struct ScaledProduct
+    a::Float64
+end
+(s::ScaledProduct)(x, y) = s.a * x * y
+dscaledproduct1(s::ScaledProduct, x, y) = s.a * y
+@register_symbolic dscaledproduct1(s::ScaledProduct, x, y)
+@register_derivative (s::Symbolics.SymbolicCallable{<:ScaledProduct})(x, y) 1 dscaledproduct1(s.f, x, y)
+
+struct NoRuleCallable end
+
+@testset "Derivative rules of symbolic callables" begin
+    @variables x y t z(t) (f::ScaledSquare)(..) (g::ScaledProduct)(..) (h::NoRuleCallable)(..) k(..) (a::Any)(..)
+    Dx = Differential(x)
+    Dt = Differential(t)
+    fs, gs = unwrap(f), unwrap(g)
+
+    @test isequal(expand_derivatives(Dx(f(x))), dscaledsquare(fs, x))
+    @test isequal(expand_derivatives(Dx(f(x^2))), 2x * dscaledsquare(fs, x^2))
+    @test isequal(expand_derivatives(Dt(f(z))), dscaledsquare(fs, z) * Dt(z))
+    @test isequal(Symbolics.derivative(sin(f(x)), x), cos(f(x)) * dscaledsquare(fs, x))
+    @test isequal(@derivative_rule(fs(unwrap(x)), 1), unwrap(dscaledsquare(fs, x)))
+
+    fn = build_function(Symbolics.derivative(f(x), x), fs, x; expression = Val{false})
+    @test fn(ScaledSquare(3.0), 2.0) == 12.0
+
+    # the partial derivative w.r.t. `y` has no rule, so it is needed only when `y`
+    # depends on the differentiation variable
+    @test isequal(expand_derivatives(Dx(g(x, y))), dscaledproduct1(gs, x, y))
+    @test isequal(expand_derivatives(Dx(g(x, x))), Dx(g(x, x)))
+
+    # symbolic functions without a callable type or without a rule are left unexpanded
+    @test isequal(expand_derivatives(Dx(h(x))), Dx(h(x)))
+    @test isequal(expand_derivatives(Dx(k(x))), Dx(k(x)))
+    @test isequal(expand_derivatives(Dx(a(x))), Dx(a(x)))
+    @test isequal(expand_derivatives(Dx(h(f(x)))), Differential(f(x))(h(f(x))) * dscaledsquare(fs, x))
+    @test isequal(expand_derivatives(Dt(z)), Dt(z))
+end
+
+@testset "NormalDerivative" begin
+    struct TestPiece <: Symbolics.DomainSets.Domain{Float64}
+        name::Symbol
+    end
+    Base.show(io::IO, p::TestPiece) = print(io, "Γ_", p.name)
+
+    @variables t x u(..) v(..)
+    @variables w(..)[1:2]
+    Γ = TestPiece(:wall)
+    Dn = NormalDerivative(Γ)
+    Dx = Differential(x)
+
+    @testset "construction, printing and recovery" begin
+        tr = u(t, Γ)
+        ex = Dn(tr)
+        @test ex isa Num
+        @test operation(unwrap(ex)) isa NormalDerivative
+        @test isequal(only(arguments(unwrap(ex))), unwrap(tr))
+        @test repr(ex) == "Dn_wall(u(t, Γ_wall))"
+        @test repr(Dn) == "Dn_wall"
+        # fall back to printing the piece when it has no name
+        @test repr(NormalDerivative(Symbolics.DomainSets.UnitInterval())) ==
+            "Dn_" * repr(Symbolics.DomainSets.UnitInterval())
+
+        # piece recovery from the term, for both operator and trace
+        @test operation(unwrap(ex)).piece === Γ
+        @test unwrap_const(last(arguments(only(arguments(unwrap(ex)))))) === Γ
+
+        # array-valued traces
+        arr = Dn(w(t, Γ))
+        @test arr isa Symbolics.Arr
+        @test operation(unwrap(arr)) isa NormalDerivative
+        @test size(arr) == (2,)
+    end
+
+    @testset "equality and hashing" begin
+        Dn2 = NormalDerivative(TestPiece(:wall))
+        @test isequal(Dn, Dn2)
+        @test hash(Dn) == hash(Dn2)
+        @test !isequal(Dn, NormalDerivative(TestPiece(:other)))
+        a = Dn(u(t, Γ))
+        b = Dn2(u(t, TestPiece(:wall)))
+        @test isequal(a, b)
+        @test hash(a) == hash(b)
+        @test !isequal(a, NormalDerivative(TestPiece(:other))(u(t, Γ)))
+        @test isequal(2 * a + a, 3 * b)
+    end
+
+    @testset "symbolic boundary domains compare as Bool" begin
+        @variables a b
+        IV = Symbolics.DomainSets.ClosedInterval
+        A = NormalDerivative(IV(0.0, a))
+        A2 = NormalDerivative(IV(0.0, a))
+        B = NormalDerivative(IV(0.0, b))
+        @test isequal(A, A2) === true
+        @test A == A2
+        @test isequal(A, B) === false
+        @test (A == B) === false
+        @test hash(A) == hash(A2)
+        @test !isequal(A, NormalDerivative(Symbolics.DomainSets.OpenInterval(0.0, a)))
+        @test (isequal(A, A2) ? 1 : 2) == 1
+        @test (isequal(A, B) ? 1 : 2) == 2
+        @test isequal(NormalDerivative(IV(0.0, 1.0)), NormalDerivative(IV(0.0, 1.0)))
+        @test !isequal(NormalDerivative(IV(0.0, 1.0)), NormalDerivative(IV(0.0, 2.0)))
+    end
+
+    @testset "expand_derivatives leaves it untouched" begin
+        ex = Dn(u(t, Γ))
+        @test isequal(expand_derivatives(ex), ex)
+        ex2 = 2 * Dn(u(t, Γ)) + u(t, Γ)
+        @test isequal(expand_derivatives(ex2), ex2)
+        # a normal derivative is not constant: derivatives of it stay unevaluated, never 0
+        Dt = Differential(t)
+        @test isequal(expand_derivatives(Dt(ex)), Dt(ex))
+        @test isequal(expand_derivatives(Dt(2 * ex)), 2 * Dt(ex))
+    end
+
+    @testset "mismatched pieces are not an error here" begin
+        ex = NormalDerivative(TestPiece(:a))(u(t, TestPiece(:b)))
+        @test operation(unwrap(ex)).piece == TestPiece(:a)
+        @test unwrap_const(last(arguments(only(arguments(unwrap(ex)))))) == TestPiece(:b)
+    end
+
+    @testset "substitution through operators" begin
+        Dt = Differential(t)
+        rule = u(t, Γ) => u(t, x)
+        dn = Dn(u(t, Γ))
+        @test isequal(substitute(dn, rule), dn)
+        @test isequal(Symbolics.substitute_in_deriv(dn, rule), Dn(u(t, x)))
+        @test isequal(Symbolics.substitute_in_deriv(2 * dn + 1, rule), 2 * Dn(u(t, x)) + 1)
+        # Differential behaviour is unchanged by the filter extension
+        dd = Dt(u(t, x))
+        @test isequal(substitute(dd, u(t, x) => v(t, x)), dd)
+        @test isequal(Symbolics.substitute_in_deriv(dd, u(t, x) => v(t, x)), Dt(v(t, x)))
+        # explicit rules for the operator itself are honored
+        Dn_other = NormalDerivative(TestPiece(:other))
+        @test isequal(substitute(Dn, Dict(Dn => Dn_other)), Dn_other)
+        @test isequal(Symbolics.substitute_in_deriv(Dn(u(t, Γ)), Dict(Dn => Dn_other)), Dn_other(u(t, Γ)))
+        # operators defined elsewhere stay opaque, as with plain `substitute`
+        opaque_term = Symbolics.STerm(Op(), [unwrap(x)]; type = Real, shape = UnitRange{Int}[])
+        @test isequal(Symbolics.substitute_in_deriv(opaque_term, Dict(unwrap(x) => 2)), opaque_term)
+        @test isequal(Symbolics.substitute_in_deriv_and_depvar(opaque_term, Dict(unwrap(x) => 2)), opaque_term)
+        # nested operators
+        nested = Dt(Dn(u(t, Γ)))
+        @test isequal(substitute(nested, rule), nested)
+        @test isequal(Symbolics.substitute_in_deriv(nested, rule), Dt(Dn(u(t, x))))
+    end
+end
+
+## Vector Calculus
+let
+    @variables x[1:3] y[1:3]
+
+    # `E = false` (default) builds a lazy term headed by the operator;
+    # `E = true` expands the operator into `Differential`s at application.
+    @variables f
+    gf = Grad{false}(x)(f)
+    @test gf isa Arr{Num, 1}
+    @test operation(unwrap(gf)) isa Grad{false}
+    @test all(isequal.(
+        Grad{true}(x)(f),
+        [Differential(x[1])(f), Differential(x[2])(f), Differential(x[3])(f)],
+    ))
+    @test isequal(
+        scalarize(expand_derivatives(gf)),
+        scalarize(expand_derivatives.(Grad{true}(x)(f))),
+    )
+
+    ∇ = Grad{false}(x)
+    ∇e = Grad{true}(x)
+
+    out = ∇ ⋅ y
+    @test isequal(out, Divergence{false}(x)(y))
+    @test isequal(
+        Divergence{true}(x)(y),
+        Differential(x[1])(y[1]) + Differential(x[2])(y[2]) + Differential(x[3])(y[3]),
+    )
+
+    out = ∇ × y
+    @test isequal(out, Curl{false}(x)(y))
+    @test all(
+        isequal.(
+            Curl{true}(x)(y), [
+                Differential(x[2])(y[3]) - Differential(x[3])(y[2]),
+                Differential(x[3])(y[1]) - Differential(x[1])(y[3]),
+                Differential(x[1])(y[2]) - Differential(x[2])(y[1]),
+            ]
+        )
+    )
+
+
+    out = (∇e ⋅ ∇e).(scalarize(y))
+    @test all(
+        isequal.(
+            out,
+            [
+                Differential(x[1])(Differential(x[1])(y[1])) + Differential(x[2])(Differential(x[2])(y[1])) + Differential(x[3])(Differential(x[3])(y[1])),
+                Differential(x[1])(Differential(x[1])(y[2])) + Differential(x[2])(Differential(x[2])(y[2])) + Differential(x[3])(Differential(x[3])(y[2])),
+                Differential(x[1])(Differential(x[1])(y[3])) + Differential(x[2])(Differential(x[2])(y[3])) + Differential(x[3])(Differential(x[3])(y[3])),
+            ],
+        ),
+    )
+
+
+    out = (∇e × ∇e).(scalarize(y))
+    @test all(
+        isequal.(
+            out,
+            [
+                [
+                    Differential(x[2])(Differential(x[3])(y[i])) - Differential(x[3])(Differential(x[2])(y[i])),
+                    Differential(x[3])(Differential(x[1])(y[i])) - Differential(x[1])(Differential(x[3])(y[i])),
+                    Differential(x[1])(Differential(x[2])(y[i])) - Differential(x[2])(Differential(x[1])(y[i])),
+                ] for i in 1:3
+            ],
+        ),
+    )
+
+    # Mixed partials are not reordered symbolically, so check the identities on concrete
+    # fields: ∇×∇ vanishes, and ∇×(∇×v) == ∇(∇⋅v) - Δv.
+    @variables p q r
+    ∇pqr = Grad{false}([p, q, r])
+    v = [p^2 * q * r, p * q^3 + sin(r), cos(p) * r^2]
+    cg = ∇pqr × ∇pqr
+    @test all(iszero, reduce(vcat, scalarize.(expand_derivatives.(cg.(v)))))
+    curlcurl = expand_derivatives.(scalarize(Curl{false}([p, q, r])(Curl{false}([p, q, r])(v))))
+    graddiv_minus_lap = scalarize(expand_derivatives(Grad{false}([p, q, r])(Divergence{false}([p, q, r])(v)))) .-
+        expand_derivatives.(Laplacian{false}([p, q, r]).(v))
+    @test all(iszero, simplify.(Num.(curlcurl .- graddiv_minus_lap)))
+
+    @variables a b
+    D = Grad{false}([a, b])
+    @test D == Grad{false}([a, b])
+    @test D != Grad{true}([a, b])
+    @test hash(D) == hash(Grad{false}([a, b]))
+    @test get(Dict(D => 1), Grad{false}([a, b]), :missing) == 1
+    @test isequal(Divergence{false}(x)(y), LinearAlgebra.dot(∇, y))
+    @test_throws MethodError Grad{false}([a])(Grad{false}([a, b]))
+    @test_throws ArgumentError LinearAlgebra.dot(Grad{false}([a]), Grad{false}([a, a]))(1)
+    @test_throws ArgumentError LinearAlgebra.dot(Grad{false}([a, a]), Grad{false}([a]))(1)
+    @variables c[1:3]
+    @test_throws ArgumentError LinearAlgebra.cross(Grad{false}([c[1], c[2]]), Grad{false}(c))(1)
+    @variables d4[1:4]
+    for vars in ([c[1]], collect(d4))
+        err = try
+            LinearAlgebra.cross(Grad{false}(vars), [a, b])
+        catch e
+            e
+        end
+        @test err isa DimensionMismatch
+        @test occursin("2 or 3", err.msg)
+    end
+    @test_throws ArgumentError LinearAlgebra.cross(Grad{false}(c), Grad{false}([c[1], c[2]]))(1)
+    @test_throws ArgumentError Curl{false}([c[1]])
+    @test_throws ArgumentError Curl{false}([c[1], c[2], c[3], c[3]])
+    @test_throws ArgumentError Grad{false}([a, b])([a, b])
+    @test_throws ArgumentError Divergence{false}([a, b])(a)
+    @test_throws ArgumentError Divergence{false}([a, b])(c)
+    # `∇ × v` over two variables is the scalar curl, sharing `Curl`'s definition.
+    @variables w2[1:2]
+    for E in (false, true)
+        ∇ab = Grad{E}([a, b])
+        v2 = [a^2 * b, b^3 + a]
+        for field in (v2, Num.(v2), unwrap.(v2), w2)
+            @test isequal(LinearAlgebra.cross(∇ab, field), Curl{E}([a, b])(field))
+            @test isequal(∇ab × field, Curl{E}([a, b])(field))
+        end
+        @test typeof(∇ab × v2) == typeof(Curl{E}([a, b])(v2))
+        @test isequal(expand_derivatives(∇ab × v2), 1 - a^2)
+        @test iszero(expand_derivatives(Num(∇ab × Num[a, b])))
+        # Mixed partials are not reordered symbolically, but `∇ × ∇` vanishes on expansion.
+        cg2 = ∇ab × ∇ab
+        @test cg2 == Curl{E}([a, b]) ∘ ∇ab
+        @test iszero(expand_derivatives(Num(cg2(a^2 * b))))
+    end
+    @test operation(unwrap(Grad{false}([a, b]) × [a, b])) isa Curl{false, 2}
+    # `Curl` also accepts two independent variables, producing the scalar
+    # curl `D(vars[1])(v[2]) - D(vars[2])(v[1])` of a 2-vector field.
+    c2 = Curl{false}([a, b])
+    w = [a^2 * b, b^3 + a]
+    @test operation(unwrap(c2(w))) isa Curl{false}
+    @test isequal(Curl{true}([a, b])(w), Differential(a)(w[2]) - Differential(b)(w[1]))
+    @test isequal(expand_derivatives(c2(w)), 1 - a^2)
+    @test iszero(expand_derivatives(Num(c2([a, b]))))
+    @test iszero(expand_derivatives(Num((c2 ∘ Grad{false}([a, b]))(a^2 * b))))
+    @test isequal(expand_derivatives(Differential(a)(c2(w))), Differential(a, 2)(w[2]) - 2a)
+    @test c2 == Curl{false}([a, b])
+    @test hash(c2) == hash(Curl{false}([a, b]))
+    @test c2 != Curl{false}([a, b, c[1]])
+    @test_throws ArgumentError Curl{false}([a, b])([a, b, c[1]])
+    @test_throws ArgumentError Curl{false}(c)([a, b])
+    @test_throws ArgumentError Curl{false}([a, b])(a)
+    f = a^2 + b^2
+    grad = Grad{false}([a, b])(f)
+    @test grad isa Arr{Num, 1}
+    @test isequal(expand_derivatives.(scalarize(grad)), Num[2a, 2b])
+    lap = Laplacian{false}([a, b])(f)
+    @test lap isa Num
+    @test isequal(expand_derivatives(lap), 4)
+    @test isequal(expand_derivatives.(scalarize(Grad{false}([a, b])(1))), Num[0, 0])
+    @test isequal(expand_derivatives.(scalarize(Grad{false}([a, b])(2.5))), Num[0, 0])
+    @test isequal(expand_derivatives(Laplacian{false}([a, b])(1)), 0)
+    directional = LinearAlgebra.dot([1, 2], Grad{false}([a, b]))
+    @test isequal(expand_derivatives.(directional.([a^2, b^2])), Num[2a, 4b])
+    @test isequal(expand_derivatives(directional(a^2 + b^2)), 2a + 4b)
+    @test_throws DimensionMismatch LinearAlgebra.dot([1, 2, 3], Grad{false}([a, b]))
+    @test sprint(show, Grad{false}([a, b])) == "∇"
+    @test sprint(show, Divergence{false}(x)(y)) == "∇⋅(y)"
+    @test occursin("∇(a^2 + b^2)", sprint(show, grad))
+    @test occursin("∇×(y)", sprint(show, ∇ × y))
 end

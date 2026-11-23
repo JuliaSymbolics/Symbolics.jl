@@ -37,3 +37,24 @@ latexify(ex)
 will produce LaTeX output from Symbolics models and expressions.
 This works on basics like `Term` all the way to higher primitives
 like `ODESystem` and `ReactionSystem`.
+
+### Per-variable LaTeX names
+
+Attach a `latexwrapper` to a variable to choose its LaTeX rendering
+independently of its Julia name (similar to SymPy's `Symbol(r'\omega_{0}')`):
+
+```julia
+using Symbolics, Latexify
+
+@variables x t
+@variables w0 [latexwrapper = s -> raw"\omega_{0}"]
+@variables vx(x, t) [latexwrapper = s -> "v_{x}"]
+
+latexify(vx + w0^2)
+# v_{x}\left( x, t \right) + \omega_{0}^{2}
+```
+
+The wrapper is a function from the symbol's string name to a LaTeX fragment.
+That fragment is emitted verbatim, so underscores and carets are not escaped.
+Without `latexwrapper`, multi-character names are wrapped in `\mathtt{...}`
+by default.

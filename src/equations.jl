@@ -1,3 +1,11 @@
+"""
+    NAMESPACE_SEPARATOR
+
+Character used to separate nested symbolic names when Symbolics displays a
+namespace-qualified variable.
+
+The separator is `₊` and is used by variable construction and display code.
+"""
 const NAMESPACE_SEPARATOR = '₊'
 
 hide_lhs(_) = false
@@ -24,8 +32,8 @@ Base.hash(a::Equation, salt::UInt) = hash(a.lhs, hash(a.rhs, salt))
 
 function Base.show(io::IO, eq::Equation)
     warn_load_latexify()
-    if hide_lhs(eq.lhs)
-        show(io, eq.rhs)
+    if hide_lhs(unwrap_const(eq.lhs))::Bool
+        show(io, unwrap_const(eq.rhs))
     else
         print(io, eq.lhs, " ~ ", eq.rhs)
     end
@@ -62,7 +70,7 @@ julia> x - y ~ 0
 x - y ~ 0
 
 julia> A ~ B
-(broadcast(~, A, B))[1:3,1:3]
+A ~ B
 
 julia> A .~ 3x
 (broadcast(~, A, 3x))[1:3,1:3]
