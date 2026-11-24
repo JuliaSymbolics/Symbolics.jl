@@ -95,6 +95,13 @@ end
         @test isequal(collect(split_complex_equation(a, b)), a ~ b)
     end
 
+    # unwrapped sides and an Equation argument split like the wrapped sides
+    for p in (p_num, p_sym, p_dep, p_z)
+        @test isequal(split_complex_equation(p.original.lhs, p.original.rhs), p)
+        @test isequal(split_complex_equation(p.original), p)
+    end
+    @test isequal(split_complex_equation(x ~ y), x ~ y)
+
     @test [e for e in p_dep] == [p_dep[1], p_dep[2]]
     @test collect(p_dep) isa Vector{Equation}
     @test p_dep[end] == p_dep[2]
@@ -115,6 +122,12 @@ end
     @test p_dep == collect(p_dep)
     @test isequal(p_dep, collect(p_dep))
     @test hash(p_dep) == hash(collect(p_dep))
+
+    # copy keeps the marked pair; equality ignores .original
+    @test copy(p_dep) isa SplitComplexEquation
+    @test copy(p_dep) == p_dep
+    @test p_dep == SplitComplexEquation(p_dep.real_eq, p_dep.imag_eq, x ~ y)
+    @test hash(p_dep) == hash(SplitComplexEquation(p_dep.real_eq, p_dep.imag_eq, x ~ y))
 
     # user-written groupings and the output of ~ are not marked
     @test !(Equation[p_dep[1], p_dep[2]] isa SplitComplexEquation)
@@ -138,6 +151,36 @@ end
             @test_throws ArgumentError split_complex_equation(lhs, rhs)
         end
     end
+end
+
+@testset "split_complex_equation equal and unequal numeric parts" begin
+    @variables t x
+    @variables ψ(..)
+    # equal NaN parts are accepted, matching ~
+    @test split_complex_equation(NaN + im * x, NaN + 2im) == (x ~ 2.0)
+    @test split_complex_equation(x + NaN * im, 2 + NaN * im) == (x ~ 2.0)
+    @test split_complex_equation(-0.0 + im * x, 0.0 + 2im) == (x ~ 2.0)
+    @test isequal(split_complex_equation(NaN + im * x, NaN + 2im), (NaN + im * x) ~ (NaN + 2im))
+    # a NaN against a number stays unequal
+    @test_throws ArgumentError split_complex_equation(NaN + im * x, 1 + 2im)
+    @test_throws ArgumentError split_complex_equation(x + NaN * im, 2 + 1im)
+    # Bool parts of a Complex{Bool} are reported as numbers
+    err = try
+        split_complex_equation(ψ(t, 0), im)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test err.msg == "Unequal numeric imaginary parts in equation: 0 and 1"
+    err = try
+        split_complex_equation(im, 1 + x * im)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test err.msg == "Unequal numeric real parts in equation: 0 and 1"
 end
 
 @testset "power and division inference" begin

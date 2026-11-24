@@ -62,8 +62,10 @@ unsplit complex equation.
 
 It is a read-only two-element `AbstractVector{Equation}` with `eqs[1] ==
 eqs.real_eq` and `eqs[2] == eqs.imag_eq`: iteration, indexing, `length`,
-`vcat` and `reduce(vcat, ...)` work, but `push!` and `setindex!` do not. Call
-`collect(eqs)` where a `Vector{Equation}` is required.
+`vcat`, `reduce(vcat, ...)` and `copy` keep the marked pair, but `push!` and
+`setindex!` do not. Call `collect(eqs)` where a `Vector{Equation}` is required.
+Equality, `isequal` and `hash` compare only the two component equations, not
+`.original`.
 
 A variable declared without `::Complex` is real, so `conj`, `real`, `imag` and
 `abs` of it simplify before the split: with `@variables ψ(..)`, the `original`
@@ -93,6 +95,12 @@ end
 Base.iterate(eqs::SplitComplexEquation, state::Int = 1) =
     state > 2 ? nothing : (eqs[state], state + 1)
 
+Base.copy(eqs::SplitComplexEquation) = eqs
+
+# Two NaNs are equal numeric parts, and Bool parts display as numbers.
+numeric_parts_equal(x, y) = x == y || (isnan(x) && isnan(y))
+part_to_show(x) = x isa Bool ? Int(x) : x
+
 function complex_equation_components(a, b; check_constants)
     ar, br = value(real(a)), value(real(b))
     ai, bi = value(imag(a)), value(imag(b))
@@ -101,12 +109,12 @@ function complex_equation_components(a, b; check_constants)
     return if real_numeric && imag_numeric
         error("Equation $a ~ $b does not contain any symbols")
     elseif real_numeric
-        check_constants && ar != br &&
-            throw(ArgumentError("Unequal numeric real parts in equation: $ar and $br"))
+        check_constants && !numeric_parts_equal(ar, br) &&
+            throw(ArgumentError("Unequal numeric real parts in equation: $(part_to_show(ar)) and $(part_to_show(br))"))
         ai ~ bi
     elseif imag_numeric
-        check_constants && ai != bi &&
-            throw(ArgumentError("Unequal numeric imaginary parts in equation: $ai and $bi"))
+        check_constants && !numeric_parts_equal(ai, bi) &&
+            throw(ArgumentError("Unequal numeric imaginary parts in equation: $(part_to_show(ai)) and $(part_to_show(bi))"))
         ar ~ br
     else
         (ar ~ br, ai ~ bi)
@@ -121,12 +129,13 @@ equations contain symbols, return a [`SplitComplexEquation`](@ref) that also
 stores the original equation.
 
 When one component equation is purely numeric, return the symbolic
-[`Equation`](@ref) if the numeric parts are equal. Unequal numeric parts
-raise an `ArgumentError`. Throws an error when neither side contains symbols.
+[`Equation`](@ref) if the numeric parts are equal, counting two `NaN`s as
+equal. Unequal numeric parts raise an `ArgumentError`. Throws an error when
+neither side contains symbols.
 
-Pass numbers or wrapped symbolic expressions such as `Num` and
-`Complex{Num}`. For an existing `Equation` named `eq`, pass
-`Symbolics.wrap(eq.lhs)` and `Symbolics.wrap(eq.rhs)`.
+Pass numbers, wrapped symbolic expressions such as `Num` and `Complex{Num}`,
+or the unwrapped symbolic expressions that an [`Equation`](@ref) stores.
+`split_complex_equation(eq)` splits an existing `Equation` `eq` directly.
 
 # Examples
 
@@ -145,12 +154,17 @@ true
 
 julia> split_complex_equation(x, 1 + 0im)
 x ~ 1
+
+julia> split_complex_equation(Equation(x + im * y, 1 + 2im)) isa SplitComplexEquation
+true
 ```
 """
-function split_complex_equation(a::Number, b::Number)
+function split_complex_equation(a::Union{Number, BasicSymbolic}, b::Union{Number, BasicSymbolic})
     parts = complex_equation_components(a, b; check_constants = true)
     return parts isa Tuple ? SplitComplexEquation(parts..., Equation(a, b)) : parts
 end
+
+split_complex_equation(eq::Equation) = split_complex_equation(eq.lhs, eq.rhs)
 
 """
 $(TYPEDSIGNATURES)

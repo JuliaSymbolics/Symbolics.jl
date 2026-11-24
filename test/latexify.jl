@@ -5,6 +5,7 @@ using LaTeXStrings
 using ReferenceTests
 import SymbolicUtils as SU
 using Symbolics: VartypeT
+using StaticArrays
 
 using DomainSets: Interval, ClosedInterval
 
@@ -295,4 +296,18 @@ end
     @variables u[1:2] v[1:2]
     @test String(latexify([u ~ v])) ==
         "\\begin{align}\nu &= v\n\\end{align}\n"
+end
+
+@testset "SplitComplexEquation and non-Vector equation containers" begin
+    @variables x y
+    sce = split_complex_equation(x + im * y, 1 + 2im)
+    @test String(latexify(sce)) ==
+        "\\begin{align}\nx &= 1 \\\\\ny &= 2\n\\end{align}\n"
+    @test String(latexify(sce)) == String(latexify(collect(sce)))
+    @test repr("text/latex", sce) == "\$\$ " * String(latexify(sce)) * " \$\$"
+
+    # non-Vector AbstractVector{Equation} keeps Latexify's generic array recipe
+    eqarray = "\\begin{equation}\n\\left[\n\\begin{array}{c}\nx = 1 \\\\\ny = 2 \\\\\n\\end{array}\n\\right]\n\\end{equation}\n"
+    @test String(latexify(SVector(x ~ 1, y ~ 2))) == eqarray
+    @test String(latexify(view([x ~ 1, y ~ 2], 1:2))) == eqarray
 end
