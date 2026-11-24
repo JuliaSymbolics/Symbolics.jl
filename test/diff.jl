@@ -809,6 +809,57 @@ end
                          Num[-2a[1] + 2x[1], -2a[2] + 2x[2], -2a[3] + 2x[3], 2(-1 + y)]))
 end
 
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/2005
+@testset "Sparsity of dependent array element accesses" begin
+    # `x(t)[k]` reads one element, just like `x[k]` for a bare array
+    @variables t x(t)[1:3]
+    xs = collect(x)
+    @test isequal(Symbolics.sparsejacobian([xs[1] * xs[2], xs[3]], xs).nzval,
+                  Num[xs[2], xs[1], 1])
+
+    # the independent variable inside `x(t)` is still seen
+    @test Symbolics.jacobian_sparsity([xs[2] * t], [t, xs[1], xs[2], xs[3]]) ==
+        sparse([1, 1], [1, 3], true, 1, 4)
+end
+
+# https://github.com/JuliaSymbolics/Symbolics.jl/issues/2004
+@testset "Sparsity of array slices" begin
+    # a slice reads only the elements it names, like the scalar equivalent
+    @variables x1 x2 x3 y1
+    ref = Symbolics.jacobian_sparsity(
+        [y1 * x1, sum([x1, x2] .* [1, 1])], [x1, x2, x3, y1]
+    )
+    @variables x[1:3] y
+    @test Symbolics.jacobian_sparsity(
+        [y * x[1], sum(x[1:2] .* [1, 1])], [x[1], x[2], x[3], y]
+    ) == ref
+    @test Symbolics.jacobian_sparsity([sum(x[2:3] .* [1, 1])], [x[1], x[2], x[3]]) ==
+        sparse([1, 1], [2, 3], true)
+
+    # a colon reads the whole array
+    @test Symbolics.jacobian_sparsity([sum(x[:] .* [1, 1, 1])], [x[1], x[2], x[3]]) ==
+        sparse([1, 1, 1], [1, 2, 3], true)
+
+    @variables z[1:2, 1:3]
+    zs = vec([z[a, b] for a in 1:2, b in 1:3]) # z[1,1], z[2,1], z[1,2], ...
+    @test Symbolics.jacobian_sparsity([sum(z[1, 1:2] .* [1, 1])], zs) ==
+        sparse([1, 1], [1, 3], true, 1, 6)
+    @test Symbolics.jacobian_sparsity([sum(z[:, 2] .* [1, 1])], zs) ==
+        sparse([1, 1], [3, 4], true, 1, 6)
+
+    # slices of a dependent array variable too
+    @variables t xt(t)[1:3]
+    @test Symbolics.jacobian_sparsity([sum(xt[1:2] .* [1, 1])], collect(xt)) ==
+        sparse([1, 1], [1, 2], true, 1, 3)
+end
+
+@testset "Sparsity of array-shaped getindex terms" begin
+    @variables x[1:3]
+    slice = SymbolicUtils.term(getindex, Symbolics.unwrap(x), 1:2; type = Vector{Real}, shape = [1:2])
+    expr = SymbolicUtils.term(sum, slice; type = Real)
+    @test Matrix(Symbolics.jacobian_sparsity([expr], collect(x))) == Bool[1 1 0]
+end
+
 struct Op <: SymbolicUtils.Operator end
 
 @testset "Derivative of non-`Differential` operators" begin
@@ -1112,13 +1163,41 @@ let
     @test_throws ArgumentError LinearAlgebra.dot(Grad{false}([a]), Grad{false}([a, a]))(1)
     @test_throws ArgumentError LinearAlgebra.dot(Grad{false}([a, a]), Grad{false}([a]))(1)
     @variables c[1:3]
-    @test_throws DimensionMismatch LinearAlgebra.cross(Grad{false}([c[1], c[2]]), Grad{false}(c))
+    @test_throws ArgumentError LinearAlgebra.cross(Grad{false}([c[1], c[2]]), Grad{false}(c))(1)
+    @variables d4[1:4]
+    for vars in ([c[1]], collect(d4))
+        err = try
+            LinearAlgebra.cross(Grad{false}(vars), [a, b])
+        catch e
+            e
+        end
+        @test err isa DimensionMismatch
+        @test occursin("2 or 3", err.msg)
+    end
     @test_throws ArgumentError LinearAlgebra.cross(Grad{false}(c), Grad{false}([c[1], c[2]]))(1)
     @test_throws ArgumentError Curl{false}([c[1]])
     @test_throws ArgumentError Curl{false}([c[1], c[2], c[3], c[3]])
     @test_throws ArgumentError Grad{false}([a, b])([a, b])
     @test_throws ArgumentError Divergence{false}([a, b])(a)
     @test_throws ArgumentError Divergence{false}([a, b])(c)
+    # `∇ × v` over two variables is the scalar curl, sharing `Curl`'s definition.
+    @variables w2[1:2]
+    for E in (false, true)
+        ∇ab = Grad{E}([a, b])
+        v2 = [a^2 * b, b^3 + a]
+        for field in (v2, Num.(v2), unwrap.(v2), w2)
+            @test isequal(LinearAlgebra.cross(∇ab, field), Curl{E}([a, b])(field))
+            @test isequal(∇ab × field, Curl{E}([a, b])(field))
+        end
+        @test typeof(∇ab × v2) == typeof(Curl{E}([a, b])(v2))
+        @test isequal(expand_derivatives(∇ab × v2), 1 - a^2)
+        @test iszero(expand_derivatives(Num(∇ab × Num[a, b])))
+        # Mixed partials are not reordered symbolically, but `∇ × ∇` vanishes on expansion.
+        cg2 = ∇ab × ∇ab
+        @test cg2 == Curl{E}([a, b]) ∘ ∇ab
+        @test iszero(expand_derivatives(Num(cg2(a^2 * b))))
+    end
+    @test operation(unwrap(Grad{false}([a, b]) × [a, b])) isa Curl{false, 2}
     # `Curl` also accepts two independent variables, producing the scalar
     # curl `D(vars[1])(v[2]) - D(vars[2])(v[1])` of a 2-vector field.
     c2 = Curl{false}([a, b])
