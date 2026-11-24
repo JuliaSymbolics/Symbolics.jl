@@ -249,13 +249,21 @@ function _occurs_in(x::SymbolicT, expr::SymbolicT)
     iscall(expr) || return false
     args = arguments(expr)
     literal_idx = operation(expr) === getindex && length(args) > 1 &&
-        all(_is_literal_index, Iterators.drop(args, 1))
+        all(_is_scalar_literal, Iterators.drop(args, 1))
     for (k, a) in enumerate(args)
         literal_idx && k == 1 && parent !== nothing && isequal(a, parent) && continue
         a isa SymbolicT && _occurs_in(x, a) && return true
     end
     return false
 end
+
+# `idx` is a literal scalar index like the `Const`-wrapped `2` in `arr[2]`,
+# as opposed to a symbolic index or a range. Used by the occurrence checks, which do not
+# expand slices.
+@inline _is_scalar_literal(idx::Integer) = true
+@inline _is_scalar_literal(idx::BasicSymbolic{VartypeT}) =
+    SymbolicUtils.isconst(idx) && unwrap_const(idx) isa Integer
+@inline _is_scalar_literal(idx) = false
 
 # `idx` is a literal index like the `Const`-wrapped `2` in `arr[2]` or `1:2` in
 # `arr[1:2]`, as opposed to a symbolic index.
@@ -998,7 +1006,7 @@ function _depends_pruned(ex::SymbolicT, varset, arrset)
     iscall(ex) || return false
     args = arguments(ex)
     literal_idx = operation(ex) === getindex && length(args) > 1 &&
-        all(_is_literal_index, Iterators.drop(args, 1))
+        all(_is_scalar_literal, Iterators.drop(args, 1))
     is_call = !(operation(ex) in (+, -, *, /, ^, getindex))
     for (k, a) in enumerate(args)
         literal_idx && k == 1 && a in arrset && continue
@@ -1016,7 +1024,7 @@ function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
         args = arguments(ex)
         # a literal `arr[k]` is an element access: it depends on `arr` only through `varset`
         literal_idx = operation(ex) === getindex && length(args) > 1 &&
-            all(_is_literal_index, Iterators.drop(args, 1))
+            all(_is_scalar_literal, Iterators.drop(args, 1))
         is_call = !(operation(ex) in (+, -, *, /, ^, getindex))
         for (k, a) in enumerate(args)
             literal_idx && k == 1 && a in arrset && continue
