@@ -255,7 +255,7 @@ end
         @test nc((big(10)^10 + x)^(-3), 1, 2) == -3 // big(10)^40     # beyond Int64
         @test Symbolics._pow_const(big(3)^90, 1//3) == big(3)^30
         @test_throws ArgumentError Symbolics._pow_const(-8, 1//3)  # principal root is complex
-        m = 10^10
+        m = Int64(10)^10                                         # Int64 also on 32-bit systems
         @test nc(sqrt(1//m + m*x), 0, 2) == 1//100000 && nc(sqrt(1//m + m*x), 1, 2) == 500000000000000
         @test Symbolics._iroot(big(3)^700, 7) == big(3)^100 && Symbolics._iroot(big(10)^1000 + 1, 2) === nothing
     end
