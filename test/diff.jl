@@ -1285,7 +1285,12 @@ end
         expand_derivatives(Differential(a)(Laplacian(vars)(f))),
         expand_derivatives(Differential(a)(Differential(a)(Differential(a)(f)) + Differential(b)(Differential(b)(f)))),
     )
-    @test isequal(expand_derivatives(Laplacian{false}([a, b, c])(g(a, b, c))), expand_derivatives(Laplacian{false}([a, b, c])(g(a, b, c))))
+    # the vector Laplacian of a field is the sum of explicit second partials of each component
+    Dd2(v, fi) = Differential(v)(Differential(v)(fi))
+    expected_g = [sum(Dd2(vi, g(a, b, c)[i]) for vi in (a, b, c)) for i in 1:3]
+    @test isequal(expand_derivatives.(scalarize(Laplacian{false}([a, b, c])(g(a, b, c)))), expand_derivatives.(expected_g))
+    concrete = [a^2 * b, b^3 * c, a * c^2]
+    @test isequal(expand_derivatives.(scalarize(Laplacian{false}([a, b, c])(concrete))), [2b, 6b * c, 2a])
     # `substitute` rebuilds the lazy term, so a field substitution works
     @variables x y uxy(..)
     sub = substitute(Laplacian([x, y])(uxy(x, y)), Dict(uxy(x, y) => x^2 * y))
