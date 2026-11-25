@@ -449,10 +449,10 @@ version = "0.0.20230411+1"
 
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "f2659a735f9360fedfa29925812380f322679e93"
+git-tree-sha1 = "30fbbf8fb9d4e5d3264b4eb10c04f8a9ebaf9381"
 registries = "General"
 uuid = "2e619515-83b5-522b-bb60-26c02a35a201"
-version = "2.10.0+0"
+version = "2.11.0+0"
 
 [[deps.ExprTools]]
 git-tree-sha1 = "d2e49e7efd29719d6f28b891b0e0e159daa9d2b4"
@@ -1148,10 +1148,10 @@ version = "1.5.1"
 
 [[deps.Plots]]
 deps = ["Base64", "Contour", "Dates", "Downloads", "FFMPEG", "GR", "JLFzf", "JSON", "LaTeXStrings", "Latexify", "LinearAlgebra", "Measures", "NaNMath", "Pkg", "PlotThemes", "PlotUtils", "PrecompileTools", "Printf", "REPL", "Random", "RecipesBase", "RecipesPipeline", "Reexport", "RelocatableFolders", "Requires", "Scratch", "Showoff", "SparseArrays", "Statistics", "StatsBase", "TOML", "UUIDs", "UnicodeFun", "Unzip"]
-git-tree-sha1 = "870db50cd0b5bd7a2f083512cf4b0f1e790453c2"
+git-tree-sha1 = "6952186a9cb90c7b73dc2c0b47cdf8837be08333"
 registries = "General"
 uuid = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-version = "1.41.8"
+version = "1.41.9"
 
     [deps.Plots.extensions]
     FileIOExt = "FileIO"
