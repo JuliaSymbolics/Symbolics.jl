@@ -29,6 +29,7 @@ N = 4
     @test all(j -> is_derivative(unwrap(j)), J)
     Jsp = Symbolics.sparsejacobian(ex, collect(u))
     @test nnz(Jsp) == N^2
+    @test all(j -> is_derivative(unwrap(j)), nonzeros(Jsp))
     @test_throws Symbolics.DerivativeNotDefinedError expand_derivatives(
         Differential(u[1])(ex[1]); throw_no_derivative = true
     )
@@ -172,4 +173,64 @@ sum_counter(A, x) = sum(A) + x
         @test_throws ArgumentError Symbolics.sparsejacobian([expr], collect(u))
         @test_throws ArgumentError Symbolics.jacobian_sparsity([expr], collect(u))
     end
+end
+
+takeslice(x) = x
+@register_array_symbolic takeslice(x::AbstractVector) begin
+    size = size(x)
+    eltype = eltype(x)
+    ndims = 1
+end
+sumslice(x) = sum(x)
+@register_symbolic sumslice(x::AbstractVector)
+
+@variables t Mdep(t)::SparseMatrixCSC{Float64, Int}
+
+@testset "literal slices depend only on the selected elements" begin
+    ex = collect(takeslice(u[1:2]))
+    J = Symbolics.jacobian(ex, collect(u))
+    @test all(j -> is_derivative(unwrap(j)), J[:, 1:2])
+    @test all(iszero, J[:, 3:N])
+    Jsp = Symbolics.sparsejacobian(ex, collect(u))
+    @test nnz(Jsp) == 4
+    @test all(j -> is_derivative(unwrap(j)), nonzeros(Jsp))
+    @test all(iszero, Jsp[:, 3:N])
+    @test Symbolics.jacobian_sparsity(ex, collect(u)) == sparse([1, 1, 2, 2], [1, 2, 1, 2], true, 2, N)
+    # an opaque coefficient of a slice does not depend on columns outside the slice
+    prod = [unwrap(Mp) * unwrap(sumslice(u[1:2]))]
+    @test nnz(Symbolics.jacobian_sparsity(prod, [u[3]])) == 0
+    @test_throws ArgumentError Symbolics.jacobian_sparsity(prod, [u[1]])
+    @test_throws ArgumentError Symbolics.jacobian(prod, [u[1]])
+    # parameters of the indexee are still dependencies
+    @variables w(t)[1:2]
+    @test Symbolics.jacobian_sparsity([sumslice(w[1:2])], [t]) == sparse([1], [1], true, 1, 1)
+end
+
+@testset "array coefficients that are calls or composite terms" begin
+    @variables p
+    ucol = collect(u)
+    for ex in (
+        Symbolics.scalarize(Mdep * u),
+        [unwrap(2 * Mp) / unwrap(u[1])],
+        [Mdep * u[1]],
+    )
+        @test_throws ArgumentError Symbolics.jacobian(ex, ucol)
+        @test_throws ArgumentError Symbolics.sparsejacobian(ex, ucol)
+        @test_throws ArgumentError Symbolics.jacobian_sparsity(ex, ucol)
+        # Num-wrapped operands with raw symbolic variables
+        @test_throws ArgumentError Symbolics.jacobian(Num.(ex), unwrap.(ucol))
+    end
+    # the condition of a conditional has no derivative, so the coefficient never meets `u[1]`
+    ex = [Mp * ifelse(u[1] > 0, p, 2p)]
+    @test all(iszero, Symbolics.jacobian(ex, ucol))
+    @test all(iszero, Symbolics.sparsejacobian(ex, ucol))
+    @test all(j -> iszero(Num(j)), Symbolics.jacobian(Num.(ex), unwrap.(ucol)))
+    # controls: a scalar-typed registered kernel and a coefficient independent of `vars`
+    @test isequal(Symbolics.jacobian([offset(Mp, u[1])], ucol)[1, 1], 1)
+    @test isequal(Symbolics.jacobian([Mdep * p + u[1]], ucol)[1, 1], 1)
+end
+
+@testset "exprs_occur_in is purely structural" begin
+    @test Symbolics.exprs_occur_in([u[1], u[2]], unwrap(Mp) * u[1]) == Bool[1, 0]
+    @test_throws ArgumentError Symbolics.jacobian_sparsity([unwrap(Mp) * u[1]], [u[1], u[2]])
 end

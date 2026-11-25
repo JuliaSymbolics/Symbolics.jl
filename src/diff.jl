@@ -240,18 +240,19 @@ occursin_info(x::BasicSymbolic{VartypeT}, expr, fail::Bool = true) = false
 end
 
 # Whether `x` occurs anywhere in `expr`: as the term itself, or, for a scalar-indexed
-# `x = arr[k]`, as the whole array `arr`. A literal `arr[k']` is an element access, so its
-# indexee `arr` is not a whole-array occurrence.
+# `x = arr[k]`, as the whole array `arr`. A literal access `arr[k']` or `arr[1:2]` reads only
+# the selected elements, so its indexee `arr` is not a whole-array occurrence.
 function _occurs_in(x::SymbolicT, expr::SymbolicT)
     isequal(x, expr) && return true
     parent = is_scalar_indexed(x) ? arguments(x)[1] : nothing
     parent !== nothing && isequal(parent, expr) && return true
     iscall(expr) || return false
     args = arguments(expr)
-    literal_idx = operation(expr) === getindex && length(args) > 1 &&
-        all(_is_scalar_literal, Iterators.drop(args, 1))
-    for (k, a) in enumerate(args)
-        literal_idx && k == 1 && parent !== nothing && isequal(a, parent) && continue
+    if parent !== nothing && operation(expr) === getindex && isequal(args[1], parent)
+        children = _literal_access_children(expr)
+        children === nothing || return any(Base.Fix1(_occurs_in, x), children)
+    end
+    for a in args
         a isa SymbolicT && _occurs_in(x, a) && return true
     end
     return false
@@ -271,6 +272,35 @@ end
 @inline _is_literal_index(idx::BasicSymbolic{VartypeT}) =
     SymbolicUtils.isconst(idx) && _is_literal_index(unwrap_const(idx))
 @inline _is_literal_index(idx) = false
+
+# The scalar elements read by `ex = arr[idx...]` when every index is literal: `()` for a
+# scalar access (which is its own element) and the elements of a slice of known shape.
+# `nothing` for a dynamic lookup or a slice of unknown shape, which occurrence checks must
+# treat as an access to the whole of `arr`.
+function _literal_access_elements(ex::SymbolicT)
+    iscall(ex) && operation(ex) === getindex || return nothing
+    args = arguments(ex)
+    length(args) > 1 && all(_is_literal_index, Iterators.drop(args, 1)) || return nothing
+    sh = shape(ex)
+    SymbolicUtils.is_array_shape(sh) || return ()
+    sh isa SU.Unknown && return nothing
+    return SymbolicT[ex[i] for i in SU.stable_eachindex(ex)]
+end
+
+# What an occurrence check of the elements of `arr` visits in a literal access
+# `ex = arr[idx...]` instead of the whole of `arr`: the parameters inside the indexee and
+# the selected elements. `nothing` if `ex` is not a literal access.
+function _literal_access_children(ex::SymbolicT)
+    elems = _literal_access_elements(ex)
+    elems === nothing && return nothing
+    indexee = arguments(ex)[1]
+    children = SymbolicT[]
+    iscall(indexee) && append!(children, arguments(indexee))
+    append!(children, elems)
+    return children
+end
+
+_is_conditional(f) = f === ifelse || f === ifelse_eager || f === ifelse_branching
 
 function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT}, fail::Bool = true)
     shexpr = shape(expr)
@@ -309,6 +339,8 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
         if isix
             # `f(.., arr, ..)[k]` depends on every element of `arr`
             indexee = arguments(expr)[1]
+            # a distinct literal element of the same array does not depend on `x`
+            _literal_access_elements(expr) === () && isequal(indexee, arguments(x)[1]) && return false
             return iscall(indexee) && _occurs_in(x, indexee)
         end
         return SymbolicUtils.query(isequal(x), expr)
@@ -690,10 +722,11 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                     end
                 end
                 return SymbolicUtils.add_worker(VartypeT, summed_args)
-            elseif f === ifelse || f === ifelse_eager || f === ifelse_branching
+            elseif _is_conditional(f)
                 inner_args = arguments(arg)
                 dtrue = executediff(D, inner_args[2]; throw_no_derivative)
                 dfalse = executediff(D, inner_args[3]; throw_no_derivative)
+                _iszero_derivative(dtrue) && _iszero_derivative(dfalse) && return differential_zero(arg)
                 args = SymbolicUtils.ArgsT{VartypeT}((inner_args[1], dtrue, dfalse))
                 # Preserve the conditional variant so the derivative keeps the same
                 # eager/branching lowering behaviour as the primal.
@@ -980,14 +1013,16 @@ end
 # treats it as a scalar coefficient is wrong. Throws if such a symbol is an operand of
 # arithmetic that depends on `vars`.
 function _check_no_array_symbol_operands(exprs, vars)
-    varset = Set{SymbolicT}(vars)
+    varset = Set{SymbolicT}(unwrap(v) for v in vars)
     arrset = Set{SymbolicT}()
-    for v in vars
+    for v in varset
         is_scalar_indexed(v) && push!(arrset, arguments(v)[1])
     end
     seen = Dict{SymbolicT, Bool}()
+    carry = Dict{SymbolicT, Bool}()
     for ex in exprs
-        ex isa SymbolicT && _depends_checking_array_symbols(ex, varset, arrset, seen)
+        ex = unwrap(ex)
+        ex isa SymbolicT && _depends_checking_array_symbols(ex, varset, arrset, seen, carry)
     end
     return nothing
 end
@@ -1005,11 +1040,16 @@ function _depends_pruned(ex::SymbolicT, varset, arrset)
     (ex in varset || ex in arrset) && return true
     iscall(ex) || return false
     args = arguments(ex)
-    literal_idx = operation(ex) === getindex && length(args) > 1 &&
-        all(_is_scalar_literal, Iterators.drop(args, 1))
-    is_call = !(operation(ex) in (+, -, *, /, ^, getindex))
+    op = operation(ex)
+    if op === getindex && args[1] in arrset
+        children = _literal_access_children(ex)
+        children === nothing || return any(a -> _depends_pruned(a, varset, arrset), children)
+    end
+    is_call = !(op in (+, -, *, /, ^, getindex))
+    conditional = _is_conditional(op)
     for (k, a) in enumerate(args)
-        literal_idx && k == 1 && a in arrset && continue
+        # `executediff` of a conditional ignores the condition
+        conditional && k == 1 && continue
         a isa SymbolicT || continue
         is_call && _is_zero_partial(ex, k) && continue
         _depends_pruned(a, varset, arrset) && return true
@@ -1017,35 +1057,62 @@ function _depends_pruned(ex::SymbolicT, varset, arrset)
     return false
 end
 
-function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen)
+_is_opaque_array(a::SymbolicT) =
+    symtype(a) <: AbstractArray && !SymbolicUtils.is_array_shape(shape(a))
+
+# Whether `a` is, or is built by scalar arithmetic from, an array-typed symbol with a scalar
+# shape. The scalar-typed `2Mp` carries `Mp`.
+function _carries_array_symbol(a::SymbolicT, cache::Dict{SymbolicT, Bool})
+    _is_opaque_array(a) && return true
+    iscall(a) && operation(a) in (+, -, *, /, ^) || return false
+    return get!(cache, a) do
+        any(b -> b isa SymbolicT && _carries_array_symbol(b, cache), arguments(a))
+    end
+end
+
+function _depends_checking_array_symbols(ex::SymbolicT, varset, arrset, seen, carry)
     return get!(seen, ex) do
         depends = ex in varset || ex in arrset
         iscall(ex) || return depends
         args = arguments(ex)
-        # a literal `arr[k]` is an element access: it depends on `arr` only through `varset`
-        literal_idx = operation(ex) === getindex && length(args) > 1 &&
-            all(_is_scalar_literal, Iterators.drop(args, 1))
-        is_call = !(operation(ex) in (+, -, *, /, ^, getindex))
+        op = operation(ex)
+        # a literal access `arr[k]` or `arr[1:2]` depends on `arr` only through `varset`
+        if op === getindex && args[1] in arrset
+            children = _literal_access_children(ex)
+            if children !== nothing
+                for a in children
+                    _depends_checking_array_symbols(a, varset, arrset, seen, carry) && (depends = true)
+                end
+                return depends
+            end
+        end
+        is_call = !(op in (+, -, *, /, ^, getindex))
+        conditional = _is_conditional(op)
         for (k, a) in enumerate(args)
-            literal_idx && k == 1 && a in arrset && continue
+            # `executediff` of a conditional ignores the condition
+            conditional && k == 1 && continue
             a isa SymbolicT || continue
             if is_call
                 # An argument whose registered partial is zero contributes nothing to the
                 # derivative (as in `executediff`), so a rejection inside it is dropped. The
                 # partial is only consulted once a rejection happens.
                 try
-                    _depends_checking_array_symbols(a, varset, arrset, seen) && (depends = true)
+                    _depends_checking_array_symbols(a, varset, arrset, seen, carry) && (depends = true)
                 catch err
                     err isa ArgumentError && _is_zero_partial(ex, k) || rethrow()
                 end
             else
-                _depends_checking_array_symbols(a, varset, arrset, seen) && (depends = true)
+                _depends_checking_array_symbols(a, varset, arrset, seen, carry) && (depends = true)
             end
         end
-        if depends && operation(ex) in (+, -, *, /, ^)
+        if depends && op in (+, -, *, /, ^)
+            # An operand of a product or quotient that holds an array-typed symbol is a
+            # coefficient even as a call or inside a scalar-typed product; as a term of a sum
+            # it is independent of `vars` and drops out, except as a bare symbol.
+            coefficient = op in (*, /, ^)
             for a in args
-                a isa SymbolicT && !iscall(a) && symtype(a) <: AbstractArray &&
-                    !SymbolicUtils.is_array_shape(shape(a)) || continue
+                a isa SymbolicT || continue
+                (coefficient ? _carries_array_symbol(a, carry) : (!iscall(a) && _is_opaque_array(a))) || continue
                 # Only now are registered partials consulted: with the zero-partial call
                 # arguments pruned, as in `executediff`, `ex` may not depend on `vars`.
                 _depends_pruned(ex, varset, arrset) || return false
@@ -1208,20 +1275,22 @@ julia> Symbolics.jacobian_sparsity(exprs, vars)
 ```
 """
 function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
+    du, u = _sparsity_operands(exprs, vars)
+    _check_no_array_symbol_operands(du, u)
+    return _sparsity_pattern(du, u)
+end
+
+function _sparsity_operands(exprs::AbstractArray, vars::AbstractArray)
     exprs = collect(exprs)
     vars = collect(vars)
-    if any(iswrapped, exprs)
-        du = map(value, exprs)
-    else
-        du = exprs
-    end
-    if any(iswrapped, vars)
-        u = map(value, vars)
-    else
-        u = vars
-    end
+    du = any(iswrapped, exprs) ? map(value, exprs) : exprs
+    u = any(iswrapped, vars) ? map(value, vars) : vars
+    return du, u
+end
+
+# The structural occurrence pattern of `vars` in `exprs`, without validating the operands.
+function _sparsity_pattern(du, u)
     dict = Dict(zip(u, 1:length(u)))
-    _check_no_array_symbol_operands(du, u)
 
     # `arrdict[arr]` maps a lazy array to the columns of its element vars
     # `arr[k]`, since occurrences of `arr`/`arr[i]` mark all of them.
@@ -1234,8 +1303,8 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
     i = Ref(1)
     I = Int[]
     J = Int[]
-    sizehint!(I, 2length(exprs))
-    sizehint!(J, 2length(vars))
+    sizehint!(I, 2length(du))
+    sizehint!(J, 2length(u))
 
 
     # This rewriter notes down which u's appear in a
@@ -1243,18 +1312,15 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
 
     function r(x, is_indexee::Bool = false)
         if iscall(x)
-            args = arguments(x)
             # A literal `arr[1]` or `arr[1:2]` is element access, not a whole-array
             # occurrence; `arr` itself is an indexee and only contributes the
             # variables inside it, not a dependency on every element.
-            literal_idx = operation(x) === getindex && length(args) > 1 &&
-                all(_is_literal_index, Iterators.drop(args, 1))
-            for (k, y) in enumerate(args)
-                r(y, literal_idx && k == 1)
+            elems = operation(x) === getindex ? _literal_access_elements(x) : nothing
+            for (k, y) in enumerate(arguments(x))
+                r(y, elems !== nothing && k == 1)
             end
-            if literal_idx && SymbolicUtils.is_array_shape(shape(x))
-                foreach(r ∘ Base.Fix1(getindex, x), SU.stable_eachindex(x)) # if `x` is e.g. `arr[1:2]`, also visit `arr[1]` and `arr[2]` (only the latter are in `vars`)
-            end
+            # if `x` is e.g. `arr[1:2]`, also visit `arr[1]` and `arr[2]` (only the latter are in `vars`)
+            elems === nothing || foreach(r, elems)
         end
         j = get(dict, x, -1)
         if j != -1
@@ -1323,7 +1389,7 @@ Return an array of booleans `finds` where `finds[i]` is true if `exprs[i]` occur
 false otherwise.
 """
 function exprs_occur_in(exprs, expr)
-    vec(jacobian_sparsity([expr], exprs))
+    vec(_sparsity_pattern(_sparsity_operands([expr], exprs)...))
 end
 
 """

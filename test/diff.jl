@@ -1045,6 +1045,17 @@ end
         @test unwrap_const(last(arguments(only(arguments(unwrap(ex)))))) == TestPiece(:b)
     end
 
+    @testset "distinct elements of one dependent array are independent" begin
+        @variables w3(t)[1:3]
+        nd = NormalDerivative(Symbolics.DomainSets.Interval(0.0, 1.0))
+        @test !Symbolics.occursin_info(unwrap(w3[1]), unwrap(w3[2]))
+        @test Symbolics.occursin_info(unwrap(w3[2]), unwrap(w3[2]))
+        @test iszero(expand_derivatives(Differential(w3[1])(nd(w3[2]))))
+        J = Symbolics.jacobian([w3[1] + nd(w3[2])], collect(w3))
+        @test isequal(J[1, 1], 1) && iszero(J[1, 3])
+        @test !iszero(J[1, 2])
+    end
+
     @testset "substitution through operators" begin
         Dt = Differential(t)
         rule = u(t, Γ) => u(t, x)
