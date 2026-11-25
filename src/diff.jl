@@ -1868,7 +1868,7 @@ function _scalarized(arg::SymbolicT)
             end
             return buffer
         end
-        _ => return SU.scalarize(arg)::Vector{SymbolicT}
+        _ => return SymbolicT[c isa SymbolicT ? c : SConst(c) for c in SU.scalarize(arg)]
     end
 end
 
