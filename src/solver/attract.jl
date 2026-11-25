@@ -154,12 +154,16 @@ Rewrites ``a*b^f(x) + c*d^g(x)`` into
 Which is a solvable polynomial, hence reducing the smart
 number of occurrences of x in the expression.
 
+Which of the two exponential terms is picked as ``b^f`` depends on the
+internal order of the sum, so the result may take either of two equivalent
+forms.
+
 # Arguments
 - lhs: A Num expression.
 - var: Num and should satisfy is_singleton
 
 # Examples
-```jldoctest
+```jldoctest; filter = r"slog\\(-1\\) [-+] slog\\(2\\) [-+] 3slog\\(5\\) [-+] slog\\([25]\\)\\*x [-+] slog\\([25]\\)\\*x"
 julia> using Symbolics
 
 julia> x = (@variables x)[1]
