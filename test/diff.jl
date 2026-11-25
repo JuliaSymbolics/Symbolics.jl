@@ -1215,6 +1215,11 @@ end
     @test isequal(Symbolics._scalarized(unwrap(v)), unwrap(v))
     @test Curl{true}([a, b])(unwrap((_ -> 1).(z))) isa Symbolics.SymbolicT
     @test Symbolics._scalarized(unwrap((_ -> 1).(z))) isa Vector{Symbolics.SymbolicT}
+    @variables y[1:2] u::Vector{Real}
+    @test Divergence{true}([a, b])(unwrap(y + u)) isa Symbolics.SymbolicT
+    inferred = Base.return_types(Symbolics._scalarized, (Symbolics.SymbolicT,))[1]
+    @test inferred != Any
+    @test inferred <: Union{Symbolics.SymbolicT, Vector{Symbolics.SymbolicT}}
 end
 
 @testset "Vector Laplacian" begin

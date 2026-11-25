@@ -1868,7 +1868,17 @@ function _scalarized(arg::SymbolicT)
             end
             return buffer
         end
-        _ => return SymbolicT[c isa SymbolicT ? c : SConst(c) for c in SU.scalarize(arg)]
+        _ => begin
+            scalarized = SU.scalarize(arg)
+            scalarized isa Vector{SymbolicT} && return scalarized
+            scalarized isa SymbolicT && return scalarized
+            scalarized = scalarized::AbstractVector
+            buffer = SymbolicT[]
+            for c in scalarized
+                push!(buffer, c isa SymbolicT ? c : SConst(c))
+            end
+            return buffer::Vector{SymbolicT}
+        end
     end
 end
 
