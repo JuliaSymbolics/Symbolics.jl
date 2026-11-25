@@ -284,6 +284,11 @@ function _literal_access_elements(ex::SymbolicT)
     sh = shape(ex)
     SymbolicUtils.is_array_shape(sh) || return ()
     sh isa SU.Unknown && return nothing
+    return _slice_elements(ex)
+end
+
+# Cached, since every occurrence check of every output and variable pair re-reads the slice.
+SymbolicUtils.@cache limit = 10_000 function _slice_elements(ex::SymbolicT)::Vector{SymbolicT}
     return SymbolicT[ex[i] for i in SU.stable_eachindex(ex)]
 end
 
