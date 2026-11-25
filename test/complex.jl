@@ -64,6 +64,46 @@ end
     @test (0 ~ complex(Num(n), y)) == Equation[0 ~ Num(n), 0 ~ y]
 end
 
+@testset "split_complex_equation with Number-typed symbols" begin
+    @variables n::Number x y
+    original = Equation(n, x + im * y)
+    wrapped = split_complex_equation(Num(n), x + im * y)
+    unwrapped = split_complex_equation(original.lhs, original.rhs)
+    from_equation = split_complex_equation(original)
+    values = Dict{Any, Number}(unwrap(n) => 1 + 2im, unwrap(x) => 1, unwrap(y) => 2)
+
+    for p in (wrapped, unwrapped, from_equation)
+        @test p == Equation[real(original.lhs) ~ x, imag(original.lhs) ~ y]
+        @test p.original == original
+    end
+    for eq in (original, wrapped..., unwrapped..., from_equation...)
+        @test unwrap_const(substitute(eq.lhs, values; fold = Val(true))) ==
+            unwrap_const(substitute(eq.rhs, values; fold = Val(true)))
+    end
+end
+
+@testset "split_complex_equation with Number-typed complex components" begin
+    @variables n::Number y
+    z = complex(Num(n), y)
+    for (lhs, rhs) in ((z, 0), (0, z))
+        @testset "$lhs ~ $rhs" begin
+            p = split_complex_equation(lhs, rhs)
+            @test p == (lhs ~ rhs)
+            @test split_complex_equation(p.original) == p
+        end
+    end
+end
+
+@testset "split_complex_equation requires scalar operands" begin
+    @variables A[1:2] B[1:2] (Z::Complex)[1:2] (W::Complex)[1:3]
+    for (lhs, rhs, eq) in ((A, B, A ~ B), (Z, W, Equation(Z, W)))
+        @test_throws ArgumentError split_complex_equation(lhs, rhs)
+        @test_throws ArgumentError split_complex_equation(eq.lhs, eq.rhs)
+        @test_throws ArgumentError split_complex_equation(eq)
+    end
+    @test_throws ArgumentError split_complex_equation([1, 2], 0)
+end
+
 @testset "split_complex_equation returns a SplitComplexEquation" begin
     @variables t x y
     @variables ψ(..) w::Complex
@@ -129,8 +169,7 @@ end
     @test p_dep == SplitComplexEquation(p_dep.real_eq, p_dep.imag_eq, x ~ y)
     @test hash(p_dep) == hash(SplitComplexEquation(p_dep.real_eq, p_dep.imag_eq, x ~ y))
 
-    # user-written groupings and the output of ~ are not marked
-    @test !(Equation[p_dep[1], p_dep[2]] isa SplitComplexEquation)
+    @test_throws MethodError push!(p_dep, x ~ 3)
     @test !((Dx(ψ(t, 1)) ~ im * ψ(t, 1)) isa SplitComplexEquation)
 
     @test split_complex_equation(x, 1 + 0im) == (x ~ 1)

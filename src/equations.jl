@@ -61,9 +61,11 @@ equations with `x isa SplitComplexEquation`. `eqs.original` recovers the
 unsplit complex equation.
 
 It is a read-only two-element `AbstractVector{Equation}` with `eqs[1] ==
-eqs.real_eq` and `eqs[2] == eqs.imag_eq`: iteration, indexing, `length`,
-`vcat`, `reduce(vcat, ...)` and `copy` keep the marked pair, but `push!` and
-`setindex!` do not. Call `collect(eqs)` where a `Vector{Equation}` is required.
+eqs.real_eq` and `eqs[2] == eqs.imag_eq`. The pair supports iteration and
+indexing. `copy(eqs)` preserves the marker. `collect(eqs)`, `vcat(eqs)` and
+`reduce(vcat, pairs)` for a vector of split pairs return ordinary
+`Vector{Equation}` values. Attempts to mutate the pair with `push!` or
+`setindex!` raise an error.
 Equality, `isequal` and `hash` compare only the two component equations, not
 `.original`.
 
@@ -124,7 +126,7 @@ end
 """
     split_complex_equation(lhs, rhs)
 
-Equate the real and imaginary parts of `lhs` and `rhs`. When both component
+Equate the real and imaginary parts of scalar `lhs` and `rhs`. When both component
 equations contain symbols, return a [`SplitComplexEquation`](@ref) that also
 stores the original equation.
 
@@ -136,6 +138,7 @@ neither side contains symbols.
 Pass numbers, wrapped symbolic expressions such as `Num` and `Complex{Num}`,
 or the unwrapped symbolic expressions that an [`Equation`](@ref) stores.
 `split_complex_equation(eq)` splits an existing `Equation` `eq` directly.
+Array operands raise an `ArgumentError`.
 
 # Examples
 
@@ -159,7 +162,12 @@ julia> split_complex_equation(Equation(x + im * y, 1 + 2im)) isa SplitComplexEqu
 true
 ```
 """
-function split_complex_equation(a::Union{Number, BasicSymbolic}, b::Union{Number, BasicSymbolic})
+function split_complex_equation(a::Union{Number, BasicSymbolic, AbstractArray}, b::Union{Number, BasicSymbolic, AbstractArray})
+    a = a isa Num ? unwrap(a) : a
+    b = b isa Num ? unwrap(b) : b
+    if a isa AbstractArray || b isa AbstractArray || isarraysymbolic(a) || isarraysymbolic(b)
+        throw(ArgumentError("split_complex_equation requires scalar operands"))
+    end
     parts = complex_equation_components(a, b; check_constants = true)
     return parts isa Tuple ? SplitComplexEquation(parts..., Equation(a, b)) : parts
 end
