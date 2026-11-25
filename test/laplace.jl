@@ -14,12 +14,137 @@ import Nemo, Groebner
 @test isequal(laplace(exp(3t)*(t^2 + 4t + 2), f, t, F, s), 2/(s-3)^3 + 4/(s-3)^2 + 2/(s-3))
 @test isequal(laplace(6exp(5t)*cos(2t) - exp(7t), f, t, F, s), 6(s-5)/((s-5)^2 + 4) + expand(-1/(s-7)))
 
+# regression tests for fixed transform rules
+@test isequal(laplace(t*exp(t), f, t, F, s), 1/(s-1)^2)
+@test isequal(laplace(t^3*exp(t), f, t, F, s), 6/(s-1)^4)
+@test isequal(laplace(t*sin(t), f, t, F, s), 2s/(1 + s^2)^2)
+@test isequal(laplace(sqrt(t), f, t, F, s), Symbolics.term(sqrt, pi)/(2 * s^(3//2)))
+@test isequal(laplace(t^(1//2), f, t, F, s), Symbolics.term(sqrt, pi)/(2 * s^(3//2)))
+@test isequal(laplace(t^(3//2), f, t, F, s), Symbolics.term(Symbolics.gamma, 5//2)/s^(5//2))
+@test isequal(laplace(t^(5//2), f, t, F, s), Symbolics.term(Symbolics.gamma, 7//2)/s^(7//2))
+@test isequal(laplace(t^(-1//2), f, t, F, s), Symbolics.term(Symbolics.gamma, 1//2)/s^(1//2))
+# powers with n <= -1 diverge: fall back to the integral definition rather than erroring
+@test Symbolics._has_integral(laplace(t^(-2), f, t, F, s))
+@test Symbolics._has_integral(laplace(1/t, f, t, F, s))
+@test isequal(laplace(t^(1//2)*exp(2t), f, t, F, s), Symbolics.term(sqrt, pi)/(2 * (s - 2)^(3//2)))
+@test isequal(laplace(t^(3//2)*exp(2t), f, t, F, s), Symbolics.term(Symbolics.gamma, 5//2)/(s - 2)^(5//2))
+# frequency shift with a coefficient-free exp(t)
+@test isequal(laplace(t^(1//2)*exp(t), f, t, F, s), Symbolics.term(sqrt, pi)/(2 * (s - 1)^(3//2)))
+@test isequal(laplace(t^(3//2)*exp(t), f, t, F, s), Symbolics.term(Symbolics.gamma, 5//2)/(s - 1)^(5//2))
+@test isequal(laplace(exp(t)*sin(t), f, t, F, s), 1/((s - 1)^2 + 1))
+@test isequal(laplace(exp(t)*cos(2t), f, t, F, s), (s - 1)/((s - 1)^2 + 4))
+@test isequal(laplace(exp(t)*f(t), f, t, F, s), F(s - 1))
+# negative powers are stored as quotients, e.g. exp(2t)/t^(1//2)
+@test isequal(laplace(t^(-1//2)*exp(2t), f, t, F, s), Symbolics.term(Symbolics.gamma, 1//2)/(s - 2)^(1//2))
+@test isequal(laplace(t^(-1//2)*exp(t), f, t, F, s), Symbolics.term(Symbolics.gamma, 1//2)/(s - 1)^(1//2))
+@test Symbolics._has_integral(laplace(t^(-3//2)*exp(2t), f, t, F, s))
+# s-derivative rule
+@test isequal(laplace(t^2*f(t), f, t, F, s), (Differential(s)^2)(F(s)))
+# fractional or symbolic powers without a closed-form rule fall back to the integral definition
+@test Symbolics._has_integral(laplace(t^(1//2)*f(t), f, t, F, s))
+@variables n
+@test Symbolics._has_integral(laplace(t^n, f, t, F, s))
+
+# AC-matching soundness: a parameter slot ~a must not bind a factor containing t, otherwise
+# t would leak into the s-domain. These products must fall back to the integral definition.
+@variables a b omega
+@test Symbolics._has_integral(laplace(sin(cos(t)*t), f, t, F, s))
+@test Symbolics._has_integral(laplace(sin(t*cos(t)), f, t, F, s))
+@test Symbolics._has_integral(laplace(cos(sin(t)*t), f, t, F, s))
+# symbolic parameters are constants w.r.t. t and must factor out / be accepted as coefficients
+@test isequal(laplace(a*sin(2t), f, t, F, s), 2a/(4 + s^2))
+@test isequal(laplace(a*sin(omega*t), f, t, F, s), a*omega/(omega^2 + s^2))
+@test isequal(laplace(a*cos(omega*t), f, t, F, s), a*s/(omega^2 + s^2))
+@test isequal(laplace(a*t^2, f, t, F, s), 2a/s^3)
+@test isequal(laplace(sin(omega*t), f, t, F, s), omega/(omega^2 + s^2))
+# multi-factor coefficients of t (e.g. 2a*t is stored flat as *(2, a, t)); the coefficient
+# is any number of t-free factors and must still be matched (values verified against SymPy)
+@test isequal(laplace(sin(2a*t), f, t, F, s), 2a/(4a^2 + s^2))
+@test isequal(laplace(cos(2a*t), f, t, F, s), s/(4a^2 + s^2))
+@test isequal(laplace(sin(a*b*t), f, t, F, s), a*b/(a^2*b^2 + s^2))
+@test isequal(laplace(exp(2a*t), f, t, F, s), 1/(s - 2a))
+@test isequal(laplace(exp(-a*t), f, t, F, s), 1/(s + a))
+@test isequal(laplace(sinh(2a*t), f, t, F, s), 2a/(s^2 - 4a^2))
+@test isequal(laplace(exp(-a*t)*cos(b*t), f, t, F, s), (s + a)/((s + a)^2 + b^2))
+@test isequal(laplace(exp(2a*t)*sin(b*t), f, t, F, s), b/((s - 2a)^2 + b^2))
+
+# sum-argument coefficients: (a+b)*t is stored expanded as a*t + b*t; the argument is still a
+# homogeneous-linear multiple of t, so arg/t = a+b is the frequency/rate (verified against SymPy)
+@test isequal(laplace(sin((a+b)*t), f, t, F, s), (a+b)/((a+b)^2 + s^2))
+@test isequal(laplace(cos((a+b)*t), f, t, F, s), s/((a+b)^2 + s^2))
+@test isequal(laplace(exp((a+b)*t), f, t, F, s), 1/(s - (a+b)))
+@test isequal(laplace(sinh((a+b)*t), f, t, F, s), (a+b)/(s^2 - (a+b)^2))
+
+# powers of exponentials: exp(t)^n is stored as a power, not exp(n*t); fold to exp(n*t)
+@test isequal(laplace(exp(t)^2, f, t, F, s), 1/(s - 2))
+@test isequal(laplace(exp(t)^3, f, t, F, s), 1/(s - 3))
+@test isequal(laplace(exp(a*t)^2, f, t, F, s), 1/(s - 2a))
+
+# general frequency-differentiation combinator L{t^n g} = (-1)^n d^n/ds^n L{g}
+# covers t^n*trig for n >= 2 and multi-factor/sum coefficients (values verified against SymPy)
+@test isequal(laplace(t*sin((a+b)*t), f, t, F, s), 2*(a+b)*s/((a+b)^2 + s^2)^2)
+@test isequal(laplace(t*cos((a+b)*t), f, t, F, s), (s^2 - (a+b)^2)/((a+b)^2 + s^2)^2)
+# numeric cross-check for the messier higher-order forms (SymPy values at s=5)
+_lapval(ex, sval) = Float64(Symbolics.value(substitute(laplace(ex, f, t, F, s), Dict(s => sval))))
+@test _lapval(t^2*sin(2t), 5) ≈ 0.011644593874287588
+@test _lapval(t^3*cos(2t), 5) ≈ 0.0003478108418012077
+@test _lapval(t^2*sin(t), 5) ≈ 2*(3*25 - 1)/(1 + 25)^3   # 2(3s^2-1)/(1+s^2)^3 at s=5
+# the uninterpreted-function s-derivative still works via the same combinator
+@test isequal(laplace(t^2*f(t), f, t, F, s), (Differential(s)^2)(F(s)))
+@test isequal(laplace(t*f(t), f, t, F, s), -Differential(s)(F(s)))
+
+# opt-in trig_reduce for products and powers of trig/hyperbolic functions (values verified against SymPy)
+@test isequal(laplace(2cos(t)*sin(t), f, t, F, s; trig_reduce=true), 2/(s^2 + 4))
+@test isequal(laplace(sin(t)^2, f, t, F, s; trig_reduce=true), -(1//2)*s/(s^2 + 4) + (1//2)/s)
+@test isequal(laplace(cos(t)^3, f, t, F, s; trig_reduce=true), (1//4)*s/(s^2 + 9) + (3//4)*s/(s^2 + 1))
+@test isequal(laplace(sin(t)*cos(2t), f, t, F, s; trig_reduce=true), -(1//2)/(s^2 + 1) + (3//2)/(s^2 + 9))
+@test isequal(laplace(sin(2t)*sin(3t), f, t, F, s; trig_reduce=true), -(1//2)*s/(s^2 + 25) + (1//2)*s/(s^2 + 1))
+@test isequal(laplace(sinh(t)*cosh(t), f, t, F, s; trig_reduce=true), 1/(s^2 - 4))
+@test isequal(laplace(3 + sin(t)^2, f, t, F, s; trig_reduce=true), -(1//2)*s/(s^2 + 4) + (1//2)/s + 3/s)
+@test isequal(laplace(exp(2t)*sin(t)^2, f, t, F, s; trig_reduce=true), -(1//2)*(s - 2)/((s - 2)^2 + 4) + (1//2)/(s - 2))
+# off by default; when on, a term trig_reduce cannot make transformable keeps the original fallback
+@test Symbolics._has_integral(laplace(2cos(t)*sin(t), f, t, F, s))
+@test isequal(laplace(tan(t)^2, f, t, F, s; trig_reduce=true), laplace(tan(t)^2, f, t, F, s))
+# symbolic frequencies with trig_reduce: must not recurse without end (regression for a
+# stack overflow when a reduced term kept a sum argument like cos(a*t - b*t)).
+# Compared numerically at sample (a,b,s) because the symbolic result's term ordering
+# (e.g. (a-b)^2 vs (-a+b)^2) is not stable across SymbolicUtils versions/platforms.
+_subval(ex, d) = Float64(Symbolics.value(substitute(ex, d)))
+let d = Dict(a => 2, b => 3, s => 5)
+    @test _subval(laplace(sin(a*t)*sin(b*t), f, t, F, s; trig_reduce=true), d) ≈
+          _subval(-(1//2)*s/((a+b)^2 + s^2) + (1//2)*s/((a-b)^2 + s^2), d)
+    @test _subval(laplace(sin(a*t)*cos(b*t), f, t, F, s; trig_reduce=true), d) ≈
+          _subval((1//2)*(a+b)/((a+b)^2 + s^2) + (1//2)*(a-b)/((a-b)^2 + s^2), d)
+end
+# exp(t)^n as a factor needs trig_reduce to fold into the product; off by default it falls back
+@test Symbolics._has_integral(laplace(exp(t)^2*sin(t), f, t, F, s))
+@test isequal(laplace(exp(t)^2*sin(t), f, t, F, s; trig_reduce=true), 1/((s-2)^2 + 1))
+
 # https://www.math.lsu.edu/~adkins/m2065/2065s08review2a.pdf
 @test isequal(inverse_laplace(7/(s+3)^3, F, s, f, t), (7//2)t^2 * exp(-3t))
 @test isequal(inverse_laplace((s-9)/(s^2 + 9), F, s, f, t), cos(3t) - 3sin(3t))
+# regression test for fixed inverse rule
+@test isequal(inverse_laplace(s*(-4 + s^2)/(4 + s^2)^2, F, s, f, t; warns=false), cos(2t) - 2t*sin(2t))
 # partial fraction decomposition
 @test isequal(inverse_laplace((s+2)/(s^2 - 3s - 4), F, s, f, t), (6//5)*exp(4t) - (1//5)*exp(-t))
 @test isequal(inverse_laplace(1/(s^2 - 10s + 9), F, s, f, t), (1//8)*exp(9t) - (1//8)*exp(t))
+
+# inverse power rule with fractional exponents uses gamma instead of factorial (no crash)
+@test isequal(inverse_laplace(1/s^(3//2), F, s, f, t; warns=false), t^(1//2)/Symbolics.term(Symbolics.gamma, 3//2))
+@test isequal(inverse_laplace(1/s^(5//2), F, s, f, t; warns=false), t^(3//2)/Symbolics.term(Symbolics.gamma, 5//2))
+@test isequal(inverse_laplace(1/(s+2)^(3//2), F, s, f, t; warns=false), exp(-2t)*t^(1//2)/Symbolics.term(Symbolics.gamma, 3//2))
+# symbolic constants factor out of the inverse transform
+@variables c d
+@test isequal(inverse_laplace(c/(s+d), F, s, f, t; warns=false), c*exp(-d*t))
+
+# irreducible quadratic denominators via completing the square (values verified against SymPy)
+# (2s+3)/((s+2)^2+9) = (2(s+2)-1)/((s+2)^2+9) -> exp(-2t)(2cos3t - (1/3)sin3t)
+@test isequal(inverse_laplace((2s+3)/(s^2+4s+13), F, s, f, t; warns=false),
+              2*(cos(3t) - (2//3)*sin(3t))*exp(-2t) + exp(-2t)*sin(3t))
+@test isequal(expand(inverse_laplace(1/(s^2+2s+5), F, s, f, t; warns=false) - (1//2)*exp(-t)*sin(2t)), 0)
+@test isequal(expand(inverse_laplace(s/(s^2+2s+5), F, s, f, t; warns=false) - exp(-t)*(cos(2t) - (1//2)*sin(2t))), 0)
+# repeated real root
+@test isequal(inverse_laplace(1/(s^2+4s+4), F, s, f, t; warns=false), exp(-2t)*t)
 
 Dt = Differential(t)
 @test_skip isequal(laplace_solve_ode(Dt(f(t)) + 3f(t) ~ t^2*exp(-3t) + t*exp(-2t) + t, f, t, [1]), (1//3)*t^3*exp(-3t) + t*exp(-2t) + (1//3)*t + (19//9)*exp(-3t) - exp(-2t) - 1//9) # generates very large system of equations that solve_interms_ofvar has trouble with
