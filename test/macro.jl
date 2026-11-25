@@ -165,6 +165,33 @@ end
 # @test foo(x, wrap(1)) isa Num
 # @test foo(x, wrap(6)) isa String
 
+@wrapped function wrapped_kw(x::Real; scale = 2, offset::Int = 0, rest...)
+    scale * x + offset + length(rest)
+end
+
+@testset "@wrapped keyword arguments" begin
+    @variables a
+    @test wrapped_kw(a) isa Num
+    @test isequal(wrapped_kw(a), 2a)
+    @test isequal(wrapped_kw(a; scale = 3, offset = 1), 3a + 1)
+    @test isequal(wrapped_kw(a; p = 1, q = 2), 2a + 2)
+    @test isequal(wrapped_kw(unwrap(a); scale = 5), unwrap(5a))
+    @test !(wrapped_kw(unwrap(a)) isa Num)
+end
+
+@testset "@wrapped rejects varargs" begin
+    for ex in (
+            :(
+                @wrapped function wrapped_va(x::Real, ys::Real...)
+                    x
+                end
+            ),
+            :(@wrapped wrapped_va(x::Real, ys...) = x),
+        )
+        @test_throws ArgumentError macroexpand(@__MODULE__, ex)
+    end
+end
+
 
 let
     vars = @variables t a b(a) c(..) x[1:2] y(t)[1:3] z(..)[1:2]
