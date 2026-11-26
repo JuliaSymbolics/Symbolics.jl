@@ -1638,7 +1638,10 @@ function (d::Divergence{E})(arr::AbstractArray) where {E}
 end
 
 # Compose them for Laplacian
-(d::Divergence{E})(g::Grad{E}) where {E} = Laplacian{E}(g, d)
+function (d::Divergence{E})(g::Grad{E}) where {E}
+    isequal(d.vars, g.vars) && return Laplacian{E}(g, d)
+    return d ∘ g
+end
 (d::Divergence)(g::Grad) = d ∘ g
 
 function LinearAlgebra.dot(g1::Grad{E}, x::Union{Grad, SymbolicT, Num, AbstractArray}) where {E}
@@ -1670,12 +1673,21 @@ The Laplacian operator `∇ ⋅ ∇` with respect to the independent variables
 produced by `LinearAlgebra.dot(∇, ∇)`. Applied to a scalar field it produces the sum of
 second partial derivatives; applied to a vector field it acts componentwise.
 
+`Laplacian{E}(grad, div)` throws an `ArgumentError` unless `grad` and `div` have identical
+ordered variables. Composing a `Divergence` with a `Grad` over different variables, or in a
+different order, does not produce a `Laplacian`; it is an ordinary composition.
+
 See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
 interaction with [`expand_derivatives`](@ref).
 """
 struct Laplacian{E}
     grad::Grad{E}
     div::Divergence{E}
+
+    function Laplacian{E}(grad::Grad{E}, div::Divergence{E}) where {E}
+        isequal(grad.vars, div.vars) || throw(ArgumentError(lazy"`Laplacian` requires `Grad` and `Divergence` to have identical ordered variables. Got $(grad.vars) and $(div.vars)."))
+        return new{E}(grad, div)
+    end
 end
 
 Laplacian{E}(vars; check = true) where {E} = Laplacian{E}(Grad{E}(vars; check), Divergence{E}(vars; check))
@@ -1697,6 +1709,7 @@ function (lap::Laplacian{E})(x::SymbolicT) where {E}
 end
 (lap::Laplacian)(x::Num) = Num(lap(unwrap(x)))
 (lap::Laplacian)(x::Number) = lap(Num(x))
+(lap::Laplacian)(x::Complex{Num}) = Complex{Num}(lap(real(x)), lap(imag(x)))
 (lap::Laplacian{false})(x::Arr{T, 1}) where {T} = Arr{T, 1}(lap(unwrap(x)))
 (lap::Laplacian{true})(x::Arr{T, 1}) where {T} = T.(lap(unwrap(x)))
 function (lap::Laplacian)(x::AbstractArray)
@@ -1927,7 +1940,8 @@ $(TYPEDSIGNATURES)
 
 Return `true` if `t` is a symbolic term whose operation is a lazy [`Laplacian`](@ref),
 such as `Laplacian(vars)(u)`. Wrapped values such as `Num` are unwrapped first. A lazy
-[`Divergence`](@ref) applied to a lazy [`Grad`](@ref) term is not a `Laplacian`.
+[`Divergence`](@ref) applied to a lazy [`Grad`](@ref) term is not a `Laplacian`, and neither is
+the composition of a `Divergence` and a `Grad` over different or differently ordered variables.
 
 See also: [`is_vector_operator`](@ref).
 """

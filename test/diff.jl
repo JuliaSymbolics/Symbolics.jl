@@ -1244,6 +1244,15 @@ end
     @test Laplacian{false}([a, b])(a^2 + b^2) isa Num
     @test isequal(expand_derivatives(Laplacian{false}([a, b])(a^2 + b^2)), 4)
     @test isequal(Laplacian{true}([a, b])(a^2), Differential(a)(Differential(a)(a^2)) + Differential(b)(Differential(b)(a^2)))
+    # complex components apply to the real and imaginary parts
+    @variables x y
+    cplx = [complex(x^3, y^4), complex(y^3, -x^4)]
+    for E in (false, true)
+        res = Laplacian{E}([x, y])(cplx)
+        @test res isa Vector{Complex{Num}}
+        @test isequal(expand_derivatives.(real.(res)), [6x, 6y])
+        @test isequal(expand_derivatives.(imag.(res)), [12y^2, -12x^2])
+    end
     # non-vector fields
     @variables M[1:2, 1:2] v::Vector{Real}
     for E in (false, true)
@@ -1267,7 +1276,26 @@ end
     end
     @test dot(Grad{false}(vars), Grad{false}(vars)) isa Laplacian{false}
     @test Laplacian(vars) isa Laplacian{false}
-    @test Divergence{false}(vars)(Grad{false}([a, c])) isa Laplacian{false}
+    @test Divergence{false}(vars)(Grad{false}(vars)) isa Laplacian{false}
+    # mismatched or reordered variables are not a Laplacian
+    @variables mx my
+    mixed = mx^2 * my + mx * my^2
+    exact_mixed = 2mx + 2my
+    for E in (false, true)
+        @test_throws ArgumentError Laplacian{E}(Grad{E}([mx, my]), Divergence{E}([my, mx]))
+        @test_throws ArgumentError Laplacian{E}(Grad{E}([mx, my]), Divergence{E}([mx, c]))
+        @test_throws ArgumentError Laplacian{E}(Grad{E}([mx, my]), Divergence{E}([mx, my, c]))
+        composed = Divergence{E}([my, mx])(Grad{E}([mx, my]))
+        @test !(composed isa Laplacian)
+        @test isequal(expand_derivatives(composed(mixed)), 4mx + 4my)
+    end
+    lazy_mixed = Divergence{false}([my, mx])(Grad{false}([mx, my]))(mixed)
+    @test Symbolics.is_laplacian(lazy_mixed) === false
+    @test isequal(expand_derivatives(Laplacian{false}([mx, my])(mixed)), exact_mixed)
+    @test isequal(Laplacian{true}([mx, my])(mixed) |> expand_derivatives, exact_mixed)
+    # display, as shown in the manual
+    @variables dx dy dz
+    @test sprint(show, (Grad([dx, dy, dz]) ⋅ Grad([dx, dy, dz]))(dx^2 + dy^2 + dz^2)) == "∇⋅∇(dx^2 + dy^2 + dz^2)"
     # hash and equality
     @test Laplacian(vars) == Laplacian(vars) && hash(Laplacian(vars)) == hash(Laplacian(vars))
     @test Laplacian(vars) != Laplacian([a, c])
