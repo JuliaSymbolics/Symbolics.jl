@@ -1285,6 +1285,8 @@ end
         @test_throws ArgumentError Laplacian{E}(Grad{E}([mx, my]), Divergence{E}([my, mx]))
         @test_throws ArgumentError Laplacian{E}(Grad{E}([mx, my]), Divergence{E}([mx, c]))
         @test_throws ArgumentError Laplacian{E}(Grad{E}([mx, my]), Divergence{E}([mx, my, c]))
+        @test Laplacian{E}(Grad{E}([mx, my]), Divergence{E}([my, mx]); check = false) isa Laplacian{E}
+        @test Laplacian{E}(Grad{E}([mx, my]), Divergence{E}([mx, my, c]); check = false) isa Laplacian{E}
         composed = Divergence{E}([my, mx])(Grad{E}([mx, my]))
         @test !(composed isa Laplacian)
         @test isequal(expand_derivatives(composed(mixed)), 4mx + 4my)

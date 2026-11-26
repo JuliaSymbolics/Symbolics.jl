@@ -1673,9 +1673,10 @@ The Laplacian operator `∇ ⋅ ∇` with respect to the independent variables
 produced by `LinearAlgebra.dot(∇, ∇)`. Applied to a scalar field it produces the sum of
 second partial derivatives; applied to a vector field it acts componentwise.
 
-`Laplacian{E}(grad, div)` throws an `ArgumentError` unless `grad` and `div` have identical
-ordered variables. Composing a `Divergence` with a `Grad` over different variables, or in a
-different order, does not produce a `Laplacian`; it is an ordinary composition.
+`Laplacian{E}(grad, div; check = true)` throws an `ArgumentError` unless `grad` and `div` have
+identical ordered variables; `check = false` skips this validation. Composing a `Divergence`
+with a `Grad` over different variables, or in a different order, does not produce a
+`Laplacian`; it is an ordinary composition.
 
 See [`Grad`](@ref) for the meaning of `E`, the `check` keyword and the
 interaction with [`expand_derivatives`](@ref).
@@ -1684,13 +1685,13 @@ struct Laplacian{E}
     grad::Grad{E}
     div::Divergence{E}
 
-    function Laplacian{E}(grad::Grad{E}, div::Divergence{E}) where {E}
-        isequal(grad.vars, div.vars) || throw(ArgumentError(lazy"`Laplacian` requires `Grad` and `Divergence` to have identical ordered variables. Got $(grad.vars) and $(div.vars)."))
+    function Laplacian{E}(grad::Grad{E}, div::Divergence{E}; check = true) where {E}
+        check && !isequal(grad.vars, div.vars) && throw(ArgumentError(lazy"`Laplacian` requires `Grad` and `Divergence` to have identical ordered variables. Got $(grad.vars) and $(div.vars)."))
         return new{E}(grad, div)
     end
 end
 
-Laplacian{E}(vars; check = true) where {E} = Laplacian{E}(Grad{E}(vars; check), Divergence{E}(vars; check))
+Laplacian{E}(vars; check = true) where {E} = Laplacian{E}(Grad{E}(vars; check), Divergence{E}(vars; check); check)
 Laplacian(vars; check = true) = Laplacian{false}(vars; check)
 
 SU.promote_symtype(lap::Laplacian, T::SU.TypeT) = SU.promote_symtype(lap.div, SU.promote_symtype(lap.grad, T))
