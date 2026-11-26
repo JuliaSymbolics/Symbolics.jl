@@ -137,6 +137,9 @@ neither side contains symbols.
 
 Pass numbers, wrapped symbolic expressions such as `Num` and `Complex{Num}`,
 or the unwrapped symbolic expressions that an [`Equation`](@ref) stores.
+For a `Complex{Num}` operand, components whose symbolic types are broader than
+`Real` are projected with `real` in both the stored original and the component
+equations.
 `split_complex_equation(eq)` splits an existing `Equation` `eq` directly.
 Array operands raise an `ArgumentError`.
 
@@ -163,8 +166,7 @@ true
 ```
 """
 function split_complex_equation(a::Union{Number, BasicSymbolic, AbstractArray}, b::Union{Number, BasicSymbolic, AbstractArray})
-    a = a isa Num ? unwrap(a) : a
-    b = b isa Num ? unwrap(b) : b
+    a, b = unwrap(a), unwrap(b)
     if a isa AbstractArray || b isa AbstractArray || isarraysymbolic(a) || isarraysymbolic(b)
         throw(ArgumentError("split_complex_equation requires scalar operands"))
     end

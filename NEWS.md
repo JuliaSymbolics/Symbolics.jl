@@ -9,6 +9,8 @@
   from a user-written pair of real equations with `isa SplitComplexEquation`.
   An unequal pair of numeric real or imaginary parts raises an `ArgumentError` when
   the other component contains symbols.
+  Components of `Complex{Num}` operands with symbolic types broader than `Real`
+  are projected with `real` in the stored original and component equations.
   `lhs ~ rhs` itself still returns a `Vector{Equation}` for a complex split.
 
 ## 7.37.0

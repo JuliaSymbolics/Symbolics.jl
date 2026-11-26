@@ -85,11 +85,34 @@ end
 @testset "split_complex_equation with Number-typed complex components" begin
     @variables n::Number y
     z = complex(Num(n), y)
-    for (lhs, rhs) in ((z, 0), (0, z))
+    target = 1 + 2im
+    p = split_complex_equation(z, target)
+    for fold in (Val(true), Val(false))
+        @testset "partial substitution with $fold" begin
+            partial = substitute(p.original.lhs, Dict(unwrap(y) => 2); fold)
+            @test unwrap_const(substitute(partial, Dict(unwrap(n) => 1); fold = Val(true))) === target
+            @test unwrap_const(substitute(partial, Dict(unwrap(n) => 1 + 3im); fold = Val(true))) === target
+        end
+    end
+
+    projected_n = real(unwrap(n))
+    for (lhs, rhs, expected) in (
+            (z, 0, Equation[projected_n ~ 0, y ~ 0]),
+            (0, z, Equation[0 ~ projected_n, 0 ~ y]),
+            (z, target, Equation[projected_n ~ 1, y ~ 2]),
+            (complex(y, Num(n)), 2 + im, Equation[y ~ 2, projected_n ~ 1]),
+        )
         @testset "$lhs ~ $rhs" begin
             p = split_complex_equation(lhs, rhs)
-            @test p == (lhs ~ rhs)
+            @test p == expected
             @test split_complex_equation(p.original) == p
+            for n_value in (1, 2, 1 + 3im)
+                values = Dict(unwrap(n) => n_value, unwrap(y) => 2)
+                evaluate(expr) = unwrap_const(substitute(expr, values; fold = Val(true)))
+                a, b = evaluate(p.original.lhs), evaluate(p.original.rhs)
+                @test (evaluate(p.real_eq.lhs), evaluate(p.real_eq.rhs)) == (real(a), real(b))
+                @test (evaluate(p.imag_eq.lhs), evaluate(p.imag_eq.rhs)) == (imag(a), imag(b))
+            end
         end
     end
 end
