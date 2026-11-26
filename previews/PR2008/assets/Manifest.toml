@@ -28,18 +28,20 @@ uuid = "a4c015fc-c6ff-483c-b24f-f7ea428134e9"
 version = "0.0.1"
 
 [[deps.AbstractAlgebra]]
-deps = ["Compat", "LinearAlgebra", "MacroTools", "PrecompileTools", "Preferences", "Random", "RandomExtensions", "SparseArrays"]
-git-tree-sha1 = "0cf4d60ca84d298ab63f45230e1f340077dc1e2b"
+deps = ["Compat", "LinearAlgebra", "MacroTools", "PrecompileTools", "Preferences", "Random", "RandomExtensions"]
+git-tree-sha1 = "d5c1f7dd87601281fc45fef74e300139a399f4a0"
 registries = "General"
 uuid = "c3fe647b-3220-5bb0-a1ea-a7954cac585d"
-version = "0.50.5"
+version = "0.51.4"
 
     [deps.AbstractAlgebra.extensions]
     IJuliaExt = "IJulia"
+    SparseArraysExt = "SparseArrays"
     TestExt = "Test"
 
     [deps.AbstractAlgebra.weakdeps]
     IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
+    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
     Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [[deps.AbstractPlutoDingetjes]]
@@ -189,11 +191,11 @@ uuid = "c3b6d118-76ef-56ca-8cc7-ebb389d030a1"
 version = "0.3.7"
 
 [[deps.Bzip2_jll]]
-deps = ["Artifacts", "JLLWrappers", "Libdl"]
-git-tree-sha1 = "1b96ea4a01afe0ea4090c5c8039690672dd13f2e"
+deps = ["Artifacts", "LazyJLLWrappers", "Libdl"]
+git-tree-sha1 = "4d0b66ab0ba8ed6fccfd82631775b22fc1f6823a"
 registries = "General"
 uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
-version = "1.0.9+0"
+version = "1.0.10"
 
 [[deps.CEnum]]
 git-tree-sha1 = "389ad5c84de1ae7cf0e28e381131c98ea87d54fc"
@@ -610,10 +612,10 @@ version = "2.56.0+0"
 
 [[deps.Glib_jll]]
 deps = ["Artifacts", "GettextRuntime_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Libiconv_jll", "Libmount_jll", "PCRE2_jll", "Zlib_jll"]
-git-tree-sha1 = "ea9f1fb37ff10597353b56f3ba0ebd525acef6e0"
+git-tree-sha1 = "1638fea231fe18a947dcbf007ce4975ffd2ef3aa"
 registries = "General"
 uuid = "7746bdde-850d-59dc-9ae8-88ece973131d"
-version = "2.90.1+0"
+version = "2.90.2+0"
 
 [[deps.Graphite2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -638,10 +640,10 @@ version = "1.15.0"
 
 [[deps.Groebner]]
 deps = ["AbstractAlgebra", "Atomix", "Combinatorics", "Logging", "Nemo", "PrecompileTools", "Primes", "Printf", "Random", "SmallCollections", "TimerOutputs"]
-git-tree-sha1 = "c9197abb898233928ea1c110a1882629920a6b7c"
+git-tree-sha1 = "ce59cdf9050f5177d02330fa7b1483311549fc3c"
 registries = "General"
 uuid = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
-version = "0.10.11"
+version = "0.10.12"
 weakdeps = ["DynamicPolynomials"]
 
     [deps.Groebner.extensions]
@@ -649,10 +651,10 @@ weakdeps = ["DynamicPolynomials"]
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll"]
-git-tree-sha1 = "59d266e426ab9695f625fe2b6a51c2d3a04f1ecd"
+git-tree-sha1 = "3373195b17beba7ccc1c82f00db9859e82f74c6b"
 registries = "General"
 uuid = "2e76f6c2-a576-52d4-95c1-20adfe4de566"
-version = "100.15001.0+0"
+version = "100.15002.0+0"
 
 [[deps.HashArrayMappedTries]]
 git-tree-sha1 = "2eaa69a7cab70a52b9687c8bf950a5a93ec895ae"
@@ -1032,10 +1034,10 @@ version = "1.1.5"
 
 [[deps.Nemo]]
 deps = ["AbstractAlgebra", "FLINT_jll", "LinearAlgebra", "Random", "RandomExtensions", "SHA"]
-git-tree-sha1 = "9a1c91731d5127666be24468faf6da924fe71c3d"
+git-tree-sha1 = "6df1a9fbe1a25b633b5fb5c80a5bc0efec96e891"
 registries = "General"
 uuid = "2edaba10-b0f1-5616-af89-8c11ac63239a"
-version = "0.56.2"
+version = "0.57.2"
 
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
