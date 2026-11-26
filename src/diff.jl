@@ -1866,7 +1866,7 @@ const LazyVectorOperator = Union{Grad{false}, Divergence{false}, Curl{false}, La
 _expanded_der_op(g::Grad{false}) = Grad{true}(g.vars; check = false)
 _expanded_der_op(d::Divergence{false}) = Divergence{true}(d.vars; check = false)
 _expanded_der_op(c::Curl{false}) = Curl{true}(c.vars; check = false)
-_expanded_der_op(l::Laplacian{false}) = Laplacian{true}(_expanded_der_op(l.grad), _expanded_der_op(l.div))
+_expanded_der_op(l::Laplacian{false}) = Laplacian{true}(_expanded_der_op(l.grad), _expanded_der_op(l.div); check = false)
 
 # The eager operators index their argument, which `scalarize` does for any array of known vector
 # shape. `scalar * array` is by far the most common array-shaped argument, so it is scalarized directly.
