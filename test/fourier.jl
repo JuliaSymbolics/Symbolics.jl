@@ -94,7 +94,7 @@ end
     # exact: integer arithmetic does not wrap around
     m = typemin(Int)
     @test isequal(fourier(f(m * t), t => w), abs(1 // big(m)) * FourierTransform(t => w * (1 // big(m)))(f(t)))
-    @test isequal(fourier(f(2^62 * (2t + a)), t => w), fourier(f(big(2)^63 * t + big(2)^62 * a), t => w))
+    @test isequal(fourier(f(Int64(2)^62 * (2t + a)), t => w), fourier(f(big(2)^63 * t + big(2)^62 * a), t => w))
     # floats are computed without underflow or overflow, and a result a Float64 cannot hold
     # leaves the term unevaluated
     small = fourier(f(1.0e-170t + 1.0e-170), t => 1.0e-170)
