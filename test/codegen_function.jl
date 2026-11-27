@@ -426,6 +426,15 @@ end
         Base.invokelatest(eval(iip), out, pv)
         @test out == [pv[mod1(k + 1, 40)] * k for k in 1:40]
     end
+    # With a SymbolicUtils that has the rewrite, the first write comes before the last value.
+    if isdefined(SymbolicUtils.Code, :EAGER_SCALAR_WRITES_KEY)
+        first_write_before_last_value = map((false, true)) do setting
+            _, iip = Symbolics.codegen_function(ir, maker, [p]; eager_scalar_writes = setting)
+            code = string(iip)
+            findfirst("batched_setindex!", code)[1] < findlast("(*)(", code)[1]
+        end
+        @test first_write_before_last_value == (false, true)
+    end
 end
 
 @testset "`fuse_broadcasts`" begin
