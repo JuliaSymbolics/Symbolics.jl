@@ -19,8 +19,9 @@ is_derivative
 
 !!! note
     For symbolic differentiation, all registered functions in the symbolic expression
-    need a registered derivative. For more information, see the
-    [function registration](@ref function_registration) page.
+    need a registered derivative. For more information, see
+    [Defining Derivatives of Registered Functions](@ref defining_derivatives_of_registered_functions)
+    on the [function registration](@ref function_registration) page.
 
 ## High-Level Differentiation Functions
 

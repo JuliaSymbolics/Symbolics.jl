@@ -1155,6 +1155,27 @@ let
     @test occursin("∇×(y)", sprint(show, ∇ × y))
 end
 
+abstract type AbstractCustomMetadata end
+struct CustomMetadata <: AbstractCustomMetadata
+    val::Int
+end
+@symbolic_wrap struct WrappedCustomMetadata <: AbstractCustomMetadata
+    val::CustomMetadata
+end
+Symbolics.unwrap(r::WrappedCustomMetadata) = r.val
+test_opaque_meta(x, m::AbstractCustomMetadata) = x
+@register_symbolic test_opaque_meta(x, m::AbstractCustomMetadata)
+
+inspect_sq(w) = w^2
+@register_symbolic inspect_sq(w)
+Symbolics.derivative(::typeof(inspect_sq), args::NTuple{1, SymbolicUtils.BasicSymbolic}, ::Val{1}) = 2 * args[1]
+Symbolics.derivative(::typeof(inspect_sq), args::NTuple{1, Any}, ::Val{1}) = SymbolicUtils.iscall(args[1]) ? 2 * args[1] : 2 * args[1]
+
+ctrl_func(t) = t^3
+@register_symbolic ctrl_func(t)
+@register_derivative ctrl_func(t) 1 100 * t
+Symbolics.derivative(::typeof(ctrl_func), args::NTuple{1, Any}, ::Val{1}) = 3 * args[1]^2
+
 @testset "Legacy Symbolics.derivative method registration (#2121)" begin
     test_custom_sq(z) = z^2
     @register_symbolic test_custom_sq(z)
@@ -1180,4 +1201,26 @@ end
 
     H = Symbolics.hessian(test_custom_sq(z), [z])
     @test isequal(H, reshape([2], 1, 1))
+
+    # [P1] Opaque function with concrete metadata argument where wrapper accepts concrete value
+    meta_expr = test_opaque_meta(x, CustomMetadata(3))
+    # Default derivative stays symbolic:
+    d_meta = Symbolics.derivative(meta_expr, x)
+    @test occursin("Differential", sprint(show, d_meta))
+    # Strict mode throws DerivativeNotDefinedError:
+    @test_throws Symbolics.DerivativeNotDefinedError Symbolics.derivative(meta_expr, x; throw_no_derivative=true)
+    # @derivative_rule returns nothing without constructing wrappers:
+    @test (@derivative_rule test_opaque_meta(Symbolics.unwrap(x), Symbolics.unwrap(CustomMetadata(3))) 1) === nothing
+
+    # [P2] Tree-inspecting rule and raw specialization on raw expression nodes:
+    # Raw specialization:
+    d_raw = Symbolics.derivative(inspect_sq(x), x; throw_no_derivative=true)
+    @test isequal(d_raw, 2x)
+
+    # Tree-inspecting rule on nested call sin(x):
+    d_tree = Symbolics.derivative(inspect_sq(sin(x)), x; throw_no_derivative=true)
+    @test isequal(d_tree, 2 * sin(x) * cos(x))
+
+    # Control asserting an applicable @register_derivative rule takes precedence:
+    @test isequal(Symbolics.derivative(ctrl_func(x), x), 100x)
 end
