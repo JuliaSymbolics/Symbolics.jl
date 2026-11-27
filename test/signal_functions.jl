@@ -48,6 +48,59 @@ end
     @test dirac(typemin(Int)) == dirac(typemax(UInt)) == 0
 end
 
+@testset "exact arguments near the kinks and their limits" begin
+    m = typemax(Int)
+    xs = (
+        (m - 1) // m, -(m - 1) // m, m // (m - 1), 1 // m, -1 // m, (m ÷ 2) // m, m // 2,
+        typemax(Int) // 1, (typemin(Int) + 1) // 1, typemin(Int) // 1, 1 // 0, -1 // 0,
+        0 // 1, 1 // 1, -1 // 1, 1 // 2, -1 // 2, UInt(0) // UInt(1), typemax(UInt) // UInt(2),
+        typemin(Int), typemax(Int), UInt(0), UInt(1), typemax(UInt), big(10)^100, true,
+    )
+    for x in xs, f in (heaviside, rect, tri)
+        exact = big(x)
+        @test f(x) ≈ f(exact isa Integer ? BigFloat(exact) : exact)
+        root = rootfunction(f)(x)
+        sides = (left_continuous_function(f)(x), right_continuous_function(f)(x))
+        # the rebuilt piecewise form agrees away from the jumps
+        (root == 0 && f !== tri) || @test sides[root < 0 ? 1 : 2] == f(x)
+    end
+    @test tri((m - 1) // m) === 1 // m
+end
+
+@testset "values at ±Inf" begin
+    for x in (Inf, -Inf, Inf32, big(Inf))
+        @test heaviside(x) == (x > 0)
+        @test rect(x) == tri(x) == dirac(x) == Symbolics.dcosc(x) == 0
+        @test isnan(diraccomb(x, 1))
+        for f in (heaviside, rect, tri)
+            side = rootfunction(f)(x) < 0 ? left_continuous_function(f) : right_continuous_function(f)
+            @test side(x) == f(x)
+        end
+    end
+end
+
+@testset "second derivative of sinc at extreme arguments" begin
+    dcosc = Symbolics.dcosc
+    reference(x) = setprecision(BigFloat, 4096) do
+        y = x isa Rational ? big(x.num) / big(x.den) : BigFloat(x)
+        s, c = sinpi(y), cospi(y)
+        (-big(π) * s - 2 * (c - s / big(π) / y) / y) / y
+    end
+    for x in (
+            2^53 + 1, -(2^53 + 1), typemax(Int), typemin(Int), typemax(UInt),
+            (2^54 + 1) // 2, typemax(Int) // 2, (typemax(Int) - 1) // typemax(Int), 7 // 2,
+            1.0e155, -1.0e155, floatmax(Float64), floatmax(Float32), floatmax(Float16),
+        )
+        expected = oftype(float(x), reference(x))
+        @test dcosc(x) isa typeof(float(x))
+        @test dcosc(x) ≈ expected rtol = 8 * eps(typeof(float(x)))
+        @test signbit(dcosc(x)) == signbit(expected)
+    end
+    @test dcosc(2^53 + 1) > 0
+    @test dcosc(1.0e155) ≈ -2.0e-310
+    @test isnan(dcosc(NaN))
+end
+
 @testset "argument types are kept" begin
     for f in (heaviside, rect, tri, Symbolics.dcosc), T in (Float16, Float32, Float64, BigFloat)
         @test f(T(0.25)) isa T

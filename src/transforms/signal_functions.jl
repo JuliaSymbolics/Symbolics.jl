@@ -9,18 +9,19 @@ Its derivative is [`dirac`](@ref Symbolics.dirac).
 """
 heaviside(t::Real) = (1 + sign(t)) / 2
 
+# Integers and rationals wrap or overflow, so only compare them, never do arithmetic first.
+const ExactReal = Union{Integer, Rational}
+
 """
     rect(t)
 
 Rectangular pulse: `1` for `|t| < 1/2`, `1/2` at `|t| = 1/2` and `0` otherwise.
 """
 rect(t::Real) = heaviside(one(t) / 2 - abs(t))
-# `abs(t)` wraps for `typemin` of a signed integer, and unsigned subtraction wraps.
-rect(t::Integer) = rect(float(t))
-function rect(t::Rational)
-    half = one(t) / 2
-    -0.5 < t < 0.5 && return one(half)
-    return t == 0.5 || t == -0.5 ? half : zero(half)
+function rect(t::ExactReal)
+    value = one(float(t))
+    -0.5 < t < 0.5 && return value
+    return t == 0.5 || t == -0.5 ? value / 2 : zero(value)
 end
 
 """
@@ -33,16 +34,34 @@ function tri(t::Real)
     return isnan(t) || -1 < t < 1 ? one(t) - abs(t) : zero(t)
 end
 
-# Keeps the arithmetic of the root functions below from wrapping or overflowing.
-_float_exact(t::Union{Integer, Rational}) = float(t)
-_float_exact(t) = t
+# Root and side functions of the discontinuities. The `ExactReal` methods only need the
+# sign of the root, and subtract only where the result cannot wrap or overflow.
+_rect_root(t) = abs(t) - 1 // 2
+_rect_root(t::ExactReal) = (t < -0.5 || t > 0.5) - (-0.5 < t < 0.5)
+# changes sign at each of the kinks -1, 0 and 1
+_tri_root(t) = t * (t^2 - 1)
+_tri_root(t::ExactReal) = (t > 1) - (t < -1) + (-1 < t < 0) - (0 < t < 1)
+_tri_left(t) = ifelse(t < 0, 0, 1 - t)
+_tri_left(t::ExactReal) = 0 <= t < 1 ? one(t) - t : zero(t)
+_tri_right(t) = ifelse(t <= 0, 1 + t, 0)
+_tri_right(t::ExactReal) = -1 < t <= 0 ? one(t) + t : zero(t)
+
+# `sinpi` and `cospi` round a rational to floating point before reducing it.
+_exact_trigpi(f, x) = f(x)
+_exact_trigpi(f, x::ExactReal) = oftype(float(x), f(float(rem(big(x), 2))))
 
 # Second derivative of `sinc`.
 function dcosc(x::Real)
     y = float(x)
+    isinf(y) && return zero(y)
+    if !(abs(y) < 0.5)  # also takes NaN, on which the series would not terminate
+        s, c = _exact_trigpi(sinpi, x), _exact_trigpi(cospi, x)
+        # `-π^2 * sinc(x) - 2 * cosc(x) / x`, divided step by step so nothing overflows.
+        # `-π` alone would be a `Float64`, whatever the type of `s`
+        return (-(π * s) - 2 * (c - s / π / y) / y) / y
+    end
+    # The closed form is 0/0 at the origin, so sum the Taylor series near it.
     π² = abs2(oftype(y, π))
-    abs(y) < 0.5 || return -π² * sinc(y) - 2 * cosc(y) / y
-    # The formula above is 0/0 at the origin, so sum the Taylor series near it.
     u² = π² * abs2(y)
     power, total, previous, k = -one(u²), -one(u²) / 3, zero(u²), 1
     while total != previous
@@ -114,8 +133,7 @@ end
 # `dirac` and `diraccomb` are deliberately not registered: they are zero on both sides of an
 # impulse, so rewriting them as piecewise functions would silently replace them by zero.
 @register_discontinuity heaviside(t) t 0 1
-@register_discontinuity rect(t) abs(_float_exact(t)) - 1 // 2 1 0
-# `t * (t^2 - 1)` changes sign at each of the kinks -1, 0 and 1.
-@register_discontinuity tri(t) _float_exact(t) * (_float_exact(t)^2 - 1) ifelse(t < 0, 0, 1 - t) ifelse(t <= 0, 1 + t, 0)
+@register_discontinuity rect(t) _rect_root(t) 1 0
+@register_discontinuity tri(t) _tri_root(t) _tri_left(t) _tri_right(t)
 
 @public heaviside, dirac, rect, tri, diraccomb
