@@ -87,8 +87,8 @@ end
         (-big(π) * s - 2 * (c - s / big(π) / y) / y) / y
     end
     for x in (
-            2^53 + 1, -(2^53 + 1), typemax(Int), typemin(Int), typemax(UInt),
-            (2^54 + 1) // 2, typemax(Int) // 2, (typemax(Int) - 1) // typemax(Int), 7 // 2,
+            Int64(2)^53 + 1, -(Int64(2)^53 + 1), typemax(Int), typemin(Int), typemax(UInt),
+            (Int64(2)^54 + 1) // 2, typemax(Int) // 2, (typemax(Int) - 1) // typemax(Int), 7 // 2,
             1.0e155, -1.0e155, floatmax(Float64), floatmax(Float32), floatmax(Float16),
         )
         expected = oftype(float(x), reference(x))
@@ -96,7 +96,7 @@ end
         @test dcosc(x) ≈ expected rtol = 8 * eps(typeof(float(x)))
         @test signbit(dcosc(x)) == signbit(expected)
     end
-    @test dcosc(2^53 + 1) > 0
+    @test dcosc(Int64(2)^53 + 1) > 0
     @test dcosc(1.0e155) ≈ -2.0e-310
     @test isnan(dcosc(NaN))
 end
@@ -105,12 +105,12 @@ end
     m = typemax(Int)
     @test diraccomb(1 // m, 1 // (m - 1)) === 0.0
     @test_throws DomainError diraccomb(m // 1, 1 // m)
-    @test diraccomb(2^53 + 1, 2.0) === 0.0
+    @test diraccomb(Int64(2)^53 + 1, 2.0) === 0.0
     @test diraccomb(2.0^53, 3) === 0.0
     @test diraccomb(Float32(0.5), 1) === 0.0f0
     @test diraccomb(1 // 3, 1.0) === 0.0
     @test_throws DomainError diraccomb(2 // m, 1 // m)
-    @test_throws DomainError diraccomb(2^53 + 2, 2.0)
+    @test_throws DomainError diraccomb(Int64(2)^53 + 2, 2.0)
     @test_throws DomainError diraccomb(typemin(Int), UInt(2))
     @test_throws DomainError diraccomb(1.5, 1 // 2)
     @test isnan(diraccomb(1 // 0, 1))
@@ -119,7 +119,8 @@ end
 
 @testset "sinc's second derivative does not allocate for machine integers" begin
     allocated(x) = @allocated Symbolics.dcosc(x)
-    for x in (0, 3, -4, typemax(Int), typemin(Int), UInt(7), Int8(5), Int128(9))
+    # only types no wider than a word on any build: `Int128` is wider on 32-bit ones
+    for x in (0, 3, -4, typemax(Int), typemin(Int), UInt(7), Int8(5))
         allocated(x)
         @test allocated(x) == 0
     end
