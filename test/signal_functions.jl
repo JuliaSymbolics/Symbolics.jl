@@ -1,4 +1,4 @@
-using Symbolics, Test
+using Symbolics, Test, ForwardDiff
 using Symbolics: heaviside, dirac, rect, tri, diraccomb, rootfunction,
     left_continuous_function, right_continuous_function
 
@@ -34,6 +34,49 @@ at(ex, dict) = Symbolics.value(substitute(ex, dict; fold = Val(true)))
     for f in (heaviside, rect, tri, dirac, Base.Fix2(diraccomb, 1.0))
         @test isnan(f(NaN))
     end
+end
+
+@testset "integer extremes" begin
+    for x in (typemin(Int), typemax(Int), typemin(Int8), UInt(2), typemax(UInt), big(2)^80, 3 // 1, UInt(3) // UInt(1))
+        @test rect(x) == tri(x) == 0
+    end
+    @test rect(UInt(0)) == tri(UInt(0)) == 1
+    @test tri(UInt(1)) == 0
+    @test rect(UInt(1) // UInt(2)) == 1 // 2
+    @test heaviside(typemin(Int)) == 0
+    @test heaviside(typemax(UInt)) == 1
+    @test dirac(typemin(Int)) == dirac(typemax(UInt)) == 0
+end
+
+@testset "argument types are kept" begin
+    for f in (heaviside, rect, tri, Symbolics.dcosc), T in (Float16, Float32, Float64, BigFloat)
+        @test f(T(0.25)) isa T
+        @test f(T(2)) isa T
+        @test isnan(f(T(NaN)))
+    end
+    x = ForwardDiff.Dual(0.25, 1.0)
+    @test ForwardDiff.partials(tri(x), 1) == -1
+    @test ForwardDiff.value(rect(x)) == 1
+end
+
+@testset "second derivative of sinc" begin
+    d2 = d(d(sinc(t)))
+    @test isequal(d2, d(cosc(t)))
+    f = build_function(d2, t; expression = Val{false})
+    @test f(0.0) ≈ f(0) ≈ -π^2 / 3
+    @test at(d2, t => 0) ≈ -π^2 / 3
+    # series and closed form against a high-precision reference
+    reference(x) = setprecision(BigFloat, 512) do
+        y = big(x)
+        -big(π)^2 * sinpi(y) / (big(π) * y) - 2 * (cospi(y) - sinpi(y) / (big(π) * y)) / y^2
+    end
+    for x in (1.0e-12, 1.0e-4, 0.1, -0.3, 0.4999, 0.5, 1.0, 7.25)
+        @test f(x) ≈ reference(x) rtol = 1.0e-13
+        @test Symbolics.dcosc(big(x)) ≈ reference(x) rtol = 1.0e-60
+    end
+    @test Symbolics.dcosc(Inf) == 0
+    # no rule for the third derivative: unevaluated rather than wrong
+    @test Symbolics.is_derivative(Symbolics.unwrap(d(d2)))
 end
 
 @testset "symbolic application" begin
@@ -76,8 +119,8 @@ end
     @test isequal(d(dirac(t, 1)), dirac(t, 2))
     @test isequal(d(sinc(t)), cosc(t))
     @test isequal(d(sinc(a * t)), a * cosc(a * t))
-    @test at(d(d(sinc(t))), t => 0.3) ≈ (cosc(0.3 + 1.0e-6) - cosc(0.3 - 1.0e-6)) / 2.0e-6 rtol = 1.0e-6
     @test Symbolics.is_derivative(Symbolics.unwrap(d(diraccomb(t, T))))
+    @test_throws OverflowError d(dirac(t, typemax(Int)))
 end
 
 @testset "substitute" begin
@@ -121,6 +164,19 @@ end
     @test rootfunction(heaviside)(0.0) == 0
     @test rootfunction(rect)(0.5) == rootfunction(rect)(-0.5) == 0
     @test all(iszero ∘ rootfunction(tri), (-1.0, 0.0, 1.0))
+    for x in (Int64(2)^32, -Int64(2)^32, typemax(Int), typemin(Int), typemax(UInt), UInt(2))
+        @test rootfunction(tri)(x) != 0
+        @test sign(rootfunction(tri)(x)) == sign(x)
+        @test rootfunction(rect)(x) > 0
+        @test piecewise(tri, x) == tri(x) == 0
+        @test piecewise(rect, x) == rect(x) == 0
+    end
+    # A root and two sides cannot express a point value: exactly at a jump the
+    # reconstructed form takes a one-sided value instead of 1/2.
+    @test piecewise(heaviside, 0.0) == 1
+    @test heaviside(0.0) == 0.5
+    @test piecewise(rect, 0.5) == piecewise(rect, -0.5) == 0
+    @test rect(0.5) == rect(-0.5) == 0.5
 
     x = Symbolics.unwrap(t)
     for f in (heaviside, rect, tri)

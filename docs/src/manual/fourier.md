@@ -27,13 +27,17 @@ f.([-0.5, 0.0, 0.5])
 | `diraccomb(t, T)` | `0` away from multiples of `T`, `DomainError` on them | left unevaluated |
 | `sinc(t)` | `sin(π t) / (π t)`, `1` at `t = 0` | `cosc(t)` |
 
-`sinc` is Julia's normalized `sinc`. The second derivative of `sinc` is expressed as
-`-π^2 * sinc(t) - 2 * cosc(t) / t`, which evaluates to `NaN` at `t = 0`.
+`sinc` is Julia's normalized `sinc`. Its second derivative evaluates to `-π^2/3` at `t = 0`;
+the third and higher derivatives are left unevaluated.
 
 `heaviside`, `rect` and `tri` are registered with
 [`@register_discontinuity`](@ref Symbolics.@register_discontinuity). `dirac` and `diraccomb`
 deliberately are not: they are zero on both sides of an impulse, so a tool that rewrites a
 registered function as a piecewise function would silently replace the impulse by zero.
+
+A root function with two sides cannot express the value at a single point. A piecewise form
+reconstructed from the registration therefore takes a one-sided value exactly at a jump:
+`1` instead of `1/2` for `heaviside(0)`, and `0` instead of `1/2` for `rect(±1/2)`.
 
 ```@docs
 Symbolics.heaviside

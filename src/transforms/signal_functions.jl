@@ -15,13 +15,43 @@ heaviside(t::Real) = (1 + sign(t)) / 2
 Rectangular pulse: `1` for `|t| < 1/2`, `1/2` at `|t| = 1/2` and `0` otherwise.
 """
 rect(t::Real) = heaviside(one(t) / 2 - abs(t))
+# `abs(t)` wraps for `typemin` of a signed integer, and unsigned subtraction wraps.
+rect(t::Integer) = rect(float(t))
+function rect(t::Rational)
+    half = one(t) / 2
+    -0.5 < t < 0.5 && return one(half)
+    return t == 0.5 || t == -0.5 ? half : zero(half)
+end
 
 """
     tri(t)
 
 Triangular pulse `max(1 - |t|, 0)`.
 """
-tri(t::Real) = max(one(t) - abs(t), zero(t))
+function tri(t::Real)
+    # Subtract only inside the pulse: unsigned and `typemin` arguments would wrap.
+    return isnan(t) || -1 < t < 1 ? one(t) - abs(t) : zero(t)
+end
+
+# Keeps the arithmetic of the root functions below from wrapping or overflowing.
+_float_exact(t::Union{Integer, Rational}) = float(t)
+_float_exact(t) = t
+
+# Second derivative of `sinc`.
+function dcosc(x::Real)
+    y = float(x)
+    π² = abs2(oftype(y, π))
+    abs(y) < 0.5 || return -π² * sinc(y) - 2 * cosc(y) / y
+    # The formula above is 0/0 at the origin, so sum the Taylor series near it.
+    u² = π² * abs2(y)
+    power, total, previous, k = -one(u²), -one(u²) / 3, zero(u²), 1
+    while total != previous
+        power *= -u² / ((2k - 1) * 2k)
+        k += 1
+        previous, total = total, total + power / (2k + 1)
+    end
+    return π² * total
+end
 
 # Value of an impulse located where `r == 0`.
 function _impulse(r::Real, t::Real)
@@ -70,20 +100,22 @@ end
 # `sinc` of a `Num` would otherwise be traced into `sinpi(t) / (π * t)`, which is `NaN` at 0.
 @register_symbolic Base.sinc(x)
 @register_symbolic Base.cosc(x)
+@register_symbolic dcosc(x)
 
 @register_derivative heaviside(t) 1 dirac(t)
 @register_derivative rect(t) 1 dirac(t + 1 // 2) - dirac(t - 1 // 2)
 @register_derivative tri(t) 1 rect(t + 1 // 2) - rect(t - 1 // 2)
 @register_derivative dirac(t) 1 dirac(t, 1)
-@register_derivative dirac(t, n) 1 dirac(t, unwrap_const(n) + 1)
+@register_derivative dirac(t, n) 1 dirac(t, Base.Checked.checked_add(unwrap_const(n), 1))
 # The derivative of `sinc` is `cosc`, which comes from DiffRules.
-@register_derivative Base.cosc(x) 1 -(π^2) * sinc(x) - 2 * cosc(x) / x
+# `dcosc` has no derivative rule: higher derivatives stay unevaluated.
+@register_derivative Base.cosc(x) 1 dcosc(x)
 
 # `dirac` and `diraccomb` are deliberately not registered: they are zero on both sides of an
 # impulse, so rewriting them as piecewise functions would silently replace them by zero.
 @register_discontinuity heaviside(t) t 0 1
-@register_discontinuity rect(t) abs(t) - 1 // 2 1 0
+@register_discontinuity rect(t) abs(_float_exact(t)) - 1 // 2 1 0
 # `t * (t^2 - 1)` changes sign at each of the kinks -1, 0 and 1.
-@register_discontinuity tri(t) t * (t^2 - 1) ifelse(t < 0, 0, 1 - t) ifelse(t <= 0, 1 + t, 0)
+@register_discontinuity tri(t) _float_exact(t) * (_float_exact(t)^2 - 1) ifelse(t < 0, 0, 1 - t) ifelse(t <= 0, 1 + t, 0)
 
 @public heaviside, dirac, rect, tri, diraccomb
