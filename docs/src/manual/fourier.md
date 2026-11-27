@@ -22,10 +22,12 @@ f.([-0.5, 0.0, 0.5])
 |:---------|:------|:-----------|
 | `heaviside(t)` | `0`, `1/2` at `t = 0`, `1` | `dirac(t)` |
 | `rect(t)` | `1` for `abs(t) < 1/2`, `1/2` at `abs(t) = 1/2`, else `0` | `dirac(t + 1/2) - dirac(t - 1/2)` |
-| `tri(t)` | `max(1 - abs(t), 0)` | `rect(t + 1/2) - rect(t - 1/2)` |
+| `tri(t)` | `max(1 - abs(t), 0)` | `1` on `(-1, 0)`, `-1` on `(0, 1)`, `0` outside |
 | `dirac(t)`, `dirac(t, n)` | `0` for `t != 0`, `DomainError` at `0` | `dirac(t, n + 1)` |
 | `diraccomb(t, T)` | `0` away from multiples of `T`, `DomainError` on them | left unevaluated |
 | `sinc(t)` | `sin(π t) / (π t)`, `1` at `t = 0` | `cosc(t)` |
+
+At its kinks the derivative of `tri` takes the mean of the two sides.
 
 `sinc` is Julia's normalized `sinc`. Its second derivative evaluates to `-π^2/3` at `t = 0`;
 the third and higher derivatives are left unevaluated.

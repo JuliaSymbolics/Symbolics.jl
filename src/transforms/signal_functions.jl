@@ -53,15 +53,18 @@ function _exact_sincospi(x::Integer)
     return (zero(unit), isodd(x) ? -unit : unit)
 end
 function _exact_sincospi(x::Rational)
-    r = float(rem(big(x), 2))  # `sinpi` rounds a rational before reducing it
+    r = rem(big(x), 2)  # `sinpi` rounds a rational before reducing it
+    # enough bits to keep `r` apart from the zeros of the sine and cosine
+    bits = precision(BigFloat) + ndigits(denominator(r); base = 2)
+    b = BigFloat(r; precision = bits)
     F = typeof(float(x))
-    return (F(sinpi(r)), F(cospi(r)))
+    return (F(sinpi(b)), F(cospi(b)))
 end
 
 # Second derivative of `sinc`.
-function dcosc(x::Real)
+function dcosc(x::Number)
     y = float(x)
-    isinf(y) && return zero(y)
+    y isa Real && isinf(y) && return zero(y)
     if !(abs(y) < 0.5)  # also takes NaN, on which the series would not terminate
         s, c = _exact_sincospi(x)
         # `-π^2 * sinc(x) - 2 * cosc(x) / x`, divided step by step so nothing overflows.
@@ -69,8 +72,8 @@ function dcosc(x::Real)
         return (-(π * s) - 2 * (c - s / π / y) / y) / y
     end
     # The closed form is 0/0 at the origin, so sum the Taylor series near it.
-    π² = abs2(oftype(y, π))
-    u² = π² * abs2(y)
+    π² = abs2(oftype(real(y), π))
+    u² = π² * y^2
     power, total, previous, k = -one(u²), -one(u²) / 3, zero(u²), 1
     while total != previous
         power *= -u² / ((2k - 1) * 2k)
@@ -78,6 +81,13 @@ function dcosc(x::Real)
         previous, total = total, total + power / (2k + 1)
     end
     return π² * total
+end
+
+# Derivative of `tri`. Only compares, so nothing is rounded away or wraps.
+function dtri(t::Real)
+    isnan(t) && return float(t)
+    twice = (-1 <= t < 0) + (-1 < t < 0) - (0 < t <= 1) - (0 < t < 1)
+    return oftype(float(t), twice / 2)
 end
 
 # Value of an impulse located where `r == 0`.
@@ -140,10 +150,12 @@ end
 @register_symbolic Base.sinc(x)
 @register_symbolic Base.cosc(x)
 @register_symbolic dcosc(x)
+@register_symbolic dtri(t)
 
 @register_derivative heaviside(t) 1 dirac(t)
 @register_derivative rect(t) 1 dirac(t + 1 // 2) - dirac(t - 1 // 2)
-@register_derivative tri(t) 1 rect(t + 1 // 2) - rect(t - 1 // 2)
+@register_derivative tri(t) 1 dtri(t)
+@register_derivative dtri(t) 1 dirac(t + 1) - 2 * dirac(t) + dirac(t - 1)
 @register_derivative dirac(t) 1 dirac(t, 1)
 @register_derivative dirac(t, n) 1 dirac(t, Base.Checked.checked_add(unwrap_const(n), 1))
 # The derivative of `sinc` is `cosc`, which comes from DiffRules.

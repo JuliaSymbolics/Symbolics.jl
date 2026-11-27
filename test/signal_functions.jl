@@ -125,6 +125,48 @@ end
     end
 end
 
+@testset "derivative of tri near its kinks" begin
+    f = build_function(d(tri(t)), t; expression = Val{false})
+    @test f.([-2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0]) == [0, 0.5, 1, 0, -1, -0.5, 0]
+    m = typemax(Int)
+    for x in (2.0^-60, nextfloat(0.0), 1 // m, prevfloat(1.0), (m - 1) // m, UInt(1) // UInt(m))
+        @test f(x) == -1
+    end
+    @test f(-2.0^-60) == f(-1 // m) == 1
+    for x in (nextfloat(1.0), m // (m - 1), m, typemin(Int), typemax(UInt), UInt(2), Inf, -Inf)
+        @test f(x) == 0
+    end
+    @test f(0.25f0) === -1.0f0
+    @test isnan(f(NaN))
+end
+
+@testset "complex arguments of the sinc second derivative" begin
+    reference(z) = setprecision(BigFloat, 512) do
+        y = Complex{BigFloat}(z)
+        s, c = sinpi(y), cospi(y)
+        (-(big(π) * s) - 2 * (c - s / big(π) / y) / y) / y
+    end
+    f = build_function(d(d(sinc(t))), t; expression = Val{false})
+    for z in (1.0 + 1.0im, 0.1 + 0.2im, -0.3im, 2.5 - 3.0im, 1 + 0im, 0.25f0 + 1.0f0im)
+        @test f(z) isa typeof(float(z))
+        @test f(z) ≈ reference(z) rtol = 16 * eps(typeof(real(float(z))))
+    end
+    @test f(0.0 + 0.0im) ≈ -π^2 / 3
+    @test isnan(f(complex(NaN, 0.0)))
+end
+
+@testset "sinc's second derivative next to large integers and half-integers" begin
+    reference(x) = setprecision(BigFloat, 4096) do
+        y = big(x.num) / big(x.den)
+        s, c = sinpi(y), cospi(y)
+        (-(big(π) * s) - 2 * (c - s / big(π) / y) / y) / y
+    end
+    ε = 1 // big(10)^90
+    for x in (big(10)^100 - ε, big(10)^100 + 1 + ε, big(10)^100 + 1 // 2 - ε, 1 - ε)
+        @test Symbolics.dcosc(x) ≈ reference(x) rtol = 1.0e-60
+    end
+end
+
 @testset "argument types are kept" begin
     for f in (heaviside, rect, tri, Symbolics.dcosc), T in (Float16, Float32, Float64, BigFloat)
         @test f(T(0.25)) isa T
@@ -187,7 +229,8 @@ end
     @test isequal(d(heaviside(2t - a)), 2dirac(2t - a))
     @test isequal(d(rect(t)), dirac(t + 1 // 2) - dirac(t - 1 // 2))
     @test isequal(d(rect(a * t)), a * (dirac(a * t + 1 // 2) - dirac(a * t - 1 // 2)))
-    @test isequal(d(tri(t)), rect(t + 1 // 2) - rect(t - 1 // 2))
+    @test isequal(d(tri(t)), Symbolics.dtri(t))
+    @test isequal(d(d(tri(t))), dirac(t + 1) - 2dirac(t) + dirac(t - 1))
     for x in (-2.0, -1.5, -0.5, 0.25, 0.75, 1.5)
         @test at(d(tri(t)), t => x) ≈ (tri(x + 1.0e-6) - tri(x - 1.0e-6)) / 2.0e-6 atol = 1.0e-8
     end
