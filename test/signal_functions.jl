@@ -117,25 +117,24 @@ end
         x == 0 || @test piecewise(heaviside, x) == heaviside(x)
         abs(x) == 0.5 || @test piecewise(rect, x) == rect(x)
         @test piecewise(tri, x) == tri(x)
-        x == 0 || @test piecewise(dirac, x) == dirac(x)
-        x == 0 || @test piecewise(dirac, x, 1) == dirac(x, 1)
-        isinteger(x) || @test piecewise(diraccomb, x, 1.0) == diraccomb(x, 1.0)
     end
     @test rootfunction(heaviside)(0.0) == 0
     @test rootfunction(rect)(0.5) == rootfunction(rect)(-0.5) == 0
     @test all(iszero ∘ rootfunction(tri), (-1.0, 0.0, 1.0))
-    @test rootfunction(dirac)(0.0) == rootfunction(dirac)(0.0, 1) == 0
-    @test all(iszero ∘ Base.Fix2(rootfunction(diraccomb), 2.0), (-2.0, 0.0, 2.0, 4.0))
-    # a sign change at every impulse, so that events can locate it
-    @test rootfunction(diraccomb)(1.9, 2.0) * rootfunction(diraccomb)(2.1, 2.0) < 0
 
     x = Symbolics.unwrap(t)
-    for (f, args) in (
-            (heaviside, (x,)), (rect, (x,)), (tri, (x,)), (dirac, (x,)),
-            (dirac, (x, 1)), (diraccomb, (x, 1.0)),
-        )
-        @test rootfunction(f)(args...) isa Symbolics.SymbolicT
-        @test left_continuous_function(f)(args...) isa Symbolics.SymbolicT
-        @test right_continuous_function(f)(args...) isa Symbolics.SymbolicT
+    for f in (heaviside, rect, tri)
+        @test rootfunction(f)(x) isa Symbolics.SymbolicT
+        @test left_continuous_function(f)(x) isa Symbolics.SymbolicT
+        @test right_continuous_function(f)(x) isa Symbolics.SymbolicT
+    end
+end
+
+# Both sides of an impulse are zero, so a registration would let a piecewise rewrite
+# replace it by zero. They must stay opaque.
+@testset "impulses are not registered discontinuities" begin
+    for f in (dirac, diraccomb),
+            g in (rootfunction, left_continuous_function, right_continuous_function)
+        @test_throws MethodError g(f)
     end
 end

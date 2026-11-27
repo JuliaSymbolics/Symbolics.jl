@@ -30,8 +30,10 @@ f.([-0.5, 0.0, 0.5])
 `sinc` is Julia's normalized `sinc`. The second derivative of `sinc` is expressed as
 `-π^2 * sinc(t) - 2 * cosc(t) / t`, which evaluates to `NaN` at `t = 0`.
 
-All of these except `sinc` and `cosc` are registered with
-[`@register_discontinuity`](@ref Symbolics.@register_discontinuity).
+`heaviside`, `rect` and `tri` are registered with
+[`@register_discontinuity`](@ref Symbolics.@register_discontinuity). `dirac` and `diraccomb`
+deliberately are not: they are zero on both sides of an impulse, so a tool that rewrites a
+registered function as a piecewise function would silently replace the impulse by zero.
 
 ```@docs
 Symbolics.heaviside

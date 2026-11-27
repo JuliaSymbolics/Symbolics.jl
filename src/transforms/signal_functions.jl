@@ -79,15 +79,11 @@ end
 # The derivative of `sinc` is `cosc`, which comes from DiffRules.
 @register_derivative Base.cosc(x) 1 -(π^2) * sinc(x) - 2 * cosc(x) / x
 
+# `dirac` and `diraccomb` are deliberately not registered: they are zero on both sides of an
+# impulse, so rewriting them as piecewise functions would silently replace them by zero.
 @register_discontinuity heaviside(t) t 0 1
 @register_discontinuity rect(t) abs(t) - 1 // 2 1 0
 # `t * (t^2 - 1)` changes sign at each of the kinks -1, 0 and 1.
 @register_discontinuity tri(t) t * (t^2 - 1) ifelse(t < 0, 0, 1 - t) ifelse(t <= 0, 1 + t, 0)
-@register_discontinuity dirac(t) t 0 0
-@register_discontinuity diraccomb(t, T) sinpi(t / T) 0 0
-# `dirac(t, n)` has its impulse where `dirac(t)` does.
-(::typeof(rootfunction(dirac)))(t, n) = t
-(::typeof(left_continuous_function(dirac)))(t, n) = left_continuous_function(dirac)(t)
-(::typeof(right_continuous_function(dirac)))(t, n) = right_continuous_function(dirac)(t)
 
 @public heaviside, dirac, rect, tri, diraccomb
