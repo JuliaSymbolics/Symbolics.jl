@@ -295,6 +295,8 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
         # check if x is shadowed by integration variable in integrand
         isequal(domain.variables, x) && return false
     end
+    # a transform depends on its evaluation point, which is not among its arguments
+    op isa FourierOperator && occursin_info(x, op.point) && return true
 
     predicate = let cond = op !== getindex &&
             op !== LinearAlgebra.dot &&
@@ -696,7 +698,9 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 base, exp = args
                 prod_args = (exp, (base ^ Const{VartypeT}(exp - 1))::BasicSymbolic{VartypeT}, executediff(D, base; simplify, throw_no_derivative))
                 return SymbolicUtils.mul_worker(VartypeT, prod_args)
-            elseif f isa NormalDerivative # not constant in D.x, so stay unevaluated rather than 0
+            elseif f isa Union{NormalDerivative, FourierOperator} # not constant in D.x, so stay unevaluated rather than 0
+                return D(arg)
+            elseif (f === real || f === imag) && is_fourier_term(args[1]) # the chain rule through `real` would be wrong
                 return D(arg)
             elseif f isa SymbolicUtils.Operator # operator applications return a new variable
                 return differential_zero(arg)
@@ -1132,6 +1136,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
             for (k, y) in enumerate(args)
                 r(y, literal_idx && k == 1)
             end
+            operation(x) isa FourierOperator && r(operation(x).point)
             if literal_idx && SymbolicUtils.is_array_shape(shape(x))
                 foreach(r ∘ Base.Fix1(getindex, x), SU.stable_eachindex(x)) # if `x` is e.g. `arr[1:2]`, also visit `arr[1]` and `arr[2]` (only the latter are in `vars`)
             end
