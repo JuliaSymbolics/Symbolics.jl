@@ -101,6 +101,30 @@ end
     @test isnan(dcosc(NaN))
 end
 
+@testset "diraccomb divisibility of exact arguments" begin
+    m = typemax(Int)
+    @test diraccomb(1 // m, 1 // (m - 1)) === 0.0
+    @test_throws DomainError diraccomb(m // 1, 1 // m)
+    @test diraccomb(2^53 + 1, 2.0) === 0.0
+    @test diraccomb(2.0^53, 3) === 0.0
+    @test diraccomb(Float32(0.5), 1) === 0.0f0
+    @test diraccomb(1 // 3, 1.0) === 0.0
+    @test_throws DomainError diraccomb(2 // m, 1 // m)
+    @test_throws DomainError diraccomb(2^53 + 2, 2.0)
+    @test_throws DomainError diraccomb(typemin(Int), UInt(2))
+    @test_throws DomainError diraccomb(1.5, 1 // 2)
+    @test isnan(diraccomb(1 // 0, 1))
+    @test diraccomb(3, Inf) == 0
+end
+
+@testset "sinc's second derivative does not allocate for machine integers" begin
+    allocated(x) = @allocated Symbolics.dcosc(x)
+    for x in (0, 3, -4, typemax(Int), typemin(Int), UInt(7), Int8(5), Int128(9))
+        allocated(x)
+        @test allocated(x) == 0
+    end
+end
+
 @testset "argument types are kept" begin
     for f in (heaviside, rect, tri, Symbolics.dcosc), T in (Float16, Float32, Float64, BigFloat)
         @test f(T(0.25)) isa T

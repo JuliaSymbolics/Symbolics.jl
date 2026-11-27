@@ -46,16 +46,24 @@ _tri_left(t::ExactReal) = 0 <= t < 1 ? one(t) - t : zero(t)
 _tri_right(t) = ifelse(t <= 0, 1 + t, 0)
 _tri_right(t::ExactReal) = -1 < t <= 0 ? one(t) + t : zero(t)
 
-# `sinpi` and `cospi` round a rational to floating point before reducing it.
-_exact_trigpi(f, x) = f(x)
-_exact_trigpi(f, x::ExactReal) = oftype(float(x), f(float(rem(big(x), 2))))
+# `(sinpi(x), cospi(x))`, without rounding an exact `x` first.
+_exact_sincospi(x) = (sinpi(x), cospi(x))
+function _exact_sincospi(x::Integer)
+    unit = one(float(x))
+    return (zero(unit), isodd(x) ? -unit : unit)
+end
+function _exact_sincospi(x::Rational)
+    r = float(rem(big(x), 2))  # `sinpi` rounds a rational before reducing it
+    F = typeof(float(x))
+    return (F(sinpi(r)), F(cospi(r)))
+end
 
 # Second derivative of `sinc`.
 function dcosc(x::Real)
     y = float(x)
     isinf(y) && return zero(y)
     if !(abs(y) < 0.5)  # also takes NaN, on which the series would not terminate
-        s, c = _exact_trigpi(sinpi, x), _exact_trigpi(cospi, x)
+        s, c = _exact_sincospi(x)
         # `-π^2 * sinc(x) - 2 * cosc(x) / x`, divided step by step so nothing overflows.
         # `-π` alone would be a `Float64`, whatever the type of `s`
         return (-(π * s) - 2 * (c - s / π / y) / y) / y
@@ -98,13 +106,25 @@ end
 
 Dirac comb with period `T > 0`, the sum of `dirac(t - k * T)` over all integers `k`.
 
-Numerically it is `0` away from the impulses and throws a `DomainError` where
-`rem(t, T) == 0`. In floating point that test is exact: `t` within rounding error of a
+Numerically it is `0` away from the impulses and throws a `DomainError` where `t` is a
+multiple of `T`. That test is exact: a floating-point `t` within rounding error of a
 multiple of `T` can evaluate to `0`.
 """
 function diraccomb(t::Real, T::Real)
     T > 0 || throw(DomainError(T, "the period of diraccomb must be positive"))
-    return _impulse(rem(t, T), t)
+    return _impulse(_comb_remainder(t, T), t)
+end
+
+# Zero exactly when `t` is a multiple of `T`.
+function _comb_remainder(t::Real, T::Real)
+    # `rem` of integers or rationals can overflow, and rounds them when mixed with floats
+    stored = Union{ExactReal, AbstractFloat}
+    if (t isa ExactReal || T isa ExactReal) && t isa stored && T isa stored &&
+            isfinite(t) && isfinite(T)
+        F = float(promote_type(typeof(t), typeof(T)))
+        return iszero(rem(Rational{BigInt}(t), Rational{BigInt}(T))) ? zero(F) : one(F)
+    end
+    return rem(float(t), float(T))
 end
 
 @register_symbolic heaviside(t)
