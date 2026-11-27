@@ -1330,14 +1330,17 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
     for ui in u
         ui isa SymbolicT && is_scalar_indexed(ui) && occursin_info(ui, expr)
     end
-    if expr isa SymbolicT && any(ui -> SymbolicUtils.query(z -> is_fourier_term(z) && occursin_info(ui, z), expr), u)
-        S = sparse(trues(length(u), length(u))) # transform terms are opaque to the linearity analysis
-        return full ? S : tril(S)
-    end
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
     f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
     lp = unwrap_const(linearity_propagator(f))
     S = _sparse(lp, length(u))
+    # transform terms are opaque to the linearity analysis: a variable in one may pair with any other
+    fourier_vars = expr isa SymbolicT ? findall(ui -> SymbolicUtils.query(z -> is_fourier_term(z) && occursin_info(ui, z), expr), u) : Int[]
+    if !isempty(fourier_vars)
+        occurring = findall(ui -> occursin_info(ui, expr), u)
+        I, J = vec([i for i in fourier_vars, j in occurring]), vec([j for i in fourier_vars, j in occurring])
+        S = S .| sparse([I; J], [J; I], true, length(u), length(u))
+    end
     S = full ? S : tril(S)
 end
 

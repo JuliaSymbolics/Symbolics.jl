@@ -95,8 +95,14 @@ end
     m = typemin(Int)
     @test isequal(fourier(f(m * t), t => w), abs(1 // big(m)) * FourierTransform(t => w * (1 // big(m)))(f(t)))
     @test isequal(fourier(f(2^62 * (2t + a)), t => w), fourier(f(big(2)^63 * t + big(2)^62 * a), t => w))
-    # a phase that overflows a float stays unevaluated
-    @test isequal(fourier(f(t + 1.0e300), t => 1.0e300), FourierTransform(t => 1.0e300)(f(t + 1.0e300)))
+    # floats are computed without underflow or overflow, and a result a Float64 cannot hold
+    # leaves the term unevaluated
+    small = fourier(f(1.0e-170t + 1.0e-170), t => 1.0e-170)
+    @test Symbolics.hasnode(z -> iscall(z) && operation(z) === sin, unwrap(imag(small)))
+    for (ex, k) in ((f(t + 1.0e300), 1.0e300), (f(t + 1.0e-200), 1.0e-200), (f(1.0e200t + 1.0e-200a), w))
+        @test isequal(fourier(ex, t => k), FourierTransform(t => k)(ex))
+    end
+    @test Symbolics._hasbigfloat(real(fourier(f(t + big(1) / 3), t => w)))
 end
 
 @testset "operator construction" begin
@@ -113,6 +119,7 @@ end
         @test_throws ArgumentError FourierTransform(p)
     end
     @test_throws ArgumentError FourierTransform(t => w; convention = (1, -1))
+    @test_throws ArgumentError FourierTransform(t => w)(1)
 end
 
 @testset "safety of unevaluated terms" begin
@@ -144,7 +151,11 @@ end
         @test isequal(expand_derivatives(Differential(a)(G)), Differential(a)(G))
     end
     # transform terms are opaque to the Hessian sparsity analysis
-    @test all(Symbolics.hessian_sparsity(real(T), [w, a]))
+    @variables x y
+    H = Symbolics.hessian_sparsity(real(FourierTransform(t => w)(a * f(t))) * x + y^2, [w, x, y, a, d])
+    # rows and columns of `w` and `a` (in the transform term) are marked against every variable
+    # that occurs; `d` does not occur, and `x`, `y` pair only as the rest of the expression says
+    @test Matrix(H) == Bool[1 1 1 1 0; 1 0 0 1 0; 1 0 1 1 0; 1 1 1 1 0; 0 0 0 0 0]
     @test !Symbolics.isaffine(real(T), [w])
 
     # generated code cannot evaluate a transform term

@@ -94,6 +94,8 @@ _transform_term(op::FourierOperator, x::SymbolicT) =
 # the transform is linear over the complex numbers, so the integrand is always real-typed
 (op::FourierOperator)(x::Complex{Num}) = _iszero(unwrap(imag(x))) ? op(real(x)) : op(real(x)) + im * op(imag(x))
 (op::FourierOperator)(x::SymbolicT) = op(_transform_input(x))
+# rejecting numbers keeps generated code from returning a symbolic term for a numeric input
+(op::FourierOperator)(x::Number) = throw(ArgumentError("`$op` applies to symbolic expressions; for a constant `c`, use `$op(Num(c))` or `fourier(c, ...)`."))
 SymbolicUtils.isbinop(::FourierOperator) = false
 
 for T in (:FourierTransform, :InverseFourierTransform)
@@ -176,13 +178,23 @@ function _transform(op::FourierOperator, g::SymbolicT)::Complex{Num}
     return _transform_term(op, g)
 end
 
-# Integer constants are widened to `BigInt` while the shift rule computes, so that no
-# fixed-width arithmetic can wrap around; `_narrow` converts back the ones that fit.
+# Numeric constants are widened to `BigInt` and `BigFloat` while the shift rule computes, so
+# that no fixed-width arithmetic wraps around or underflows. `_narrow` converts the results
+# back: integers that fit become `Int`, and floats become `Float64` (unless the input had
+# `BigFloat`s), or `NaN` if that would overflow, underflow or round a nonzero value to zero.
 _mapconsts(f, ex) = SymbolicUtils.Rewriters.Postwalk(z -> SymbolicUtils.isconst(z) ? Const{VartypeT}(f(unwrap_const(z))) : z)(unwrap(ex))
-_widen(v) = v isa Union{Rational, Integer} && !(v isa Bool) ? big(v) : v
-_narrow(v) = v isa BigInt && typemin(Int) <= v <= typemax(Int) ? Int(v) :
-    v isa Rational{BigInt} && _narrow(numerator(v)) isa Int && _narrow(denominator(v)) isa Int ? Rational{Int}(v) : v
-_nonfinite(ex) = SymbolicUtils.query(z -> SymbolicUtils.isconst(z) && (v = unwrap_const(z)) isa Number && !isfinite(v), ex)
+_widen(v) = v isa Union{Rational, Integer, AbstractFloat} && !(v isa Bool) ? big(v) : v
+function _narrow(v, keepbig = false)
+    v isa BigInt && typemin(Int) <= v <= typemax(Int) && return Int(v)
+    v isa Rational{BigInt} && _narrow(numerator(v)) isa Int && _narrow(denominator(v)) isa Int && return Rational{Int}(v)
+    (v isa BigFloat && !keepbig) || return v
+    x = Float64(v)
+    return isfinite(x) && !issubnormal(x) && iszero(x) == iszero(v) ? x : NaN
+end
+# `query` does not see the coefficients of sums and products, and `_mapconsts` does
+_anyconst(pred, ex) = (found = Ref(false); _mapconsts(v -> (found[] |= pred(v); v), ex); found[])
+_hasbigfloat(ex) = _anyconst(v -> v isa BigFloat, ex)
+_nonfinite(ex) = _anyconst(v -> v isa Number && !isfinite(v), ex)
 
 # h(c x + d) ↔ e^{-iβkd/c} H(k/c) / |c|, for a symbolic function `h` of one argument
 # depending on `x`, with `c` a finite nonzero real number and `d` real.
@@ -198,11 +210,13 @@ function _transform_affine(op::FourierOperator, g::SymbolicT)
         !iszero(unwrap_const(c)) && _isreal_symbolic(d) || return _transform_term(op, g)
     (isone(unwrap_const(c)) && _iszero(d)) && return _transform_term(op, g)
     ic = (c = unwrap_const(c)) isa Integer ? 1 // c : inv(c)
-    k = Num(_mapconsts(_widen, op.point))
-    point = _mapconsts(_narrow, k * ic)
-    θ = _mapconsts(_narrow, -_kernel_beta(op) * k * Num(d) * ic)
-    scale = _narrow(abs(ic))
-    # a phase or point that overflowed a float would make the result undefined
+    keepbig = _hasbigfloat(g) || _hasbigfloat(op.point)
+    narrow = v -> _narrow(v, keepbig)
+    k = Num(_mapconsts(_widen, op.point)) * ic
+    point = _mapconsts(narrow, k)
+    θ = _mapconsts(narrow, -_kernel_beta(op) * k * Num(d))
+    scale = narrow(abs(ic))
+    # a float that cannot represent the phase, point or scale would make the result wrong
     (_nonfinite(point) || _nonfinite(θ) || !isfinite(scale)) && return _transform_term(op, g)
     newargs = collect(SymbolicT, args)
     newargs[only(i)] = x
@@ -254,7 +268,8 @@ _transform_input(ex::SymbolicT) = symtype(ex) <: Complex ? Complex{Num}(ex) : Nu
     fourier(ex, t => ω; convention = :angular)
 
 The Fourier transform of `ex` with respect to `t`, as a function of `ω`:
-`expand_transforms(FourierTransform(t => ω; convention)(ex))`. The result is a
+`expand_transforms(FourierTransform(t => ω; convention)(ex))`, where a numeric `ex` is first
+converted to `Num` (the operator itself takes only symbolic arguments). The result is a
 `Complex{Num}` in which any part no rule applies to stays an unevaluated
 [`FourierTransform`](@ref) term. An array is transformed elementwise.
 
@@ -282,7 +297,8 @@ end
 
 The inverse Fourier transform of `F` with respect to `ω`, as a function of `t`, under the
 same `convention` as [`fourier`](@ref):
-`expand_transforms(Symbolics.InverseFourierTransform(ω => t; convention)(F))`.
+`expand_transforms(Symbolics.InverseFourierTransform(ω => t; convention)(F))`, with a numeric
+`F` first converted to `Num`.
 """
 function inverse_fourier(ex, p::Pair; convention = :angular)
     ex isa AbstractArray && return map(x -> inverse_fourier(x, p; convention), ex)
