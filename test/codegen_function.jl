@@ -403,6 +403,31 @@ end
     end
 end
 
+@testset "`eager_scalar_writes`" begin
+    @test !Symbolics.CodegenFunctionOptions().eager_scalar_writes
+    probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
+    # Both `codegen_function` methods: a symbolic expression and an array of them.
+    for (expr, args) in ((probe, [a]), ([probe], [[a]])), setting in (nothing, true, false)
+        empty!(PROBED_REWRITES)
+        kwargs = setting === nothing ? (;) : (; eager_scalar_writes = setting)
+        Symbolics.codegen_function(IRStructure{SymReal}(), expr, args; kwargs...)
+        @test PROBED_REWRITES[:eager_scalar_writes] === something(setting, false)
+    end
+
+    # The result is the same with it, for an output that shares no memory with the arguments.
+    @variables p[1:40]
+    regions = [[k:k] for k in 1:40]
+    values = [SymbolicUtils.Const{Symbolics.VartypeT}([unwrap(p[mod1(k + 1, 40)] * k)]) for k in 1:40]
+    maker = SymbolicUtils.ArrayMaker{Symbolics.VartypeT}(regions, values)
+    pv = collect(1.0:40)
+    for setting in (false, true)
+        _, iip = Symbolics.codegen_function(ir, maker, [p]; eager_scalar_writes = setting)
+        out = zeros(40)
+        Base.invokelatest(eval(iip), out, pv)
+        @test out == [pv[mod1(k + 1, 40)] * k for k in 1:40]
+    end
+end
+
 @testset "`fuse_broadcasts`" begin
     @test !Symbolics.CodegenFunctionOptions().fuse_broadcasts
     probe = SymbolicUtils.term(RewritesProbe(), unwrap(a); type = Real)
