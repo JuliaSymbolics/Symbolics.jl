@@ -295,6 +295,8 @@ function _occursin_info(x::BasicSymbolic{VartypeT}, expr::BasicSymbolic{VartypeT
         # check if x is shadowed by integration variable in integrand
         isequal(domain.variables, x) && return false
     end
+    # a transform depends on its evaluation point, which is not among its arguments
+    op isa FourierOperator && occursin_info(x, op.point) && return true
 
     predicate = let cond = op !== getindex &&
             op !== LinearAlgebra.dot &&
@@ -679,6 +681,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 a, b = unwrap.(IntervalSets.endpoints(domain))
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
                 inner_function = arguments(arg)[1]
+                # substitution does not enter a transform term, so it cannot set the integration variable there
+                SymbolicUtils.query(z -> is_fourier_term(z) && !isequal(operation(z).var, domainvars) && occursin_info(domainvars, z), inner_function) && return D(arg)
                 if iscall(a) || isequal(a, D.x)
                     t1 = substitute_in_deriv_and_depvar(inner_function, Dict(domainvars => a))
                     t2 = executediff(D, a; simplify, throw_no_derivative)
@@ -696,7 +700,9 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 base, exp = args
                 prod_args = (exp, (base ^ Const{VartypeT}(exp - 1))::BasicSymbolic{VartypeT}, executediff(D, base; simplify, throw_no_derivative))
                 return SymbolicUtils.mul_worker(VartypeT, prod_args)
-            elseif f isa NormalDerivative # not constant in D.x, so stay unevaluated rather than 0
+            elseif f isa Union{NormalDerivative, FourierOperator} # not constant in D.x, so stay unevaluated rather than 0
+                return D(arg)
+            elseif (f === real || f === imag) && is_fourier_term(args[1]) # the chain rule through `real` would be wrong
                 return D(arg)
             elseif f isa SymbolicUtils.Operator # operator applications return a new variable
                 return differential_zero(arg)
@@ -1132,6 +1138,7 @@ function jacobian_sparsity(exprs::AbstractArray, vars::AbstractArray)
             for (k, y) in enumerate(args)
                 r(y, literal_idx && k == 1)
             end
+            operation(x) isa FourierOperator && r(operation(x).point)
             if literal_idx && SymbolicUtils.is_array_shape(shape(x))
                 foreach(r ∘ Base.Fix1(getindex, x), SU.stable_eachindex(x)) # if `x` is e.g. `arr[1:2]`, also visit `arr[1]` and `arr[2]` (only the latter are in `vars`)
             end
@@ -1327,6 +1334,14 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
     f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)
     lp = unwrap_const(linearity_propagator(f))
     S = _sparse(lp, length(u))
+    # transform terms are opaque to the linearity analysis: a variable in one may pair with any other
+    if expr isa SymbolicT && SymbolicUtils.query(is_fourier_term, expr)
+        transforms = filterchildren(is_fourier_term, expr)
+        fourier_vars = findall(ui -> any(z -> occursin_info(ui, z), transforms), u)
+        occurring = findall(ui -> occursin_info(ui, expr), u)
+        I, J = vec([i for i in fourier_vars, j in occurring]), vec([j for i in fourier_vars, j in occurring])
+        S = S .| sparse([I; J], [J; I], true, length(u), length(u))
+    end
     S = full ? S : tril(S)
 end
 

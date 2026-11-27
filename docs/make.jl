@@ -65,6 +65,7 @@ makedocs(
                 "manual/taylor.md",
                 "manual/sparsity_detection.md",
                 "manual/limits.md",
+                "manual/fourier.md",
             ],
 
             "manual/misc.md",
