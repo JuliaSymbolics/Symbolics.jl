@@ -99,9 +99,10 @@ end
     # leaves the term unevaluated
     small = fourier(f(1.0e-170t + 1.0e-170), t => 1.0e-170)
     @test Symbolics.hasnode(z -> iscall(z) && operation(z) === sin, unwrap(imag(small)))
-    for (ex, k) in ((f(t + 1.0e300), 1.0e300), (f(t + 1.0e-200), 1.0e-200), (f(1.0e200t + 1.0e-200a), w))
+    for (ex, k) in ((f(t + 1.0e300), 1.0e300), (f(t + 1.0e-200), 1.0e-200), (f(1.0e200t + 1.0e-200a), w), (f(t + 1.1), 1.0e20))
         @test isequal(fourier(ex, t => k), FourierTransform(t => k)(ex))
     end
+    @test !isequal(fourier(f(t + 1.0e8), t => w), FourierTransform(t => w)(f(t + 1.0e8)))  # an exact phase coefficient
     @test Symbolics._hasbigfloat(real(fourier(f(t + big(1) / 3), t => w)))
 end
 

@@ -214,7 +214,8 @@ function _transform_affine(op::FourierOperator, g::SymbolicT)
     narrow = v -> _narrow(v, keepbig)
     k = Num(_mapconsts(_widen, op.point)) * ic
     point = _mapconsts(narrow, k)
-    θ = _mapconsts(narrow, -_kernel_beta(op) * k * Num(d))
+    # a rounded phase constant this large would be off by more than about 1e-8 rad
+    θ = _mapconsts(v -> (r = narrow(v); v isa BigFloat && r != v && abs(r) > 2^26 ? NaN : r), -_kernel_beta(op) * k * Num(d))
     scale = narrow(abs(ic))
     # a float that cannot represent the phase, point or scale would make the result wrong
     (_nonfinite(point) || _nonfinite(θ) || !isfinite(scale)) && return _transform_term(op, g)
