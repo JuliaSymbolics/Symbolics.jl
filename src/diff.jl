@@ -681,6 +681,8 @@ function executediff(D::Differential, arg::BasicSymbolic{VartypeT}; simplify=fal
                 a, b = unwrap.(IntervalSets.endpoints(domain))
                 summed_args = SymbolicUtils.ArgsT{VartypeT}()
                 inner_function = arguments(arg)[1]
+                # substitution does not enter a transform term, so it cannot set the integration variable there
+                SymbolicUtils.query(z -> is_fourier_term(z) && !isequal(operation(z).var, domainvars) && occursin_info(domainvars, z), inner_function) && return D(arg)
                 if iscall(a) || isequal(a, D.x)
                     t1 = substitute_in_deriv_and_depvar(inner_function, Dict(domainvars => a))
                     t2 = executediff(D, a; simplify, throw_no_derivative)
@@ -1327,6 +1329,10 @@ function hessian_sparsity(expr, vars::AbstractVector; full::Bool=true, linearity
     # silently wrong pattern
     for ui in u
         ui isa SymbolicT && is_scalar_indexed(ui) && occursin_info(ui, expr)
+    end
+    if expr isa SymbolicT && any(ui -> SymbolicUtils.query(z -> is_fourier_term(z) && occursin_info(ui, z), expr), u)
+        S = sparse(trues(length(u), length(u))) # transform terms are opaque to the linearity analysis
+        return full ? S : tril(S)
     end
     dict = Dict(ui => TermCombination(Set([Dict(i=>1)])) for (i, ui) in enumerate(u))
     f = Rewriters.Prewalk(x-> get(dict, x, x); maketerm=basic_mkterm)(expr)

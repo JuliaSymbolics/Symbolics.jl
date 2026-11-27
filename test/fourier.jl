@@ -78,7 +78,7 @@ end
     I = Integral(s in Symbolics.DomainSets.ClosedInterval(0, t^2))(s)
     for ex in (
             f(t)^2, f(t) * f(2t), exp(-t^2), t * f(t), f(t^2), f(a * t), f(t + sign(t)),
-            f(t) * I, f(t) / (1 + t^2), f(t + z), t, f(Inf * t),
+            f(t) * I, f(t) / (1 + t^2), f(t + z), t, f(Inf * t), f(1.0e-320 * t),
         )
         @test isequal(fourier(ex, t => w), F(ex))
     end
@@ -88,6 +88,15 @@ end
     @test Symbolics.hasnode(unwrap(real(fourier(inner * f(t), t => w)))) do x
         Symbolics.is_fourier_term(x) && isequal(operation(x).point, unwrap(t * (1 // 2)))
     end
+end
+
+@testset "numeric overflow" begin
+    # exact: integer arithmetic does not wrap around
+    m = typemin(Int)
+    @test isequal(fourier(f(m * t), t => w), abs(1 // big(m)) * FourierTransform(t => w * (1 // big(m)))(f(t)))
+    @test isequal(fourier(f(2^62 * (2t + a)), t => w), fourier(f(big(2)^63 * t + big(2)^62 * a), t => w))
+    # a phase that overflows a float stays unevaluated
+    @test isequal(fourier(f(t + 1.0e300), t => 1.0e300), FourierTransform(t => 1.0e300)(f(t + 1.0e300)))
 end
 
 @testset "operator construction" begin
@@ -126,6 +135,17 @@ end
     @test isequal(substitute(real(T) + 1, Dict(real(T) => 2)), Num(3))
     G = Integral(t in Symbolics.DomainSets.ClosedInterval(0, a))(real(T))
     @test Symbolics.hasnode(isequal(unwrap(real(T))), unwrap(expand_derivatives(Differential(a)(G))))
+    # the Leibniz rule would substitute the integration variable into a transform term
+    @syms s
+    for G in (
+            Integral(w in Symbolics.DomainSets.ClosedInterval(0, a))(real(T)),
+            Integral(s in Symbolics.DomainSets.ClosedInterval(0, a))(real(FourierTransform(t => w)(s * f(t)))),
+        )
+        @test isequal(expand_derivatives(Differential(a)(G)), Differential(a)(G))
+    end
+    # transform terms are opaque to the Hessian sparsity analysis
+    @test all(Symbolics.hessian_sparsity(real(T), [w, a]))
+    @test !Symbolics.isaffine(real(T), [w])
 
     # generated code cannot evaluate a transform term
     @test_throws UndefVarError build_function(real(T), w; expression = Val(false))(1.0)

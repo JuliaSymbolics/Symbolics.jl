@@ -176,6 +176,14 @@ function _transform(op::FourierOperator, g::SymbolicT)::Complex{Num}
     return _transform_term(op, g)
 end
 
+# Integer constants are widened to `BigInt` while the shift rule computes, so that no
+# fixed-width arithmetic can wrap around; `_narrow` converts back the ones that fit.
+_mapconsts(f, ex) = SymbolicUtils.Rewriters.Postwalk(z -> SymbolicUtils.isconst(z) ? Const{VartypeT}(f(unwrap_const(z))) : z)(unwrap(ex))
+_widen(v) = v isa Union{Rational, Integer} && !(v isa Bool) ? big(v) : v
+_narrow(v) = v isa BigInt && typemin(Int) <= v <= typemax(Int) ? Int(v) :
+    v isa Rational{BigInt} && _narrow(numerator(v)) isa Int && _narrow(denominator(v)) isa Int ? Rational{Int}(v) : v
+_nonfinite(ex) = SymbolicUtils.query(z -> SymbolicUtils.isconst(z) && (v = unwrap_const(z)) isa Number && !isfinite(v), ex)
+
 # h(c x + d) ↔ e^{-iβkd/c} H(k/c) / |c|, for a symbolic function `h` of one argument
 # depending on `x`, with `c` a finite nonzero real number and `d` real.
 function _transform_affine(op::FourierOperator, g::SymbolicT)
@@ -183,20 +191,24 @@ function _transform_affine(op::FourierOperator, g::SymbolicT)
     args = arguments(g)
     i = findall(a -> _depends_on(a, x), args)
     length(i) == 1 || return _transform_term(op, g)
-    cd = _affine_parts(args[only(i)], x)
+    cd = _affine_parts(_mapconsts(_widen, args[only(i)]), x)
     cd === nothing && return _transform_term(op, g)
     c, d = unwrap(cd[1]), unwrap(cd[2])
     SymbolicUtils.isconst(c) && unwrap_const(c) isa Real && isfinite(unwrap_const(c)) &&
         !iszero(unwrap_const(c)) && _isreal_symbolic(d) || return _transform_term(op, g)
     (isone(unwrap_const(c)) && _iszero(d)) && return _transform_term(op, g)
     ic = (c = unwrap_const(c)) isa Integer ? 1 // c : inv(c)
+    k = Num(_mapconsts(_widen, op.point))
+    point = _mapconsts(_narrow, k * ic)
+    θ = _mapconsts(_narrow, -_kernel_beta(op) * k * Num(d) * ic)
+    scale = _narrow(abs(ic))
+    # a phase or point that overflowed a float would make the result undefined
+    (_nonfinite(point) || _nonfinite(θ) || !isfinite(scale)) && return _transform_term(op, g)
     newargs = collect(SymbolicT, args)
     newargs[only(i)] = x
     h = maketerm(SymbolicT, operation(g), newargs, metadata(g))
-    k = Num(op.point)
-    θ = -_kernel_beta(op) * k * Num(d) * ic
-    phase = _iszero(unwrap(θ)) ? 1 : Complex{Num}(cos(θ), sin(θ))
-    return phase * abs(ic) * _transform_term(_at(op, k * ic), h)
+    phase = _iszero(θ) ? 1 : Complex{Num}(cos(Num(θ)), sin(Num(θ)))
+    return phase * scale * _transform_term(_at(op, point), h)
 end
 
 function _expand_transforms(ex::SymbolicT)::SymbolicT
