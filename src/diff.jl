@@ -970,58 +970,69 @@ function jacobian(ops::AbstractVector, vars::AbstractVector{SymbolicT};
     return result
 end
 
-function _walk_indexed_producer!(indexed_expr, bvars, walk!, vs)
-    if is_scalar_indexed(indexed_expr)
-        args = SymbolicUtils.arguments(indexed_expr)
-        if all(_is_scalar_literal, @view args[2:end])
-            _walk_indexed_producer!(args[1], bvars, walk!, vs)
-        else
-            for arg in args
-                if !any(bv -> isequal(arg, bv), bvars)
-                    push!(vs, arg)
-                    walk!(arg, bvars)
+function _augment_with_call_args!(vs)
+    # Track inclusion-minimal binder sets traversed for each expression
+    traversed_scopes = Dict{SymbolicT, Vector{Set{Any}}}()
+    bucket_queues = Dict{Int, Vector{Tuple{SymbolicT, Set{Any}}}}()
+    max_queued_depth = 0
+
+    function enqueue_scope!(ex, bvars::Set{Any})
+        d = length(bvars)
+        q = get!(Vector{Tuple{SymbolicT, Set{Any}}}, bucket_queues, d)
+        push!(q, (ex, bvars))
+        if d > max_queued_depth
+            max_queued_depth = d
+        end
+    end
+
+    function _walk_indexed_producer!(indexed_expr, bvars)
+        if is_scalar_indexed(indexed_expr)
+            args = SymbolicUtils.arguments(indexed_expr)
+            if all(_is_scalar_literal, @view args[2:end])
+                _walk_indexed_producer!(args[1], bvars)
+            else
+                for arg in args
+                    if !any(bv -> isequal(arg, bv), bvars)
+                        push!(vs, arg)
+                        walk!(arg, bvars)
+                    end
+                end
+            end
+        elseif SymbolicUtils.iscall(indexed_expr)
+            for subarg in SymbolicUtils.arguments(indexed_expr)
+                if !any(bv -> isequal(subarg, bv), bvars)
+                    push!(vs, subarg)
+                    walk!(subarg, bvars)
                 end
             end
         end
-    elseif SymbolicUtils.iscall(indexed_expr)
-        for subarg in SymbolicUtils.arguments(indexed_expr)
-            if !any(bv -> isequal(subarg, bv), bvars)
-                push!(vs, subarg)
-                walk!(subarg, bvars)
-            end
-        end
     end
-end
 
-function _augment_with_call_args!(vs)
-    visited_free = Set{SymbolicT}()
-    visited_bound = Set{Tuple{SymbolicT, Tuple}}()
-
-    function walk!(ex, bvars::Tuple)
+    function walk!(ex, bvars::Set{Any})
         SymbolicUtils.iscall(ex) || return
-        if isempty(bvars)
-            (ex in visited_free) && return
-            push!(visited_free, ex)
-        else
-            (ex in visited_free || (ex, bvars) in visited_bound) && return
-            push!(visited_bound, (ex, bvars))
+
+        prev_sets = get!(Vector{Set{Any}}, traversed_scopes, ex)
+        if any(prev -> issubset(prev, bvars), prev_sets)
+            return
         end
+        filter!(prev -> !issubset(bvars, prev), prev_sets)
+        push!(prev_sets, bvars)
 
         o = SymbolicUtils.operation(ex)
         if o isa Integral
             bvar = o.domain.variables
-            bvars_to_add = bvar isa Union{Tuple, AbstractVector} ? Tuple(unwrap(v) for v in bvar) : (unwrap(bvar),)
-            new_bvars = (bvars..., bvars_to_add...)
+            bvars_to_add = bvar isa Union{Tuple, AbstractVector} ? [unwrap(v) for v in bvar] : [unwrap(bvar)]
+            new_bvars = union(bvars, bvars_to_add)
             for arg in SymbolicUtils.arguments(ex)
                 any(bv -> isequal(arg, bv), new_bvars) && continue
                 push!(vs, arg)
-                walk!(arg, new_bvars)
+                enqueue_scope!(arg, new_bvars)
             end
         elseif is_scalar_indexed(ex)
             args = SymbolicUtils.arguments(ex)
             push!(vs, ex)
             if all(_is_scalar_literal, @view args[2:end])
-                _walk_indexed_producer!(args[1], bvars, walk!, vs)
+                _walk_indexed_producer!(args[1], bvars)
             else
                 for arg in args
                     any(bv -> isequal(arg, bv), bvars) && continue
@@ -1040,8 +1051,21 @@ function _augment_with_call_args!(vs)
     end
 
     for s in collect(vs)
-        walk!(s, ())
+        enqueue_scope!(s, Set{Any}())
     end
+
+    curr_depth = 0
+    while curr_depth <= max_queued_depth
+        if haskey(bucket_queues, curr_depth)
+            q = bucket_queues[curr_depth]
+            while !isempty(q)
+                (item, bvars) = popfirst!(q)
+                walk!(item, bvars)
+            end
+        end
+        curr_depth += 1
+    end
+
     return vs
 end
 

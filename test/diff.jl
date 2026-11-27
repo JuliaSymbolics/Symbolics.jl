@@ -159,7 +159,7 @@ let
     # Scaling regression for shared subexpressions across integration scopes
     let
         n_sc = 14
-        @variables q_sc t_sc[1:n_sc] f_sc(..) g_sc(..)
+        @variables q_sc t_sc[1:n_sc] f_sc(..) g_sc(..) tau_sc
         e_sc = g_sc(t_sc...)
         for k in 1:n_sc
             I_k = Integral(t_sc[k] in Symbolics.DomainSets.ClosedInterval(0, 1))
@@ -171,6 +171,23 @@ let
         # while exponential/unshared traversal allocates > 120 MB at depth 14.
         alloc_sc = @allocated Symbolics.jacobian(ops_sc, vars_sc)
         @test alloc_sc < 500_000
+
+        # Reversed argument order (integral argument first)
+        e_rev = g_sc(t_sc...)
+        for k in 1:n_sc
+            I_k = Integral(t_sc[k] in Symbolics.DomainSets.ClosedInterval(0, 1))
+            e_rev = f_sc(I_k(e_rev), e_rev)
+        end
+        @test isequal(only(Symbolics.jacobian([e_rev], vars_sc)), 0)
+        alloc_rev = @allocated Symbolics.jacobian([e_rev], vars_sc)
+        @test alloc_rev < 500_000
+
+        # Outer integral wrapping the shared fixture
+        I_outer = Integral(tau_sc in Symbolics.DomainSets.ClosedInterval(0, 1))
+        e_outer = I_outer(e_sc)
+        @test isequal(only(Symbolics.jacobian([e_outer], vars_sc)), 0)
+        alloc_outer = @allocated Symbolics.jacobian([e_outer], vars_sc)
+        @test alloc_outer < 500_000
     end
 
     # Unshared binder-free call chain allocation growth assertion
