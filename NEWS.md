@@ -1,3 +1,13 @@
+## 8.0.0
+
+### Breaking changes
+
+- `Differential(x)` throws an `ArgumentError` unless `x` is a symbolic variable or a
+  coordinate of one; the `Differential` docstring lists the accepted targets. Constants,
+  arithmetic expressions such as `2x` or `x + y`, slices such as `x[1:2]`, and complex
+  values are rejected, so `Symbolics.derivative(x, 2x)` errors instead of returning `0`.
+  Numeric targets throw `ArgumentError` rather than `ErrorException` or `MethodError`.
+
 ## 7.37.0
 
 ### Behavior changes
