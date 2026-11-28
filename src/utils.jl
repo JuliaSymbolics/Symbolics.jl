@@ -698,13 +698,9 @@ factors(x) = arguments(x, *)
 Evaluate the equation `eq` or inequality `ineq`. `subs` is a dictionary of variable to numerical value substitutions. 
 If both sides of the equation or inequality are numeric, then the result is a boolean.
 
-Both inequalities are inclusive: `x ≲ y` checks `x ≤ y` and `x ≳ y` checks `x ≥ y`, so equal
-values satisfy both. Julia's own number types (`Bool`, the fixed-size integers, `BigInt`,
-`Rational`, `Float16`/`Float32`/`Float64`, `BigFloat` and `Irrational`) are compared with `<=`:
-`NaN` is unordered, so any inequality with a `NaN`
-side is `false`, and `-0.0` and `0.0` compare equal. Other numeric types are compared through the
-`isless`/`isequal` ordering interface, as `isless(a, b) || isequal(a, b)`, so a type only needs to
-define those two.
+Both inequalities include equality and use `isless` and `isequal` for ordered values.
+Positive and negative zero compare equal for Julia's built-in floating-point types.
+An unordered operand such as `NaN` makes either inequality false.
 
 # Examples
 ```julia-repl
@@ -730,13 +726,13 @@ function evaluate(eq::Equation, subs)
     return isequal(lhs, rhs)
 end
 
-# Inclusive `a ≤ b` for the numeric branches of `evaluate(::Inequality, subs)`. Values that only
-# implement the ordering interface (`isless`/`isequal`) use it; built-in numbers keep Julia's `<=`,
-# so `NaN` stays unordered and signed zeros compare equal.
-const _BuiltinOrderedNumber = Union{Bool, Base.BitInteger, BigInt, Rational, Base.IEEEFloat,
-                                    BigFloat, Irrational}
-_evaluate_leq(a, b) = isless(a, b) || isequal(a, b)
-_evaluate_leq(a::_BuiltinOrderedNumber, b::_BuiltinOrderedNumber) = a <= b
+function _evaluate_leq(a, b)
+    (isunordered(a) || isunordered(b)) && return false
+    normalize_zero(x) = x
+    normalize_zero(x::Union{Float16, Float32, Float64, BigFloat}) = iszero(x) ? zero(x) : x
+    lhs, rhs = normalize_zero(a), normalize_zero(b)
+    return isless(lhs, rhs) || isequal(lhs, rhs)
+end
 
 function evaluate(ineq::Inequality, subs)
     lhs = substitute(ineq.lhs, subs)

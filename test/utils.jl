@@ -400,6 +400,14 @@ Base.isless(a::OrderOnlyReal, b::OrderOnlyReal) = isless(a.v, b.v)
 Base.isequal(a::OrderOnlyReal, b::OrderOnlyReal) = isequal(a.v, b.v)
 Base.hash(a::OrderOnlyReal, h::UInt) = hash(a.v, hash(:OrderOnlyReal, h))
 
+struct OrderOnlyFloat <: AbstractFloat
+    v::Int
+    tag::Bool
+end
+Base.isless(a::OrderOnlyFloat, b::OrderOnlyFloat) = isless(a.v, b.v)
+Base.isequal(a::OrderOnlyFloat, b::OrderOnlyFloat) = isequal(a.v, b.v)
+Base.hash(a::OrderOnlyFloat, h::UInt) = hash(a.v, hash(:OrderOnlyFloat, h))
+
 @testset "evaluate" begin
     @variables x y
     eqn_1 = x ~ y 
@@ -428,14 +436,17 @@ Base.hash(a::OrderOnlyReal, h::UInt) = hash(a.v, hash(:OrderOnlyReal, h))
     @test !Symbolics.evaluate(ltr, Dict(x => hi, y => lo))
     @test !Symbolics.evaluate(gtr, Dict(x => lo, y => hi))
 
-    # Built-in floats keep `<=`: NaN is unordered and signed zeros are equal.
-    for (a, b) in ((NaN, 1.0), (1.0, NaN), (NaN, NaN))
-        subs = Dict(x => a, y => b)
+    subs = Dict(x => OrderOnlyFloat(1, true), y => OrderOnlyFloat(1, false))
+    @test Symbolics.evaluate(ltr, subs)
+    @test Symbolics.evaluate(gtr, subs)
+
+    for (a, b) in ((NaN, 1.0), (1.0, NaN), (NaN, NaN), (NaN, lo), (lo, NaN))
+        subs = Dict{Num, Real}(x => a, y => b)
         @test !Symbolics.evaluate(ltr, subs)
         @test !Symbolics.evaluate(gtr, subs)
     end
-    for (a, b) in ((-0.0, 0.0), (0.0, -0.0))
-        subs = Dict(x => a, y => b)
+    for (a, b) in ((-0.0, 0.0), (0.0, -0.0), (-0.0, 0), (0, -0.0))
+        subs = Dict{Num, Real}(x => a, y => b)
         @test Symbolics.evaluate(ltr, subs)
         @test Symbolics.evaluate(gtr, subs)
     end
