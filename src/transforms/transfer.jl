@@ -23,10 +23,12 @@ calls `simplify_fractions` on each entry and can be slow. The determinants are e
 without division, so the cost and the size of the result can grow exponentially with `nx`
 for dense symbolic `A`.
 
-Arithmetic on integer and rational constants is exact: coefficients which do not fit in an
-`Int` are returned as `BigInt`s. Floating-point constants are combined in `BigFloat` and
-rounded to `Float64` at the end; an `ArgumentError` is thrown if a coefficient overflows or
-underflows `Float64`. Constants inside other functions, such as `sin`, are left as given.
+Arithmetic on constants is exact, with floating-point constants taken as the rationals they
+represent. Without floating-point constants, coefficients which do not fit in an `Int` are
+returned as `BigInt`s. With them, all coefficients are rounded to `Float64` at the end (to
+`BigFloat` if there is a `BigFloat` constant). An `ArgumentError` is thrown for `Inf` and
+`NaN` constants, and if a coefficient overflows or underflows `Float64`. Constants inside
+other functions, such as `sin`, are left as given.
 
 Only the explicit form above is supported, not the descriptor form `Ex' = Ax + Bu`. If the
 matrices come from symbolic differentiation (as with ModelingToolkit's
@@ -67,8 +69,8 @@ function transfer_function(
     # All arithmetic is done on polynomials with `BigInt`-based coefficients, because
     # `expand` computes in machine integers, which wrap around silently.
     atoms = Bijections.Bijection{SymbolicUtils.PolyVarT, SymbolicT}()
-    keepbig = Ref(false)
-    polynomial(x) = _polynomial!(atoms, keepbig, unwrap(x))
+    floattype = Ref{Type}(Union{})
+    polynomial(x) = _polynomial!(atoms, floattype, unwrap(x))
 
     # Row `i` of `[A B]` and of `[C D]` is multiplied by its common denominator. Then
     # `M = s*diagm(E) - A` and `G[i, j] = det([M B[:, j]; -C[i, :]' D[i, j]]) / (F[i] det(M))`.
@@ -83,7 +85,7 @@ function transfer_function(
         SymbolicUtils.from_poly(
             atoms,
             DP.Polynomial(
-                SymbolicUtils.PolyCoeffT[_narrow(c, keepbig[]) for c in MP.coefficients(p)],
+                SymbolicUtils.PolyCoeffT[_narrow(c, floattype[]) for c in MP.coefficients(p)],
                 MP.monomials(p)
             )
         )
@@ -99,41 +101,43 @@ function transfer_function(
     return simplify ? map(simplify_fractions, G) : G
 end
 
-# `x` as a polynomial with exact coefficients for integer and rational constants, and
-# `BigFloat` ones for floats. Anything but `+`, `*` and non-negative integer powers
-# becomes a variable of its own, recorded in `atoms`.
-function _polynomial!(atoms, keepbig, x::SymbolicT)
+# `x` as a polynomial with exact coefficients, where `floattype` records the type to round
+# them to. Anything but `+`, `*` and non-negative integer powers becomes a variable of its
+# own, recorded in `atoms`.
+function _polynomial!(atoms, floattype, x::SymbolicT)
     if SymbolicUtils.isconst(x)
         v = unwrap_const(x)
-        keepbig[] |= v isa BigFloat
-        c = v isa Integer ? BigInt(v) : v isa Rational ? Rational{BigInt}(v) :
-            v isa AbstractFloat ? BigFloat(v) : nothing
+        if v isa AbstractFloat
+            isfinite(v) || throw(ArgumentError("the constant $v is not finite"))
+            floattype[] = promote_type(floattype[], Float64, typeof(v))
+        end
+        c = v isa Integer ? BigInt(v) :
+            v isa Union{Rational, AbstractFloat} ? Rational{BigInt}(v) : nothing
         c === nothing || return MP.polynomial(c * one(SymbolicUtils.PolyVarT))
     elseif iscall(x)
         op, args = operation(x), arguments(x)
-        op === (+) && return sum(a -> _polynomial!(atoms, keepbig, a), args)
-        op === (*) && return prod(a -> _polynomial!(atoms, keepbig, a), args)
+        op === (+) && return sum(a -> _polynomial!(atoms, floattype, a), args)
+        op === (*) && return prod(a -> _polynomial!(atoms, floattype, a), args)
         if op === (^)
             n = unwrap_const(args[2])
-            n isa Integer && n >= 0 && return _polynomial!(atoms, keepbig, args[1])^Int(n)
+            n isa Integer && n >= 0 && return _polynomial!(atoms, floattype, args[1])^Int(n)
         end
     end
     var = SymbolicUtils.basicsymbolic_to_polyvar(Bijections.active_inv(atoms), x)
     return MP.polynomial(big(1) * var)
 end
 
-# Coefficients that fit are converted back to machine numbers
-_fits(v) = abs(v) <= typemax(Int)
-_narrow(v::BigInt, _) = _fits(v) ? Int(v) : v
-function _narrow(v::Rational{BigInt}, keepbig)
-    isone(denominator(v)) && return _narrow(numerator(v), keepbig)
-    return _fits(numerator(v)) && _fits(denominator(v)) ? Rational{Int}(v) : v
-end
-function _narrow(v::BigFloat, keepbig)
-    keepbig && return v
-    x = Float64(v)
-    isfinite(x) && iszero(x) == iszero(v) ||
-        throw(ArgumentError("the coefficient $v cannot be represented as a `Float64`"))
+# Coefficients are rounded to `F`, or converted back to machine numbers if they fit
+function _narrow(v, F)
+    if F === Union{}
+        q = isone(denominator(v)) ? numerator(v) : v
+        fits = abs(numerator(q)) <= typemax(Int) && denominator(q) <= typemax(Int)
+        return fits ? (q isa BigInt ? Int(q) : Rational{Int}(q)) : q
+    end
+    x = F(v)
+    isfinite(x) && iszero(x) == iszero(v) || throw(
+        ArgumentError("the coefficient $(BigFloat(v)) cannot be represented as a `$F`")
+    )
     return x
 end
 

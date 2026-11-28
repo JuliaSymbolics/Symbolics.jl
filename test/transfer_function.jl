@@ -241,6 +241,22 @@ end
     @test_throws ArgumentError transfer_function(diagm(fill(-1.0e-200, 2)), [1, 1], [1, 0], 0, s)
 end
 
+@testset "floating-point constants are combined exactly" begin
+    K = 1.0e100
+    # `K + 1 - K` must not be lost: the transfer function is `s / (s + K)`
+    G = transfer_function([-K 0; 0 -1], [K, 0], [-1, 0], 1, s)
+    num = Symbolics.arguments(Symbolics.unwrap(G[1]))[1]
+    @test isequal(num, Symbolics.unwrap(s^2 + 1.0 * s))
+    @test frequency_response(G, s, [1.0])[1] ≈ 1.0e-100im
+
+    @variables q
+    for x in (Inf, -Inf, NaN, x -> Inf * x)
+        v = x isa Function ? x(q) : x
+        @test_throws ArgumentError transfer_function(fill(-1, 1, 1), [v], [1], 0, s)
+        @test_throws ArgumentError transfer_function(zeros(0, 0), zeros(0, 1), zeros(1, 0), v, s)
+    end
+end
+
 @testset "constants are returned as machine numbers" begin
     G = transfer_function(fill(-2.5, 1, 1), [1], [1], 0, s)
     at_half = value(substitute(G[1], Dict(s => 0.5); fold = Val(true)))
