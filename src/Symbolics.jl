@@ -273,6 +273,9 @@ export limit
 include("partialfractions.jl")
 export partial_frac_decomposition
 
+include("transforms/transfer.jl")
+export transfer_function, frequency_response
+
 # Hacks to make wrappers "nicer"
 const NumberTypes = Union{AbstractFloat,Integer,Complex{<:AbstractFloat},Complex{<:Integer}}
 (::Type{T})(x::SymbolicUtils.BasicSymbolic) where {T<:NumberTypes} = throw(ArgumentError("Cannot convert Sym to $T since Sym is symbolic and $T is concrete. Use `substitute` to replace the symbolic unwraps."))

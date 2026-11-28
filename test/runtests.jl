@@ -91,6 +91,7 @@ if GROUP == "All" || GROUP == "Core"
         @safetestset "ODE solver test" begin include("diffeqs.jl") end
         @safetestset "Laplace transform test" begin include("laplace.jl") end
         @safetestset "Partial Fraction Decomposition Test" begin include("partialfractions.jl") end
+        @safetestset "Transfer Function Test" begin include("transfer_function.jl") end
     end
 end
 
