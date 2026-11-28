@@ -84,6 +84,11 @@ Fields:
   regions, such as literals, are converted to the output's element type once per call, so a
   `Float32` output is computed in `Float32` arithmetic. This rounds them to that type, so it
   is off by default.
+- `eager_scalar_writes`: when `true`, the scalars of an `ArrayMaker` or array literal output
+  are written as soon as enough of them were computed, instead of after all of them. That
+  keeps the values from staying alive to the end of the function, which makes large
+  functions faster to compile and to run. Set it only when the output shares no memory
+  with anything it is computed from, and distinct indices of it do not share memory.
 - `use_literal_pow`: Whether to lower `x ^ n` for a constant literal `n` to
   `Base.literal_pow(^, x, Val(n))`. This improves the runtime performance of the generated code,
   but may be incompatible with symbolic tracing. Defaults to `true`.
@@ -103,6 +108,7 @@ struct CodegenFunctionOptions
     fuse_unalias::Bool
     fuse_output_eltype::Bool
     use_literal_pow::Bool
+    eager_scalar_writes::Bool
 end
 
 function CodegenFunctionOptions(;
@@ -111,12 +117,13 @@ function CodegenFunctionOptions(;
         sort_addmul = false, optimize = nothing, similarto = nothing,
         outputidxs = nothing, skipzeros = false, scalarize_single_element_regions = true,
         fuse_broadcasts = false, fuse_unalias = true,
-        fuse_output_eltype = false, use_literal_pow = true, kwargs...
+        fuse_output_eltype = false, use_literal_pow = true,
+        eager_scalar_writes = false, kwargs...
     )
     return CodegenFunctionOptions(
         nanmath, wrap_code, checkbounds, iip_config, sort_addmul, optimize,
         similarto, outputidxs, skipzeros, scalarize_single_element_regions, fuse_broadcasts,
-        fuse_unalias, fuse_output_eltype, use_literal_pow
+        fuse_unalias, fuse_output_eltype, use_literal_pow, eager_scalar_writes
     )
 end
 
@@ -158,6 +165,7 @@ function codegen_function(
     rewrites[Code.FUSE_UNALIAS_KEY] = fuse_unalias
     rewrites[Code.FUSE_OUTPUT_ELTYPE_KEY] = fuse_output_eltype
     rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
+    rewrites[:eager_scalar_writes] = opts.eager_scalar_writes
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
 
@@ -224,6 +232,7 @@ function codegen_function(
     rewrites[Code.FUSE_UNALIAS_KEY] = fuse_unalias
     rewrites[Code.FUSE_OUTPUT_ELTYPE_KEY] = fuse_output_eltype
     rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
+    rewrites[:eager_scalar_writes] = opts.eager_scalar_writes
 
     expr = _recursive_unwrap(expr)
 
