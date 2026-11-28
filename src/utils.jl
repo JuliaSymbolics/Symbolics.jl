@@ -696,7 +696,11 @@ factors(x) = arguments(x, *)
     evaluate(ineq::Inequality, subs)
 
 Evaluate the equation `eq` or inequality `ineq`. `subs` is a dictionary of variable to numerical value substitutions. 
-If both sides of the equation or inequality are numeric, then the result is a boolean. 
+If both sides of the equation or inequality are numeric, then the result is a boolean.
+
+Both inequalities include equality and use `isless` and `isequal` for ordered values.
+Positive and negative zero compare equal for Julia's built-in floating-point types.
+An unordered operand such as `NaN` makes either inequality false.
 
 # Examples
 ```julia-repl
@@ -722,18 +726,26 @@ function evaluate(eq::Equation, subs)
     return isequal(lhs, rhs)
 end
 
+function _evaluate_leq(a, b)
+    (isunordered(a) || isunordered(b)) && return false
+    normalize_zero(x) = x
+    normalize_zero(x::Union{Float16, Float32, Float64, BigFloat}) = iszero(x) ? zero(x) : x
+    lhs, rhs = normalize_zero(a), normalize_zero(b)
+    return isless(lhs, rhs) || isequal(lhs, rhs)
+end
+
 function evaluate(ineq::Inequality, subs)
     lhs = substitute(ineq.lhs, subs)
     rhs = substitute(ineq.rhs, subs)
     if (ineq.relational_op == geq)
         return if SymbolicUtils.isconst(rhs) && SymbolicUtils.isconst(lhs)
-            isless(unwrap_const(rhs), unwrap_const(lhs))::Bool
+            _evaluate_leq(unwrap_const(rhs), unwrap_const(lhs))::Bool
         else
             isless(rhs, lhs)
         end
     elseif (ineq.relational_op == leq)
         return if SymbolicUtils.isconst(lhs) && SymbolicUtils.isconst(rhs)
-            isless(unwrap_const(lhs), unwrap_const(rhs))::Bool
+            _evaluate_leq(unwrap_const(lhs), unwrap_const(rhs))::Bool
         else
             isless(lhs, rhs)
         end

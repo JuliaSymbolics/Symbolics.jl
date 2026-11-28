@@ -393,6 +393,21 @@ end
     @test Set(terms(-x - y + z)) == Set([-x, -y, z])
 end
 
+struct OrderOnlyReal <: Real
+    v::Int
+end
+Base.isless(a::OrderOnlyReal, b::OrderOnlyReal) = isless(a.v, b.v)
+Base.isequal(a::OrderOnlyReal, b::OrderOnlyReal) = isequal(a.v, b.v)
+Base.hash(a::OrderOnlyReal, h::UInt) = hash(a.v, hash(:OrderOnlyReal, h))
+
+struct OrderOnlyFloat <: AbstractFloat
+    v::Int
+    tag::Bool
+end
+Base.isless(a::OrderOnlyFloat, b::OrderOnlyFloat) = isless(a.v, b.v)
+Base.isequal(a::OrderOnlyFloat, b::OrderOnlyFloat) = isequal(a.v, b.v)
+Base.hash(a::OrderOnlyFloat, h::UInt) = hash(a.v, hash(:OrderOnlyFloat, h))
+
 @testset "evaluate" begin
     @variables x y
     eqn_1 = x ~ y 
@@ -405,6 +420,36 @@ end
     @test Symbolics.evaluate(gtr, Dict(x => 2, y => 1))
     @test Symbolics.evaluate(ltr, Dict(x => 1, y => 2))
     @test !Symbolics.evaluate(ltr, Dict(x => 2, y => 1))
+
+    for val in (1, 2 // 3, 0.5)
+        subs = Dict(x => val, y => val)
+        @test Symbolics.evaluate(gtr, subs)
+        @test Symbolics.evaluate(ltr, subs)
+    end
+
+    # A `Real` that only implements the ordering interface.
+    lo, hi = OrderOnlyReal(1), OrderOnlyReal(2)
+    @test Symbolics.evaluate(ltr, Dict(x => lo, y => lo))
+    @test Symbolics.evaluate(gtr, Dict(x => lo, y => lo))
+    @test Symbolics.evaluate(ltr, Dict(x => lo, y => hi))
+    @test Symbolics.evaluate(gtr, Dict(x => hi, y => lo))
+    @test !Symbolics.evaluate(ltr, Dict(x => hi, y => lo))
+    @test !Symbolics.evaluate(gtr, Dict(x => lo, y => hi))
+
+    subs = Dict(x => OrderOnlyFloat(1, true), y => OrderOnlyFloat(1, false))
+    @test Symbolics.evaluate(ltr, subs)
+    @test Symbolics.evaluate(gtr, subs)
+
+    for (a, b) in ((NaN, 1.0), (1.0, NaN), (NaN, NaN), (NaN, lo), (lo, NaN))
+        subs = Dict{Num, Real}(x => a, y => b)
+        @test !Symbolics.evaluate(ltr, subs)
+        @test !Symbolics.evaluate(gtr, subs)
+    end
+    for (a, b) in ((-0.0, 0.0), (0.0, -0.0), (-0.0, 0), (0, -0.0))
+        subs = Dict{Num, Real}(x => a, y => b)
+        @test Symbolics.evaluate(ltr, subs)
+        @test Symbolics.evaluate(gtr, subs)
+    end
 end
 
 @testset "Issue #1683: Scalarization of `Num` retains type" begin
