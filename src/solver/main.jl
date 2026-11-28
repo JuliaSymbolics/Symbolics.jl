@@ -1,4 +1,5 @@
-Base.:^(a::Complex{<:Real}, b::Num) = Symbolics.Pow(a, b)
+Base.:^(a::Complex{T}, b::Num) where {T <: Union{AbstractFloat, Integer, Rational, AbstractIrrational}} =
+    Complex{Num}(SymbolicUtils.term(^, a, Symbolics.unwrap(b)))
 
 # The solver builds roots from Nemo factor dictionaries, whose iteration order is
 # hash-dependent, so without an explicit sort the returned root order can change

@@ -340,6 +340,16 @@ function Base.:/(x::Complex{Num}, y::Complex{Num})
     Complex((a*c + b*d)/den, (b*c - a*d)/den)
 end
 Base.:^(z::Complex{Num}, n::Integer) = Base.power_by_squaring(z, n)
+
+function Base.:^(z::Complex{Num}, p::Real)
+    a, b = reim(z)
+    r_pow = hypot(a, b)^p
+    θ_pow = p * atan(b, a)
+    return Complex(r_pow * cos(θ_pow), r_pow * sin(θ_pow))
+end
+
+Base.:^(z::Complex{Num}, p::Rational) = invoke(^, Tuple{Complex{Num}, Real}, z, p)
+
 Base.:^(z::Complex{Num}, n::Bool) = invoke(^, Tuple{Complex{Num}, Integer}, z, n)
 Base.:^(::Irrational{:ℯ}, x::Num) = exp(x)
 
