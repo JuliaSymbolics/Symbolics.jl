@@ -28,6 +28,17 @@ symbolic differentiation, so it only works for models whose operations can all b
 differentiated symbolically. Systems in descriptor form `Ex' = Ax + Bu` are not supported;
 pass the reduced matrices.
 
+`s` may appear in `B` and `D`. A system which also depends on the input derivative, with
+`B = B1 + s*B2` and `D = D1 + s*D2`, is passed in this form:
+
+```@example transfer
+G = transfer_function(fill(-1, 1, 1), [1 + 2s], [1], 3s, s)
+```
+
+For a nonlinear model the entries of the linearized matrices contain state atoms, such as
+`x(t)`. Substitute their values at the operating point, together with the parameters,
+before calling `frequency_response`.
+
 ```@docs
 transfer_function
 frequency_response

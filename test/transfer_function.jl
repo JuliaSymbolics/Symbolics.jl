@@ -50,6 +50,56 @@ end
     @test iszero_expr(G[1] - (R + T * s + 1) / (R * (T * s + 1)))
 end
 
+# `B = B1 + s*B2` and `D = D1 + s*D2` carry the input derivative
+@testset "pure differentiator" begin
+    G = transfer_function(zeros(0, 0), zeros(0, 1), zeros(1, 0), s, s)
+    @test isequal(G[1], s)
+    ωs = [0.0, 0.5, 10.0]
+    @test frequency_response(G, s, ωs)[:] == im .* ωs
+    # a state which neither the input nor the output sees only cancels with `simplify`
+    A, B, C = fill(-1, 1, 1), [0], [0]
+    G = transfer_function(A, B, C, s, s)
+    @test iszero_expr(G[1] - s)
+    @test frequency_response(G, s, ωs)[:] ≈ im .* ωs
+    G = transfer_function(A, B, C, s, s; simplify = true)
+    @test isequal(G[1], s)
+    # `x' = -x + u'`, `y = x`
+    G = transfer_function(A, [s], [1], 0, s)
+    @test isequal(G[1], s / (1 + s))
+    @test frequency_response(G, s, ωs)[:] ≈ im .* ωs ./ (1 .+ im .* ωs)
+end
+
+@testset "input derivative in `B` and `D`" begin
+    @variables b d e
+    A = [0 1; -k -c]
+    B = [0, 1] + s * [b, d]
+    G = transfer_function(A, B, [1, 0], e * s, s)
+    Δ = s^2 + c * s + k
+    hand = (b * s * (s + c) + d * s + 1 + e * s * Δ) / Δ
+    @test iszero_expr(G[1] - hand)
+    Gs = transfer_function(A, B, [1, 0], e * s, s; simplify = true)
+    @test iszero_expr(Gs[1] - hand)
+
+    vals = Dict(k => 2.0, c => 3.0, b => 0.5, d => 0.25, e => 0.125)
+    Anum, B1, B2 = [0.0 1.0; -2.0 -3.0], [0.0, 1.0], [0.5, 0.25]
+    ωs = [0.0, 0.5, 1.0, 10.0]
+    for H in (G, Gs)
+        response = frequency_response(substitute(H, vals), s, ωs)
+        for (i, ω) in enumerate(ωs)
+            hand_ω = reference(Anum, B1 + im * ω * B2, [1.0 0.0], [0.0], ω)
+            @test response[1, 1, i] ≈ only(hand_ω) + im * ω * 0.125
+        end
+    end
+end
+
+# the formula is applied as written
+@testset "`s` in `A` and `C`" begin
+    G = transfer_function(fill(-exp(-s), 1, 1), [1], [s], 0, s)
+    @test iszero_expr(G[1] - s / (s + exp(-s)))
+    @test_throws ArgumentError transfer_function(fill(s, 1, 1), [1], [1], 0, s)
+    @test_throws ArgumentError transfer_function([s 0; 0 -1], [1, 1], [1, 1], 0, s)
+end
+
 @testset "denominators are shared across a row" begin
     G = transfer_function([-1 / (R * C) 1 / C; 0 -1 / T], [0, 1 / T], [1, 0], 0, s)
     @test iszero_expr(G[1] - R / ((R * C * s + 1) * (T * s + 1)))

@@ -9,6 +9,13 @@ single input, and `C` an `(ny, nx)` matrix, or a vector of length `nx` for a sin
 output. `D` is an `(ny, nu)` matrix, or a number if `ny == nu == 1`. Other sizes throw a
 `DimensionMismatch`. A system without states (`A` of size `(0, 0)`) returns `D`.
 
+`s` may appear in `B` and `D`, as in `B = B1 + s*B2` and `D = D1 + s*D2` for a system
+driven by `u` and its derivative `u'`. The formula is applied as written, also if `A` or
+`C` contain `s`; an `ArgumentError` is thrown if `sI - A` is then identically singular.
+For a linearized nonlinear model, the entries contain states and inputs, which must be
+substituted by their values at the operating point before calling
+[`frequency_response`](@ref).
+
 Each entry is a fraction of two expanded polynomials, after clearing the denominators of
 the entries of `A`, `B`, `C` and `D`. Common factors of numerator and denominator, such as
 uncontrollable or unobservable modes, are only cancelled with `simplify = true`, which
@@ -71,6 +78,7 @@ function transfer_function(
     sp, o = polynomial(s), polynomial(Num(0))
     M = DP.Polynomial[(i == j ? E[i] * sp : o) - AB[i, j] for i in 1:nx, j in 1:nx]
     detM = _determinant(M, polynomial(Num(1)))
+    iszero(detM) && throw(ArgumentError("`sI - A` is singular for every `$s`"))
     narrow(p) = Num(
         SymbolicUtils.from_poly(
             atoms,
