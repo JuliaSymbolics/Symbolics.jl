@@ -244,6 +244,8 @@ include("symstruct.jl")
 include("recordliteral.jl")
 include("symzero.jl")
 
+include("array-rules.jl")
+
 import Libdl
 include("build_function.jl")
 include("codegen_fn.jl")
