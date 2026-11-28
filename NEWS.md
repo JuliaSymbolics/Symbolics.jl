@@ -1,3 +1,16 @@
+## Unreleased
+
+### Breaking changes
+
+- Broadcasting `~` over symbolic arrays (`x .~ y`, `A .~ 3x`, `D.(u) .~ u`) returns a
+  concrete `Array{Equation}` of the elementwise scalar equations, so
+  `(x .~ y) isa AbstractVector{<:Equation}` holds and the result can be passed wherever a
+  vector of equations is expected. It used to return a lazy symbolic `Arr{Any}` whose
+  elements became equations only after `collect` or `scalarize`. The concrete array does
+  not accept symbolic indices: `(x .~ y)[i]` with a symbolic `i` throws an
+  `ArgumentError`; write `x[i] ~ y[i]` instead. Unary `.~` (Boolean complement) and every
+  other broadcast still return a symbolic `Arr`.
+
 ## 7.37.0
 
 ### Behavior changes
