@@ -49,10 +49,143 @@ lhss(xs) = map(x->x.lhs, xs)
 rhss(xs) = map(x->x.rhs, xs)
 
 """
+$(TYPEDEF)
+
+The real-part and imaginary-part [`Equation`](@ref)s of a complex-valued
+equation, as produced by [`split_complex_equation`](@ref).
+
+Unlike the plain `Vector{Equation}` returned by a complex [`~`](@ref), a
+`SplitComplexEquation` records that its two equations came from splitting one
+complex equation, so it can be told apart from a user-written pair of real
+equations with `x isa SplitComplexEquation`. `eqs.original` recovers the
+unsplit complex equation.
+
+It is a read-only two-element `AbstractVector{Equation}` with `eqs[1] ==
+eqs.real_eq` and `eqs[2] == eqs.imag_eq`. The pair supports iteration and
+indexing. `copy(eqs)` preserves the marker. `collect(eqs)`, `vcat(eqs)` and
+`reduce(vcat, pairs)` for a vector of split pairs return ordinary
+`Vector{Equation}` values. Attempts to mutate the pair with `push!` or
+`setindex!` raise an error.
+Equality, `isequal` and `hash` compare only the two component equations, not
+`.original`.
+
+A variable declared without `::Complex` is real, so `conj`, `real`, `imag` and
+`abs` of it simplify before the split: with `@variables ψ(..)`, the `original`
+of `im * conj(ψ(t))` is the same as that of `im * ψ(t)`. Declare `ψ(..)::Complex`
+when the equation is not holomorphic in it.
+
+# Fields
+$(FIELDS)
+"""
+struct SplitComplexEquation <: AbstractVector{Equation}
+    """The equation between the real parts of the two sides."""
+    real_eq::Equation
+    """The equation between the imaginary parts of the two sides."""
+    imag_eq::Equation
+    """The unsplit equation between the original complex-valued sides."""
+    original::Equation
+end
+
+Base.size(::SplitComplexEquation) = (2,)
+
+function Base.getindex(eqs::SplitComplexEquation, i::Int)
+    i == 1 && return eqs.real_eq
+    i == 2 && return eqs.imag_eq
+    throw(BoundsError(eqs, i))
+end
+
+Base.iterate(eqs::SplitComplexEquation, state::Int = 1) =
+    state > 2 ? nothing : (eqs[state], state + 1)
+
+Base.copy(eqs::SplitComplexEquation) = eqs
+
+# Two NaNs are equal numeric parts, and Bool parts display as numbers.
+numeric_parts_equal(x, y) = x == y || (isnan(x) && isnan(y))
+part_to_show(x) = x isa Bool ? Int(x) : x
+
+function complex_equation_components(a, b; check_constants)
+    ar, br = value(real(a)), value(real(b))
+    ai, bi = value(imag(a)), value(imag(b))
+    real_numeric = ar isa Number && br isa Number
+    imag_numeric = ai isa Number && bi isa Number
+    return if real_numeric && imag_numeric
+        error("Equation $a ~ $b does not contain any symbols")
+    elseif real_numeric
+        check_constants && !numeric_parts_equal(ar, br) &&
+            throw(ArgumentError("Unequal numeric real parts in equation: $(part_to_show(ar)) and $(part_to_show(br))"))
+        ai ~ bi
+    elseif imag_numeric
+        check_constants && !numeric_parts_equal(ai, bi) &&
+            throw(ArgumentError("Unequal numeric imaginary parts in equation: $(part_to_show(ai)) and $(part_to_show(bi))"))
+        ar ~ br
+    else
+        (ar ~ br, ai ~ bi)
+    end
+end
+
+"""
+    split_complex_equation(lhs, rhs)
+
+Equate the real and imaginary parts of scalar `lhs` and `rhs`. When both component
+equations contain symbols, return a [`SplitComplexEquation`](@ref) that also
+stores the original equation.
+
+When one component equation is purely numeric, return the symbolic
+[`Equation`](@ref) if the numeric parts are equal, counting two `NaN`s as
+equal. Unequal numeric parts raise an `ArgumentError`. Throws an error when
+neither side contains symbols.
+
+Pass numbers, wrapped symbolic expressions such as `Num` and `Complex{Num}`,
+or the unwrapped symbolic expressions that an [`Equation`](@ref) stores.
+For a `Complex{Num}` operand, components whose symbolic types are broader than
+`Real` are projected with `real` in both the stored original and the component
+equations.
+`split_complex_equation(eq)` splits an existing `Equation` `eq` directly.
+Array operands raise an `ArgumentError`.
+
+# Examples
+
+```jldoctest
+julia> using Symbolics
+
+julia> @variables x y;
+
+julia> eqs = split_complex_equation(x + im * y, 1 + 2im)
+2-element SplitComplexEquation:
+ x ~ 1
+ y ~ 2
+
+julia> eqs isa SplitComplexEquation
+true
+
+julia> split_complex_equation(x, 1 + 0im)
+x ~ 1
+
+julia> split_complex_equation(Equation(x + im * y, 1 + 2im)) isa SplitComplexEquation
+true
+```
+"""
+function split_complex_equation(a::Union{Number, BasicSymbolic, AbstractArray}, b::Union{Number, BasicSymbolic, AbstractArray})
+    a, b = unwrap(a), unwrap(b)
+    if a isa AbstractArray || b isa AbstractArray || isarraysymbolic(a) || isarraysymbolic(b)
+        throw(ArgumentError("split_complex_equation requires scalar operands"))
+    end
+    parts = complex_equation_components(a, b; check_constants = true)
+    return parts isa Tuple ? SplitComplexEquation(parts..., Equation(a, b)) : parts
+end
+
+split_complex_equation(eq::Equation) = split_complex_equation(eq.lhs, eq.rhs)
+
+"""
 $(TYPEDSIGNATURES)
 
 Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
 `Num` and a `Number`.
+
+When either side is complex-valued and both the real and imaginary parts
+contain symbols, `~` returns a `Vector{Equation}` holding the real-part and
+imaginary-part equations. Use [`split_complex_equation`](@ref) to get a
+[`SplitComplexEquation`](@ref) with the original equation.
 
 # Examples
 
@@ -85,18 +218,9 @@ function Base.:~(lhs, rhs)
 end
 for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
     (T != :Complex && S != :Complex) && continue
-    @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
-                                      ai = value(imag(a)), bi = value(imag(b))
-        if ar isa Number && br isa Number && ai isa Number && bi isa Number
-            error("Equation $a ~ $b does not contain any symbols")
-        elseif ar isa Number && br isa Number
-            ai ~ bi
-        elseif ai isa Number && bi isa Number
-            ar ~ br
-        else
-            [ar ~ br
-            ai ~ bi]
-        end
+    @eval function Base.:~(a::$T, b::$S)
+        parts = complex_equation_components(a, b; check_constants = false)
+        return parts isa Tuple ? Equation[parts...] : parts
     end
 end
 

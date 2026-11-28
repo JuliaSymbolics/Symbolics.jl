@@ -10,10 +10,31 @@ function wrapper_type(::Type{Complex{T}}) where T
     Symbolics.has_symwrapper(T) ? Complex{wrapper_type(T)} : Complex{T}
 end
 
+const BuiltinComplexInteger = Union{
+    Bool, Int8, Int16, Int32, Int64, Int128, UInt8, UInt16, UInt32, UInt64, UInt128, BigInt,
+}
+const BuiltinComplexComponent = Union{
+    BuiltinComplexInteger, Rational{<:BuiltinComplexInteger}, Float16, Float32, Float64, BigFloat,
+}
+
+# Cross-type equality for a custom Real may promote both values and hide rounding.
+exact_complex(r::Real, i::Real) = Complex{typejoin(typeof(r), typeof(i))}(r, i)
+
+function exact_complex(r::BuiltinComplexComponent, i::BuiltinComplexComponent)
+    T = promote_type(typeof(r), typeof(i))
+    z = try
+        Complex{T}(r, i)
+    catch err
+        err isa InexactError || rethrow()
+        return Complex{Real}(r, i)
+    end
+    return isequal(real(z), r) && isequal(imag(z), i) ? z : Complex{Real}(r, i)
+end
+
 function SymbolicUtils.unwrap(a::Complex{<:Num})
-    re, img = unwrap(real(a)), unwrap(imag(a))
+    re, img = real(unwrap(real(a))), real(unwrap(imag(a)))
     if SymbolicUtils.isconst(re) && SymbolicUtils.isconst(img)
-        return Const{VartypeT}(complex(unwrap_const(re), unwrap_const(img)))
+        return Const{VartypeT}(exact_complex(unwrap_const(re), unwrap_const(img)))
     end
     if iscall(re) && operation(re) === real && iscall(img) && operation(img) === imag && isequal(arguments(re)[1], arguments(img)[1])
         return arguments(re)[1]

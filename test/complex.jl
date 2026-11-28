@@ -51,6 +51,237 @@ end
     @test !hasname(x + y)
 end
 
+@testset "complex ~ still returns a plain Vector{Equation}" begin
+    @variables x y n::Number
+    p = x + im * y ~ 1 + 2im
+    @test p isa Vector{Equation}
+    @test isequal(p, Equation[x ~ 1, y ~ 2])
+    push!(p, x ~ 3)
+    @test length(p) == 3
+    p[1] = y ~ 4
+    @test isequal(p[1], y ~ 4)
+    @test (complex(Num(n), y) ~ 0) == Equation[Num(n) ~ 0, y ~ 0]
+    @test (0 ~ complex(Num(n), y)) == Equation[0 ~ Num(n), 0 ~ y]
+end
+
+@testset "split_complex_equation with Number-typed symbols" begin
+    @variables n::Number x y
+    original = Equation(n, x + im * y)
+    wrapped = split_complex_equation(Num(n), x + im * y)
+    unwrapped = split_complex_equation(original.lhs, original.rhs)
+    from_equation = split_complex_equation(original)
+    values = Dict{Any, Number}(unwrap(n) => 1 + 2im, unwrap(x) => 1, unwrap(y) => 2)
+
+    for p in (wrapped, unwrapped, from_equation)
+        @test p == Equation[real(original.lhs) ~ x, imag(original.lhs) ~ y]
+        @test p.original == original
+    end
+    for eq in (original, wrapped..., unwrapped..., from_equation...)
+        @test unwrap_const(substitute(eq.lhs, values; fold = Val(true))) ==
+            unwrap_const(substitute(eq.rhs, values; fold = Val(true)))
+    end
+end
+
+@testset "split_complex_equation with Number-typed complex components" begin
+    @variables n::Number y
+    z = complex(Num(n), y)
+    target = 1 + 2im
+    p = split_complex_equation(z, target)
+    for fold in (Val(true), Val(false))
+        @testset "partial substitution with $fold" begin
+            partial = substitute(p.original.lhs, Dict(unwrap(y) => 2); fold)
+            @test unwrap_const(substitute(partial, Dict(unwrap(n) => 1); fold = Val(true))) === target
+            @test unwrap_const(substitute(partial, Dict(unwrap(n) => 1 + 3im); fold = Val(true))) === target
+        end
+    end
+
+    projected_n = real(unwrap(n))
+    for (lhs, rhs, expected) in (
+            (z, 0, Equation[projected_n ~ 0, y ~ 0]),
+            (0, z, Equation[0 ~ projected_n, 0 ~ y]),
+            (z, target, Equation[projected_n ~ 1, y ~ 2]),
+            (complex(y, Num(n)), 2 + im, Equation[y ~ 2, projected_n ~ 1]),
+        )
+        @testset "$lhs ~ $rhs" begin
+            p = split_complex_equation(lhs, rhs)
+            @test p == expected
+            @test split_complex_equation(p.original) == p
+            for n_value in (1, 2, 1 + 3im)
+                values = Dict(unwrap(n) => n_value, unwrap(y) => 2)
+                evaluate(expr) = unwrap_const(substitute(expr, values; fold = Val(true)))
+                a, b = evaluate(p.original.lhs), evaluate(p.original.rhs)
+                @test (evaluate(p.real_eq.lhs), evaluate(p.real_eq.rhs)) == (real(a), real(b))
+                @test (evaluate(p.imag_eq.lhs), evaluate(p.imag_eq.rhs)) == (imag(a), imag(b))
+            end
+        end
+    end
+end
+
+@testset "split_complex_equation requires scalar operands" begin
+    @variables A[1:2] B[1:2] (Z::Complex)[1:2] (W::Complex)[1:3]
+    for (lhs, rhs, eq) in ((A, B, A ~ B), (Z, W, Equation(Z, W)))
+        @test_throws ArgumentError split_complex_equation(lhs, rhs)
+        @test_throws ArgumentError split_complex_equation(eq.lhs, eq.rhs)
+        @test_throws ArgumentError split_complex_equation(eq)
+    end
+    @test_throws ArgumentError split_complex_equation([1, 2], 0)
+end
+
+@testset "split_complex_equation returns a SplitComplexEquation" begin
+    @variables t x y
+    @variables ψ(..) w::Complex
+    Dx = Differential(t)
+
+    p_num = split_complex_equation(x + im * y, 1 + 2im)
+    p_sym = split_complex_equation(im, x + y * im)
+    p_dep = split_complex_equation(Dx(ψ(t, 1)), im * ψ(t, 1))
+    p_z = split_complex_equation(z, w)
+    for p in (p_num, p_sym, p_dep, p_z)
+        @test p isa SplitComplexEquation
+        @test p isa AbstractVector{Equation}
+        @test length(p) == 2
+        @test size(p) == (2,)
+        @test eltype(p) == Equation
+        @test p[1] isa Equation && p[2] isa Equation
+        @test p[1] == p.real_eq && p[2] == p.imag_eq
+        @test p.original isa Equation
+    end
+    @test isequal(p_num, Equation[x ~ 1, y ~ 2])
+    @test isequal(p_sym, Equation[0 ~ x, 1 ~ y])
+    @test isequal(p_dep, Equation[Dx(ψ(t, 1)) ~ 0, 0 ~ ψ(t, 1)])
+    @test isequal(p_z, Equation[real(z) ~ real(w), imag(z) ~ imag(w)])
+    @test p_dep.original == Equation(Dx(ψ(t, 1)), im * ψ(t, 1))
+    @test p_num.original == Equation(x + im * y, 1 + 2im)
+
+    # the marked pair holds the same equations as ~
+    for (a, b) in ((x + im * y, 1 + 2im), (im, x + y * im), (Dx(ψ(t, 1)), im * ψ(t, 1)), (z, w))
+        @test isequal(collect(split_complex_equation(a, b)), a ~ b)
+    end
+
+    # unwrapped sides and an Equation argument split like the wrapped sides
+    for p in (p_num, p_sym, p_dep, p_z)
+        @test isequal(split_complex_equation(p.original.lhs, p.original.rhs), p)
+        @test isequal(split_complex_equation(p.original), p)
+    end
+    @test isequal(split_complex_equation(x ~ y), x ~ y)
+
+    @test [e for e in p_dep] == [p_dep[1], p_dep[2]]
+    @test collect(p_dep) isa Vector{Equation}
+    @test p_dep[end] == p_dep[2]
+    @test p_dep[1:2] isa Vector{Equation}
+    @test p_dep[1:2] == [p_dep[1], p_dep[2]]
+    @test_throws BoundsError p_dep[0]
+    @test_throws BoundsError p_dep[3]
+    @test first(p_dep) == p_dep[1]
+    @test last(p_dep) == p_dep[2]
+    @test isequal(map(eq -> eq.lhs, p_dep), [p_dep[1].lhs, p_dep[2].lhs])
+    @test isequal(Symbolics.lhss(p_dep), [p_dep[1].lhs, p_dep[2].lhs])
+    @test vcat(p_dep) isa Vector{Equation}
+    @test vcat(p_dep) == [p_dep[1], p_dep[2]]
+    @test vcat(p_dep, x ~ y) isa Vector{Equation}
+    @test length(vcat(p_dep, x ~ y)) == 3
+    @test reduce(vcat, [p_dep, p_sym]) isa Vector{Equation}
+    @test reduce(vcat, [p_dep, p_sym]) == [p_dep[1], p_dep[2], p_sym[1], p_sym[2]]
+    @test p_dep == collect(p_dep)
+    @test isequal(p_dep, collect(p_dep))
+    @test hash(p_dep) == hash(collect(p_dep))
+
+    # copy keeps the marked pair; equality ignores .original
+    @test copy(p_dep) isa SplitComplexEquation
+    @test copy(p_dep) == p_dep
+    @test p_dep == SplitComplexEquation(p_dep.real_eq, p_dep.imag_eq, x ~ y)
+    @test hash(p_dep) == hash(SplitComplexEquation(p_dep.real_eq, p_dep.imag_eq, x ~ y))
+
+    @test_throws MethodError push!(p_dep, x ~ 3)
+    @test !((Dx(ψ(t, 1)) ~ im * ψ(t, 1)) isa SplitComplexEquation)
+
+    @test split_complex_equation(x, 1 + 0im) == (x ~ 1)
+    @test split_complex_equation(1 + 0im, x) == (1 ~ x)
+    @test split_complex_equation(im * x, 2im) == (x ~ 2)
+    @test split_complex_equation(2im, im * x) == (2 ~ x)
+    @test isequal(split_complex_equation(x, y), x ~ y)
+    @test_throws ErrorException split_complex_equation(1 + 2im, 3im)
+end
+
+@testset "split_complex_equation rejects unequal numeric parts" begin
+    @variables x
+    for (side, candidate) in ((x, 1), (im * x, 2))
+        for (lhs, rhs) in ((side, 1 + 2im), (1 + 2im, side))
+            values = Dict(x => candidate)
+            @test unwrap_const(unwrap(substitute(lhs, values))) !=
+                unwrap_const(unwrap(substitute(rhs, values)))
+            @test_throws ArgumentError split_complex_equation(lhs, rhs)
+        end
+    end
+end
+
+struct HalfIntegerComponent <: Real
+    twice::Int64
+end
+Base.:(==)(a::HalfIntegerComponent, b::HalfIntegerComponent) = a.twice == b.twice
+Base.signbit(a::HalfIntegerComponent) = signbit(a.twice)
+Base.hash(a::HalfIntegerComponent, h::UInt) = hash(a.twice // 2, h)
+Base.convert(::Type{Float64}, a::HalfIntegerComponent) = a.twice / 2
+Base.promote_rule(::Type{HalfIntegerComponent}, ::Type{Float64}) = Float64
+
+@testset "split_complex_equation preserves exact numeric components" begin
+    @variables x y
+    h = Int64(2)^53 + 1
+    lhs = complex(Num(h), Num(0.5))
+    @test_throws ArgumentError split_complex_equation(lhs, complex(Num(h - 1), y))
+    @test split_complex_equation(lhs, complex(Num(h), y)) == (0.5 ~ y)
+
+    rhs = complex(x, y)
+    for (r, i) in ((h, 0.5), (0.5, h), (-1, typemax(UInt64)))
+        a = complex(Num(r), Num(i))
+        eq = Equation(a, rhs)
+        stored = unwrap_const(eq.lhs)
+        @test isequal((real(stored), imag(stored)), (r, i))
+        for p in (split_complex_equation(a, rhs), split_complex_equation(eq))
+            @test p == Equation[r ~ x, i ~ y]
+            @test p.original == eq
+            @test split_complex_equation(p.original) == p
+        end
+    end
+    @test unwrap_const(unwrap(complex(Num(1), Num(0.5)))) === 1.0 + 0.5im
+
+    exact = HalfIntegerComponent(2h - 1)
+    rounded = HalfIntegerComponent(2h - 2)
+    a = complex(Num(exact), Num(0.5))
+    @test real(unwrap_const(Equation(a, rhs).lhs)) === exact
+    @test_throws ArgumentError split_complex_equation(a, complex(Num(rounded), y))
+end
+
+@testset "split_complex_equation equal and unequal numeric parts" begin
+    @variables t x
+    @variables ψ(..)
+    # equal NaN parts are accepted, matching ~
+    @test split_complex_equation(NaN + im * x, NaN + 2im) == (x ~ 2.0)
+    @test split_complex_equation(x + NaN * im, 2 + NaN * im) == (x ~ 2.0)
+    @test split_complex_equation(-0.0 + im * x, 0.0 + 2im) == (x ~ 2.0)
+    @test isequal(split_complex_equation(NaN + im * x, NaN + 2im), (NaN + im * x) ~ (NaN + 2im))
+    # a NaN against a number stays unequal
+    @test_throws ArgumentError split_complex_equation(NaN + im * x, 1 + 2im)
+    @test_throws ArgumentError split_complex_equation(x + NaN * im, 2 + 1im)
+    # Bool parts of a Complex{Bool} are reported as numbers
+    err = try
+        split_complex_equation(ψ(t, 0), im)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test err.msg == "Unequal numeric imaginary parts in equation: 0 and 1"
+    err = try
+        split_complex_equation(im, 1 + x * im)
+        nothing
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test err.msg == "Unequal numeric real parts in equation: 0 and 1"
+end
+
 @testset "power and division inference" begin
     @test @inferred(a^2) isa Num
     @test @inferred(a^(1 // 2)) isa Num
