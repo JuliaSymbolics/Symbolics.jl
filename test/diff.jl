@@ -633,6 +633,17 @@ let
     @test !iszero(Symbolics.simplify(only(Symbolics.hessian(expr, [x]))))
 end
 
+@testset "Indexed array derivatives" begin
+    @variables c::Bool a b i::Int
+    for op in (ifelse, Symbolics.ifelse_eager, Symbolics.ifelse_branching)
+        @test isequal(Symbolics.derivative(op(c, [a^2, b], [b, a])[1], a), op(c, 2a, 0))
+    end
+    der = Symbolics.derivative(Arr([a^2, a * b])[i], a)
+    @test isequal(substitute(der, Dict(i => 1); fold = Val(true)), 2a)
+    @test isequal(substitute(der, Dict(i => 2); fold = Val(true)), b)
+    @test iszero(Symbolics.derivative(Arr([a, b])[i], i))
+end
+
 @testset "`throw_no_derivative`" begin
     @variables t x(t) y::Bool z(..)
     D = Differential(t)
