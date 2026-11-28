@@ -393,6 +393,13 @@ end
     @test Set(terms(-x - y + z)) == Set([-x, -y, z])
 end
 
+struct OrderOnlyReal <: Real
+    v::Int
+end
+Base.isless(a::OrderOnlyReal, b::OrderOnlyReal) = isless(a.v, b.v)
+Base.isequal(a::OrderOnlyReal, b::OrderOnlyReal) = isequal(a.v, b.v)
+Base.hash(a::OrderOnlyReal, h::UInt) = hash(a.v, hash(:OrderOnlyReal, h))
+
 @testset "evaluate" begin
     @variables x y
     eqn_1 = x ~ y 
@@ -410,6 +417,27 @@ end
         subs = Dict(x => val, y => val)
         @test Symbolics.evaluate(gtr, subs)
         @test Symbolics.evaluate(ltr, subs)
+    end
+
+    # A `Real` that only implements the ordering interface.
+    lo, hi = OrderOnlyReal(1), OrderOnlyReal(2)
+    @test Symbolics.evaluate(ltr, Dict(x => lo, y => lo))
+    @test Symbolics.evaluate(gtr, Dict(x => lo, y => lo))
+    @test Symbolics.evaluate(ltr, Dict(x => lo, y => hi))
+    @test Symbolics.evaluate(gtr, Dict(x => hi, y => lo))
+    @test !Symbolics.evaluate(ltr, Dict(x => hi, y => lo))
+    @test !Symbolics.evaluate(gtr, Dict(x => lo, y => hi))
+
+    # Built-in floats keep `<=`: NaN is unordered and signed zeros are equal.
+    for (a, b) in ((NaN, 1.0), (1.0, NaN), (NaN, NaN))
+        subs = Dict(x => a, y => b)
+        @test !Symbolics.evaluate(ltr, subs)
+        @test !Symbolics.evaluate(gtr, subs)
+    end
+    for (a, b) in ((-0.0, 0.0), (0.0, -0.0))
+        subs = Dict(x => a, y => b)
+        @test Symbolics.evaluate(ltr, subs)
+        @test Symbolics.evaluate(gtr, subs)
     end
 end
 
