@@ -215,6 +215,43 @@ end
     end
 end
 
+struct HalfIntegerComponent <: Real
+    twice::Int64
+end
+Base.:(==)(a::HalfIntegerComponent, b::HalfIntegerComponent) = a.twice == b.twice
+Base.signbit(a::HalfIntegerComponent) = signbit(a.twice)
+Base.hash(a::HalfIntegerComponent, h::UInt) = hash(a.twice // 2, h)
+Base.convert(::Type{Float64}, a::HalfIntegerComponent) = a.twice / 2
+Base.promote_rule(::Type{HalfIntegerComponent}, ::Type{Float64}) = Float64
+
+@testset "split_complex_equation preserves exact numeric components" begin
+    @variables x y
+    h = Int64(2)^53 + 1
+    lhs = complex(Num(h), Num(0.5))
+    @test_throws ArgumentError split_complex_equation(lhs, complex(Num(h - 1), y))
+    @test split_complex_equation(lhs, complex(Num(h), y)) == (0.5 ~ y)
+
+    rhs = complex(x, y)
+    for (r, i) in ((h, 0.5), (0.5, h), (-1, typemax(UInt64)))
+        a = complex(Num(r), Num(i))
+        eq = Equation(a, rhs)
+        stored = unwrap_const(eq.lhs)
+        @test isequal((real(stored), imag(stored)), (r, i))
+        for p in (split_complex_equation(a, rhs), split_complex_equation(eq))
+            @test p == Equation[r ~ x, i ~ y]
+            @test p.original == eq
+            @test split_complex_equation(p.original) == p
+        end
+    end
+    @test unwrap_const(unwrap(complex(Num(1), Num(0.5)))) === 1.0 + 0.5im
+
+    exact = HalfIntegerComponent(2h - 1)
+    rounded = HalfIntegerComponent(2h - 2)
+    a = complex(Num(exact), Num(0.5))
+    @test real(unwrap_const(Equation(a, rhs).lhs)) === exact
+    @test_throws ArgumentError split_complex_equation(a, complex(Num(rounded), y))
+end
+
 @testset "split_complex_equation equal and unequal numeric parts" begin
     @variables t x
     @variables ψ(..)
