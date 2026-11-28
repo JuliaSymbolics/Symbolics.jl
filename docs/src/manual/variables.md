@@ -28,6 +28,8 @@ Base.:~(::Num, ::Num)
 Symbolics.Inequality
 Symbolics.:≲
 Symbolics.:≳
+Symbolics.leq
+Symbolics.geq
 Symbolics.value
 ```
 
