@@ -11,8 +11,9 @@ and easily understandable to all Julia programmers.
 
 ## Functionality Inherited From SymbolicUtils.jl
 
-The [`substitute`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.substitute)
-and [`simplify`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.simplify)
+The [`substitute`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.substitute),
+[`simplify`](https://symbolicutils.juliasymbolics.org/api/#SymbolicUtils.simplify),
+and [`expand`](https://docs.sciml.ai/SymbolicUtils/stable/api/#SymbolicUtils.expand)
 functions are provided by SymbolicUtils and reexported by Symbolics.
 Documentation for `rewriter` can be found [here](https://docs.sciml.ai/SymbolicUtils/stable/manual/rewrite/#Rule-based-rewriting), using the `@rule` macro or the `@acrule` macro from SymbolicUtils.jl.
 
