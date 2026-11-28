@@ -551,6 +551,8 @@ function nzmap(f, x::Union{Base.ReshapedArray, LinearAlgebra.Transpose})
     Setfield.@set x.parent = nzmap(f, x.parent)
 end
 
+nzmap(f, x::LinearAlgebra.Adjoint{<:Any, <:AbstractSparseArray}) = nzmap(f, sparse(x))
+
 function nzmap(f, x::SubArray)
     unview = copy(x)
     if unview isa Union{SparseMatrixCSC, SparseVector}
@@ -686,10 +688,10 @@ end
 
 function _set_array(out, outputidxs, rhss::AbstractArray, checkbounds, skipzeros)
     if parent(rhss) !== rhss
-        # Sparse parents are written through `out.nzval`. Any other wrapper (e.g.
-        # `Transpose`) may index differently from its parent, so densify it.
         if _issparse(rhss)
-            return _set_array(out, outputidxs, parent(rhss), checkbounds, skipzeros)
+            nz = findnz(sparse(rhss))
+            indices = CartesianIndex.(nz[1:(end - 1)]...)
+            return _set_array(out, indices, nz[end], checkbounds, skipzeros)
         end
         rhss = collect(rhss)
     end
