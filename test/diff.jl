@@ -5,6 +5,58 @@ using LinearAlgebra, SparseArrays
 using Symbolics: value, unwrap, scalarize, Arr
 using SymbolicUtils: unwrap_const
 
+pos(s, v) = s
+@register_symbolic pos(s, v)
+@register_derivative pos(s, v) 1 Symbolics.SConst(1)
+@register_derivative pos(s, v) 2 Symbolics.SConst(0)
+arrfun(w::AbstractVector) = sum(w)
+@register_symbolic arrfun(w::AbstractVector)
+
+@variables time
+@testset "Total derivative hook" begin
+    @variables s v
+    Dt = Differential(time)
+    expr = Dt(sin(pos(s, v)))
+    @test iszero(expand_derivatives(expr))
+    @eval function Symbolics.total_derivative(::typeof(pos), args, D)
+        isequal(D.x, unwrap(time)) || return nothing
+        return args[2]
+    end
+    @test isequal(expand_derivatives(Dt(pos(s, v))), v)
+    @test isequal(expand_derivatives(expr), cos(pos(s, v)) * v)
+    @test isequal(Symbolics.jacobian([pos(s, v)], [time]), reshape([v], 1, 1))
+    @test isequal(Symbolics.jacobian([pos(s, v)], [s, v]), [1 0])
+    @test isequal(Matrix(Symbolics.sparsejacobian([pos(s, v)], [time, s])), Symbolics.jacobian([pos(s, v)], [time, s]))
+    @variables w[1:2]
+    @test isequal(Symbolics.jacobian([arrfun(w), pos(s, v)], [time]), reshape([0, v], 2, 1))
+end
+
+delayed_hook(x) = x
+@register_symbolic delayed_hook(x)
+
+@testset "Total derivative hook across world ages in one task" begin
+    @variables x
+    expr = Differential(time)(sin(delayed_hook(x)))
+    start = Channel{Nothing}(0)
+    task = @async begin
+        take!(start)
+        old_result = expand_derivatives(expr)
+        latest_result = Base.invokelatest(expand_derivatives, expr)
+        old_result, latest_result
+    end
+    yield()
+
+    @eval function Symbolics.total_derivative(::typeof(delayed_hook), args, D)
+        isequal(D.x, unwrap(time)) || return nothing
+        return args[1]
+    end
+
+    put!(start, nothing)
+    old_result, latest_result = fetch(task)
+    @test iszero(old_result)
+    @test isequal(latest_result, cos(delayed_hook(x)) * x)
+end
+
 # Derivatives
 @variables t σ ρ β
 @variables x y z
