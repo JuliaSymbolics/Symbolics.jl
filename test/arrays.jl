@@ -684,6 +684,49 @@ end
     @test build_function(x in 1:3, x; expression = Val{false})(2) === true
 end
 
+@testset "Issue#1955: `collect` of empty `Arr` retains eltype" begin
+    @variables X[1:0, 1:10] Y[1:0]
+    cx = collect(X)
+    @test cx isa Matrix{Num}
+    @test eltype(cx) === Num
+    @test size(cx) == (0, 10)
+    cy = collect(Y)
+    @test cy isa Vector{Num}
+    @test eltype(cy) === Num
+    @test size(cy) == (0,)
+    @variables Z[1:2, 1:3]
+    cz = collect(Z)
+    @test cz isa Matrix{Num}
+    @test isequal(cz, Num[Z[1, 1] Z[1, 2] Z[1, 3]; Z[2, 1] Z[2, 2] Z[2, 3]])
+    @test isequal(@inferred(collect(Z)), Num[Z[1, 1] Z[1, 2] Z[1, 3]; Z[2, 1] Z[2, 2] Z[2, 3]])
+    @test (@inferred(collect(X)) isa Matrix{Num})
+    @variables cv[1:2]::Complex ce[1:0]::Complex
+    ccv = collect(cv)
+    @test ccv isa Vector{Complex{Num}}
+    @test eltype(ccv) === Complex{Num}
+    cce = collect(ce)
+    @test cce isa Vector{Complex{Num}}
+    @test eltype(cce) === Complex{Num}
+    @test size(cce) == (0,)
+    @variables s[1:2]::String se[1:0]::String
+    cs = collect(s)
+    @test cs isa AbstractVector
+    @test size(cs) == (2,)
+    @test isequal(cs, [s[1], s[2]])
+    cse = collect(se)
+    @test cse isa AbstractVector
+    @test size(cse) == (0,)
+    @variables y[1:3] z[1:3]
+    @test collect(y .=> z) isa Vector{<:Pair}
+    @test collect(y .~ z) isa Vector{Equation}
+    @test Dict(collect(y .=> z)) isa Dict
+    z0 = Arr(fill(3.0))
+    zc = collect(z0)
+    @test zc isa Arr{Num, 0}
+    @test size(zc) == ()
+    @test isequal(zc[], 3.0)
+end
+
 @testset "Issue#1975: `dims` reductions do not mutate their argument's shape" begin
     @variables A[1:5, 1:4] W[1:3, 1:4, 1:5]
     reductions = [
