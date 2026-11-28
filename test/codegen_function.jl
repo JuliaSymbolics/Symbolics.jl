@@ -5,6 +5,7 @@ using SymbolicUtils: unwrap
 using SparseArrays
 using LinearAlgebra
 using RuntimeGeneratedFunctions
+using ForwardDiff
 
 RuntimeGeneratedFunctions.init(@__MODULE__)
 
@@ -507,4 +508,34 @@ end
         @test !occursin("literal_pow", string(oop))
         @test @invokelatest(eval(oop)([2])) == 8
     end
+end
+
+@testset "`optimize` rule that returns one array node" begin
+    @variables x[1:3]
+    sx = unwrap(x)
+    xs = unwrap.(collect(x))
+    u = [1.0, 2.0, 3.0]
+    function rule_functions(exprs, node, args; kw...)
+        ir = IRStructure{SymReal}()
+        foreach(e -> SymbolicUtils.populate_ir!(ir, e), [exprs; node])
+        detector(ir, expr) = expr isa AbstractVector ? true : nothing
+        rule = Code.OptimizationRule("node", detector, (ir, expr, _) -> (ir, node), 1)
+        return eval.(Symbolics.codegen_function(ir, exprs, args; optimize = [rule], kw...))
+    end
+    function rule_output(exprs, node, args, out; kw...)
+        _, iip = rule_functions(exprs, node, args; kw...)
+        @invokelatest iip(out, u)
+        return out
+    end
+    maker = SymbolicUtils.ArrayMaker{SymReal}([[1:3]], [Symbolics.SConst(sin.(xs))]; shape = SymbolicUtils.ShapeVecT((1:3,)))
+
+    @test rule_output(sin.(xs), maker, [xs], fill(NaN, 3)) == sin.(u)
+    @test rule_output(xs .+ 2, SymbolicUtils.@arrayop((i,), sx[i] + 2), [sx], zeros(3)) == u .+ 2
+    @test rule_output(sin.(xs), maker, [xs], fill(100.0, 5); outputidxs = [5, 1, 3]) == [sin(u[2]), 100.0, sin(u[3]), 100.0, sin(u[1])]
+    @test rule_output([sin(xs[1]), 0 * xs[2], sin(xs[3])], maker, [xs], fill(100.0, 3); skipzeros = true) == [sin(u[1]), 100.0, sin(u[3])]
+    @test rule_output(sin.(xs), cos.(xs), [xs], fill(100.0, 3); outputidxs = [3, 2, 1]) == reverse(cos.(u))
+
+    oop, iip = rule_functions(sin.(xs), maker, [xs])
+    @test @invokelatest(oop(u)) == sin.(u)
+    @test ForwardDiff.jacobian((y, v) -> @invokelatest(iip(y, v)), zeros(3), u) == Diagonal(cos.(u))
 end

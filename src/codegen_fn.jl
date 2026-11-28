@@ -226,8 +226,12 @@ function codegen_function(
     rewrites[Code.USE_LITERAL_POW_KEY] = use_literal_pow
 
     expr = _recursive_unwrap(expr)
+    scalar_expr = expr
 
     ir, expr = Code.apply_optimization_rules(ir, expr, optimize)
+    if expr isa SymbolicT && outputidxs === nothing && !skipzeros
+        return codegen_function(ir, expr, args, Setfield.@set opts.optimize = nothing)
+    end
 
     i = findfirst(x -> x isa DestructuredArgs, args)
     if similarto === nothing
@@ -255,7 +259,7 @@ function codegen_function(
                     args,
                     IIP_OUTSYM,
                     outputidxs,
-                    expr,
+                    expr isa SymbolicT ? scalar_expr : expr,
                     checkbounds,
                     skipzeros
                 )
