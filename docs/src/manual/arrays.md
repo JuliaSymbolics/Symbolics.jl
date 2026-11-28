@@ -209,6 +209,15 @@ In general, any scalar expression which is derived from array expressions can be
 Symbolics.scalarize(sum(A[:,1]) + sum(A[2,:]))
 ```
 
+## Solving `A * x = b` with arrays of symbolics
+
+For a Julia `Matrix{Num}` (arrays of scalar symbolics after `scalarize`), `A \ b`
+uses soft-pivoted LU. That can produce deeply nested fractions and `NaN` after
+substitution when a chosen pivot is numerically zero. Prefer `inv(A) * b` or
+Cramer's rule via `det` when you need a closed form valid for every nonsingular
+numeric specialization (Laplace cost grows factorially with `n`; practical for
+small systems — see [the FAQ on `A \ b`](@ref faq_symbolic_backslash)).
+
 ## Array API Reference
 
 ```@docs
