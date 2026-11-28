@@ -13,13 +13,18 @@ end
 function SymbolicUtils.unwrap(a::Complex{<:Num})
     re, img = unwrap(real(a)), unwrap(imag(a))
     if SymbolicUtils.isconst(re) && SymbolicUtils.isconst(img)
-        return Const{VartypeT}(complex(unwrap_const(re), unwrap_const(img)))
+        re_c, img_c = unwrap_const(re), unwrap_const(img)
+        if re_c isa Real && img_c isa Real
+            return Const{VartypeT}(complex(re_c, img_c))
+        end
+        return Const{VartypeT}(re_c + im * img_c)
     end
     if iscall(re) && operation(re) === real && iscall(img) && operation(img) === imag && isequal(arguments(re)[1], arguments(img)[1])
         return arguments(re)[1]
     end
     sT = promote_type(symtype(re), symtype(img))
-    return Term{VartypeT}(complex, SymbolicUtils.ArgsT{vartype(re)}((re, img)); type = Complex{sT}, shape = SymbolicUtils.ShapeVecT())
+    type = sT <: Real ? Complex{sT} : sT
+    return Term{VartypeT}(complex, SymbolicUtils.ArgsT{vartype(re)}((re, img)); type, shape = SymbolicUtils.ShapeVecT())
 end
 
 SymbolicUtils.infer_vartype(::Type{Complex{Num}}) = VartypeT
@@ -44,6 +49,42 @@ function Base.show(io::IO, a::Complex{Num})
     show(io, real(a) + IM * imag(a))
 end
 
+# Split `x` into `(re, img)` with `x == re + im*img` and real-symtyped parts.
+# e.g. `x => im*y` substituted into `1.7x` gives `1.7*complex(0, y)` with re/im `0, 1.7y`.
+function _complex_reim(x::BasicSymbolic{VartypeT})
+    if !(symtype(x) <: Real) && iscall(x)
+        op = operation(x)
+        if op === (+) || op === (*)
+            args = arguments(x)
+            re, img = _complex_reim(args[1])
+            for i in 2:length(args)
+                are, aim = _complex_reim(args[i])
+                if op === (+)
+                    re += are
+                    img += aim
+                else
+                    re, img = re * are - img * aim, re * aim + img * are
+                end
+            end
+            return re, img
+        end
+    end
+    return real(x), imag(x)
+end
+
 function (s::SymbolicUtils.Substituter)(x::Complex{Num})
-    Complex{Num}(s(real(x)), s(imag(x)))
+    val = get(SymbolicUtils.get_substitution_dict(s), x, nothing)
+    val === nothing || return Complex{Num}(wrap(val))
+    re, img = s(real(x)), s(imag(x))
+    re isa Num && img isa Num && return Complex{Num}(re, img)
+    are, aim = _complex_reim(unwrap(re))
+    re2, im2 = _complex_reim(unwrap(img))
+    return Complex{Num}(wrap(are - im2), wrap(aim + re2))
+end
+
+function (s::SymbolicUtils.Substituter)(ex::Array{Num})
+    res = [s(x) for x in ex]
+    all(x -> x isa Num, res) && return convert(Array{Num}, res)
+    all(x -> x isa Union{Num, Complex{Num}}, res) && return convert(Array{Complex{Num}}, res)
+    return res
 end
