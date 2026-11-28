@@ -15,8 +15,10 @@ Due to it requiring such wrappers, we only fully support a limited number of typ
 These types are
 
 - Real numbers (wrapped using `Num`)
-- complex numbers (stored as `Complex{Num}` where `Complex` is from Base Julia)
-- arrays of Real and complex numbers (wrapped using `Arr`, so `Arr{Num}` or `Arr{Complex{Num}}`)
+- complex and other numbers (wrapped using [`Symbolics.SymbolicNumber`](@ref), or stored
+  explicitly in Cartesian form as `Complex{Num}` where `Complex` is from Base Julia; see
+  [Complex numbers](@ref complex_numbers))
+- arrays of these numbers (wrapped using `Arr`, so `Arr{Num}` or `Arr{SymbolicNumber}`)
 
 ## `@variables` and types
 

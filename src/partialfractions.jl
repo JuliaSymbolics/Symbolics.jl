@@ -93,7 +93,7 @@ function partial_frac_decomposition(expr, x; warns=true)
 
             # cover up method
             other_facs = filter(f -> !isequal(f, fac), facs)
-            numerator = rationalize(unwrap_const(substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root)))) # plug in root to expression without its factor in denominator
+            numerator = rationalize(value(substitute(A / prod((f -> f.expr^f.multiplicity).(other_facs)), Dict(x => fac.root)))) # plug in root to expression without its factor in denominator
             push!(result, numerator / fac.expr^fac.multiplicity)
 
             if fac.multiplicity > 1
@@ -155,29 +155,30 @@ end
 
 # for partial fractions, into linear and irreducible quadratic factors
 function factorize(expr, x; warns=true)
-    roots = symbolic_solve(expr, x, dropmultiplicity=false)
+    roots = symbolic_solve(expr, x, dropmultiplicity = false)
 
     counts = count_multiplicities(roots)
     facs = Set()
 
-    for root in keys(counts)
-        if !_iszero(imag(root))
-            fac_expr = expand((x - root)*(x - conj(root)))
-            if _iszero(real(root))
-                # workaround for purely imaginary roots
-                # otherwise, the fac_expr expansion will be real but imag(fac_expr) doesn't evaluate properly
-                fac_expr = imag(root)^2 + x^2
+    for (root, multiplicity) in counts
+        wrapped_root = wrap(root)
+        real_root, imag_root = reim(wrapped_root)
+        if !_iszero(imag_root)
+            fac_expr = if _iszero(real_root)
+                wrap(postprocess_root(unwrap(imag_root^2))) + x^2
+            else
+                expand((x - wrapped_root) * (x - conj(wrapped_root)))
             end
 
             if !_iszero(imag(fac_expr))
                 warns && @warn "Encountered issue with complex irrational roots. Returning nothing."
                 return nothing
             end
-            push!(facs, Factor(real(fac_expr), counts[root], x))
+            push!(facs, Factor(real(fac_expr), multiplicity, x))
             continue
         end
 
-        push!(facs, Factor(x - root, root, counts[root], x))
+        push!(facs, Factor(x - root, root, multiplicity, x))
     end
 
     return facs

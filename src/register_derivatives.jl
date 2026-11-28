@@ -277,6 +277,8 @@ end
     end
 end
 @register_derivative one(x) 1 COMMON_ZERO
+@register_derivative complex(x, y) 1 COMMON_ONE
+@register_derivative complex(x, y) 2 SConst(im)
 
 """
 $(SIGNATURES)

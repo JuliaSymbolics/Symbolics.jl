@@ -33,9 +33,7 @@ function ssqrt(n)
         return sqrt(n)
     end
 
-    if symtype(n) === Real
-        return term(ssqrt, n)
-    end
+    return term(ssqrt, n)
 end
 
 SymbolicUtils.promote_symtype(::typeof(ssqrt), ::Type{T}) where {T} = T
@@ -49,7 +47,7 @@ function scbrt(n)
     n = unwrap(n)
 
     if n isa Real
-    isnan(n) && return n
+        isnan(n) && return n
         return cbrt(n)
     end
 
@@ -57,9 +55,7 @@ function scbrt(n)
         return (n)^(1 / 3)
     end
 
-    if symtype(n) === Real
-        return term(scbrt, n)
-    end
+    return term(scbrt, n)
 end
 
 SymbolicUtils.promote_symtype(::typeof(scbrt), ::Type{T}) where {T} = T
@@ -170,28 +166,24 @@ function bigify(n)
     return n
 end
 
+function sdiv(x, y)
+    x, y = unwrap(x), unwrap(y)
+    if x isa BasicSymbolic || y isa BasicSymbolic
+        return x / y
+    end
+    return x // y
+end
+
 function comp_rational(x, y)
     x, y = bigify(unwrap(x)), bigify(unwrap(y))
-    if !(unwrap(x) isa AbstractFloat || x isa Complex) &&
-       !(unwrap(y) isa AbstractFloat || y isa Complex)
-        r = x // y
-        return r
+    if x isa Complex && y isa Real
+        return complex(comp_rational(real(x), y), comp_rational(imag(x), y))
+    elseif x isa AbstractFloat && y isa Union{Integer, Rational}
+        return Rational{BigInt}(x) // y
+    elseif x isa Union{Integer, Rational, BasicSymbolic} && y isa Union{Integer, Rational, BasicSymbolic}
+        return sdiv(x, y)
     end
-
-    x, y = unwrap(x), unwrap(y)
-    r = nothing
-    if x isa ComplexF64
-        real_p = real(x)
-        imag_p = imag(x)
-        r = Rational(real_p) // y
-        if !isequal(imag_p, 0)
-            r += (Rational(imag_p) // y) * im
-        end
-    elseif x isa Float64
-        r = Rational{BigInt}(x) // y
-    end
-
-    return isequal(r, nothing) ? x / y : r
+    return x / y
 end
 
 ### multivar stuff ###

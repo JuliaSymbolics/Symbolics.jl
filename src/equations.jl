@@ -51,8 +51,7 @@ rhss(xs) = map(x->x.rhs, xs)
 """
 $(TYPEDSIGNATURES)
 
-Create an [`Equation`](@ref) out of two [`Num`](@ref) instances, or an
-`Num` and a `Number`.
+Create an [`Equation`](@ref) out of two symbolic or numeric expressions.
 
 # Examples
 
@@ -81,22 +80,6 @@ function Base.:~(lhs, rhs)
         throw(ArgumentError("Cannot equate an array of different sizes. Got $sl and $sr."))
     else
         Equation(lhs, rhs)
-    end
-end
-for T in [:Num, :Complex, :Number], S in [:Num, :Complex, :Number]
-    (T != :Complex && S != :Complex) && continue
-    @eval Base.:~(a::$T, b::$S) = let ar = value(real(a)), br = value(real(b)),
-                                      ai = value(imag(a)), bi = value(imag(b))
-        if ar isa Number && br isa Number && ai isa Number && bi isa Number
-            error("Equation $a ~ $b does not contain any symbols")
-        elseif ar isa Number && br isa Number
-            ai ~ bi
-        elseif ai isa Number && bi isa Number
-            ar ~ br
-        else
-            [ar ~ br
-            ai ~ bi]
-        end
     end
 end
 

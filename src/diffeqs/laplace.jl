@@ -153,6 +153,10 @@ julia> laplace(2cos(t)*sin(t), f, t, F, s; trig_reduce=true)
 2 / (4 + s^2)
 ```
 """
+function laplace(expr::SymbolicNumber, f, t, F, s; kwargs...)
+    return wrap(laplace(unwrap(expr), f, t, F, s; kwargs...))
+end
+
 function laplace(expr, f, t, F, s; rules=nothing, trig_reduce=false)
     expr = expand(expr)
 
@@ -234,6 +238,7 @@ end
 inverse_transform_rules(F, s, f, t) = Symbolics.Chain([
     @rule 1/s => 1
     @rule 1/(~a + s) => exp(-~a * t)
+        @rule 1 / (~a - s) => -exp(~a * t)
     @rule 1/s^(~n::_is_pos_int) => t^(~n-1) / factorial(~n-1)
     @rule 1/s^(~n::_is_pos_frac) => t^(~n-1) / term(gamma, ~n)
     @rule 1/(2 * s^(3/2)) => sqrt(t)/term(sqrt, pi)
