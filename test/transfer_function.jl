@@ -6,6 +6,13 @@ using Test
 
 iszero_expr(x) = isequal(value(simplify_fractions(x)), 0)
 reference(A, B, C, D, ω) = C * ((im * ω * I - A) \ B) + D
+# numerator and denominator are evaluated apart, because folding the division would round
+function exact_value(x, vals...)
+    ux = Symbolics.unwrap(x)
+    parts = Symbolics.SymbolicUtils.isdiv(ux) ? Symbolics.arguments(ux) : (ux, 1)
+    num, den = map(p -> value(substitute(p, Dict(vals...); fold = Val(true))), parts)
+    return num // den
+end
 
 @variables s R L C T m c k
 
@@ -143,6 +150,57 @@ end
     @test_throws ArgumentError frequency_response(G, s, [1.0])
     H = frequency_response(substitute(G, Dict(T => 2)), s, [0.5])
     @test H[1] ≈ 1 / (1 + im)
+end
+
+# machine integers would wrap around in all of these
+@testset "large integer and rational constants" begin
+    p = Int32(100_000)
+    big_p = big(p)
+    for A in (diagm(fill(-p, 3)), diagm(fill(Num(-p), 3)))
+        G = transfer_function(A, [1, 1, 1], [1, 0, 0], 0, s)
+        @test frequency_response(G, s, [0.0])[1] ≈ 1.0e-5
+        @test exact_value(G[1], s => big(2)) == 1 // (big_p + 2)
+        G = transfer_function(A, [1, 1, 1], [1, 0, 0], 0, s; simplify = true)
+        @test exact_value(G[1], s => big(2)) == 1 // (big_p + 2)
+    end
+
+    q = 10_000_000
+    G = transfer_function(diagm([-q, -q, -q]), [1, 1, 1], [1, 0, 0], 0, s)
+    @test frequency_response(G, s, [0.0])[1] ≈ 1.0e-7
+    @test exact_value(G[1], s => big(0)) == 1 // big(q)
+
+    r = 1 // 100_003
+    G = transfer_function(diagm(fill(-r, 4)), [1, 1, 1, 1], [1, 0, 0, 0], 0, s)
+    @test exact_value(G[1], s => big(0)) == 100_003
+    @test frequency_response(G, s, [0.0])[1] ≈ 100_003
+
+    # constants inside symbolic entries
+    @variables a b
+    A = [-q * a b; 0 -q * a + (1 // q) * b]
+    G = transfer_function(A, [0, q * b], [q, 0], 0, s)
+    at = (s => big(3), a => big(5), b => big(7))
+    hand = big(q)^2 * 7^2 // ((3 + big(q) * 5) * (3 + big(q) * 5 - 7 // big(q)))
+    @test exact_value(G[1], at...) == hand
+
+    # multinomial coefficients above `typemax(Int64)`
+    G = transfer_function(fill((a + b)^70, 1, 1), [1], [1], 0, s)
+    @test exact_value(G[1], s => big(0), a => big(1), b => big(1)) == -1 // big(2)^70
+
+    # floating-point coefficients outside the range of `Float64`
+    @test_throws ArgumentError transfer_function(diagm(fill(-1.0e200, 2)), [1, 1], [1, 0], 0, s)
+    @test_throws ArgumentError transfer_function(diagm(fill(-1.0e-200, 2)), [1, 1], [1, 0], 0, s)
+end
+
+@testset "constants are returned as machine numbers" begin
+    G = transfer_function(fill(-2.5, 1, 1), [1], [1], 0, s)
+    at_half = value(substitute(G[1], Dict(s => 0.5); fold = Val(true)))
+    @test at_half isa Float64
+    @test at_half ≈ 1 / 3
+    G = transfer_function(zeros(0, 0), zeros(0, 1), zeros(1, 0), 1 // 3, s)
+    @test value(G[1]) === 1 // 3
+    @variables q[1:2]
+    G = transfer_function(fill(-q[1], 1, 1), [sin(2 * q[2])], [1], 0, s)
+    @test isequal(G[1], sin(2 * q[2]) / (q[1] + s))
 end
 
 @testset "sizes" begin

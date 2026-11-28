@@ -14,8 +14,12 @@ the entries of `A`, `B`, `C` and `D`. Common factors of numerator and denominato
 uncontrollable or unobservable modes, are only cancelled with `simplify = true`, which
 calls `simplify_fractions` on each entry and can be slow. The determinants are expanded
 without division, so the cost and the size of the result can grow exponentially with `nx`
-for dense symbolic `A`. As in `expand`, integer coefficients use machine integers and
-overflow silently, so give large numeric values as floating-point numbers.
+for dense symbolic `A`.
+
+Arithmetic on integer and rational constants is exact: coefficients which do not fit in an
+`Int` are returned as `BigInt`s. Floating-point constants are combined in `BigFloat` and
+rounded to `Float64` at the end; an `ArgumentError` is thrown if a coefficient overflows or
+underflows `Float64`. Constants inside other functions, such as `sin`, are left as given.
 
 Only the explicit form above is supported, not the descriptor form `Ex' = Ax + Bu`. If the
 matrices come from symbolic differentiation (as with ModelingToolkit's
@@ -53,26 +57,83 @@ function transfer_function(
     size(Dm) == (ny, nu) ||
         throw(DimensionMismatch("`D` must have size $((ny, nu)), got $(size(D))"))
 
+    # All arithmetic is done on polynomials with `BigInt`-based coefficients, because
+    # `expand` computes in machine integers, which wrap around silently.
+    atoms = Bijections.Bijection{SymbolicUtils.PolyVarT, SymbolicT}()
+    keepbig = Ref(false)
+    polynomial(x) = _polynomial!(atoms, keepbig, unwrap(x))
+
     # Row `i` of `[A B]` and of `[C D]` is multiplied by its common denominator. Then
     # `M = s*diagm(E) - A` and `G[i, j] = det([M B[:, j]; -C[i, :]' D[i, j]]) / (F[i] det(M))`.
-    E, AB = _clear_denominators(Matrix{Num}([collect(A) collect(B)]))
-    F, CD = _clear_denominators(Matrix{Num}([Cm Dm]))
-    M = Matrix{Num}([(i == j ? E[i] * s : Num(0)) - AB[i, j] for i in 1:nx, j in 1:nx])
-    detM = _expanded_det(M)
+    # converted before concatenation, which would promote rationals to floats
+    E, AB = _clear_denominators(polynomial, Matrix{Num}([Num.(collect(A)) Num.(collect(B))]))
+    F, CD = _clear_denominators(polynomial, Matrix{Num}([Num.(Cm) Num.(Dm)]))
+    sp, o = polynomial(s), polynomial(Num(0))
+    M = DP.Polynomial[(i == j ? E[i] * sp : o) - AB[i, j] for i in 1:nx, j in 1:nx]
+    detM = _determinant(M, polynomial(Num(1)))
+    narrow(p) = Num(
+        SymbolicUtils.from_poly(
+            atoms,
+            DP.Polynomial(
+                SymbolicUtils.PolyCoeffT[_narrow(c, keepbig[]) for c in MP.coefficients(p)],
+                MP.monomials(p)
+            )
+        )
+    )
     G = Matrix{Num}(undef, ny, nu)
     for i in 1:ny, j in 1:nu
-        bordered = [M AB[:, nx + j]; -permutedims(CD[i, 1:nx]) CD[i, nx + j]]
-        num = _expanded_det(Matrix{Num}(bordered))
-        G[i, j] = _iszero(num) ? Num(0) : num / expand(F[i] * detM)
+        bordered = DP.Polynomial[M AB[:, nx + j]; -permutedims(CD[i, 1:nx]) CD[i, nx + j]]
+        num = _determinant(bordered, polynomial(Num(1)))
+        den = F[i] * detM
+        # dividing a rational number by one would give a float
+        G[i, j] = iszero(num) ? Num(0) : isone(den) ? narrow(num) : narrow(num) / narrow(den)
     end
     return simplify ? map(simplify_fractions, G) : G
 end
 
-# Returns `(d, P)` with `P == d .* X` row-wise and no fractions left in `P`, so that `expand`
-# can cancel like terms in the determinants.
-function _clear_denominators(X::Matrix{Num})
-    d = fill(Num(1), size(X, 1))
-    P = similar(X)
+# `x` as a polynomial with exact coefficients for integer and rational constants, and
+# `BigFloat` ones for floats. Anything but `+`, `*` and non-negative integer powers
+# becomes a variable of its own, recorded in `atoms`.
+function _polynomial!(atoms, keepbig, x::SymbolicT)
+    if SymbolicUtils.isconst(x)
+        v = unwrap_const(x)
+        keepbig[] |= v isa BigFloat
+        c = v isa Integer ? BigInt(v) : v isa Rational ? Rational{BigInt}(v) :
+            v isa AbstractFloat ? BigFloat(v) : nothing
+        c === nothing || return MP.polynomial(c * one(SymbolicUtils.PolyVarT))
+    elseif iscall(x)
+        op, args = operation(x), arguments(x)
+        op === (+) && return sum(a -> _polynomial!(atoms, keepbig, a), args)
+        op === (*) && return prod(a -> _polynomial!(atoms, keepbig, a), args)
+        if op === (^)
+            n = unwrap_const(args[2])
+            n isa Integer && n >= 0 && return _polynomial!(atoms, keepbig, args[1])^Int(n)
+        end
+    end
+    var = SymbolicUtils.basicsymbolic_to_polyvar(Bijections.active_inv(atoms), x)
+    return MP.polynomial(big(1) * var)
+end
+
+# Coefficients that fit are converted back to machine numbers
+_fits(v) = abs(v) <= typemax(Int)
+_narrow(v::BigInt, _) = _fits(v) ? Int(v) : v
+function _narrow(v::Rational{BigInt}, keepbig)
+    isone(denominator(v)) && return _narrow(numerator(v), keepbig)
+    return _fits(numerator(v)) && _fits(denominator(v)) ? Rational{Int}(v) : v
+end
+function _narrow(v::BigFloat, keepbig)
+    keepbig && return v
+    x = Float64(v)
+    isfinite(x) && iszero(x) == iszero(v) ||
+        throw(ArgumentError("the coefficient $v cannot be represented as a `Float64`"))
+    return x
+end
+
+# Returns `(d, P)` with `P == d .* X` row-wise and no fractions left in `P`, so that like
+# terms cancel in the determinants.
+function _clear_denominators(polynomial, X::Matrix{Num})
+    d = DP.Polynomial[polynomial(Num(1)) for _ in axes(X, 1)]
+    P = Matrix{DP.Polynomial}(undef, size(X))
     for i in axes(X, 1)
         fractions = map(X[i, :]) do x
             ux = unwrap(x)
@@ -83,17 +144,16 @@ function _clear_denominators(X::Matrix{Num})
             mergewith!(max, common, den)
         end
         for (base, pow) in common
-            d[i] *= Num(base)^pow
+            d[i] *= polynomial(base)^pow
         end
         for j in axes(X, 2)
-            P[i, j] = expand(
-                sum(fractions[j]) do (num, den)
-                    for (base, pow) in common
-                        num *= Num(base)^(pow - get(den, base, 0))
-                    end
-                    num
+            P[i, j] = sum(fractions[j]) do (num, den)
+                term = polynomial(num)
+                for (base, pow) in common
+                    term *= polynomial(base)^(pow - get(den, base, 0))
                 end
-            )
+                term
+            end
         end
     end
     return d, P
@@ -102,7 +162,7 @@ end
 # A term as `(numerator, factors of the denominator => multiplicity)`
 function _fraction(t)
     den = Dict{SymbolicT, Int}()
-    isdiv(t) || return Num(t), den
+    isdiv(t) || return t, den
     num, d = arguments(t)
     for factor in (ismul(d) ? arguments(d) : [d])
         base, pow = factor, 1
@@ -115,24 +175,24 @@ function _fraction(t)
         end
         _isone(base) || (den[base] = get(den, base, 0) + pow)
     end
-    return Num(num), den
+    return num, den
 end
 
 # Division-free Laplace expansion, memoised on the set of remaining columns. Zero entries
 # are skipped, so sparse matrices stay cheap.
-function _expanded_det(M::Matrix{Num})
+function _determinant(M::Matrix{DP.Polynomial}, unit)
     n = size(M, 1)
-    memo = Dict{BitSet, Num}()
+    memo = Dict{BitSet, DP.Polynomial}()
     function minor_det(row, cols)
-        row > n && return Num(1)
+        row > n && return unit
         return get!(memo, cols) do
-            total = Num[]
+            total = zero(unit)
             for (k, j) in enumerate(cols)
-                _iszero(M[row, j]) && continue
+                iszero(M[row, j]) && continue
                 term = M[row, j] * minor_det(row + 1, setdiff(cols, j))
-                push!(total, isodd(k) ? term : -term)
+                total += isodd(k) ? term : -term
             end
-            expand(sum(total; init = Num(0)))
+            total
         end
     end
     return minor_det(1, BitSet(1:n))
@@ -147,7 +207,8 @@ for every angular frequency `ω` in `ωs`, in `ComplexF64` arithmetic. Returns a
 once with [`build_function`](@ref).
 
 `s` must be the only variable in `G`: substitute numeric values for all parameters first,
-otherwise an `ArgumentError` is thrown. At a pole on the grid the entry is not finite (it
+otherwise an `ArgumentError` is thrown. `substitute` computes with machine integers, which
+wrap around silently, so use floating-point numbers for large parameter values. At a pole on the grid the entry is not finite (it
 contains `Inf` or `NaN`). A common factor of numerator and denominator which vanishes on
 the grid also gives `NaN`.
 
