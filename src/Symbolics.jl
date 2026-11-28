@@ -210,6 +210,7 @@ include("linearity.jl")
 
 export Differential, NormalDerivative, expand_derivatives, is_derivative, @register_derivative, @derivative_rule
 export Grad, Divergence, Curl, Laplacian
+@public is_vector_operator, is_laplacian
 include("register_derivatives.jl")
 include("diff.jl")
 
