@@ -93,10 +93,12 @@ Additionally, [`@register_array_symbolic`](@ref) can be used to define array fun
 For size propagation it's required that a computation of how the sizes are computed is
 also supplied.
 
-### Defining Derivatives of Registered Functions
+### [Defining Derivatives of Registered Functions](@id defining_derivatives_of_registered_functions)
 
-In order for symbolic differentiation to work, defining [`@register_derivative`](@ref) for
-registered functions is required. For example,
+Use [`@register_derivative`](@ref) to define a symbolic derivative. A registered function can also
+supply `Symbolics.derivative(::typeof(f), args::NTuple{N, Any}, ::Val{i})` for compatibility.
+The tuple contains raw symbolic arguments. An applicable [`@register_derivative`](@ref) rule takes
+precedence. For example,
 
 ```julia
 @register_derivative min(x, y) 1 ifelse(x < y, 1, 0)
@@ -105,6 +107,24 @@ registered functions is required. For example,
 is the partial derivative of the Julia `min(x,y)` function with respect to `x`. Refer to
 the documentation of [`@register_derivative`](@ref) for an in-depth explanation of the macro
 syntax.
+
+A method-based derivative definition can be supplied like:
+
+```jldoctest
+julia> my_square(x) = x^2
+my_square (generic function with 1 method)
+
+julia> @register_symbolic my_square(x)
+
+julia> Symbolics.derivative(::typeof(my_square), args::NTuple{1, Any}, ::Val{1}) = 2 * args[1]
+
+julia> @variables x
+1-element Vector{Num}:
+ x
+
+julia> Symbolics.derivative(my_square(x), x)
+2x
+```
 
 Querying the rules defined using this method requires the use of [`@derivative_rule`](@ref).
 
